@@ -66,20 +66,28 @@ const MODE_OWNERS = {
   SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
 };
 
-const ESCAPES = "src/terminal/escapes.ts";
+const ESCAPES = "src/terminal/escapes";
 const NAMED = /^\s*import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/gm;
+
+/**
+ * NodeNext import specifiers end `.js` while the file on disk is `.ts`, so a
+ * resolved specifier never equals a path. Comparing without the extension is
+ * what makes MG20 fire at all — with it, the rule silently matched nothing.
+ */
+const bare = (p) => p.replace(/\.(m|c)?[jt]sx?$/, "");
 
 function checkModeOwnership(files, readFile) {
   const violations = [];
   for (const file of files) {
     const f = file.replaceAll("\\", "/");
-    if (f === ESCAPES) continue;
+    if (bare(f) === ESCAPES) continue;
     const src = readFile(file);
 
     NAMED.lastIndex = 0;
     let m;
     while ((m = NAMED.exec(src))) {
-      if (resolve(f, m[2]) !== ESCAPES) continue;
+      const target = resolve(f, m[2]);
+      if (target === null || bare(target) !== ESCAPES) continue;
       for (const raw of m[1].split(",")) {
         const name = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0];
         const owner = MODE_OWNERS[name];

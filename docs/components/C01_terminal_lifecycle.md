@@ -201,6 +201,10 @@ Eight trappable handlers, registered by the constructor and named individually b
 
 `SIGTSTP` re-raising is the subtle one. Handling it without re-raising means Ctrl-Z appears to do nothing; releasing without re-raising means the terminal is restored while the process keeps running.
 
+**"Release" in the `SIGTSTP` row means releasing what is `held`, not `release()` the method.** The instance goes to `suspended`, which is what `SIGCONT` re-acquires from — the method reading cannot be what was meant, because `released` is terminal (I11) and a released instance cannot be revived. Ctrl-Z is `suspend()`'s effect plus the re-raise.
+
+**Only the `SIGTSTP` handler is removed**, and only so the re-raise reaches the default disposition. Disposing the rest would take `SIGCONT` with it, and the process would come back with the terminal unrestored and nothing left registered to restore it — which is C01's whole failure mode, reached through its own stop path.
+
 **`SIGCONT` sets no flag.** C01 has no contamination concept (§2, commitment 7); it re-acquires and says so through `onResume`, and the L4 shell calls `scheduler.invalidate()` exactly as it does after an orchestrated `resume()`. An earlier draft of this row set `contaminated` here, which contradicted §2, commitment 7 and T6.7 — three places against one.
 
 ### Suspend and resume
@@ -346,7 +350,9 @@ This is **stronger** than a byte diff, not a weaker substitute for one: it survi
   **The other two exit paths are B01's.** `/exit` and Ctrl-D confirm are C22 and C16 driving `release()`, and **B01 B1.6** already asserts all five triggers against a control run. Two tests claiming the same coverage is how one of them stops being maintained, so this one is narrowed rather than duplicated. The narrowing is deliberate, not an omission.
 - **T5.2**: the pre-launch scrollback is intact after exit; the frame left no trace on the primary screen.
 - **T5.3**: a thrown exception leaves its stack readable in the PTY's primary-screen scrollback.
-- **T5.4**: `SIGTSTP` then `SIGCONT` — the terminal is usable while stopped, and the frame is repainted on resume.
+- **T5.4**: `SIGTSTP` releases the terminal fully and removes its own handler; the PTY is left matching the control run.
+
+  **The `SIGCONT` half is not testable in a PTY harness, and the reason is structural rather than a shortcut.** A PTY-spawned non-interactive shell leaves the process group orphaned, and POSIX discards a stop signal sent to an orphaned process group — so the process continues instead of stopping and there is nothing for `SIGCONT` to resume. Verified against `sh -c`, `sh -c "set -m; …"` and `bash -mc`; all three continue. Re-acquisition, handler reinstatement and the `onResume` notification are covered at tier 3 by **T3.13**, where the signal reaches the handler directly. The repaint half is C03's and belongs to T4.7.
 - **T5.5**: launching `vi` through pass-through, quitting it, and exiting Prism leaves the terminal clean. Two nested alternate-screen users, correctly unwound.
 - **T5.6**: `prism | cat` emits no escape sequence at all.
 - **T5.7**: repeated mount/unmount, fifty cycles, leaves the PTY uncorrupted and shows no handler leak.

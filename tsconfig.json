@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    // ESNext.Disposable for `Disposable` and `Symbol.dispose`. Six specs
+    // (C01, C03, C13, C15, C16, C19) return one and none defines it; taking the
+    // language's type means no module owns it and `using` works.
+    "lib": ["ES2022", "ESNext.Disposable"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
