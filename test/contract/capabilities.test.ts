@@ -108,30 +108,39 @@ describe("C02 contract", () => {
     const section = spec.split("## 4. Degradation")[1]?.split("\n## ")[0];
     expect(section, "§4 not found in the spec").toBeDefined();
 
-    const owners = new Map<string, string>();
+    // field → the owners §4 gives it. A Set because colourDepth has two rows:
+    // it degrades in two stages, and both name C10.
+    const specRows = new Map<string, Set<string>>();
     for (const line of section!.split("\n")) {
       // Split on unescaped pipes only: the unicode row's behaviour cell contains
       // `+ - \|` as a code span, and splitting naively drops the row entirely.
       const cells = line.split(/(?<!\\)\|/).map((c) => c.trim());
-      // | Absent | Behaviour | Owner |  — three cells plus two empty edges.
-      if (cells.length !== 5) continue;
-      const [, absent, , owner] = cells;
-      if (absent === undefined || owner === undefined) continue;
+      // | Absent | Field | Behaviour | Owner |  — four cells plus two empty edges.
+      if (cells.length !== 6) continue;
+      const [, absent, field, , owner] = cells;
+      if (absent === undefined || field === undefined || owner === undefined) continue;
       if (absent === "Absent" || /^-+$/.test(absent)) continue;
-      owners.set(absent, owner);
+
+      const name = field.replaceAll("`", "");
+      const owners = specRows.get(name) ?? new Set<string>();
+      owners.add(owner.replaceAll("*", ""));
+      specRows.set(name, owners);
     }
-    expect(owners.size, "§4 rows parsed").toBeGreaterThan(0);
+    expect(specRows.size, "§4 rows parsed").toBeGreaterThan(0);
 
-    // Every owner named in §4 is named identically in DEGRADATION.
-    const specOwners = [...owners.values()].map((o) => o.replaceAll("*", "")).sort();
-    const tableOwners = Object.values(DEGRADATION).map((d) => d.owner).sort();
-    // Truecolour and All colour are both colourDepth, so §4 carries one more
-    // row than the record has fields; C10 owning both is why this still matches.
-    expect(new Set(specOwners)).toEqual(new Set(tableOwners));
-
-    // The bijection that stops the eighth field arriving without a row.
+    // The bijection, in both directions and against the spec rather than only
+    // against ourselves: the eighth field cannot arrive without a row, and a
+    // row cannot outlive the field it covers.
     const { capabilities } = detectCapabilities({ TERM: "xterm" });
+    expect([...specRows.keys()].sort()).toEqual(Object.keys(capabilities).sort());
     expect(Object.keys(DEGRADATION).sort()).toEqual(Object.keys(capabilities).sort());
+
+    // And every row's owner matches the implementation's, per field.
+    for (const [field, owners] of specRows) {
+      expect([...owners], `§4 owners for ${field}`).toEqual([
+        DEGRADATION[field as keyof TerminalCapabilities].owner,
+      ]);
+    }
 
     for (const field of FIELDS) {
       expect(DEGRADATION[field].owner, `${field} owner`).toMatch(/^(C\d\d|L4)( (C\d\d|L4))*$/);

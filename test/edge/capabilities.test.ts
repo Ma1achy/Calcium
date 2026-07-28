@@ -105,4 +105,21 @@ describe("C02 edge cases", () => {
     // Nothing leaked onto Object.prototype along the way.
     expect(({} as Record<string, unknown>)["TERM"]).toBeUndefined();
   });
+
+  it("T3.10: the dumb gate applies to TERM's rules, not TERM_PROGRAM's", () => {
+    // Intent, not oversight. TERM_PROGRAM describes the emulator and TERM=dumb
+    // is a statement about terminfo, so iTerm2 still supports synchronised
+    // update. The case that makes it matter is an altScreen:true override — the
+    // user has said detection is wrong, and gating this would hand them an alt
+    // screen that tears.
+    const c = caps({ TERM: "dumb", TERM_PROGRAM: "iTerm.app" });
+
+    expect(c.synchronisedUpdate).toBe(true);
+    expect(c.imageProtocol).toBe("iterm2");
+
+    expect(c.altScreen).toBe(false);
+    expect(c.bracketedPaste).toBe(false);
+    expect(c.mouse).toBe(false);
+    expect(c.colourDepth).toBe(1);
+  });
 });

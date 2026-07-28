@@ -25,8 +25,11 @@ export type TerminalCapabilities = Readonly<{
  * is acquired and before C22 has a diagnostics path; C22 §8 orders release
  * before printing, so C02 decides what is wrong and C22 decides when the user
  * is told.
+ *
+ * Not exported: nothing consumes it yet, and §2 spells the return type inline.
+ * It gets a name in the spec when C22 consumes it.
  */
-export type Detection = Readonly<{
+type Detection = Readonly<{
   capabilities: TerminalCapabilities;
   warnings: readonly string[];
 }>;

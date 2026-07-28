@@ -1,6 +1,32 @@
 // A03 SS31/SS32 — supply chain. A04 §2, §3.
 import { readFileSync, existsSync } from "node:fs";
 
+/**
+ * Package names justified by DEPENDENCIES.md — read only from the sections that
+ * list *installed* packages.
+ *
+ * Scraping the whole document also picked up the "What is deliberately NOT a
+ * dependency" table, which is prose about absence: a backticked package name
+ * there reported as `"x" is justified but not installed — stale entry`, which
+ * is precisely backwards.
+ */
+export function justifiedIn(doc) {
+  const INSTALLED = /^##\s+(Runtime|Development)\b/;
+  const names = new Set();
+  let inSection = false;
+
+  for (const line of doc.split("\n")) {
+    if (line.startsWith("## ")) {
+      inSection = INSTALLED.test(line);
+      continue;
+    }
+    if (!inSection) continue;
+    const m = /^\|\s*`([^`]+)`/.exec(line);
+    if (m) names.add(m[1]);
+  }
+  return names;
+}
+
 export function checkDependencies() {
   const v = [];
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
@@ -14,7 +40,7 @@ export function checkDependencies() {
   }
 
   const doc = readFileSync("DEPENDENCIES.md", "utf8");
-  const justified = new Set([...doc.matchAll(/^\|\s*`([^`]+)`/gm)].map((m) => m[1]));
+  const justified = justifiedIn(doc);
 
   for (const d of declared) {
     if (!justified.has(d)) {
