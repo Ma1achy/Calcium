@@ -132,6 +132,8 @@ Reasoning lives in the scratchpads. These are the decisions.
 | D50 | **`patch` is a distinct block kind from `diff`, and they never merge.** One is rows of field comparisons, the other hunks of text with line numbers and two palettes. A merged kind's height would depend on which mode it is in, and C09 I1 — measured height equals rendered height — is the invariant that cannot bend. Rendered by C25, registered through C09 exactly as C11 and C12 do |
 | D51 | **`status: "proposed"` is reserved now and unused in v1.** Adding a `status` value later is a `tui.view/2` bump under C04 I2's rules, and the bump is the expensive part rather than the field. No adapter produces it: C07 constructs documents from what a command returned, and a proposed change has not run |
 | D52 | **The approval half of an agent harness already exists, because `fill` is propose-then-approve.** D8 made `fill` the default so a command is read before it runs; that is the same shape as an agent proposing and a human approving, with the human composing. An agent producing a document whose rows carry `fill` actions needs no new approval mechanism — approval is `fill`, refusal is not submitting, and the audit trail is the transcript. This is the reason the agent direction is cheap, and it will not be obvious to anyone reading this register later |
+| D53 | **`SIGCONT` re-acquires and reports; it sets no flag.** C01 owns terminal state and C03 owns contamination, so a `SIGCONT` re-acquisition needs an outbound channel or it is invisible to the only layer that could repaint after one. `onResume` is that channel, and it is the same shape as `onResize`: C01 states a fact about the terminal, L4 decides what it means. The rejected alternative — C01 setting `contaminated` — put one flag under two owners, which is the failure C01 exists to prevent, applied to itself |
+| D54 | **Exit codes are 128 + signal, per signal: 130, 143, 129.** One shutdown *path* is a property worth having; one shutdown *code* is a lie to whoever is supervising the process. A fixed 130 reports a user pressing Ctrl-C when the supervisor is what sent the signal |
 
 These were settled before the specs were written and lived only in the working scratchpad, which declares itself uncommitted. They are load-bearing — D43 in particular — and belong in the register.
 
@@ -139,13 +141,13 @@ These were settled before the specs were written and lived only in the working s
 
 | | |
 |---|---|
-| D26 | One module owns all six pieces of terminal state; no escape sequence is written elsewhere |
+| D26 | One module owns every piece of terminal state the process takes from the shell; no escape sequence is written elsewhere. C01 §3 names the keys rather than counting them — three places once said "six" and meant three different sets |
 | D27 | Cleanup handlers registered before acquisition; release before printing on fault paths |
 | D28 | Alternate screen is the only hard capability. Everything else degrades |
 | D29 | No information is carried by colour alone, anywhere |
 | D30 | Minimum 60 × 16, with a layout-engine-free fallback below it |
 | D31 | Dimensions read as one snapshot, the sole input to a frame. Resize is not debounced |
-| D32 | stdout is redirected at startup; non-renderer writes go to the debug log |
+| D32 | stdout is redirected at startup; every write not made through **C01's `writer`** goes to the debug sink. C01 owns both. "Non-renderer" is defined structurally — the renderer is whoever holds the privileged handle — because once `write` is replaced, no caller is distinguishable from inside it |
 | D33 | Contamination forces a full repaint from a cleared screen |
 | D34 | Mouse on by default; `/mouse` toggles; copy mode is mandatory; Shift-drag documented as the native-selection bypass |
 

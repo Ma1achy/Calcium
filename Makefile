@@ -1,8 +1,11 @@
 # A04 §5 — CI runs these targets, not equivalents.
 .PHONY: install check enforce test golden e2e audit all clean
 
-install:            ## npm ci, no install scripts (A04 §3)
+install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	npm ci --ignore-scripts
+	npm rebuild node-pty --ignore-scripts=false
+	@node -e "require('node-pty')" \
+	  || (echo "node-pty did not build — tier 5 cannot run" && exit 1)
 
 check:              ## type-check and lint
 	npm run check

@@ -58,6 +58,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG17 | C19 imports nothing from `terminal/` | C19 T2.5 |
 | MG18 | C20 imports nothing from `terminal/`; no C17 import | C20 T2.5, T2.6 |
 | MG19 | C21 imports nothing from `terminal/` | C21 T2.3 |
+| MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 
@@ -92,7 +93,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS14 | `\x1b`, `\u001b` | outside `terminal/escapes.ts` | C01 I1, T2.5 |
-| SS15 | Mode sequences `1049 25 2004 1002 1006` | outside C01; `2026` outside C03 | C01 T2.8 |
+| SS15 | Mode numbers `1049 25 2004 1002 1006 2026` | outside `terminal/escapes.ts` | C01 I1, T2.8 |
 | SS16 | Hex, ANSI code, colour name | `viewmodel/` | C04 T2.7 |
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
 | SS18 | Hex literal | any block-producing module | C10 T2.9 |
@@ -102,6 +103,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS22 | Literal verb, flag or enum list | `completion/` | C19 T2.6 |
 
 **SS22 is the anti-drift check.** A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review.
+
+**SS15 scopes to `escapes.ts`, not to C01.** An earlier version said "outside C01", which contradicted SS14 and C01 I1: the literals are *required* to live in `escapes.ts`, so a rule forbidding them outside C01 fails on the one file that must contain them. Ownership of the *modes* is asserted separately, as MG20 — the escape module's named exports are imported only by their owning component. Two checks, because a single one cannot express both "the digits live in one file" and "the meaning belongs to one component".
 
 ### Structural prohibitions
 
@@ -117,8 +120,16 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS30 | Second tokeniser or quoter | anywhere | C18 T2.3, C19 T2.4 |
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
+| SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
+| SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
+
+**SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
+
+**SS34 is the two-owners check.** Ink 7 accepts `render({ alternateScreen })` and will enter and leave it itself. C01 holds the alternate screen, so Ink must not — `held` would stop describing what was taken, and release would emit sequences for state something else already released. The framework's own option is the tempting shortcut precisely because it looks simpler at the call site.
 
 **SS31 and SS32 are supply-chain gates.** `tui-kit` has three runtime dependencies because the specs need no more (A04 §2); a fourth appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
+
+**SS32 carries exactly one exception, and it is named rather than implicit.** `node-pty` ships no Linux prebuild and must be compiled, so it has `install`, `postinstall` and `prepare` scripts. `--ignore-scripts` stays set for the whole tree; the build is invoked by name from `make install`, which is a different thing from letting every package run arbitrary code at install time. SS32's allow list holds `node-pty` and nothing else, so a second package acquiring an install script still fails the build — and the one exception is visible in a diff rather than discovered later.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
 

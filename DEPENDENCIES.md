@@ -20,7 +20,7 @@ after it is installed; an absent package cannot be compromised.
 |---|---|---|
 | `typescript` | — | — |
 | `vitest` | Test runner | — |
-| `node-pty` | Real pseudo-terminals for C01–C03's tier-5 tests. There is no other way to test terminal restoration honestly | — |
+| `node-pty` | Real pseudo-terminals for C01–C03's tier-5 tests. There is no other way to test terminal restoration honestly. **Needs a native build**: it ships darwin and win32 prebuilds only, so every devcontainer and all of CI compiles it. `make install` invokes that build by name — `--ignore-scripts` stays set for the tree, and A03 SS32 carries `node-pty` as its single named exception (A04 §3) | — |
 | `eslint` | — | — |
 | `@types/node` | — | — |
 

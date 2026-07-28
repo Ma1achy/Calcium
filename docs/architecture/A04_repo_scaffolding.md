@@ -63,7 +63,7 @@ Dev dependencies are looser but not free: `typescript`, `vitest`, `node-pty` (C0
 |---|---|
 | `npm ci`, never `npm install`, in CI | Installs the lockfile exactly; `install` can silently resolve differently |
 | Lockfile committed, reviewed like code | A lockfile diff in an unrelated PR is the signal |
-| `--ignore-scripts` on install | **Postinstall is the primary npm attack vector.** Nothing here needs one |
+| `--ignore-scripts` on install | **Postinstall is the primary npm attack vector.** One dev dependency needs a build; see below |
 | `npm audit --audit-level=high` as a gate | Fails the build, not a warning nobody reads |
 | Exact versions for direct dependencies | No `^`; a patch release is a decision |
 | Dependency review on every PR | A new transitive dependency is visible and justified |
@@ -72,6 +72,19 @@ Dev dependencies are looser but not free: `typescript`, `vitest`, `node-pty` (C0
 | Publish from CI only, using `GITHUB_TOKEN` | No laptop holds a publish credential; the token is workflow-scoped and expires with the run |
 
 **`--ignore-scripts` is the one that matters most.** It is also the one that breaks builds that assumed a postinstall, which is why it is set from the first commit rather than retrofitted.
+
+**`--ignore-scripts` stays. One dev dependency — `node-pty` — needs a native build, and it is rebuilt by an explicit named step rather than by re-enabling install scripts for the whole tree. The distinction is that we invoke the build; no package's hook runs unsupervised.**
+
+`make install` is therefore two commands, not one:
+
+```
+npm ci --ignore-scripts
+npm rebuild node-pty --ignore-scripts=false
+```
+
+The second flag is not redundant. `.npmrc` sets `ignore-scripts=true` globally, which applies to `rebuild` as well as `install` — and `npm rebuild` reports "rebuilt dependencies successfully" while building nothing, so the failure is silent until a `require` fails much later. Making it a Makefile target rather than a note is the point: this is the step that makes C01–C03's tier 5 runnable at all, and folklore does not survive a clean checkout.
+
+`node-pty` ships prebuilds for darwin and win32 only. On Linux — which is every devcontainer and all of CI — there is no binary and the toolchain compiles one. A03 SS32 carries `node-pty` as its single named exception so that a second package acquiring an install script still fails the build.
 
 ---
 
@@ -259,7 +272,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 1. Three repositories, not a monorepo, so each package is exercised as a package.
 2. `tui-kit` has three runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
 3. A new dependency needs a justification in `DEPENDENCIES.md`, and A03 asserts the file matches `package.json`.
-4. `--ignore-scripts` from the first commit; nothing here needs a postinstall.
+4. `--ignore-scripts` from the first commit, for the whole tree. One dev dependency needs a native build, and it is invoked by name from `make install` rather than by re-enabling install scripts; A03 SS32 names it as its single exception.
 5. `npm ci` in CI, lockfile committed and reviewed.
 6. `npm audit --audit-level=high` is a gate, not a warning.
 7. Devcontainers are required for development and never required for consumption.
