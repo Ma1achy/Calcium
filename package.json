@@ -16,7 +16,7 @@
     "build":    "tsc -p tsconfig.build.json",
     "check":    "tsc --noEmit && eslint .",
     "enforce":  "node tools/enforce/index.mjs",
-    "test":     "vitest run --dir test --exclude 'test/{e2e,golden}/**'",
+    "test":     "vitest run --dir test --exclude '{e2e,golden}/**'",
     "golden":   "vitest run --dir test/golden",
     "e2e":      "vitest run --dir test/e2e",
     "audit":    "npm audit --audit-level=high"

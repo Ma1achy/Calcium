@@ -13,10 +13,10 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "declaration": true,
-    "sourceMap": true,
-    "outDir": "dist",
-    "rootDir": "src"
+    "types": ["node"]
   },
+  // This config type-checks everything: src, the six test tiers, and the
+  // enforcement tools. Emit settings live in tsconfig.build.json, which is
+  // scoped to `src` — `rootDir: "src"` here would reject every test file.
   "include": ["src", "test", "tools"]
 }
