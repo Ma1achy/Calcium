@@ -2,17 +2,35 @@
 import { readFileSync } from "node:fs";
 import { layerOf } from "./layers.mjs";
 
-const IMPORT = /^\s*(?:import|export)\b[^'"]*?from\s*['"]([^'"]+)['"]/gm;
+const IMPORT = /^\s*(?:import|export)\b([^'"]*?)from\s*['"]([^'"]+)['"]/gm;
 const BARE   = /^\s*import\s*['"]([^'"]+)['"]/gm;
 
-function importsOf(file) {
-  const src = readFileSync(file, "utf8");
+/**
+ * A statement-level `import type` / `export type` erases at build and creates no
+ * runtime edge, so it is not an import for the layer rule's purposes — C01 needs
+ * C02's `TerminalCapabilities` type while genuinely not importing C02.
+ *
+ * An inline `import { type X, y }` is NOT skipped: the statement still emits,
+ * and `y` is a real edge.
+ */
+function isTypeOnly(clause) {
+  return /^type\b/.test(clause.trim());
+}
+
+function importsOf(file, readFile) {
+  const src = readFile(file);
   const out = [];
-  for (const re of [IMPORT, BARE]) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(src))) out.push(m[1]);
+
+  IMPORT.lastIndex = 0;
+  let m;
+  while ((m = IMPORT.exec(src))) {
+    if (isTypeOnly(m[1])) continue;
+    out.push(m[2]);
   }
+
+  BARE.lastIndex = 0;
+  while ((m = BARE.exec(src))) out.push(m[1]);
+
   return out;
 }
 
@@ -29,12 +47,16 @@ function resolve(file, spec) {
   return stack.join("/");
 }
 
-export function checkModuleGraph(files) {
+/**
+ * `readFile` is injected so the rule can be tested against fabricated modules at
+ * layer paths that do not exist on disk — the same reason C02 takes its `env`.
+ */
+export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [];
   for (const file of files) {
     const from = layerOf(file);
     if (!from) continue;
-    for (const spec of importsOf(file)) {
+    for (const spec of importsOf(file, readFile)) {
       const target = resolve(file, spec);
       if (!target) continue;
       const to = layerOf(target);

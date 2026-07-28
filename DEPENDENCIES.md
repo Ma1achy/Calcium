@@ -36,6 +36,7 @@ Each of these is the kind of thing a project normally installs. The specs make e
 | A width/truncation library | `cells()` | Must be the same implementation the measurer uses, or measurement drifts (C09 I6) |
 | A styling library (chalk) | Ink | Ink already owns styling |
 | An NDJSON parser | `node:readline` | Built in (C06) |
+| A TypeScript linter (typescript-eslint) | `tsc --strict`, plus A03 scans | 87 packages, and every rule it would give us over strict TypeScript is replaceable by a source scan — `no-console` moved to A03 SS33 and got stronger, catching `console.error` and `console.warn` too. **The one exception is `no-floating-promises`, and it is not replaceable by a regex.** C02 has no async at all, so deciding this at C02 decides it at the wrong moment. **Reopen at C06**: cancellation and streaming are where a floating promise is a real bug rather than a style one, and if the answer is still no there, it is no for good reasons rather than for want of a case. Until then `src/` is not linted — see `eslint.config.js` |
 
 ## Adding one
 

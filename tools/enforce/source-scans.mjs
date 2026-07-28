@@ -9,10 +9,15 @@ export const SCANS = [
     scope: "src/", allow: ["src/shell/session.ts"],
     why: "no ambient clock; C22 injects `() => number`" },
 
-  { id: "SS10", spec: "C02 T2.5",
-    pattern: /process\.env\s*[.\[]\s*['"]?(TERM|COLORTERM|TERM_PROGRAM|LANG|LC_ALL|LC_CTYPE|TMUX)/,
+  // Banning `process.env` outright rather than the seven names: a narrower
+  // pattern walks straight past `const { TERM } = process.env` and
+  // `process.env[k]`. No file in src/ has business reading the environment —
+  // C22 reads config through an injected filesystem — so the broad rule has no
+  // false positives and, unlike the narrow one, no false negatives.
+  { id: "SS10", spec: "C02 T2.5 · C02 T6.2",
+    pattern: /process\.env/,
     scope: "src/", allow: ["src/terminal/capabilities.ts"],
-    why: "only C02 reads terminal environment variables" },
+    why: "only C02 reads the environment, and it reads the injected record" },
 
   { id: "SS11", spec: "C09 T2.7 · C10 T2.6",
     pattern: /process\.env/,
@@ -45,6 +50,14 @@ export const SCANS = [
     pattern: /process\.stdout\.write/,
     scope: "src/data/process/", allow: [],
     why: "child output is piped; it never reaches the real terminal" },
+
+  // Moved here from eslint's `no-console`, and stronger for it: this catches
+  // console.error and console.warn, which the lint rule did not, and it cannot
+  // fall silent because a parser could not read the file.
+  { id: "SS33", spec: "C01 I8 · A04",
+    pattern: /\bconsole\.\w+/,
+    scope: "src/", allow: [],
+    why: "C01 owns stdout; a stray write is captured to the debug log, but it should not exist" },
 
   { id: "SS28", spec: "C16 T2.6 · C17 T2.6 · C18 T2.4 · C19 T2.5 · C20 T2.6",
     pattern: /\b(?:commit|flush|invalidate)\s*\(/,
