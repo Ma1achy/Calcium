@@ -5,6 +5,35 @@ The specs are the contract: 24 component specs, 3 architecture documents.
 
 ---
 
+## Run everything in the devcontainer
+
+`node`, `npm`, `make`, tests — all of it, inside `.devcontainer`. Never on the host.
+
+Four reasons, and the first has already bitten:
+
+- **Node parity.** Ink 7 requires Node ≥ 22. A host on 20 gets different results
+  from CI, and `EBADENGINE` is a warning people scroll past. `engine-strict=true`
+  turns it into an error, but only inside a correctly built container.
+- **`node-pty` needs a build toolchain.** C01–C03's tier-5 PTY tests will not run
+  without it, and a missing toolchain looks like a failing test rather than a
+  missing dependency.
+- **Reproducibility.** "It passes locally" means nothing if locally is not what CI
+  runs.
+- **Blast radius.** `npm install` and arbitrary scripts belong in a container, not
+  on the host.
+
+First command in any session:
+
+    node --version        # expect v22.x — if not, rebuild the container
+
+**This does not contradict A04 §4.** That section says the devcontainer is never
+the *supported path*, and it means for consumers: R01 R4.4 commits that a clean
+clone plus `npm install` gives a working shell with no container, and that is the
+reuse claim. It says nothing about how this repo is developed. Contributors and
+agents use the container; consumers must not need it.
+
+---
+
 ## Layers
 
 ```

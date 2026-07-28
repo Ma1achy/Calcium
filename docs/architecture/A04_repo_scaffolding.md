@@ -73,9 +73,16 @@ Dev dependencies are looser but not free: `typescript`, `vitest`, `node-pty` (C0
 
 ## 4. Devcontainers
 
-One per repo, and **for local testing only — never the supported path.**
+One per repo. **Required for development, never required for consumption** — and
+those are different claims that an earlier draft ran together.
 
-R01 R4.4 commits to `clean clone → npm install → npm start → running shell, no further steps`. If the reference app worked only inside a container, "a teammate can build a TUI easily" would quietly become "if they adopt our container", and the reuse claim would weaken to nothing. The devcontainer is a convenience that CI happens to share.
+Contributors and agents work inside the container: Node parity with CI, the
+`node-pty` toolchain, reproducibility, and blast radius. Consumers must never need
+it — R01 R4.4 commits that a clean clone plus `npm install` gives a working shell,
+and if that only held inside a container, "a teammate can build a TUI easily" would
+quietly become "if they adopt our container".
+
+Concretely, R4.4 is `clean clone → npm install → npm start → running shell, no further steps`, and the container appears nowhere in it.
 
 | Repo | Base | Adds | For |
 |---|---|---|---|
@@ -245,24 +252,24 @@ The reference app bumping is the release gate. It lives in another repo precisel
 
 ## 10. Commitments
 
-1. 1. 1. Three repositories, not a monorepo, so each package is exercised as a package.
-2. 2. 2. `tui-kit` has exactly two runtime dependencies; the specs require no more.
-3. 3. 3. A new dependency needs a justification in `DEPENDENCIES.md`, and A03 asserts the file matches `package.json`.
-4. 4. 4. `--ignore-scripts` from the first commit; nothing here needs a postinstall.
-5. 5. 5. `npm ci` in CI, lockfile committed and reviewed.
-6. 6. 6. `npm audit --audit-level=high` is a gate, not a warning.
-7. 7. 7. Devcontainers are for local testing only and never the supported path.
-8. 8. 8. `prism-tui`'s devcontainer carries Python, so conformance is runnable locally.
-9. 9. 9. CI runs the same Makefile targets a developer runs — not equivalents.
-10. 10. 10. `make enforce` executes A03; it runs before the test suite so violations fail in seconds.
-11. 11. 11. A skipped real-integration run is recorded, never silent.
-12. 12. 12. Distribution is to GitHub Packages, private, from CI on tag using `GITHUB_TOKEN`; no laptop holds a credential.
-13. 13. 15. Not a git dependency — that would require an install script, trading the most valuable supply-chain control for a saved configuration step.
-14. 14. 16. GitHub Actions attestation is not npm provenance, and is not described as it.
-15. 17. `npm link` locally, registry install in CI — the packaging test runs where a link cannot mask it.
-16. 18. Heavy stages run on `main` and tags; `enforce` runs on every push regardless.
-17. 15. 13. `CLAUDE.md` states the invisible rules, and instructs that a wrong spec is changed before the code.
-18. 16. 14. One skill — `implement-component`.
+1. Three repositories, not a monorepo, so each package is exercised as a package.
+2. `tui-kit` has exactly two runtime dependencies; the specs require no more.
+3. A new dependency needs a justification in `DEPENDENCIES.md`, and A03 asserts the file matches `package.json`.
+4. `--ignore-scripts` from the first commit; nothing here needs a postinstall.
+5. `npm ci` in CI, lockfile committed and reviewed.
+6. `npm audit --audit-level=high` is a gate, not a warning.
+7. Devcontainers are required for development and never required for consumption.
+8. `prism-tui`'s devcontainer carries Python, so conformance is runnable locally.
+9. CI runs the same Makefile targets a developer runs — not equivalents.
+10. `make enforce` executes A03; it runs before the test suite so violations fail in seconds.
+11. A skipped real-integration run is recorded, never silent.
+12. Distribution is to GitHub Packages, private, from CI on tag using `GITHUB_TOKEN`; no laptop holds a credential.
+13. Not a git dependency — that would require an install script, trading the most valuable supply-chain control for a saved configuration step.
+14. GitHub Actions attestation is not npm provenance, and is not described as it.
+15. `npm link` locally, registry install in CI — the packaging test runs where a link cannot mask it.
+16. Heavy stages run on `main` and tags; `enforce` runs on every push regardless.
+17. `CLAUDE.md` states the invisible rules, and instructs that a wrong spec is changed before the code.
+18. One skill — `implement-component`.
 
 ---
 

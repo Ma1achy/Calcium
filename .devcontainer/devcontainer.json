@@ -5,7 +5,7 @@
     "ghcr.io/devcontainers/features/node:1": { "version": "22" }
   },
 
-  // A04 §4 — for local testing only, never the supported path.
+  // A04 §4 — required for development, never required for consumption.
   // `git clone && npm install && make all` must work without this container.
 
   // node-pty needs a toolchain for C01-C03's tier-5 PTY tests.
