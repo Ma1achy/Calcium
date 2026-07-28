@@ -1,0 +1,267 @@
+# S01 — The frame
+
+| Field | Value |
+|---|---|
+| **Type** | Surface |
+| **Tier** | Chrome — always present, never scrolls |
+| **Package** | `tui-kit` (structure) + `prism-tui` (header and footer content, via hook 5) |
+| **Data source** | C22 `SessionSnapshot` · C14 `VisibleRange` · C17 buffer and cursor · C19 ghost text · C16 `activeTarget` |
+| **Source** | `t01` §The frame · A01 D6, D24a, D30 · A02 §6 hook 5 · C22 §6 |
+| **Status** | Draft |
+
+---
+
+## 1. Purpose
+
+S01 is the only thing on screen that is always on screen. Every other surface renders *into* it.
+
+It owns four regions with fixed vertical ownership, the arithmetic that divides the terminal between them, and the two pieces of chrome — header and footer — that carry session state so nothing else has to.
+
+The constraint that governs every decision here: **the frame must never render more than `rows` rows.** A newline written while the cursor sits on the last row scrolls the alternate screen, producing a visible jump and desynchronising everything below it (C01 §2). Height arithmetic is therefore clamped at every step rather than trusted.
+
+`tui-kit` owns the structure; the header's and footer's *content* is app-supplied (F5). What follows is the structure, plus Prism's content as the worked example.
+
+---
+
+## 2. The screen
+
+At 100 × 30, mid-session, with the live block navigable:
+
+```
+▲ prism  v1.0.0   fmx-prod · malachy@fmx.io              ● live         14:23:07
+────────────────────────────────────────────────────────────────────────────────
+   ✓ tier-1 rules                        22 rules · 0 errors · 587ms
+   next: /test …   /experiment submit …                              587ms
+
+▌ ── ps · 4 of 11 · --mine · last 24h ──────────────────────────────────────────
+▌
+▌   all ×11    training ×9    evaluation ×2
+▌   ● running ×1   ✓ succeeded ×6   ✗ failed ×2   ○ queued ×1
+▌
+▌      uuid      kind       family             status             metric    age
+▌  ▸ ● a3f9b21  candidate  digit-classifier   running · ep 17/40  0.0372 ▁▂▃▅▆  23m
+▌  ▸ ✓ 7c2d4e1  experiment decoder-zoom       succeeded           0.0089    41m
+────────────────────────────────────────────────────────────────────────────────
+❯ /promote a3f9b21 --open-mr
+────────────────────────────────────────────────────────────────────────────────
+↑↓ rows   ⏎ drill in   ␣ expand   f filter   s sort   ⌃↑ prev   esc prompt
+```
+
+The `▌` gutter marks the live block (D6). The footer has switched to row keys because focus is in that block.
+
+---
+
+## 3. Height arithmetic
+
+```
+headerRows   = 1
+footerRows   = 1
+promptRows   = min( editor.displayRows(width, gutter), floor(rows / 2) )
+viewportRows = max( 0, rows − headerRows − footerRows − promptRows )
+```
+
+with `gutter = { first: 2, cont: 2 }` (D24a, C22 §6).
+
+**The prompt is capped at half the terminal.** Pasting two hundred lines is a real thing people do (C17 T5.2), and an uncapped prompt would consume the entire frame and leave the viewport at zero. Beyond the cap the prompt **windows around the cursor**, computed from C17's `cursorCell`, with `⋯` markers on whichever edges are elided. C17 needs no scroll model for this — buffer plus cursor position is enough.
+
+Every derived height is clamped at zero or greater, and the sum is asserted equal to `rows` before any output is written.
+
+---
+
+## 4. Fields
+
+### Header — left to right
+
+| Field | Source | Format | Dropped below |
+|---|---|---|---|
+| Mark | Static | `▲ prism` | never |
+| Version | `session.version` | `v1.0.0` | 90 cols |
+| Cluster | `session.cluster` | `fmx-prod` | never |
+| Identity | `session.identity` | `malachy@fmx.io`, then `malachy`, then dropped | 100, then 70 |
+| Health | `session.health` | §5 | never |
+| Clock | Injected clock | `14:23:07`, then `14:23` | 80 cols |
+
+**"Dropped below" means the field is absent at widths strictly narrower than the stated one.** A field listed at 90 is present at 90 and gone at 89. Stating the boundary rather than implying it is what makes T1.8 checkable.
+
+**Cluster and health never elide.** Which cluster you are talking to and whether it is reachable are the two facts whose absence causes a wrong action; everything else is convenience. Elision order is fixed and tested rather than emergent.
+
+### Prompt
+
+`❯ ` then C17's buffer, then C19's ghost text in `muted` tone. The cursor is placed from `cursorCell(width, gutter)`.
+
+`(prism) ❯` is gone — it marked shell mode, which the `/` prefix makes unambiguous and the header already carries (D24a).
+
+### Footer
+
+Hints drop in a fixed order as width shrinks, rightmost-first: `? help`, then `/ commands`, then `⌃r search`, then `↑↓ history`, then `↹ complete`. `⏎ run` is never dropped — a footer that cannot tell you how to submit is worse than no footer.
+
+The order is fixed and golden-framed rather than emergent, for the same reason S03's column order is: an order that falls out of available width is an order nobody designed.
+
+Static key hints, with **one** context axis: when `activeTarget` is `liveBlock`, it shows row keys instead of shell keys.
+
+That is the only chrome that reflects state. A footer that rewrites itself continuously is more distracting than useful, and context-sensitive help is `?` (C16 §6).
+
+---
+
+## 5. States
+
+| State | Trigger | Render |
+|---|---|---|
+| **Loading** | Banner sections still fetching (C22 §4 step 7) | Frame complete; the welcome block fills in progressively. The prompt is usable throughout |
+| **Empty** | Fresh session, no commands | Header, welcome block, prompt, footer. The viewport is not blank — the welcome is its first entry |
+| **Degraded — offline** | `health: "offline"` | Header shows `✗ offline` in `error` tone. Nothing else changes |
+| **Degraded — expiring** | `health: "expiring"` | Header shows `▲ token 4d` in `warn` tone, taking precedence over `live` |
+| **Degraded — no colour** | `colourDepth: 1` | Tones become typographic (C10 §3); health keeps its glyph, so the state is still readable |
+| **Degraded — ASCII** | `unicode: "ascii"` | `▲`→`^`, `▌`→`|`, `●`→`*`, rules use `-`. All 1:1 by cell count (C09 §4), so geometry is unchanged |
+| **Narrow** | 60–79 cols | Version, identity and seconds drop per §4; the footer drops hints per the fixed order below |
+| **Too small** | Below 60 × 16 | §6 |
+
+The health indicator has four states and is the header's only variable element:
+
+| Health | Render | Tone |
+|---|---|---|
+| `live` | `● live` | ok |
+| `degraded` | `▲ degraded` | warn |
+| `offline` | `✗ offline` | error |
+| `expiring` | `▲ token 4d` | warn — takes precedence over `live` |
+
+---
+
+## 6. The too-small fallback
+
+Below 60 × 16 the frame is replaced entirely:
+
+```
+Terminal too small
+
+Minimum   60 x 16
+Current   44 x 12
+
+Resize to continue.
+```
+
+**Rendered with no layout engine, no block registry, no theme** (C22 I8, C02 §Size). Plain text, no colour, no box drawing, positioned top-left. It must work in a terminal too small for the layout engine to produce a sane result, so it does not use one — and it uses `x` rather than `×` so it works with no Unicode either.
+
+Session state survives. This is a render mode, not an error state: the frame returns on resize with the transcript, history and input buffer intact.
+
+---
+
+## 7. Interactions
+
+S01 handles no keys. It reads `activeTarget` to choose a footer and renders the cursor where C17 says it is.
+
+Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` (C14 I16) and is **frame chrome, not block content** — it enters no measurement and no theme token beyond a tone.
+
+---
+
+## 8. Commitments
+
+1. Four regions with fixed vertical ownership; only the viewport flexes.
+2. The frame never renders more than `rows` rows, asserted before output.
+3. Every derived height is clamped at zero or greater.
+4. The prompt caps at half the terminal and windows around the cursor beyond it.
+5. The prompt gutter is `{first: 2, cont: 2}` and is passed to C17, never assumed by it.
+6. Header and footer content is app-supplied; `tui-kit` owns only the structure.
+7. Cluster and health never elide; header elision and footer hint-dropping are both fixed orders, tested rather than emergent, and `⏎ run` is never dropped.
+8. Health has four states and is the header's only variable element.
+9. The footer has exactly one context axis — shell keys versus row keys.
+10. The gutter marker is chrome and enters no measurement.
+11. The too-small fallback uses no layout engine, no registry, no theme, and no Unicode.
+12. Session state survives the too-small state; it is a render mode, not an error.
+
+---
+
+## 9. Tests
+
+Six tiers, plus golden frames at 80 / 100 / 120 / 160.
+
+### Tier 1 — unit
+
+- **T1.1**: height arithmetic for a one-row prompt at 24, 30 and 50 rows → the four regions sum to `rows` exactly.
+- **T1.2**: a three-row prompt → the viewport shrinks by two, the sum still holds.
+- **T1.3**: a prompt whose `displayRows` exceeds `floor(rows/2)` → capped; the viewport keeps at least the remainder.
+- **T1.4**: at `rows = 16` with a 40-row prompt → prompt capped at 8, viewport 6, footer and header 1 each.
+- **T1.5**: the windowed prompt shows the rows around `cursorCell.row`, with `⋯` on each elided edge.
+- **T1.6**: each health state renders its documented glyph and tone — four cases.
+- **T1.7**: `expiring` with a live cluster → `expiring` wins.
+- **T1.8**: header elision at 100, 90, 89, 80, 79, 70 and 69 columns → the documented fields are present at the boundary and absent one cell below it.
+- **T1.8b**: footer hints drop rightmost-first in the documented order; `⏎ run` survives at 60.
+- **T1.9**: cluster and health survive at 60 columns.
+- **T1.10**: `activeTarget === "liveBlock"` → row-key footer; anything else → shell-key footer.
+- **T1.11**: the gutter is drawn beside exactly the entries whose `VisibleRange.live` is true.
+
+### Tier 2 — contract / interface
+
+- **T2.1** (C2): for a fuzz corpus of terminal sizes 60×16 to 400×200 × prompt heights 1 to 300, the rendered row count equals `rows`, never more.
+- **T2.2** (C3): no computed height in that corpus is negative.
+- **T2.3** (C10): measured transcript heights are identical with and without the gutter — it costs no rows.
+- **T2.4** (C5): the gutter passed to C17 matches the prompt S01 renders, so `displayRows` equals the rendered height (C17 T2.1, from the frame's side).
+- **T2.5** (C6): swapping the chrome hook changes the header and footer and nothing else.
+- **T2.6** (C11): the fallback render calls neither the block registry nor the theme — asserted by spies.
+- **T2.7**: every `SessionSnapshot` field consumed by the header has a documented format and elision point.
+
+### Tier 3 — edge cases
+
+- **T3.1**: exactly 60 × 16 → the full frame, not the fallback.
+- **T3.2**: 59 × 16 and 60 × 15 → fallback on each.
+- **T3.3**: `rows = 3` (below minimum, but exercised) → fallback; no negative viewport.
+- **T3.4**: an empty transcript → viewport renders blank rows, not a collapsed frame.
+- **T3.5**: a transcript taller than the viewport → only the visible range renders.
+- **T3.6**: identity absent (`null`) → the field is dropped, not rendered as `null` or `undefined`.
+- **T3.7**: a cluster name longer than the header → truncated with the capability-correct marker; health still renders.
+- **T3.8**: a 5,000-character single-line prompt at 80 columns → windowed, capped, cursor visible.
+- **T3.9**: a 200-line pasted prompt → capped at half the terminal, cursor visible, viewport non-zero.
+- **T3.10**: the cursor at the first and last row of a windowed prompt → visible in both, with the marker on the correct edge only.
+- **T3.11**: under `unicode: "ascii"` → `^`, `|`, `*`, `-` substitutions, and the row count is unchanged from UTF-8.
+- **T3.12**: at `colourDepth: 1` → every header state remains distinguishable by glyph.
+- **T3.13**: a resize from 120 × 40 to 61 × 16 to 44 × 12 and back → full, full, fallback, full; state intact throughout.
+- **T3.14**: ghost text longer than the remaining width → truncated, never wrapping the prompt onto an extra row.
+
+### Tier 4 — integration
+
+- **T4.1** (with C22): each health transition updates the header within one frame.
+- **T4.2** (with C22, C17): the gutter S01 passes and the prompt it draws agree at every width.
+- **T4.3** (with C14): `VisibleRange` renders top to bottom with `skipRows` honoured at both edges.
+- **T4.4** (with C14, C13): the live entry gains the gutter; a frozen streaming entry does not.
+- **T4.5** (with C16): moving focus into the live block switches the footer within one frame.
+- **T4.6** (with C19): ghost text renders in `muted` after the cursor and never enters C17's buffer.
+- **T4.7** (with C03): a header clock tick commits `"spinner"`, not `"input"` — the clock never pre-empts a keystroke.
+- **T4.8** (with C10): a theme switch redraws the frame with identical geometry.
+- **T4.9** (with C15): a pushed view occupies exactly the viewport region; header and footer are untouched.
+
+### Tier 5 — e2e
+
+- **T5.1**: golden frames at 80 / 100 / 120 / 160, in both themes, both unicode modes, and at all four colour depths.
+- **T5.2**: golden frames for each of the eight §5 states.
+- **T5.3**: a real session at 60 columns → every header field that survives is readable and nothing overlaps.
+- **T5.4**: pasting 200 lines into a real 80 × 24 terminal → the frame holds, the viewport stays usable, submission works.
+- **T5.5**: dragging the terminal edge continuously from 160 to 44 and back → no blank frame, no scroll, no corruption.
+- **T5.6**: a session left idle for ten minutes → only the clock changes; no drift, no leak, no spurious repaint.
+
+### Tier 6 — fail-on-revert
+
+- **T6.1** (C2): an off-by-one making the frame `rows + 1` tall → T2.1 fails, and every frame scrolls the alternate screen.
+- **T6.2** (C4): removing the prompt cap → T3.9 fails and a paste eats the viewport.
+- **T6.3** (C5): letting C17 assume a gutter → T2.4 fails and the viewport is one row wrong on wrapped input.
+- **T6.4** (C7): eliding cluster or health first → T1.9 fails.
+- **T6.11** (C7): dropping `⏎ run` from the footer, or dropping hints in a different order → T1.8b fails.
+- **T6.5** (C9): adding a second context axis to the footer → T1.10's exhaustive check fails.
+- **T6.6** (C10): rendering the gutter inside a block → T2.3 fails and every live block measures one cell wider.
+- **T6.7** (C11): using the block registry for the fallback → T2.6 fails, and the fallback breaks in exactly the terminals it exists for.
+- **T6.8** (C11): using `×` in the fallback → T3.11's ASCII case fails on a non-UTF-8 terminal.
+- **T6.9** (C12): discarding state on the too-small transition → T3.13 fails.
+- **T6.10** (T4.7): committing the clock as `"input"` → keystroke latency regresses under an idle clock.
+
+---
+
+## 10. Out of scope
+
+| Not here | Where |
+|---|---|
+| What the welcome block contains | S02 |
+| What any verb renders into the viewport | S03–S15 |
+| Scroll position and virtualisation | C14 |
+| The buffer, cursor and `displayRows` | C17 |
+| Focus resolution | C16 |
+| Overlay and pushed-view placement | C15 |
+| Prism's specific header and footer content | `prism-tui`, via hook 5 |

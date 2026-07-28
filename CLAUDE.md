@@ -1,0 +1,91 @@
+# tui-kit
+
+A framework for building terminal user interfaces over JSON-emitting CLIs.
+The specs are the contract: 24 component specs, 3 architecture documents.
+
+---
+
+## Layers
+
+```
+L0 foundation    terminal/ · data/     (two halves — see below)
+L1 presentation  presentation/
+L2 viewport      viewport/
+L3 interaction   interaction/
+L4 shell         shell/
+```
+
+**Imports go DOWN only.** Never up, never sideways within a layer.
+
+**L0's two halves never import each other.** `terminal/` knows nothing of view
+models; `data/` knows nothing of terminals. That independence is what allows them
+to be built in parallel, and it is the rule most easily broken by accident.
+
+If a component needs something from above, **L4 orchestrates it** — see A02 Seam 4.
+That rule has already caught four attempted violations during specification.
+
+---
+
+## Never
+
+Each of these produces code that compiles, passes review, and is wrong.
+
+- **Read a clock** outside `shell/session.ts`. It is injected as `() => number`.
+- **Read `process.env`** outside `terminal/capabilities.ts`.
+- **Embed a colour.** A block names a palette slot; C10 resolves it.
+- **Write an escape sequence** outside `terminal/escapes.ts`.
+- **Use `.length` for display width.** Use `cells()` — the same implementation the
+  measurer uses, or measurement drifts.
+- **Let `measure` see anything that animates.** Appearance animates; geometry never does.
+- **Add a dependency** without a row in `DEPENDENCIES.md`.
+- **Add an export** nothing consumes.
+- **Commit a frame** from L1, L2 or L3. L4 does that.
+
+---
+
+## Always
+
+- **Six test tiers**: unit, contract, edge, integration, e2e, fail-on-revert.
+- **A fail-on-revert test names the change that makes it fail**, not just the assertion.
+  "Removing the idempotency guard → T3.14 fails" is the form.
+- **`make enforce` before opening an MR.** Five seconds. It is A03 executed.
+- **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
+  initialise, serialise.
+
+---
+
+## The spec is the contract
+
+Specs live in [`docs/`](docs/). Start with [`docs/README.md`](docs/README.md) —
+it says what to read first, what is authoritative here, and where to start.
+
+Each component has a spec with numbered **commitments** and **invariants**.
+Implement to the spec, and cite invariant numbers in tests: `T3.7 (I5): …`.
+
+**If the spec is wrong, change the spec first.** A spec and an implementation that
+disagree is worse than either being wrong on its own — and an agent that silently
+diverges leaves 47 documents describing something that no longer exists.
+
+If a spec is ambiguous, **say so rather than choosing**. Ambiguity found during
+implementation is the cheapest kind to fix.
+
+---
+
+## Where things are
+
+| Path | Components |
+|---|---|
+| `src/terminal/` | C01 lifecycle · C02 capabilities · C03 frame scheduler |
+| `src/data/` | C04 view model · C05 manifest · C06 transport · C07 adapters · C08 fixtures · C21 process |
+| `src/presentation/` | C09 blocks · C10 theme · C11 table · C12 plot |
+| `src/viewport/` | C13 transcript · C14 viewport · C15 overlays |
+| `src/interaction/` | C16 router · C17 editor · C18 parser · C19 completion · C20 history |
+| `src/shell/` | C22 composition · C23 execution |
+| `src/index.ts` | C24 public API |
+
+Full index at [`docs/INDEX.md`](docs/INDEX.md).
+
+Build order: C01–C03 and C04–C07 are independent and can go in parallel — L0's two
+halves do not import each other, which is what makes that true rather than convenient.
+
+**Start with C01.** Highest risk, and the template the other twenty-three follow.

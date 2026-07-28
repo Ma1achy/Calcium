@@ -1,0 +1,29 @@
+{
+  "name": "tui-kit",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+
+  // A04 §4 — for local testing only, never the supported path.
+  // `git clone && npm install && make all` must work without this container.
+
+  // node-pty needs a toolchain for C01-C03's tier-5 PTY tests.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++",
+  "postCreateCommand": "node --version && npm ci --ignore-scripts",
+
+  "containerEnv": {
+    "TERM": "xterm-256color",
+    "LANG": "en_GB.UTF-8"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "vitest.explorer"],
+      "settings": {
+        "editor.formatOnSave": true,
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  }
+}

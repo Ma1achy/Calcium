@@ -1,0 +1,247 @@
+# C12 — Plot renderer
+
+| Field | Value |
+|---|---|
+| **Type** | Component |
+| **Package** | `tui-kit` |
+| **Layer** | L1 presentation |
+| **Depends on** | C04 (`Plot`, `Measure`) · C09 (registers into its registry; `cells()`) · C10 (`resolveTone`) |
+| **Consumed by** | C09's registry · table cells carrying `spark` · every surface showing a metric |
+| **Source** | A01 D37 · A01 Appendix A.2 · A02 §2 |
+| **Status** | Draft |
+
+---
+
+## 1. Purpose
+
+C12 draws numbers. Two forms, sharing a scaling core:
+
+**Line plots** — a braille grid with axes, for a training loss curve or a request-rate history. Braille gives 2×4 dots per cell, so a 56×8 plot has 112×32 addressable points, which is enough resolution for a curve to read as a curve.
+
+**Sparklines** — one row, no axes, inline. In a table cell beside a metric, or under a rule.
+
+Like C11, it registers into C09's registry through the public mechanism rather than being privileged. The braille rasterisation and Bresenham line-drawing are ported from the existing mockup, which is a working implementation rather than a sketch (A01 Appendix A.2).
+
+The property that makes plots easy relative to every other block: **measured height is declared, not derived.** A plot's height comes from the block, never from its data, so there is no path by which a surprising series produces a surprising number of rows.
+
+---
+
+## 2. Public interface
+
+`Plot` and `Series` are declared in **C04** with every other block variant; C12 declares no block shapes of its own.
+
+```typescript
+const plotDefinition: BlockDefinition<Plot>;   // registered into C09
+```
+
+Internal to C12: the raster grid, the Bresenham walker, the scaling and downsampling functions. None is a block shape.
+
+### Height
+
+```
+sparkline                    → 1
+line, axes: false            → height
+line, axes: true             → height + 2      (axis rule, then x-labels)
+```
+
+With `axes: false` there is no y-label column and the plot area is the full `width`. With axes it is `width − yLabelWidth − 3`, where 3 covers a space, the `│`, and a space.
+
+Exact and data-independent. An empty series occupies its declared height with a centred empty message rather than collapsing — a plot that changes height when data arrives would shift everything below it mid-stream.
+
+Width is `ctx.width`. For an axed line plot the plot area is `width − yLabelWidth − 3`, where `yLabelWidth` is the widest formatted y-label and 3 covers a space, the `│`, and a space.
+
+---
+
+## 3. Rasterisation
+
+**Braille.** Each cell is a 2×4 dot matrix mapped to `U+2800 + mask`, with the standard bit assignment — dots 1,2,3,7 in the left column and 4,5,6,8 in the right. Points are plotted into a boolean grid of `width×2` by `height×4`, then folded into characters.
+
+**Lines.** Successive points are joined with Bresenham. Without it, a series that moves faster than one dot-column per sample renders as disconnected specks rather than a curve.
+
+**Scaling.** `yMin`/`yMax` over all series unless the block pins them. Values map linearly to dot rows, inverted so larger is higher.
+
+**Axes.** Three y-labels — max, midpoint, min — formatted per `yFormat`, right-aligned in the label column. The x-axis is a rule under the plot area; x-labels sit at left, centre and right of it.
+
+---
+
+## 4. Degenerate series
+
+Every one of these is real, and each has a defined result rather than an exception.
+
+| Input | Result |
+|---|---|
+| Empty series | Declared height, centred empty message |
+| Single point | A dot at vertical centre |
+| All values equal | Flat line at vertical centre; y-labels all show that value. **No division by zero** |
+| `NaN`, `±Infinity` present | Filtered out before scaling; the line breaks across the gap rather than spanning it |
+| All values non-finite | Treated as empty |
+| Fewer points than dot-columns | Points spread across the full width; the line is drawn between them |
+| More points than dot-columns | Downsampled by min/max per column, so spikes survive rather than being averaged away |
+
+Downsampling by min/max rather than by sampling is the one worth naming: a loss curve with a spike is *about* the spike, and taking every nth point loses it exactly when it matters.
+
+---
+
+## 5. Multiple series and 1-bit
+
+Series are distinguished by tone. At `colourDepth: 1` there is no tone, and D29 forbids carrying information by colour alone.
+
+**So at 1-bit, a multi-series line plot renders as stacked strips** — one sub-plot per series, sharing the x-axis. Overlaying two braille curves with no colour produces a picture that cannot be read, and inventing dash patterns inside a 2×4 dot cell does not work either.
+
+The arithmetic has to be exact, because the total must not change:
+
+```
+base      = floor(height / n)
+remainder = height − base·n           → given to the first strip
+strip i   = base + (i === 0 ? remainder : 0)
+Σ strips  = height                    exactly
+```
+
+**Series labels consume no plot rows.** Each label is written into the y-label column beside its strip, not above it. A label occupying a row would make the total exceed `height`, which is the trap this rule exists to avoid.
+
+When `n > height` there are not enough rows to give each series one. The plot then renders the **first series plus a legend line naming the omitted ones**, still within `height`, and sets a truncation marker. Silently dropping series would be worse than saying so.
+
+Single-series plots are unaffected. Sparklines are single-series by construction.
+
+---
+
+## 6. ASCII fallback
+
+Under `unicode: "ascii"`, braille is unavailable.
+
+| Form | Unicode | ASCII |
+|---|---|---|
+| Line plot | Braille, 2×4 subcells | Column ramp `.:-=+*#@`, 1×8 subcells |
+| Sparkline | `▁▂▃▄▅▆▇█` | `.:-=+*#@` |
+| Axis rule | `└─│` | `+-\|` |
+
+**The cell grid is identical** — same width, same height, same measured rows (C09 §4, 1:1 by cell count). Only vertical resolution changes, from 4 subrows to 8 via the ramp, and horizontal from 2 dots per cell to 1. The plot gets blockier; nothing moves.
+
+---
+
+## 7. Invariants
+
+- **I1** — Measured height is a function of the block alone, never of the data.
+- **I2** — Rasterisation is pure and total. No series input throws.
+- **I3** — No division by zero on a constant or single-point series.
+- **I4** — Non-finite values are filtered before scaling and never reach the grid.
+- **I5** — Downsampling preserves per-column minima and maxima.
+- **I6** — At `colourDepth: 1`, multi-series plots stack; series are never distinguished by colour alone.
+- **I7** — Stacked strips sum to exactly `height`; series labels occupy the y-label column and consume no plot rows.
+- **I8** — When series outnumber available rows, the plot renders the first series plus a legend and marks itself truncated. Series are never dropped silently.
+- **I9** — The ASCII fallback occupies an identical cell grid to the Unicode form.
+- **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 2` with, by `width` cells.
+- **I11** — C12 owns no state; every render is a pure function of block, width and context.
+- **I12** — C12 registers through C09's public `register`; it is not privileged.
+- **I13** — Sparklines are exactly one row, at every width including 1.
+
+---
+
+## 8. Commitments
+
+1. Two forms — braille line plots with axes, and one-row sparklines — sharing a scaling core.
+2. Measured height is declared, never derived from data.
+3. An empty series occupies its declared height rather than collapsing.
+4. Points are joined with Bresenham, so a curve reads as a curve.
+5. Every degenerate series in §4 has a defined result and none throws.
+6. Downsampling is by per-column min/max, so spikes survive.
+7. At 1-bit, multi-series plots stack into strips summing exactly to `height`; labels live in the y-label column.
+8. Series that cannot be given a row are named in a legend, never dropped silently.
+9. The ASCII fallback keeps the cell grid identical and only loses subcell resolution.
+10. C12 holds no state and registers through the public mechanism.
+11. Braille rasterisation and Bresenham are ported from the mockup's working implementation.
+
+---
+
+## 9. Tests
+
+Six tiers. No state machine — C12 is pure over the block.
+
+### Tier 1 — unit
+
+- **T1.1** (I1): height for each form and axes combination — sparkline 1, line 8, axed line 10 — independent of series length, including empty.
+- **T1.2**: braille encoding — each of the eight dot positions sets the documented bit; a full cell is `U+28FF`, an empty one `U+2800`.
+- **T1.3**: a horizontal run of points produces a continuous row of identical cells.
+- **T1.4**: a steep segment produces a connected line, not gaps — Bresenham exercised directly.
+- **T1.5** (I3): a constant series → a flat centred line, y-labels all equal, no `NaN` in output.
+- **T1.6** (I3): a single point → one dot at vertical centre.
+- **T1.7**: an empty series → declared height, the empty message centred, no grid characters.
+- **T1.8** (I4): a series containing `NaN` and `Infinity` → filtered; the line breaks across the gap rather than spanning it.
+- **T1.9**: an all-non-finite series → treated as empty.
+- **T1.10** (I5): 10,000 points into a 56-cell plot with one spike → the spike survives downsampling.
+- **T1.11**: three points into a 56-cell plot → spread across the full width, joined.
+- **T1.12**: y-labels formatted per `yFormat` — four cases.
+- **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
+- **T1.14**: pinned `yMin`/`yMax` override the computed range, and out-of-range points clamp to the edge rather than escaping the grid.
+
+### Tier 2 — contract / interface
+
+- **T2.1** (I2): a fuzz corpus — empty, single, constant, non-finite, 100,000-point, negative, mixed-sign, denormal — rasterises without throwing, at every width from 1 to 200.
+- **T2.2** (I1): the C09 generic measurement suite passes for `plot` at all seven widths.
+- **T2.3** (I10): for every corpus entry, no output row exceeds `width` cells and no output exceeds the declared row count.
+- **T2.4** (I9): for every corpus entry, Unicode and ASCII forms produce identical row and column counts.
+- **T2.5** (I11): a source scan finds no mutable module state in `plot/`.
+- **T2.6** (I12): `plot` is registered via `registry.register`; removing the call removes the kind.
+- **T2.7** (I2): rasterisation called a hundred times on the same input returns identical output.
+
+### Tier 3 — edge cases
+
+- **T3.1**: `height: 0` → clamped to 1.
+- **T3.2**: `height: 1` with axes → the plot area is 1 row, total 3; still renders.
+- **T3.3**: width narrower than the y-label column → labels are dropped before the plot area is starved; the curve still renders.
+- **T3.4**: width 1 → a single column of the ramp; no throw.
+- **T3.5**: values spanning fifteen orders of magnitude → linear scaling still terminates; extremes clamp to the edges.
+- **T3.6**: all values negative → range computed correctly; the flat-zero assumption does not appear.
+- **T3.7**: values differing only in the last float digit → treated as constant rather than producing a noise-amplified curve.
+- **T3.8**: `xLabels` longer than a third of the width → truncated, never overlapping each other.
+- **T3.9**: a series arriving one point at a time across sixty renders → each render is correct in isolation; no accumulated state.
+- **T3.10** (I6, I7): two series at `colourDepth: 1`, `height: 8` → strips of 4 and 4, summing to 8; labels appear in the y-label column and consume no plot rows.
+- **T3.11** (I7): three series at `height: 8` → strips of 4, 2, 2 — the remainder goes to the first — summing to exactly 8.
+- **T3.11b** (I8): ten series at `height: 4` → the first series plus a legend naming the other nine, total still 4 rows, truncation marked.
+- **T3.11c** (I7): for n from 1 to 12 and height from 1 to 20, Σ strips equals height in every combination. The arithmetic is property-tested, not spot-checked.
+- **T3.12**: a `spark` on a table cell narrower than the series → windows to the last N points, matching the mockup's behaviour.
+- **T3.13**: a series of exactly `width × 2` points → one point per dot column, no downsampling, no interpolation.
+
+### Tier 4 — integration
+
+- **T4.1** (with C09): registration, measurement and rendering behave identically to a built-in kind under the generic suite.
+- **T4.2** (with C09, C02): under `unicode: "ascii"`, measured heights and rendered row counts match the Unicode case exactly.
+- **T4.3** (with C10): the same plot at 24-, 8-, 4- and 1-bit has identical geometry; only the 1-bit multi-series case changes form, and not its total height.
+- **T4.4** (with C11): a sparkline inside a table cell contributes zero extra rows and does not affect column planning beyond its cell width.
+- **T4.5** (with C14): a plot inside an expanded table row measures through `measureChild` and shifts subsequent blocks by exactly its height.
+- **T4.6** (with C13): a streamed series growing by one point per patch → the plot re-renders at constant height; the viewport does not move.
+
+### Tier 5 — e2e
+
+- **T5.1**: golden frames — a loss curve, a request-rate history, a flat series, an empty series — at four widths, both themes, both unicode modes.
+- **T5.2**: a real `--watch` on a training run for two minutes → the curve grows smoothly, height never changes, no flicker.
+- **T5.3**: under `LANG=C` → the ASCII ramp renders, the curve remains legible, geometry is unchanged.
+- **T5.4**: under `TERM=dumb` with two series → stacked strips, both readable without colour.
+
+### Tier 6 — fail-on-revert
+
+- **T6.1** (I1): deriving height from series length → T1.1 fails and streaming plots start shifting the viewport.
+- **T6.2** (I3): dividing by the range without guarding a constant series → T1.5 fails with `NaN` output.
+- **T6.3** (I4): letting `NaN` reach the grid → T1.8 fails.
+- **T6.4** (I5): downsampling by every-nth-point → T1.10 fails, and spikes vanish exactly when they matter.
+- **T6.5** (I6): overlaying multi-series at 1-bit → T3.10 fails, and the plot becomes unreadable without colour.
+- **T6.11** (I7): giving each strip a label row → T3.11c fails, and every stacked plot grows beyond its measured height.
+- **T6.12** (I8): dropping series that do not fit → T3.11b fails.
+- **T6.6** (I9): an ASCII form of different cell dimensions → T2.4 fails.
+- **T6.7** (I10): writing outside the declared region → T2.3 fails and the frame corrupts.
+- **T6.8** (I13): a sparkline occupying two rows at some width → T1.13 fails, and every table row containing one shifts.
+- **T6.9**: dropping Bresenham for point-plotting → T1.4 fails and steep curves become dotted.
+- **T6.10** (I12): making `plot` a privileged built-in → T2.6 fails.
+
+---
+
+## 10. Out of scope
+
+| Not here | Where |
+|---|---|
+| Where the numbers come from | C07 adapters, the S-series |
+| Terminal image protocols for real charts | Phase 1B — C02 detects them, nothing uses them |
+| Interactive plots — zoom, crosshair, hover | Phase 2 |
+| Axis tick density beyond max/mid/min | Phase 1B |
+| Tone → colour | C10 |
+| Column planning around a sparkline cell | C11 |
