@@ -129,7 +129,11 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 
 **SS31 and SS32 are supply-chain gates.** `tui-kit` has three runtime dependencies because the specs need no more (A04 §2); a fourth appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
 
-**SS32 carries exactly one exception, and it is named rather than implicit.** `node-pty` ships no Linux prebuild and must be compiled, so it has `install`, `postinstall` and `prepare` scripts. `--ignore-scripts` stays set for the whole tree; the build is invoked by name from `make install`, which is a different thing from letting every package run arbitrary code at install time. SS32's allow list holds `node-pty` and nothing else, so a second package acquiring an install script still fails the build — and the one exception is visible in a diff rather than discovered later.
+**SS32 runs over the tree, not over our own manifest.** Checking only `package.json` would pass on a tree where every dependency ran code at install time, which is the thing the rule exists to prevent.
+
+**It checks `preinstall`, `install` and `postinstall` on dependencies — not `prepare`.** `prepare` runs in a package's own directory and for a git dependency; it never runs on a published tarball. Eighteen packages in this tree declare one and none of them executes. Flagging them would train everyone to ignore SS32, which is worse than not having it. Our own manifest is still checked on all four, and A04 commitment 13 is what keeps git dependencies out.
+
+**Two named exceptions, each with its reason recorded.** `node-pty` ships darwin and win32 prebuilds only, so Linux compiles it; `--ignore-scripts` stays set for the whole tree and `make install` invokes that one build by name, which is a different thing from letting every package run arbitrary code. `esbuild` is transitive under vitest and its postinstall is *suppressed* — npm installs the platform binary as an optional dependency and the hook is a fallback we never reach. Listed rather than silently skipped, so that if a vitest upgrade makes it load-bearing there is a place the reason already lives. Anything else acquiring an install script fails the build.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
 

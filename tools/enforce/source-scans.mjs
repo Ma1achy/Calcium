@@ -30,6 +30,28 @@ export const SCANS = [
     scope: "src/", allow: ["src/terminal/escapes.ts"],
     why: "escape literals live in one module" },
 
+  // The digits, not the meaning. SS15 says where the literals may live; MG20
+  // (module-graph.mjs) says which component may import each one. An earlier
+  // version of this rule said "outside C01", which contradicted SS14 and C01 I1
+  // — the literals are *required* to be in escapes.ts, so that rule would have
+  // failed on the one file that must contain them.
+  //
+  // The pattern matches the DECSET *form* — `?<mode>h` or `?<mode>l` — not the
+  // bare number, deliberately. A03 declares the rule over the numbers, but `25`
+  // as a bare integer is a page size, a timeout, a column width; scanning for it
+  // would produce noise until someone deleted the rule. The form is what has
+  // meaning, and a mode number that is not in it does nothing on its own: it
+  // still needs an escape prefix, which SS14 catches.
+  { id: "SS15", spec: "C01 I1 · C01 T2.8",
+    pattern: /\?(?:1049|25|2004|1002|1006|2026)[hl]/,
+    scope: "src/", allow: ["src/terminal/escapes.ts"],
+    why: "mode literals live in one module; C01 owns what they mean" },
+
+  { id: "SS34", spec: "C01 I1 · C01 T2.9",
+    pattern: /render\s*\(\s*\{[^}]*alternateScreen/,
+    scope: "src/", allow: [],
+    why: "C01 owns the alternate screen; two owners of one piece of terminal state is the failure this component prevents" },
+
   { id: "SS16", spec: "C04 T2.7",
     pattern: /#[0-9a-fA-F]{3,8}\b|\\x1b\[[0-9;]*m/,
     scope: "src/data/viewmodel/", allow: [],

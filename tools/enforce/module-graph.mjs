@@ -48,11 +48,59 @@ function resolve(file, spec) {
 }
 
 /**
+ * MG20 — each mode export of `escapes.ts` belongs to exactly one component.
+ *
+ * SS15 says where the digits may live; this says who may mean them. Asserted per
+ * sequence rather than per file, so C03's transactional exception for `2026`
+ * stays exactly one sequence wide rather than becoming "C03 may use escapes".
+ *
+ * An export with no importer is fine: `SCROLL_REGION` has no consumer until
+ * M-T6, and requiring one would force a dead export CLAUDE.md forbids.
+ */
+const MODE_OWNERS = {
+  ALT_SCREEN:     "src/terminal/lifecycle.ts",
+  CURSOR:         "src/terminal/lifecycle.ts",
+  BRACKET_PASTE:  "src/terminal/lifecycle.ts",
+  MOUSE:          "src/terminal/lifecycle.ts",
+  SCROLL_REGION:  "src/terminal/frame-scheduler.ts",
+  SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
+};
+
+const ESCAPES = "src/terminal/escapes.ts";
+const NAMED = /^\s*import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/gm;
+
+function checkModeOwnership(files, readFile) {
+  const violations = [];
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (f === ESCAPES) continue;
+    const src = readFile(file);
+
+    NAMED.lastIndex = 0;
+    let m;
+    while ((m = NAMED.exec(src))) {
+      if (resolve(f, m[2]) !== ESCAPES) continue;
+      for (const raw of m[1].split(",")) {
+        const name = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0];
+        const owner = MODE_OWNERS[name];
+        if (owner === undefined || owner === f) continue;
+        violations.push({
+          rule: "MG20", file: f,
+          message: `imports ${name} from escapes.ts, but ${owner} owns that mode`,
+          spec: "C01 I1 · C01 T2.8",
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+/**
  * `readFile` is injected so the rule can be tested against fabricated modules at
  * layer paths that do not exist on disk — the same reason C02 takes its `env`.
  */
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
-  const violations = [];
+  const violations = checkModeOwnership(files, readFile);
   for (const file of files) {
     const from = layerOf(file);
     if (!from) continue;
