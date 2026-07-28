@@ -87,14 +87,20 @@ export const SCANS = [
     why: "L4 orchestrates; interaction never commits a frame" },
 ];
 
-export function checkSourceScans(files) {
+/**
+ * `readFile` is injected for the same reason the module graph injects it: a rule
+ * is only known to work when it has been shown to fire, and showing that means
+ * a fabricated violation at a path that does not exist on disk. A03 commitment
+ * 14 requires one per rule — see `test/unit/enforce-rules.test.ts`.
+ */
+export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [];
   for (const scan of SCANS) {
     for (const file of files) {
       const f = file.replaceAll("\\", "/");
       if (!f.startsWith(scan.scope)) continue;
       if (scan.allow.some((a) => f === a || f.startsWith(a))) continue;
-      const src = readFileSync(file, "utf8");
+      const src = readFile(file);
       src.split("\n").forEach((line, i) => {
         if (line.trimStart().startsWith("//")) return;
         if (scan.pattern.test(line)) {

@@ -19,4 +19,7 @@ export type Violation = {
 };
 
 export declare const SCANS: readonly Scan[];
-export declare function checkSourceScans(files: readonly string[]): Violation[];
+export declare function checkSourceScans(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): Violation[];

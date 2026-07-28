@@ -82,7 +82,9 @@ npm ci --ignore-scripts
 npm rebuild node-pty --ignore-scripts=false
 ```
 
-The second flag is not redundant. `.npmrc` sets `ignore-scripts=true` globally, which applies to `rebuild` as well as `install` — and `npm rebuild` reports "rebuilt dependencies successfully" while building nothing, so the failure is silent until a `require` fails much later. Making it a Makefile target rather than a note is the point: this is the step that makes C01–C03's tier 5 runnable at all, and folklore does not survive a clean checkout.
+**`--ignore-scripts=false` is required on the rebuild.** `.npmrc`'s global setting applies to `npm rebuild` too, which then succeeds without building and reports success. This is why the rebuild is a Makefile target rather than a note: a clean checkout would otherwise fail much later, at a `require`, with no connection to the cause.
+
+That is the exact shape of failure this section exists to prevent, produced by this section's own control. `make install` verifies the build afterwards — `node -e "require('node-pty')"` — because a step whose failure mode is a success message needs an assertion, not a flag.
 
 `node-pty` ships prebuilds for darwin and win32 only. On Linux — which is every devcontainer and all of CI — there is no binary and the toolchain compiles one. A03 SS32 carries `node-pty` as its single named exception so that a second package acquiring an install script still fails the build.
 
@@ -126,7 +128,7 @@ Each declares its terminal as `xterm-256color` with a UTF-8 locale, and each als
 
 | Target | Does | Budget |
 |---|---|---|
-| `make install` | `npm ci --ignore-scripts` | — |
+| `make install` | `npm ci --ignore-scripts`, then the one named build, then verify it (§3) | — |
 | `make check` | Type-check and lint | < 20 s |
 | `make enforce` | **A03's assertions** — module graph, source scans, exhaustiveness | < 5 s |
 | `make test` | Tiers 1–4 | < 60 s |

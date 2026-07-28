@@ -19,7 +19,7 @@ Unwritten, they fail quietly. A component reads a clock and golden frames start 
 
 ---
 
-## 2. The five kinds of check
+## 2. The six kinds of check
 
 | Kind | Runs at | Cost | Catches |
 |---|---|---|---|
@@ -28,8 +28,18 @@ Unwritten, they fail quietly. A component reads a clock and golden frames start 
 | **Exhaustiveness** | Compile | 0 | A union member added without its handler |
 | **Type-level** | Compile | 0 | A shape that must not be constructible |
 | **Corpus** | Test | seconds | Properties over fixtures — measurement, contrast, drop orders |
+| **Vacuity** | Test | ~0 | A rule that matches nothing, and therefore passes |
 
 The first four are **build gates**: they fail the build, not a test run, because a layer violation merged and fixed later has already had time to be depended upon.
+
+**The sixth checks the other five.** Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule. A rule with no such test is assumed vacuous until it has one.
+
+This is not belt-and-braces. Every check here reports success the same way whether the tree is clean or the rule is broken, and a broken rule is indistinguishable from compliance at exactly the moment it matters. Two failure modes, and both have occurred in this repo:
+
+- **A pattern that cannot match a real subject.** MG20 compared a resolved specifier against `src/terminal/escapes` while every NodeNext specifier ends `.js`. It matched nothing and reported compliance.
+- **A scope that matches no files.** SS26 scopes to `src/data/process/`; the tree has `src/data/process.ts`, a file. `startsWith` never matches, so the rule has never once been evaluated.
+
+A fabricated violation catches the first and not the second — the fabrication is written at a path inside the declared scope, so it fires whether or not that scope describes anything. Both checks are therefore required, and both are in `test/unit/enforce-rules.test.ts`. A rule whose scope is not yet real is listed there as **pending**, with the component that will create it; the pending entry is itself asserted, so it fails once the scope becomes real rather than outliving its reason.
 
 ---
 
@@ -113,7 +123,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS23 | `.length`, `charAt`, `slice` on display text | outside the grapheme layer | C09 T2.9, C17 T2.4 |
 | SS24 | Mutable module state | `table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
-| SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 |
+| SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
 | SS27 | Timer or escalation logic | `process/` | C21 T2.4 |
 | SS28 | Scheduler calls | `input/`, `editor/`, `parser/`, `completion/`, `history/` | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
 | SS29 | Multi-store access | outside local handlers | C23 T2.7 |
@@ -134,6 +144,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 **It checks `preinstall`, `install` and `postinstall` on dependencies — not `prepare`.** `prepare` runs in a package's own directory and for a git dependency; it never runs on a published tarball. Eighteen packages in this tree declare one and none of them executes. Flagging them would train everyone to ignore SS32, which is worse than not having it. Our own manifest is still checked on all four, and A04 commitment 13 is what keeps git dependencies out.
 
 **Two named exceptions, each with its reason recorded.** `node-pty` ships darwin and win32 prebuilds only, so Linux compiles it; `--ignore-scripts` stays set for the whole tree and `make install` invokes that one build by name, which is a different thing from letting every package run arbitrary code. `esbuild` is transitive under vitest and its postinstall is *suppressed* — npm installs the platform binary as an optional dependency and the hook is a fallback we never reach. Listed rather than silently skipped, so that if a vitest upgrade makes it load-bearing there is a place the reason already lives. Anything else acquiring an install script fails the build.
+
+**SS26 is pending and has never been evaluated.** It scopes to `src/data/process/` and the scaffold created `src/data/process.ts` — a file, not a directory — so the prefix match finds nothing and the rule passes on every run. It came in with the scaffold and would not have fired had it been violated. The scope is corrected when C21 lands and creates the directory; until then the vacuity suite carries it as a named pending entry rather than counting it as enforcement. This is the defect the sixth kind of check exists to find, and it is recorded here rather than quietly fixed because the count of live rules should be honest.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
 
@@ -233,6 +245,7 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 11. `CP6` and `CP8` are the two corpus properties that have already found or would find defects reading does not.
 12. Every failure names the rule, the file, the line and the declaring spec.
 13. MG and SS run pre-commit, because their violations become depended-upon within days.
+14. **Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule.** A rule with no such test is assumed vacuous until it has one. Every scan's scope is separately asserted to match at least one file in the tree; a scope that matches nothing is listed as pending, with its blocking component, and the pending entry fails once the scope becomes real.
 
 ---
 

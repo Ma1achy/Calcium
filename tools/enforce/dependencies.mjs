@@ -1,6 +1,9 @@
 // A03 SS31/SS32 — supply chain. A04 §2, §3.
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 
+/** The rules this module implements. See MODULE_GRAPH_RULES for why. */
+export const DEPENDENCY_RULES = ["SS31", "SS32"];
+
 const INSTALL_HOOKS = ["preinstall", "install", "postinstall", "prepare"];
 
 /**
@@ -69,19 +72,28 @@ export function justifiedIn(doc) {
   return names;
 }
 
-export function checkDependencies() {
+/**
+ * The disk, injected. SS31 and SS32 are the two rules whose fabricated
+ * violation cannot be a file path — one needs a manifest, the other a tree —
+ * so the reads are parameters rather than calls (A03 commitment 14).
+ */
+export function checkDependencies(io = {}) {
+  const readFile = io.readFile ?? ((f) => readFileSync(f, "utf8"));
+  const exists = io.exists ?? existsSync;
+  const tree = io.tree ?? installed();
+
   const v = [];
-  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  const pkg = JSON.parse(readFile("package.json"));
   const declared = new Set(Object.keys(pkg.dependencies ?? {}));
 
-  if (!existsSync("DEPENDENCIES.md")) {
+  if (!exists("DEPENDENCIES.md")) {
     v.push({ rule: "SS31", file: "DEPENDENCIES.md",
              message: "missing — every runtime dependency needs a justification",
              spec: "A04 §2" });
     return v;
   }
 
-  const doc = readFileSync("DEPENDENCIES.md", "utf8");
+  const doc = readFile("DEPENDENCIES.md");
   const justified = justifiedIn(doc);
 
   for (const d of declared) {
@@ -110,10 +122,10 @@ export function checkDependencies() {
   // A03 scopes SS32 to "the install tree", not to our own manifest. Checking
   // only package.json would have passed on a tree where every dependency ran
   // code at install time, which is the thing the rule exists to prevent.
-  for (const [name, dir] of installed()) {
+  for (const [name, dir] of tree) {
     if (SS32_ALLOW.has(name)) continue;
     let dep;
-    try { dep = JSON.parse(readFileSync(`${dir}/package.json`, "utf8")); } catch { continue; }
+    try { dep = JSON.parse(readFile(`${dir}/package.json`)); } catch { continue; }
     const hooks = DEPENDENCY_HOOKS.filter((s) => dep.scripts?.[s]);
     if (hooks.length > 0) {
       v.push({ rule: "SS32", file: `${dir}/package.json`,

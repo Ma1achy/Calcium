@@ -6,3 +6,5 @@ export declare function checkModuleGraph(
   files: readonly string[],
   readFile?: (file: string) => string,
 ): Violation[];
+
+export declare const MODULE_GRAPH_RULES: readonly string[];

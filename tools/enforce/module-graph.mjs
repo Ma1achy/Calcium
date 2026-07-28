@@ -2,6 +2,14 @@
 import { readFileSync } from "node:fs";
 import { layerOf } from "./layers.mjs";
 
+/**
+ * The rules this module actually implements — A03 §3 inventories twenty, and
+ * seventeen of them wait on the components they govern. Declared as a list so
+ * the vacuity suite can assert every one of them has been shown to fire; a rule
+ * added here without a fabricated violation fails A03 commitment 14.
+ */
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG20"];
+
 const IMPORT = /^\s*(?:import|export)\b([^'"]*?)from\s*['"]([^'"]+)['"]/gm;
 const BARE   = /^\s*import\s*['"]([^'"]+)['"]/gm;
 
