@@ -14,7 +14,7 @@
 
 ## 1. Purpose
 
-C09 is where a `Block` becomes rows on a screen. It owns the **registry** — the pairing of each block kind with a `measure` and a `render` — and ships sixteen default kinds.
+C09 is where a `Block` becomes rows on a screen. It owns the **registry** — the pairing of each block kind with a `measure` and a `render` — and ships fourteen default kinds; `table`, `plot` and `patch` bring the union to seventeen.
 
 The registry lives here rather than in C04 because `render` needs theme (L1) and capabilities (L0 terminal), and a registry at L0 data would import upward and sideways. C04 owns the schema and the measurement *contract*; C09 owns the implementations that satisfy it.
 
@@ -71,7 +71,7 @@ function createBlockRegistry(opts: { defaults?: boolean }): BlockRegistry;
 
 ---
 
-## 3. The sixteen kinds
+## 3. The seventeen kinds
 
 Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an obligation on the implementation.
 
@@ -94,7 +94,9 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `group` | sum or max of children | `column` sums, `row` takes the max |
 | `raw` | lines | Pre-formatted, emitted as-is with control characters stripped |
 
-`table` and `plot` are declared in C04's union but registered by C11 and C12. C09 owns the registry and fourteen kinds; those two are large enough to be their own components and register into the same registry as an app-defined kind would — which is the proof that the extension mechanism is real rather than privileged.
+`table`, `plot` and `patch` are declared in C04's union but registered by C11, C12 and C25. C09 owns the registry and fourteen kinds; those three are large enough to be their own components and register into the same registry as an app-defined kind would — which is the proof that the extension mechanism is real rather than privileged.
+
+That it is three rather than one matters. A single privileged exception is indistinguishable from a special case; three components using the same public `register`, each removable by deleting its call, is the mechanism being exercised rather than described.
 
 ### Wrapping versus truncation
 
@@ -125,6 +127,39 @@ Every substitution is **1:1 by column count** (C04 §5). This is the constraint 
 Where no 1:1 substitution exists, the *content budget* changes at measure time instead, which requires the measurer to see capabilities. **No default kind requires this**, and adding one that does is a design decision, not an implementation detail.
 
 Colour degradation is C10's; C09 names a palette slot and renders whatever style comes back. `code` is the only kind that names anything outside the `tone` palette.
+
+---
+
+## 4a. Syntax tokenisation
+
+C10 defines a `syntax` palette; this is where the tokens come from. `Code` is `{kind, id, language, text, wrap}` — text and a language name, no spans — so something has to turn one into the other, and it is not the adapter.
+
+**Tokenisation happens at render, never in the adapter.** Adapters are pure and must not do work proportional to content length (C07): a manifest arriving over a transport should not be highlighted on the way in, because most documents are never scrolled to. Results are **memoised on `(text, language)`**, which is what keeps a re-render of the same block free.
+
+**Measurement ignores syntax entirely.** Tokens change appearance, never line count, so `measure` never tokenises. This keeps I1 cheap and has a consequence worth stating: a `code` block measures identically whether or not its language is registered, so a language shipping tomorrow does not reflow yesterday's transcript.
+
+**An unregistered language renders as plain text, not an error** — the same principle as C07's fallback adapter. A language nobody has registered is readable today and highlighted whenever someone registers it.
+
+### `hljs` class → palette slot
+
+`lowlight` emits a hast AST carrying highlight.js class names. The mapping is explicit rather than derived, because a derived mapping silently changes when the upstream grammar does:
+
+| `hljs` class | Slot |
+|---|---|
+| `hljs-keyword` | `syntax.keyword` |
+| `hljs-string` | `syntax.string` |
+| `hljs-comment` | `syntax.comment` |
+| `hljs-number`, `hljs-literal` | `syntax.number` |
+| `hljs-attr`, `hljs-attribute` | `syntax.key` |
+| `hljs-type`, `hljs-built_in` | `syntax.type` |
+| `hljs-title`, `hljs-function` | `syntax.function` |
+| `hljs-operator` | `syntax.operator` |
+| `hljs-punctuation` | `syntax.punctuation` |
+| anything else | the default tone — **never dropped** |
+
+The fallback is a fallback, not a filter. An unmapped class renders its text in the default tone; it never renders as nothing, which is the failure mode where a grammar update makes half a file invisible.
+
+Only the languages actually needed are registered — `createLowlight({ yaml, json })` — rather than highlight.js's full set, which is most of the package's weight and none of its value here.
 
 ---
 
@@ -221,7 +256,10 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.3** (I2): `measure` called a hundred times returns the same value and performs no I/O.
 - **T2.4** (I2): the malformed corpus from C04 T2.3 — empty, null-ish, 10,000-character, adversarial — measures without throwing, for every kind.
 - **T2.5** (I5): for every substitution in §4, `cells(unicode) === cells(ascii)`.
-- **T2.6** (I13): every member of C04's `Block` union has a registered definition. **This is a composition-level test** — it runs after C11 and C12 have registered, since C09 alone supplies fourteen of the sixteen.
+- **T2.6** (I13): every member of C04's `Block` union has a registered definition. **This is a composition-level test** — it runs after C11, C12 and C25 have registered, since C09 alone supplies fourteen of the seventeen.
+- **T2.13** (§4a): `measure` performs no tokenisation — a spy on the tokeniser records zero calls across the fixture corpus, and a `code` block measures identically with its language registered and unregistered.
+- **T2.14** (§4a): a YAML fixture produces the documented slots; every `hljs` class in the table maps to its slot, and an unmapped class renders in the default tone rather than being dropped.
+- **T2.15** (§4a): a block whose `language` is unregistered renders as plain text with no error raised.
 - **T2.12** (I8): for every kind, `measure` returns the same value across a hundred `tick` values.
 - **T2.7** (I3): a source scan finds no `process.env` read in `blocks/`.
 - **T2.8** (I4): a source scan finds no hex, ANSI or named colour in `blocks/`; `syntax` slots appear only in the `code` renderer.

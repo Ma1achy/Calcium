@@ -30,7 +30,7 @@ It is deliberately the least interesting component to run and the most consequen
 type ViewDocument = Readonly<{
   schema:    "tui.view/1";
   command:   string;                  // the input exactly as typed
-  status:    "ok" | "error" | "partial";
+  status:    "ok" | "error" | "partial" | "proposed";
   blocks:    readonly Block[];
   error?:    ErrorLike;               // present iff status === "error"
   meta: Readonly<{
@@ -40,13 +40,25 @@ type ViewDocument = Readonly<{
     durationMs: number;
     truncated:  boolean;
     resultId?:  string;               // the identifier this command produced, if any
+    argv:       readonly string[];    // what was actually spawned
+    stderr:     string;               // usually empty
+    transport:  "emulated" | "fixture" | "subprocess" | "local";
+    origin:     "user" | "action" | "agent" | "refresh";
   }>;
 }>;
 ```
 
 `meta.resultId` is how `$_` is populated: an adapter that knows its verb returned an identifier declares it, and L4 reads it. Without this the shell would have to guess which field of an arbitrary envelope was "the" identifier, which is not knowable generically.
 
+### The invocation record
+
+`argv`, `stderr` and `transport` answer the question a rendered block cannot: *did the far side return something unexpected, or did the adapter mishandle it?* They live in `meta` rather than in a block because a block is content and the invocation is *about* the document — in `meta` it is uniformly available to any inspector, including one an app writes. C23 renders them through `/debug`.
+
+**`origin` is not a debugging field, and it is required.** It is what makes a transcript legible once more than one thing is putting entries into it. Shipped optional it would be unset, then unreliable, and the first agent feature is the one that needs to trust it — so it is always present, always set by C23 (`user` for a typed submission, `action` for an exec action, `refresh` for a time-driven tick, `agent` reserved). A string now costs less than a schema migration later.
+
 `partial` exists for streaming documents that have not finished. **A partial document is renderable at every point in its life** — there is no assembly state in which it cannot be drawn.
+
+**`proposed` is reserved and unused in v1.** A proposed change has not run, might not run, and its actions are the point rather than a convenience — so it is none of `ok`, `error` or `partial`. No adapter may produce it (I12): C07 constructs documents from what a command *returned*, and nothing has returned yet. It ships now because adding a `status` value later is a `tui.view/2` bump under I2's rules, and the bump is the expensive part, not the field.
 
 ```typescript
 type ErrorLike = Readonly<{
@@ -64,12 +76,12 @@ Only `message` is required (F3). Prism's `{code, stage, message, details}` envel
 
 ## 3. Block vocabulary
 
-Sixteen kinds ship as defaults. The union is **open** — an app registers additional kinds through C09 (F1).
+Seventeen kinds ship as defaults. The union is **open** — an app registers additional kinds through C09 (F1).
 
 ```typescript
 type Block =
   | Rule | Notice | KeyValue | Table | Steps | Logs | Events
-  | Plot | Progress | Code | Diff | Pills | Tip | Panel | Group | Raw;
+  | Plot | Progress | Code | Diff | Patch | Pills | Tip | Panel | Group | Raw;
 ```
 
 ```typescript
@@ -91,6 +103,18 @@ type Code     = Readonly<{ kind: "code"; id: string; language: string; text: str
 type Diff     = Readonly<{ kind: "diff"; id: string;
                            rows: readonly Readonly<{ field: string; a: string; b: string;
                              comparison?: "same" | "better" | "worse" | "changed" }>[] }>;
+type Patch    = Readonly<{ kind: "patch"; id: string;
+                           path: string;               // the file, for the header
+                           language: string;           // syntax palette, per hunk line
+                           hunks: readonly Hunk[];
+                           layout?: "unified" | "split" }>;   // default: width-derived
+type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@
+                           lines: readonly Readonly<{
+                             kind: "add" | "remove" | "context";
+                             text: string;
+                             oldNo?: number;
+                             newNo?: number }>[];
+                           collapsedBefore?: number }>; // unchanged lines elided above
 type Pills    = Readonly<{ kind: "pills"; id: string;
                            chips: readonly Readonly<{ label: string; tone?: Tone;
                              action?: Action; active?: boolean }>[] }>;
@@ -127,6 +151,7 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
 | `progress` | label, current, total | 1 |
 | `code` | language, text, `wrap` | lines when truncating; `Σ ceil(len / w)` when wrapping |
 | `diff` | field / a / b rows | rows + header |
+| `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
 | `pills` | chips with actions | `ceil(totalWidth / w)` — one logical row that may wrap |
 | `tip` | text with fill actions | `ceil(len / w)` |
 | `panel` | title, children | children + 2 |
@@ -134,6 +159,12 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
 | `raw` | pre-formatted text | lines |
 
 A `pills` block is **one logical row**. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks, not one block that wraps — wrapping is overflow behaviour, not a layout choice.
+
+### `patch` and `diff` are not variants of each other
+
+They share a name and nothing else. `diff` is rows of `{field, a, b, comparison}` — a **structured** comparison, right for S07's metric table. `patch` is hunks of text with line numbers, two palettes and collapse. Merging them would produce a block whose measurement depends on which mode it is in, and C09 I1 is the invariant that cannot bend: a kind whose height rule branches on a mode flag is a kind whose measurer and renderer drift apart quietly.
+
+`patch` is declared here because C04 owns every block shape — settled when `plot` moved out to C12 — but it is **registered by C25**, exactly as `table` is by C11 and `plot` by C12. `collapsedBefore` is view state that affects height, so it lives in the block (commitment 4); expanding a collapsed region patches the document rather than mutating anything external, which is the same mechanism C11 uses for expanded rows and the reason it reaches a frozen entry when an action cannot.
 
 `raw` is the escape hatch and it is load-bearing. Anything unmodellable — a system command's stdout, an unrecognised envelope — becomes `raw` and still renders. **The vocabulary never has to be complete for the tool to work.**
 
@@ -268,13 +299,15 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I9** — `merge` carries **data only**. View state — `expanded`, focus, selection — is always taken from the existing row, never from the incoming one, whether or not the row is touched. A `--watch` tick cannot collapse a row the user opened.
 - **I10** — A partial document is renderable. No block kind has an "incomplete" representation that renders differently from a complete one.
 - **I11** — C04 imports nothing from `terminal/`, `presentation/` or above. Verified on the module graph.
+- **I12** — `status: "proposed"` is never produced by an adapter. C07 constructs documents from what a command returned, and a proposed change has not run. Reserved for the agent path; unused in v1.
+- **I13** — `meta.origin` is always present. It is not optional, and no code path constructs a document without it — a provenance field that can be absent becomes a provenance field nobody trusts.
 
 ---
 
 ## 7. Commitments
 
 1. `ViewDocument` is a pure, deeply immutable value with no reference to Ink, terminals or the network.
-2. Sixteen block kinds ship; the union is open and extended through C09's registry.
+2. Seventeen block kinds ship; the union is open and extended through C09's registry.
 3. `raw` renders anything, so the vocabulary is never blocking.
 4. View state that affects height lives in the block.
 5. Blocks name palette slots, never values; `error` and `warn` tones carry glyphs.
@@ -283,12 +316,16 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 8. `applyPatch` is pure; `merge` upserts by row id and preserves untouched rows.
 9. `measure(block, w)` equals rendered height at width `w`, and is pure and total.
 10. Capability-driven glyph substitution must be width-preserving.
-11. C04 owns the schema — **every** block variant is declared here; C09 owns the registry, C11 the table engine, C12 the plot renderer.
+11. C04 owns the schema — **every** block variant is declared here; C09 owns the registry, C11 the table engine, C12 the plot renderer, C25 the patch renderer.
 12. The schema identifier is framework-named `tui.view/1`. `tui-kit` ships nothing Prism-branded.
 13. A `pills` block is one logical row; multi-row pill layouts are multiple blocks.
 14. Capability-driven substitutions are 1:1 by column count.
 15. `validateDocument` and `validateBlock` are public, total, and the single enforcement point for I3.
 16. Schema version is `tui.view/1`; mismatch is refused at the boundary.
+17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it.
+18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts.
+19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump.
+20. `patch` and `diff` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag.
 
 ---
 
@@ -313,7 +350,7 @@ Six tiers. No state machine, so no transition table.
 
 ### Tier 2 — contract / interface
 
-The generic suite. **These run against every registered block kind, including app-registered ones**, so a consumer's custom block is held to the same contract as the sixteen defaults.
+The generic suite. **These run against every registered block kind, including app-registered ones**, so a consumer's custom block is held to the same contract as the seventeen defaults.
 
 - **T2.1** (I7, the headline): for every registered kind × a fixture corpus × widths {40, 60, 80, 100, 120, 160, 200}, `measure(block, w)` equals the line count of the rendered output at width `w`. This is the single most valuable test in the system.
 - **T2.2** (I7): `measure` is pure — a hundred repeat calls return the same number and perform no I/O.

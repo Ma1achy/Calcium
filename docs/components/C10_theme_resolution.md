@@ -6,7 +6,7 @@
 | **Package** | `tui-kit` (mechanism + a default set) + app (its own tokens) |
 | **Layer** | L1 presentation |
 | **Depends on** | C04 (`Tone`) · `TerminalCapabilities` injected |
-| **Consumed by** | C09 C11 C12 (every renderer) · L4 (`/theme`, config persistence) |
+| **Consumed by** | C09 C11 C12 C25 (every renderer) · L4 (`/theme`, config persistence) |
 | **Source** | A01 D29, D36, F4 · A01 Appendix A.1 · A02 §2, §6 |
 | **Status** | Draft |
 
@@ -62,12 +62,18 @@ function resolveTone(tone: Tone, theme: ResolvedTheme, caps: TerminalCapabilitie
 | Palette | Carries | Contrast floor | At 1-bit | Consumed by |
 |---|---|---|---|---|
 | `tone` | meaning | yes | typographic classes (§3) | everything semantic |
-| `syntax` | meaning | yes | typographic | `code` blocks only |
+| `syntax` | meaning | yes | typographic | `code` and `patch` blocks only |
 | `spectrum` | decoration | none | default foreground | declared app art only |
 
 `resolveTone` is a convenience over `resolve` for the `tone` palette, which is the overwhelmingly common case and keeps `tone: "ok"` as the ergonomic form.
 
-**`syntax` exists because ten semantic tones are genuinely thin for highlighting.** Keyword, string, comment, number, type, function, operator and punctuation are eight distinct roles, and cramming them into `meta`/`info`/`accent`/`identifier` makes a YAML promote preview and a JSON envelope both worse. Prism renders one or the other on nearly every command.
+**`syntax` exists because ten semantic tones are genuinely thin for highlighting.** Keyword, string, comment, number, key, type, function, operator and punctuation are nine distinct roles, and cramming them into `meta`/`info`/`accent`/`identifier` makes a YAML promote preview and a JSON envelope both worse. Prism renders one or the other on nearly every command.
+
+`syntax.key` covers YAML and JSON keys and HTML attributes — `lowlight` emits these as `hljs-attr`, and none of the other eight fits. A manifest is mostly keys, and mapping them to `type` would be wrong in the one place highlighting matters most.
+
+**`syntax`'s consumer list is closed, and it is two.** It was `code` alone until C25; a patch line needs syntax *inside* a line that already carries an add/remove tone, which makes `patch` the only place in the system where two palettes meet on one line. Widening the list was a deliberate decision, not a discovered permission — and it stays closed at two. **A third consumer is a spec change**, to this table, to I16, to T2.8 and to A03 SS20 together. The friction is the point: `syntax` used casually stops meaning anything, and the four-place change is what makes a third consumer argue for itself.
+
+How a tone and a syntax slot compose on one line is **not yet decided** — `Style` has no background channel, and the options are recorded in C25 §6. That decision belongs here when it is taken.
 
 ### Adding a palette
 
@@ -168,7 +174,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I13** — Tokens are authored in 24-bit hex only; no theme file contains an ANSI index or a terminal-specific value.
 - **I14** — A block names a palette slot and never embeds a colour value.
 - **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and has a typographic fallback, a `decoration` palette is neither and is lint-restricted to declared art.
-- **I16** — `syntax` is consumed only by `code` blocks; `spectrum` only by declared art.
+- **I16** — `syntax` is consumed only by `code` and `patch` blocks; `spectrum` only by declared art. The list is closed at two; a third consumer is a spec change to §3, I16, T2.8 and A03 SS20 together.
 
 ---
 
@@ -218,8 +224,11 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.5** (I13): a source scan finds no ANSI index or terminal-specific value in any theme file.
 - **T2.6** (I12): a source scan finds no `process.env` read in `theme/`.
 - **T2.7**: every `Tone` in C04's union has an entry in every shipped theme — exhaustive over the type, so adding a tone without tokens fails the build.
-- **T2.8** (I16): a source scan finds no `syntax` reference outside `code` rendering, and no `spectrum` reference outside declared art.
+- **T2.8** (I16): a source scan finds no `syntax` reference outside `code` and `patch` rendering, and no `spectrum` reference outside declared art.
 - **T2.9** (I14): a source scan finds no hex literal in any block-producing module.
+- **T2.13** (§2): the `syntax` palette has exactly nine slots — keyword, string, comment, number, key, type, function, operator, punctuation — in every shipped theme. Adding a tenth without tokens fails the build, the same shape as T2.7.
+- **T2.14** (§2, I15): every `syntax` slot passes the contrast floor in both variants, `syntax` being a `meaning` palette.
+- **T2.15** (§3): at depth 1, every `syntax` slot collapses to a typographic class and emits no colour code — including `syntax.key`.
 
 ### Tier 3 — edge cases
 

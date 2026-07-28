@@ -48,9 +48,22 @@ interface LocalRegistry {
 }
 ```
 
-`tui-kit` ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/exit` calls `C22.stop`. An app registers its own alongside them.
+`tui-kit` ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
 
 A local handler is the only place a component above L0 may reach several stores at once, and it does so through C23 rather than laterally.
+
+#### `/debug` — inspecting what actually ran
+
+```
+/debug        the previous entry's invocation
+/debug <n>    n entries back
+```
+
+Renders a `keyValue` of `argv`, `transport`, `origin`, `exitCode`, `durationMs` and `adapter`, plus `stderr` as a `raw` block when non-empty, plus the retained raw payload as a `code` block when `--debug` is on (C13 §retention). It appends as an ordinary entry, so it scrolls and is itself inspectable.
+
+**It is a local command and not an action, and that is the whole design.** An action originating from a frozen entry is refused (I18), and inspecting an *older* entry is the entire point — an inspect action would be refused on every entry worth inspecting. Reading an entry's `meta` is not firing an action: nothing re-runs, nothing reaches the far side, and the stale-data footgun I18 exists to prevent does not arise. D5 is untouched.
+
+This is also what distinguishes `/debug` from `{ } json`, which several surfaces offer. `{ } json` **re-runs** the command with `--json` — honest, and what the command says, but on a `--watch` or a changing cluster it returns different data than the block it was opened from. `/debug` describes the entry in front of you.
 
 ---
 
@@ -113,6 +126,21 @@ C09's `RenderContext.onAction` is supplied by C23. Nothing else may supply it �
 **`open` never goes through a shell.** A URL arriving from a far-side envelope is untrusted data, and `spawnShell("open " + url)` would be an injection through the one path that otherwise has none (D18). The opener takes a parsed URL and rejects any scheme outside `http` and `https`.
 
 An action from a **frozen** entry is refused (A01 D5, C13 §2): frozen entries hold stale data and firing `↑ promote` from one is the footgun that rule exists to prevent. Actions from a frozen-but-streaming entry are refused for the same reason — it is not focusable, so an action on it can only have arrived by mistake.
+
+---
+
+### Setting `origin`
+
+C23 is the only component that appends documents, so it is the only one that can set provenance. It sets `meta.origin` on **every** document it appends, with no default and no path that omits it (C04 I13):
+
+| Value | Set when |
+|---|---|
+| `user` | A typed submission from the prompt |
+| `action` | An `exec` action dispatched from a block (§3a) |
+| `refresh` | A time-driven tick — stall notice or part refresh (§3b) |
+| `agent` | Reserved. Nothing produces it in v1 |
+
+`origin` is not a debugging field. It is what makes a transcript legible once more than one thing is putting entries into it, and a provenance field that can be absent is one nobody trusts.
 
 ---
 
@@ -218,6 +246,8 @@ Per submission.
 - **I19** — Stall detection and part refresh are C23's, on C22's injected clock. No adapter, view, layer or entry reads a clock.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success.
+- **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
+- **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
 
 ---
 
@@ -244,6 +274,9 @@ Per submission.
 19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time.
 20. A stream silent for 120 s gets a muted stall notice, never an error.
 21. View refreshes are staggered by offset and fail in isolation.
+22. C23 sets `meta.origin` on every append; provenance is never absent.
+23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point.
+24. `/debug` never re-runs; `{ } json` always does, and each surface says so.
 
 ---
 

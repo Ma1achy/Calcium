@@ -4,32 +4,50 @@
   "description": "A framework for building terminal user interfaces over JSON-emitting CLIs.",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
-  "exports": {
-    ".":            { "types": "./dist/index.d.ts",           "default": "./dist/index.js" },
-    "./testing":    { "types": "./dist/testing/index.d.ts",   "default": "./dist/testing/index.js" },
-    "./fixtures":   { "types": "./dist/fixtures/index.d.ts",  "default": "./dist/fixtures/index.js" }
+  "engines": {
+    "node": ">=22"
   },
-  "files": ["dist", "README.md", "LICENSE"],
-  "publishConfig": { "registry": "https://npm.pkg.github.com/" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    },
+    "./fixtures": {
+      "types": "./dist/fixtures/index.d.ts",
+      "default": "./dist/fixtures/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "scripts": {
-    "build":    "tsc -p tsconfig.build.json",
-    "check":    "tsc --noEmit && eslint .",
-    "enforce":  "node tools/enforce/index.mjs",
-    "test":     "vitest run --dir test --exclude '{e2e,golden}/**'",
-    "golden":   "vitest run --dir test/golden",
-    "e2e":      "vitest run --dir test/e2e",
-    "audit":    "npm audit --audit-level=high"
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit && eslint .",
+    "enforce": "node tools/enforce/index.mjs",
+    "test": "vitest run --dir test --exclude '{e2e,golden}/**'",
+    "golden": "vitest run --dir test/golden",
+    "e2e": "vitest run --dir test/e2e",
+    "audit": "npm audit --audit-level=high"
   },
   "dependencies": {
-    "ink":   "7.1.1",
+    "ink": "7.1.1",
+    "lowlight": "3.3.0",
     "react": "19.2.8"
   },
   "devDependencies": {
     "@types/node": "26.1.2",
-    "eslint":      "10.8.0",
-    "node-pty":    "1.1.0",
-    "typescript":  "7.0.2",
-    "vitest":      "4.1.10"
+    "eslint": "10.8.0",
+    "node-pty": "1.1.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
   }
 }

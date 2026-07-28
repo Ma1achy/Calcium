@@ -46,7 +46,7 @@ export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
 // blocks — the type a consumer returns
 export type {
   Block, Rule, Notice, KeyValue, Table, TableRow, Cell, Steps, Logs, Events,
-  Plot, Series, Progress, Code, Diff, Pills, Tip, Panel, Group, Raw,
+  Plot, Series, Progress, Code, Diff, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
   Tone, Action, ErrorLike, ViewDocument, ViewPatch,
 };
 
@@ -82,6 +82,10 @@ export { cells, truncate, planColumns };
 
 A consumer never constructs, inspects or drives any of them. If one is ever needed, that is a signal the layering has a gap — not a request to widen the export list.
 
+**No `b.hunk`, and no diff parser.** `Patch` is exported as a block shape, but nothing here turns two texts into hunks. That is the app's problem — hunks arrive from a diff tool or already structured from the far side, and the framework renders them.
+
+Two reasons, and the second is the load-bearing one. A `b.hunk` helper would invite hand-constructing diffs, which is not a thing anyone should do. And a diff algorithm shipped here would be a fourth runtime dependency or a few hundred lines of internal code that is wrong about rename detection quietly — the same bar DEPENDENCIES.md sets for everything else, applied to something the framework does not need in order to render.
+
 ---
 
 ## 4. Builders
@@ -110,6 +114,8 @@ export const b: {
   progress(spec: { label: string; current: number; total: number }): Progress;
   code(language: string, text: string, opts?: { wrap?: boolean }): Code;
   diff(rows: DiffRow[]): Diff;
+  patch(spec: { path: string; language: string; hunks: Hunk[];
+                layout?: "unified" | "split" }): Patch;
   pills(chips: ChipInput[]): Pills;
   tip(text: string, actions?: Action[]): Tip;
   panel(title: string, children: Block[]): Panel;

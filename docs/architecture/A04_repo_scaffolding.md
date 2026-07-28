@@ -13,7 +13,7 @@
 
 | Repo | Contains | Publishes |
 |---|---|---|
-| `tui-kit` | C01–C24, the framework | A package to GitHub Packages, private |
+| `tui-kit` | C01–C25, the framework | A package to GitHub Packages, private |
 | `docker-tui` | R01, the reference app | Nothing — proof, plus an import manifest |
 | `prism-tui` | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
 
@@ -25,9 +25,13 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 ## 2. Dependency posture
 
-**`tui-kit` has two runtime dependencies: `react` and `ink`.**
+**`tui-kit` has three runtime dependencies: `react`, `ink` and `lowlight`.**
 
-That is not an aspiration; it falls out of the specs. Everything else is already in Node or is arithmetic the specs define:
+It had two for most of the specification, and that was worth saying because **two was a property that fell out of the specs rather than a target we were defending.** Every other candidate had an internal alternative the specs made better: `Intl.Segmenter` over a grapheme splitter, C10's own arithmetic over a colour library, an injected `() => number` over a date library.
+
+`lowlight` is the first capability that genuinely cannot be internal, which is the bar DEPENDENCIES.md sets rather than a number. C10 defines a `syntax` palette and nothing produced the token spans it colours; a hand-written tokeniser for YAML would be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. The count moved because a spec needed something real, not because the discipline slipped — and the discipline is the justification, never the integer.
+
+Everything else is already in Node or is arithmetic the specs define, and that is what keeps the list this short:
 
 | Capability | Source |
 |---|---|
@@ -41,7 +45,7 @@ That is not an aspiration; it falls out of the specs. Everything else is already
 | Clock (C22) | Injected `() => number` — **no date library, ever** |
 | Terminal escapes (C01, C03) | String literals in one module |
 
-**The strongest supply-chain control is not having dependencies.** A scanner tells you about a compromised package after it is installed; an absent package cannot be compromised. Two direct dependencies is a security property before it is an engineering one.
+**The strongest supply-chain control is not having dependencies.** A scanner tells you about a compromised package after it is installed; an absent package cannot be compromised. A short direct-dependency list is a security property before it is an engineering one — which is why the bar for adding one is an argument, not a budget.
 
 The no-ambient-clock rule (A03 SS1) removes the date library that most projects carry. The palette rule (C10) removes the colour library. The measurement contract (C09) removes the width library, because a third-party one would not be the same implementation the measurer uses.
 
@@ -253,7 +257,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 ## 10. Commitments
 
 1. Three repositories, not a monorepo, so each package is exercised as a package.
-2. `tui-kit` has exactly two runtime dependencies; the specs require no more.
+2. `tui-kit` has three runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
 3. A new dependency needs a justification in `DEPENDENCIES.md`, and A03 asserts the file matches `package.json`.
 4. `--ignore-scripts` from the first commit; nothing here needs a postinstall.
 5. `npm ci` in CI, lockfile committed and reviewed.

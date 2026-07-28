@@ -38,6 +38,8 @@ type TuiConfig = Readonly<{
   blocks?:            readonly BlockDefinition[];
   transport?:         TransportRouter;
 
+  debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
+
   clock?:    () => number;
   fs?:       FileSystem;
   stateDir?: string;                       // PRISM_TUI_STATE_DIR, default ~/.prism
@@ -74,6 +76,8 @@ interface TuiInstance {
 ```
 
 Four required fields. Every optional one has a working default: the fallback adapter, the `/` prefix policy, manifest-derived completion, default chrome, no extra blocks, subprocess transport, real clock and filesystem.
+
+`debug.retainPayloads` turns on C13's raw-payload retention (C13 §5a) so `/debug` can show what an adapter was actually given. Absent, nothing is retained. Present without a count, the default is 50 — a number rather than "all" because doubling memory against a 100,000-block cap is how a debug mode becomes one nobody turns on.
 
 `stateDir` resolves from `PRISM_TUI_STATE_DIR`, defaulting to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
 

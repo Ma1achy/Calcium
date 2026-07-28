@@ -6,12 +6,13 @@ after it is installed; an absent package cannot be compromised.
 
 `make enforce` (SS31) asserts this file and `package.json` agree exactly.
 
-## Runtime — two
+## Runtime — three
 
 | Package | Why it cannot be internal | Owner |
 |---|---|---|
 | `ink` | The React reconciler for terminals, plus Yoga layout. Reimplementing it is the project, not a dependency of it | — |
 | `react` | Ink's reconciler target. Not optional | — |
+| `lowlight` | Emits token roles as an AST, not styled output, so C10 keeps ownership of colour. `shiki`, `highlight.js` used directly and `prismjs` all bake colours into what they emit; `lowlight` returns a hast tree of `hljs-*` classes that C09 maps to palette slots (C09 §4a). A hand-written YAML tokeniser is ~150 lines that will be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. 6 packages, 0 vulnerabilities; only the needed grammars are registered — `createLowlight({ yaml, json })`, not the full highlight.js set | — |
 
 ## Development
 

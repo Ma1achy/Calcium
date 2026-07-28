@@ -112,6 +112,16 @@ Three rules make this safe:
 
 **Streaming entries are never evicted.** A long-running `--watch` scrolled far up is still receiving patches; dropping it would strand the stream with nowhere to write. If the cap cannot be met without evicting one, the cap is exceeded and the overshoot is reported rather than forcing the eviction.
 
+### 5a. Raw payload retention
+
+Off by default. When `debug.retainPayloads` is set (C22 §2), C13 retains the raw payload an adapter was given, for the **last N entries only**, evicting oldest first.
+
+This is what answers the question a rendered block cannot: *did the far side return something unexpected, or did the adapter mishandle it?* `/debug` shows it (C23 §2).
+
+**Retention is capped at N rather than covering every entry, and the reason is not squeamishness about memory.** Retaining every payload roughly doubles memory per entry against the 100,000-block cap, and a debug mode that makes a long session unusable is a debug mode nobody turns on — which means it is not available at the moment it is needed. Fifty covers any real debugging session, because the entry you are inspecting is almost always one you just ran.
+
+Payload eviction is **independent of the block cap**: it runs on its own N-entry window, so retention never evicts an entry and the cap never evicts a payload early. Two eviction policies sharing one counter would make each one's behaviour depend on the other's.
+
 **Eviction is reported, never silent.** `droppedBlocks` accumulates, and C13 maintains a **synthetic marker entry** at the head of the transcript carrying a single `notice` block naming the count. It is a real entry — frozen, settled, never itself evicted — so `totalRows` and every visibility query account for it with no special case downstream. A session that quietly loses its beginning is worse than one that says so.
 
 **Cap overshoot is reported too.** When the cap cannot be met because every candidate is live or streaming, `overCap` holds the excess block count. L4 surfaces it; C13 does not decide what to do about it.

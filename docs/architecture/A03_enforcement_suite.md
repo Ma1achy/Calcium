@@ -97,7 +97,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
 | SS18 | Hex literal | any block-producing module | C10 T2.9 |
 | SS19 | ANSI index or terminal-specific value | theme files | C10 T2.5 |
-| SS20 | `syntax` palette reference | outside `code` rendering | C10 T2.8 |
+| SS20 | `syntax` palette reference | outside `code` and `patch` rendering | C10 T2.8 |
 | SS21 | `spectrum` palette reference | outside declared art | C10 T2.8 |
 | SS22 | Literal verb, flag or enum list | `completion/` | C19 T2.6 |
 
@@ -118,7 +118,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
 
-**SS31 and SS32 are supply-chain gates.** `tui-kit` has two runtime dependencies because the specs need no more (A04 §2); a third appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
+**SS31 and SS32 are supply-chain gates.** `tui-kit` has three runtime dependencies because the specs need no more (A04 §2); a fourth appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
 

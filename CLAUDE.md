@@ -1,7 +1,7 @@
 # tui-kit
 
 A framework for building terminal user interfaces over JSON-emitting CLIs.
-The specs are the contract: 24 component specs, 3 architecture documents.
+The specs are the contract: 25 component specs, 4 architecture documents.
 
 ---
 
@@ -93,7 +93,7 @@ Implement to the spec, and cite invariant numbers in tests: `T3.7 (I5): …`.
 
 **If the spec is wrong, change the spec first.** A spec and an implementation that
 disagree is worse than either being wrong on its own — and an agent that silently
-diverges leaves 47 documents describing something that no longer exists.
+diverges leaves 56 documents describing something that no longer exists.
 
 If a spec is ambiguous, **say so rather than choosing**. Ambiguity found during
 implementation is the cheapest kind to fix.
@@ -106,7 +106,7 @@ implementation is the cheapest kind to fix.
 |---|---|
 | `src/terminal/` | C01 lifecycle · C02 capabilities · C03 frame scheduler |
 | `src/data/` | C04 view model · C05 manifest · C06 transport · C07 adapters · C08 fixtures · C21 process |
-| `src/presentation/` | C09 blocks · C10 theme · C11 table · C12 plot |
+| `src/presentation/` | C09 blocks · C10 theme · C11 table · C12 plot · C25 patch |
 | `src/viewport/` | C13 transcript · C14 viewport · C15 overlays |
 | `src/interaction/` | C16 router · C17 editor · C18 parser · C19 completion · C20 history |
 | `src/shell/` | C22 composition · C23 execution |
@@ -117,4 +117,4 @@ Full index at [`docs/INDEX.md`](docs/INDEX.md).
 Build order: C01–C03 and C04–C07 are independent and can go in parallel — L0's two
 halves do not import each other, which is what makes that true rather than convenient.
 
-**Start with C01.** Highest risk, and the template the other twenty-three follow.
+**Start with C01.** Highest risk, and the template the other twenty-four follow.
