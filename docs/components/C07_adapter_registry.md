@@ -142,6 +142,14 @@ Caps: **8 columns** and **2,000 rows** per generated table. The row cap matters 
 
 Nested objects render as their JSON text inside a cell rather than being flattened. Flattening invents structure the tool did not declare, and a wrong table is worse than an honest blob.
 
+### Open risk: the list shape is unproven visually
+
+**The list shape's legibility is asserted structurally but unproven visually until C11 registers `table`.** If the rendered output is not legible without an adapter, the finding is about this shape table and not about C11.
+
+This is recorded as a risk rather than as a deferred test because of who carries it. Commitment 3 and I11 say a verb shipping tomorrow is usable tomorrow; a list is the majority shape a far side returns; and the claim is currently unproven for exactly that shape. `test/golden/fallback-docker.test.ts` asserts what can be asserted now — docker's own field order preserved, `Status` prose and `State` machine-readable both surviving unread, `Names` comma-joined and unsplit — and C09 §2 renders an unregistered kind as `raw`, so a snapshot taken today would capture a JSON blob and read to a later reviewer as reviewed.
+
+**Reading that output is a named step in C11's plan, not a side effect of a deferral expiring.** The distinction matters: an `it.todo` reads as work waiting on C11, and this is C07's risk carried on C11's schedule. The 8-column cap, the row cap, the choice not to split `Names`, and the decision to render a nested object as JSON text are all decisions in this section that only a rendered table can evaluate.
+
 ---
 
 ## 6. Streaming

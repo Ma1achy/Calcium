@@ -122,11 +122,19 @@ describe("C07 §5 — docker's real JSON through the fallback, unadapted", () =>
     expect(table.rows[1]?.cells["Names"]?.text).toBe("api,api-legacy");
   });
 
-  // Waits on C11: `table` registers from there (C09 §2 renders an unregistered
-  // kind as `raw`), so a rendered snapshot today would capture a JSON blob and
-  // read as a reviewed artefact. The legibility claim — commitment 3, I11 — is
-  // only answerable once the renderer exists, and the todo expires when it does.
+  // **C07 §5 carries this as an open risk, not as work waiting on C11.**
+  //
+  // `table` registers from C11 (C09 §2 renders an unregistered kind as `raw`),
+  // so a snapshot today captures a JSON blob and reads to a later reviewer as
+  // reviewed. But the claim under test is C07's: commitment 3 and I11 say a
+  // verb shipping tomorrow is usable tomorrow, a list is the majority shape,
+  // and that claim is unproven for exactly that shape. If the rendered output
+  // is not legible, **the §5 shape table changes** — the caps, the decision not
+  // to split `Names`, the nested-object-as-JSON rule — and C11 is unaffected.
+  //
+  // Reading this output is a named step in C11's plan. The todo expiring is how
+  // the deferral is enforced, not how the risk is discharged.
   it.todo(
-    "the list shape renders legibly at 80, 120 and 160 with no adapter — waits on C11",
+    "the list shape renders legibly at 80, 120 and 160 with no adapter — waits on C11 (C07 §5 open risk)",
   );
 });
