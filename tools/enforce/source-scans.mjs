@@ -102,6 +102,27 @@ export const SCANS = [
     scope: "src/presentation/blocks/", allow: [],
     why: "display width comes from cells(), never .length" },
 
+  // SS3 carried two of the four vacuity failures at once (A03 §2). It was
+  // inventoried in A03 from the start and never written here, so it could not
+  // fire and appeared in no report; and its scope named `adapters/` while the
+  // tree held `adapters.ts`, a file, so `startsWith` would have matched nothing
+  // even once it existed. C07 makes the directory real and this makes the rule
+  // real.
+  //
+  // Clock reads are SS1's across all of `src/`, so this covers what SS1 does
+  // not: randomness, the filesystem, and the process. Together they are C07 I1
+  // — an adapter is a pure function of a `RawResult` and a context, which is
+  // what lets the presentation layer of every verb be tested in milliseconds
+  // with no cluster and no subprocess.
+  //
+  // It polices the kit-side fallback and any in-tree adapter. An *app's*
+  // adapters live outside this repo, where T2.1's determinism check is what
+  // holds the same line — the scan cannot follow them and does not pretend to.
+  { id: "SS3", spec: "C07 I1 · C07 T2.2",
+    pattern: /\bMath\.random\b|\bprocess\.\w|require\(\s*["']fs["']|from\s+["']node:(?:fs|os|child_process)["']/,
+    scope: "src/data/adapters/", allow: [],
+    why: "adapters are pure: a fixture in, a document out, and nothing ambient in between" },
+
   // The scope is real as of C06: `src/data/process/` is a directory now, holding
   // C21's interface. This rule is the one A03 §2 names as never having been
   // evaluated — it scoped to a directory while the tree had `process.ts`, a

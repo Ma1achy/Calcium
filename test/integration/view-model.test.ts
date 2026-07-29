@@ -8,6 +8,7 @@
 // the document lifecycle a streaming verb actually produces. That is not a
 // substitute for T4.3, but it is the part of T4.3 that does not need C13.
 import { describe, expect, it } from "vitest";
+import { createFallbackAdapter } from "../../src/data/adapters/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import {
   applyPatch,
@@ -122,9 +123,61 @@ describe("C04 integration — the document lifecycle", () => {
     expect(d.meta.origin).toBe("refresh");
   });
 
-  it.todo(
-    "T4.1: a fallback-adapted arbitrary JSON object produces a document passing every T2 contract test — waits on C07",
-  );
+  it("T4.1: a fallback-adapted arbitrary JSON object produces a document passing every T2 contract test", () => {
+    // C04's vocabulary, exercised by the component that actually produces
+    // documents rather than by a literal written to satisfy the validator. The
+    // difference matters: a hand-built document is written by someone who has
+    // read C04, and the fallback is written against JSON nobody controls.
+    const shapes: unknown[] = [
+      { name: "web", replicas: 3 },
+      [{ id: "a" }, { id: "b" }],
+      { total: 2, items: [{ id: "a" }, { id: "b" }] },
+      [],
+      null,
+      "a bare string",
+      [{ a: 1 }, { b: 2 }],
+    ];
+
+    for (const stdout of shapes) {
+      const doc = createFallbackAdapter().adapt(
+        {
+          argv: ["prism", "ps", "--json"],
+          exitCode: 0,
+          signal: null,
+          stdout,
+          stdoutRaw: "",
+          stderr: "",
+          durationMs: 1,
+          parseError: null,
+          cancelled: false,
+          timedOut: false,
+        },
+        {
+          command: "/ps",
+          verb: "ps",
+          width: 100,
+          userRequestedJson: false,
+          transport: "fixture",
+          origin: "user",
+          tool: null,
+        },
+      );
+
+      const validity = validateDocument(doc);
+      expect(validity.ok, validity.ok ? "" : validity.error.join("; ")).toBe(true);
+      expect(doc.blocks.length).toBeGreaterThan(0);
+
+      // The measurement contract, at the widths C04 §5 names. A document that
+      // validates and cannot be measured is one that breaks scrolling instead
+      // of rendering wrongly, which is harder to trace.
+      for (const width of [40, 80, 120]) {
+        for (const b of doc.blocks) {
+          if (b.kind === "table") continue; // C11 registers the measurer.
+          expect(Number.isFinite(measurable().measure(b, width))).toBe(true);
+        }
+      }
+    }
+  });
   it("T4.2: a custom block kind joins the T2.1 corpus by being registered, not by being listed", () => {
     // The extension mechanism, held to the same contract as the defaults. The
     // suite reads `registry.kinds`, so a consumer's kind is measured, rendered

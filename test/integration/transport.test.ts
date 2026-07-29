@@ -5,9 +5,16 @@
 // does not wait is C05: `local` and `streams` are manifest facts, they are read
 // by whoever calls the transport, and both are testable today.
 import { describe, expect, it } from "vitest";
+import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import { findTool } from "../../src/data/manifest/index.js";
-import { createFixtureTransport, createRouter } from "../../src/data/transport/index.js";
-import type { Invocation, TransportRouter } from "../../src/data/transport/index.js";
+import { validateDocument } from "../../src/data/viewmodel/index.js";
+import {
+  createEmulatedTransport,
+  createFixtureTransport,
+  createNdjsonReader,
+  createRouter,
+} from "../../src/data/transport/index.js";
+import type { Invocation, RawPatch, TransportRouter } from "../../src/data/transport/index.js";
 import { fixture } from "../support/manifest.js";
 import { drain, invocation, recorded, result } from "../support/transport.js";
 
@@ -95,8 +102,92 @@ describe("C06 with C05", () => {
   });
 
   it.todo("T4.1 (with C21): the escalation ladder issues real signals through the runner — waits on C21");
-  it.todo("T4.3 (with C07): a RawResult from either transport adapts to the same document — waits on C07");
-  it.todo("T4.4b (with C07): a degraded stream produces a document containing the remainder as a raw block — waits on C07");
+  it("T4.3 (with C07): a RawResult from either transport adapts to the same document", async () => {
+    // C06's own claim, from C07's side: the transports differ in how they get a
+    // result and not in what a result is. If a fixture and an emulated run
+    // adapted differently, every fixture-backed test would be testing something
+    // the production path never produces.
+    const payload = [
+      { id: "a", state: "running" },
+      { id: "b", state: "exited" },
+    ];
+    const inv = invocation({ verb: "ps", argv: ["ps"] });
+
+    const fromFixture = await createFixtureTransport([
+      recorded({ verb: "ps", argv: ["ps"], result: result({ stdout: payload }) }),
+    ]).invoke(inv);
+    const fromEmulated = await createEmulatedTransport(() =>
+      result({ stdout: payload, argv: ["ps", "--json"] }),
+    ).invoke(inv);
+
+    const registry = createAdapterRegistry();
+    const ctx = {
+      command: "/ps",
+      verb: "ps",
+      width: 100,
+      userRequestedJson: false,
+      transport: "fixture" as const,
+      origin: "user" as const,
+      tool: null,
+    };
+
+    // `meta` records which transport ran, so the comparison is of the blocks and
+    // the status — the parts that are supposed to be identical.
+    const a = registry.adapt(fromFixture, ctx);
+    const b = registry.adapt(fromEmulated, ctx);
+    expect(a.blocks).toEqual(b.blocks);
+    expect(a.status).toBe(b.status);
+    expect(validateDocument(a).ok).toBe(true);
+  });
+
+  it("T4.4b (with C07): a degraded stream produces a document containing the remainder", async () => {
+    // End to end across the seam: C06 decides the stream stopped being NDJSON,
+    // and C07 is the only thing that can put the rest of it on screen. C06
+    // carries no `remaining` field — the `malformed` patches are the remainder
+    // (C06 §5, C07 §6), and this is the assertion that they arrive.
+    const lines = [
+      ...Array.from({ length: 10 }, (_, i) => JSON.stringify({ n: i })),
+      "<!DOCTYPE html>",
+      "<html><body>502 Bad Gateway</body></html>",
+      "</html>",
+    ];
+
+    // An async generator, because `isPatches` tests for `Symbol.asyncIterator`
+    // — a sync one is taken for a settled result and produces nonsense.
+    const transport = createEmulatedTransport(() => {
+      async function* patches(): AsyncGenerator<RawPatch> {
+        const reader = createNdjsonReader();
+        for (const line of lines) {
+          for (const patch of reader.push(`${line}\n`)) yield patch;
+        }
+        yield { kind: "end", result: result({ stdout: undefined, stdoutRaw: lines.join("\n") }) };
+      }
+      return patches();
+    });
+
+    const registry = createAdapterRegistry();
+    let seq = 0;
+    let remainder = "";
+    for await (const patch of transport.stream(invocation({ verb: "logs", streams: true }))) {
+      const view = registry.adaptPatch(patch, {
+        command: "/logs",
+        verb: "logs",
+        width: 100,
+        userRequestedJson: false,
+        transport: "emulated",
+        origin: "user",
+        tool: null,
+        seq,
+      });
+      seq += 1;
+      if ((view?.op === "append" || view?.op === "replace") && view.block.kind === "raw") {
+        remainder = view.block.text;
+      }
+    }
+
+    expect(remainder).toContain("502 Bad Gateway");
+    expect(remainder).toContain("</html>");
+  });
   it.todo("T4.5b (with L4): the concurrency refusal surfaces as a notice naming the running verb — waits on L4");
   it.todo("T4.6 (with L4): a cd built-in followed by a verb → the verb spawns in the new directory — waits on L4 and C18");
 });

@@ -21,7 +21,7 @@
 // about. The fabricated violation catches the first, the scope check the
 // second, the existence check the third; no one of them catches the others,
 // which is why all three are here (A03 §2, commitment 14).
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   checkModuleGraph,
@@ -67,6 +67,14 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'const style = resolve("spectrum.3", theme, caps);',
   },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
+  {
+    // The shape an adapter author reaches for when a document wants a
+    // timestamp column the far side did not send. It compiles, it reads
+    // sensibly, and it makes the adapter untestable against a fixture.
+    rule: "SS3",
+    file: "src/data/adapters/docker.ts",
+    source: "const seed = Math.random();",
+  },
   { rule: "SS26", file: "src/data/process/runner.ts", source: 'process.stdout.write(chunk);' },
   {
     // The exit-code half of SS25. A `switch` on the code, on the way to a
@@ -344,5 +352,96 @@ describe("A03 commitment 14 — every scope reaches the tree", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+/**
+ * The third half, and the one neither of the others can reach.
+ *
+ * A fabricated violation proves a rule *can* fire; a scope check proves it has
+ * something to fire *at*. Neither says anything about a rule that was written
+ * down in A03 and never implemented — `checkSourceScans` iterates the rows it
+ * has, so a missing row is not a rule that fails but a rule that is not there.
+ * It appears in no report, and an unimplemented rule is indistinguishable from
+ * a passing one in every report there is.
+ *
+ * That was SS3 for the whole life of the project: inventoried in A03, absent
+ * from `source-scans.mjs`, and additionally scoped to a directory that was a
+ * file. Two of A03 §2's four vacuity failures in one rule.
+ *
+ * So the inventory is asserted equal to what exists — implemented plus
+ * explicitly pending. **A rule written down and never built fails on the commit
+ * that writes it down**, which is the commit where someone still remembers what
+ * it was for.
+ */
+describe("A03 commitment 14b — the inventory equals what is implemented", () => {
+  /**
+   * Rules inventoried in A03 and deliberately not implemented yet, each with
+   * the component that will make them implementable. An entry here is a rule
+   * that is NOT being enforced, and saying so is the point.
+   */
+  const PENDING_RULES: Record<string, string> = {
+    SS2: "C08 — the fixture world does not exist",
+    SS4: "C13 — no transcript/",
+    SS5: "C14 — no viewport/ rule yet",
+    SS6: "C16",
+    SS7: "C17",
+    SS8: "C19",
+    SS9: "C20",
+    SS12: "C10 — folded into SS11's scope for now",
+    SS13: "C14",
+    SS18: "C10 — needs the block-producing module list",
+    SS22: "C19",
+    SS24: "C11, C12, C18",
+    SS27: "C21",
+    SS29: "C23",
+    SS30: "C18, C19",
+    SS31: "implemented in dependencies.mjs, not source-scans.mjs",
+    SS32: "implemented in dependencies.mjs, not source-scans.mjs",
+    SS38: "implemented in dependencies.mjs, not source-scans.mjs",
+  };
+
+  /** The SS ids A03 declares, read from the document rather than restated here. */
+  function inventoriedScans(): readonly string[] {
+    const doc = readFileSync("docs/architecture/A03_enforcement_suite.md", "utf8");
+    const ids = new Set<string>();
+    for (const line of doc.split("\n")) {
+      const match = /^\|\s*(SS\d+)\s*\|/.exec(line);
+      if (match?.[1] !== undefined) ids.add(match[1]);
+    }
+    return [...ids].sort();
+  }
+
+  it("every SS rule A03 inventories is implemented or explicitly pending", () => {
+    const implemented = new Set(SCANS.map((s) => s.id));
+    const missing = inventoriedScans().filter(
+      (id) => !implemented.has(id) && PENDING_RULES[id] === undefined,
+    );
+
+    expect(
+      missing,
+      `A03 inventories ${missing.join(", ")} and nothing implements them. ` +
+        `An unimplemented rule reports compliance exactly like a satisfied one — ` +
+        `implement it, or add it to PENDING_RULES with its blocking component.`,
+    ).toEqual([]);
+  });
+
+  it("nothing listed pending has quietly been implemented", () => {
+    // The other direction, for the same reason the scope list checks its own
+    // exemptions: a pending entry that outlives its reason is a rule everyone
+    // believes is unenforced, and nobody checks the ones they think are off.
+    const implemented = new Set(SCANS.map((s) => s.id));
+    const stale = Object.keys(PENDING_RULES).filter((id) => implemented.has(id));
+
+    expect(stale, `${stale.join(", ")} is listed pending but implemented`).toEqual([]);
+  });
+
+  it("every implemented scan is inventoried in A03", () => {
+    // And the last direction: a rule in the code with no row in A03 is a rule
+    // no one specified, which is how the suite grows past what it can justify.
+    const inventoried = new Set(inventoriedScans());
+    const unspecified = SCANS.map((s) => s.id).filter((id) => !inventoried.has(id));
+
+    expect(unspecified, `${unspecified.join(", ")} is enforced but not inventoried`).toEqual([]);
   });
 });
