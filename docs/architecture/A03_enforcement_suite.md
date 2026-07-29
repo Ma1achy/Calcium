@@ -140,6 +140,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 §4, C05 §2 |
+| SS36 | A string literal assigned to a `colour` field | `src/` | C10 I18, T2.19 |
 
 **SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
 
@@ -156,6 +157,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 **SS26 is pending and has never been evaluated.** It scopes to `src/data/process/` and the scaffold created `src/data/process.ts` — a file, not a directory — so the prefix match finds nothing and the rule passes on every run. It came in with the scaffold and would not have fired had it been violated. The scope is corrected when C21 lands and creates the directory; until then the vacuity suite carries it as a named pending entry rather than counting it as enforcement. This is the defect the sixth kind of check exists to find, and it is recorded here rather than quietly fixed because the count of live rules should be honest.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
+
+**SS36 exists because a tag that is droppable gets dropped.** C10 resolves a colour to a value that names its own depth — `rgb`, `ansi256`, `ansi16` — so the writer downstream switches on a tag rather than inferring the depth from the format, and the consumer that infers wrong emits truecolour to a sixteen-colour terminal. Types hold that inside the tree. What types do not hold is a cast, and a `Style` assembled by hand in a renderer with `colour: "#7faecf"` is one `as` away from compiling. The scan is what makes the untagged form unwritable rather than merely discouraged.
 
 **SS35 is SS30's shape applied to a type name.** C05's first draft declared its own `Result<T, E>` with `errors` plural where C04's has `error` singular — same name, same half of L0, and both compile. Nothing would have failed until a call site read `r.error` on the wrong one, which is a runtime `undefined` rather than a type error. One `Result` in the tree, declared in `data/viewmodel/types.ts`; a component wanting a plural puts it in the type argument.
 
@@ -256,6 +259,21 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 12. Every failure names the rule, the file, the line and the declaring spec.
 13. MG and SS run pre-commit, because their violations become depended-upon within days.
 14. **Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule.** A rule with no such test is assumed vacuous until it has one. Every scan's scope is separately asserted to match at least one file in the tree; and where a rule enumerates named entities — mode owners, export names, file paths — those names are separately asserted to exist. A scope or a name that matches nothing is listed as pending, with its blocking component, and the pending entry fails once it becomes real.
+15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for.
+
+---
+
+## 9a. What a deferral rule finds that nobody expects
+
+`tools/enforce/todo-expiry.mjs` was written to answer one question: which deferred tests became writable when a component landed. It answers a second, and the second is worth more.
+
+**A blocker that is wrong is indistinguishable from a blocker that is pending.** A test deferred "waits on C10" when the work is actually C09's looks exactly like one legitimately waiting — for as long as C10 does not exist. Nothing distinguishes them, because both are simply not-yet.
+
+The moment C10 landed, three such deferrals surfaced: one about glyph substitution under ASCII, one about a measurer, one about a registry — all C09's work, and C10 §10 says as much in its own out-of-scope table. Each had been mislabelled at the moment it was written, and each would have sat mislabelled until someone re-read two specs side by side and noticed.
+
+The rule reports them because it cannot tell the difference either: it fires on *implemented blocker, test still deferred*, and a mislabelled deferral satisfies that exactly. **The fix is not to make the rule cleverer.** A wrong blocker is a claim about which component owns a piece of work, and the only thing that can settle it is a person reading both specs — which is precisely what the failure forces, at the one moment the answer is cheap to establish.
+
+So the response to TD2 is two-branched, and both branches are ordinary: write the test, or restate what it is actually waiting for. An exemption is neither.
 
 ---
 

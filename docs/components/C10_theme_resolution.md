@@ -135,7 +135,17 @@ Prism's token sets are in A01 Appendix A.1 — ten tones, nine `syntax` slots an
 
 **The 4-bit rule is the one that matters.** Computing nearest-of-16 by RGB distance collapses tones onto each other — `dim` and `muted` both land on bright black, `warn` and `accent` both on yellow — and the result is a UI where distinctions silently vanish. Sixteen slots for ten tones needs a human decision, so each theme declares its own mapping and the framework validates that it is injective across the tones that must stay distinct.
 
-At 8-bit, "rank order preserved" means that if `dim` was darker than `default` in 24-bit it remains darker after quantisation. Nearest-neighbour alone can invert a pair; the resolver corrects for it, by assigning the palette in luminance order and never choosing an entry that would break monotonicity.
+At 8-bit, "rank order preserved" means that if `dim` was darker than `default` in 24-bit it remains darker after quantisation. Nearest-neighbour alone can invert a pair, so the resolver assigns luminance **levels** across the whole palette at once, minimising total perceptual distance subject to monotonicity between levels.
+
+### Why that, and not a nearest-neighbour walk
+
+Written down because it reads as over-engineering next to the obvious version, and the obvious version was tried twice. Both failures are here so nobody simplifies it back — **and neither would be caught by a pairwise test.**
+
+**Constrain as you go.** Walk the palette darkest first and refuse any entry darker than the last one assigned. Rank order holds, and it cascades: `meta`'s nearest lilac in the cube sits 0.11 lighter than its token, which raises the floor for its neighbour, which raises it again, and `ok` comes out near-white with `accent` a pale cream. A greedy walk cannot trade a small loss on one slot for a large saving on the next, and that trade is the entire question.
+
+**Exempt near-equal neighbours.** Let two slots whose source luminances are within noise of each other go unconstrained. The cascade stops, and transitivity goes with it: `info` and `identifier` are 0.030 apart — a real ranking — with two near-equal steps between them, so the pair inverts while **every adjacent comparison passes**. A test that walks neighbours cannot see this, which is why the invariant is stated over all pairs and the code is not written as a walk.
+
+Rank order is a property of the whole set, so the set is assigned as one problem. Levels begin where luminance has risen past the noise threshold; within a level the source expresses no order and none is imposed; between levels the order is absolute. Any pair separated by more than the threshold necessarily falls in different levels, which is exactly the invariant I6 states.
 
 **8-bit quantisation targets indices 16–255 only.** The first sixteen are whatever the emulator's own palette says they are — the same numbers a 4-bit theme deliberately curates — so quantising into them would make an 8-bit result depend on a user's terminal configuration while presenting itself as a measured nearest neighbour. 16–231 are the 6×6×6 cube and 232–255 the greyscale ramp, and both are fixed values a distance can honestly be computed against.
 
@@ -210,7 +220,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I3** — Contrast is validated at load. A failing theme or override is rejected, never partially applied.
 - **I4** — An invalid override leaves the current theme exactly as it was.
 - **I5** — The 4-bit mapping is declared per theme and injective across tones required to stay distinct.
-- **I6** — 8-bit quantisation preserves the lightness rank order of tones.
+- **I6** — 8-bit quantisation preserves the lightness rank order of tones, **over every pair** and not merely between neighbours. Two tones separated by more than the noise threshold in 24-bit do not invert at 8-bit.
 - **I7** — C10 triggers no repaint itself. It reports a change; L4 invalidates.
 - **I8** — Surfaces follow the same degradation ladder as tones, and vanish entirely at 1-bit.
 - **I9** — No tone resolves to the variant's own `bg`.
@@ -222,6 +232,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and declares its typographic fallback as `classes`, one entry per slot, a `decoration` palette does neither and is lint-restricted to declared art.
 - **I16** — `syntax` is consumed only by `code` and `patch` blocks; `spectrum` only by declared art. The list is closed at two; a third consumer is a spec change to §3, I16, T2.8 and A03 SS20 together.
 - **I17** — Within one palette and one variant, no two slots carry the same 24-bit value, and at 8-bit no two of `{ok, warn, error, info, accent}` resolve to the same index. A slot that renders as another slot bought nothing.
+- **I18** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
 
 ---
 
@@ -260,7 +271,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.7** (I3): a theme whose `error` fails 4.5:1 → `loadTheme` returns errors naming `error`, no theme produced.
 - **T1.8**: a valid override merges and clears the cache.
 - **T1.9** (I9): a theme where a tone equals `bg` → rejected at load.
-- **T1.10** (I6): a token set whose 8-bit nearest neighbours would invert `dim` and `default` → resolution corrects the order.
+- **T1.10** (I6): rank order holds over **every pair** of tones separated by more than the noise threshold, not over adjacent ones. Asserted as all pairs deliberately: a neighbour-wise assertion passes against a neighbour-wise implementation that inverts `info` and `identifier`, which is the bug §3 records.
 - **T1.11**: `muted` at 2.5:1 passes; at 2.0:1 fails.
 - **T1.12** (I8): at depth 1, every surface resolves to an empty `Style` — no background is painted.
 - **T1.13** (I8): at depth 4, surfaces use the curated mapping, not computed nearest.
@@ -279,6 +290,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.13** (§2): the `syntax` palette has exactly nine slots — keyword, string, comment, number, key, type, function, operator, punctuation — in every shipped theme. Adding a tenth without tokens fails the build, the same shape as T2.7.
 - **T2.14** (§2, I15): every `syntax` slot passes its §4 floor in both variants and against **both surfaces**, `syntax` being a `meaning` palette. `comment` is checked at 3 : 1 with the rest at 4.5.
 - **T2.16** (I17): per palette, per variant, no two slots share a 24-bit value. This is the test that caught `key`/`number` and, less obviously, light `number`/`type` — the second was created by the contrast correction itself, so nothing but recomputation could have found it.
+- **T2.18** (I18): over every ref × every depth, a returned `colour` is absent or an object whose `kind` is one of exactly `rgb`, `ansi256`, `ansi16` — never a string. The kinds are compared against a list **written out literally in the test**, the same shape as C05 T1.7c: a list derived from the type agrees with itself and passes on any addition.
+- **T2.19** (I18): a source scan finds no string literal assigned to a `colour` field anywhere in `src/` (A03 SS36). Types stop this inside the tree; the scan is what stops it arriving through a cast, which is how a tag gets dropped in practice.
 - **T2.17** (I17): at depth 8, `{ok, warn, error, info, accent}` resolve to five distinct values, per variant. I17's 24-bit half and T2.3's 4-bit half both miss this: two tones distinct in hex can quantise onto one 256-colour index, and that failure is invisible in truecolour — which is where every value was authored and every golden will be reviewed. `dim`, `muted` and `default` collapsing at low depth is acceptable and is deliberately not asserted.
 - **T2.15** (§3): at depth 1, every `syntax` slot collapses to a typographic class and emits no colour code — including `syntax.key`.
 
@@ -327,6 +340,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.12** (§4): validating against `bg` alone → T2.4 fails on `muted`, which measured 2.31 on `bgElev` before the correction. The revert is invisible in the transcript and shows up only inside a panel.
 - **T6.13** (I17): giving two slots the same value — the state `key` and `number` shipped in, and the state light `number` and `type` fell into when both were corrected to the floor → T2.16 fails, naming the pair.
 - **T6.14** (I17): dropping the 8-bit distinctness check → T2.17 fails. Nothing in a truecolour terminal would have shown it.
+- **T6.15** (I6): rewriting the 8-bit assignment as a neighbour-wise walk → T1.10 fails on `info` and `identifier`, **while every adjacent comparison still passes**. This is the revert that looks like a simplification, and §3 records both attempts that produced it.
+- **T6.16** (I18): making `Style.colour` a bare string, or adding an untagged form beside the union → T2.18 fails, and the writer downstream is back to guessing the depth from the format.
 
 ---
 
