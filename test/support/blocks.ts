@@ -12,6 +12,7 @@ import {
   document,
   type Block,
   type BlockKind,
+  type ColumnDef,
   type Table,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
@@ -220,6 +221,122 @@ export function doc(overrides: Partial<ViewDocument> = {}): ViewDocument {
     ...overrides,
   } as ViewDocument);
 }
+
+// --- C11's layout fixtures --------------------------------------------------
+//
+// `tableOf` stays a merge fixture: one column, no priorities worth dropping. What
+// C11 needs is a table under width pressure, and the honest source for one is a
+// surface that already declares its priorities — S03's eleven, which is also the
+// set the drop tables were verified against.
+
+/**
+ * S03's eleven columns, as `ColumnDef`s.
+ *
+ * `expand` carries `role: "expand"` — the marker column C11 fills (C11 I16) — and
+ * `status` declares `minWidth` equal to its longest value plus a glyph, which is
+ * how I10 is expressed: the surface says "whole or dropped" by choosing that
+ * minimum, and C11 enforces it generically.
+ */
+export function psColumns(): readonly ColumnDef[] {
+  return Object.freeze([
+    { key: "expand", label: "", align: "left", priority: 100, minWidth: 1, sortable: false, role: "expand" },
+    { key: "glyph", label: "", align: "left", priority: 100, minWidth: 1, sortable: false },
+    { key: "uuid", label: "uuid", align: "left", priority: 90, minWidth: 7, sortable: true },
+    { key: "family", label: "family", align: "left", priority: 85, minWidth: 12, flex: true, sortable: true },
+    { key: "status", label: "status", align: "left", priority: 80, minWidth: 11, sortable: true },
+    { key: "detail", label: "detail", align: "left", priority: 65, minWidth: 12, flex: true, sortable: false },
+    { key: "metric", label: "metric", align: "right", priority: 60, minWidth: 8, sortable: true },
+    { key: "age", label: "age", align: "right", priority: 50, minWidth: 6, sortable: true },
+    { key: "kind", label: "kind", align: "left", priority: 30, minWidth: 10, sortable: true },
+    { key: "owner", label: "owner", align: "left", priority: 20, minWidth: 8, sortable: true },
+    { key: "mr", label: "mr", align: "left", priority: 10, minWidth: 6, sortable: false },
+  ] as const);
+}
+
+/**
+ * A five-row `ps` table — the fixture C11 T2.3 measures at every width.
+ *
+ * `expanded` and `detail` are parameters because the suite runs every expansion
+ * combination over it, and `rows` because T3.9 and T3.16 want 500 and 10,000 of
+ * them. Each has a default that differs from what the tests ask for, so a builder
+ * ignoring its argument fails rather than passing quietly (`test/support/README.md`).
+ */
+export function psTable(
+  options: Readonly<{
+    id?: string;
+    rows?: number;
+    expanded?: readonly number[];
+    detail?: boolean;
+    sort?: Table["sort"];
+  }> = {},
+): Table {
+  const count = options.rows ?? 4;
+  const expanded = new Set(options.expanded ?? []);
+  const withDetail = options.detail ?? false;
+
+  const uuids = ["a3f9b21", "7c2d4e1", "2e8a04c", "f410d99", "b1c7e34"];
+  const ages = ["23m", "1h 12m", "45s", "3d", "2h"];
+  const metrics = ["0.0372", "0.0089", "", "0.1240", "0.0500"];
+  const states = ["running", "succeeded", "failed", "queued", "promoted"];
+
+  return block({
+    kind: "table",
+    id: options.id ?? "ps",
+    columns: psColumns(),
+    rows: Array.from({ length: count }, (_, i) => {
+      const row: {
+        id: string;
+        cells: Record<string, { text: string; tone?: "ok" | "error" | "muted"; glyph?: "running" | "ok" | "error" | "queued" }>;
+        expanded?: boolean;
+        detail?: readonly Block[];
+      } = {
+        id: `r${i + 1}`,
+        cells: {
+          expand: { text: "" },
+          glyph: { text: "", glyph: "running" },
+          uuid: { text: uuids[i % uuids.length] ?? "0000000" }, // cells-ok
+          family: { text: `family-${String(i + 1)}` },
+          status: { text: states[i % states.length] ?? "running" }, // cells-ok
+          detail: { text: `ep ${String(i + 1)}/40` },
+          metric: { text: metrics[i % metrics.length] ?? "" }, // cells-ok
+          age: { text: ages[i % ages.length] ?? "1m" }, // cells-ok
+          kind: { text: "candidate" },
+          owner: { text: "malachy@fmx.io" },
+          mr: { text: `!12${String(i)}` },
+        },
+      };
+      if (expanded.has(i + 1)) row.expanded = true;
+      if (withDetail) {
+        row.detail = [
+          block({
+            kind: "progress",
+            id: `${options.id ?? "ps"}-p${String(i + 1)}`,
+            label: "epoch",
+            current: 17,
+            total: 40,
+          }),
+        ];
+      }
+      return row;
+    }),
+    ...(options.sort === undefined ? {} : { sort: options.sort }),
+  });
+}
+
+/**
+ * The corpus C11's conformance runs over: the `ps` table flat, expanded, with and
+ * without declared detail, plus the two `table` fixtures the shared corpus already
+ * holds — the single-column one and the empty one, which is where zero columns and
+ * an empty message are covered.
+ */
+export const TABLE_CORPUS: readonly Block[] = Object.freeze([
+  psTable(),
+  psTable({ id: "ps-expanded", rows: 5, expanded: [1, 3] }),
+  psTable({ id: "ps-detail", rows: 5, expanded: [2], detail: true }),
+  psTable({ id: "ps-sorted", rows: 5, sort: { key: "age", direction: "desc" } }),
+  ONE_PER_KIND.table,
+  ...ADVERSARIAL.filter((b) => b.kind === "table"),
+]);
 
 /** A table with `n` rows, ids `r1..rn` — the merge and view-state fixture. */
 export function tableOf(n: number, id = "t"): Table {

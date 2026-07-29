@@ -44,6 +44,115 @@ export function illustratedRows(file: string, fence: number): number {
   return found.replace(/\n$/, "").split("\n").length;
 }
 
+// --- the S-series' column and drop tables (A03 CP6) ------------------------
+//
+// Read from the markdown for the same reason the row counts are. A fixture
+// restating S03's drop order would agree with itself while the spec drifted, and
+// the drop tables are the one part of a surface that was verified against an
+// independent implementation of the planner during specification — so a
+// disagreement locates a defect on one side or the other, which is only true if
+// the comparison reads what a human reads.
+
+/** A markdown table, as header cells and body rows of cells. */
+function tables(file: string): readonly Readonly<{ header: readonly string[]; rows: readonly (readonly string[])[] }>[] {
+  const lines = readFileSync(file, "utf8").split("\n");
+  const out: { header: readonly string[]; rows: (readonly string[])[] }[] = [];
+
+  const cellsOf = (line: string): readonly string[] =>
+    line
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((c) => c.trim());
+
+  for (let i = 0; i < lines.length; i += 1) { // cells-ok
+    const line = lines[i] ?? "";
+    const next = lines[i + 1] ?? "";
+    // A header is a `| … |` row followed by the `|---|` separator. Anything else
+    // beginning with a pipe is a body row of a table already open.
+    if (!line.trim().startsWith("|") || !/^\|[\s|:-]+\|$/.test(next.trim())) continue;
+
+    const header = cellsOf(line);
+    const rows: (readonly string[])[] = [];
+    let j = i + 2;
+    while (j < lines.length && (lines[j] ?? "").trim().startsWith("|")) {
+      rows.push(cellsOf(lines[j] ?? ""));
+      j += 1;
+    }
+    out.push({ header, rows });
+    i = j - 1;
+  }
+
+  return out;
+}
+
+/** The keys named in backticks in a cell. `none` and `all eleven` name none. */
+function keysIn(cell: string): readonly string[] {
+  return [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
+}
+
+/** The widths a drop row applies to — `160 · 120 · 100` is three. */
+function widthsIn(cell: string): readonly number[] {
+  return [...cell.matchAll(/\d+/g)].map((m) => Number(m[0]));
+}
+
+export type SurfaceColumn = Readonly<{
+  key: string;
+  priority: number;
+  minWidth: number;
+  flex: boolean;
+  sortable: boolean;
+}>;
+
+/**
+ * A surface's declared columns, in declared order.
+ *
+ * S06 merges two into one row — `| expand · glyph | 100 | 1 · 1 | — |` — so a
+ * name containing `·` is split, its minimums with it. The merged form is the
+ * spec's, and reading it is cheaper than asking five surfaces to change shape for
+ * a test.
+ */
+export function surfaceColumns(file: string): readonly (readonly SurfaceColumn[])[] {
+  return tables(file)
+    .filter((t) => t.header[0] === "Column" && t.header[1] === "Priority")
+    .map((t) =>
+      t.rows.flatMap((row): SurfaceColumn[] => {
+        const names = (row[0] ?? "").split("·").map((n) => n.trim().replace(/`/g, ""));
+        const mins = (row[2] ?? "").split("·").map((m) => Number(m.trim()));
+        const priority = Number(row[1]);
+        const flex = (row[3] ?? "") === "yes";
+        const sortable = (row[4] ?? "") === "yes";
+        return names.map((key, i) => ({
+          key,
+          priority,
+          minWidth: mins[i] ?? mins[0] ?? 1,
+          flex,
+          sortable,
+        }));
+      }),
+    );
+}
+
+export type SurfaceDrops = Readonly<{ width: number; dropped: readonly string[] }>;
+
+/**
+ * A surface's stated drop order, one entry per width.
+ *
+ * `column` selects which table's drops when a surface states two — S06 draws
+ * families and versions side by side in one table with two cells per row.
+ */
+export function surfaceDrops(file: string, column = 1): readonly SurfaceDrops[] {
+  const table = tables(file).find(
+    (t) => t.header[0] === "Width" && (t.header[column] ?? "") !== "",
+  );
+  if (table === undefined) return [];
+
+  return table.rows.flatMap((row) =>
+    widthsIn(row[0] ?? "").map((width) => ({ width, dropped: keysIn(row[column] ?? "") })),
+  );
+}
+
 // --- S07 diff --------------------------------------------------------------
 
 const S07_IDENTITY: Block = block({

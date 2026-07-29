@@ -130,6 +130,17 @@ export type ColumnDef = Readonly<{
   maxWidth?: number;
   flex?: boolean;
   sortable: boolean;
+  /**
+   * The column whose content a renderer supplies rather than the data (I30).
+   *
+   * Surfaces declare an `expand` column of `minWidth` 1 whose cell is the
+   * expand/collapse marker, and its cell is inside their drop arithmetic — so it
+   * must stay an ordinary column for planning while being extraordinary for
+   * content. This is how C11 recognises it (C11 I16). Presentation intent, not
+   * view state: it never changes with what the user does, so `merge` carries it
+   * like the rest of `columns` and I9 is untouched.
+   */
+  role?: "expand";
 }>;
 
 export type TableRow = Readonly<{

@@ -111,9 +111,25 @@ export const SCANS = [
   // `src/presentation/blocks/` alone, so the editor's `.length` was unpoliced
   // and recorded as covered — SS26's failure one directory over. The citation
   // graph is what found it; nothing had before.
+  // **The scope is `src/presentation/`, not `blocks/`.** Its reason — display width
+  // comes from `cells()`, the implementation the measurer uses — is a fact about
+  // presentation and not about one directory of it. Scoped to `blocks/` it stopped
+  // seeing `src/presentation/table/` the day C11 created it, and C11 is the largest
+  // consumer of measurement in the tree. Narrower reads as tighter and is looser,
+  // because it stops seeing new files: SS2's argument, and SS26's failure with a
+  // longer fuse.
   { id: "SS23", spec: "C09 T2.9",
     pattern: /\.length\b(?!.*\/\/ *cells-ok)/,
-    scope: "src/presentation/blocks/", allow: [],
+  //
+  // **`theme/` is named as the one exception, rather than the scope being narrowed
+  // back.** C10 resolves colours: its `.length` reads are over palette levels,
+  // contrast ceilings and error arrays, and none of it is text a terminal draws.
+  // Marking sixteen of them `// cells-ok` would put a claim about display width on
+  // lines that have nothing to do with display width, which is worse than the
+  // exemption — it teaches the annotation to mean "the scan complained". An
+  // allow-list of one directory is auditable; a glob that might stop matching is
+  // not (SS19's argument, recorded there).
+    scope: "src/presentation/", allow: ["src/presentation/theme/"],
     why: "display width comes from cells(), never .length" },
 
   { id: "SS40", spec: "C17 I2 · C17 T2.4",
@@ -166,6 +182,27 @@ export const SCANS = [
   // evaluated — it scoped to a directory while the tree had `process.ts`, a
   // file, so `startsWith` never matched and it reported compliance for as long
   // as anyone cared to look.
+  // C11 owns no state: sort order, expansion and focus all arrive as data (C11
+  // I11), and `planColumns` is pure and holds no cache (C11 §2). A module-level
+  // `let` in `table/` is how each of those stops being true — a memo keyed on the
+  // last width, a remembered sort order, a cached plan — and none of them changes
+  // a single frame in the suite, because the answers are correct. What changes is
+  // that two tables sharing the module disagree, and only when one of them
+  // resizes.
+  //
+  // **The scope names the directory, and C11 implements into one.** A03 inventoried
+  // this as `table/` while the scaffold held `src/presentation/table.ts`, a file,
+  // so `startsWith` would have matched nothing and the rule would have reported
+  // compliance from the day it was written — SS26, one directory over. The fix was
+  // to the layout, not to the rule.
+  //
+  // Anchored to the start of a line so a `let` inside a function body is what it
+  // is: an ordinary local, in a pure function, which is not what this forbids.
+  { id: "SS24", spec: "C11 I11 · C11 T2.6 · C12 T2.5 · C18 T2.2",
+    pattern: /^(?:export\s+)?(?:let|var)\s/m,
+    scope: "src/presentation/table/", allow: [],
+    why: "C11 owns no state: a module-level binding is a cache two tables share and only one of them invalidates" },
+
   { id: "SS26", spec: "C21 T2.2",
     pattern: /process\.stdout\.write/,
     scope: "src/data/process/", allow: [],

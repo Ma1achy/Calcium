@@ -4,7 +4,11 @@
 // Assembled once here rather than per file so that "the same block in both
 // themes" and "the same block in both unicode modes" are one argument apart
 // (T4.2, T2.2).
-import { createBlockRegistry, type BlockRegistry } from "../../src/presentation/blocks/index.js";
+import {
+  createBlockRegistry,
+  type BlockDefinition,
+  type BlockRegistry,
+} from "../../src/presentation/blocks/index.js";
 import { defaultTheme, loadTheme, type ResolvedTheme } from "../../src/presentation/theme/index.js";
 import { renderToLines, type RenderOptions } from "../../src/testing/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
@@ -42,8 +46,20 @@ export const MONO_CAPS: TerminalCapabilities = Object.freeze({
   colourDepth: 1,
 });
 
-export function registry(): BlockRegistry {
-  return createBlockRegistry({});
+/**
+ * A registry, with extra kinds registered through the public `register`.
+ *
+ * The parameter is `BlockDefinition<never>[]` so a caller can pass
+ * `tableDefinition`, whose `B` is `Table`, without a cast at every call site:
+ * `BlockDefinition<B>` is invariant in `B` — `B` appears in both `measure`'s and
+ * `render`'s parameters — so `<Table>` is not assignable to `<Block>`. The
+ * registry stores `<Block>` and `defaults.ts` casts at its own collection point
+ * for the same reason; this is that cast, once, here.
+ */
+export function registry(definitions: readonly BlockDefinition<never>[] = []): BlockRegistry {
+  const r = createBlockRegistry({});
+  for (const definition of definitions) r.register(definition as unknown as BlockDefinition);
+  return r;
 }
 
 /**
@@ -55,18 +71,37 @@ export function registry(): BlockRegistry {
  * meet.
  */
 export function measurable(
-  options: Readonly<{ theme?: ResolvedTheme; capabilities?: TerminalCapabilities; tick?: number }> = {},
+  options: Readonly<{
+    theme?: ResolvedTheme;
+    capabilities?: TerminalCapabilities;
+    tick?: number;
+    /**
+     * Kinds registered through C09's public `register`, on top of the fourteen
+     * defaults. `table`, `plot` and `patch` are **not** defaults — C11, C12 and
+     * C25 register them, which is what proves the extension path (C09 §3) — so a
+     * suite that wants one passes it here.
+     *
+     * The option that could have been inert. An unregistered kind still renders,
+     * as `raw`, and still produces rows — so a test that registers `table`, draws
+     * one and counts lines passes whether or not the option arrived.
+     * `support-harness.test.ts` asserts on `kinds` and on content only the real
+     * renderer emits, with a default that genuinely lacks the kind.
+     */
+    definitions?: readonly BlockDefinition<never>[];
+    focus?: RenderOptions["focus"];
+  }> = {},
 ): Readonly<{
   measure: (block: Block, width: number) => number;
   renderToLines: (block: Block, width: number) => readonly string[];
   kinds: readonly string[];
   registry: BlockRegistry;
 }> {
-  const r = registry();
+  const r = registry(options.definitions ?? []);
   const render: RenderOptions = {
     theme: options.theme ?? DARK_THEME,
     capabilities: options.capabilities ?? FULL_CAPS,
     tick: options.tick ?? 0,
+    ...(options.focus === undefined ? {} : { focus: options.focus }),
   };
 
   return {

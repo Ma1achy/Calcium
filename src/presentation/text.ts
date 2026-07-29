@@ -194,6 +194,41 @@ export function truncateParts(
 }
 
 /**
+ * Compare two strings by grapheme cluster (C11 \u00a74).
+ *
+ * Here rather than in C11 because this file owns the one segmenter (\u00a71's reason
+ * for `cells`, applied to ordering): a second `Intl.Segmenter` built in a sort
+ * comparator is both a per-call cost on every frame and a second answer to "where
+ * does a cluster end".
+ *
+ * Clusters are compared by code point, not by locale. `Intl.Collator` would read
+ * the ambient locale, which is A03 SS1's objection in a different coat \u2014 a table
+ * that sorts differently on a colleague's machine is a golden frame that cannot be
+ * shared, and C11 has no injected locale to take one from.
+ */
+export function compareByGrapheme(a: string, b: string): number {
+  if (a === b) return 0;
+  const left = [...GRAPHEMES.segment(stripControl(a))];
+  const right = [...GRAPHEMES.segment(stripControl(b))];
+  const shared = Math.min(left.length, right.length); // cells-ok
+
+  for (let i = 0; i < shared; i += 1) {
+    const l = left[i]?.segment ?? "";
+    const r = right[i]?.segment ?? "";
+    if (l === r) continue;
+    const lp = l.codePointAt(0) ?? 0;
+    const rp = r.codePointAt(0) ?? 0;
+    if (lp !== rp) return lp - rp;
+    // Same base, different cluster \u2014 a combining mark or a joiner. Ordered by the
+    // whole cluster's code units, which is arbitrary but total and stable.
+    return l < r ? -1 : 1;
+  }
+
+  // A prefix sorts before the string that extends it.
+  return left.length - right.length; // cells-ok
+}
+
+/**
  * Break at the width and nowhere else \u2014 no word breaking, no trimming.
  *
  * `code` wraps this way rather than as prose. Two reasons, and the second is

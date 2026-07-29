@@ -108,6 +108,13 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/shell/execution.ts",
     source: "const backoff = base + crypto.randomUUID().length;",
   },
+  {
+    // SS24 covers C11, C12 and C18; only `table/` exists, so this fabrication is
+    // the whole of the proof that the other two scopes will fire when they do.
+    rule: "SS24",
+    file: "src/presentation/table/plan.ts",
+    source: "let lastPlan = null;",
+  },
   { rule: "SS26", file: "src/data/process/runner.ts", source: 'process.stdout.write(chunk);' },
   {
     // The exit-code half of SS25. A `switch` on the code, on the way to a
@@ -465,7 +472,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     SS13: "C14",
     SS18: "C10 — needs the block-producing module list",
     SS22: "C19",
-    SS24: "C11, C12, C18",
     SS29: "C23",
     SS30: "C18, C19",
     SS31: "implemented in dependencies.mjs, not source-scans.mjs",
