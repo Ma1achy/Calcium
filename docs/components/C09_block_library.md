@@ -196,8 +196,33 @@ Every substitution is **1:1 by column count** (C04 §5). This is the constraint 
 | `─ │ ┌ ┐ └ ┘ ├ ┤` | `- \| + + + + + +` | 1 |
 | `…` | `~` | 1 |
 | `▁▂▃▄▅▆▇█` | `.:-=+*#@` | 1 |
-| `✓ ✗ ● ○ ◌ ⊘ ▲ ▌` | `+ x * o . / ! \|` | 1 |
 | Braille plot | Block plot | same grid |
+
+### The `Glyph` vocabulary
+
+C09 owns both renderings of every glyph a block can name (C04 §5). A block names the slot; this table is the only place either character exists.
+
+| `Glyph` | Unicode | ASCII | Rôle |
+|---|---|---|---|
+| `ok` | `✓` | `+` | Succeeded, healthy, valid |
+| `warn` | `▲` | `!` | A warning that does not suppress success |
+| `error` | `✗` | `x` | Failed |
+| `info` | `ℹ` | `i` | Informational, no judgement |
+| `pending` | `◌` | `.` | Not started |
+| `working` | `◐` | `%` | Starting, connecting, installing — in progress |
+| `running` | `●` | `*` | Running, steady state |
+| `queued` | `○` | `o` | Accepted, not yet running |
+| `cancelled` | `⊘` | `/` | Stopped by request |
+| `expand` | `▸` | `>` | A collapsed row |
+| `collapse` | `▾` | `v` | An expanded row |
+| `live` | `▌` | `\|` | The live-state gutter (D6) |
+| `bullet` | `•` | `-` | A list marker with no status meaning |
+
+**Why this is a closed union and not a string.** While the field was free, C09 emitted a block-supplied character verbatim — so the 1:1 guarantee held for the glyphs C09 chose and silently did not hold for the ones an adapter wrote. That is a guarantee that is mostly-true, and mostly-true fails only under `LANG=C`, only for the users least able to describe what they are seeing. It also drifted immediately: before tokenisation the tree carried `✗`, `✖`, `*`, `+` and `▲` in glyph positions, across five files, for three rôles.
+
+**`working` is distinct from `running` and `pending`**, and is in the vocabulary because S11 and S15 illustrate it — `◐ connecting`, `◐ mlflow starting`, `◐ layers installing`. Three states looked like two until the surfaces were read.
+
+**Anything outside the vocabulary is text, not a glyph.** `↗ open`, `⊘ cancel`, `⬡ pods` and `≡ logs` are action labels and footer hints — text that happens to begin with a character, never a glyph slot — and their behaviour under ASCII is the app's. That is what keeps this table's guarantee absolute rather than nearly absolute.
 
 **No substitution may change cell count.** `…` → `...` would be three cells where the measurer assumed one, and every log line's truncation point would shift — silently, only for users with a non-UTF-8 locale.
 

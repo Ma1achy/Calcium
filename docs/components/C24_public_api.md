@@ -47,7 +47,7 @@ export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
 export type {
   Block, Rule, Notice, KeyValue, Table, TableRow, Cell, Steps, Logs, Events,
   Plot, Series, Progress, Code, Diff, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
-  Tone, Action, ErrorLike, ViewDocument, ViewPatch,
+  Tone, Glyph, Action, ErrorLike, ViewDocument, ViewPatch,
 };
 
 // builders — §4
@@ -100,7 +100,7 @@ The API's quality is mostly this, because an adapter is the thing a consumer wri
 export const b: {
   rule(label: string, meta?: string): Rule;
   notice: {
-    (tone: Tone, text: string, glyph?: string): Notice;
+    (tone: Tone, text: string, glyph?: Glyph): Notice;
     ok(text: string): Notice;  warn(text: string): Notice;
     error(text: string): Notice;  info(text: string): Notice;
   };

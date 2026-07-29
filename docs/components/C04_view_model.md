@@ -89,7 +89,7 @@ type Block =
 type Gap      = Readonly<{ gapBefore?: boolean }>;
 
 type Rule     = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap;
-type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: string; text: string }> & Gap;
+type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: Glyph; text: string }> & Gap;
 type KeyValue = Readonly<{ kind: "keyValue"; id: string;
                            rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[] }> & Gap;
 type Steps    = Readonly<{ kind: "steps"; id: string;
@@ -240,7 +240,7 @@ The unit inside a `table`, and the only place a tone and a glyph travel together
 type Cell = Readonly<{
   text:   string;
   tone?:  Tone;
-  glyph?: string;                     // leading status glyph
+  glyph?: Glyph;                      // leading status glyph — a slot, never a character
   spark?: readonly number[];          // inline sparkline appended to text
 }>;
 
@@ -299,6 +299,27 @@ type Tone =
 **A block names a palette slot; it never embeds a colour value.** `Tone` is the slot type of the `tone` palette — the semantic one, and the overwhelmingly common case. Other palettes exist (`syntax` for `code` blocks, `spectrum` for app art) and an app may add its own; C10 §2 owns their declaration.
 
 The constraint is indirection, not scarcity. Three things depend on it and none of them require the vocabulary to be small: a value embedded in a block is the same value in both themes, has no meaning at 16 colours or at 1-bit, and cannot be contrast-validated at load. A `Cell` toned `error` is expected to carry a glyph too — D29 is a constraint on block *construction*, and the lint in §6 checks it.
+
+### A block names a glyph slot, for the same reason
+
+```typescript
+type Glyph =
+  | "ok" | "warn" | "error" | "info"
+  | "pending" | "working" | "running" | "queued" | "cancelled"
+  | "expand" | "collapse" | "live" | "bullet";
+```
+
+**The identical argument.** A glyph embedded in a block is the same character on every terminal, has no fallback at `unicode: "ascii"`, and cannot be width-checked at load. `glyph: "✗"` is `colour: "#c0ffee"` written in a different field.
+
+It is also the argument commitment 10 already makes and could not keep. **Every capability-driven substitution is 1:1 by column count** — but C09 can only guarantee that for glyphs it owns, and while the field is a free string an app supplies whatever it likes and C09 emits it verbatim. The guarantee was therefore mostly-true, which is worse than a narrow one: it holds for the box drawing and the spinner and silently does not hold for the thing an adapter wrote, and the failure appears only under `LANG=C`, only for the users who cannot report it precisely.
+
+The evidence that this drifts is not hypothetical. Before tokenisation the tree contained `✗`, `✖`, `*`, `+` and `▲` in glyph positions, in five files, for three roles.
+
+C09 §4 owns the vocabulary and both renderings, and the 1:1 rule holds by construction rather than by review.
+
+**The escape hatch, stated so that the guarantee stays absolute:** a glyph outside the vocabulary goes in the block's **text**, not its glyph field, and its behaviour under ASCII is the app's problem. That is where every action label already lives — `↗ open`, `⊘ cancel`, `⬡ pods` are text in a label, not glyph slots — and it is why the surfaces need no change. A vocabulary with an "or any string" arm is not a vocabulary.
+
+**`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `running` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
 
 ### Actions
 
@@ -436,7 +457,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I3** — `error` is present iff `status === "error"`. Enforced by `validateDocument`, not by convention.
 - **I4** — `validateDocument` and `validateBlock` are total: any input yields a result, never a throw.
 - **I5** — No block carries a colour. Lint: no hex literal, no ANSI code, no colour name in `viewmodel/`.
-- **I6** — Any `Notice` or `Cell` toned `error` or `warn` carries a non-empty glyph. Lint over block construction, satisfying D29 at the source rather than at the renderer.
+- **I6** — Any `Notice` or `Cell` toned `error` or `warn` carries a glyph, and every glyph is a member of `Glyph` — a slot, never a character. Lint over block construction, satisfying D29 at the source rather than at the renderer. The type carries the second half: a literal in a glyph position does not compile.
 - **I7** — `measure` is pure, total, and equals rendered height (§5).
 - **I8** — `applyPatch` is pure. Given the same document and patch, the result is deeply equal.
 - **I9** — `merge` carries **data only**. View state — `expanded`, focus, selection — is always taken from the existing row, never from the incoming one, whether or not the row is touched. A `--watch` tick cannot collapse a row the user opened.
@@ -459,12 +480,12 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 2. Seventeen block kinds ship; the union is open and extended through C09's registry.
 3. `raw` renders anything, so the vocabulary is never blocking.
 4. View state that affects height lives in the block.
-5. Blocks name palette slots, never values; `error` and `warn` tones carry glyphs.
+5. Blocks name palette slots and glyph slots, never values or characters; `error` and `warn` tones carry glyphs.
 6. Only `message` is required on `ErrorLike`; Prism's envelope is a specialisation.
 7. `fill` is the default action; `exec` is reserved for reversible operations.
 8. `applyPatch` is pure; `merge` upserts by row id and preserves untouched rows.
 9. `measure(block, w)` equals rendered height at width `w`, and is pure and total.
-10. Capability-driven glyph substitution must be width-preserving.
+10. Capability-driven glyph substitution is width-preserving, and holds for **every** glyph a block can name — which is what closing `Glyph` to a vocabulary buys. A free-string field made this guarantee mostly-true.
 11. C04 owns the schema — **every** block variant is declared here; C09 owns the registry, C11 the table engine, C12 the plot renderer, C25 the patch renderer.
 12. The schema identifier is framework-named `tui.view/1`. `tui-kit` ships nothing Prism-branded.
 13. A `pills` block is one logical row; multi-row pill layouts are multiple blocks.
