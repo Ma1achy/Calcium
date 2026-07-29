@@ -112,12 +112,14 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS16 | Hex, ANSI code, colour name | `viewmodel/` | C04 T2.7 |
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
 | SS18 | Hex literal | any block-producing module | C10 T2.9 |
-| SS19 | ANSI index or terminal-specific value | theme files | C10 T2.5 |
+| SS19 | ANSI index or terminal-specific value | `presentation/theme/`, allowing `four-bit.ts` | C10 I13, T2.5 |
 | SS20 | `syntax` palette reference | outside `code` and `patch` rendering | C10 T2.8 |
 | SS21 | `spectrum` palette reference | outside declared art | C10 T2.8 |
 | SS22 | Literal verb, flag or enum list | `completion/` | C19 T2.6 |
 
 **SS22 is the anti-drift check.** A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review.
+
+**SS19 scopes to the directory with one named exception, not to the token files.** C10 I13 forbids an ANSI index in token data, while C10 §3 requires a curated 4-bit map per theme — so exactly one file in `theme/` must contain indices, and it is named in the allow-list. Scoping the rule to `tokens-*.ts` instead would read as tighter and be looser: it stops seeing a new token file the day someone adds one, which is SS26's failure arriving through a different door. An allow-list of one exception is auditable; a glob that might not match anything is not.
 
 **SS15 scopes to `escapes.ts`, not to C01.** An earlier version said "outside C01", which contradicted SS14 and C01 I1: the literals are *required* to live in `escapes.ts`, so a rule forbidding them outside C01 fails on the one file that must contain them. Ownership of the *modes* is asserted separately, as MG20 — the escape module's named exports are imported only by their owning component. Two checks, because a single one cannot express both "the digits live in one file" and "the meaning belongs to one component".
 

@@ -237,18 +237,44 @@ Decisions that exist only in that JavaScript and CSS. Captured here so the mocku
 
 Tone resolution is the same in both; only the values change.
 
-| Tone | Dark | Light |
-|---|---|---|
-| `default` | `#d4d4d4` | `#383a42` |
-| `dim` | `#8a8a8a` | `#696c77` |
-| `muted` | `#5a5a5a` | `#a0a1a7` |
-| `ok` | `#87b86c` | `#50a14f` |
-| `warn` | `#d4b35a` | `#c18401` |
-| `error` | `#d47867` | `#e45649` |
-| `info` | `#7faecf` | `#0184bc` |
-| `accent` | `#e8a87c` | `#4078f2` |
-| `meta` | `#b89cd2` | `#a626a4` |
-| `identifier` | `#7fb8b8` | `#0997b3` |
+**These values were authored from the mockup and corrected to meet C10 §4's floors against both `bg` and `bgElev`.** Nine tones and two `syntax` slots moved; hue and saturation are held, and lightness is the minimum change that clears the floor. The measured ratios are recorded per value, and **C10 T2.4 recomputes them from the shipped tokens** — so this table is an assertion the suite upholds, not a record of intent. The mockup is still the thing anyone would compare against, and it now differs: do not restore its values without re-running that test.
+
+Ratios are `bg / bgElev`. Floors are 4.5 : 1, except `dim` at 3 : 1 and `muted` at 2.5 : 1.
+
+| Tone | Dark | | Light | |
+|---|---|---|---|---|
+| `default` | `#d4d4d4` | 11.74 / 10.73 | `#383a42` | 10.86 / 9.95 |
+| `dim` | `#8a8a8a` | 5.04 / 4.61 | `#696c77` | 5.01 / 4.59 |
+| `muted` | `#626262` | 2.85 / 2.61 | `#94959c` | 2.86 / 2.62 |
+| `ok` | `#87b86c` | 7.54 / 6.90 | `#3c793c` | 5.04 / 4.62 |
+| `warn` | `#d4b35a` | 8.62 / 7.88 | `#916301` | 5.04 / 4.62 |
+| `error` | `#d47867` | 5.54 / 5.06 | `#cd2d1e` | 5.04 / 4.62 |
+| `info` | `#7faecf` | 7.34 / 6.71 | `#0173a5` | 5.03 / 4.61 |
+| `accent` | `#e8a87c` | 8.56 / 7.82 | `#1f60f0` | 5.04 / 4.62 |
+| `meta` | `#b89cd2` | 7.23 / 6.61 | `#a626a4` | 5.86 / 5.37 |
+| `identifier` | `#7fb8b8` | 7.83 / 7.16 | `#07768c` | 5.06 / 4.63 |
+
+`muted` carries the thinnest margin in the table — 2.61 and 2.62 against a floor of 2.5 — and both variants moved to get there. The dark token was `#5a5a5a`, which measured 2.52 against `bg` and **2.31 against `bgElev`**: not "de-emphasised" but struggling, and struggling on the surface every panel and overlay paints. The figure is recorded rather than only the pass, because a nudge of a few points would break the check and nothing else would say so.
+
+**`syntax`** — nine slots, `lowlight`'s classes mapped in C09 §4a. Same lineage as the tones, so the two read as one design rather than two:
+
+| Slot | Dark | | Light | |
+|---|---|---|---|---|
+| `keyword` | `#c678dd` | 5.91 / 5.40 | `#a626a4` | 5.86 / 5.37 |
+| `string` | `#98c379` | 8.63 / 7.89 | `#3c793c` | 5.04 / 4.62 |
+| `comment` | `#676e7d` | 3.40 / 3.11 | `#86888f` | 3.39 / 3.11 |
+| `number` | `#d19a66` | 7.07 / 6.46 | `#916301` | 5.04 / 4.62 |
+| `key` | `#e06c75` | 5.45 / 4.98 | `#a8432c` | 5.74 / 5.26 |
+| `type` | `#e5c07b` | 10.08 / 9.21 | `#7a5401` | 6.50 / 5.95 |
+| `function` | `#61afef` | 7.37 / 6.73 | `#1f60f0` | 5.04 / 4.62 |
+| `operator` | `#56b6c2` | 7.35 / 6.72 | `#0173a5` | 5.03 / 4.61 |
+| `punctuation` | `#abb2bf` | 8.17 / 7.46 | `#383a42` | 10.86 / 9.95 |
+
+`comment` takes the 3 : 1 floor rather than 4.5. Recessive is the requirement, not a compromise on it — a comment that met 4.5 would not be a comment.
+
+Two collisions had to be broken, and C10 I17 is what found them. `lowlight` emits `hljs-attr` and `hljs-literal` in one colour, so **`key` and `number` were identical**; the ninth slot exists precisely because YAML keys had nowhere to go, and a `key` that renders as `number` buys nothing. It takes the attribute red in both variants.
+
+**Light `number` and `type` are the second, and it is the less obvious one.** They were the same hue at different lightness, and correcting both to the floor collapsed them onto one value — the correction *created* the collision, so only recomputation could have found it. `type` moves to a darker gold. That looks arbitrary read cold, and it is not.
 
 **Decorative** — the welcome art only (S02 §2), exempt from contrast floors:
 
@@ -256,6 +282,8 @@ Tone resolution is the same in both; only the values change.
 |---|---|---|
 | `spectrum.0`…`spectrum.7` | `#e8736b` `#e89866` `#e8c95e` `#a3d066` `#66c890` `#5fb5d4` `#7a8fe0` `#c187d4` | `#e45649` `#d19a66` `#c18401` `#50a14f` `#0997b3` `#0184bc` `#4078f2` `#a626a4` |
 | `spectrum.outline` | `#e8e8e8` | `#383a42` |
+
+`spectrum` keeps the mockup's values untouched. It declares `carries: "decoration"`, which is what exempts it (C10 I15) — several of its light entries are the tone values as they were *before* the correction above, and that is not an oversight. Art is not text, and a rule applied where it buys nothing is a rule people learn to ignore.
 
 The welcome art is **77 cells × 8 rows**, three glyphs (`█` U+2588, `▒` U+2592, space), stored verbatim as a fixture and reproduced in S02 §2. Columns 1–15 are the prism triangle in `spectrum.outline` on every row; column 16 is an unstyled separator; columns 17–77 are the wordmark, its eight rows taking `spectrum[0…7]` top to bottom. Two coloured spans per row, never per-glyph.
 
