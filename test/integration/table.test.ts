@@ -152,6 +152,17 @@ describe("C11 tier 4 — the table inside C09", () => {
     }
   });
 
+  // `Cell.spark` is in C04's type and C11 renders nothing for it: an inline
+  // sparkline is C12's rasterisation (C12 §1, and its `Consumed by` names table
+  // cells), and a second implementation here is what C09 I6 forbids one directory
+  // over. So the cell renders its text and the series is unread — visible in S03
+  // §2, whose figure draws `0.0372` where the mockup drew `0.0372 ▁▂▃▅▆`.
+  //
+  // Deferred with a blocker rather than left as a comment, because a gap nothing
+  // reports is a gap nobody finds: the seam is C11 calling C12's sparkline for a
+  // cell's `spark`, same layer and acyclic, and it changes this component.
+  it.todo("T4.4: a cell's `spark` renders inline and adds no rows — waits on C12");
+
   it("T4.6 (I15): focusableRowIds matches the rendered rows in order", () => {
     const registry = measurable({ definitions: [tableDefinition], capabilities: FULL_CAPS });
     const block: Table = {
