@@ -119,6 +119,14 @@ Evaluated top to bottom; **the first match wins**. `cancelled` outranks `timedOu
 
 `ErrorLike` requires only `message` (C04, F3). Where the far side supplies `code`, `stage`, `details` or `remediation` they are carried through; `remediation` naming a runnable command becomes a `fill` action. A failed `promote` and a failed `validate` therefore render identically, because the same code renders both.
 
+### Open: `RawResult.overflowed`
+
+C21 bounds each stream at 8 MiB and reports `overflowed` when the bound is crossed; C06 carries it as a `RawResult` field. Whether it reaches the document, and under which name, is C07's decision and is not yet made.
+
+**An overflowed child is not a truncated document.** `meta.truncated` says the fallback capped rows; `RawResult.overflowed` says the far side emitted more bytes than the runner would hold. The remedies differ — widen a cap or write an adapter in one case, reconsider what the far side is being asked to emit in the other. If both need surfacing, they need two fields, or one field with a reason.
+
+Recorded as a distinction rather than as a task, so whoever takes it starts from the difference instead of rediscovering it. The temptation is to `||` the two together in `authoritativeMeta`, which compiles, passes review, and makes one field mean two things — and I13's line about the three fields the registry cannot know stops being true, because it would then be computing one of them.
+
 ### Explicit `--json`
 
 When `userRequestedJson`, the document is a single `code` block containing pretty-printed stdout, whatever the verb. The user is inspecting the contract; rendering it would defeat the request (A01 O3).
