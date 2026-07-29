@@ -30,41 +30,20 @@ const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 /**
  * Control characters, stripped before anything is measured or drawn (C09 I14).
  *
- * C0 except tab and newline — tab is expanded rather than dropped, and a
- * newline is a break the wrapper acts on — plus delete and C1. A tool's output
- * cannot inject an escape sequence into the frame, so this runs on the way in
- * rather than being trusted not to happen.
+ * The implementation moved down to `data/text.ts` when C07 landed: an adapter
+ * must strip on the way *into* a block rather than on the way out to the screen
+ * (C07 T3.14), and L0 cannot import L1 (MG7). Re-exported rather than
+ * reimplemented — two filters over one rule diverge in the cases nobody tests.
  *
- * A code-point test rather than a character class, because writing the class
- * means writing the escape character into a file that is not
- * `terminal/escapes.ts` (C01 I1, A03 SS14). The range is the same either way;
- * only one of the two forms can be written here.
+ * Every caller here is unaffected, which is the assertion the existing tests
+ * make.
  */
-function isControl(cp: number): boolean {
-  if (cp === 0x09 || cp === 0x0a) return false; // tab, newline
-  return cp < 0x20 || (cp >= 0x7f && cp <= 0x9f);
-}
+export { stripControl } from "../data/text.js";
+
+import { stripControl } from "../data/text.js";
 
 /** A tab stop, in cells. Fixed rather than configurable — see `expandTabs`. */
 export const TAB_STOP = 8;
-
-/** Every text field passes through here before it is measured or rendered. */
-export function stripControl(text: string): string {
-  let clean = true;
-  for (const ch of text) {
-    if (isControl(ch.codePointAt(0) ?? 0)) {
-      clean = false;
-      break;
-    }
-  }
-  if (clean) return text;
-
-  let out = "";
-  for (const ch of text) {
-    if (!isControl(ch.codePointAt(0) ?? 0)) out += ch;
-  }
-  return out;
-}
 
 /**
  * Tabs to spaces, against a fixed stop.
