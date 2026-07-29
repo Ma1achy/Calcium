@@ -6,13 +6,14 @@ after it is installed; an absent package cannot be compromised.
 
 `make enforce` (SS31) asserts this file and `package.json` agree exactly.
 
-## Runtime — three
+## Runtime — four
 
 | Package | Why it cannot be internal | Owner |
 |---|---|---|
 | `ink` | The React reconciler for terminals, plus Yoga layout. Reimplementing it is the project, not a dependency of it. **It supplies layout, and its width computation must agree with `cells()`** — C09 breaks and truncates every line itself (C09 §3), but Ink still measures text for box sizing, with its own implementation. Two implementations of one number, and this one cannot be deduplicated away: the row below says why a width library is not a dependency, and that reasoning does not stop Ink having one. C09 T2.16 asserts the agreement over the adversarial corpus; a divergence is a finding about which of the two is right | — |
 | `react` | Ink's reconciler target. Not optional | — |
 | `lowlight` | Emits token roles as an AST, not styled output, so C10 keeps ownership of colour. `shiki`, `highlight.js` used directly and `prismjs` all bake colours into what they emit; `lowlight` returns a hast tree of `hljs-*` classes that C09 maps to palette slots (C09 §4a). A hand-written YAML tokeniser is ~150 lines that will be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. 6 packages, 0 vulnerabilities; only the needed grammars are registered — `createLowlight({ yaml, json })`, not the full highlight.js set | — |
+| `highlight.js` | **What it does**: the two grammars `lowlight` tokenises with — `yaml` and `json`, imported one file each. **Why internal is worse**: the row above already argues it; a hand-written YAML tokeniser is ~150 lines that will be wrong about anchors, multi-line scalars and flow mappings, and wrong quietly. **Why it is a row rather than a transitive**: `lowlight` depends on it, so it is already in the tree — but C09 §4a imports `highlight.js/lib/languages/yaml` *directly*, and an import of a package we have not declared is a phantom dependency that a hoisting change breaks. Declaring it adds no attack surface and removes a lie. `lowlight`'s own `common` bundle would have avoided the row and statically imported thirty-seven grammars to do it, which is the weight §4a exists to refuse. **Transitive count**: 0. **Maintenance signal**: 11.11.1, the reference implementation, last published 2025-08-26. **Owner**: — |
 
 ## Development
 

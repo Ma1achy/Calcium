@@ -62,6 +62,7 @@ export {
   ROW_GUTTER,
   atLeastOne,
   childWidths,
+  placeable,
   groupChildWidth,
   insetWidth,
   normaliseWidth,

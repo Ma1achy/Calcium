@@ -39,6 +39,7 @@
     "audit": "npm audit --audit-level=high"
   },
   "dependencies": {
+    "highlight.js": "11.11.1",
     "ink": "7.1.1",
     "lowlight": "3.3.0",
     "react": "19.2.8"

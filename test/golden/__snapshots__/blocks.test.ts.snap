@@ -1,0 +1,753 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m ----------------[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns~
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"li~
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading     [38;2;232;168;124m#######[38;2;98;98;98m...............[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield       [39m  [38;2;138;138;138mbefore      [39m  [38;2;138;138;138mafter       [39m
+[38;2;98;98;98mp99         [39m  [38;2;212;212;212m120ms       [39m  [38;2;135;184;108m98ms        [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"~
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m+[38;2;232;168;124m Summary [38;2;138;138;138m-----------------------------+[39m
+[38;2;138;138;138m|[39mtwo lines                             [38;2;138;138;138m|[39m
+|of text                               |
+[38;2;138;138;138m+--------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m ------------------------------------[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","la~
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"seri~
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading            [38;2;232;168;124m###########[38;2;98;98;98m........................[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield               [39m  [38;2;138;138;138mbefore            [39m  [38;2;138;138;138mafter             [39m
+[38;2;98;98;98mp99                 [39m  [38;2;212;212;212m120ms             [39m  [38;2;135;184;108m98ms              [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","lang~
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m+[38;2;232;168;124m Summary [38;2;138;138;138m-------------------------------------------------+[39m
+[38;2;138;138;138m|[39mtwo lines                                                 [38;2;138;138;138m|[39m
+|of text                                                   |
+[38;2;138;138;138m+----------------------------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                          right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m --------------------------------------------------------[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":~
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,~
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading                  [38;2;232;168;124m###############[38;2;98;98;98m..................................[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield                     [39m  [38;2;138;138;138mbefore                   [39m  [38;2;138;138;138mafter                    [39m
+[38;2;98;98;98mp99                       [39m  [38;2;212;212;212m120ms                    [39m  [38;2;135;184;108m98ms                     [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","~
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m+[38;2;232;168;124m Summary [38;2;138;138;138m---------------------------------------------------------------------+[39m
+[38;2;138;138;138m|[39mtwo lines                                                                     [38;2;138;138;138m|[39m
+|of text                                                                       |
+[38;2;138;138;138m+------------------------------------------------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                                    right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m-- [38;2;232;168;124mDeployments[38;2;138;138;138m ------------------------------------------------------------------------------------------------[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10,"minWidth":8,"sorta~
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m+ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m- [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,2,8,5],"label":"rps"}],"axes":true}
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading                                [38;2;232;168;124m#######################[38;2;98;98;98m....................................................[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield                                   [39m  [38;2;138;138;138mbefore                                [39m  [38;2;138;138;138mafter                                 [39m
+[38;2;98;98;98mp99                                     [39m  [38;2;212;212;212m120ms                                 [39m  [38;2;135;184;108m98ms                                  [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l~
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m+[38;2;232;168;124m Summary [38;2;138;138;138m-------------------------------------------------------------------------------------------------------------+[39m
+[38;2;138;138;138m|[39mtwo lines                                                                                                             [38;2;138;138;138m|[39m
+|of text                                                                                                               |
+[38;2;138;138;138m+----------------------------------------------------------------------------------------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                                                        right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > dark-unicode at 40 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns…
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m✓ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m⠋ [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"li…
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading     [38;2;232;168;124m███████[38;2;98;98;98m░░░░░░░░░░░░░░░[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield       [39m  [38;2;138;138;138mbefore      [39m  [38;2;138;138;138mafter       [39m
+[38;2;98;98;98mp99         [39m  [38;2;212;212;212m120ms       [39m  [38;2;135;184;108m98ms        [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"…
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m┌[38;2;232;168;124m Summary [38;2;138;138;138m─────────────────────────────┐[39m
+[38;2;138;138;138m│[39mtwo lines                             [38;2;138;138;138m│[39m
+│of text                               │
+[38;2;138;138;138m└──────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > dark-unicode at 60 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────────────────────────[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","la…
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m✓ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m⠋ [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"seri…
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading            [38;2;232;168;124m███████████[38;2;98;98;98m░░░░░░░░░░░░░░░░░░░░░░░░[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield               [39m  [38;2;138;138;138mbefore            [39m  [38;2;138;138;138mafter             [39m
+[38;2;98;98;98mp99                 [39m  [38;2;212;212;212m120ms             [39m  [38;2;135;184;108m98ms              [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","lang…
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m┌[38;2;232;168;124m Summary [38;2;138;138;138m─────────────────────────────────────────────────┐[39m
+[38;2;138;138;138m│[39mtwo lines                                                 [38;2;138;138;138m│[39m
+│of text                                                   │
+[38;2;138;138;138m└──────────────────────────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                          right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > dark-unicode at 80 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────────────────────────────────────────────[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":…
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m✓ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m⠋ [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,…
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading                  [38;2;232;168;124m███████████████[38;2;98;98;98m░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield                     [39m  [38;2;138;138;138mbefore                   [39m  [38;2;138;138;138mafter                    [39m
+[38;2;98;98;98mp99                       [39m  [38;2;212;212;212m120ms                    [39m  [38;2;135;184;108m98ms                     [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","…
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m┌[38;2;232;168;124m Summary [38;2;138;138;138m─────────────────────────────────────────────────────────────────────┐[39m
+[38;2;138;138;138m│[39mtwo lines                                                                     [38;2;138;138;138m│[39m
+│of text                                                                       │
+[38;2;138;138;138m└──────────────────────────────────────────────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                                    right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > dark-unicode at 120 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;138;138;138m── [38;2;232;168;124mDeployments[38;2;138;138;138m ────────────────────────────────────────────────────────────────────────────────────────────────[38;2;184;156;210m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;127;174;207mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;98;98;98mRegion  [39m  [38;2;212;212;212meu-west-1[39m
+[38;2;98;98;98mReplicas[39m  [38;2;212;212;212m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10,"minWidth":8,"sorta…
+── steps · measured 3 · rendered 3
+[38;2;135;184;108m✓ [38;2;212;212;212mResolve[39m
+[38;2;232;168;124m⠋ [38;2;212;212;212mBuild  [39m  [38;2;184;156;210mlayer 3 of 7[39m
+[38;2;98;98;98m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;184;156;210m12:00:01[39m  [38;2;127;174;207minfo [39m  [38;2;212;212;212mlistening on :8080[39m
+[38;2;184;156;210m12:00:02[39m  [38;2;212;179;90mwarn [39m  [38;2;212;212;212mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;184;156;210m12:00:00[39m  [38;2;232;168;124mdeploy[39m  [38;2;212;212;212mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,2,8,5],"label":"rps"}],"axes":true}
+── progress · measured 1 · rendered 1
+[38;2;212;212;212mUploading                                [38;2;232;168;124m███████████████████████[38;2;98;98;98m░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░[38;2;184;156;210m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
+[38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
+── diff · measured 2 · rendered 2
+[38;2;138;138;138mfield                                   [39m  [38;2;138;138;138mbefore                                [39m  [38;2;138;138;138mafter                                 [39m
+[38;2;98;98;98mp99                                     [39m  [38;2;212;212;212m120ms                                 [39m  [38;2;135;184;108m98ms                                  [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l…
+── pills · measured 1 · rendered 1
+[38;2;232;168;124mall[39m  [38;2;98;98;98mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;138;138;138mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;138;138;138m┌[38;2;232;168;124m Summary [38;2;138;138;138m─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐[39m
+[38;2;138;138;138m│[39mtwo lines                                                                                                             [38;2;138;138;138m│[39m
+│of text                                                                                                               │
+[38;2;138;138;138m└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                                                        right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m ----------------[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns~
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"li~
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading     [38;2;31;96;240m#######[38;2;148;149;156m...............[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield       [39m  [38;2;105;108;119mbefore      [39m  [38;2;105;108;119mafter       [39m
+[38;2;148;149;156mp99         [39m  [38;2;56;58;66m120ms       [39m  [38;2;60;121;60m98ms        [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"~
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m+[38;2;31;96;240m Summary [38;2;105;108;119m-----------------------------+[39m
+[38;2;105;108;119m|[39mtwo lines                             [38;2;105;108;119m|[39m
+|of text                               |
+[38;2;105;108;119m+--------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m ------------------------------------[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","la~
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"seri~
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading            [38;2;31;96;240m###########[38;2;148;149;156m........................[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield               [39m  [38;2;105;108;119mbefore            [39m  [38;2;105;108;119mafter             [39m
+[38;2;148;149;156mp99                 [39m  [38;2;56;58;66m120ms             [39m  [38;2;60;121;60m98ms              [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","lang~
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m+[38;2;31;96;240m Summary [38;2;105;108;119m-------------------------------------------------+[39m
+[38;2;105;108;119m|[39mtwo lines                                                 [38;2;105;108;119m|[39m
+|of text                                                   |
+[38;2;105;108;119m+----------------------------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                          right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m --------------------------------------------------------[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":~
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,~
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading                  [38;2;31;96;240m###############[38;2;148;149;156m..................................[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield                     [39m  [38;2;105;108;119mbefore                   [39m  [38;2;105;108;119mafter                    [39m
+[38;2;148;149;156mp99                       [39m  [38;2;56;58;66m120ms                    [39m  [38;2;60;121;60m98ms                     [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","~
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m+[38;2;31;96;240m Summary [38;2;105;108;119m---------------------------------------------------------------------+[39m
+[38;2;105;108;119m|[39mtwo lines                                                                     [38;2;105;108;119m|[39m
+|of text                                                                       |
+[38;2;105;108;119m+------------------------------------------------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                                    right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m-- [38;2;31;96;240mDeployments[38;2;105;108;119m ------------------------------------------------------------------------------------------------[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10,"minWidth":8,"sorta~
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m+ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m- [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m. Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,2,8,5],"label":"rps"}],"axes":true}
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading                                [38;2;31;96;240m#######################[38;2;148;149;156m....................................................[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield                                   [39m  [38;2;105;108;119mbefore                                [39m  [38;2;105;108;119mafter                                 [39m
+[38;2;148;149;156mp99                                     [39m  [38;2;56;58;66m120ms                                 [39m  [38;2;60;121;60m98ms                                  [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l~
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m+[38;2;31;96;240m Summary [38;2;105;108;119m-------------------------------------------------------------------------------------------------------------+[39m
+[38;2;105;108;119m|[39mtwo lines                                                                                                             [38;2;105;108;119m|[39m
+|of text                                                                                                               |
+[38;2;105;108;119m+----------------------------------------------------------------------------------------------------------------------+[39m
+── group · measured 1 · rendered 1
+left                                                        right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-unicode at 40 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns…
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m✓ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m⠋ [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"li…
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading     [38;2;31;96;240m███████[38;2;148;149;156m░░░░░░░░░░░░░░░[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield       [39m  [38;2;105;108;119mbefore      [39m  [38;2;105;108;119mafter       [39m
+[38;2;148;149;156mp99         [39m  [38;2;56;58;66m120ms       [39m  [38;2;60;121;60m98ms        [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"…
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m┌[38;2;31;96;240m Summary [38;2;105;108;119m─────────────────────────────┐[39m
+[38;2;105;108;119m│[39mtwo lines                             [38;2;105;108;119m│[39m
+│of text                               │
+[38;2;105;108;119m└──────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-unicode at 60 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────────────────────────[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","la…
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m✓ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m⠋ [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"seri…
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading            [38;2;31;96;240m███████████[38;2;148;149;156m░░░░░░░░░░░░░░░░░░░░░░░░[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield               [39m  [38;2;105;108;119mbefore            [39m  [38;2;105;108;119mafter             [39m
+[38;2;148;149;156mp99                 [39m  [38;2;56;58;66m120ms             [39m  [38;2;60;121;60m98ms              [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","lang…
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m┌[38;2;31;96;240m Summary [38;2;105;108;119m─────────────────────────────────────────────────┐[39m
+[38;2;105;108;119m│[39mtwo lines                                                 [38;2;105;108;119m│[39m
+│of text                                                   │
+[38;2;105;108;119m└──────────────────────────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                          right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-unicode at 80 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────────────────────────────────────────────[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":…
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m✓ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m⠋ [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,…
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading                  [38;2;31;96;240m███████████████[38;2;148;149;156m░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield                     [39m  [38;2;105;108;119mbefore                   [39m  [38;2;105;108;119mafter                    [39m
+[38;2;148;149;156mp99                       [39m  [38;2;56;58;66m120ms                    [39m  [38;2;60;121;60m98ms                     [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","…
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m┌[38;2;31;96;240m Summary [38;2;105;108;119m─────────────────────────────────────────────────────────────────────┐[39m
+[38;2;105;108;119m│[39mtwo lines                                                                     [38;2;105;108;119m│[39m
+│of text                                                                       │
+[38;2;105;108;119m└──────────────────────────────────────────────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                                    right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;
+
+exports[`C09 T2.10 — golden frames > light-unicode at 120 1`] = `
+"── rule · measured 1 · rendered 1
+[38;2;105;108;119m── [38;2;31;96;240mDeployments[38;2;105;108;119m ────────────────────────────────────────────────────────────────────────────────────────────────[38;2;166;38;164m 3 active[39m
+── notice · measured 1 · rendered 1
+[38;2;1;115;165mNothing to do.[39m
+── keyValue · measured 2 · rendered 2
+[38;2;148;149;156mRegion  [39m  [38;2;56;58;66meu-west-1[39m
+[38;2;148;149;156mReplicas[39m  [38;2;56;58;66m3[39m
+── table · measured 1 · rendered 1
+{"kind":"table","id":"table-1","columns":[{"key":"name","label":"Name","align":"left","priority":10,"minWidth":8,"sorta…
+── steps · measured 3 · rendered 3
+[38;2;60;121;60m✓ [38;2;56;58;66mResolve[39m
+[38;2;31;96;240m⠋ [38;2;56;58;66mBuild  [39m  [38;2;166;38;164mlayer 3 of 7[39m
+[38;2;148;149;156m◌ Push   [39m
+── logs · measured 2 · rendered 2
+[38;2;166;38;164m12:00:01[39m  [38;2;1;115;165minfo [39m  [38;2;56;58;66mlistening on :8080[39m
+[38;2;166;38;164m12:00:02[39m  [38;2;145;99;1mwarn [39m  [38;2;56;58;66mslow query: 1.2s[39m
+── events · measured 1 · rendered 1
+[38;2;166;38;164m12:00:00[39m  [38;2;31;96;240mdeploy[39m  [38;2;56;58;66mstarted[39m
+── plot · measured 1 · rendered 1
+{"kind":"plot","id":"plot-1","form":"line","height":8,"series":[{"values":[1,4,2,8,5],"label":"rps"}],"axes":true}
+── progress · measured 1 · rendered 1
+[38;2;56;58;66mUploading                                [38;2;31;96;240m███████████████████████[38;2;148;149;156m░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░[38;2;166;38;164m 30%[39m
+── code · measured 2 · rendered 2
+[38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
+[38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
+── diff · measured 2 · rendered 2
+[38;2;105;108;119mfield                                   [39m  [38;2;105;108;119mbefore                                [39m  [38;2;105;108;119mafter                                 [39m
+[38;2;148;149;156mp99                                     [39m  [38;2;56;58;66m120ms                                 [39m  [38;2;60;121;60m98ms                                  [39m
+── patch · measured 1 · rendered 1
+{"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l…
+── pills · measured 1 · rendered 1
+[38;2;31;96;240mall[39m  [38;2;148;149;156mfailed[39m
+── tip · measured 1 · rendered 1
+[38;2;105;108;119mPress ? for keys.   Show keys[39m
+── panel · measured 4 · rendered 4
+[38;2;105;108;119m┌[38;2;31;96;240m Summary [38;2;105;108;119m─────────────────────────────────────────────────────────────────────────────────────────────────────────────┐[39m
+[38;2;105;108;119m│[39mtwo lines                                                                                                             [38;2;105;108;119m│[39m
+│of text                                                                                                               │
+[38;2;105;108;119m└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘[39m
+── group · measured 1 · rendered 1
+left                                                        right
+── raw · measured 2 · rendered 2
+pre-formatted
+output"
+`;

@@ -149,7 +149,7 @@ function clusterCells(cluster: string): number {
 export function truncate(
   text: string,
   width: number,
-  caps: Readonly<{ unicode: "full" | "ascii" }>,
+  caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
 ): string {
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return "";
@@ -157,6 +157,8 @@ export function truncate(
   const clean = stripControl(text);
   if (cells(clean) <= limit) return clean;
 
+  // `bmp` keeps the Unicode marker: U+2026 is in the basic plane, and the
+  // ASCII form is for terminals that cannot draw beyond it at all.
   const marker = caps.unicode === "ascii" ? "~" : "…";
   const budget = limit - 1; // the marker's own cell
   if (budget <= 0) return marker;
@@ -173,6 +175,73 @@ export function truncate(
   // A double-width glyph refused at the boundary leaves a cell to fill, so the
   // result is exactly `limit` cells rather than `limit - 1`.
   return out + " ".repeat(budget - used) + marker;
+}
+
+/**
+ * Truncation, reported as its parts.
+ *
+ * `kept` is a prefix of the input — exactly, in code units — and `suffix` is
+ * the padding and marker that were added. A caller that has spans, tokens or
+ * any other structure addressed by offset can slice it against `kept` and style
+ * `suffix` for itself; `truncate` is this with the two glued together.
+ *
+ * `code` is the caller that needs it: its syntax tokens are offsets into the
+ * block's text, and a marker is not in the token stream.
+ */
+export function truncateParts(
+  text: string,
+  width: number,
+  caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
+): Readonly<{ kept: string; suffix: string }> {
+  const whole = stripControl(text);
+  const limit = Math.max(0, Math.floor(width));
+  if (limit === 0) return { kept: "", suffix: "" };
+  if (cells(whole) <= limit) return { kept: whole, suffix: "" };
+
+  const marker = caps.unicode === "ascii" ? "~" : "\u2026";
+  const budget = limit - 1;
+  if (budget <= 0) return { kept: "", suffix: marker };
+
+  let kept = "";
+  let used = 0;
+  for (const { segment } of GRAPHEMES.segment(whole)) {
+    const w = clusterCells(segment);
+    if (used + w > budget) break;
+    kept += segment;
+    used += w;
+  }
+
+  return { kept, suffix: " ".repeat(budget - used) + marker };
+}
+
+/**
+ * Break at the width and nowhere else \u2014 no word breaking, no trimming.
+ *
+ * `code` wraps this way rather than as prose. Two reasons, and the second is
+ * what makes it necessary rather than merely apt: breaking source at spaces
+ * misrepresents it, and a trimmed break point means the rendered rows are no
+ * longer exact slices of the source \u2014 which is what lets syntax tokens,
+ * addressed by offset, be sliced against them at all.
+ */
+export function hardWrapCells(text: string, width: number): readonly string[] {
+  const limit = Math.max(1, Math.floor(width));
+  const out: string[] = [];
+  let line = "";
+  let used = 0;
+
+  for (const { segment } of GRAPHEMES.segment(text)) {
+    const w = clusterCells(segment);
+    if (w > limit) continue;
+    if (used + w > limit && line !== "") {
+      out.push(line);
+      line = "";
+      used = 0;
+    }
+    line += segment;
+    used += w;
+  }
+  out.push(line);
+  return out;
 }
 
 /**
@@ -200,6 +269,14 @@ export function wrapCells(text: string, width: number): readonly string[] {
     let used = 0;
     for (const { segment } of GRAPHEMES.segment(paragraph)) {
       const w = clusterCells(segment);
+
+      // A cluster wider than the whole line can never be placed. At width 1 a
+      // CJK glyph is exactly that, and drawing it anyway puts two cells in a
+      // one-cell row — which the terminal wraps into a row nobody counted.
+      // Dropping it is the only option that keeps the geometry honest, and both
+      // halves drop it, because both call this.
+      if (w > limit) continue;
+
       if (used + w > limit && line !== "") {
         const at = breakPoint(line);
         if (at === null) {

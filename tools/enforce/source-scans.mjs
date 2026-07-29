@@ -183,7 +183,16 @@ export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8"
       if (scan.allow.some((a) => f === a || f.startsWith(a))) continue;
       const src = readFile(file);
       src.split("\n").forEach((line, i) => {
-        if (line.trimStart().startsWith("//")) return;
+        // Comments are prose about the rule, not violations of it. A line
+        // comment was already skipped; a block comment's continuation was not,
+        // so documenting `frames[tick % frames.length]` in a doc comment fired
+        // SS23 — the rule reporting a sentence that explains it.
+        //
+        // Only the comment *forms* are skipped, never a line with code on it:
+        // `const w = s.length; // why` still fires, which is the case that
+        // matters.
+        const start = line.trimStart();
+        if (start.startsWith("//") || start.startsWith("*") || start.startsWith("/*")) return;
         if (scan.pattern.test(line)) {
           violations.push({
             rule: scan.id, file: `${file}:${i + 1}`,

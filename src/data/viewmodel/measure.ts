@@ -83,6 +83,38 @@ export function groupChildWidth(
  * indexes — a `row` group gives every child the same width today, and a future
  * weights field would change that here and nowhere else.
  */
+/**
+ * Which children a `row` group can place, and at what width (§3).
+ *
+ * The floor of 1 makes the arithmetic total and, at a narrow width, makes the
+ * children plus their gutters wider than the group: two children at width 1
+ * need three columns. A child that cannot be placed is placed by *neither*
+ * half — it contributes to neither the rendered rows nor the measured height —
+ * which is the only one of the three available answers that keeps them
+ * agreeing.
+ *
+ * Above `2n - 1` columns every child fits and this returns all of them.
+ */
+export function placeable(block: Panel | Group, width: number): number {
+  if (block.kind === "panel" || block.direction === "column") {
+    return block.children.length;
+  }
+
+  const w = normaliseWidth(width);
+  const each = groupChildWidth(block.direction, width, block.children.length);
+  let used = 0;
+  let placed = 0;
+  for (const _child of block.children) {
+    const needed = placed === 0 ? each : each + ROW_GUTTER;
+    if (used + needed > w) break;
+    used += needed;
+    placed += 1;
+  }
+
+  // At least one, so a group is never emptied by arithmetic alone.
+  return Math.max(1, placed);
+}
+
 export function childWidths(block: Panel | Group, width: number): readonly number[] {
   if (block.kind === "panel") {
     return block.children.map(() => insetWidth(width));

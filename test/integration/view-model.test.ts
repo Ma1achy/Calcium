@@ -8,6 +8,7 @@
 // the document lifecycle a streaming verb actually produces. That is not a
 // substitute for T4.3, but it is the part of T4.3 that does not need C13.
 import { describe, expect, it } from "vitest";
+import type { Block } from "../../src/data/viewmodel/index.js";
 import {
   applyPatch,
   block,
@@ -15,11 +16,36 @@ import {
   type Table,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
-import { doc, tableOf } from "../support/blocks.js";
+import { CORPUS, doc, tableOf } from "../support/blocks.js";
+import { DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { renderToLines } from "../../src/testing/index.js";
+import type { RenderContext } from "../../src/presentation/blocks/index.js";
+import { Box, Text } from "ink";
+import { createElement, type ReactElement } from "react";
+import {
+  checkMeasurement,
+  formatReport,
+  uncoveredKinds,
+} from "../support/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);
   return r.doc;
+}
+
+/**
+ * A consumer's block kind, written the way a consumer would write one: two
+ * rows, resolved tones, no privileged access to anything.
+ */
+function renderBanner(block: Block, ctx: RenderContext): ReactElement {
+  const text = (block as unknown as { text: string }).text;
+  const lines = [`== ${text} ==`, "-".repeat(Math.max(1, ctx.width - 4))];
+  return createElement(
+    Box,
+    { flexDirection: "column" },
+    lines.map((line, i) => createElement(Text, { key: i }, line)),
+  );
 }
 
 describe("C04 integration — the document lifecycle", () => {
@@ -99,19 +125,56 @@ describe("C04 integration — the document lifecycle", () => {
   it.todo(
     "T4.1: a fallback-adapted arbitrary JSON object produces a document passing every T2 contract test — waits on C07",
   );
-  it.todo(
-    "T4.2: registering a custom block kind adds it to the T2.1 corpus automatically — the suite discovers it rather than being extended by hand — waits on C09",
-  );
+  it("T4.2: a custom block kind joins the T2.1 corpus by being registered, not by being listed", () => {
+    // The extension mechanism, held to the same contract as the defaults. The
+    // suite reads `registry.kinds`, so a consumer's kind is measured, rendered
+    // and checked without anyone editing a list — and a consumer's kind that
+    // breaks I1 fails the same assertion the built-ins do.
+    const registry = createBlockRegistry({});
+    registry.register({
+      kind: "banner",
+      measure: () => 2,
+      render: (b, ctx) => renderBanner(b, ctx),
+    });
+
+    const banner = { kind: "banner", id: "banner-1", text: "custom" } as unknown as Block;
+    const kit = {
+      measure: (b: Block, w: number) => registry.measure(b, w),
+      renderToLines: (b: Block, w: number) =>
+        renderToLines(registry, b, w, { theme: DARK_THEME, capabilities: FULL_CAPS }),
+      kinds: registry.kinds,
+    };
+
+    expect(kit.kinds, "discovery, not registration in two places").toContain("banner");
+    expect(
+      uncoveredKinds(kit, [banner]),
+      "every kind bar the custom one is a default; the point is that `banner` is not among the uncovered",
+    ).not.toContain("banner");
+
+    const report = checkMeasurement(kit, [banner], { widths: [40, 80] });
+    expect(report.failures, formatReport(report)).toEqual([]);
+  });
   it.todo(
     "T4.3: appending fifty documents and applying two hundred patches leaves every document valid and frozen — waits on C13",
   );
   it.todo(
-    "T4.4: virtualising a 10,000-block transcript selects a range whose summed measured heights equal the viewport height exactly — waits on C09 and C14",
+    "T4.4: virtualising a 10,000-block transcript selects a range whose summed measured heights equal the viewport height exactly — waits on C14",
   );
   it.todo(
-    "T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the height delta, with no drift — waits on C09 and C14",
+    "T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the height delta, with no drift — waits on C11 and C14",
   );
-  it.todo(
-    "T4.6: the same document under both themes produces identical line counts — waits on C09",
-  );
+  it("T4.6: the same document under both themes produces identical line counts", () => {
+    // Colour never changes row count (§5). A whole document, not one block:
+    // this is the assertion C14 relies on when a theme switch invalidates the
+    // frame but not the measured heights.
+    const blocks = CORPUS.filter((b) => !["table", "plot", "patch"].includes(b.kind));
+    const dark = measurable({ theme: DARK_THEME });
+    const light = measurable({ theme: LIGHT_THEME });
+
+    for (const width of [40, 80, 120]) {
+      const darkRows = blocks.reduce((sum, b) => sum + dark.renderToLines(b, width).length, 0);
+      const lightRows = blocks.reduce((sum, b) => sum + light.renderToLines(b, width).length, 0);
+      expect(lightRows, `width ${width}`).toBe(darkRows);
+    }
+  });
 });

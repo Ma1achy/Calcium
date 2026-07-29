@@ -12,6 +12,8 @@ import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { MODES } from "../support/fake-terminal.js";
+import { ONE_PER_KIND } from "../support/blocks.js";
+import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import { store, TONES } from "../support/theme.js";
 
 describe("C02 integration", () => {
@@ -45,8 +47,26 @@ describe("C02 integration", () => {
       expect(resolveTone(tone, themes.current, mono).colour, `${tone} at depth 1`).toBeUndefined();
     }
   });
+  it("T4.4a: unicode:'ascii' → every glyph C09 draws is ASCII, and the row count is unchanged", () => {
+    // The half that landed with C09. The table and the sparkline are C11's and
+    // C12's, and the deferral below now names them rather than C09 — a blocker
+    // that is wrong is indistinguishable from one that is pending (A03 §9a).
+    const unicode = measurable();
+    const ascii = measurable({ capabilities: ASCII_CAPS });
+
+    for (const fixture of Object.values(ONE_PER_KIND)) {
+      const rows = ascii.renderToLines(fixture, 60);
+      expect(rows, fixture.kind).toHaveLength(unicode.renderToLines(fixture, 60).length);
+    }
+
+    const panel = ONE_PER_KIND.panel;
+    const drawn = ascii.renderToLines(panel, 40).map(visible).join("");
+    expect(drawn.includes("+"), "corners degrade to +").toBe(true);
+    expect([...drawn].every((ch) => (ch.codePointAt(0) ?? 0) < 0x80)).toBe(true);
+  });
+
   it.todo(
-    "T4.4: unicode:'ascii' → a rendered table uses + - | and a sparkline uses .:|#; no codepoint above U+007F in the output — waits on C09",
+    "T4.4: unicode:'ascii' → a rendered table uses + - | and a sparkline uses .:|#; no codepoint above U+007F in the output — waits on C11 and C12",
   );
   it.todo(
     "T4.5: unicode:'ascii' → the braille plot degrades to a block plot rather than emitting braille codepoints — waits on C12",

@@ -25,8 +25,14 @@ import {
   type Group,
   type Panel,
 } from "../../src/data/viewmodel/index.js";
-import { ALL_KINDS, CORPUS, doc, ONE_PER_KIND } from "../support/blocks.js";
-import { checkMeasurement, DEFAULT_WIDTHS } from "../support/measurement-conformance.js";
+import { ADVERSARIAL, ALL_KINDS, CORPUS, doc, ONE_PER_KIND } from "../support/blocks.js";
+import {
+  checkAsciiParity,
+  checkMeasurement,
+  DEFAULT_WIDTHS,
+  formatReport,
+} from "../support/measurement-conformance.js";
+import { ASCII_CAPS, measurable } from "../support/render.js";
 
 /**
  * Every member of the union, listed. The annotation is the assertion: adding a
@@ -227,11 +233,11 @@ describe("C04 measurement arithmetic (§3)", () => {
   });
 });
 
-describe("C04 measurement contract — waits on C09", () => {
-  it("T2.0: the conformance suite is written and runs; it has no registry to run against", () => {
-    // The suite is real code, not a plan. This drives it against a stub
-    // registry to prove it executes and reports — so that when C09 lands, the
-    // only new thing is a registry, not a test harness.
+describe("C04 measurement contract", () => {
+  it("T2.0: the conformance suite is written and runs, against a stub as well as a registry", () => {
+    // The suite is real code, not a plan. Driving it against a stub keeps that
+    // demonstrable now that a real registry exists: the suite is parameterised
+    // over the registry, so a consumer runs it against theirs (C09 T4.2).
     const stub = {
       measure: (b: Block) => (b.kind === "group" ? 0 : 1),
       renderToLines: () => ["one line"],
@@ -245,18 +251,77 @@ describe("C04 measurement contract — waits on C09", () => {
     expect(DEFAULT_WIDTHS, "C04 §8's seven widths").toEqual([40, 60, 80, 100, 120, 160, 200]);
   });
 
-  it.todo(
-    "T2.1: for every registered kind × the corpus × seven widths, measure equals rendered line count — the headline, and the single most valuable test in the system — waits on C09",
-  );
-  it.todo("T2.2: measure is pure — a hundred repeat calls, no I/O — waits on C09");
-  it.todo(
-    "T2.3: measure is total over the adversarial corpus — empty, zero-length, 10,000-character — waits on C09",
-  );
-  it.todo("T2.4: measure is monotone — appending a row never decreases height — waits on C09");
-  it.todo("T2.5: measure never returns a negative or non-integer, at any width including 1 — waits on C09");
-  it.todo(
-    "T2.6: under unicode:'ascii' measure equals its value under unicode:'full' for every fixture — waits on C09",
-  );
+  /**
+   * The registry is C09's, and these are C04's assertions about it: the
+   * contract belongs to the component that declared it, and it is only
+   * checkable now that something satisfies it. `table`, `plot` and `patch`
+   * are excluded because C11, C12 and C25 register them — they resolve through
+   * the `raw` fallback here, which measures the fallback rather than the kind.
+   */
+  const measured = CORPUS.filter((b) => !["table", "plot", "patch"].includes(b.kind));
+
+  it("T2.1: for every registered kind × the corpus × seven widths, measure equals rendered line count", () => {
+    // The headline, executed for the first time. Everything above L1 depends on
+    // it and nothing else can enforce it: C14 virtualises on measured heights
+    // without rendering, so the two coming apart is a viewport that drifts
+    // rather than a block that looks wrong.
+    const report = checkMeasurement(measurable(), measured);
+
+    expect(report.failures, formatReport(report)).toEqual([]);
+  });
+
+  it("T2.2: measure is pure — a hundred repeat calls, no I/O", () => {
+    const kit = measurable();
+
+    for (const b of measured) {
+      const first = kit.measure(b, 80);
+      const answers = new Set(Array.from({ length: 100 }, () => kit.measure(b, 80)));
+      expect(answers, `${b.id} is not pure`).toEqual(new Set([first]));
+    }
+  });
+
+  it("T2.3: measure is total over the adversarial corpus — empty, zero-length, 10,000-character", () => {
+    const kit = measurable();
+
+    for (const b of ADVERSARIAL) {
+      for (const width of [0, 1, 80, 10_000]) {
+        expect(() => kit.measure(b, width), `${b.id} at ${width}`).not.toThrow();
+      }
+    }
+  });
+
+  it("T2.4: measure is monotone — appending a row never decreases height", () => {
+    // Not enforceable generically, so it is a property per kind: the
+    // conformance suite grows each collection block by one item and compares.
+    const report = checkMeasurement(measurable(), measured, { widths: [80] });
+
+    expect(report.failures.filter((f) => f.check === "monotone")).toEqual([]);
+  });
+
+  it("T2.5: measure never returns a negative or non-integer, at any width including 1", () => {
+    const kit = measurable();
+
+    for (const b of CORPUS) {
+      for (const width of [1, 2, 3, 40, 200]) {
+        const height = kit.measure(b, width);
+        expect(Number.isInteger(height), `${b.id} at ${width}: ${height}`).toBe(true);
+        expect(height, `${b.id} at ${width}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("T2.6: under unicode:'ascii' measure equals its value under unicode:'full' for every fixture", () => {
+    // Every capability substitution is 1:1 by column count (C04 §5), so the
+    // heights are identical rather than merely similar. The ellipsis is the
+    // case that catches people: `…` is one column and `...` is three.
+    const report = checkAsciiParity(
+      measurable(),
+      measurable({ capabilities: ASCII_CAPS }),
+      measured,
+    );
+
+    expect(report.failures, formatReport(report)).toEqual([]);
+  });
 });
 
 function readIfPresent(path: string): string {

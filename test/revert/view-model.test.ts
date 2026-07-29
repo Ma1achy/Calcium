@@ -4,7 +4,7 @@
 // `src/data/viewmodel/`, written out so that making it breaks a named test
 // rather than passing review. Several are edits that were *made* during this
 // component's implementation and caught here.
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import {
@@ -17,7 +17,11 @@ import {
   type TableRow,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
-import { doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
+import { CORPUS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
+import { ASCII_CAPS, measurable } from "../support/render.js";
+import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
+import { cells } from "../../src/presentation/text.js";
+import { checkAsciiParity, formatReport } from "../support/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);
@@ -220,8 +224,27 @@ describe("C04 fail-on-revert", () => {
     expect(() => block({ kind: "plot", id: "p", form: "line", series: [] })).toThrow();
   });
 
-  it.todo("T6.1 (I7): a measurer under-counting wrapped lines by one → T2.1 fails at the wrap width — waits on C09");
-  it.todo("T6.2 (I7): a measurer ignoring the expanded flag → T3.12 and T4.5 fail — waits on C09 and C14");
+  it("T6.1 (I7): a measurer under-counting wrapped lines by one → T2.1 fails at the wrap width", () => {
+    // The revert is a prefix left out of the wrapping width, or `floor` where
+    // the count should be. Both are right at most widths and one row short at
+    // the widths where the text wraps — which is why this asserts over a range.
+    const kit = measurable();
+    const notice = block({
+      kind: "notice",
+      id: "revert-wrap",
+      tone: "error",
+      glyph: "✗",
+      text: "x".repeat(97),
+    });
+
+    for (const width of [20, 30, 40, 50]) {
+      expect(kit.measure(notice, width), `width ${width}`).toBe(
+        kit.renderToLines(notice, width).length,
+      );
+    }
+  });
+
+  it.todo("T6.2 (I7): a measurer ignoring the expanded flag → T3.12 and T4.5 fail — waits on C11 and C14");
   it("T6.7a (§1): importing theme into viewmodel/ → T2.9 fails", () => {
     // The half of T6.7 that C10 landing made writable. A block names a palette
     // slot and never resolves one, so `viewmodel/` importing `theme/` is the
@@ -240,12 +263,80 @@ describe("C04 fail-on-revert", () => {
     }
   });
 
-  // C10 is built; these two named it as a blocker and should not have. Glyph
-  // substitution under ASCII is C09's (C10 §10 says so outright), and the
-  // registry half of T6.7 waits on the renderer, not on the theme.
-  it.todo("T6.3: an ASCII fallback glyph of a different width → T2.6 fails — waits on C09");
-  it.todo("T6.7b (§1): moving the registry into C04 → T2.9 fails — waits on C09");
-  it.todo("T6.9 (I10): an assembly-only block representation → T5.3 fails as a partial document renders differently mid-stream — waits on C09 and C13");
-  it.todo("T6.14 (I17): removing the max(1, …) floor → T3.6b fails at all three kinds — waits on C09");
-  it.todo("T6.15 (§3): giving a row group's children the full width → T3.6c fails and T2.1 fails wherever a child wraps — waits on C09");
+  it("T6.3: an ASCII fallback glyph of a different width → T2.6 fails", () => {
+    // The 1:1 rule made checkable: every substitution is one cell on both
+    // sides, so a fixture's measured height is identical in both unicode
+    // modes. A two-cell fallback would pass every test run in a UTF-8 locale.
+    for (const [unicode, ascii] of SUBSTITUTIONS) {
+      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+    }
+
+    const report = checkAsciiParity(
+      measurable(),
+      measurable({ capabilities: ASCII_CAPS }),
+      CORPUS.filter((b) => !["table", "plot", "patch"].includes(b.kind)),
+    );
+    expect(report.failures, formatReport(report)).toEqual([]);
+  });
+
+  it("T6.7b (§1): moving the registry into C04 → T2.9 fails", () => {
+    // The registry pairs a measurer with a renderer, and `render` needs theme
+    // (L1) and capabilities (L0 terminal). A registry at L0 data would import
+    // upward and sideways at once — so the check is that `viewmodel/` still
+    // imports neither, and that the registry is somewhere else entirely.
+    const viewmodel = readdirSync("src/data/viewmodel")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/data/viewmodel/${f}`);
+
+    for (const file of viewmodel) {
+      const source = readFileSync(file, "utf8");
+      expect(source, `${file} must not reach L1`).not.toMatch(/from\s+["'][^"']*presentation/);
+      expect(source, `${file} must not reach L0-terminal`).not.toMatch(/from\s+["'][^"']*terminal/);
+      expect(source, `${file} must not hold a registry`).not.toMatch(/createBlockRegistry/);
+    }
+
+    expect(existsSync("src/presentation/blocks/registry.ts"), "the registry lives at L1").toBe(true);
+  });
+
+  it.todo("T6.9 (I10): an assembly-only block representation → T5.3 fails as a partial document renders differently mid-stream — waits on C13");
+
+  it("T6.14 (I17): removing the max(1, …) floor → T3.6 fails at all three kinds", () => {
+    // `ceil(cells("") / w)` is 0 and an empty notice renders as a row. The
+    // three are the kinds whose arithmetic reaches zero; an empty *container*
+    // is the one legitimate zero, and is asserted alongside so that a floor
+    // applied too widely fails here too.
+    const kit = measurable();
+
+    expect(kit.measure(block({ kind: "notice", id: "f-n", tone: "info", text: "" }), 80)).toBe(1);
+    expect(kit.measure(block({ kind: "tip", id: "f-t", text: "" }), 80)).toBe(1);
+    expect(kit.measure(block({ kind: "raw", id: "f-r", text: "" }), 80)).toBe(1);
+    expect(
+      kit.measure(block({ kind: "group", id: "f-g", direction: "column", children: [] }), 80),
+      "the absence of content, rather than empty content",
+    ).toBe(0);
+  });
+
+  it("T6.15 (§3): giving a row group's children the full width → T2.1 fails wherever a child wraps", () => {
+    // A `row` group splits the width; a measurer that passes `w` through agrees
+    // with nothing that renders, and only once a child wraps — which is why the
+    // fixture is two children whose text wraps at the split width and not at
+    // the full one.
+    const kit = measurable();
+    const text = "y".repeat(30);
+    const group = block({
+      kind: "group",
+      id: "revert-row",
+      direction: "row",
+      children: [
+        { kind: "notice", id: "revert-row-a", tone: "info", text },
+        { kind: "notice", id: "revert-row-b", tone: "info", text },
+      ],
+    });
+
+    // At 80 columns each child gets floor((80 - 1) / 2) = 39, so 30 cells fit
+    // on one row. At 40 each child gets 19 and the same text takes two.
+    expect(kit.measure(group, 80)).toBe(1);
+    expect(kit.measure(group, 40), "the split width is what wraps").toBe(2);
+    expect(kit.renderToLines(group, 40)).toHaveLength(2);
+  });
 });

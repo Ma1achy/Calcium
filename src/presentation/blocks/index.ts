@@ -1,9 +1,15 @@
 /**
- * The registry and fourteen default kinds.
+ * C09 — the registry and fourteen default kinds.
  *
- * C09 — see spec.
- * Implement to the spec's commitments and invariants; cite invariant
- * numbers in tests. If the spec is wrong, change the spec first.
+ * The obligation that dominates every decision here: **`measure(block, w)`
+ * equals the number of rows `render(block)` occupies at width `w`** (I1). C14
+ * virtualises on measured heights without rendering, so a divergence does not
+ * produce a wrong-looking block — it produces a viewport that drifts as the
+ * user scrolls, which is far harder to diagnose. Every kind's two halves are
+ * written as a pair and tested as a pair.
  */
 
-export {};
+export { DEFAULT_DEFINITIONS } from "./defaults.js";
+export { glyphs, spinnerFrames, SUBSTITUTIONS, type GlyphSet } from "./glyphs.js";
+export { createBlockRegistry } from "./registry.js";
+export type { BlockDefinition, BlockRegistry, FocusState, RenderContext } from "./types.js";

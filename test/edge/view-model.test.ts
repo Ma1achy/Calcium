@@ -22,6 +22,8 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { ADVERSARIAL, doc, tableOf } from "../support/blocks.js";
+import { measurable } from "../support/render.js";
+import { cells } from "../../src/presentation/text.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);
@@ -239,11 +241,65 @@ describe("C04 patch edges", () => {
   });
 });
 
-describe("C04 measurement edges — waits on C09", () => {
-  it.todo("T3.3: a notice of exactly w, w-1 and w+1 characters → 1, 1 and 2 lines — waits on C09");
-  it.todo("T3.4: a table with zero rows → header plus the empty message, not zero — waits on C09 and C11");
-  it.todo("T3.8: double-width CJK text → two columns per glyph, not one — waits on C09");
-  it.todo("T3.9: a ZWJ emoji with a variation selector → one cell, not one per code unit — waits on C09");
-  it.todo("T3.10: a combining mark → the base character's width, not two — waits on C09");
-  it.todo("T3.11: a logs line longer than w → 1 line, truncated, never wrapped — waits on C09");
+describe("C04 measurement edges", () => {
+  const kit = measurable();
+
+  it("T3.3: a notice of exactly w, w-1 and w+1 characters → 1, 1 and 2 lines", () => {
+    const noticeOf = (n: number): Block =>
+      block({ kind: "notice", id: `edge-n-${n}`, tone: "info", text: "x".repeat(n) });
+
+    expect(kit.measure(noticeOf(39), 40)).toBe(1);
+    expect(kit.measure(noticeOf(40), 40)).toBe(1);
+    expect(kit.measure(noticeOf(41), 40)).toBe(2);
+  });
+
+  it.todo("T3.4: a table with zero rows → header plus the empty message, not zero — waits on C11");
+
+  it("T3.8: double-width CJK text → two columns per glyph, not one", () => {
+    // Ten glyphs, twenty columns: at width 20 it is one row and at 19 it is
+    // two. A measurer counting characters says one at both.
+    const cjk = block({
+      kind: "notice",
+      id: "edge-cjk",
+      tone: "info",
+      text: "日本語のテキストです",
+    });
+
+    expect(cells("日本語のテキストです")).toBe(20);
+    expect(kit.measure(cjk, 20)).toBe(1);
+    expect(kit.measure(cjk, 19)).toBe(2);
+  });
+
+  it("T3.9: a ZWJ emoji with a variation selector → one cluster, not one per code unit", () => {
+    const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}";
+
+    expect(family.length, "code units").toBe(8); // cells-ok
+    expect(cells(family), "columns").toBe(2);
+
+    const zwj = block({ kind: "notice", id: "edge-zwj", tone: "info", text: family });
+    expect(kit.measure(zwj, 2)).toBe(1);
+  });
+
+  it("T3.10: a combining mark → the base character's width, not two", () => {
+    const decomposed = "e\u0301galite\u0301";
+
+    expect(decomposed.length, "code units").toBe(9); // cells-ok
+    expect(cells(decomposed), "columns").toBe(7);
+
+    const notice = block({ kind: "notice", id: "edge-comb", tone: "info", text: decomposed });
+    expect(kit.measure(notice, 7)).toBe(1);
+  });
+
+  it("T3.11: a logs line longer than w → 1 line, truncated, never wrapped", () => {
+    const logs = block({
+      kind: "logs",
+      id: "edge-logs",
+      lines: [{ ts: "12:00:01", level: "info", message: "m".repeat(500) }],
+    });
+
+    for (const width of [20, 40, 80]) {
+      expect(kit.measure(logs, width), `width ${width}`).toBe(1);
+      expect(kit.renderToLines(logs, width), `width ${width}`).toHaveLength(1);
+    }
+  });
 });
