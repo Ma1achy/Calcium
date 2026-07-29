@@ -1,0 +1,335 @@
+/**
+ * The vocabulary the whole system speaks.
+ *
+ * C04 — see spec. Types only: no runtime value is exported from this file, so
+ * nothing here can be the place an invariant is enforced. Enforcement lives in
+ * `construct.ts` (shape invariants) and `validate.ts` (document invariants),
+ * and having exactly one of each is the point (C04 §4b).
+ *
+ * C04 imports nothing from `terminal/`, `presentation/` or above (I11). That is
+ * why `ColumnDef` is declared here rather than in C11: it is a field of `Table`,
+ * so `Table` could not be declared without it, and a type-only import from L1
+ * would erase at build and pass the module graph while being exactly the
+ * dependency I11 exists to prevent.
+ */
+
+// --- the document ---------------------------------------------------------
+
+export type ViewDocument = Readonly<{
+  schema: "tui.view/1";
+  command: string;
+  status: DocumentStatus;
+  blocks: readonly Block[];
+  error?: ErrorLike;
+  meta: DocumentMeta;
+}>;
+
+/**
+ * `proposed` is reserved and unused in v1 (I12). It ships now because adding a
+ * `status` value later is a `tui.view/2` bump, and the bump is the expensive
+ * part rather than the field.
+ */
+export type DocumentStatus = "ok" | "error" | "partial" | "proposed";
+
+export type DocumentMeta = Readonly<{
+  verb: string | null;
+  adapter: string;
+  exitCode: number;
+  durationMs: number;
+  truncated: boolean;
+  resultId?: string;
+  /** The invocation record — what actually ran (commitment 17). */
+  argv: readonly string[];
+  stderr: string;
+  transport: "emulated" | "fixture" | "subprocess" | "local";
+  /** Required, never optional (I13). Provenance that can be absent is untrusted. */
+  origin: "user" | "action" | "agent" | "refresh";
+}>;
+
+export type ErrorLike = Readonly<{
+  message: string;
+  code?: string;
+  stage?: string;
+  details?: Readonly<Record<string, unknown>>;
+  remediation?: string;
+}>;
+
+export const SCHEMA = "tui.view/1" as const;
+
+// --- tone, actions --------------------------------------------------------
+
+export type Tone =
+  | "default"
+  | "dim"
+  | "muted"
+  | "ok"
+  | "warn"
+  | "error"
+  | "info"
+  | "accent"
+  | "meta"
+  | "identifier";
+
+/** The tones that oblige a glyph (I6, D29). */
+export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
+
+export type Action =
+  | Readonly<{ kind: "fill"; label: string; command: string }>
+  | Readonly<{ kind: "exec"; label: string; command: string }>
+  | Readonly<{ kind: "open"; label: string; url: string }>
+  | Readonly<{ kind: "expand"; label: string; target: string }>;
+
+// --- table ----------------------------------------------------------------
+
+export type Cell = Readonly<{
+  text: string;
+  tone?: Tone;
+  glyph?: string;
+  spark?: readonly number[];
+}>;
+
+/**
+ * Declared here, not in C11 — see the file header. C11 owns `PlannedColumns`
+ * and `planColumns`, which are the plan derived from this plus a width.
+ */
+export type ColumnDef = Readonly<{
+  key: string;
+  label: string;
+  align: "left" | "right";
+  priority: number;
+  minWidth: number;
+  maxWidth?: number;
+  flex?: boolean;
+  sortable: boolean;
+}>;
+
+export type TableRow = Readonly<{
+  id: string;
+  cells: Readonly<Record<string, Cell>>;
+  detail?: readonly Block[];
+  actions?: readonly Action[];
+  /** View state. Never merged (I9), never carried across a `replace` (§4). */
+  expanded?: boolean;
+}>;
+
+/**
+ * A row as it may arrive in a `merge`. I9 holds because the field does not
+ * exist to be set, not because a rule is remembered (I16).
+ */
+export type MergeRow = Omit<TableRow, "expanded">;
+
+// --- blocks ---------------------------------------------------------------
+
+export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }>;
+
+export type Notice = Readonly<{
+  kind: "notice";
+  id: string;
+  tone: Tone;
+  glyph?: string;
+  text: string;
+}>;
+
+export type KeyValue = Readonly<{
+  kind: "keyValue";
+  id: string;
+  rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[];
+}>;
+
+export type Table = Readonly<{
+  kind: "table";
+  id: string;
+  columns: readonly ColumnDef[];
+  rows: readonly TableRow[];
+  sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;
+  showHeader?: boolean;
+  emptyMessage?: string;
+}>;
+
+export type Steps = Readonly<{
+  kind: "steps";
+  id: string;
+  steps: readonly Readonly<{
+    label: string;
+    detail?: string;
+    state: "pending" | "active" | "done" | "failed";
+  }>[];
+}>;
+
+export type Logs = Readonly<{
+  kind: "logs";
+  id: string;
+  lines: readonly Readonly<{ ts: string; level: string; message: string }>[];
+}>;
+
+export type Events = Readonly<{
+  kind: "events";
+  id: string;
+  events: readonly Readonly<{ ts: string; type: string; message: string }>[];
+}>;
+
+export type Series = Readonly<{
+  values: readonly number[];
+  label?: string;
+  tone?: Tone;
+}>;
+
+/**
+ * `height` is optional on the type only because `sparkline` does not take one.
+ * `form: "line"` without it is a construction error, not a default (§3) — a
+ * defaulted height is how C12's central property fails silently.
+ */
+export type Plot = Readonly<{
+  kind: "plot";
+  id: string;
+  form: "line" | "sparkline";
+  series: readonly Series[];
+  height?: number;
+  axes?: boolean;
+  xLabels?: readonly [string, string, string];
+  yFormat?: "number" | "percent" | "bytes" | "duration";
+  emptyMessage?: string;
+}>;
+
+export type Progress = Readonly<{
+  kind: "progress";
+  id: string;
+  label: string;
+  current: number;
+  total: number;
+}>;
+
+export type Code = Readonly<{
+  kind: "code";
+  id: string;
+  language: string;
+  text: string;
+  wrap?: boolean;
+}>;
+
+export type Diff = Readonly<{
+  kind: "diff";
+  id: string;
+  rows: readonly Readonly<{
+    field: string;
+    a: string;
+    b: string;
+    comparison?: "same" | "better" | "worse" | "changed";
+  }>[];
+}>;
+
+export type Hunk = Readonly<{
+  header: string;
+  lines: readonly Readonly<{
+    kind: "add" | "remove" | "context";
+    text: string;
+    oldNo?: number;
+    newNo?: number;
+  }>[];
+  collapsedBefore?: number;
+}>;
+
+export type Patch = Readonly<{
+  kind: "patch";
+  id: string;
+  path: string;
+  language: string;
+  hunks: readonly Hunk[];
+  layout?: "unified" | "split";
+}>;
+
+export type Pills = Readonly<{
+  kind: "pills";
+  id: string;
+  chips: readonly Readonly<{
+    label: string;
+    tone?: Tone;
+    action?: Action;
+    active?: boolean;
+  }>[];
+}>;
+
+export type Tip = Readonly<{
+  kind: "tip";
+  id: string;
+  text: string;
+  actions?: readonly Action[];
+}>;
+
+export type Panel = Readonly<{
+  kind: "panel";
+  id: string;
+  title: string;
+  children: readonly Block[];
+}>;
+
+export type Group = Readonly<{
+  kind: "group";
+  id: string;
+  direction: "row" | "column";
+  children: readonly Block[];
+}>;
+
+/** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
+export type Raw = Readonly<{ kind: "raw"; id: string; text: string }>;
+
+export type Block =
+  | Rule
+  | Notice
+  | KeyValue
+  | Table
+  | Steps
+  | Logs
+  | Events
+  | Plot
+  | Progress
+  | Code
+  | Diff
+  | Patch
+  | Pills
+  | Tip
+  | Panel
+  | Group
+  | Raw;
+
+export type BlockKind = Block["kind"];
+
+// --- patches --------------------------------------------------------------
+
+export type ViewPatch =
+  | Readonly<{ op: "append"; block: Block }>
+  | Readonly<{ op: "replace"; blockId: string; block: Block }>
+  | Readonly<{ op: "merge"; blockId: string; rows: readonly MergeRow[] }>
+  | Readonly<{ op: "status"; status: DocumentStatus }>;
+
+/**
+ * Fallible in the type (I15). `applyPatch` runs on every stream tick in the
+ * render path, and a pure data function that throws there is worse than one
+ * that returns: C23 §5 must handle the failure either way, and only this form
+ * can be handled without a `try` around the hot loop.
+ */
+export type PatchResult =
+  | Readonly<{ ok: true; doc: ViewDocument }>
+  | Readonly<{ ok: false; error: ErrorLike }>;
+
+export type Result<T, E> = Readonly<{ ok: true; value: T }> | Readonly<{ ok: false; error: E }>;
+
+// --- the measurement contract (§5) ----------------------------------------
+
+/**
+ * The registry's dispatcher, as seen by a container kind that does not know
+ * what it is measuring (A02 Seam 1).
+ */
+export type MeasureFn = (block: Block, width: number) => number;
+
+/**
+ * C04 declares this and implements none of it. The measurers live in C09, C11,
+ * C12 and C25 — `render` needs theme and capabilities, so the registry cannot
+ * live at L0, and a measurer without its renderer beside it is the pair that
+ * drifts (§1).
+ */
+export type Measure<B extends Block = Block> = (
+  block: B,
+  width: number,
+  measureChild: MeasureFn,
+) => number;
