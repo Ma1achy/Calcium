@@ -74,6 +74,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG18 | C20 imports nothing from `terminal/`; no C17 import | C20 T2.5, T2.6 |
 | MG19 | C21 imports nothing from `terminal/` | C21 T2.3 |
 | MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
+| MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 §3, T2.17 |
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 
@@ -142,7 +143,6 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 §4, C05 §2 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I18, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I4, T2.17 |
-| SS38 | An import from `src/terminal/` other than `escapes.js`, or a value import of anything else | `src/presentation/` | C09 §3, T2.17 |
 
 **SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
 
@@ -164,7 +164,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 
 **SS37 is SS36's other half.** SS36 makes an untagged colour unwritable inside the tree; SS37 stops the tag being discarded on the way out of it. Ink's `color` prop takes a string and re-derives the depth from its *format* — so a renderer handing it `"#7faecf"` has asked one question and got two answers, and the one that reaches the terminal is Ink's. Worse for the suite than for the frame: the colour library behind that prop decides how much colour to emit from its own environment detection, which reports none at all under a test runner. Every golden frame would render monochrome and pass, while production rendered truecolour. A rendering nobody ships, verified thoroughly. Renderers emit SGR from `terminal/escapes.ts` instead (C09 §3).
 
-**SS38 keeps the new edge singular.** C09 §3's `escapes.sgr` is the first runtime import from L1 to L0-terminal — legal under MG1, which forbids upward imports and not downward ones, and required rather than tolerated. What makes it safe is that it is one narrow import and not the beginning of a habit: the rule permits `escapes.js` and type-only capability imports, and fails on anything else `src/presentation/` reaches for in `src/terminal/`. Recorded as a rule rather than a paragraph because "tidy that import away" and "add one more like it" are both reasonable-looking edits.
+**MG21 keeps the new edge singular.** C09 §3's `escapes.sgr` is the first runtime import from L1 to L0-terminal — legal under MG1, which forbids upward imports and not downward ones, and required rather than tolerated. What makes it safe is that it is one narrow import and not the beginning of a habit: the rule permits `escapes.js` and type-only capability imports, and fails on anything else `src/presentation/` reaches for in `src/terminal/`. It is an MG rule rather than an SS one because it is a question about the import graph, which the grep-class scans cannot ask: a multi-line `import type` spans lines, and only the graph checker knows a type-only import is not an edge. Recorded as a rule rather than a paragraph because "tidy that import away" and "add one more like it" are both reasonable-looking edits.
 
 **SS35 is SS30's shape applied to a type name.** C05's first draft declared its own `Result<T, E>` with `errors` plural where C04's has `error` singular — same name, same half of L0, and both compile. Nothing would have failed until a call site read `r.error` on the wrong one, which is a runtime `undefined` rather than a type error. One `Result` in the tree, declared in `data/viewmodel/types.ts`; a component wanting a plural puts it in the type argument.
 

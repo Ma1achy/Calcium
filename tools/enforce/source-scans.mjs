@@ -1,4 +1,6 @@
-// A03 §4 — SS1..SS35. Forbidden patterns, scoped by directory.
+// A03 §4 — the implemented subset of SS1..SS37. Forbidden patterns, scoped by
+// directory. A row here is a rule that can fire; A03 inventories the rest, each
+// waiting on the component that creates its scope.
 import { readFileSync } from "node:fs";
 
 /** allow: paths (or prefixes) exempt from the rule. */
@@ -141,6 +143,24 @@ export const SCANS = [
     pattern: /\bcolour\s*:\s*["'`]/,
     scope: "src/", allow: [],
     why: "a resolved colour names its depth; there is no untagged form" },
+
+  // SS36's other half. SS36 makes an untagged colour unwritable inside the
+  // tree; this stops the tag being discarded on the way out of it.
+  //
+  // Ink's colour props take a string and re-derive the depth from its format,
+  // so a renderer handing one `"#7faecf"` has asked one question and received
+  // two answers — and the one that reaches the terminal is Ink's. The suite
+  // suffers worse than the frame: the colour library behind those props sizes
+  // its output from its own environment detection, which reports no colour at
+  // all under a test runner. Every golden frame would render monochrome and
+  // pass while production rendered truecolour.
+  //
+  // The `=` is what makes this a prop rather than prose: `color={style}` and
+  // `color="red"` both match, a comment about colour does not.
+  { id: "SS37", spec: "C09 I4 · C09 T2.17",
+    pattern: /\b(?:color|backgroundColor)\s*=/,
+    scope: "src/presentation/", allow: [],
+    why: "renderers emit SGR from terminal/escapes.ts; an Ink colour prop discards the depth tag" },
 
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,

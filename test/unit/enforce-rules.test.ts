@@ -76,6 +76,11 @@ const FABRICATED: readonly Fabrication[] = [
     source: "render({ alternateScreen: true }, ui);",
   },
   {
+    rule: "SS37",
+    file: "src/presentation/blocks/notice.ts",
+    source: '<Text color={style.colour}>{text}</Text>',
+  },
+  {
     rule: "SS36",
     file: "src/presentation/blocks/text.ts",
     source: 'const style = { colour: "#7faecf", bold: true };',
@@ -100,6 +105,15 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "MG20",
     file: "src/terminal/frame-scheduler.ts",
     source: 'import { ALT_SCREEN } from "./escapes.js";',
+  },
+  {
+    // The edge C09 opens, and the two edits that would widen it. A value
+    // import of anything in `terminal/` other than `escapes.js` fails; the
+    // type-only form of the same import does not, and the case below asserts
+    // that separately rather than assuming it.
+    rule: "MG21",
+    file: "src/presentation/blocks/notice.ts",
+    source: 'import { detect } from "../../terminal/capabilities.js";',
   },
 ];
 
@@ -133,6 +147,27 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+  });
+
+  it("MG21 permits escapes.js, and permits a type-only capability import", () => {
+    // The half of the rule a fabricated violation cannot show. MG21 is only
+    // useful if the two imports C09 §3 actually needs pass it: `sgr` at run
+    // time, and `TerminalCapabilities` as a type. A rule that failed on those
+    // would be reverted within the hour and the edge would stop being watched.
+    const permitted = {
+      "src/presentation/blocks/notice.ts": [
+        'import { sgr, SGR_RESET } from "../../terminal/escapes.js";',
+        'import type { TerminalCapabilities } from "../../terminal/capabilities.js";',
+        "",
+      ].join("\n"),
+    };
+
+    const violations = checkModuleGraph(
+      Object.keys(permitted),
+      (f) => permitted[f as keyof typeof permitted] ?? "",
+    ).filter((v) => v.rule === "MG21");
+
+    expect(violations, "the two imports C09 §3 requires must both pass").toEqual([]);
   });
 
   it("SS31 fires on a dependency with no entry in DEPENDENCIES.md", () => {

@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG20"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG20", "MG21"];
 
 const IMPORT = /^\s*(?:import|export)\b([^'"]*?)from\s*['"]([^'"]+)['"]/gm;
 const BARE   = /^\s*import\s*['"]([^'"]+)['"]/gm;
@@ -133,11 +133,55 @@ export function modeOwnersAreReal(readFile = (f) => readFileSync(f, "utf8")) {
 }
 
 /**
+ * MG21 — `presentation/` reaches into `terminal/` for `escapes.js` and nothing
+ * else.
+ *
+ * C09 §3's `sgr` is the first runtime edge from L1 to L0-terminal. It is legal
+ * — MG1 forbids upward imports and this is downward — and it is *required*: an
+ * SGR sequence is an escape literal, and C01 I1 puts those in one module. What
+ * makes it safe is that it stays one narrow import rather than becoming the
+ * beginning of a habit.
+ *
+ * Two edits this exists to catch, and both look reasonable in review: tidying
+ * the import away (which would put an escape literal in `presentation/`, where
+ * SS14 forbids it), and adding one more like it.
+ *
+ * Type-only imports are not edges — `importsOf` already drops them, which is
+ * how `presentation/` keeps naming `TerminalCapabilities` without importing C02.
+ */
+function checkPresentationEdges(files, readFile) {
+  const violations = [];
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (!f.startsWith("src/presentation/")) continue;
+
+    for (const spec of importsOf(file, readFile)) {
+      const target = resolve(f, spec);
+      if (target === null || !target.startsWith("src/terminal/")) continue;
+      if (bare(target) === ESCAPES) continue;
+
+      violations.push({
+        rule: "MG21", file: f,
+        message:
+          `imports ${spec} from terminal/ at run time — presentation/ may import ` +
+          `escapes.js and nothing else (C09 §3); a capability type is an ` +
+          `\`import type\`, which is not an edge`,
+        spec: "C09 §3 · C09 T2.17",
+      });
+    }
+  }
+  return violations;
+}
+
+/**
  * `readFile` is injected so the rule can be tested against fabricated modules at
  * layer paths that do not exist on disk — the same reason C02 takes its `env`.
  */
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
-  const violations = checkModeOwnership(files, readFile);
+  const violations = [
+    ...checkModeOwnership(files, readFile),
+    ...checkPresentationEdges(files, readFile),
+  ];
   for (const file of files) {
     const from = layerOf(file);
     if (!from) continue;
