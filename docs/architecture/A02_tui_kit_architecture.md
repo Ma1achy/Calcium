@@ -87,6 +87,18 @@ L0T and L0D have no edge between them. That absence is the point.
 
 C11 and C12 sit beside C09 rather than under it: the table engine and plot renderer *are* block renderers, registered like any other.
 
+### Whose claim is this
+
+Every component spec carries a commitment list and an invariant list, and they must pair: **an invariant is what a test cites, so a commitment with no invariant is a promise nothing enforces.** Two rules decide the cases where they legitimately do not pair, and both answer the same question — whose claim is this.
+
+**Structural invariants carry no commitment.** An invariant asserting the module graph rather than behaviour — "C13 imports nothing from `terminal/` or `presentation/`" — is enforced by A03 and consumed by no caller, so a commitment would restate a build rule as a promise to a reader who cannot act on it. Ten specs carry such an invariant and none commits to it; that is one decision, not ten omissions.
+
+**A spec commits only to what it can enforce. A rule owned elsewhere is a cross-reference, not a commitment.** The test is whether the spec can *fail* when the rule is violated. C04 committed to capability substitution being width-preserving, which happens in C09's renderers: C04 cannot fail if it is broken, so C04's version was an overclaim, and C09 I5 is where the rule lives. C02 committed to D29 — no information carried by colour alone, anywhere — which C02 has no view of at all.
+
+The failure mode is specific and worth naming: **a claim restated downstream is a claim made where it cannot be tested, and the duplication is what hides that neither copy is backed.** Three rules were each stated in two specs and asserted in neither.
+
+Both rules are mechanical now, not advisory — see §8.
+
 ---
 
 ## 2. Interfaces
