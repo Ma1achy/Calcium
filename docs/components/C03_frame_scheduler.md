@@ -86,9 +86,11 @@ A ceiling is also the only form of this rule C03 can implement. A deadline is *n
 
 A render callback may cause a commit — a component measuring itself during render, a resize observed mid-paint. Writing is synchronous, so this arrives while a write is already in progress.
 
-**A commit during a write is deferred, not dropped and not recursive.** C03 records that a re-entrant commit occurred, with the strictest reason seen, and acts on it once the current write returns: immediately if that reason was immediate, otherwise by scheduling a fresh window from the end of the write (T3.15). Recursing would risk unbounded depth; dropping would lose the final state.
+**A commit during a write is deferred, not dropped and not written inline more than once.** C03 records that a re-entrant commit occurred, with the strictest reason seen, and acts on it once the current write returns: inline if that reason was immediate, otherwise by scheduling a fresh window from the end of the write (T3.15). Dropping would lose the final state.
 
-**A commit re-entering the deferred write is escalated to the scheduler, not written inline.** I10 says nothing is dropped; T3.20 says the chain is not unbounded. For a render callback that commits on *every* invocation those two pull against each other, and exactly one reading satisfies both: drain once, and if the deferred write defers again, arm a timer rather than writing. An immediate reason gets a zero window, so the frame lands on the next turn instead of on this stack. The frame is kept, the stack is not, and an application stuck in a render loop renders at timer cadence rather than hanging.
+**A commit arising from that second write escalates to the timer.** Inline-once bounds the chain at two writes; escalation means nothing is dropped. An immediate reason gets a zero window, so the frame lands on the next turn instead of on this stack.
+
+**The hazard is livelock, not depth.** An earlier draft of this section argued that recursing would risk unbounded stack depth. That is the wrong failure: a render callback that commits on every invocation never recurses — each write returns before the next begins — it simply never terminates the drain. The loop is flat and infinite rather than deep and finite, so a depth bound would not have caught it and neither did the prose. It was found when T3.20 exhausted the test runner's heap. A callback like that is pathological but legal, and C03's job is to keep it rendering at timer cadence rather than hanging (I10, T3.20, T6.10).
 
 **Strictest** means: immediate outranks coalesced, and among coalesced the shorter window wins. Order among the three immediate reasons is unobservable, and that is not an accident — `resize` sets contamination eagerly at commit time even while deferring (§5), so the only thing that could distinguish the three has already taken effect by the time the deferred reason is chosen. Do not define an order there; it would have no effect.
 
@@ -151,7 +153,9 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 - **I7** — `resize` implies `invalidate()`. There is no path where dimensions change and a diff is attempted.
 - **I8** — C03 holds no frame content. It calls `render()` or `repaint()`; what is drawn is current state.
 - **I9** — A throwing `render()` does not leave a pending timer, an unbalanced marker, or a stuck `contaminated` flag.
-- **I10** — A commit during a write is deferred and acted on once, at the strictest reason seen. Never recursive, never dropped.
+- **I10** — A commit during a write is deferred with the strictest reason seen and acted on once the write returns: inline **once**, then by timer. A commit arising from that second write escalates to the timer rather than writing inline again.
+
+  Inline-once bounds the chain at two writes; escalation means nothing is dropped. A render callback that commits on every render is pathological but legal, and without the escalation it drains forever — a livelock, not a recursion, which is why the depth argument in §3 does not catch it.
 - **I11** — `lifecycle.acquired` is read at write time through a live view, never captured at construction.
 
 ---
@@ -169,7 +173,7 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 9. C03 holds no frame content and owns no rendering.
 10. The timer is injected, so no test sleeps.
 11. C03 receives a live read-only view of C01 and cannot acquire or release.
-12. A commit arriving during a write is deferred and coalesced to the strictest reason, never recursive.
+12. A commit arriving during a write is deferred and coalesced to the strictest reason, written inline at most once, and escalated to the timer thereafter. The chain is bounded at two writes and nothing is dropped.
 13. C03 writes only the synchronised-update markers, through an injected bound `write`. Frame bytes leave through `render()`, which C03 does not own.
 
 ---
@@ -268,7 +272,7 @@ PTY harness, real timers, real terminal.
 - **T6.7** (I7): decoupling resize from invalidation → T1.10 fails.
 - **T6.8** (I8): adding a frame buffer or content parameter to `commit` → T2.2 fails.
 - **T6.9** (A02 §7): adding a `CommitReason` without a window → T2.5 fails at build time.
-- **T6.10** (I10): making a re-entrant commit recurse → T3.20 fails on call depth; dropping it → T3.21 fails on the lost frame. Draining the deferral in a loop rather than escalating the second one → T3.20 hangs, which is the failure the escalation exists to prevent.
+- **T6.10** (I10): dropping a re-entrant commit → T3.21 fails on the lost frame. Draining the deferral in a loop rather than escalating the second one → T3.20 does not fail, it *hangs*: the chain is flat and infinite, so it exhausts the heap rather than the stack. That is the failure the escalation exists to prevent, and the reason I10 bounds the inline writes by count rather than by depth.
 - **T6.11** (I11): snapshotting `acquired` at construction → T3.22 fails.
 - **T6.12** (I2): allowing an immediate reason to be given a window → T3.13 fails. Distinct from T6.1: that reverts the behaviour, this reverts the construction-time rejection.
 - **T6.13** (I3): re-arming the pending timer on every coalesced commit, or on one whose window is merely *not longer* → T1.4 fails, since 33 against 33 would slide the window. Never re-arming → T3.12 fails on the spinner-then-stream ordering. Strictly-shorter is what holds both directions; either comparison relaxed by one step breaks one of them.

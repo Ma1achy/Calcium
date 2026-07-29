@@ -238,7 +238,10 @@ describe("C03 re-entrancy", () => {
       },
     });
 
-    // Terminates. Recursing here would blow the stack; looping would hang.
+    // Terminates. The hazard is livelock, not depth: each write returns before
+    // the next begins, so a drain-in-a-loop is flat and infinite rather than
+    // deep and finite. It exhausts the heap, not the stack — this test found
+    // that by taking the runner down with it.
     h.scheduler.commit("input");
 
     expect(h.render).toHaveBeenCalledTimes(2);

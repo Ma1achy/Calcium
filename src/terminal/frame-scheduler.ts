@@ -108,14 +108,15 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
   }
 
   /**
-   * A write, plus the one deferred write §3 allows to follow it.
+   * A write, plus the one deferred write I10 allows to follow it.
    *
-   * I10 and T3.20 pull against each other for a render callback that commits on
-   * every invocation: nothing may be dropped, and the chain may not be
-   * unbounded. Exactly one reading satisfies both — drain once, then *escalate*
-   * a further re-entrant commit to the scheduler rather than writing it inline.
-   * The frame is kept, the stack is not, and an application stuck in a render
-   * loop renders at timer cadence instead of hanging.
+   * The hazard is livelock, not depth. A render callback that commits on every
+   * invocation never recurses — each write returns before the next begins — it
+   * simply never terminates the drain, so the loop is flat and infinite rather
+   * than deep and finite. A depth bound would not catch it. Inline-once bounds
+   * the chain at two writes; escalating anything further to the timer means
+   * nothing is dropped, and an application stuck in a render loop renders at
+   * timer cadence rather than hanging (I10, T3.20, T6.10).
    */
   function runWrite(): void {
     writeFrame();

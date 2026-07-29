@@ -135,8 +135,10 @@ describe("C03 fail-on-revert", () => {
     }
   });
 
-  it("T6.10 (I10): making a re-entrant commit recurse → T3.20; dropping it → T3.21", () => {
-    // Recursing: unbounded depth. This terminates, and the stack stays flat.
+  it("T6.10 (I10): draining the deferral in a loop → T3.20 hangs; dropping it → T3.21", () => {
+    // Not recursion — each write returns before the next begins. Draining in a
+    // loop is flat and infinite, so it exhausts the heap rather than the stack
+    // and a depth bound would not catch it. Inline-once is what terminates.
     const loop = harness({
       render: () => {
         loop.scheduler.commit("input");

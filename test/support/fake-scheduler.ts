@@ -9,10 +9,28 @@ import type { CommitReason, FrameScheduler } from "../../src/terminal/frame-sche
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { MODES, capabilities } from "./fake-terminal.js";
 
+/**
+ * A fake timer with **turn semantics**: one `advance()` is one turn, and a
+ * timer armed *during* that advance waits for the next call rather than firing
+ * within it.
+ *
+ * This matches reality — a real `setTimeout` armed inside a timer callback
+ * fires on a later tick, never inside the callback that armed it — but it is a
+ * model, and every component that later takes an injected timer inherits it
+ * from here. Read this before writing a timing test that expects a chain of
+ * timers to drain in one `advance()`; it will not, and that is deliberate.
+ *
+ * C03's T3.20 forced it. A render callback that commits on every invocation
+ * re-arms a zero-window timer inside the drain, and without the barrier the
+ * fake loops forever inside a single `advance()` — which is not a hang in the
+ * component under test but a hang in the harness, and it presents as an
+ * out-of-memory rather than as a failed assertion. Ten seconds of OOM before
+ * the first useful line of output.
+ */
 export type FakeClock = {
   /** Drop-in for C03's `schedule`. */
   schedule(fn: () => void, ms: number): Disposable;
-  /** Run to `now + ms`, firing whatever falls due, in order. */
+  /** Run to `now + ms`, firing whatever was already armed when the turn began. */
   advance(ms: number): void;
   /** Timers alive right now. I3 is an assertion about this being 0 or 1. */
   readonly outstanding: number;
@@ -29,13 +47,7 @@ export function fakeClock(): FakeClock {
   let now = 0;
   let seq = 0;
 
-  /**
-   * One `advance` is one turn: a timer armed *during* it waits for the next
-   * call, exactly as a macrotask would. Without that barrier, a render callback
-   * that re-arms a zero-window timer is drained forever inside one `advance` —
-   * which is not a hang in C03 but a hang in the fake, and it presents as an
-   * out-of-memory rather than as a failed assertion (T3.20).
-   */
+  /** The barrier that makes one `advance` one turn — see `FakeClock`. */
   function next(target: number, barrier: number): [number, Entry] | null {
     let best: [number, Entry] | null = null;
     for (const entry of live) {
