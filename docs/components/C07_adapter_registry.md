@@ -167,6 +167,8 @@ The 24-cell cap is a judgement and the only one here. A single 200-character fie
 
 Lowering the column cap was the alternative and it is worse: fields are lost *and* the survivors still get three cells each. Legibility and reachability both improve from the width change; only reachability improves from the cap.
 
+**Open, and newly visible because the mechanism is now live: the affordance is invisible.** A generated table declares no column with `role: "expand"`, so at 80 cells three of docker's fields drop, every row becomes expandable, and nothing on screen says so — C11 draws the marker only into a column a surface declared, and it declines to synthesise one or to reserve a gutter because either would move width arithmetic the surfaces state (C11 I16). Under the old uniform minimum this could not arise, since nothing ever dropped. The remedy is a decision for this section rather than for C11: a leading `role: "expand"` column of `minWidth` 1 costs three cells with its gap, and whether it counts toward the eight-column cap is the part that needs deciding.
+
 ### Resolved: the list shape was illegible, and D38 was satisfied vacuously
 
 **The risk below was read on the commit that registered `table` (C11), and it was real.** The finding was against this section's defaults, exactly as recorded, and it was worse than "the columns come out narrow". The remedy is the measured `minWidth` above; what follows is what the reading found, kept because the reasoning is the reason for that rule.
