@@ -190,7 +190,12 @@ export function interactivePty(
   opts: { env?: Record<string, string>; cols?: number; rows?: number } = {},
 ): InteractivePty {
   const term = spawn("/bin/sh", ["-c", program], {
-    name: "xterm-256color",
+    // Same as `runInPty`: `name` is the child's TERM and wins over the env
+    // record, so hard-coding it makes `env: { TERM: … }` inert. The second
+    // instance of one defect in one file — worth stating, because a fix applied
+    // to the caller that found it would have left this one live for whoever
+    // needed an interactive session under a different terminal.
+    name: opts.env?.["TERM"] ?? "xterm-256color",
     cols: opts.cols ?? 80,
     rows: opts.rows ?? 24,
     env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
