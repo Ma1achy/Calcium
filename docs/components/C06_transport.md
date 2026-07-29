@@ -68,7 +68,7 @@ type RawResult = Readonly<{
 type RawPatch =
   | Readonly<{ kind: "data";      value: unknown }>
   | Readonly<{ kind: "malformed"; line: string }>
-  | Readonly<{ kind: "degraded";  reason: string; remaining: string }>
+  | Readonly<{ kind: "degraded";  reason: string }>
   | Readonly<{ kind: "end";       result: RawResult }>;
 
 interface VerbTransport {
@@ -189,10 +189,18 @@ For `streams: true` tools, stdout is NDJSON, one patch per line.
 |---|---|
 | Parses as JSON | `{ kind: "data", value }` |
 | Does not parse | `{ kind: "malformed", line }`, and counted |
-| Malformed exceeds **10%** of lines seen, minimum 10 lines | `{ kind: "degraded", … }` once, then the remainder is forwarded as raw text |
+| Malformed exceeds **10%** of lines seen, minimum 10 lines | `{ kind: "degraded", reason }` once; subsequent lines continue to arrive as `malformed` patches, and C07 composes them into a `raw` block |
 | Process exits | `{ kind: "end", result }` — always last, always emitted |
 
 The 10-line floor matters: without it, one malformed line in the first three trips degradation on a healthy stream.
+
+**Degradation is a property of arrival order, not of content.** The ratio is running, so the same hundred lines degrade or do not depending on where the malformed ones fall. Nine at the front trip it at line ten; nine at the back never do.
+
+That is intended. A far side emitting a banner, an HTML error page or a stack trace front-loads its garbage, and nine bad lines at the start is strong evidence the stream is not NDJSON at all — while nine scattered through a hundred is a far side with a few odd rows. The rule should treat those differently, and a content-only rule cannot. The point is to stop early, not to characterise the whole stream.
+
+**Degradation is sticky.** Once tripped, later well-formed lines do not un-trip it: raw text has already been emitted, and switching back mid-stream would interleave two renderings of one stream. This is a different claim from "it fires once" — a rule that emitted one `degraded` patch and then resumed parsing would satisfy that and still produce the interleaving.
+
+The `degraded` patch carries a reason and nothing else. It had a `remaining` field, and the field was a fiction: the trip fires on a completed line, completing a line clears the buffer, so `remaining` was a partial line that was empty in almost every case. Redefining it as everything after the trip would mean buffering the rest of the stream, which contradicts streaming outright. What actually carries the remainder is the `malformed` patches that follow.
 
 **`end` is emitted on every path**, including cancellation, timeout and spawn failure. A consumer awaiting the terminal patch never hangs.
 
@@ -232,7 +240,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I9** — `stream` always emits exactly one `end` patch, last, on every termination path.
 - **I10** — Partial lines are buffered across chunk boundaries.
 - **I11** — A single NDJSON line exceeding **1 MB** is emitted as `malformed` and its buffer released. Buffering is bounded; a far side emitting an unterminated stream cannot exhaust memory.
-- **I12** — Degradation requires both ≥10% malformed and ≥10 lines seen.
+- **I12** — Degradation requires both ≥10% malformed and ≥10 lines seen, and it is evaluated on every completed line, so it depends on arrival order. It is **sticky**: once tripped, later well-formed lines do not un-trip it, and every subsequent line arrives as `malformed`.
 - **I13** — At most one non-streaming invocation is in flight; every settlement path releases the guard.
 - **I14** — Transport selection is per verb; `for()` is total and falls back to the default.
 - **I15** — All three implementations satisfy the same interface and are substitutable in every test that does not concern spawning.
@@ -253,7 +261,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 6. Partial output is retained on every abnormal termination.
 7. `timeoutMs: 0` means unbounded, for live views.
 8. Streaming emits exactly one `end`, always last.
-9. Malformed-line degradation needs 10% *and* a 10-line floor.
+9. Malformed-line degradation needs 10% *and* a 10-line floor, depends on arrival order by design, and is sticky once tripped.
 10. One non-streaming invocation at a time; streams are exempt.
 11. Transport is selected per verb, defaulting when unmapped.
 12. Three implementations behind one interface, selected by one mode value; nothing else branches on mode. The **app's** entry point resolves `PRISM_TUI_TRANSPORT` and passes a constructed router through `TuiConfig.transport`; `tui-kit` has no binary and reads no environment (I18).
@@ -313,9 +321,11 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T3.9**: `AbortSignal` already aborted at call time → no spawn occurs at all.
 - **T3.10** (I10): a JSON object split across three chunks → one `data` patch.
 - **T3.11** (I10): a chunk boundary falling inside a multi-byte UTF-8 sequence → no mojibake, no spurious malformed line.
-- **T3.12** (I12): 9 malformed lines out of 100 → no degradation. 11 out of 100 → degraded.
+- **T3.12** (I12): 9 malformed lines out of 100, **arriving after the stream is established** → no degradation. 11 out of 100 → degraded.
+- **T3.12b** (I12): the same 9 out of 100, **clustered at the front** → degraded at line ten. T3.12 and T3.12b are a pair and the file says so: deleting either makes the rule look order-independent, and the next reader "simplifies" the survivor into a claim about content.
 - **T3.13** (I12): 3 malformed out of 5 (60%, below the floor) → no degradation.
 - **T3.14**: degradation fires once, not per subsequent malformed line.
+- **T3.14b** (I12): a degraded stream that then emits fifty well-formed lines → still degraded, and all fifty arrive as `malformed`. Distinct from T3.14: a rule that emitted one `degraded` patch and resumed parsing passes T3.14 and interleaves two renderings of one stream.
 - **T3.15**: stream emitting zero lines then exiting → only `end`.
 - **T3.16** (I11): a single NDJSON line of 10 MB → emitted as `malformed` once the 1 MB cap trips; the buffer is released; subsequent lines parse normally.
 - **T3.16b** (I11): an unterminated stream writing continuously with no newline → memory stays bounded at the cap.
@@ -333,7 +343,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T4.1** (with C21): the escalation ladder issues real signals through the runner, verified on a child that ignores `SIGINT`.
 - **T4.2** (with C05): `local: true` never reaches the transport; `streams: true` selects `stream` over `invoke`.
 - **T4.3** (with C07): a `RawResult` from either transport adapts to a valid document, and both produce the same document for equivalent input.
-- **T4.4** (with C07): a degraded stream produces a document containing the remaining output as a `raw` block.
+- **T4.4** (with C07): a degraded stream produces a document whose `raw` block is composed from the `malformed` patches that follow the `degraded` one — which is what actually arrives, the `degraded` patch itself carrying only a reason.
 - **T4.5** (with L4): the concurrency refusal surfaces as a notice naming the running verb, and the prompt stays usable.
 - **T4.6** (with L4): a `cd` built-in followed by a verb → the verb spawns in the new directory.
 
@@ -356,6 +366,7 @@ Real subprocesses.
 - **T6.4** (I9): an early-return path that skips `end` → T2.4 fails on that termination.
 - **T6.5** (I7): discarding buffered output on cancel → T3.4 fails.
 - **T6.6** (I12): dropping the 10-line floor → T3.13 fails.
+- **T6.6b** (I12): making degradation un-sticky — resuming parsing after the notice — → T3.14b fails, and one stream renders as data and raw text interleaved. T3.14 does not catch it.
 - **T6.7** (I13): releasing the guard only on success → T3.3 fails on five of six paths.
 - **T6.8** (I10): parsing per chunk rather than per line → T3.10 and T3.11 fail.
 - **T6.9** (I4): appending `--json` unconditionally without the dedupe → T1.4 fails.

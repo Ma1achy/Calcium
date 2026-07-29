@@ -125,9 +125,16 @@ Nested objects render as their JSON text inside a cell rather than being flatten
 | `RawPatch` | `ViewPatch` |
 |---|---|
 | `data` | Adapter's mapping, or `append` of a fallback block |
-| `malformed` | `null` — ignored, already counted by C06 |
-| `degraded` | `append` of a `raw` block carrying the remainder |
+| `malformed`, before `degraded` | `null` — ignored, already counted by C06 |
+| `degraded` | `append` of an empty `raw` block |
+| `malformed`, after `degraded` | extends that `raw` block |
 | `end` | `status` patch, plus any terminal blocks |
+
+**`malformed` is read twice, and which reading applies depends on whether `degraded` has arrived.** Before it, a stray unparseable line among good ones is noise and is dropped. After it, the `malformed` patches *are* the remainder — they are what carries the rest of the stream as text.
+
+An earlier draft had `degraded` carry a `remaining` string and this table append a raw block from it. The field was a fiction: C06 trips degradation on a completed line, and completing a line clears the buffer, so `remaining` was a partial line that was empty in almost every case (C06 §5). Redefining it as everything after the trip would have meant buffering the rest of the stream inside a streaming transport.
+
+C06's degradation is sticky (C06 I12), so a `data` patch never follows a `degraded` one. `adaptPatch` still handles the combination rather than asserting against it — the mapping is total over the patch type, and a total function needs no invariant to hold.
 
 An adapter without `adaptPatch` still streams: each `data` patch goes through the fallback, which appends a block. Streaming therefore works before anyone writes a stream adapter.
 
@@ -169,6 +176,7 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I9** — `userRequestedJson` produces a `code` block for every verb, with no per-verb exception.
 - **I10** — C07 imports nothing from `terminal/`, `presentation/` or above.
 - **I11** — No adapter is required for a verb to be usable.
+- **I12** — A degraded stream's remainder reaches the document. `malformed` patches are dropped before `degraded` arrives and compose the `raw` block after it — C06 supplies no other carrier for the remainder (C06 §5).
 
 ---
 
@@ -187,6 +195,7 @@ The notice is muted rather than an error because the *command* may have succeede
 11. Schema mismatch fails at startup, naming the offending adapter.
 12. Every produced document is valid per C04, on every path.
 13. Deleting an adapter because the far side converged is a success, not a regression.
+14. A degraded stream's remainder is composed from the `malformed` patches that follow the notice; C06 carries it nowhere else (I12, §6).
 
 ---
 
@@ -246,7 +255,8 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T3.16**: `remediation` that is not a runnable command → rendered as text, no fill action.
 - **T3.17**: an adapter registered for a verb absent from the manifest → registration succeeds and is simply never reached.
 - **T3.18**: `end` patch arriving with `cancelled` → status patch is `partial`.
-- **T3.19**: a `degraded` patch followed by more `data` patches → the raw block is appended once, and later data still appends.
+- **T3.19**: a `degraded` patch followed by more `malformed` patches → the raw block is appended once and extended by each subsequent line, so the remainder reaches the document. The reachable case, C06's degradation being sticky.
+- **T3.19b**: `malformed` patches *before* any `degraded` one → dropped, no raw block. The same patch kind, read the opposite way, and the §6 table is the only thing saying which reading applies.
 
 ### Tier 4 — integration
 
