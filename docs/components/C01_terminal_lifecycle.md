@@ -317,7 +317,7 @@ Where the real defects live.
 - **T3.16** (I8, C15): `SIGTERM` while suspended → handlers disposed, stdout restored, zero terminal bytes emitted, exit **143**. The child is untouched.
 - **T3.17** (I12): `SIGWINCH` fires → `columns` and `rows` are each read exactly once, and every subscriber receives the same frozen object. "Never sees a mismatched pair" is not directly observable; read-once-and-freeze is, and it is what makes the claim true. Asserted with a stream whose `columns` getter mutates `rows`.
 - **T3.18**: `SIGWINCH` arrives while suspended → no subscriber is notified; the dimensions belong to the child.
-- **T3.19**: `SIGWINCH` fires three times in one tick → three notifications, not one. C01 does not coalesce; that is C03's job (D31 — resize is not debounced).
+- **T3.19**: `SIGWINCH` fires three times in one tick → three notifications, not one. C01 does not coalesce, and neither does C03: `resize` is immediate there and cannot be given a window (C03 §3, C03 I2). Nothing in the system debounces it (D31).
 - **T3.20**: `acquire()` while suspended → throws a named error. `resume()` is the intended call and the ambiguity is not tolerated.
 - **T3.21**: `acquire()` after `release()` → throws. `released` is terminal; the handlers are gone and a revived instance would hold state nothing releases.
 - **T3.22**: `suspend()` or `resume()` after `release()` → throws.

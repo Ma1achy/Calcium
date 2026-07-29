@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` |
 | **Layer** | L0 terminal |
-| **Depends on** | `TerminalCapabilities` (injected) · a read-only `acquired` view of C01 (injected) · a render callback |
+| **Depends on** | `TerminalCapabilities` (injected) · a read-only `acquired` view of C01 (injected) · C01's `writer`, bound (injected) · a render callback |
 | **Consumed by** | L4 shell · C13 C14 C15 C17 (anything that changes what should be on screen) |
 | **Source** | A01 D31, D33 · A02 §2, §4, §7 |
 | **Status** | Draft |
@@ -40,6 +40,7 @@ function createFrameScheduler(opts: {
   repaint:      () => void;                       // clear, then paint from blank
   capabilities: TerminalCapabilities;
   lifecycle:    { readonly acquired: boolean };
+  write:        (s: string) => void;              // C01's writer, bound by L4
   schedule?:    (fn: () => void, ms: number) => Disposable;   // injected for tests
   windows?:     Partial<Record<CommitReason, number>>;
 }): FrameScheduler;
@@ -47,9 +48,13 @@ function createFrameScheduler(opts: {
 
 `schedule` is injected so every timing test runs on a fake clock in microseconds rather than sleeping. A scheduler tested with real timers is a scheduler with flaky tests.
 
+`write` exists because C03 emits the synchronised-update markers itself and A01 D32 requires every write to go through C01's `writer`. L4 supplies `lifecycle.writer.write.bind(lifecycle.writer)`; C03 never holds the stream, only a bound call. It is also the observation point for T1.12, T1.13 and T4.3 — what reached the terminal is what was passed here.
+
+**The seam is two strings wide.** `write` carries `SYNC_UPDATE.enter` and `SYNC_UPDATE.leave` and nothing else; frame content leaves through `render()`, which C03 does not own. That narrowness is the evidence the seam is cut in the right place, so T2.7 asserts it over the whole unit and edge corpus. A third string means something has moved into C03 that belongs elsewhere.
+
 `lifecycle` is injected as a read-only view rather than the full `TerminalLifecycle`. C03 needs to know whether writing is safe; it must not be able to acquire or release.
 
-**The view must be live, not a snapshot.** `acquired` is read at write time, through a getter backed by C01's own state. An object literal capturing the value at construction would report `false` forever, and every frame would be silently dropped — a failure that looks like a hung UI with no error anywhere.
+**The view must be live, not a snapshot.** `acquired` is read at write time, through a getter backed by C01's own state. An object literal capturing the value at construction would report `false` forever, and every frame would be silently dropped — a failure that looks like a hung UI with no error anywhere. This is L4's mistake to make, not C03's, so C03 cannot prevent it structurally; T3.24 demonstrates it instead, so the warning is known to be about something real.
 
 ---
 
@@ -73,7 +78,9 @@ function createFrameScheduler(opts: {
 
 A render callback may cause a commit — a component measuring itself during render, a resize observed mid-paint. Writing is synchronous, so this arrives while a write is already in progress.
 
-**A commit during a write is deferred, not dropped and not recursive.** C03 records that a re-entrant commit occurred, with the strictest reason seen, and acts on it once the current write returns: immediately if that reason was immediate, otherwise by scheduling. Recursing would risk unbounded depth; dropping would lose the final state.
+**A commit during a write is deferred, not dropped and not recursive.** C03 records that a re-entrant commit occurred, with the strictest reason seen, and acts on it once the current write returns: immediately if that reason was immediate, otherwise by scheduling a fresh window from the end of the write (T3.15). Recursing would risk unbounded depth; dropping would lose the final state.
+
+**Strictest** means: immediate outranks coalesced, and among coalesced the shorter window wins. Order among the three immediate reasons is unobservable, and that is not an accident — `resize` sets contamination eagerly at commit time even while deferring (§5), so the only thing that could distinguish the three has already taken effect by the time the deferred reason is chosen. Do not define an order there; it would have no effect.
 
 `flush()` during a write is a no-op — the write it would force is already happening.
 
@@ -111,17 +118,15 @@ The recovery is always the same and always safe. A full repaint is a larger burs
 
 ## 5. State machine
 
-Two states plus an orthogonal `contaminated` flag. Writing is synchronous, so no `writing` state is observable.
-
-Three states. `writing` is transient but observable from inside the render callback, which is what makes re-entrancy well-defined.
+Three states plus an orthogonal `contaminated` flag. `writing` is transient but observable from inside the render callback, which is what makes re-entrancy well-defined.
 
 | From ↓ / call → | `commit(input\|completion)` | `commit(resize)` | `commit(stream\|spinner)` | `flush()` | `invalidate()` |
 |---|---|---|---|---|---|
 | **idle** | → writing → idle (T1.1) | set flag, → writing → idle (T1.10) | → pending, timer set (T1.3) | no-op (T3.1) | flag set, idle (T1.8) |
-| **pending** | cancel timer, → writing → idle (T1.5) | set flag, cancel timer, → writing → idle (T3.16) | → pending, timer unchanged (T1.4) | cancel timer, → writing → idle (T1.6) | flag set, pending (T3.6) |
+| **pending** | cancel timer, → writing → idle (T1.5) | set flag, cancel timer, → writing → idle (T3.16) | → pending; timer unchanged unless the new deadline is strictly earlier, in which case it is replaced (T1.4, T3.12) | cancel timer, → writing → idle (T1.6) | flag set, pending (T3.6) |
 | **writing** | defer (T3.7) | defer, flag set (T3.17) | defer (T3.18) | no-op (T3.8) | flag set (T3.19) |
 
-Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()` and clears the flag (T1.9). `resize` sets that flag as part of the commit (I7).
+Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()` and clears the flag once that repaint returns (T1.9, T3.5). `resize` sets that flag as part of the commit (I7).
 
 ---
 
@@ -129,9 +134,9 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 
 - **I1** — C03 never writes while `lifecycle.acquired` is false. A commit in that state is dropped silently.
 - **I2** — `input` and `completion` commits are never delayed by any amount, and their windows are not configurable.
-- **I3** — At most one timer is outstanding. A second coalesced commit within an open window does not extend, restart or duplicate it.
+- **I3** — At most one timer is outstanding. A second coalesced commit within an open window never extends, slides or duplicates it; it may only shorten it to a strictly earlier deadline.
 - **I4** — An immediate commit cancels a pending timer. A timer never fires after the frame it would have produced has already been drawn.
-- **I5** — A write while `contaminated` is a full repaint, and clears the flag.
+- **I5** — A write while `contaminated` is a full repaint, and clears the flag once the repaint returns. A repaint that throws leaves the flag set, so the next write retries it (T3.5).
 - **I6** — Synchronised-update markers are emitted iff the capability is present, and are always balanced — every `2026 h` has a matching `2026 l`, including when the render callback throws.
 - **I7** — `resize` implies `invalidate()`. There is no path where dimensions change and a diff is attempted.
 - **I8** — C03 holds no frame content. It calls `render()` or `repaint()`; what is drawn is current state.
@@ -149,12 +154,13 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 4. At most one timer is outstanding at a time.
 5. Nothing is written while the terminal is not acquired.
 6. Synchronised update wraps every write where supported, and markers are always balanced.
-7. `invalidate()` makes the next write a full repaint and then clears.
+7. `invalidate()` makes the next write a full repaint, and clears once that repaint returns.
 8. `resize` implies invalidation.
 9. C03 holds no frame content and owns no rendering.
 10. The timer is injected, so no test sleeps.
 11. C03 receives a live read-only view of C01 and cannot acquire or release.
 12. A commit arriving during a write is deferred and coalesced to the strictest reason, never recursive.
+13. C03 writes only the synchronised-update markers, through an injected bound `write`. Frame bytes leave through `render()`, which C03 does not own.
 
 ---
 
@@ -170,9 +176,9 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T1.2** (I2): `commit("completion")` from idle → same.
 - **T1.3**: `commit("stream")` from idle → `render()` not yet called; `pending` true; timer at 33 ms. Advancing 32 ms → still not called. Advancing to 33 ms → called once.
 - **T1.4** (I3): three `commit("stream")` calls within one window → exactly one timer, one `render()` at 33 ms from the **first** commit. The window does not slide.
-- **T1.5** (I4): `commit("stream")` then `commit("input")` at 4 ms → `render()` called once, at 4 ms. Advancing past 16 ms produces no second call.
+- **T1.5** (I4): `commit("stream")` then `commit("input")` at 4 ms → `render()` called once, at 4 ms. Advancing past 33 ms — the window the cancelled timer would have fired in — produces no second call.
 - **T1.6**: `commit("spinner")` then `flush()` → `render()` called immediately, timer cancelled, `pending` false.
-- **T1.7**: `commit("spinner")` schedules at 100 ms, not 16 ms.
+- **T1.7**: `commit("spinner")` schedules at 100 ms, not at the 33 ms stream window.
 - **T1.8** (I5): `invalidate()` then `commit("input")` → `repaint()` called, `render()` not; `contaminated` false afterwards.
 - **T1.9** (I5): two writes after one `invalidate()` → first is `repaint()`, second is `render()`.
 - **T1.10** (I7): `commit("resize")` → `repaint()` called immediately without an explicit `invalidate()`.
@@ -189,6 +195,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T2.4** (I3): `pending` is true only while a timer is outstanding, for every reason in the enum.
 - **T2.5**: every `CommitReason` in the union has a window entry — asserted exhaustively over the type, so adding a reason without a window fails the build.
 - **T2.6** (A02 §1): the module graph contains no import from `data/`.
+- **T2.7** (C13): across the whole tier-1 and tier-3 corpus, every string passed to `write` is the synchronised-update open or close marker. Nothing else, ever — a third string means frame content has moved into C03.
 
 ### Tier 3 — edge cases
 
@@ -203,8 +210,10 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.9**: `acquired` flips false while a timer is pending → the timer fires and writes nothing (I1); no throw, `pending` clears.
 - **T3.10**: `acquired` flips false and back to true while pending → the pending write happens once.
 - **T3.11**: a hundred `commit("stream")` calls in one synchronous block → exactly one timer, one render.
-- **T3.12**: alternating `stream` and `spinner` commits → the earlier deadline wins; the later reason does not push the frame out.
+- **T3.12** (I3): alternating `stream` and `spinner` commits → the earlier deadline wins in both orderings. Stream-then-spinner leaves the 33 ms timer alone; spinner-then-stream replaces the 100 ms timer with a 33 ms one. A later reason never pushes the frame out.
 - **T3.13** (I2): `windows: { input: 50 }` at construction → **throws**. Same for `completion` and `resize`.
+- **T3.14** (I1): `flush()` from pending while `acquired` is false → the timer is cancelled, nothing is written, `pending` is false. The one path where an explicit flush discards a frame silently.
+- **T3.15** (I3, I10): a coalesced commit deferred during a write schedules a **fresh** window measured from the end of the write, not from the original commit. No timer is outstanding at that moment, so I3 holds.
 - **T3.16**: `commit("resize")` while pending → timer cancelled, repaint written immediately.
 - **T3.17** (I10): `commit("resize")` during a write → deferred, contamination flag set, and the deferred write is a repaint.
 - **T3.18** (I10): `commit("stream")` during a write → deferred and scheduled, not written immediately.
@@ -212,15 +221,17 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.20** (I10): a render callback that commits on every invocation → exactly one deferred write follows, not an unbounded chain.
 - **T3.21** (I10): `commit("stream")` then `commit("input")` both during one write → one deferred write, immediate, at the stricter reason.
 - **T3.22** (I11): `acquired` flips true after construction → the next commit writes. A snapshotted view would never write at all.
+- **T3.23** (§1): the starvation property, directly. With `windows: { stream: 16 }`, a long interleaving of `stream` commits at 16 ms and `input` commits at irregular offsets → every input frame is rendered at the tick its commit arrived, none is delayed behind a pending stream frame, and stream frames remain capped at one per window. This is what T4.6 and T5.2 assert against real components and real timers; here it is deterministic.
+- **T3.24** (I11): a scheduler constructed with an object literal capturing `acquired` — the mistake §2 warns L4 against — drops every frame after the first state change, silently: no throw, no output, no timer left behind. T3.22 proves the live view works; this proves the dead one fails, and fails in exactly the way described.
 
 ### Tier 4 — integration
 
 - **T4.1** (with C01, C01's T4.3): C03 never writes while C01 reports unacquired, asserted from C01's side of the boundary too.
 - **T4.2** (with C01, C02): the shell's `resume()` → `invalidate()` sequence causes the next commit to repaint.
 - **T4.3** (with C02): `synchronisedUpdate: false` from a real detection run → no `2026` wrapper reaches the stream.
-- **T4.4** (with C13, C14): appending a transcript block issues one `commit("stream")`, and a burst of appends within 16 ms produces one frame.
+- **T4.4** (with C13, C14): with `windows: { stream: 16 }`, appending a transcript block issues one `commit("stream")`, and a burst of appends within one 16 ms window produces one frame.
 - **T4.5** (with C17): a keystroke issues `commit("input")` and the frame is drawn before the next keystroke is processed.
-- **T4.6** (with C17, C13): typing while a stream commits at 16 ms intervals → every keystroke frame is immediate and none is delayed behind a stream frame. This is the starvation property, tested directly.
+- **T4.6** (with C17, C13): with `windows: { stream: 16 }`, typing while a stream commits at 16 ms intervals → every keystroke frame is immediate and none is delayed behind a stream frame. The starvation property against real components; T3.23 asserts the same property deterministically and does not wait on them.
 - **T4.7** (with C01): a `SIGWINCH` snapshot produces `commit("resize")` and therefore a repaint, not a diff.
 
 ### Tier 5 — e2e
@@ -247,7 +258,10 @@ PTY harness, real timers, real terminal.
 - **T6.9** (A02 §7): adding a `CommitReason` without a window → T2.5 fails at build time.
 - **T6.10** (I10): making a re-entrant commit recurse → T3.20 fails on call depth; dropping it → T3.21 fails on the lost frame.
 - **T6.11** (I11): snapshotting `acquired` at construction → T3.22 fails.
-- **T6.12** (I2): allowing an immediate reason to be given a window → T3.13 fails.
+- **T6.12** (I2): allowing an immediate reason to be given a window → T3.13 fails. Distinct from T6.1: that reverts the behaviour, this reverts the construction-time rejection.
+- **T6.13** (I3): replacing the pending timer on every coalesced commit regardless of deadline → T1.4 fails, since the window would slide again. Never replacing it → T3.12 fails on the spinner-then-stream ordering. The rule is one-directional and both directions are held.
+- **T6.14** (C13): passing frame content to `write` rather than through `render()` → T2.7 fails on the third string.
+- **T6.15** (I11): snapshotting `acquired` in the L4 wiring rather than in C03 → T3.24 fails. The failure C03 cannot prevent structurally, so it is demonstrated instead.
 
 ---
 
