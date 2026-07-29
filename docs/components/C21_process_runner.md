@@ -27,6 +27,14 @@ Its position in the layering is worth restating because it constrains the design
 `COMPONENT_SOURCES.C21` in `tools/enforce/todo-expiry.mjs` therefore points at `runner.ts`, not at the directory's first file. The row means *the file that must contain the behaviour*.
 
 ```typescript
+function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner;
+
+type ProcessRunnerDeps = Readonly<{
+  env:    Readonly<NodeJS.ProcessEnv>;    // `$SHELL` is resolved from this record
+  stdin:  Readonly<{ isRaw?: boolean }>;  // the §5 probe reads this, not the real one
+  debug?: (line: string) => void;         // where a fallback warning goes
+}>;
+
 interface ProcessRunner {
   spawn(argv: readonly string[], opts: SpawnOptions): ChildHandle;
   spawnShell(command: string, opts: SpawnOptions): ChildHandle;
@@ -49,6 +57,7 @@ interface ChildHandle {
   readonly stderr:  AsyncIterable<string>;
   readonly exited:  Promise<Exit>;
   readonly running: boolean;
+  readonly overflowed: boolean;       // §4 — the bound was crossed and output was dropped
   signal(sig: string): boolean;
 }
 ```
@@ -56,6 +65,14 @@ interface ChildHandle {
 `spawn` and `spawnShell` are **separate methods, not a flag**, because the distinction is the security-relevant one (D18) and a boolean makes it invisible at the call site. `spawn` takes an argv array and no shell is involved. `spawnShell` takes a string the *user typed* and hands it to their shell (C18 §5) — the TUI never assembles that string from data it composed.
 
 The shell is `$SHELL` when set and executable, otherwise `/bin/sh`.
+
+**C21 reads nothing ambient**, and that is why `env`, `stdin` and `debug` are constructor dependencies rather than globals reached for at the point of use. It is the fourth component with the property — C02 takes an environment record, C03 takes a `schedule`, C22 takes a clock — and by now the pattern is load-bearing enough to name: a component that reaches for a global is a component that cannot be put in a state a test wants to observe.
+
+Each of the three has a specific payoff here, and the middle one is the reason the rule earns its place rather than merely being obeyed:
+
+- `env` is where `$SHELL` comes from. A03 SS10 bans `process.env` everywhere in `src/` outside C02, with a broad pattern and a one-file allow-list, because an exception list is the thing that grows.
+- `stdin` makes **I6 testable**. A test hands the runner `{ isRaw: true }` and asserts the refusal; against the real `process.stdin` the same test would have to put the test runner's own terminal into raw mode and hope to restore it. An invariant that can only be checked by mutating global state is an invariant that ends up unchecked.
+- `debug` is where §2's `$SHELL` fallback warning goes. C21 cannot import C01 and A03 SS33 bans `console.*`, so a sink that writes nowhere by default is the only shape left — and it is C01's own, which takes `debug?: (line: string) => void` for the same reason.
 
 ---
 
@@ -75,7 +92,9 @@ stdout and stderr are **piped separately and never merged** (B3, and the single-
 
 Both are exposed as `AsyncIterable<string>` over a **streaming UTF-8 decoder**. A multi-byte character split across two chunk boundaries is one character, not two replacement marks. C06 parses NDJSON line by line and would otherwise see mojibake at exactly the buffer boundaries — a bug that appears only with non-ASCII content and only at certain output sizes.
 
-Each stream is bounded at 8 MiB by default. Beyond that, C21 stops buffering, marks the handle overflowed, and continues draining so the child is not blocked on a full pipe — a child stuck on write is worse than truncated output, because it never exits and never reports.
+Each stream is bounded at 8 MiB by default. Beyond that, C21 stops buffering, sets `overflowed` on the handle, and continues draining so the child is not blocked on a full pipe — a child stuck on write is worse than truncated output, because it never exits and never reports.
+
+**The mark is a field, not a sentinel in the stream.** A marker chunk would be indistinguishable from content a child actually emitted — C06 would read it as a line of NDJSON and report it as malformed — and it would put a fact *about* the channel inside the channel. `overflowed` travels to C06 as `RawResult.overflowed`, reported and never interpreted; whether it reaches the document, and under which name, is C07 §4's open question.
 
 ---
 
@@ -83,7 +102,9 @@ Each stream is bounded at 8 MiB by default. Beyond that, C21 stops buffering, ma
 
 For children that need the terminal — `vim`, `less`, `kubectl exec` — stdio is inherited and C21 awaits exit.
 
-**C21 cannot verify the terminal was released**, since it cannot import C01. But it can check cheaply and does: if `stdin.isRaw` is still true at `handoff()`, the caller skipped `lifecycle.suspend()`, and C21 throws rather than handing a raw-mode terminal to a child that expects a cooked one. The symptom otherwise is a child with no working line editing and no obvious cause.
+**C21 cannot verify the terminal was released**, since it cannot import C01. But it can check cheaply and does: if the injected `stdin`'s `isRaw` is still true at `handoff()`, the caller skipped `lifecycle.suspend()`, and C21 throws rather than handing a raw-mode terminal to a child that expects a cooked one. The symptom otherwise is a child with no working line editing and no obvious cause.
+
+The probe is the *injected* `stdin` (§2), which is what a real caller wires to `process.stdin` and what a test wires to `{ isRaw: true }`. The throw names the missing `suspend()` rather than describing the state it found: "still in raw mode" sends a reader looking for who set it, and the answer is always that nobody unset it.
 
 Handoff does not detach — the child shares the process group so `Ctrl-C` reaches it through the terminal, as it would from a normal shell.
 
@@ -125,6 +146,7 @@ Per child handle.
 - **I11** — `killAll` sends `SIGKILL` to every live group, with no grace period and no timer.
 - **I12** — C21 imports nothing from `terminal/` and writes nothing to the real stdout.
 - **I13** — `exited` always resolves, including on spawn failure.
+- **I14** — The environment, the raw-mode probe and the warning sink are injected. C21 reads no ambient global.
 
 ---
 
@@ -143,6 +165,7 @@ Per child handle.
 11. `cwd` is a function, read at spawn (I10).
 12. `killAll` sends `SIGKILL` with no grace period, so C21 holds no timing policy anywhere (I11).
 13. `exited` always resolves, spawn failure included (I13).
+14. The environment, the raw-mode probe and the warning sink are injected, so I6 can be asserted without a test mutating the terminal it runs in (I14).
 
 ---
 
@@ -165,12 +188,15 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I4): a 2 MiB stream of mixed CJK, emoji and ASCII → decoded byte-identically, at every chunk size from 1 to 65536.
+- **T2.1** (I4): mixed CJK, emoji and ASCII → decoded byte-identically, at **every chunk size from 1 to 256** over a payload containing every rune width at every alignment, and at 4096, 65535 and 65536 over 2 MiB.
+
+  *The range was "1 to 65536" over 2 MiB, which is 137 GiB of decoding and would not finish inside a unit tier — but the reason to change it is not the runtime.* What can break a streaming decoder is a multi-byte sequence split at a particular byte offset, and there are at most three interior offsets in a UTF-8 rune. Sweeping chunk sizes 1 to 256 across a payload of mixed widths exercises every one of them many times over; chunk size 40,000 exercises the same offsets as 400 and takes a hundred times as long to say so. The large sizes are kept for a different claim — that the *bound* and the queue behave at realistic pipe-chunk sizes — and 2 MiB is where that is worth asserting.
 - **T2.2** (I3): a source scan finds no write to the real `process.stdout` in `process/`.
 - **T2.3** (I12): the module graph shows no import from `terminal/`.
 - **T2.4** (I8): a source scan finds no timer or escalation logic in `process/`.
 - **T2.5** (I1): `spawn` has no parameter that could carry a shell string; `spawnShell` has no argv form. A compile-level test.
 - **T2.6** (I13): across a hundred spawns including failures, `exited` resolves every time.
+- **T2.7** (I14): a source scan finds no `process.env`, no `console.` and no reference to the real `process.stdin` in `process/`. The environment arrives as a record and the probe as an object.
 
 ### Tier 3 — edge cases
 
@@ -191,6 +217,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T3.15** (I11): `killAll` with five live children including a pipeline → every group receives `SIGKILL`, `live` empties, and no timer is scheduled.
 - **T3.16**: a child spawning its own grandchild that outlives it → group signalling reaches the grandchild.
 - **T3.17**: output containing a null byte → passed through the decoder without truncating the stream.
+- **T3.18**: fifty short-lived children spawned at once → every one of them yields its whole output. Node's `exit` can fire before the stdio `data` events are delivered, so a runner that ends its streams on exit drops output still in flight — and the failure appears only under enough load to reorder the two.
 
 ### Tier 4 — integration
 
@@ -223,6 +250,9 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T6.9** (I10): capturing `cwd` at construction → T1.7 fails.
 - **T6.10** (I11): skipping `killAll` at exit → T5.5 leaves orphans.
 - **T6.11** (I13): a spawn-failure path that leaves `exited` pending → T2.6 fails and a verb hangs forever.
+- **T6.12** (I14): reading `process.env.SHELL` or `process.stdin` directly → T2.7 fails, SS10's allow-list gains its second entry, and T3.8 can no longer be asserted without a test putting its own terminal into raw mode.
+- **T6.13** (I12): importing anything from `terminal/`, type-only included → T2.3 fails. The type-only form is the one to watch: it erases at build, so it would pass a rule that only counted runtime edges while being exactly the dependency that ends L0's independence.
+- **T6.14**: ending the streams when the child exits rather than when its stdio closes → T3.18 fails. `exit` and `close` are separate events because the first can precede the delivery of output, and conflating them loses a short command's entire stdout under load.
 
 ---
 

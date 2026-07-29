@@ -4,19 +4,25 @@
 // Most of this tier waits on components that do not exist, and says which. What
 // does not wait is C05: `local` and `streams` are manifest facts, they are read
 // by whoever calls the transport, and both are testable today.
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import { findTool } from "../../src/data/manifest/index.js";
+import { createProcessRunner } from "../../src/data/process/runner.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import {
   createEmulatedTransport,
   createFixtureTransport,
   createNdjsonReader,
   createRouter,
+  createSubprocessTransport,
 } from "../../src/data/transport/index.js";
 import type { Invocation, RawPatch, TransportRouter } from "../../src/data/transport/index.js";
+import { fakeClock } from "../support/fake-scheduler.js";
 import { fixture } from "../support/manifest.js";
-import { drain, invocation, recorded, result } from "../support/transport.js";
+import { asScriptFile, scripts, waitForFileToContain } from "../support/process.js";
+import { clockOf, drain, invocation, recorded, result } from "../support/transport.js";
 
 /**
  * The routing decision C23 will make, in the two lines it actually is.
@@ -101,7 +107,66 @@ describe("C06 with C05", () => {
     expect(submit(createRouter({ default: createFixtureTransport([]) }), fixture(), invocation({ verb: "help", argv: ["help"] }))).toBe("local");
   });
 
-  it.todo("T4.1 (with C21): the escalation ladder issues real signals through the runner — waits on C21");
+  it("T4.1 (with C21): the escalation ladder issues real signals through the real runner", async () => {
+    // Deferred since C06 and written now. Every rung above was asserted against
+    // `fakeChild`, which records the signals it is handed — a fake cannot show
+    // that `SIGINT` reached a process group, only that C06 asked for it.
+    //
+    // The child announces each signal it survives, so the evidence is produced
+    // by the child rather than by our own bookkeeping: a line written after
+    // delivery cannot come from a process that died of it.
+    const clock = clockOf(fakeClock());
+    const transport = createSubprocessTransport({
+      binary: "node",
+      clock,
+      runner: createProcessRunner({ env: process.env, stdin: {} }),
+    });
+
+    // The child logs each caught signal to a file as well as to stdout, because
+    // `invoke` collects the stream internally and hands it over only after the
+    // child has exited — too late to drive a ladder one rung at a time. Delivery
+    // is asynchronous, so each rung must be *observed* before the next is
+    // released; ticking blind would send SIGKILL before the handlers ran and the
+    // test would assert the ladder while proving only that it did not hang.
+    const log = `${mkdtempSync(`${tmpdir()}/c06-ladder-`)}/signals`;
+    const controller = new AbortController();
+    // As a file, not `node -e`: C06 appends `--json` to every invocation, and
+    // with `-e` there is no script path to end node's own option parsing — so
+    // the flag is read as a node option and the process dies with `bad option`.
+    // Anything spawned through this transport has to tolerate a trailing flag.
+    const [, ...args] = asScriptFile(scripts.ignoring(["SIGINT", "SIGTERM"], log));
+    const inv = invocation({ argv: args, signal: controller.signal });
+
+    const settled = transport.invoke(inv);
+
+    // Waited for, not assumed. A signal delivered before node installs its
+    // handler takes the default action and kills the child — and an immediate
+    // exit on SIGINT is indistinguishable from a child that never handled it.
+    await waitForFileToContain(log, "ready");
+
+    controller.abort();
+    // Each rung is two seconds of *injected* clock. Real ones would be six
+    // seconds of test, which is why C06 takes a `Clock` at all.
+    await waitForFileToContain(log, "caught:SIGINT");
+    clock.tick(2_000);
+    await waitForFileToContain(log, "caught:SIGTERM");
+    clock.tick(2_000);
+
+    const result = await settled;
+
+    // Both rungs are asserted from the file rather than from `stdoutRaw`.
+    // `appendFileSync` completes before the handler returns; a pipe write does
+    // not, so a SIGKILL arriving while the last `caught:` line is still queued
+    // takes it with the process. The file records what the child *did*; stdout
+    // records what got out, and only one of those is the claim under test.
+    expect(readFileSync(log, "utf8")).toContain("caught:SIGINT");
+    expect(readFileSync(log, "utf8")).toContain("caught:SIGTERM");
+    expect(result.stdoutRaw).toContain("caught:SIGINT");
+    expect(result.signal).toBe("SIGKILL");
+    expect(result.exitCode).toBeNull();
+    expect(result.cancelled).toBe(true);
+  }, 20_000);
+
   it("T4.3 (with C07): a RawResult from either transport adapts to the same document", async () => {
     // C06's own claim, from C07's side: the transports differ in how they get a
     // result and not in what a result is. If a fixture and an emulated run

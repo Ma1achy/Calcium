@@ -102,6 +102,9 @@ export function createSubprocessTransport(opts: {
         stdoutRaw: "",
         stderr: "",
         parseError: null,
+        // Nothing spawned, so nothing overflowed. The paths that use `base` are
+        // the aborted-before-spawn and failed-to-spawn ones.
+        overflowed: false,
       };
 
       // An already-aborted signal spawns nothing at all (T3.9). Checking after
@@ -158,6 +161,10 @@ export function createSubprocessTransport(opts: {
         parseError,
         cancelled: state.cancelled,
         timedOut: state.timedOut,
+        // C21's fact, carried and not interpreted (SS25). A `stdoutRaw` that is
+        // a prefix of what the far side wrote is still what arrived, and a
+        // consumer that must know is one that can now ask.
+        overflowed: child.overflowed,
       };
     },
 
@@ -221,6 +228,10 @@ export function createSubprocessTransport(opts: {
             parseError: null,
             cancelled: state.cancelled,
             timedOut: state.timedOut,
+            // Read from the child rather than tracked alongside it, and `null`
+            // only on the path where no child was ever spawned. A stream that
+            // overflowed dropped patches, not just bytes.
+            overflowed: child?.overflowed ?? false,
           },
         };
       }

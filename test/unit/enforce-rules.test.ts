@@ -157,6 +157,28 @@ const FABRICATED: readonly Fabrication[] = [
   },
 
   {
+    // The grace period, which is the form this arrives in. Nobody adds an
+    // escalation ladder to C21; someone adds two seconds of politeness to
+    // `killAll` and the timing policy exists in two places.
+    rule: "SS27",
+    file: "src/data/process/runner.ts",
+    source: "setTimeout(() => handle.signal('SIGKILL'), 2000);",
+  },
+  {
+    // And the other half: the ladder's own signal, named here rather than by a
+    // caller. C21 delivers what it is given and names only `SIGKILL`.
+    rule: "SS27",
+    file: "src/data/process/stream.ts",
+    source: 'const first = "SIGTERM";',
+  },
+  {
+    // The read that would make I6 untestable again, and the one SS10 does not
+    // cover.
+    rule: "SS41",
+    file: "src/data/process/runner.ts",
+    source: "if (process.stdin.isRaw) throw new Error('suspend first');",
+  },
+  {
     rule: "MG1",
     file: "src/presentation/table.ts",
     source: 'import { scroll } from "../viewport/viewport.js";',
@@ -175,6 +197,16 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "MG6",
     file: "src/data/transport/subprocess.ts",
     source: 'import type { ViewDocument } from "../viewmodel/types.js";',
+  },
+  {
+    // The same sideways shape as MG6, one directory over, and in the form
+    // someone would actually write it: asking C01 whether the terminal was
+    // released reads as *more* correct than probing `stdin.isRaw`, which is
+    // exactly why the rule counts a type-only import as an edge. L0's halves
+    // are independent in what they know, not merely in what they emit.
+    rule: "MG19",
+    file: "src/data/process/runner.ts",
+    source: 'import type { TerminalLifecycle } from "../../terminal/lifecycle.js";',
   },
   {
     rule: "MG20",
@@ -434,7 +466,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     SS18: "C10 — needs the block-producing module list",
     SS22: "C19",
     SS24: "C11, C12, C18",
-    SS27: "C21",
     SS29: "C23",
     SS30: "C18, C19",
     SS31: "implemented in dependencies.mjs, not source-scans.mjs",

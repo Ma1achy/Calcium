@@ -147,6 +147,11 @@ function partial(argv: readonly string[], seen: readonly RawPatch[]): RawResult 
     parseError: null,
     cancelled: false,
     timedOut: false,
+    // A replay never crosses a buffer bound: nothing was spawned, and the bytes
+    // are whatever the corpus holds. Stated rather than defaulted — the parity
+    // suite compares the complete result, and an absent field reads identically
+    // to a false one at a call site and differently in a comparison.
+    overflowed: false,
   };
 }
 

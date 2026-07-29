@@ -61,6 +61,7 @@ function resultOf(over: Partial<RawResult>, stdout: unknown, rawText: string): R
     parseError: null,
     cancelled: false,
     timedOut: false,
+    overflowed: false,
     ...over,
   };
 }

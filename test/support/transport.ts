@@ -50,6 +50,8 @@ export type ScriptedChild = {
   ignores?: readonly string[];
   /** Exit reported when a signal ends it. */
   onSignal?: (sig: string) => Exit;
+  /** The buffer bound was crossed (C21 I5). C06 reports it and never interprets it. */
+  overflowed?: boolean;
 };
 
 export type FakeChild = ChildHandle & {
@@ -137,6 +139,7 @@ export function fakeChild(script: ScriptedChild = {}): FakeChild {
     get running() {
       return running;
     },
+    overflowed: script.overflowed ?? false,
     get signals() {
       return signals;
     },
@@ -228,6 +231,7 @@ export function result(over: Partial<RawResult> = {}): RawResult {
     parseError: null,
     cancelled: false,
     timedOut: false,
+    overflowed: false,
     ...over,
   };
 }

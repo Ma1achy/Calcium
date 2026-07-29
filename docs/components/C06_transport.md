@@ -63,6 +63,7 @@ type RawResult = Readonly<{
   parseError: string | null;
   cancelled:  boolean;
   timedOut:   boolean;
+  overflowed: boolean;                // the runner's buffer bound was crossed (C21 I5)
 }>;
 
 type RawPatch =
@@ -118,6 +119,8 @@ function createRouter(opts: {
 `createEmulatedTransport` takes a **handler function**, not a world object. `tui-kit` must not reference an app type, and a closure keeps the fixture world entirely on the app side (C08) while the framework supplies only the interface.
 
 `cwd` is a function, not a value. The shell's working directory changes when the user runs `cd` (C18 built-in), and a captured string would spawn every subsequent verb in the original directory.
+
+`overflowed` is C21's fact, reported and not interpreted — the far side emitted more bytes than the runner would hold, so `stdoutRaw` is a prefix of what it wrote rather than the whole of it. **It is not `meta.truncated`.** That field says the fallback adapter capped rows (C07 I13), and the two claims share nothing but a shape: one is about blocks the adapter chose not to build, the other about bytes that never reached it. C07 §4 carries the open question of whether and how this reaches a document; C06's part is to say it happened.
 
 `clock` is injected for the same reason C03's `schedule` is. `durationMs` needs the time twice and the §4 ladder needs two 2 s timers, and both are ambient reads that SS1 permits only in `src/shell/session.ts`. Injected, T3.5 asserts each rung of the ladder against a counter instead of sleeping through four seconds per case.
 
@@ -325,6 +328,8 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
   Comparison is field-complete in both places a `RawResult` appears — the settled return of `invoke`, and the `result` inside the terminal `end` patch. The second is the easier one to forget: `data`, `malformed` and `degraded` patches are compared whole already, so the streaming side reads as covered while carrying the same gap one level down.
 
   Fields that cannot match are **named individually with a reason**, and the list is closed. A field is exempt by being on it, never by not being looked at — which is the same discipline the scan allow-lists take, and for the same reason: a rule that narrows to what it happens to cover stops seeing what it does not.
+
+  `overflowed` is the first field added after the mechanism was built, and it is the mechanism's own test: field-completeness meant the fixture and emulated transports had to have an answer the day C21 gave the subprocess one. Neither can overflow — no buffer bound is crossed replaying a recording — so both report what was recorded, which for anything not recorded from an overflowing child is `false`. Asserted rather than left to default: an absent field and a `false` one read identically at a call site and differently in a comparison, and that is exactly the hole `argv` fell through.
 - **T2.7** (I16): a source scan finds no clock read and no mutable module state in `fixture.ts`; replaying the same corpus twice yields deep-equal results.
 - **T2.8** (I17): a source scan finds no `emulated` mode selection in `test/`, and no test imports C08's world.
 - **T2.9** (I18): a source scan finds no `PRISM_TUI_TRANSPORT` anywhere in `src/`.

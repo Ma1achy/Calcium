@@ -100,6 +100,6 @@ describe("C03 e2e", () => {
     "T5.4: dragging the terminal edge continuously — every frame correct, none blank, no corruption — waits on C14 and a real render tree",
   );
   it.todo(
-    "T5.5: suspending to a child and returning — the first frame after resume is a full repaint, verified by byte volume — waits on C21 and the L4 shell",
+    "T5.5: suspending to a child and returning — the first frame after resume is a full repaint, verified by byte volume — waits on L4",
   );
 });

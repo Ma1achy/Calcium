@@ -1,9 +1,11 @@
 // C01 tier 4 — integration. Real components, still no real terminal.
 //
 // C02 and C03 exist, so T4.1, T4.2, T4.3 and T4.7 run against real components.
-// What remains names its blocker in a greppable form: `grep "waits on C21"`
-// finds everything that a component landing would unblock. That is how C03's
-// three were found the day it landed.
+// What remains names its blocker in a greppable form: `grep "waits on L4"`
+// finds everything the shell landing would unblock. That is how C03's three
+// were found the day it landed, and C21's nine the day the runner did — the
+// grep is the manual half; `tools/enforce/todo-expiry.mjs` is the half that
+// fails on its own.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
@@ -157,7 +159,7 @@ describe("C01 integration", () => {
     }
   });
   it.todo(
-    "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on C21 and the L4 shell",
+    "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on L4",
   );
   it.todo(
     "T4.5: startup ordering — the composition root's steps 6, 7, 8 execute in that order, asserted by an event log — waits on C22",

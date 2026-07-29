@@ -151,6 +151,7 @@ describe("C04 integration — the document lifecycle", () => {
           parseError: null,
           cancelled: false,
           timedOut: false,
+          overflowed: false,
         },
         {
           command: "/ps",

@@ -13,6 +13,8 @@ import { defaultTheme, loadTheme } from "../../dist/presentation/theme/index.js"
 import { renderSequenceToLines } from "../../dist/testing/index.js";
 import { createTerminalLifecycle } from "../../dist/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../dist/terminal/frame-scheduler.js";
+import { createProcessRunner } from "../../dist/data/process/runner.js";
+import { createSubprocessTransport } from "../../dist/data/transport/index.js";
 
 const mode = process.argv[2];
 
@@ -313,6 +315,147 @@ switch (mode) {
       });
       process.exit(0);
     }, seconds * 1000);
+    break;
+  }
+
+  // --- C21, tier 5 ---------------------------------------------------------
+  //
+  // The runner driven inside a real PTY. What these modes prove is the runner's
+  // behaviour against a real terminal and real process groups; what they do
+  // *not* prove is that an application wires suspend to handoff or killAll to
+  // exit, because C22 does not exist and this fixture is standing where it will.
+  // Stated here rather than left for a reader to infer.
+
+  case "process-glob": {
+    // T5.1 — `ls *.md` through the user's shell. The glob is the assertion: an
+    // argv spawn passes `*.md` to `ls` literally and it finds nothing.
+    const runner = createProcessRunner({ env: process.env, stdin: process.stdin });
+    const child = runner.spawnShell("ls *.md", { cwd: () => process.cwd() });
+
+    let out = "";
+    for await (const chunk of child.stdout) out += chunk;
+    await child.exited;
+
+    process.stdout.write(`GLOB ${JSON.stringify(out.split("\n").filter(Boolean))}\n`);
+    process.exit(0);
+    break;
+  }
+
+  case "process-cancel": {
+    // T5.3 — Ctrl-C during `sleep 30 | cat`. The terminal's SIGINT reaches this
+    // process, not the children: they are detached and lead their own group,
+    // which is the point. So the handler asks the runner, and the runner
+    // signals the group.
+    const runner = createProcessRunner({ env: process.env, stdin: process.stdin });
+    const child = runner.spawnShell("sleep 30 | cat", { cwd: () => process.cwd() });
+    const pgid = child.pid;
+
+    process.on("SIGINT", () => {
+      void (async () => {
+        await runner.killAll();
+        const { execFileSync } = await import("node:child_process");
+        let survivors = "";
+        try {
+          survivors = execFileSync("ps", ["-o", "pid=", "-g", String(pgid)], {
+            encoding: "utf8",
+          }).trim();
+        } catch (err) {
+          // `ps` exits 1 when the group holds nothing, which is the answer we
+          // want. Any other failure would report an empty group it never saw.
+          survivors = err.status === 1 && String(err.stdout ?? "") === "" ? "" : `PS-FAILED ${err}`;
+        }
+        process.stdout.write(`SURVIVORS ${JSON.stringify(survivors)}\n`);
+        process.stdout.write("PROMPT\n");
+        process.exit(0);
+      })();
+    });
+
+    process.stdout.write(`PGID ${pgid}\nREADY\n`);
+    setInterval(() => {}, 1000);
+    break;
+  }
+
+  case "process-handoff": {
+    // T5.2 — `vi` through handoff, and the sequence L4 will own: suspend the
+    // lifecycle, hand the terminal over, resume. Two nested alternate-screen
+    // users, and the assertion is made from outside by the PTY.
+    const lifecycle = make();
+    const runner = createProcessRunner({ env: process.env, stdin: process.stdin });
+
+    lifecycle.acquire();
+    paint(lifecycle);
+    lifecycle.suspend();
+
+    const exit = await runner.handoff(["vi"], { cwd: () => process.cwd() });
+
+    lifecycle.resume();
+    paint(lifecycle);
+    lifecycle.release();
+
+    process.stdout.write(`HANDOFF ${JSON.stringify(exit)}\n`);
+    process.exit(0);
+    break;
+  }
+
+  case "process-handoff-raw": {
+    // The guard, end to end. Acquiring puts stdin in raw mode; handing off
+    // without suspending first is the mistake I6 exists to catch, and the
+    // symptom otherwise is a child with no working line editing.
+    const lifecycle = make();
+    const runner = createProcessRunner({ env: process.env, stdin: process.stdin });
+
+    lifecycle.acquire();
+    try {
+      await runner.handoff(["true"], { cwd: () => process.cwd() });
+      lifecycle.release();
+      process.stdout.write("REFUSED no\n");
+    } catch (err) {
+      lifecycle.release();
+      process.stdout.write(`REFUSED ${JSON.stringify(String(err.message))}\n`);
+    }
+    process.exit(0);
+    break;
+  }
+
+  case "process-stream": {
+    // T5.4 — a real streaming far side at 1,000 lines/s. Counted rather than
+    // sampled: "no dropped output" is a claim about every line, and RSS is read
+    // before and after because a stream that accumulates is the failure this
+    // looks for.
+    const seconds = Number(process.argv[3] ?? 60);
+    const lines = seconds * 1000;
+    const emitter = `${process.cwd()}/test/support/emitter.mjs`;
+
+    const transport = createSubprocessTransport({
+      binary: "node",
+      clock: { now: () => performance.now(), schedule: () => ({ [Symbol.dispose]: () => {} }) },
+      runner: createProcessRunner({ env: process.env, stdin: process.stdin }),
+    });
+
+    const rssBefore = process.memoryUsage().rss;
+    let data = 0;
+    let end = null;
+
+    for await (const patch of transport.stream({
+      verb: "tail",
+      argv: [emitter, String(lines)],
+      streams: true,
+      timeoutMs: 0,
+      signal: new AbortController().signal,
+    })) {
+      if (patch.kind === "data") data += 1;
+      if (patch.kind === "end") end = patch.result;
+    }
+
+    report({
+      data,
+      expected: lines,
+      ended: end !== null,
+      exitCode: end?.exitCode ?? null,
+      overflowed: end?.overflowed ?? null,
+      rssGrowthMb: (process.memoryUsage().rss - rssBefore) / 1024 / 1024,
+    });
+    process.exit(0);
     break;
   }
 

@@ -145,6 +145,34 @@ describe("C06 contract", () => {
       }
     });
 
+    it("a replayed fixture is never overflowed, and the subprocess transport reports when it was", async () => {
+      // `overflowed` is the first field added since field-completeness was
+      // built, so it is that mechanism's own test: the day C21 gave the
+      // subprocess transport an answer, the other two had to have one.
+      //
+      // Asserted rather than left to default. An absent field and a `false` one
+      // read identically at a call site and differently in a comparison, and
+      // that difference is exactly the hole `argv` fell through.
+      const byName = await settledEach();
+      for (const [name, r] of byName) {
+        expect(r.overflowed, `${name} did not report overflowed`).toBe(false);
+      }
+
+      // And the value is carried rather than hardcoded: a child that crossed the
+      // bound says so through the transport, or the field is decoration.
+      const overflowing = createSubprocessTransport({
+        binary: "widget",
+        clock: clockOf(fakeClock()),
+        runner: fakeRunner(() => ({
+          stdout: ["{}"],
+          exit: { code: 0, signal: null },
+          overflowed: true,
+        })),
+      });
+
+      expect((await overflowing.invoke(invocation())).overflowed).toBe(true);
+    });
+
     it("the exemption list is closed, and every entry carries a reason", () => {
       // A field is exempt by being named, never by not being looked at. Adding a
       // field to `RawResult` now fails here until someone either makes it agree
