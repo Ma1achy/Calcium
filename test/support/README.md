@@ -10,6 +10,7 @@ expectations, which is the same reason C02 takes its `env` by injection.
 | `fake-scheduler.ts` | `fakeClock()`, `harness()`, `assertSeamNarrow()` for C03's tiers 1–3 |
 | `transport.ts` | `fakeRunner()`, `fakeChild()`, `clockOf()`, `invocation()`, `recorded()`, `drain()` for C06's tiers 1–3, and `transportCases()` — the three-transport shared suite I15 asserts. The runner is faked against C21 §2 rather than invented, so a drift from that interface fails here rather than on the day C21 lands |
 | `pty.ts` | `runInPty()`, `interactivePty()`, `control()`, `trackDecset()` for tier 5 |
+| `process.ts` | `groupMembers()`, `waitForGroupEmpty()`, `openDescriptorCount()`, `run()`, `collect()` and `scripts` — the real-process harness for C21. Nothing here is a fake: C21's value is in its interaction with the OS, and a test that mocks the process has moved to tier 3 without saying so |
 | `fixture.mjs` | The program tier 5 runs inside a PTY. Imports `dist/`, not `src/` |
 
 | `world.ts` | `fakeWorld()`, `worldResult()`, `steppableClock()` — a constant `WorldDriver` double for C08's resolver, which is not "the world" for I14's purposes |
@@ -42,6 +43,19 @@ Two things follow for anyone adding a helper here.
 - **A default must differ from the value the test asks for.** `fakeStdout({
   columns: 132 })` asserts 132 *and* that the default is 80; otherwise a helper
   ignoring its argument passes.
+- **A helper can also be vacuous in its answer, not only in its parameters.**
+  `groupMembers` is the case: `ps` exits 1 both for a group with no members and
+  for a `ps` that could not run, so reading the status alone returns `[]` from an
+  image with no `procps` — and T3.1, whose whole assertion is that a process
+  group is empty, passes having seen nothing. It throws on any shape that is not
+  clearly one or the other, and a positive control asserts a group *known* to
+  hold a process is seen. An observation helper needs the second test; without
+  it, every assertion resting on it rests on an unchecked empty.
+- **Assert on evidence a failure could not produce.** `child.killed` says a
+  signal was sent, not survived, so a test using it to prove a child ignored
+  `SIGTERM` passes identically when the child died. `scripts.ignoring` announces
+  each caught signal on stdout instead: a line written after delivery cannot come
+  from a dead process.
 - **A parameter with no observable effect is a finding, not a gap to skip.** It
   may mean the parameter should not exist yet. `measurable({ tick })` is
   observable through exactly one block kind — `steps` with an `active` step is

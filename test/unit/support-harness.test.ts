@@ -23,8 +23,17 @@
 // Non-PTY only. The two PTY runners are asserted in `test/e2e/harness.test.ts`,
 // because spawning a pseudo-terminal per parameter belongs where the 60-second
 // budget already lives.
+import { spawn as spawnRaw } from "node:child_process";
+import { closeSync, openSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { capabilities, fakeDebug, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
+import {
+  groupMembers,
+  openDescriptorCount,
+  run,
+  scripts,
+  waitForGroupEmpty,
+} from "../support/process.js";
 import { fakeClock, harness } from "../support/fake-scheduler.js";
 import {
   clockOf,
@@ -432,5 +441,163 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
     // A box narrower than the text wraps it, so the reported width differs.
     expect(inkWidth("hello")).toBe(5);
     expect(inkWidth("a".repeat(40), 10)).toBeLessThanOrEqual(10);
+  });
+});
+
+/**
+ * The real-process harness (C21).
+ *
+ * `groupMembers` is the one that needed this most, and it is a different failure
+ * from `runInPty`'s. That one silently ignored a parameter; this one could
+ * silently answer "empty" — `ps` exits 1 both for a group with no members and
+ * for a `ps` that could not run at all. A helper reading the status as "empty"
+ * returns `[]` from an image with no `procps` installed, and T3.1, whose entire
+ * assertion is that a process group is empty, passes having spawned nothing it
+ * could see.
+ *
+ * So the positive control is the test: a group known to hold a process, seen.
+ * Without it, every group assertion in the suite rests on an unchecked `[]`.
+ */
+describe("harness parameters — real processes", () => {
+  it("groupMembers: a live group is seen, and an empty one is distinguished from a broken ps", async () => {
+    // Detached, so the child leads its own group and its pid is the pgid — the
+    // same shape C21 spawns in, which is what makes this a control for T3.1
+    // rather than for some other arrangement of processes.
+    const child = spawnRaw("node", ["-e", "setInterval(()=>{},1000)"], { detached: true });
+    const pgid = child.pid!;
+
+    try {
+      const members = await groupMembers(pgid);
+      expect(members, "a group holding a live child read as empty").toContain(pgid);
+    } finally {
+      process.kill(-pgid, "SIGKILL");
+    }
+
+    await new Promise<void>((resolve) => void child.on("close", () => resolve()));
+    await waitForGroupEmpty(pgid);
+
+    // And the other direction: a pgid nothing can be in. Empty, not a throw.
+    expect(await groupMembers(0x7fffffff)).toEqual([]);
+  });
+
+  it("groupMembers: a ps that cannot run throws rather than reporting an empty group", async () => {
+    // The vacuity case, forced. `-g` with a non-numeric argument is a usage
+    // error, not an empty group, and the two are indistinguishable by exit
+    // status alone — which is the whole reason the helper inspects more than
+    // the status.
+    await expect(groupMembers(NaN)).rejects.toThrow(/harness failure/);
+  });
+
+  it("waitForGroupEmpty(attempts): a group that never empties fails, naming the survivors", async () => {
+    const child = spawnRaw("node", ["-e", "setInterval(()=>{},1000)"], { detached: true });
+    const pgid = child.pid!;
+
+    try {
+      // One attempt, so the failure is prompt. The default is 400 — a value the
+      // assertion below would not reach — so a helper ignoring the parameter
+      // hangs for a fraction of a second and then fails on the wrong message.
+      await expect(waitForGroupEmpty(pgid, 1)).rejects.toThrow(new RegExp(`${pgid}`));
+    } finally {
+      process.kill(-pgid, "SIGKILL");
+      await new Promise<void>((resolve) => void child.on("close", () => resolve()));
+    }
+  });
+
+  it("openDescriptorCount: opening a descriptor moves the count", () => {
+    const before = openDescriptorCount();
+    const fd = openSync("/dev/null", "r");
+    try {
+      expect(openDescriptorCount()).toBeGreaterThan(before);
+    } finally {
+      closeSync(fd);
+    }
+    expect(openDescriptorCount()).toBe(before);
+  });
+
+  it("scripts.emit(text): the argument is what the child writes", async () => {
+    expect((await run(scripts.emit("asked-for"))).stdout).toBe("asked-for");
+    // The default differs, so a builder ignoring its argument fails here.
+    expect((await run(scripts.emit())).stdout).not.toBe("asked-for");
+  });
+
+  it("scripts.emitBoth(out, err): each argument reaches its own stream", async () => {
+    const ran = await run(scripts.emitBoth("to-out", "to-err"));
+    expect(ran.stdout).toBe("to-out");
+    expect(ran.stderr).toBe("to-err");
+  });
+
+  it("scripts.emitBytes(bytes, chunk): both arguments change what arrives", async () => {
+    const ran = await run(scripts.emitBytes(4096, "ab"));
+    expect(ran.stdout.length).toBeGreaterThanOrEqual(4096);
+    expect(ran.stdout.startsWith("abab")).toBe(true);
+    // The default is 1 KiB of "x", which neither assertion above would accept.
+    expect((await run(scripts.emitBytes())).stdout.length).toBeLessThan(4096);
+  });
+
+  it("scripts.exit(code): the code is the child's", async () => {
+    expect((await run(scripts.exit(7))).code).toBe(7);
+    expect((await run(scripts.exit())).code).toBe(3);
+  });
+
+  it("scripts.readEnv(name): the named variable is the one read", async () => {
+    const argv = scripts.readEnv("HARNESS_PROBE");
+    const child = spawnRaw(argv[0]!, [...argv.slice(1)], {
+      env: { ...process.env, HARNESS_PROBE: "reached" },
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let out = "";
+    child.stdout!.setEncoding("utf8");
+    child.stdout!.on("data", (chunk: string) => (out += chunk));
+    await new Promise<void>((resolve) => void child.on("close", () => resolve()));
+
+    expect(out).toBe("reached");
+  });
+
+  it("scripts.ignoring(signals): the named signals are survived and others are not", async () => {
+    const argv = scripts.ignoring(["SIGTERM"]);
+    const child = spawnRaw(argv[0]!, [...argv.slice(1)], { stdio: ["ignore", "pipe", "ignore"] });
+    child.stdout!.setEncoding("utf8");
+    await new Promise<void>((resolve) => void child.stdout!.once("data", () => resolve()));
+
+    // The announcement, not `child.killed`. That flag says a signal was *sent*
+    // and is true whether the child survived it or died of it — an assertion
+    // indistinguishable from its own negation. A line written after delivery
+    // cannot come from a dead process.
+    const caught = new Promise<string>((resolve) => {
+      let seen = "";
+      child.stdout!.on("data", (chunk: string) => {
+        seen += chunk;
+        if (seen.includes("caught:SIGTERM")) resolve(seen);
+      });
+    });
+    child.kill("SIGTERM");
+    expect(await caught, "SIGTERM was not ignored").toContain("caught:SIGTERM");
+
+    child.kill("SIGKILL");
+    const [code, signal] = await new Promise<[number | null, string | null]>((resolve) =>
+      child.on("close", (c, s) => resolve([c, s as string | null])),
+    );
+
+    expect(code).toBeNull();
+    expect(signal).toBe("SIGKILL");
+  });
+
+  it("scripts.ndjson(count, text): both arguments shape the lines", async () => {
+    const ran = await run(scripts.ndjson(4, "ünïcode"));
+    const lines = ran.stdout.trimEnd().split("\n");
+
+    expect(lines).toHaveLength(4);
+    expect(JSON.parse(lines[0]!)).toEqual({ i: 0, text: "ünïcode" });
+    expect((await run(scripts.ndjson())).stdout.trimEnd().split("\n")).toHaveLength(3);
+  });
+
+  it("scripts.emitHex(hex): the exact bytes arrive, null bytes included", async () => {
+    const argv = scripts.emitHex("610062");
+    const child = spawnRaw(argv[0]!, [...argv.slice(1)], { stdio: ["ignore", "pipe", "ignore"] });
+    const chunks: Buffer[] = [];
+    child.stdout!.on("data", (chunk: Buffer) => chunks.push(chunk));
+    await new Promise<void>((resolve) => void child.on("close", () => resolve()));
+
+    expect([...Buffer.concat(chunks)]).toEqual([0x61, 0x00, 0x62]);
   });
 });
