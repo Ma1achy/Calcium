@@ -255,7 +255,10 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 12. C10 resolves whatever tokens it is given; the shipped catalogue and the Atom One Light decision are A01 Appendix A's, which is also where a correction to them belongs (→ A01 A.1).
 13. Contrast is validated against `bg` and `bgElev` — both surfaces text lands on. `bgDeep` is excluded because it carries none (I20).
 14. No two slots of one palette render as one another: distinct in hex, and distinct at 8-bit for the five tones whose confusion would mislead (I17).
-15. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them (I21).
+15. C10 reads no environment. Capabilities arrive injected, so the same tokens and the same capability record resolve identically on any machine (I12, → C02 I5). Enforced by SS11.
+16. The `syntax` and `spectrum` palettes have closed consumer lists — `code` and `patch` for one, declared art for the other. A third consumer is a spec change in four places rather than a permission, because a palette used casually stops carrying what it declares (I16). Enforced by SS20 and SS21; C25 is the one widening, and it went through the spec.
+17. A resolved colour always names its depth. There is no untagged form and no bare string, so a 4-bit index and a 24-bit hex can never be confused at a call site that has already forgotten which it asked for (I18). Enforced by SS36.
+18. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them (I21).
 
 ---
 

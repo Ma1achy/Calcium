@@ -43,6 +43,8 @@ This is not belt-and-braces. Every check here reports success the same way wheth
 - **Ownership rows naming absent exports.** MG20's `MODE_OWNERS` assigned `SYNC_UPDATE` and `SCROLL_REGION` to C03 while `escapes.ts` exported neither. The rows governed names that did not exist, so they could not have fired whatever the tree contained.
 - **A rule inventoried here and never implemented.** SS3 had a row in this document from the start and no entry in `source-scans.mjs`. It could not fire, could not be fabricated against, and appeared in no report — and it also carried SS26's defect, scoping to `adapters/` while the tree held `adapters.ts`, a file. Two of the four failures in one rule, which is what a rule nobody built looks like.
 
+- **A checker that resolves one item and passes on the rest.** SP1 read a single invariant per parenthetical, so a commitment citing `(I5, I99)` resolved one and ignored the other: a dangling citation could ride alongside a good one and the rule reported it enforced. It shipped and was found the same day by the pass that reads its own output. Two instances of this in one day — the other was a fabricated fixture written as `- **I1 — text**` rather than `- **I1** — text`, so it parsed as no invariants at all and every citation in it read as dangling. **In both the rule was broken by what it was tested against rather than by what it checked**, which is a failure a fabricated violation invites rather than prevents: the fabrication is written by the same person, in the same sitting, under the same misreading as the rule.
+
 **The fourth is the one the other three do not catch, and it is a defect of this document rather than of the code.** A missing rule is invisible from the source side: `checkSourceScans` iterates the rows it has, so a row that was never written is not a rule that fails but a rule that is not there. The inventory is the only place it exists, and the inventory is prose. The check is therefore set equality — the ids in these tables equal the ids implemented plus the ids explicitly pending — so **a rule inventoried and never built fails on the commit that inventories it**, which is the commit where someone still remembers what it was for.
 
 Every rule therefore ships with four things: an implementation reachable from the inventory, a fabricated violation, an assertion that its scope reaches the tree, and — where the rule governs named entities — an assertion that those names exist. The three catch different failures. A fabricated violation is written at a path inside the declared scope, so it fires whether or not that scope describes anything; and a scope full of real files says nothing about whether the names a rule enumerates are real. All three are in `test/unit/enforce-rules.test.ts`.
@@ -77,7 +79,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG18 | C20 imports nothing from `terminal/`; no C17 import | C20 T2.5, T2.6 |
 | MG19 | C21 imports nothing from `terminal/` | C21 T2.3 |
 | MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
-| MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 §3, T2.17 |
+| MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I18, T2.17 |
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 
@@ -131,7 +133,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
-| SS23 | `.length`, `charAt`, `slice` on display text | outside the grapheme layer | C09 T2.9, C17 T2.4 |
+| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/blocks/` | C09 T2.9 |
+| SS40 | The same, in the editor | `src/interaction/` | C17 I2, T2.4 |
 | SS24 | Mutable module state | `table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
@@ -143,9 +146,9 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
 | SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
-| SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 §4, C05 §2 |
+| SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I29 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I18, T2.19 |
-| SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I4, T2.17 |
+| SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I18, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
 | SS38 | A bare import of a package that is not a declared runtime dependency | `src/` | A04 §2, C09 §4a |
 

@@ -97,10 +97,29 @@ export const SCANS = [
     why: "`spectrum` is decorative and restricted to declared art" },
 
   // --- structural ----------------------------------------------------------
-  { id: "SS23", spec: "C09 T2.9 · C17 T2.4",
+  //
+  // SS23 and SS40 look like one rule and are not, which is why they are two.
+  //
+  // Both forbid `.length` on display text. The **remedy differs**, and the
+  // remedy is most of what a scan is for: in a block the answer is `cells()`,
+  // the display width the measurer uses; in the editor it is a grapheme index,
+  // because C17 counts positions a cursor can occupy rather than columns a
+  // glyph fills. A shared rule would give one of the two the wrong advice at
+  // exactly the moment someone is reaching for the quick fix.
+  //
+  // A03 declared SS23 as serving `C09 T2.9 · C17 T2.4` while its scope was
+  // `src/presentation/blocks/` alone, so the editor's `.length` was unpoliced
+  // and recorded as covered — SS26's failure one directory over. The citation
+  // graph is what found it; nothing had before.
+  { id: "SS23", spec: "C09 T2.9",
     pattern: /\.length\b(?!.*\/\/ *cells-ok)/,
     scope: "src/presentation/blocks/", allow: [],
     why: "display width comes from cells(), never .length" },
+
+  { id: "SS40", spec: "C17 I2 · C17 T2.4",
+    pattern: /\.length\b(?!.*\/\/ *graphemes-ok)|\.charAt\s*\(|\.slice\s*\(/,
+    scope: "src/interaction/", allow: [],
+    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position" },
 
   // SS3 carried two of the four vacuity failures at once (A03 §2). It was
   // inventoried in A03 from the start and never written here, so it could not

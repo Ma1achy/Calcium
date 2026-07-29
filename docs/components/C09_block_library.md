@@ -332,7 +332,8 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 11. Adding a kind whose measurer needs capabilities is a design decision, not an implementation detail (I2).
 12. Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the first runtime L1 → L0-terminal edge, and it is required rather than tolerated (I18).
 13. Ink paints pre-broken lines. Its layout width must agree with `cells()`, and the agreement is asserted (T2.16), never assumed (I16).
-14. **Control characters are stripped from every text field before measurement and render** (I14). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
+14. No renderer emits a colour. Every style comes from `resolve` against a declared palette slot, so degradation, theme switching and the 1-bit collapse happen in one place instead of once per kind (I4). Enforced by SS17 and, for the Ink-prop route, SS37.
+15. **Control characters are stripped from every text field before measurement and render** (I14). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
 
 ---
 

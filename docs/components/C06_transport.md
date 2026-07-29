@@ -271,7 +271,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 
 ## 8. Commitments
 
-1. C06 reports; C07 interprets. No view model, no status mapping, no envelopes (I2).
+1. C06 reports; C07 interprets. No view model, no status mapping, no envelopes (I1, I2).
 2. `--json` is appended by transport, exactly once (I4).
 3. Spawning uses an argv array; the shell is never in the loop (I3).
 4. stdout and stderr stay separate; raw stdout is always retained (I5, I6).

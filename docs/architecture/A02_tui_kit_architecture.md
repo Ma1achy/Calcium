@@ -378,3 +378,4 @@ The rule earns its place by finding gaps: applied to C01 it surfaced four untest
 17. Six test tiers, not seven. Behaviour cross-cuts scope and is carried by the existing tiers.
 18. Every stateful component enumerates its transition table; invalid transitions are tier-3 tests.
 19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one.
+20. **Every commitment cites an invariant, several, or another spec's.** §1's two rules for whose claim a commitment is are mechanical, not advisory: A03 SP1 fails the build on a commitment with no marker, on a citation naming an invariant its spec does not declare, and on a cross-reference that does not resolve. Self-referential deliberately — this is the document that states the rule, so it is the document that commits to it.

@@ -477,6 +477,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I27** — Container widths are declared, not negotiated: `panel` and table detail at `w - 2`, a `column` group at `w`, a `row` group at an equal split. A weights field arrives when a surface needs one and not before.
 - **I28** — `form: "line"` requires an explicit `height`. There is no default, because a defaulted height on the one block kind whose height is not derivable is a silent disagreement with I7 waiting to happen.
 - **I19** — `gapBefore` is content: `merge` carries it, `measure` never counts it, and every sequence of blocks adds one row per block declaring it. A composer that inserts spacing of its own instead (C23 §2) makes a document's height unknowable from the document.
+- **I29** — `Result` is declared here and nowhere else in the tree. Two shapes under one name in one layer half compile and diverge quietly — the failure is not a type error but two callers agreeing about a field that means different things. The same shape as C01 owning "escape literals live only in `escapes.ts`": C04 declares the type, so C04 owns its exclusivity.
 - **I18** — `validateDocument` terminates on any input, including a cyclic one. A path-scoped seen-set refuses a cycle; it is not a depth limit, and it does not reject a legitimately shared subtree.
 - **I20** — `ErrorLike` requires `message` and nothing else. `code`, `stage`, `details` and `remediation` are optional, and a far side's richer envelope is a specialisation rather than a second type — so every failure in the system renders through one path (A01 B5).
 - **I20a** — `meta` carries the invocation record: `argv`, `stderr` and `transport` are present on every document C07 produces. They belong to `meta` because a block is content and the invocation is *about* the document, so any inspector reaches them uniformly without re-running anything (D49).
@@ -516,6 +517,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 28. `form: "line"` requires `height`; there is no default (I28).
 29. C04's constructors enforce the shape invariants and C24's `b` delegates to them. One enforcement point for I1 (I1).
 30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set (I18).
+31. `Result` is declared once, in C04, and nowhere else in the tree (I29). Enforced by SS35, which existed before this commitment did — a build gate with no contract behind it, found by tracing the citation graph.
 
 ---
 

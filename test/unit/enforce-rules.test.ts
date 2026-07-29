@@ -68,6 +68,22 @@ const FABRICATED: readonly Fabrication[] = [
   },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
   {
+    // SS40's own violation, and the reason it is not SS23 widened. The same
+    // expression in the editor wants a different answer: `cells()` is a display
+    // width and the cursor needs a grapheme index, so one rule would give one of
+    // the two call sites the wrong advice at the moment someone reaches for the
+    // quick fix.
+    rule: "SS40",
+    file: "src/interaction/editor.ts",
+    source: "const end = buffer.length;",
+  },
+  {
+    // The code-unit half, which `.length` alone does not cover.
+    rule: "SS40",
+    file: "src/interaction/editor.ts",
+    source: "const ch = buffer.charAt(cursor);",
+  },
+  {
     // The shape an adapter author reaches for when a document wants a
     // timestamp column the far side did not send. It compiles, it reads
     // sensibly, and it makes the adapter untestable against a fixture.

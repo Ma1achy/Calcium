@@ -135,7 +135,7 @@ Kill-append is a flag rather than a state: any non-kill operation clears it (T1.
 ## 8. Invariants
 
 - **I1** — The cursor is always at a grapheme boundary, in `[0, graphemeCount]`.
-- **I2** — Every operation is grapheme-aware; no operation indexes by code unit.
+- **I2** — Every operation is grapheme-aware; no operation indexes by code unit. Enforced by **SS40**, which is C17's own scan and not C09's SS23 widened: both forbid `.length` on text, and the remedies differ. In a block the answer is `cells()`, a display width; here it is a grapheme index, because the editor counts positions a cursor can occupy rather than columns a glyph fills. One rule serving both would give one of them the wrong advice.
 - **I3** — `displayRows(width, gutter)` equals the rows the prompt renders at that width and gutter.
 - **I4** — `cursorCell` accounts for double-width glyphs; it is a column, not a grapheme index.
 - **I5** — A paste is exactly one undo unit, regardless of size; `atomic` forces a unit boundary.
@@ -165,6 +165,7 @@ Kill-append is a flag rather than a state: any non-kill operation clears it (T1.
 10. Control characters are stripped on insert; `\n` is the only structural exception (I9).
 11. C17 never renders; the prompt composites its state with C19's ghost text (I10).
 12. C17 never commits a frame (I13).
+13. **Every operation is grapheme-aware; nothing indexes by code unit** (I2). Not only the cursor — delete, kill, word motion, undo units and paste all count the same thing, because an editor that is grapheme-aware in most places is one where a family emoji breaks whichever operation was missed. Enforced by SS40, which is C17's own scan: C09's SS23 forbids the same expression and wants a different answer.
 
 ---
 

@@ -413,6 +413,69 @@ reading by hand first is what told us which markers the template needed.
 
 ---
 
+## Third pass — the enforcement suite against the citation graph
+
+Run once the remediation above made the graph readable. **32 implemented rules,
+both directions.** The second direction is clean: every rule id named in a spec is
+implemented, except MG8, which C08 T2.6 already records as unfireable in a
+single-package repo — documented, not silent.
+
+**They do not cluster by rule kind.** Four of five MG trace, fifteen of
+twenty-two SS, all three dependency rules, and the deferral rule. The MG/SS split
+is even, so that hypothesis is dead.
+
+**They cluster by subject: colour.** Six of the eight component-level gaps were
+palette rules — SS17, SS20, SS21, SS36, SS37 and SS11's C10 half — pointing at
+C09 I4, C10 I16, C10 I18 and C10 I12. That confirms the first audit from the
+opposite side: C09 and C10 held the most unbacked invariants, five and four.
+**The enforcement suite is densest exactly where the commitment lists are
+thinnest**, and C10 alone had five rules aimed at it with three targeting
+invariants no commitment named.
+
+The likely reason generalises. Colour attracted lint rules *because* a violation
+there is invisible at runtime — D29's whole point. The commitment lists were
+written from the reader's view, where colour reads as implementation detail. The
+enforcement went one way, the summary went the other, and nothing connected them
+until the graph did.
+
+### The two that were not missing commitments
+
+**SS23 did not enforce what it claimed.** A03 declared it `C09 T2.9 · C17 T2.4`
+while its scope was `src/presentation/blocks/` alone, so the editor's `.length`
+was unpoliced and recorded as covered — SS26's failure one directory over. The fix
+is **two rules, not a widened scope**: both forbid `.length` on display text and
+the *remedies differ*, `cells()` in a block and a grapheme index in the editor.
+A shared rule gives one of the two the wrong advice, and the advice is most of
+what a scan is for. SS40 is C17's, with its own fabricated violations.
+
+**SS35 enforced something nobody had agreed to.** One `Result` in the tree,
+declared against two § references and no invariant. The rule is right — two shapes
+under one name in one layer half compile and diverge quietly — so the fix is the
+contract, not the rule. C04 I29, on the same footing as C01 owning "escape
+literals live only in `escapes.ts`": C04 declares the type, so C04 owns its
+exclusivity.
+
+### A third kind of A03 defect
+
+Not vacuous, not unimplemented — **pointing at the wrong invariant.** SS37
+declared C09 I4 while its behaviour is C09 I18, and MG21 declared a § where an
+invariant now exists. Both fire correctly and always did; both were mislabelled,
+and every previous check read the label rather than the target. The citation graph
+is the first thing that could tell the difference.
+
+### Outcome
+
+Ten remediated: four commitments for C09 I4 and C10 I12/I16/I18, one for C17 I2,
+MG6's citation completed on C06 commitment 1, A03's two wrong declarations
+corrected, SS23 split into SS23 and SS40, SS35 given C04 I29, and SP1 committed to
+in A02 commitment 20 — the rule enforcing commitment-backing was not itself
+commitment-backed.
+
+All 32 rules now trace: 25 to a component commitment through an invariant, seven
+to an architecture commitment (A02 1, 2, 20; A03 6, 15; A04 2, 3, 4).
+
+---
+
 ## Confidence
 
 Every finding was read directly from the two lists. Where a pairing is partial —
