@@ -22,6 +22,10 @@ Its position in the layering is worth restating because it constrains the design
 
 ## 2. Two spawn modes, deliberately separate
 
+**Declaration and behaviour are separate files.** `src/data/process/types.ts` holds the interface below; `src/data/process/runner.ts` holds the implementation. C06 consumes `ProcessRunner` and cannot be built without it, so the types land with C06 and the runner lands with C21 — the split is what lets that happen without C21 importing a port declared by its own consumer.
+
+`COMPONENT_SOURCES.C21` in `tools/enforce/todo-expiry.mjs` therefore points at `runner.ts`, not at the directory's first file. The row means *the file that must contain the behaviour*.
+
 ```typescript
 interface ProcessRunner {
   spawn(argv: readonly string[], opts: SpawnOptions): ChildHandle;

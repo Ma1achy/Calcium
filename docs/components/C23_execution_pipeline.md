@@ -265,6 +265,7 @@ Per submission.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
 - **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
+- **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I19) and applied by the sequence (C09 I15). The rule has teeth in one direction only: C23 may not *add* rhythm.
 
 ---
 
@@ -294,6 +295,7 @@ Per submission.
 22. C23 sets `meta.origin` on every append; provenance is never absent.
 23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point.
 24. `/debug` never re-runs; `{ } json` always does, and each surface says so.
+25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 
 ---
 
@@ -327,6 +329,7 @@ Fake transport, fake stores.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I2): a fault injected at each of the eight stages in §5 → a document is appended and the session survives, eight times.
+- **T2.11** (I24): the composed height of an appended entry equals `measureSequence` over its blocks (C09 I15), for a document with gaps and one without. C23 contributing a single row of its own fails both.
 - **T2.2** (I1): across a thousand random submissions, entry count equals submission count minus empties.
 - **T2.3** (I13): a spy on every component proves no cross-layer effect originates outside C23.
 - **T2.4** (I8): commit reasons match the documented class for every route.
@@ -379,6 +382,7 @@ Fake transport, fake stores.
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I3): invoking the transport before appending → T1.4 fails, and slow verbs look like dropped keystrokes.
+- **T6.14** (I24): inserting a blank row between top-level blocks → T2.11 fails. Without it the change is invisible: the height C14 virtualises against and the height the frame draws are computed by different code, and nothing compares them.
 - **T6.2** (I4): recomputing validation → T1.5 fails, and two answers can disagree.
 - **T6.3** (I5): queueing a second verb → T1.6 fails, and `$_` becomes ambiguous.
 - **T6.13** (I5): scoping the guard to app verbs only → T3.16 fails, and the prompt accepts submissions over a running `sleep`.

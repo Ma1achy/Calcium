@@ -273,6 +273,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **I9** — Startup validation severities are those of §8, and each cites the spec that set it.
 - **I10** — The runtime entry exports no function that performs I/O except `createTui`.
 - **I11** — The reference app lives in its own repository and consumes `tui-kit` as a published dependency, so the unused-export scan runs against `prism-tui` plus the app's declared import manifest, refreshed on each version bump. It is a reported signal, not a build gate.
+- **I12** — Every `b.*` builder sets a `gapBefore` default per its kind (§4), and an explicit `gapBefore` always wins over it. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 
 ---
 
@@ -290,6 +291,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 10. `tui-kit/testing` ships the assertions, so no consumer reimplements them.
 11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect.
 12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them.
+13. Every builder sets a `gapBefore` default per kind, and an explicit value always wins (I12, §4).
 
 ---
 
@@ -314,6 +316,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **T2.4** (I3): no exported builder returns anything but a frozen block — a type-level test.
 - **T2.5** (I7): `Measure`'s signature does not include `tick` — a compile-level test.
 - **T2.6** (I10): a source scan finds no I/O in the runtime entry outside `createTui`.
+- **T2.9** (I12): every `b.*` builder is enumerated and asserted to set the §4 default for its kind; a builder added without a row fails. For each, an explicit `gapBefore: false` and `true` overrides the default.
 - **T2.7** (I5): a source scan finds no field-name-keyed tone or glyph table in `builders/`.
 - **T2.8**: every block kind in C04's union has a builder — exhaustive over the type.
 
@@ -353,6 +356,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I2): exporting one of the eleven absent components → T2.1 fails, and the layering starts leaking.
+- **T6.12** (I12): dropping a builder's `gapBefore` default → T2.9 fails on that kind. Without the enumeration the surfaces render dense while the S-series draws them spaced, which is the gap the audit found.
 - **T6.2** (I3): a builder returning a description → T2.4 fails, and consumers learn two type families.
 - **T6.3** (I5): inferring a tone from a field name → T2.7 fails, and the fifth verb breaks silently.
 - **T6.4** (I6): making backoff configurable → the isolation guarantee becomes optional.

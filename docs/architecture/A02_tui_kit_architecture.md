@@ -25,6 +25,19 @@ L0  foundation     terminal (C01 C02 C03)   ·   data (C04 C05 C06 C07 C21)
 
 **L0 has two halves that do not know about each other.** Terminal knows nothing of view models; data knows nothing of terminals. That independence is not incidental — it is what allows C04–C07 to be built in parallel with C01–C03, and it is the first thing a lint rule should protect.
 
+### Where a shared type is declared
+
+**A type belongs to the layer that consumes it structurally, not to the component with the most to say about it.**
+
+This has come up twice in ten components, both times as a draft that put the type with its domain expert and produced an edge in the wrong direction:
+
+- **`ColumnDef` → C04, not C11.** C11 has everything interesting to say about columns — priority, flex, drop order, planning. But `ColumnDef` is a field of `Table`, so C04 cannot declare `Table` without it, and the first draft's placement made L0 depend on L1. C11 keeps `PlannedColumns` and `planColumns`, which are genuinely plan rather than content (C04 §, C11 §).
+- **`Fixture` → C06, not C08.** C08 owns provenance, recording, redaction and the authored ratio — all the rules. But `createFixtureTransport` reads `Fixture`, and it is expressed in C06's own `RawResult` and `RawPatch`, so declaring it in C08 would have put a cycle inside L0 data (C06 §2, C08 §1a).
+
+The pattern in both: the component with the domain knowledge keeps the *rules*; the consumer holds the *shape*. C11's rejected alternative is worth remembering because it is the one that hides — a type-only import erases at build and so passes the module-graph check, which makes it worse than an edge `make enforce` catches.
+
+The next likely instance is C13/C14 over transcript entries.
+
 
 ```mermaid
 flowchart TD
@@ -108,7 +121,7 @@ interface VerbTransport {
 }
 ```
 
-Subprocess and fixture implementations are fully substitutable (C06 I14), and selection is **per verb** (D13) — which is what allows a verb to migrate from Python to native TypeScript without touching anything else.
+All three implementations are fully substitutable in every test that does not concern spawning (C06 I15), and selection is **per verb** (D13) — which is what allows a verb to migrate from Python to native TypeScript without touching anything else.
 
 ### Seam 3 — focus priority
 

@@ -30,7 +30,7 @@ The generic half is everything the docker reference app would want identically; 
 
 | Half | Package | Contains |
 |---|---|---|
-| **Harness** | `tui-kit` | `Fixture` type and provenance model · the record/verify tooling · redaction · the seeded RNG · the resolver · mode handling |
+| **Harness** | `tui-kit` | the provenance model · the record/verify tooling · redaction · the seeded RNG · the resolver · mode handling. The `Fixture` **type** is declared in C06 (C06 §2), which consumes it structurally; C08 owns every rule about it |
 | **World** | `prism-tui` | Runs, deployments, model versions, secrets · their transitions · the seed corpus ported from the mockup |
 
 Without this split every consuming app reimplements recording and determinism, which is the machinery most likely to be got wrong.
@@ -186,7 +186,7 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 - **I10** — Every `derived` response is structurally identical to the recording it derives from — same keys, same types, different values.
 - **I11** — The harness answers `__manifest__` (B6) from the supplied manifest.
 - **I12** — The world's output satisfies the same contract the real CLI does (A01 B1–B8), so an adapter cannot pass against fixtures and fail against reality for contract reasons.
-- **I13** — All three transports are substitutable: any test not concerning spawning passes against each (C06 I14).
+- **I13** — All three transports are substitutable: any test not concerning spawning passes against each (C06 I15).
 - **I14** — The world backs `EmulatedTransport` only. No test path reaches it.
 - **I15** — `record --diff` reports structural deltas only, and prints a count before any work begins.
 

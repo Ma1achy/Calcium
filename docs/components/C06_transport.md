@@ -28,13 +28,14 @@ It is also where the framework's build modes live. **Three implementations, not 
 
 **Tests never run against the emulator.** An animated world serving tests becomes the thing the tests agree with, and then emulator drift silently masks a regression — which is the fiction problem C08's provenance model exists to prevent, reintroduced through the side door. The emulator is for looking at; the corpus is for asserting against.
 
-Selection is per verb (D13), which is what allows a verb to migrate to native without touching anything else, and per-mode by one factory reading one environment variable:
+Selection is per verb (D13), which is what allows a verb to migrate to native without touching anything else, and per-mode by one factory taking one mode value:
 
 ```typescript
 type TransportMode = "emulated" | "fixture" | "subprocess";
-function createTransport(mode: TransportMode, deps: TransportDeps): VerbTransport;
-// PRISM_TUI_TRANSPORT; default "subprocess"
+function createTransport(deps: TransportDeps): VerbTransport;   // mode is a field of deps
 ```
+
+**C06 does not read the environment** (I18). `PRISM_TUI_TRANSPORT` is resolved by the *app's* entry point — `prism-tui` and `docker-tui` each read their own and pass a constructed router through `TuiConfig.transport`. `tui-kit` ships no binary, and a variable named for one consumer has no business inside a framework that claims to serve others. It is also what keeps SS10 true: the only file under `src/` that touches `process.env` is C02's, reading an injected record.
 
 Nothing else in the codebase branches on mode.
 
@@ -81,9 +82,15 @@ interface TransportRouter {
   readonly inFlight: string | null;   // verb name, for the refusal message
 }
 
+type Clock = Readonly<{
+  now:      () => number;                                   // durationMs
+  schedule: (fn: () => void, ms: number) => Disposable;     // the §4 ladder
+}>;
+
 function createSubprocessTransport(opts: {
   binary: string;
-  runner: ProcessRunner;              // C21
+  runner: ProcessRunner;              // C21, declared in `data/process/types.ts`
+  clock:  Clock;
   env?: Readonly<NodeJS.ProcessEnv>;
   cwd?: () => string;                 // live — pass-through `cd` moves it
 }): VerbTransport;
@@ -95,6 +102,13 @@ type FixtureHandler = (inv: Invocation) =>
 function createFixtureTransport(corpus: readonly Fixture[]): VerbTransport;
 function createEmulatedTransport(handler: FixtureHandler): VerbTransport;
 
+/** Discriminated on mode, so a mode cannot be constructed without its dependency. */
+type TransportDeps =
+  | Readonly<{ mode: "subprocess"; binary: string; runner: ProcessRunner; clock: Clock;
+               env?: Readonly<NodeJS.ProcessEnv>; cwd?: () => string }>
+  | Readonly<{ mode: "fixture";    corpus: readonly Fixture[] }>
+  | Readonly<{ mode: "emulated";   handler: FixtureHandler }>;
+
 function createRouter(opts: {
   default: VerbTransport;
   overrides?: Readonly<Record<string, VerbTransport>>;
@@ -104,6 +118,27 @@ function createRouter(opts: {
 `createEmulatedTransport` takes a **handler function**, not a world object. `tui-kit` must not reference an app type, and a closure keeps the fixture world entirely on the app side (C08) while the framework supplies only the interface.
 
 `cwd` is a function, not a value. The shell's working directory changes when the user runs `cd` (C18 built-in), and a captured string would spawn every subsequent verb in the original directory.
+
+`clock` is injected for the same reason C03's `schedule` is. `durationMs` needs the time twice and the §4 ladder needs two 2 s timers, and both are ambient reads that SS1 permits only in `src/shell/session.ts`. Injected, T3.5 asserts each rung of the ladder against a counter instead of sleeping through four seconds per case.
+
+### `Fixture`
+
+```typescript
+type Fixture = Readonly<{
+  id:         string;
+  verb:       string;
+  argv:       readonly string[];
+  provenance: "recorded" | "derived" | "authored";
+  capturedAt: string | null;          // ISO; null iff authored
+  cliVersion: string | null;
+  note?:      string;                 // required for authored
+  result:     RawResult | readonly RawPatch[];
+}>;
+```
+
+**Declared here rather than in C08**, per A02 §1: the type belongs to the layer that consumes it structurally. `createFixtureTransport` reads it, and it is expressed in `RawResult` and `RawPatch` — so declaring it in C08 would put a cycle inside L0 data, C06 importing `Fixture` while C08 imports the types it is made of. C08 keeps every *rule* about it: the authored-note requirement, the ratio report, recording, redaction, `record --diff`.
+
+`createFixtureTransport` implements C08 §4 route 1 only — exact `verb` + `argv` match. Routes 2 and 3 belong to the handler. **On a miss it throws**, naming the verb and argv, because the alternative is a test asserting against a fixture that is not in the corpus and passing.
 
 ---
 
@@ -200,7 +235,11 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I12** — Degradation requires both ≥10% malformed and ≥10 lines seen.
 - **I13** — At most one non-streaming invocation is in flight; every settlement path releases the guard.
 - **I14** — Transport selection is per verb; `for()` is total and falls back to the default.
-- **I15** — `FixtureTransport` and `SubprocessTransport` satisfy the same interface and are substitutable in every test.
+- **I15** — All three implementations satisfy the same interface and are substitutable in every test that does not concern spawning.
+- **I16** — `FixtureTransport` reads no clock and holds no world state; it replays a corpus and nothing else.
+- **I17** — The test runner selects `fixture`. Nothing in the test suite selects `emulated` *as a source of expected values*: `EmulatedTransport` is constructed only over a fixed handler, to assert interface parity (I15), and C08's world never appears in a test path (C08 I14). The qualifier is load-bearing — without it I17 and I15 contradict each other, since parity cannot be asserted for an implementation no test may construct.
+- **I18** — C06 reads no environment. `createTransport` takes `mode` as a parameter, and no module under `src/` resolves `PRISM_TUI_TRANSPORT`.
+- **I19** — Time enters C06 only through injected `now` and `schedule`. No ambient clock, no ambient timer.
 
 ---
 
@@ -217,11 +256,14 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 9. Malformed-line degradation needs 10% *and* a 10-line floor.
 10. One non-streaming invocation at a time; streams are exempt.
 11. Transport is selected per verb, defaulting when unmapped.
-12. Three implementations behind one interface, selected by one environment variable; nothing else branches on mode.
-13. Tests run against the recorded corpus, never the emulator, so emulator drift cannot mask a regression.
+12. Three implementations behind one interface, selected by one mode value; nothing else branches on mode. The **app's** entry point resolves `PRISM_TUI_TRANSPORT` and passes a constructed router through `TuiConfig.transport`; `tui-kit` has no binary and reads no environment (I18).
+13. Tests run against the recorded corpus, never the emulator's world, so emulator drift cannot mask a regression (I17).
 14. `cwd` is read at spawn time so pass-through `cd` is honoured.
-15. The fixture transport takes a handler closure; `tui-kit` references no app type.
+15. The **emulated** transport takes a handler closure; `tui-kit` references no app type. The fixture transport takes a corpus.
 16. Line buffering is bounded at 1 MB.
+17. All three implementations are substitutable in every test that does not concern spawning (I15).
+18. The fixture transport replays and nothing else — no clock, no world state (I16).
+19. Time enters only through injected `now` and `schedule` (I19).
 
 ---
 
@@ -246,7 +288,12 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I15): the full tier-1 and tier-3 suites run against both transports; every assertion that does not concern spawning holds for both.
+- **T2.1** (I15): the full tier-1 and tier-3 suites run against **all three** transports; every assertion that does not concern spawning holds for each. The emulated case is constructed over a fixed handler returning a constant envelope.
+
+  **This is not a D43 violation, and it looks like one.** D43 forbids tests *agreeing with an animated world* — asserting on values the emulator invents, so that drift in the world silently becomes the expected result. This suite asserts that three transports behave identically at the interface, over a handler that returns a fixed envelope; nothing here treats the emulator as a source of truth about the far side. Stated because the alternative reading — see `emulated` in the `describe.each`, remember D43, narrow the suite back to two — is the same silent narrowing I15's "does not concern spawning" clause exists to prevent.
+- **T2.7** (I16): a source scan finds no clock read and no mutable module state in `fixture.ts`; replaying the same corpus twice yields deep-equal results.
+- **T2.8** (I17): a source scan finds no `emulated` mode selection in `test/`, and no test imports C08's world.
+- **T2.9** (I18): a source scan finds no `PRISM_TUI_TRANSPORT` anywhere in `src/`.
 - **T2.2** (I1): the module graph contains no import of C04 or anything above L0.
 - **T2.3** (I2): a source scan finds no exit-code mapping table and no `ErrorLike` construction in `transport/`.
 - **T2.4** (I9): for a matrix of terminations — clean exit, non-zero exit, cancel, timeout, spawn failure, malformed stream — exactly one `end` patch is emitted, and it is last.
@@ -278,6 +325,8 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T3.20** (I14, D13): `for("ps")` returns fixture while `for("promote")` returns subprocess, in one session.
 - **T3.21** (I3): argv containing shell metacharacters (`;`, `|`, `$(…)`, backticks) → passed literally, no expansion, no injection.
 - **T3.22**: `cwd` changes between two invocations → the second spawns in the new directory.
+- **T3.23**: an invocation with no matching fixture → throws, naming verb and argv. A miss is never a plausible failure, or a test asserts against a fixture that is not there and passes.
+- **T3.24** (I15): cancel mid-stream against the *fixture* transport → the lines already yielded are retained and `cancelled` is set, exactly as T3.4 asserts for subprocess. The fixture transport honours `signal`, or T3.4 becomes spawn-concerned by accident and the shared suite narrows.
 
 ### Tier 4 — integration
 
@@ -311,6 +360,9 @@ Real subprocesses.
 - **T6.8** (I10): parsing per chunk rather than per line → T3.10 and T3.11 fail.
 - **T6.9** (I4): appending `--json` unconditionally without the dedupe → T1.4 fails.
 - **T6.10** (I15): a fixture-only or subprocess-only behaviour → T2.1 fails on the shared suite.
+- **T6.15** (I15): narrowing the shared suite from three transports to two → T2.1 fails on the missing case, rather than passing with less covered.
+- **T6.16** (I18): reading `process.env` in `createTransport` → T2.9 and SS10 fail.
+- **T6.17** (I19): reading `Date.now()` for `durationMs` → SS1 fails, and T3.5's ladder assertions become four-second sleeps.
 - **T6.11** (I14): making transport selection global → T3.20 fails, and with it the incremental-migration property.
 - **T6.12**: capturing `cwd` at construction → T3.22 fails.
 - **T6.13** (I11): removing the line cap → T3.16b fails on unbounded growth.
