@@ -233,6 +233,36 @@ describe("C05 validation edges", () => {
     if (!dangling.ok) expect(dangling.errors.map((e) => e.code)).toContain("missing_value");
   });
 
+  it("T3.18: the missing-value message recommends `=` only when there is something to recommend", () => {
+    // T1.13's principle, applied to a second message: a wrong suggestion is
+    // worse than none, because it sends the reader to check something that was
+    // never the problem.
+
+    // Nothing follows, so a recommendation would be a guess at what the user
+    // meant to type.
+    const last = validateInvocation(ps(), ["--since"]);
+    expect(last.ok).toBe(false);
+    if (!last.ok) {
+      expect(last.errors[0]?.message).toBe("--since requires a value");
+      expect(last.errors[0]?.remediation).toBeUndefined();
+    }
+
+    // What follows is a flag this tool declares, so the user meant it as a flag.
+    // `--status=--mine` is not what anyone was reaching for.
+    const declared = validateInvocation(ps(), ["--status", "--mine"]);
+    expect(declared.ok).toBe(false);
+    if (!declared.ok) {
+      expect(declared.errors[0]?.message).toBe("--status requires a value");
+      expect(declared.errors[0]?.remediation).toBeUndefined();
+    }
+
+    // A short flag gets the short form back, not the long one — the message
+    // shows the user their own input.
+    const short = validateInvocation(ps(), ["-n", "-3"]);
+    expect(short.ok).toBe(false);
+    if (!short.ok) expect(short.errors[0]?.remediation).toBe("write it as -n=-3");
+  });
+
   it("a repeatable flag collects, and a non-repeatable one does not", () => {
     expect(args(ps(), ["--label=a", "--label=b", "--label=c"])["label"]).toEqual(["a", "b", "c"]);
     expect(validateInvocation(ps(), ["--limit=1", "--limit=2"]).ok).toBe(false);

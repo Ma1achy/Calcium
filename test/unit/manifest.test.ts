@@ -260,6 +260,58 @@ describe("C05 validate", () => {
     expect(validateInvocation(scale(), ["web", "3", "--side-by-side"]).ok).toBe(true);
   });
 
+  it("T1.16 (I14): both flag-value forms produce the same args", () => {
+    // The permissive rule as an equality rather than as two separate passes.
+    // Rejecting the space-separated form here would reject an invocation the far
+    // side would have run — the one failure mode a pre-spawn gate must not have.
+    const spaced = validateInvocation(ps(), ["--status", "running"]);
+    const equals = validateInvocation(ps(), ["--status=running"]);
+
+    expect(spaced.ok && equals.ok).toBe(true);
+    if (spaced.ok && equals.ok) expect(spaced.args).toEqual(equals.args);
+  });
+
+  it("T1.17 (I14, §3): a value beginning with - is refused with the form that works", () => {
+    // Both halves in one test. The message is only right if the thing it
+    // recommends actually works, and split in two, each half passes while the
+    // pair stops being true — `--since=-1h` failing its own duration check would
+    // send the reader from one error straight into another.
+    const refused = validateInvocation(ps(), ["--since", "-1h"]);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      const [first] = refused.errors;
+      expect(first?.code).toBe("missing_value");
+      expect(first?.message).toContain('a value beginning with "-" must use --since=-1h');
+      expect(first?.remediation).toBe("write it as --since=-1h");
+      expect(first?.details?.["value"]).toBe("-1h");
+    }
+
+    const accepted = validateInvocation(ps(), ["--since=-1h"]);
+    expect(accepted.ok, "--since=-1h is what the message recommends").toBe(true);
+    if (accepted.ok) expect(accepted.args["since"]).toBe("-1h");
+  });
+
+  it("T1.18 (I15): a conflict is reported once, whichever side declares it", () => {
+    // One-directional is how an app ordinarily writes it, and deduplicating by
+    // name order dropped exactly those. Mutual is one mistake, so it stays one
+    // error — two would be a worse message rather than a stricter check.
+    const oneWay = messages(scale(), ["web", "3", "--side-by-side", "--overlay"]);
+    expect(oneWay).toHaveLength(1);
+    expect(oneWay[0]).toMatch(/--side-by-side cannot be combined with --overlay/);
+
+    const source = raw();
+    const tools = source["tools"] as Record<string, unknown>[];
+    const flags = tools[2]!["flags"] as Record<string, unknown>[];
+    flags[3]!["conflicts"] = ["side-by-side"]; // --overlay now declares it back
+    const parsed = parseManifest(source);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const mutual = validateInvocation(parsed.value.tools[2]!, ["web", "3", "--side-by-side", "--overlay"]);
+    expect(mutual.ok).toBe(false);
+    if (!mutual.ok) expect(mutual.errors.filter((e) => e.code === "conflicts_violated")).toHaveLength(1);
+  });
+
   it("T1.13: a near-miss carries a suggestion and a distant miss carries none", () => {
     // A wrong suggestion is worse than none — it sends the reader to check a
     // flag that was never the problem.

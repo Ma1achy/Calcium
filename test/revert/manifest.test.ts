@@ -89,6 +89,43 @@ describe("C05 fail-on-revert", () => {
     }
   });
 
+  it("T6.10 (I14): rejecting `--flag value` pre-spawn → T1.16 fails", () => {
+    // The revert that looks like tightening. Requiring `=` is one line and one
+    // fewer branch, and it starts refusing invocations the far side would have
+    // run — silently, because the user concludes the command is wrong.
+    const ps = toolNamed("ps");
+
+    expect(validateInvocation(ps, ["--status", "running"]).ok).toBe(true);
+    expect(validateInvocation(ps, ["-n", "5"]).ok).toBe(true);
+  });
+
+  it("T6.11 (§3): reverting the `-`-value remediation to a bare message → T1.17 fails", () => {
+    // `--since -1h` is a missing-value failure under the permissive rule, and
+    // saying only that leaves the reader to discover `=` for themselves. The
+    // message and the thing it recommends are asserted together: a remediation
+    // that leads to a second error is worse than none.
+    const refused = validateInvocation(toolNamed("ps"), ["--since", "-1h"]);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.errors[0]?.remediation).toBe("write it as --since=-1h");
+
+    expect(validateInvocation(toolNamed("ps"), ["--since=-1h"]).ok).toBe(true);
+  });
+
+  it("T6.12 (I15): deduplicating conflicts by name order → T1.18 fails", () => {
+    // The optimisation this guards: ordering the pair to deduplicate assumes a
+    // symmetry the schema never required. It drops one-directional declarations
+    // — the ordinary way an app writes them — while the pair is still *seen*,
+    // just never reported from the direction that declared it.
+    const scale = toolNamed("serving scale");
+    const result = validateInvocation(scale, ["web", "3", "--side-by-side", "--overlay"]);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const violations = result.errors.filter((e) => e.code === "conflicts_violated");
+      expect(violations, "one-directional conflicts are legal and must be reported").toHaveLength(1);
+    }
+  });
+
   it.todo("T6.6: hardcoding an enum in the completion module → T4.3 fails — waits on C19");
   it.todo("T6.8 (I12): spawning a local tool → T4.4 fails — waits on C06");
 });

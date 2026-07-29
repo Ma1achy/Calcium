@@ -27,8 +27,17 @@ type Check = (
 
 const INTEGER = /^[+-]?\d+$/;
 
-/** `30s`, `1h30m`, `500ms`. Syntax only — no notion of what is a sensible span. */
-const DURATION = /^(?:\d+(?:\.\d+)?(?:ms|s|m|h|d))+$/;
+/**
+ * `30s`, `1h30m`, `500ms`, `-1h`. Syntax only — no notion of what is a sensible
+ * span, and none of what a negative one means. `-1h` is "an hour ago" to one far
+ * side and an error to another; C05 rejects what is malformed, never what is
+ * merely wrong (I10), and a leading sign is not malformed.
+ *
+ * It is also load-bearing for the §3 remediation: `--since -1h` is refused with
+ * a message recommending `--since=-1h`, and a recommendation that leads to a
+ * second error is worse than no recommendation at all.
+ */
+const DURATION = /^[+-]?(?:\d+(?:\.\d+)?(?:ms|s|m|h|d))+$/;
 
 const CHECKS: Readonly<Record<ArgType, Check>> = Object.freeze({
   string: (raw) => ({ ok: true, value: raw }),
@@ -149,6 +158,48 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
   const positionals: string[] = [];
   let terminated = false;
 
+  /** Is this token a flag the tool actually declares, long or short? */
+  function declared(token: string): boolean {
+    if (token.startsWith("--")) return byName.has(token.slice(2).split("=")[0] ?? "");
+    const body = token.slice(1);
+    const name = body.split("=")[0] ?? "";
+    return [...name].every((c) => byShort.has(c)) && name.length > 0;
+  }
+
+  /**
+   * The missing-value message, and where it says what to do instead.
+   *
+   * `--since -1h` is a missing-value failure under §3's permissive rule: `-1h`
+   * reads as a flag, and guessing from the leading character would make the same
+   * string mean two things on two tools. `--since=-1h` works, so the error names
+   * that form rather than leaving the reader to find it.
+   *
+   * Two cases get the plain message instead, and both for T1.13's reason — a
+   * wrong suggestion is worse than none, because it sends the reader to check
+   * something that was never the problem:
+   *
+   *   - nothing follows the flag, so there is no token to quote and the
+   *     recommendation would be a guess at what the user meant to type;
+   *   - what follows is a flag this tool declares, so the user meant it as a
+   *     flag and `--status=--mine` is not what they were reaching for.
+   */
+  function missingValue(flag: FlagDef, display: string, form: string, next: string | undefined): ErrorLike {
+    const quotable =
+      next !== undefined && next !== "--" && looksLikeFlag(next) && !declared(next);
+
+    if (!quotable) {
+      return err("missing_value", `${display} requires a value`, { tool: tool.name, flag: flag.name });
+    }
+
+    return err(
+      "missing_value",
+      `${display} expects a value; a value beginning with "-" must use ` +
+        `${form}=${next}, or the parser reads it as a flag`,
+      { tool: tool.name, flag: flag.name, value: next },
+      `write it as ${form}=${next}`,
+    );
+  }
+
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] ?? "";
 
@@ -201,9 +252,7 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
       // gate must not have.
       const next = argv[i + 1];
       if (next === undefined || next === "--" || looksLikeFlag(next)) {
-        errors.push(
-          err("missing_value", `--${flag.name} requires a value`, { tool: tool.name, flag: flag.name }),
-        );
+        errors.push(missingValue(flag, `--${flag.name}`, `--${flag.name}`, next));
         continue;
       }
       occurrences.push({ flag, raw: next });
@@ -279,12 +328,7 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
     const next = argv[index + 1];
     if (next === undefined || next === "--" || looksLikeFlag(next)) {
-      errors.push(
-        err("missing_value", `-${char} (--${flag.name}) requires a value`, {
-          tool: tool.name,
-          flag: flag.name,
-        }),
-      );
+      errors.push(missingValue(flag, `-${char} (--${flag.name})`, `-${char}`, next));
       return 0;
     }
     occurrences.push({ flag, raw: next });
