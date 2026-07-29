@@ -207,13 +207,11 @@ describe.each(transportCases())("C06 shared — $name", ({ make }) => {
     expect(r.exitCode).toBe(0);
   });
 
-  it("T1.3 (I4, I15): the reported argv is what was, or would have been, spawned", async () => {
+  it("T1.3 (I4, I15): the reported argv includes `--json`, which the user never typed", async () => {
     const r = await make(answer, undefined, ["ps", "--mine"]).invoke(
       invocation({ argv: ["ps", "--mine"] }),
     );
 
-    // A fixture-backed document reports the same reproducible command a real one
-    // does (§3) — including `--json`, which the user never typed.
     expect(r.argv.at(-1)).toBe("--json");
     expect(r.argv).toContain("--mine");
   });

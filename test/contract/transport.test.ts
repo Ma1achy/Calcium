@@ -10,14 +10,18 @@ import {
   createRouter,
   createSubprocessTransport,
 } from "../../src/data/transport/index.js";
-import type { RawPatch } from "../../src/data/transport/index.js";
+import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import { fakeClock } from "../support/fake-scheduler.js";
 import {
+  PARITY_EXEMPT,
   clockOf,
+  compareResults,
   drain,
+  endResultOf,
   fakeChild,
   fakeRunner,
   invocation,
+  rawResultKeys,
   recorded,
   result,
   transportCases,
@@ -69,6 +73,109 @@ describe("C06 contract", () => {
     // Without this, someone reads `"emulated"` in the each-list, remembers D43,
     // and narrows the suite back to two (T6.15).
     expect(transportCases().map((c) => c.name)).toEqual(["fixture", "emulated", "subprocess"]);
+  });
+
+  describe("T2.1 (I21): parity compares the complete RawResult", () => {
+    // The gap that let a real divergence through. The suite compared `stdout`,
+    // `exitCode` and the shape of the patch sequence, `argv` diverged, and
+    // nothing went red until C08 recorded and replayed the same invocation.
+    //
+    // A suite that picks fields is a suite with holes exactly where nobody
+    // looked, so the comparison is over the union of both records' keys and the
+    // exemptions are a closed, reasoned list.
+    const answer = result({
+      argv: ["widget", "ps", "--mine", "--json"],
+      stdout: { rows: [7] },
+      stdoutRaw: '{"rows":[7]}',
+    });
+    const argv = ["ps", "--mine"];
+    const inv = (): ReturnType<typeof invocation> => invocation({ argv, streams: false });
+
+    async function settledEach(): Promise<Map<string, RawResult>> {
+      const out = new Map<string, RawResult>();
+      for (const c of transportCases()) {
+        out.set(c.name, await c.make(answer, undefined, argv).invoke(inv()));
+      }
+      return out;
+    }
+
+    it("every field agrees on the settled path, or is named as exempt", async () => {
+      const byName = await settledEach();
+      const base = byName.get("subprocess");
+      if (base === undefined) throw new Error("the subprocess case is the reference");
+
+      for (const [name, r] of byName) {
+        if (name === "subprocess") continue;
+        expect(compareResults(base, r), `${name} diverges from subprocess`).toEqual([]);
+      }
+    });
+
+    it("every field agrees inside the terminal `end` patch too", async () => {
+      // The easier half to forget. `data`, `malformed` and `degraded` patches
+      // are already compared whole, so the streaming assertions read as covered
+      // while carrying the same gap one level down.
+      // The stored `end` has to be what a real stream of these patches actually
+      // settles to, or the comparison reports a harness mismatch and calls it a
+      // divergence. A streaming run reads NDJSON, so there is no single parsed
+      // document: `stdout` is undefined and `stdoutRaw` is the lines as they
+      // arrived.
+      const streamed = result({
+        argv: ["widget", "ps", "--mine", "--json"],
+        stdout: undefined,
+        stdoutRaw: '{"n":1}\n',
+      });
+      const patches: RawPatch[] = [
+        { kind: "data", value: { n: 1 } },
+        { kind: "end", result: streamed },
+      ];
+
+      const ends = new Map<string, RawResult>();
+      for (const c of transportCases()) {
+        const seen = await drain(
+          c.make(answer, patches, argv).stream(invocation({ argv, streams: true })),
+        );
+        ends.set(c.name, endResultOf(seen));
+      }
+
+      const base = ends.get("subprocess");
+      if (base === undefined) throw new Error("the subprocess case is the reference");
+      for (const [name, r] of ends) {
+        if (name === "subprocess") continue;
+        expect(compareResults(base, r), `${name}'s end result diverges`).toEqual([]);
+      }
+    });
+
+    it("the exemption list is closed, and every entry carries a reason", () => {
+      // A field is exempt by being named, never by not being looked at. Adding a
+      // field to `RawResult` now fails here until someone either makes it agree
+      // or writes down why it cannot.
+      for (const field of Object.keys(PARITY_EXEMPT)) {
+        expect(rawResultKeys(), `${field} is exempt but not a RawResult field`).toContain(field);
+        expect(PARITY_EXEMPT[field]?.length ?? 0).toBeGreaterThan(20);
+      }
+      expect(Object.keys(PARITY_EXEMPT)).toEqual(["durationMs"]);
+    });
+
+    it("T6.18: a divergence in any unexempt field fails the comparison", () => {
+      // Fabricated, because a comparison nobody has watched fail is one nobody
+      // knows the shape of — and this one passed through a real divergence.
+      for (const field of rawResultKeys()) {
+        if (field in PARITY_EXEMPT) continue;
+        const left = result();
+        const right = { ...result(), [field]: field === "exitCode" ? 9 : "different" };
+        expect(
+          compareResults(left, right as RawResult).map((m) => m.field),
+          `a divergence in ${field} went unreported`,
+        ).toEqual([field]);
+      }
+    });
+
+    it("T6.18: an omitted field is a divergence, not an absence", () => {
+      // The union of both records' keys, not one side's. A transport that
+      // dropped a field would otherwise pass.
+      const { stderr: _gone, ...missing } = result();
+      expect(compareResults(result(), missing as RawResult).map((m) => m.field)).toEqual(["stderr"]);
+    });
   });
 
   it("T2.2 (I1, MG6): the module graph shows no C04 import, type-only included", () => {

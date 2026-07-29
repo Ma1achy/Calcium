@@ -141,16 +141,18 @@ export function createFixtureHandler(opts: FixtureHandlerOptions): EmulatedHandl
   const findFixture = (inv: Invocation): Fixture | undefined =>
     fixtures.find((f) => f.verb === inv.verb && sameArgv(f.argv, inv.argv));
 
-  const replay = (fixture: Fixture, argv: readonly string[]): RawResult | AsyncIterable<RawPatch> => {
+  // Verbatim, exactly as `createFixtureTransport` replays (C06 I20). Route 1 is
+  // the same operation reached through a different door, and a handler that
+  // rewrote what the transport does not would make a fixture answer differently
+  // depending on which one asked.
+  const replay = (fixture: Fixture): RawResult | AsyncIterable<RawPatch> => {
     const { result } = fixture;
-    if (!Array.isArray(result)) return { ...(result as RawResult), argv };
+    if (!Array.isArray(result)) return result as RawResult;
 
     const patches = result as readonly RawPatch[];
     return {
       [Symbol.asyncIterator]: async function* (): AsyncGenerator<RawPatch> {
-        for (const patch of patches) {
-          yield patch.kind === "end" ? { kind: "end", result: { ...patch.result, argv } } : patch;
-        }
+        for (const patch of patches) yield patch;
       },
     };
   };
@@ -167,7 +169,7 @@ export function createFixtureHandler(opts: FixtureHandlerOptions): EmulatedHandl
 
     // 1 — an exact fixture matches verb + argv.
     const fixture = findFixture(inv);
-    if (fixture !== undefined) return replay(fixture, argv);
+    if (fixture !== undefined) return replay(fixture);
 
     // 2 — the world can answer. `null` is "cannot", not "nothing".
     const answered = world?.query(inv) ?? null;

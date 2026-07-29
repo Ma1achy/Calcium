@@ -42,8 +42,12 @@ export function createEmulatedTransport(handler: FixtureHandler): VerbTransport 
       const argv = argvOf(inv);
       if (inv.signal.aborted) return settled(argv, { cancelled: true });
 
+      // Reported as the handler produced it (I20). The handler knows the
+      // invocation — C08's sets `argv` for every route it answers — and a
+      // transport that overwrote it would be rewriting a result it did not
+      // construct, which is the same defect the fixture transport had.
       const produced = handler(inv);
-      if (!isPatches(produced)) return { ...produced, argv };
+      if (!isPatches(produced)) return produced;
 
       // A handler that answered with patches still owes `invoke` a result, and
       // the `end` patch is where it is (I9).
@@ -51,7 +55,7 @@ export function createEmulatedTransport(handler: FixtureHandler): VerbTransport 
       for await (const patch of produced) {
         if (patch.kind === "end") last = patch.result;
       }
-      return last === null ? settled(argv) : { ...last, argv };
+      return last === null ? settled(argv) : last;
     },
 
     stream(inv) {
@@ -76,7 +80,7 @@ export function createEmulatedTransport(handler: FixtureHandler): VerbTransport 
         }
 
         if (!isPatches(produced)) {
-          yield { kind: "end", result: { ...produced, argv } };
+          yield { kind: "end", result: produced };
           return;
         }
 
@@ -87,7 +91,7 @@ export function createEmulatedTransport(handler: FixtureHandler): VerbTransport 
             return;
           }
           if (patch.kind === "end") {
-            last = { ...patch.result, argv };
+            last = patch.result;
             continue;
           }
           yield patch;

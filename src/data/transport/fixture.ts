@@ -44,21 +44,31 @@ export function createFixtureTransport(corpus: readonly Fixture[]): VerbTranspor
     return hit;
   };
 
-  // What *would* have been spawned, so a fixture-backed document reports the
-  // same reproducible command a real one does (§3).
+  // Used only where C06 constructs a result itself — a cancellation, where
+  // nothing was recorded and the argv describes an invocation happening now.
+  // **A replayed result is never given one** (I20).
   const argvOf = (inv: Invocation): readonly string[] => withJson(inv.argv);
 
-  const resultOf = (fixture: Fixture, inv: Invocation): RawResult => {
+  // Verbatim. `meta.argv` is a historical fact about the data — what actually
+  // ran (D49) — and a recording captured a real invocation, so replay reports
+  // that invocation rather than a reconstruction of it.
+  //
+  // The transport has no binary and could not reconstruct a whole argv anyway;
+  // being given one would let it manufacture a command that never ran. A corpus
+  // recorded against `docker` and replayed where the app now spawns `podman`
+  // reports `docker`, and that is the point: it is where the data came from, and
+  // the mismatch says the corpus is stale. `meta.transport` disambiguates.
+  const resultOf = (fixture: Fixture): RawResult => {
     const { result } = fixture;
     if (Array.isArray(result)) {
       const end = (result as readonly RawPatch[]).find((p) => p.kind === "end");
-      if (end !== undefined && end.kind === "end") return { ...end.result, argv: argvOf(inv) };
+      if (end !== undefined && end.kind === "end") return end.result;
       throw new Error(
         `fixture ${fixture.id} is a patch sequence with no \`end\`, and \`invoke\` ` +
           `has nothing to return. A streaming fixture always carries one (C06 I9).`,
       );
     }
-    return { ...(result as RawResult), argv: argvOf(inv) };
+    return result as RawResult;
   };
 
   return {
@@ -69,7 +79,7 @@ export function createFixtureTransport(corpus: readonly Fixture[]): VerbTranspor
     // threw, and I15 says a caller cannot tell them apart.
     async invoke(inv) {
       if (inv.signal.aborted) return cancelled(argvOf(inv));
-      return resultOf(find(inv), inv);
+      return resultOf(find(inv));
     },
 
     stream(inv) {
@@ -84,7 +94,7 @@ export function createFixtureTransport(corpus: readonly Fixture[]): VerbTranspor
         const { result } = fixture;
 
         if (!Array.isArray(result)) {
-          yield { kind: "end", result: { ...(result as RawResult), argv } };
+          yield { kind: "end", result: result as RawResult };
           return;
         }
 
@@ -105,7 +115,7 @@ export function createFixtureTransport(corpus: readonly Fixture[]): VerbTranspor
             return;
           }
           if (patch.kind === "end") {
-            last = { ...patch.result, argv };
+            last = patch.result;
             continue;
           }
           seen.push(patch);

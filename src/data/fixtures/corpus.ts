@@ -32,9 +32,11 @@ export const CORPUS_SCHEMA = "tui.fixtures/1";
 /**
  * A stored result: `RawResult` minus the field derived from its neighbour.
  *
- * `argv` stays. It is what *would* be spawned, the transport rewrites it on
- * replay anyway (C06 §3), and storing it is what makes a corpus file readable
- * without cross-referencing the fixture's own `argv`.
+ * `argv` stays, and it is load-bearing rather than convenient: it is what was
+ * actually spawned, replay reports it verbatim (C06 I20), and it is the only
+ * record of which binary the corpus came from. A corpus recorded against
+ * `docker` says so even in an app that now spawns `podman`, which is how a stale
+ * corpus announces itself.
  */
 export type StoredResult = Omit<RawResult, "stdout">;
 

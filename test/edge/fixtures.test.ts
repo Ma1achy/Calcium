@@ -57,10 +57,11 @@ describe("C08 §4 — streaming", () => {
 
     const patches = await drain(produced as AsyncIterable<RawPatch>);
     expect(patches.map((p) => p.kind)).toEqual(["data", "data", "end"]);
-    // The spawned form, so a fixture-backed document reports the same
-    // reproducible command a real one does (C06 §3).
+    // Verbatim, including inside the terminal `end` (C06 I20). The `end`
+    // result is a RawResult and gets the same treatment as a settled one —
+    // which is the place the parity gap was easiest to miss.
     const end = patches.at(-1);
-    expect(end?.kind === "end" && end.result.argv).toEqual(["logs", "--json"]);
+    expect(end?.kind === "end" && end.result.argv).toEqual(["widget", "ps", "--json"]);
   });
 
   it("T3.7: a stream abandoned mid-iteration terminates, and nothing advanced", async () => {

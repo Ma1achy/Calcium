@@ -66,28 +66,15 @@ describe("C08 §2 — the recording round trip", () => {
     expect(replayed.parseError).toBe(direct.parseError);
   });
 
-  it("OPEN QUESTION (C06 I15): the two transports disagree about `argv`", async () => {
-    // Found by writing T4.6, and left as a finding rather than fixed here.
+  it("T4.6 (C06 I20): replay reports the recorded argv verbatim, binary included", async () => {
+    // This was a pinning test for a divergence and is now the assertion for its
+    // ruling. `meta.argv` answers what actually ran (D49) — a historical fact
+    // about the data, not a reproduction hint — so replay reports the invocation
+    // that was recorded rather than reconstructing one.
     //
-    // `createSubprocessTransport` reports the argv it actually spawned, binary
-    // included. `createFixtureTransport` rewrites `result.argv` to
-    // `withJson(inv.argv)` on every replay (C06 §3), and it has no binary to put
-    // in front — so the same verb reports a different command depending on which
-    // transport answered.
-    //
-    // That matters because of D49: `meta.argv` exists to answer "what actually
-    // ran" without re-running it, and the first agent feature is the one that
-    // must trust it. C06 I15 says a caller cannot tell the transports apart, and
-    // here a caller can, by reading `argv[0]`. C06's shared parity suite asserts
-    // nothing about `argv`, which is why this survived to be found here.
-    //
-    // The corpus is not the problem — it *stores* the full recorded argv and the
-    // transport discards it. Whether the fix is for replay to keep the recorded
-    // argv, or for the fixture transport to take a `binary`, is a C06 decision
-    // and belongs in a C06 spec change, not in C08's implementation.
-    //
-    // This test pins the current behaviour so the divergence cannot be closed
-    // silently: whoever fixes C06 gets a failure here that names the question.
+    // The reconstruction was missing its first element, because the fixture
+    // transport has no binary; giving it one would have manufactured an argv for
+    // a command that never ran.
     const { transport } = subprocess('{"ok":true}');
     const fixture = await record(
       { id: "ps/one", verb: "ps", argv: ["ps"] },
@@ -99,7 +86,33 @@ describe("C08 §2 — the recording round trip", () => {
     const replayed = await createFixtureTransport([fixture]).invoke(
       invocation({ verb: "ps", argv: ["ps"] }),
     );
-    expect(replayed.argv).toEqual(["ps", "--json"]);
+    expect(replayed.argv).toEqual(["widget", "ps", "--json"]);
+  });
+
+  it("T4.6: a corpus recorded against another binary says so, which is the point", async () => {
+    // The case that reads as an objection to the ruling and is the informative
+    // one. A corpus captured from `docker`, replayed in an app that now spawns
+    // `podman`, reports `docker` — because that is where the data came from, and
+    // the mismatch is a signal the corpus is stale.
+    //
+    // `meta.transport` disambiguates: "fixture" beside ["docker","ps","--json"]
+    // reads correctly as replayed data from that command. The two fields
+    // together are honest; the rewrite made one of them lie.
+    const clock = clockOf(fakeClock());
+    const runner = fakeRunner(() => ({ stdout: ['{"ok":true}'], exit: { code: 0, signal: null } }));
+    const fixture = await record(
+      { id: "ps/docker", verb: "ps", argv: ["ps"] },
+      {
+        transport: createSubprocessTransport({ binary: "docker", runner, clock }),
+        capturedAt: CAPTURED_AT,
+        cliVersion: null,
+      },
+    );
+
+    const replayed = await createFixtureTransport([fixture]).invoke(
+      invocation({ verb: "ps", argv: ["ps"] }),
+    );
+    expect(replayed.argv[0]).toBe("docker");
   });
 
   it("T4.6: a recording carries provenance, capture time and CLI version", async () => {

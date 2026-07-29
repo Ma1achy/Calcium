@@ -23,6 +23,7 @@ import {
   createEmulatedTransport,
   createFixtureTransport,
   createSubprocessTransport,
+  withJson,
 } from "../../src/data/transport/index.js";
 import { fakeClock, type FakeClock } from "./fake-scheduler.js";
 
@@ -283,16 +284,35 @@ export type Case = {
 export function transportCases(): readonly Case[] {
   return [
     {
+      // The stored result's `argv` is aligned to the invocation being made.
+      //
+      // Replay reports it verbatim now (I20), so a corpus entry keyed on
+      // `["ps","--mine"]` whose stored result says `["widget","ps","--json"]` is
+      // not a recording of that invocation — it is a harness that never spawned
+      // anything. Under the old rewrite the mismatch was invisible, because the
+      // transport substituted the field; that is the same substitution that hid
+      // the divergence I21 exists to catch.
       name: "fixture",
       make: (answer, patches, argv) =>
         createFixtureTransport([
-          recorded({ ...(argv === undefined ? {} : { argv }), result: patches ?? answer }),
+          recorded({
+            ...(argv === undefined ? {} : { argv }),
+            result: patches ?? (argv === undefined ? answer : { ...answer, argv: spawned(argv) }),
+          }),
         ]),
     },
     {
+      // Likewise: the handler owns the argv it reports, and here it reports what
+      // a real spawn of this invocation would have.
       name: "emulated",
-      make: (answer, patches) =>
-        createEmulatedTransport(() => (patches === undefined ? answer : replay(patches))),
+      make: (answer, patches, argv) =>
+        createEmulatedTransport(() =>
+          patches === undefined
+            ? argv === undefined
+              ? answer
+              : { ...answer, argv: spawned(argv) }
+            : replay(patches),
+        ),
     },
     {
       name: "subprocess",
@@ -321,4 +341,67 @@ export function transportCases(): readonly Case[] {
 
 async function* replay(patches: readonly RawPatch[]): AsyncGenerator<RawPatch> {
   for (const patch of patches) yield patch;
+}
+
+/** What `createSubprocessTransport` would have spawned for this invocation. */
+function spawned(argv: readonly string[]): readonly string[] {
+  return ["widget", ...withJson(argv)];
+}
+
+// --- field-complete parity (C06 I21) --------------------------------------
+
+/**
+ * Fields that cannot match across transports, each with its reason.
+ *
+ * **The list is closed, and that is the whole mechanism.** A field is exempt by
+ * being named here, never by not being looked at — which is what went wrong the
+ * first time: the suite compared `stdout`, `exitCode` and the patch sequence,
+ * `argv` diverged, and nothing went red until C08 recorded and replayed the same
+ * invocation. Adding a field to `RawResult` now fails parity until someone
+ * either makes it agree or writes down why it cannot.
+ *
+ * Same discipline as the scan allow-lists (SS19, SS20): name the exceptions,
+ * scope broadly. A comparison narrowed to what it happens to cover stops seeing
+ * what it does not.
+ */
+export const PARITY_EXEMPT: Readonly<Record<string, string>> = Object.freeze({
+  durationMs:
+    "the subprocess transport measures elapsed time through its injected clock; " +
+    "a replayed result reports what was measured at capture. Both are correct " +
+    "and they are not the same number.",
+});
+
+/** Every key of `RawResult`, from a value rather than from a restated list. */
+export function rawResultKeys(): readonly string[] {
+  return Object.keys(result()).sort();
+}
+
+export type ParityMismatch = Readonly<{ field: string; left: unknown; right: unknown }>;
+
+/**
+ * Compare two `RawResult`s field by field, over the union of their keys.
+ *
+ * The union, not one side's keys: a transport that *omitted* a field would
+ * otherwise pass, and an absent field is exactly as much a divergence as a
+ * different one.
+ */
+export function compareResults(left: RawResult, right: RawResult): readonly ParityMismatch[] {
+  const fields = new Set([...Object.keys(left), ...Object.keys(right)]);
+  const out: ParityMismatch[] = [];
+
+  for (const field of [...fields].sort()) {
+    if (field in PARITY_EXEMPT) continue;
+    const a = (left as unknown as Record<string, unknown>)[field];
+    const b = (right as unknown as Record<string, unknown>)[field];
+    if (JSON.stringify(a) !== JSON.stringify(b)) out.push({ field, left: a, right: b });
+  }
+
+  return out;
+}
+
+/** The terminal result of a stream — the second place a `RawResult` appears. */
+export function endResultOf(patches: readonly RawPatch[]): RawResult {
+  const end = patches.find((p) => p.kind === "end");
+  if (end?.kind !== "end") throw new Error("stream produced no `end` patch (C06 I9)");
+  return end.result;
 }
