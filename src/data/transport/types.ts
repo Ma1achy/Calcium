@@ -44,7 +44,12 @@ export type RawResult = Readonly<{
 export type RawPatch =
   | Readonly<{ kind: "data"; value: unknown }>
   | Readonly<{ kind: "malformed"; line: string }>
-  | Readonly<{ kind: "degraded"; reason: string; remaining: string }>
+  // A reason and nothing else. It carried a `remaining` string, and the field
+  // was a fiction: degradation trips on a completed line, completing a line
+  // clears the buffer, so `remaining` was a partial line that was empty in
+  // almost every case. What carries the remainder is the `malformed` patches
+  // that follow (C06 §5, C07 §6).
+  | Readonly<{ kind: "degraded"; reason: string }>
   | Readonly<{ kind: "end"; result: RawResult }>;
 
 export interface VerbTransport {

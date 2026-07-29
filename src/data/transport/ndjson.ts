@@ -10,6 +10,18 @@
  *     object across three chunks deliberately.
  *   - **A 10-line floor under the 10% rule** (I12). Without it, one malformed
  *     line in the first three trips degradation on a healthy stream.
+ *
+ *     The ratio is running, so **degradation depends on arrival order rather
+ *     than on content**, by design: a far side emitting a banner, an HTML error
+ *     page or a stack trace front-loads its garbage, and nine bad lines at the
+ *     start is evidence the stream is not NDJSON at all, while nine scattered
+ *     through a hundred is a far side with a few odd rows. Stopping early is the
+ *     job; characterising the whole stream is not.
+ *
+ *     And it is **sticky**. Once tripped, a well-formed line does not un-trip
+ *     it — raw text has already gone out, and resuming would interleave two
+ *     renderings of one stream. T3.14 ("fires once") does not catch a revert
+ *     here; T3.14b does.
  *   - **A 1 MB cap** (I11). A far side emitting an unterminated stream must not
  *     be able to exhaust memory, and the bound has to release the buffer rather
  *     than merely stop growing it.
@@ -64,15 +76,10 @@ export function createNdjsonReader(): NdjsonReader {
   /**
    * Fires once (T3.14), and only with both conditions met (I12).
    *
-   * `remaining` is the unconsumed buffer at the instant the ratio trips, which
-   * is a partial line and therefore **almost always empty** — the trip happens
-   * on a completed line, and completing a line clears the buffer. C06 §5 says
-   * "the remainder is forwarded as raw text" and C07 T4.4 expects a document
-   * containing that remainder, but the remainder is the *subsequent* lines,
-   * which arrive as `malformed` patches after this one. So the field as
-   * specified carries nothing the consumer needs and the patches after it carry
-   * everything. Flagged rather than quietly redefined: the fix is a spec
-   * decision about what `degraded` is for, not an implementation choice.
+   * The patch carries a reason and nothing else. C07 composes the remainder from
+   * the `malformed` patches that follow this one, which is what actually
+   * arrives — a `remaining` field would have to be either an empty partial line
+   * or the whole rest of the stream, buffered.
    */
   function degradeIfDue(): LinePatch | null {
     if (degraded) return null;
@@ -81,8 +88,7 @@ export function createNdjsonReader(): NdjsonReader {
     degraded = true;
     return {
       kind: "degraded",
-      reason: `${malformed} of ${lines} lines did not parse as JSON`,
-      remaining: buffer,
+      reason: `${String(malformed)} of ${String(lines)} lines did not parse as JSON`,
     };
   }
 

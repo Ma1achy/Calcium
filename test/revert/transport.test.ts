@@ -47,6 +47,19 @@ describe("C06 fail-on-revert", () => {
     expect(withoutFloor, "the ratio alone would have degraded").toBe(true);
   });
 
+  it("T6.6b (I12): making degradation un-sticky → T3.14b fails, and T3.14 does not", () => {
+    const reader = createNdjsonReader();
+    const out: RawPatch[] = [];
+    for (let i = 0; i < 12; i += 1) out.push(...reader.push("{oops\n"));
+    for (let i = 0; i < 5; i += 1) out.push(...reader.push('{"good":1}\n'));
+
+    // T3.14's claim — one notice — holds for the un-sticky version too, which is
+    // exactly why it cannot catch this. The claim that separates them is that
+    // nothing parses after the notice.
+    expect(out.filter((p) => p.kind === "degraded")).toHaveLength(1);
+    expect(out.filter((p) => p.kind === "data")).toHaveLength(0);
+  });
+
   it("T6.8 (I10): parsing per chunk rather than per line → T3.10 and T3.11 fail", () => {
     const chunks = ['{"na', 'me":"al', 'pha"}\n'];
 

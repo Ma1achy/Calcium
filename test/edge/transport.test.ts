@@ -278,14 +278,15 @@ describe("C06 NDJSON", () => {
   it("T3.12 (I12): 9 malformed of 100 → clean; 11 of 100 → degraded", () => {
     // The nine arrive last, after the stream has established itself.
     //
-    // **The rule is a running ratio, and T3.12 does not say where the malformed
-    // lines fall.** It cannot be read as order-independent: with the ten-line
-    // floor and a ratio checked per line, *any* distribution that puts two bad
-    // lines in the first twelve trips degradation before the hundredth line
-    // arrives — 2/12 is 16%. Nine-of-a-hundred spread evenly degrades at line
-    // twelve; nine-of-a-hundred at the tail does not. T3.12b is the other half,
-    // and both are here because deleting either makes the rule look like
-    // something it is not. Which behaviour is wanted is a spec decision.
+    // **T3.12 and T3.12b are a pair. Deleting either makes the rule look
+    // order-independent, and it is not** (C06 §5, I12). The ratio is running, so
+    // any distribution putting two malformed lines in the first twelve degrades
+    // before the hundredth arrives — 2/12 is 16%. Nine at the tail do not; nine
+    // at the front do. That is the design: garbage at the head of a stream is
+    // evidence of the wrong format entirely, and stopping early is the job.
+    //
+    // Anyone tempted to fold these into one case is about to assert a claim
+    // about content, which this rule has never made.
     const run = (bad: number): RawPatch[] => {
       const reader = createNdjsonReader();
       const out: RawPatch[] = [];
@@ -304,10 +305,27 @@ describe("C06 NDJSON", () => {
     const out: RawPatch[] = [];
     for (let i = 0; i < 100; i += 1) out.push(...reader.push(i < 9 ? "{oops\n" : `{"i":${String(i)}}\n`));
 
-    // Nine-tenths rubbish in the first ten lines is an unhealthy stream, and
-    // degrading is arguably right. The point is that the spec asserts the same
-    // ratio produces the opposite outcome, without naming the difference.
+    // Nine-tenths rubbish in the first ten lines is a stream that is probably
+    // not NDJSON at all. Same ratio as T3.12, opposite outcome, and the
+    // difference is where they fall.
     expect(out.some((p) => p.kind === "degraded")).toBe(true);
+  });
+
+  it("T3.14b (I12): degradation is sticky — fifty good lines after it stay malformed", () => {
+    const reader = createNdjsonReader();
+    const out: RawPatch[] = [];
+    for (let i = 0; i < 12; i += 1) out.push(...reader.push("{oops\n"));
+    expect(out.some((p) => p.kind === "degraded")).toBe(true);
+
+    const after: RawPatch[] = [];
+    for (let i = 0; i < 50; i += 1) after.push(...reader.push(`{"good":${String(i)}}\n`));
+
+    // Not the same claim as T3.14. A reader that emitted one notice and then
+    // resumed parsing fires exactly once and still interleaves parsed data with
+    // raw text in one stream, which is two renderings of one thing (T6.6b).
+    expect(after.filter((p) => p.kind === "data")).toHaveLength(0);
+    expect(after.filter((p) => p.kind === "malformed")).toHaveLength(50);
+    expect(after.filter((p) => p.kind === "degraded")).toHaveLength(0);
   });
 
   it("T3.13 (I12): 3 malformed of 5 — 60%, below the floor → no degradation", () => {
