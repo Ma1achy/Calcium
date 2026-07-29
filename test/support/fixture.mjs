@@ -7,7 +7,10 @@
 // Each mode is one of the exit paths C01 owns. The two shell-driven paths —
 // `/exit` and Ctrl-D confirm — are B01 B1.6's, because they are C22 and C16
 // driving the same `release()`.
-import { detectCapabilities } from "../../dist/terminal/capabilities.js";
+import { detectCapabilities, isUsable } from "../../dist/terminal/capabilities.js";
+import { createBlockRegistry } from "../../dist/presentation/blocks/index.js";
+import { defaultTheme, loadTheme } from "../../dist/presentation/theme/index.js";
+import { renderSequenceToLines } from "../../dist/testing/index.js";
 import { createTerminalLifecycle } from "../../dist/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../dist/terminal/frame-scheduler.js";
 
@@ -114,6 +117,66 @@ switch (mode) {
     }
     // A handler leak across fifty cycles is what this reports.
     process.stdout.write(`\nSIGINT-LISTENERS=${process.listenerCount("SIGINT")}\n`);
+    break;
+  }
+
+  // --- C02 tier 5 ----------------------------------------------------------
+  //
+  // The capability record, driving a real acquisition and a real frame in a
+  // real PTY. The environment is the input: each test sets TERM, LANG or TMUX
+  // and asserts on what reached the terminal.
+  //
+  // The frame is composed here rather than by the shell, because C22 does not
+  // exist. That is a real limitation and it bounds what these tests prove: they
+  // assert that a detected record reaches the renderer and changes its output,
+  // not that the application wires it that way. The wiring is C22's own T4.5.
+
+  case "caps": {
+    const { capabilities } = detectCapabilities(
+      process.env,
+      process.env["FORCE_DEPTH"] === undefined
+        ? undefined
+        : { colourDepth: Number(process.env["FORCE_DEPTH"]) },
+    );
+
+    // C02 I7 — `altScreen` alone decides whether a shell can open. A terminal
+    // that cannot take the alternate screen gets help on the primary screen and
+    // a clean exit, and **nothing is constructed**: C01 I13 makes acquisition
+    // fatal, so the refusal has to happen before it, which is what a caller
+    // reading `isUsable` is for.
+    if (!isUsable(capabilities)) {
+      process.stdout.write("tui-kit: this terminal cannot open an alternate screen.\n");
+      process.stdout.write("Run it under a terminal that supports it, or use --json.\n");
+      process.exit(0);
+    }
+
+    const lifecycle = make();
+    lifecycle.acquire();
+
+    const registry = createBlockRegistry();
+    const loaded = loadTheme(defaultTheme, "dark");
+    if (!loaded.ok) {
+      process.stderr.write("theme failed to load\n");
+      process.exit(4);
+    }
+
+    // Three blocks chosen for what they exercise: a tone that resolves to a
+    // colour at every depth above 1, a glyph that has an ASCII substitute, and
+    // a rule whose fill character is Unicode.
+    const blocks = [
+      { kind: "rule", id: "r", label: "capabilities", gapBefore: false },
+      { kind: "notice", id: "n1", tone: "error", glyph: "error", text: "a failure", gapBefore: false },
+      { kind: "notice", id: "n2", tone: "ok", glyph: "ok", text: "a success", gapBefore: false },
+    ];
+
+    const lines = renderSequenceToLines(registry, blocks, 60, {
+      theme: loaded.value.current,
+      capabilities,
+    });
+
+    lifecycle.writer.write(`\nFRAME-START\n${lines.join("\n")}\nFRAME-END\n`);
+    lifecycle.release();
+    process.stdout.write(`\nCAPS ${JSON.stringify(capabilities)}\n`);
     break;
   }
 

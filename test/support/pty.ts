@@ -118,7 +118,15 @@ export function runInPty(
     // shape deliberately.
     const prefix = opts.jobControl === true ? "set -m; " : "";
     const term = spawn("/bin/sh", ["-c", `${prefix}${program}; echo ${MARKER}; stty -a`], {
-      name: "xterm-256color",
+      // `name` **is** the child's TERM as far as node-pty is concerned, and it
+      // wins over the env record. Hard-coded, `env: { TERM: … }` was silently
+      // inert: C02's tier 5 set `TERM=dumb` and got `xterm-256color`, and the
+      // test read as covering a dumb terminal while never having seen one.
+      //
+      // Nothing had noticed because C02's are the first tests to pass `env` at
+      // all — which is the shape of every vacuity failure in this repo, one
+      // layer out from the rules that look for them.
+      name: opts.env?.["TERM"] ?? "xterm-256color",
       cols: 80,
       rows: 24,
       env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },

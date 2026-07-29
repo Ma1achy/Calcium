@@ -7,22 +7,119 @@
 //
 // A fake standing in for a counterparty before that counterparty's spec is
 // implemented would test the fake, not the seam.
-import { describe, expect, it } from "vitest";
-import { detectCapabilities } from "../../src/terminal/capabilities.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { detectCapabilities, type TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { createTerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
-import { MODES } from "../support/fake-terminal.js";
+import { MODES, fakeDebug, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import { store, TONES } from "../support/theme.js";
 
+/**
+ * C01 over a real capability record. Deliberately not `capabilities(over)` from
+ * the fake-terminal helpers: these two tests are about what *detection* produces
+ * driving acquisition, so a hand-built record would test the seam against a
+ * value no environment yields.
+ */
+const live: { release(): void }[] = [];
+
+function harness(caps: TerminalCapabilities) {
+  const stdout = fakeStdout();
+  const lifecycle = createTerminalLifecycle({
+    stdout,
+    stdin: fakeStdin(),
+    capabilities: caps,
+    onFatal: ((err: unknown) => {
+      throw err;
+    }) as (err: unknown) => never,
+    debug: fakeDebug(),
+  });
+  live.push(lifecycle);
+  return { lifecycle, stdout };
+}
+
+afterEach(() => {
+  // Handlers are process-global; an un-released instance leaks into the next
+  // test, exactly as C01's own suite records.
+  for (const l of live.splice(0)) {
+    try {
+      l.release();
+    } catch {
+      // Already released, or never acquired. Neither is this test's business.
+    }
+  }
+});
+
 describe("C02 integration", () => {
-  it.todo(
-    "T4.1: a TERM=dumb record drives C01 to acquire nothing beyond what is supported — no mouse, no bracketed paste sequences emitted — waits on C01",
-  );
-  it.todo(
-    "T4.2: mouse:false from a tmux environment → no 1002/1006 bytes in acquisition or release — waits on C01",
-  );
+  it("T4.1 (with C01, I10): a record drives acquisition, and nothing absent from it is acquired", () => {
+    // **This test's title changed.** It read "a TERM=dumb record drives C01 to
+    // acquire nothing beyond what is supported", which was written when C01 was
+    // a spec and describes a contract C01 no longer has: a `TERM=dumb` record
+    // has `altScreen: false`, and C01 I13 makes that fatal *before a byte is
+    // emitted* rather than a partial acquisition. The old title implies C01
+    // takes what it can and skips the rest; what it actually does is refuse.
+    //
+    // Both halves are worth having, so both are here — the refusal, and the
+    // selective acquisition the title was reaching for, driven from a record
+    // that can actually open a shell.
+    const dumb = detectCapabilities({ TERM: "dumb" }).capabilities;
+    expect(dumb.altScreen, "TERM=dumb is not usable").toBe(false);
+
+    const refused = harness(dumb);
+    expect(() => refused.lifecycle.acquire()).toThrow(/alternate screen unsupported/);
+    // I13, and the reason it is stated as "aborts before first paint": a
+    // terminal that cannot open must not be half-configured on the way to
+    // finding out.
+    expect(refused.stdout.output).toBe("");
+
+    // The selective half. A record with the alternate screen and nothing
+    // optional takes exactly the three keys that are unconditional.
+    const spare = harness({ ...dumb, altScreen: true });
+    spare.lifecycle.acquire();
+    const bytes = spare.stdout.output;
+
+    expect(bytes).toContain(MODES.altScreenOn);
+    expect(bytes).toContain(MODES.cursorHide);
+    expect(bytes).not.toContain(MODES.pasteOn);
+    expect(bytes).not.toContain(MODES.mouseOn);
+    expect(bytes).not.toContain(MODES.mouseSgrOn);
+  });
+
+  it("T4.2 (with C01, I10): tmux gives mouse:false, and no 1002/1006 byte is emitted either way", () => {
+    // tmux is the case the record exists for: everything else about a tmux
+    // terminal says a modern emulator, and mouse reporting is the one thing
+    // that does not pass through cleanly. So this is not a synthetic record —
+    // it is the environment C02 §3 singles out.
+    const tmux = detectCapabilities({
+      TERM: "screen-256color",
+      TMUX: "/tmp/tmux-1000/default,4242,0",
+    }).capabilities;
+
+    expect(tmux.mouse, "tmux suppresses mouse reporting").toBe(false);
+    expect(tmux.altScreen, "and is otherwise a usable terminal").toBe(true);
+
+    const { lifecycle, stdout } = harness(tmux);
+    lifecycle.acquire();
+    const acquisition = stdout.output;
+    lifecycle.release();
+    const everything = stdout.output;
+
+    // "in acquisition or release" is the whole assertion: I6 releases the
+    // inverse of `held`, so a mouse sequence that was never taken cannot be
+    // emitted on the way out either. A release that emitted a fixed sequence
+    // would fail here and pass every unit test.
+    for (const mode of [MODES.mouseOn, MODES.mouseSgrOn, MODES.mouseOff, MODES.mouseSgrOff]) {
+      expect(acquisition, `acquisition emitted ${mode}`).not.toContain(mode);
+      expect(everything, `release emitted ${mode}`).not.toContain(mode);
+    }
+
+    // Not vacuous: the same run did take the modes tmux does support.
+    expect(everything).toContain(MODES.altScreenOn);
+    expect(everything).toContain(MODES.pasteOn);
+    expect(everything).toContain(MODES.pasteOff);
+  });
   it("T4.3 (with C10): the detected depth drives resolution, and 1-bit emits no colour", () => {
     // Driven from C02's side: the record decides and C10 obeys. "Distinct" is
     // the five tones whose confusion would mislead — `dim` and `muted` sharing a

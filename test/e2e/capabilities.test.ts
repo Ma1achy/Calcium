@@ -1,23 +1,159 @@
 // C02 tier 5 — e2e, PTY harness with a controlled environment.
 //
-// The harness itself is C01's to build (node-pty, acquisition and restoration),
-// so every test here waits on C01. See the tier 4 file for the grep convention.
-import { describe, it } from "vitest";
+// The environment is the input. Each test sets `TERM`, `LANG` or `TMUX`, runs
+// the fixture inside a real pseudo-terminal, and asserts on the bytes that
+// actually reached it. Nothing here inspects the capability record directly:
+// that is tier 1's job, and a tier-5 test that read the record would prove the
+// record correct while proving nothing about whether anyone obeyed it.
+//
+// **What these tests do not prove, and it is a real bound.** C22 does not exist,
+// so the fixture composes the frame itself rather than the shell composing it.
+// They assert that a detected record reaches the renderer and changes what it
+// emits — not that the application wires detection to rendering. That wiring is
+// C22's own, and this file should not be read as covering it.
+import { describe, expect, it } from "vitest";
+import { runInPty, type PtyRun } from "../support/pty.js";
 
-describe("C02 e2e", () => {
-  it.todo(
-    "T5.1: launched under TERM=dumb → no escape sequence reaches the PTY at all; help text on the primary screen; exit 0 — waits on C01",
+const FIXTURE = "node test/support/fixture.mjs caps";
+
+/** Everything between the markers — the frame, and not the acquisition bytes. */
+function frame(run: PtyRun): string {
+  const start = run.bytes.indexOf("FRAME-START");
+  const end = run.bytes.indexOf("FRAME-END");
+  if (start === -1 || end === -1) {
+    throw new Error(`no frame in output: ${JSON.stringify(run.bytes.slice(0, 400))}`);
+  }
+  return run.bytes.slice(start + "FRAME-START".length, end);
+}
+
+/** `38;2;r;g;b` — the only form a 24-bit foreground takes. */
+const TRUECOLOUR = /\x1b\[[34]8;2;/;
+/** `38;5;n` — 8-bit indexed. */
+const INDEXED_256 = /\x1b\[[34]8;5;/;
+/** `\x1b[31m`…`\x1b[97m` — the 16-colour form, which is what 4-bit emits. */
+const FOUR_BIT = /\x1b\[(?:3[0-7]|9[0-7]|4[0-7]|10[0-7])m/;
+
+describe("C02 e2e — the environment decides, and the terminal shows it", () => {
+  it(
+    "T5.1: under TERM=dumb no escape sequence reaches the PTY, help lands on the primary screen, exit 0",
+    async () => {
+      // `TERM=dumb` gives `altScreen: false`, and C02 I7 makes that the single
+      // gate on whether a shell can open. The refusal has to happen *before*
+      // C01 is constructed, because C01 I13 turns a record without the
+      // alternate screen into a fatal error — so a caller reading `isUsable` is
+      // the whole mechanism, and this is what it looks like from outside.
+      const run = await runInPty(`${FIXTURE}; echo EXIT=$?`, { env: { TERM: "dumb" } });
+
+      expect(run.bytes).toContain("cannot open an alternate screen");
+      expect(run.bytes).toContain("EXIT=0");
+
+      // "no escape sequence at all" taken literally. Not "no alternate screen"
+      // — nothing. A terminal this degraded gets plain text or it gets a mess.
+      expect(run.bytes, "an escape sequence reached a dumb terminal").not.toMatch(/\x1b/);
+
+      // And the DECSET tracker agrees, which is the independent half: the
+      // assertion above reads the bytes, this one reads the folded state.
+      expect(run.decset).toMatchObject({ altScreen: false, cursorVisible: true });
+    },
+    30_000,
   );
-  it.todo(
-    "T5.2: launched under TERM=xterm → the frame renders, is readable, and contains no 24-bit colour sequence — waits on C01",
+
+  it(
+    "T5.2: under TERM=xterm the frame renders, is readable, and carries no 24-bit sequence",
+    async () => {
+      const run = await runInPty(FIXTURE, { env: { TERM: "xterm" } });
+      const painted = frame(run);
+
+      // Readable: the content is there, not merely the escapes around it.
+      expect(painted).toContain("capabilities");
+      expect(painted).toContain("a failure");
+      expect(painted).toContain("a success");
+
+      // 4-bit is what `xterm` without `COLORTERM` detects, and the frame is
+      // coloured — so the absences below are a degradation and not an absence
+      // of colour altogether.
+      expect(painted).toMatch(FOUR_BIT);
+      expect(painted, "24-bit colour on a 16-colour terminal").not.toMatch(TRUECOLOUR);
+      expect(painted, "256-colour on a 16-colour terminal").not.toMatch(INDEXED_256);
+    },
+    30_000,
   );
-  it.todo(
-    "T5.3: launched under LANG=C → the frame contains only ASCII; no mojibake, no replacement characters — waits on C01",
+
+  it(
+    "T5.3: under LANG=C the frame is ASCII throughout — no mojibake, no replacement characters",
+    async () => {
+      const run = await runInPty(FIXTURE, {
+        env: { TERM: "xterm-256color", LANG: "C", LC_ALL: "C" },
+      });
+      const painted = frame(run);
+
+      // Every byte in the frame is ASCII. This is the assertion the whole
+      // `unicode: "ascii"` path exists for, and it is stronger than checking a
+      // few known glyphs: a substitution table missing one entry fails here and
+      // passes a spot check.
+      const nonAscii = [...painted].filter((ch) => (ch.codePointAt(0) ?? 0) > 0x7f);
+      expect(nonAscii, `non-ASCII in the frame: ${JSON.stringify(nonAscii.join(""))}`).toEqual([]);
+
+      // Neither of the two ways this fails quietly: a replacement character
+      // means the substitution ran and produced nothing, and `Â` is what a
+      // UTF-8 box-drawing byte looks like decoded as latin-1.
+      expect(painted).not.toContain("�");
+      expect(painted).not.toContain("Â");
+
+      // Still a frame, not an empty one — the glyphs degraded rather than
+      // vanished, which C09 I5 requires to be width-preserving.
+      expect(painted).toContain("a failure");
+      expect(painted).toContain("a success");
+    },
+    30_000,
   );
-  it.todo(
-    "T5.4: launched inside tmux → no mouse sequences emitted; keyboard navigation of a table still works end to end — waits on C01",
+
+  it(
+    "T5.4: inside tmux no mouse sequence is emitted, in acquisition or release",
+    async () => {
+      const run = await runInPty(FIXTURE, {
+        env: { TERM: "screen-256color", TMUX: "/tmp/tmux-1000/default,4242,0" },
+      });
+
+      for (const mode of ["\x1b[?1002h", "\x1b[?1006h", "\x1b[?1002l", "\x1b[?1006l"]) {
+        expect(run.bytes, `emitted ${JSON.stringify(mode)} under tmux`).not.toContain(mode);
+      }
+      expect(run.decset).toMatchObject({ mouse1002: false, mouse1006: false });
+
+      // Not vacuous: the run took the terminal and gave it back, so "no mouse"
+      // is a decision rather than a program that did nothing.
+      expect(run.bytes).toContain("\x1b[?1049h");
+      expect(run.decset.altScreen).toBe(false);
+      expect(frame(run)).toContain("capabilities");
+    },
+    30_000,
   );
+
+  it(
+    "T5.5: an override forcing 24-bit under TERM=xterm puts truecolour on the wire",
+    async () => {
+      // The point of this test is the word *renderer*. A record that carried the
+      // override while the frame still emitted 4-bit would satisfy every tier-1
+      // assertion C02 has — the override is applied, the record says 24 — and be
+      // useless. This asserts the bytes.
+      const forced = await runInPty(FIXTURE, { env: { TERM: "xterm", FORCE_DEPTH: "24" } });
+      expect(frame(forced)).toMatch(TRUECOLOUR);
+
+      // The same environment without the override, so the difference is
+      // attributable to the override and not to the terminal.
+      const detected = await runInPty(FIXTURE, { env: { TERM: "xterm" } });
+      expect(frame(detected)).not.toMatch(TRUECOLOUR);
+      expect(frame(detected)).toMatch(FOUR_BIT);
+    },
+    45_000,
+  );
+
+  // T5.4's second half — "keyboard navigation of a table still works end to
+  // end" — is not here. It needs C16 to route the keys and C11 to render the
+  // table, and both are stubs. Written now it would assert that a fixture I
+  // wrote navigates a structure I built, which is weaker than the title and
+  // would read as covered.
   it.todo(
-    "T5.5: a config override forcing colour_depth = 24 under TERM=xterm → truecolour sequences appear, proving the override reaches the renderer and not just the record — waits on C01",
+    "T5.4b: inside tmux, keyboard navigation of a table works end to end — waits on C11 and C16",
   );
 });
