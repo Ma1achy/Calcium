@@ -141,6 +141,16 @@ export type ColumnDef = Readonly<{
    * like the rest of `columns` and I9 is untouched.
    */
   role?: "expand";
+  /**
+   * Which end characters are removed from when a cell does not fit (I32).
+   *
+   * `"end"` is the default and keeps the start, which is what prose wants.
+   * `"start"` keeps the tail — a path's filename, a hierarchical key's leaf, a
+   * pod name's hash suffix. Named for the operation rather than for what
+   * survives: `keep:` and `"head" | "tail"` both leave the reader guessing which
+   * side is being described, on a field set once per column and never revisited.
+   */
+  truncateFrom?: "start" | "end";
 }>;
 
 export type TableRow = Readonly<{

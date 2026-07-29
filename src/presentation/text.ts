@@ -129,6 +129,7 @@ export function truncate(
   text: string,
   width: number,
   caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
+  from: "start" | "end" = "end",
 ): string {
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return "";
@@ -142,18 +143,29 @@ export function truncate(
   const budget = limit - 1; // the marker's own cell
   if (budget <= 0) return marker;
 
-  let out = "";
+  // `from` names the end characters are removed from (C04 I32), so `"start"` walks
+  // the clusters in reverse and keeps the tail. One walk, parameterised, rather
+  // than two implementations: a second pass over the same grapheme stream would
+  // round differently at the boundary in exactly the CJK and ZWJ cases this
+  // module exists for (C09 I9).
+  const clusters = [...GRAPHEMES.segment(clean)].map((s) => s.segment);
+  const order = from === "start" ? [...clusters].reverse() : clusters;
+
+  let kept = "";
   let used = 0;
-  for (const { segment } of GRAPHEMES.segment(clean)) {
+  for (const segment of order) {
     const w = clusterCells(segment);
     if (used + w > budget) break;
-    out += segment;
+    kept = from === "start" ? segment + kept : kept + segment;
     used += w;
   }
 
   // A double-width glyph refused at the boundary leaves a cell to fill, so the
-  // result is exactly `limit` cells rather than `limit - 1`.
-  return out + " ".repeat(budget - used) + marker;
+  // result is exactly `limit` cells rather than `limit - 1`. The padding sits
+  // beside the marker in both directions, which is what keeps the kept text
+  // flush against the end it was kept from.
+  const pad = " ".repeat(budget - used);
+  return from === "start" ? marker + pad + kept : kept + pad + marker;
 }
 
 /**

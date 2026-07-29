@@ -148,12 +148,12 @@ The expanded reset row states what is cleared:
 
 Priorities are still declared, because C11 requires them and a future column would need somewhere to sit in the order. They are simply never exercised, and saying so is better than inventing a drop sequence for widths that do not occur.
 
-| Column | Priority | Min | Align |
-|---|---|---|---|
-| expand | 100 | 1 | left |
-| key | 95 | 20 | left |
-| value | 90 | 16 | left |
-| source | 70 | 8 | left |
+| Column | Priority | Min | Align | Trunc |
+|---|---|---|---|---|
+| expand | 100 | 1 | left | end |
+| key | 95 | 20 | left | **start** |
+| value | 90 | 16 | left | end |
+| source | 70 | 8 | left | end |
 
 Every column is left-aligned: nothing here is a number, and `24` in `terminal.colour_depth` is a value in a column of values rather than a numeric column. `align` is stated because `ColumnDef` requires it (C04 §3) and a table that leaves it unstated is a table whose figure decides it.
 
@@ -168,7 +168,7 @@ The contexts region below the second rule is a table too, and it declared no col
 
 Key paths truncate from the **left**, keeping the leaf. Keys are sorted, so adjacent rows share their namespace; truncating the leaf would render `ui.theme` and `ui.show_banner` identically. Values truncate from the right.
 
-**That left truncation is not expressible today, and this is the place it is recorded.** `ColumnDef` has no truncation-side field, and C11 truncates from the right unconditionally (C09 I9's marker rule says nothing about which end). So this paragraph states an intent the schema cannot carry — the same class as the missing `align`, found while fixing it. It needs a field on `ColumnDef` and a clause in C09's truncation rule before this surface renders as drawn; until then a narrow `key` column shows `ui.show_ba…` rather than `…show_banner`.
+**Declared as `truncateFrom: "start"`** — the field names the end characters are removed from, so `start` is the one that keeps the leaf (C04 I32). It did not exist when this paragraph was first written: the intent was stated in prose, `ColumnDef` could not carry it, and C11 truncated from the right unconditionally, so a narrow `key` column showed `ui.show_ba…` where this surface wants `…show_banner`. Found while declaring `align`, which is the same class of leak.
 
 ## 8. Interactions
 

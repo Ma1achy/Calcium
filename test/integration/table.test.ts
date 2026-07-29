@@ -60,6 +60,7 @@ describe("C11 tier 4 — the planner against the surfaces", () => {
         // only that field can produce.
         expect(parsed.some((c) => c.flex), "no flex column parsed").toBe(true);
         expect(parsed.every((c) => c.align === "left" || c.align === "right")).toBe(true);
+        expect(parsed.every((c) => c.truncateFrom === "start" || c.truncateFrom === "end")).toBe(true);
         expect(parsed.every((c) => c.priority > 0), "a priority read as NaN or zero").toBe(true);
         expect(parsed.every((c) => c.minWidth >= 1)).toBe(true);
       });

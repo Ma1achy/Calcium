@@ -10,7 +10,7 @@
  * in one place so they cannot disagree.
  */
 import { glyphFor, glyphs } from "../blocks/glyphs.js";
-import { fit, padStart, tone, type Span } from "../blocks/paint.js";
+import { fit, pad, padStart, tone, type Span } from "../blocks/paint.js";
 import { stripControl, truncate } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
@@ -119,10 +119,13 @@ export function rowSpans(
       ? tone("accent", ctx.theme, ctx.capabilities)
       : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
 
-    const fitted =
-      column?.align === "right"
-        ? padStart(truncate(body, planned.width, ctx.capabilities), planned.width)
-        : fit(body, planned.width, ctx.capabilities);
+    // The end a cell truncates from is the surface's (C04 I32) — a path keeps its
+    // filename, a config key its leaf, an image its tag. C11 reads the field and
+    // never infers it: a column of paths and a column of prose are
+    // indistinguishable from their contents.
+    const from = column?.truncateFrom ?? "end";
+    const cut = truncate(body, planned.width, ctx.capabilities, from);
+    const fitted = column?.align === "right" ? padStart(cut, planned.width) : pad(cut, planned.width);
 
     spans.push({ text: fitted, style });
   });

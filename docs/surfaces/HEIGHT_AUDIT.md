@@ -51,11 +51,40 @@ table changed to record it. Same figure, same commit, opposite verdicts.
 
 The mechanical part of this is covered: row counts are read from the markdown by
 `test/contract/surfaces.test.ts`, and every stated drop order is checked against
-`planColumns` (A03 CP6). What has no mechanism is alignment, truncation side, and
-anything else a figure can show that a table can omit — S14 §7 records a
-left-truncating `key` column that `ColumnDef` cannot express at all, found while
-declaring `align`. The check for those is a person comparing a figure to a table,
-which is what this section is for.
+`planColumns` (A03 CP6). What has no mechanism is anything else a figure can show
+that a table can omit. The check for those is a person comparing a figure to a
+table, which is what this section is for.
+
+### The truncation side, audited
+
+Declaring `align` turned up a second unstated intent in the same paragraph, and
+auditing it found the class is wider than the field that now expresses it.
+`ColumnDef.truncateFrom` (C04 I32) covers a table column; **nine places in the
+S-series state a side and only four are table columns.**
+
+| Surface | What truncates from the start | Expressible |
+|---|---|---|
+| S14 §7 | `key` — the leaf, or `ui.theme` and `ui.show_banner` read alike | **yes**, declared |
+| R01 §5 | `image` keeps its tag, `ports` its host port | **yes**, declared |
+| S05 §5 | Pod names keep the hash suffix | no column table yet |
+| S09 §4 | Test names keep the method | no column table yet |
+| S04 §4 | `image` — a `keyValue` row, not a column | no field on `keyValue` |
+| S08 §4 | Paths keep the filename and line — `keyValue` | no field on `keyValue` |
+| S15 §6 | Emails keep the domain — `keyValue` | no field on `keyValue` |
+| S10 §5 | File paths in a `steps` detail | no field on `steps` |
+| S11 §4 | Build log tails — `logs` lines | no field on `logs` |
+
+Two of those need a column table before they can declare anything, which is the
+S15 §5 finding again. Five are not table columns at all, and each has exactly one
+consumer — so a field on five more kinds is a schema decision rather than a fix,
+and it is recorded here rather than taken.
+
+S06 states a **third** value: SHAs truncated in the middle, keeping both ends,
+because that is what people compare by eye. It is deliberately outside the union.
+A middle truncation spends its marker between two kept halves, so the arithmetic
+is two budgets and a centred marker rather than one budget and a trailing one, and
+C09 I9's rule is written for the single-ended case. It arrives with a clause there
+or not at all.
 
 ---
 

@@ -102,6 +102,7 @@ export type SurfaceColumn = Readonly<{
   priority: number;
   minWidth: number;
   align: "left" | "right";
+  truncateFrom: "start" | "end";
   flex: boolean;
   sortable: boolean;
 }>;
@@ -125,7 +126,14 @@ export function surfaceColumns(file: string): readonly (readonly SurfaceColumn[]
       // and every flex column became false, which changes no drop order and so
       // fails no test. Same class as the illustrations this file exists to check.
       const at = (name: string): number => t.header.findIndex((h) => h === name);
-      const col = { priority: at("Priority"), min: at("Min"), align: at("Align"), flex: at("Flex"), sortable: at("Sortable") };
+      const col = {
+        priority: at("Priority"),
+        min: at("Min"),
+        align: at("Align"),
+        trunc: at("Trunc"),
+        flex: at("Flex"),
+        sortable: at("Sortable"),
+      };
 
       return t.rows.flatMap((row): SurfaceColumn[] => {
         const cell = (i: number): string => (i < 0 ? "" : (row[i] ?? ""));
@@ -135,6 +143,7 @@ export function surfaceColumns(file: string): readonly (readonly SurfaceColumn[]
         // `**right**` — the spec emphasises the exceptions, so the marker is part
         // of the value as written.
         const align = cell(col.align).replace(/\*/g, "") === "right" ? "right" : "left";
+        const truncateFrom = cell(col.trunc).replace(/\*/g, "") === "start" ? "start" : "end";
         const flex = cell(col.flex) === "yes";
         const sortable = cell(col.sortable) === "yes";
         return names.map((key, i) => ({
@@ -142,6 +151,7 @@ export function surfaceColumns(file: string): readonly (readonly SurfaceColumn[]
           priority,
           minWidth: mins[i] ?? mins[0] ?? 1,
           align: align as "left" | "right",
+          truncateFrom: truncateFrom as "start" | "end",
           flex,
           sortable,
         }));
@@ -254,6 +264,7 @@ function cols(file: string, table = 0): readonly ColumnDef[] {
     // would truncate to an ellipsis, which is what the illustrations show as blank.
     label: c.key === "expand" || c.key === "glyph" ? "" : c.key,
     align: c.align,
+    truncateFrom: c.truncateFrom,
     priority: c.priority,
     minWidth: c.minWidth,
     sortable: c.sortable,

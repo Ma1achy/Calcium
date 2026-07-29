@@ -106,17 +106,17 @@ The `Status`/`State` split is the instructive one: the human-readable field and 
 ▌   ⏎ inspect   ␣ expand   ≡ logs
 ```
 
-| Column | Priority | Min | Align | Flex | From |
-|---|---|---|---|---|---|
-| expand · glyph | 100 | 1 · 1 | left | — | `State` |
-| id | 90 | 12 | left | — | `ID`, 12 chars |
-| name | 95 | 16 | left | yes | `Names`, first only |
-| state | 85 | 10 | left | — | `State` |
-| status | 70 | 18 | left | — | `Status`, verbatim |
-| image | 60 | 20 | left | — | `Image` |
-| ports | 40 | 20 | left | — | `Ports`, condensed |
+| Column | Priority | Min | Align | Trunc | Flex | From |
+|---|---|---|---|---|---|---|
+| expand · glyph | 100 | 1 · 1 | left | end | — | `State` |
+| id | 90 | 12 | left | end | — | `ID`, 12 chars |
+| name | 95 | 16 | left | end | yes | `Names`, first only |
+| state | 85 | 10 | left | end | — | `State` |
+| status | 70 | 18 | left | end | — | `Status`, verbatim |
+| image | 60 | 20 | left | **start** | — | `Image`, tag survives |
+| ports | 40 | 20 | left | **start** | — | `Ports`, host port survives |
 
-`align` is stated because `ColumnDef` requires it (C04 §3). Nothing docker returns is a number — every field is a string, which R01 §4 lists as the sixth problem — so every column is left, and the adapter's job is not to make any of them look otherwise.
+`Trunc` is `truncateFrom` (C04 I32) — the end characters are removed from, so `start` keeps the tail. `image` keeps its tag, because `ghcr.io/acme/api:2.4.1` truncated the other way reads as every other image from that registry; `ports` keeps the host port, which R3.4 already asserted while nothing could express it. `align` is stated because `ColumnDef` requires it (C04 §3). Nothing docker returns is a number — every field is a string, which R01 §4 lists as the sixth problem — so every column is left, and the adapter's job is not to make any of them look otherwise.
 
 State glyphs follow the framework's vocabulary: `running` → `●` ok, `restarting` → `▲` warn, `paused` → `▪` warn, `exited` → `✗` error, `created` → `○` muted.
 

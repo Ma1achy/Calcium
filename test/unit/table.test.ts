@@ -7,7 +7,8 @@
 import { describe, expect, it } from "vitest";
 import { COLUMN_GAP, focusableRowIds, planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
-import { measurable } from "../support/render.js";
+import { measurable, visible } from "../support/render.js";
+import { cells } from "../../src/presentation/text.js";
 import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 
 /** Σ visible widths + gaps, computed here rather than taken from the plan. */
@@ -287,6 +288,32 @@ describe("C11 tier 1 — planColumns", () => {
     const plan = planColumns(psColumns(), 160);
     expect(plan.dropped).toEqual([]);
     expect(registry.renderToLines(psTable({ rows: 2 }), 160)[1] ?? "").not.toContain("▸");
+  });
+
+  it("T1.18 (C04 I32): a column truncates from the end it declares", () => {
+    // The end characters are *removed* from — so `start` keeps the leaf, which is
+    // S14's key column, R01's image tag and S05's pod hash. Both directions are
+    // exactly the planned width and both place one marker.
+    const columns = (from: "start" | "end"): readonly ColumnDef[] => [
+      { key: "key", label: "key", align: "left", priority: 10, minWidth: 12, sortable: false, truncateFrom: from },
+    ];
+    const rows = [{ id: "r1", cells: { key: { text: "ui.show_banner" } } }];
+
+    const draw = (from: "start" | "end"): string =>
+      visible(registry.renderToLines({ kind: "table", id: "t", columns: columns(from), rows }, 12)[1] ?? "");
+
+    // 14 characters into 12 cells: 11 kept plus a one-cell marker, from whichever
+    // end the column declared.
+    expect(draw("end")).toBe("ui.show_ban…");
+    expect(draw("start")).toBe("…show_banner");
+    expect(cells(draw("end"))).toBe(cells(draw("start")));
+
+    // The default is `end`, so a column that says nothing renders as it did before
+    // the field existed.
+    const silent = columns("end").map(({ truncateFrom: _t, ...rest }) => rest);
+    expect(visible(registry.renderToLines({ kind: "table", id: "t", columns: silent, rows }, 12)[1] ?? "")).toBe(
+      draw("end"),
+    );
   });
 
   it("the gap is two cells, and it is the plan's own number", () => {
