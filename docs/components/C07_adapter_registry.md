@@ -150,13 +150,24 @@ Caps: **8 columns** and **2,000 rows** per generated table. The row cap matters 
 
 Nested objects render as their JSON text inside a cell rather than being flattened. Flattening invents structure the tool did not declare, and a wrong table is worse than an honest blob.
 
-### Open risk: the list shape is unproven visually
+### Resolved: the list shape is illegible, and D38 is satisfied vacuously
 
-**The list shape's legibility is asserted structurally but unproven visually until C11 registers `table`.** If the rendered output is not legible without an adapter, the finding is about this shape table and not about C11.
+**The risk below was read on the commit that registered `table` (C11), and it was real.** The finding is against this section's defaults, exactly as recorded, and it is worse than "the columns come out narrow".
+
+Every generated column gets `minWidth: 3`, no `flex`, no `maxWidth`, and `priority = MAX_COLUMNS - i`. Two consequences, and the second is the one that matters:
+
+- **Nothing is legible.** At 80, 120 and 160 cells, R01 §4's seven-column docker payload renders in 33 cells: `ID` at 3, `Names` at 3, and both `State` and `Status` as the header `St…`. The two fields R01 §4 exists to distinguish are indistinguishable, and the residual 127 cells at 160 are unused because no column is `flex` (C11 §3 step 8).
+- **Nothing is ever dropped, so nothing is ever reachable.** Every column squeezes to three cells rather than shedding, so `planColumns` returns an empty `dropped` at every width above about 27 — and since C11 derives expandability from `detail !== undefined || dropped.length > 0`, **no row is expandable**. D38's promise that a shed column stays reachable holds because nothing is shed. The mechanism designed to keep information reachable is inert precisely where the table is least readable.
+
+A table that sheds columns into an expand row is legible and complete. This one is neither, and it passes every structural assertion in §8: docker's field order is preserved, `Status` and `State` both survive, `Names` is unsplit, nothing is flattened. The snapshot is in `test/golden/fallback-docker.test.ts`.
+
+The fix is a decision about this shape table rather than a defect to patch, so it is recorded and not taken here. Three candidates, and they are not exclusive: derive `minWidth` from the widest value in each column, which is the information the fallback already has and discards; mark the last column `flex` so the residual is used; or lower the column cap below 8 for narrow terminals so dropping happens and the expand row carries the rest. The third is the only one that makes D38's mechanism live.
+
+**The original risk, as recorded before the read:** the list shape's legibility was asserted structurally but unproven visually until C11 registered `table`. If the rendered output were not legible without an adapter, the finding would be about this shape table and not about C11 — which is how it turned out.
 
 This is recorded as a risk rather than as a deferred test because of who carries it. Commitment 3 and I11 say a verb shipping tomorrow is usable tomorrow; a list is the majority shape a far side returns; and the claim is currently unproven for exactly that shape. `test/golden/fallback-docker.test.ts` asserts what can be asserted now — docker's own field order preserved, `Status` prose and `State` machine-readable both surviving unread, `Names` comma-joined and unsplit — and C09 §2 renders an unregistered kind as `raw`, so a snapshot taken today would capture a JSON blob and read to a later reviewer as reviewed.
 
-**Reading that output is a named step in C11's plan, not a side effect of a deferral expiring.** The distinction matters: an `it.todo` reads as work waiting on C11, and this is C07's risk carried on C11's schedule. The 8-column cap, the row cap, the choice not to split `Names`, and the decision to render a nested object as JSON text are all decisions in this section that only a rendered table can evaluate.
+**Reading that output was a named step in C11's plan, not a side effect of a deferral expiring.** The distinction mattered: an `it.todo` reads as work waiting on C11, and this was C07's risk carried on C11's schedule. The 8-column cap, the row cap, the choice not to split `Names`, and the decision to render a nested object as JSON text are all decisions in this section that only a rendered table could evaluate — and of those four, it is the uniform `minWidth` that the reading indicted, not the caps. `Names` unsplit and nested-as-JSON both read correctly; there was simply not enough width given to any column for a reader to reach them.
 
 ---
 
