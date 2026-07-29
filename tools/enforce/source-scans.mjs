@@ -62,6 +62,38 @@ export const SCANS = [
     scope: "src/presentation/blocks/", allow: [],
     why: "renderers resolve tones; they do not carry colours" },
 
+  // C10 I13. The rule scopes to the *directory* with one named exception, not
+  // to `tokens-*.ts`: a narrowed scope reads as tighter and is looser, because
+  // it stops seeing a new token file the day someone adds one — SS26's failure
+  // arriving through a different door.
+  //
+  // The pattern is the ANSI *form*, not a bare integer. `38;5;` and `\e[3Xm`
+  // are what an index looks like when someone writes one by hand; a bare `9` in
+  // a theme file is a length, a ratio, an array position.
+  { id: "SS19", spec: "C10 I13 · C10 T2.5",
+    pattern: /\b(?:38|48);5;\d|\bansi(?:16|256)?\s*[:=]\s*\d|\[\d{1,2}m/,
+    scope: "src/presentation/theme/", allow: ["src/presentation/theme/four-bit.ts"],
+    why: "tokens are 24-bit hex; the curated 4-bit map is the one file that holds indices" },
+
+  // The allow-lists name only what exists. `code.ts` and `patch.ts` arrive with
+  // C09 and C25 and will each have to add their own row — which is the friction
+  // C10 I16 asks for: `syntax` used casually stops meaning anything, and the
+  // list being closed at two is a spec change in four places, not a permission.
+  //
+  // Until then these rules police a scope whose legitimate members do not exist,
+  // so the fabricated-violation test carries the whole weight of showing they
+  // can fire. A rule with nothing to be wrong about passes exactly like a
+  // satisfied one.
+  { id: "SS20", spec: "C10 I16 · C10 T2.8",
+    pattern: /["'`]syntax\.\w|palettes\s*\.\s*syntax/,
+    scope: "src/", allow: ["src/presentation/theme/"],
+    why: "`syntax` is consumed by code and patch rendering only; the list is closed at two" },
+
+  { id: "SS21", spec: "C10 I16 · C10 T2.8",
+    pattern: /["'`]spectrum\.\w|palettes\s*\.\s*spectrum/,
+    scope: "src/", allow: ["src/presentation/theme/"],
+    why: "`spectrum` is decorative and restricted to declared art" },
+
   // --- structural ----------------------------------------------------------
   { id: "SS23", spec: "C09 T2.9 · C17 T2.4",
     pattern: /\.length\b(?!.*\/\/ *cells-ok)/,

@@ -18,7 +18,16 @@ import {
 
 describe("todo expiry", () => {
   it("TD0: the real tree's expired deferrals are exactly the acknowledged backlog", () => {
-    const violations = checkTodoExpiry(collectTodos("test"));
+    // This file is excluded from the sweep, and the exclusion is load-bearing
+    // rather than convenient: the fixtures below are `it.todo` calls in source
+    // text, indistinguishable to `collectTodos` from real deferrals. C10 landing
+    // expired one of them, which would have made a rule about the tree fail on
+    // its own test data. A file whose job is to fabricate todos is not a source
+    // of real ones — the same reason the enforce fire-tests fabricate paths
+    // rather than reading the tree.
+    const violations = checkTodoExpiry(
+      collectTodos("test").filter((e) => !e.file.endsWith("todo-expiry.test.ts")),
+    );
     const seen = violations.map((v) => `${v.rule} ${v.file}`);
 
     // Equality, not superset. A new expiry fails because it is not in the list;

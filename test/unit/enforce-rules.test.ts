@@ -47,6 +47,25 @@ const FABRICATED: readonly Fabrication[] = [
   { rule: "SS15", file: "src/presentation/table.ts", source: 'out.write("?1049h");' },
   { rule: "SS16", file: "src/data/viewmodel/index.ts", source: 'const fg = "#c0ffee";' },
   { rule: "SS17", file: "src/presentation/blocks/text.ts", source: 'const fg = "#c0ffee";' },
+  {
+    rule: "SS19",
+    file: "src/presentation/theme/tokens-dark.ts",
+    source: 'export const OK = "\\u001b[32m"; // 38;5;114',
+  },
+  {
+    // SS20 and SS21 police scopes whose legitimate members do not exist yet —
+    // `code.ts` and `patch.ts` arrive with C09 and C25. A rule over an empty
+    // scope passes exactly like a satisfied one, so these fabrications are the
+    // only thing currently proving either rule can fire at all.
+    rule: "SS20",
+    file: "src/presentation/blocks/table.ts",
+    source: 'const style = resolve("syntax.keyword", theme, caps);',
+  },
+  {
+    rule: "SS21",
+    file: "src/viewport/transcript.ts",
+    source: 'const style = resolve("spectrum.3", theme, caps);',
+  },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
   { rule: "SS26", file: "src/data/process/runner.ts", source: 'process.stdout.write(chunk);' },
   { rule: "SS28", file: "src/interaction/router.ts", source: "scheduler.invalidate();" },

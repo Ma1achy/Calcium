@@ -2,6 +2,9 @@
 // not merely the assertion it makes.
 import { describe, expect, it } from "vitest";
 import { SCANS } from "../../tools/enforce/source-scans.mjs";
+import { GLYPH_REQUIRED_TONES } from "../../src/data/viewmodel/index.js";
+import { resolveTone } from "../../src/presentation/theme/index.js";
+import { store } from "../support/theme.js";
 import {
   DEGRADATION,
   detectCapabilities,
@@ -82,9 +85,24 @@ describe("C02 fail-on-revert", () => {
     }
   });
 
-  it.todo(
-    "T6.6 (D29): rendering a status using colour with no glyph → T4.3's colourDepth:1 case loses the distinction and fails — waits on C10",
-  );
+  it("T6.6 (D29): a status carried by colour alone → T4.3's depth-1 case loses it", () => {
+    // The revert is a block that says `tone: "error"` and nothing else. At
+    // depth 1 the tone resolves to bold and the row is indistinguishable from a
+    // warning, so the distinction has to be in the glyph — which is why C04 I6
+    // obliges one for `error` and `warn` at construction, and why this test
+    // reads C04's set rather than restating it.
+    const themes = store();
+    const mono = detectCapabilities({ TERM: "dumb" }).capabilities;
+
+    const error = resolveTone("error", themes.current, mono);
+    const warn = resolveTone("warn", themes.current, mono);
+
+    expect(error.colour, "no colour survives at depth 1").toBeUndefined();
+    expect(error, "error and warn are one style once colour is gone").toEqual(warn);
+
+    // So the glyph is the whole distinction, and C04 is where that is enforced.
+    expect([...GLYPH_REQUIRED_TONES].sort()).toEqual(["error", "warn"]);
+  });
 
   it("T6.7 (I3): caching detection in module scope → T2.3 fails on the shared reference", () => {
     const env = { TERM: "xterm" };

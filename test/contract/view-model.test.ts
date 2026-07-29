@@ -255,7 +255,7 @@ describe("C04 measurement contract — waits on C09", () => {
   it.todo("T2.4: measure is monotone — appending a row never decreases height — waits on C09");
   it.todo("T2.5: measure never returns a negative or non-integer, at any width including 1 — waits on C09");
   it.todo(
-    "T2.6: under unicode:'ascii' measure equals its value under unicode:'full' for every fixture — waits on C09 and C10",
+    "T2.6: under unicode:'ascii' measure equals its value under unicode:'full' for every fixture — waits on C09",
   );
 });
 

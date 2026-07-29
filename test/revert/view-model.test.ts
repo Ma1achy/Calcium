@@ -4,7 +4,9 @@
 // `src/data/viewmodel/`, written out so that making it breaks a named test
 // rather than passing review. Several are edits that were *made* during this
 // component's implementation and caught here.
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import {
   applyPatch,
   block,
@@ -220,8 +222,29 @@ describe("C04 fail-on-revert", () => {
 
   it.todo("T6.1 (I7): a measurer under-counting wrapped lines by one → T2.1 fails at the wrap width — waits on C09");
   it.todo("T6.2 (I7): a measurer ignoring the expanded flag → T3.12 and T4.5 fail — waits on C09 and C14");
-  it.todo("T6.3: an ASCII fallback glyph of a different width → T2.6 fails — waits on C09 and C10");
-  it.todo("T6.7 (§1): moving the registry into C04, or importing theme into viewmodel/ → T2.9 fails — waits on C09 and C10");
+  it("T6.7a (§1): importing theme into viewmodel/ → T2.9 fails", () => {
+    // The half of T6.7 that C10 landing made writable. A block names a palette
+    // slot and never resolves one, so `viewmodel/` importing `theme/` is the
+    // layering violation that would let a colour value into a view model — and
+    // SS16 would then have nothing left to catch, because the hex would be
+    // arriving through an import rather than as a literal.
+    const viewmodel = readdirSync("src/data/viewmodel")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/data/viewmodel/${f}`);
+
+    expect(checkModuleGraph(viewmodel).filter((v) => v.rule === "MG4")).toEqual([]);
+
+    expect(viewmodel.length).toBeGreaterThan(0);
+    for (const file of viewmodel) {
+      expect(readFileSync(file, "utf8"), file).not.toMatch(/from\s+["'][^"']*presentation/);
+    }
+  });
+
+  // C10 is built; these two named it as a blocker and should not have. Glyph
+  // substitution under ASCII is C09's (C10 §10 says so outright), and the
+  // registry half of T6.7 waits on the renderer, not on the theme.
+  it.todo("T6.3: an ASCII fallback glyph of a different width → T2.6 fails — waits on C09");
+  it.todo("T6.7b (§1): moving the registry into C04 → T2.9 fails — waits on C09");
   it.todo("T6.9 (I10): an assembly-only block representation → T5.3 fails as a partial document renders differently mid-stream — waits on C09 and C13");
   it.todo("T6.14 (I17): removing the max(1, …) floor → T3.6b fails at all three kinds — waits on C09");
   it.todo("T6.15 (§3): giving a row group's children the full width → T3.6c fails and T2.1 fails wherever a child wraps — waits on C09");

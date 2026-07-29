@@ -10,7 +10,9 @@
 import { describe, expect, it } from "vitest";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
+import { resolveTone } from "../../src/presentation/theme/index.js";
 import { MODES } from "../support/fake-terminal.js";
+import { store, TONES } from "../support/theme.js";
 
 describe("C02 integration", () => {
   it.todo(
@@ -19,9 +21,30 @@ describe("C02 integration", () => {
   it.todo(
     "T4.2: mouse:false from a tmux environment → no 1002/1006 bytes in acquisition or release — waits on C01",
   );
-  it.todo(
-    "T4.3: colourDepth:4 → every tone resolves to a distinct 16-colour value with contrast preserved; colourDepth:1 → every tone is typographic and no colour code is emitted — waits on C10",
-  );
+  it("T4.3 (with C10): the detected depth drives resolution, and 1-bit emits no colour", () => {
+    // Driven from C02's side: the record decides and C10 obeys. "Distinct" is
+    // the five tones whose confusion would mislead — `dim` and `muted` sharing a
+    // grey at 4-bit costs nothing, and asserting all ten would assert a thing
+    // the spec deliberately does not require.
+    const sixteen = detectCapabilities({ TERM: "xterm" }).capabilities;
+    const mono = detectCapabilities({ TERM: "dumb" }).capabilities;
+    expect(sixteen.colourDepth).toBe(4);
+    expect(mono.colourDepth).toBe(1);
+
+    const themes = store();
+    const meaning = ["ok", "warn", "error", "info", "accent"] as const;
+
+    const indices = meaning.map((tone) => {
+      const colour = resolveTone(tone, themes.current, sixteen).colour;
+      expect(colour?.kind, tone).toBe("ansi16");
+      return colour !== undefined && colour.kind === "ansi16" ? colour.index : -1;
+    });
+    expect(new Set(indices).size, "two meaning tones collapsed at 4-bit").toBe(5);
+
+    for (const tone of TONES) {
+      expect(resolveTone(tone, themes.current, mono).colour, `${tone} at depth 1`).toBeUndefined();
+    }
+  });
   it.todo(
     "T4.4: unicode:'ascii' → a rendered table uses + - | and a sparkline uses .:|#; no codepoint above U+007F in the output — waits on C09",
   );

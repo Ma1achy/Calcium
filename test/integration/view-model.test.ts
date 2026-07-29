@@ -112,6 +112,6 @@ describe("C04 integration — the document lifecycle", () => {
     "T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the height delta, with no drift — waits on C09 and C14",
   );
   it.todo(
-    "T4.6: the same document under both themes produces identical line counts — waits on C09 and C10",
+    "T4.6: the same document under both themes produces identical line counts — waits on C09",
   );
 });
