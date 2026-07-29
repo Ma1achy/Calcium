@@ -70,7 +70,9 @@ The expanded detail carries the columns that dropped at this width (C11 I2) foll
 
 **`owner` is not in the expand row, because at 100 it is not dropped.** The earlier figure listed it there, which followed from the same uncorrected drawing: it had `owner` missing from the header, so the expand row was where it went. A field shown twice in one frame is the other half of that defect. At 60 columns `owner` does drop and does appear here — §6's narrow case, and T5.3 asserts it.
 
-Two things this figure does not draw, both because the component that draws them is not built: the metric cell's inline sparkline (`0.0372 ▁▂▃▅▆`), which is `Cell.spark` and arrives when C12 registers `plot`, and any right alignment on `metric` or `age`, per §3's missing `align`.
+**The metric cell's inline sparkline is not drawn, and it could not fit if it were.** `Cell.spark` is rendered by C12 (C12 §2's `sparkline`), which is unbuilt — but the arithmetic already says the earlier figure was impossible. A sparkline is one ramp glyph per sample and A01 Appendix A.2 windows the series to **eight** points, so a spark is 8 cells; `0.0372` is 6; a space between them is 1. That is 15 cells in a column §3 declares at `min` 8 and does not mark `flex`, so it is 8 cells at every width where it survives. The old figure drew `0.0372 ▁▂▃▅▆` — 12 cells, and a five-sample spark, matching neither the column nor the algorithm.
+
+Three ways out, and it is a surface decision: raise `metric` to 15 and flex it; give the spark its own column, as S03 already did for `status` and `detail`; or state a shorter window for a cell spark than A.2's eight. Recorded rather than chosen, because which one is right depends on what a reader of `/ps` is actually looking at.
 
 ---
 

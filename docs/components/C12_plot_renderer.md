@@ -32,9 +32,26 @@ The property that makes plots easy relative to every other block: **measured hei
 
 ```typescript
 const plotDefinition: BlockDefinition<Plot>;   // registered into C09
+
+/** One row of ramp glyphs. For C11's `Cell.spark` — see below. */
+function sparkline(
+  values: readonly number[],
+  width: number,
+  caps: Pick<TerminalCapabilities, "unicode">,
+): string;
 ```
 
 Internal to C12: the raster grid, the Bresenham walker, the scaling and downsampling functions. None is a block shape.
+
+### `sparkline` exists for C11's cell case
+
+`Cell.spark` puts a series inside a table cell (C04 §3), and a cell is not a block — so C11 cannot reach it through the registry, and rendering it as a `plot` would drag block dispatch into a cell. The export is therefore **a pure function**: values and a width in, one row of glyphs out. Same layer, acyclic, no registry, no `ctx`.
+
+C12's own `form: "sparkline"` renderer calls the same internal, so there is one rasteriser and `b.spark(…)` produces the block form of exactly what a cell shows. Recorded here so nobody later reads this as public surface with no consumer and deletes it (CLAUDE.md: an export nothing consumes is removed — this one has a named consumer, and the consumer is C11).
+
+**It takes capabilities**, because the ramp differs between Unicode and ASCII (§6) and a renderer must never probe for its own (C09 I3). C11 has them on `ctx` and passes them through; nothing here reads an environment.
+
+The return is exactly `width` cells and exactly one row (I13), so a cell containing one is the same height as a cell without — which is what makes C11's column planning indifferent to it (§10, and C12 T4.4 asserts it from this side).
 
 ### Height
 

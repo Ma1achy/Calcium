@@ -39,6 +39,23 @@ Three instances, and all three were the second kind:
 | S03 §2 | Columns in an order §3's priorities contradict | Nothing — the picture was simply wrong, *and* it also carried the next row |
 | S03 §3, S05 §3, S06 §5, S15 §5 | `metric`, `age`, `errors`, `p99`, `req/s`, `p50`, `versions` right-aligned | `align`, which `ColumnDef` requires |
 
+**A third verdict exists, and the sparklines are it: a figure that is arithmetically
+impossible under its own declared columns.** Not a drawing error and not a missing
+declaration — a figure and a table that contradict each other on a number both
+state. S01 §2 and S03 §2 drew `0.0372 ▁▂▃▅▆` in S03's `metric` column: 12 cells,
+five samples. A01 Appendix A.2 windows a sparkline to eight points and one glyph is
+one cell, so the cell wants 6 + 1 + 8 = 15; §3 declares `metric` at `min` 8 with no
+`flex`, so it is 8. The figure matched neither its own column nor the algorithm it
+was drawn from. Found by checking before building C12 rather than by C12 failing to
+reproduce it, which is the cheaper order.
+
+S01 §2 carries the same cell and one more drift beside it: it draws
+`running · ep 17/40` as a single status cell, which S03 commitment 2 forbids and
+S03 T6.1 is the fail-on-revert test for — a merged status truncates to
+`running · ep 17/4…` and reads as a different status. S01's frame is deferred to
+C22, so nothing composes it yet; both are corrected when it is, and they are
+recorded here so that commit does not have to rediscover them.
+
 **Illustrations are where intent leaks in without being recorded.** They are drawn
 by eye against an idea of how the thing should look; the spec text is written
 separately, and nothing compares them. That is the commitment/invariant divergence
