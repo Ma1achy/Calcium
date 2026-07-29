@@ -15,7 +15,7 @@ import {
 } from "../../src/data/adapters/fallback.js";
 import type { AdapterContext, RawResult } from "../../src/data/adapters/types.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
-import type { Block } from "../../src/data/viewmodel/index.js";
+import type { Block, ColumnDef } from "../../src/data/viewmodel/index.js";
 
 const CTX: AdapterContext = Object.freeze({
   command: "/ps",
@@ -65,6 +65,18 @@ function kinds(blocks: readonly Block[]): readonly string[] {
   return blocks.map((b) => b.kind);
 }
 
+/**
+ * The keys of the columns that name a field.
+ *
+ * A generated table leads with a `role: "expand"` column that names none (§5), and
+ * it sits outside `MAX_COLUMNS` — so every assertion about *which fields* a table
+ * shows filters it out, and the assertions about the marker are separate and
+ * explicit.
+ */
+function fieldKeys(columns: readonly ColumnDef[]): readonly string[] {
+  return columns.filter((c) => c.role === undefined).map((c) => c.key);
+}
+
 describe("T1.14 (§5) — every shape in the table", () => {
   it("an object of scalars → rule + keyValue", () => {
     const doc = adapt({ name: "web", replicas: 3, healthy: true });
@@ -81,7 +93,11 @@ describe("T1.14 (§5) — every shape in the table", () => {
 
     const table = doc.blocks[1];
     if (table?.kind !== "table") throw new Error("expected a table");
-    expect(table.columns.map((c) => c.key)).toEqual(["id", "state"]);
+    // The marker column leads and is not a field (§5): C11 draws the expand glyph
+    // only where a column declares the rôle, and a generated table's producer is
+    // this adapter. It carries no key because it names no field.
+    expect(table.columns[0]?.role).toBe("expand");
+    expect(fieldKeys(table.columns)).toEqual(["id", "state"]);
     expect(table.rows).toHaveLength(2);
     expect(table.rows[1]?.cells["state"]?.text).toBe("exited");
   });
@@ -128,12 +144,18 @@ describe("T1.15, T3.13b (§5) — the caps", () => {
 
     const table = doc.blocks[1];
     if (table?.kind !== "table") throw new Error("expected a table");
-    expect(table.columns).toHaveLength(MAX_COLUMNS);
-    expect(table.columns.map((c) => c.key)).toEqual(keys.slice(0, MAX_COLUMNS));
-    // Priority descends with position, so C11 drops the last-appearing first.
-    expect(table.columns[0]?.priority).toBeGreaterThan(
-      table.columns[MAX_COLUMNS - 1]?.priority ?? 0,
+    // **The cap bounds fields, and the marker is not one** (§5). Eight fields plus
+    // the marker, not seven fields and a marker — charging the affordance a field
+    // would hide data in order to reveal that data is hidden.
+    expect(fieldKeys(table.columns)).toHaveLength(MAX_COLUMNS);
+    expect(table.columns).toHaveLength(MAX_COLUMNS + 1);
+    expect(fieldKeys(table.columns)).toEqual(keys.slice(0, MAX_COLUMNS));
+    // Priority descends with position, so C11 drops the last-appearing first. The
+    // marker outranks every field, so it survives every width (C11 I3).
+    expect(table.columns[1]?.priority).toBeGreaterThan(
+      table.columns[MAX_COLUMNS]?.priority ?? 0,
     );
+    expect(table.columns[0]?.priority).toBeGreaterThan(table.columns[1]?.priority ?? 0);
   });
 
   it("T3.13b: 100,000 uniform rows → 2,000 rows, truncated, and a notice naming the drop", () => {
@@ -201,7 +223,7 @@ describe("T3.8–T3.12 — the shapes that are easy to crash on", () => {
 
     const table = doc.blocks[1];
     if (table?.kind !== "table") throw new Error("expected a table");
-    expect(table.columns.map((c) => c.key)).toEqual(["id", "labels"]);
+    expect(fieldKeys(table.columns)).toEqual(["id", "labels"]);
     expect(table.rows[0]?.cells["labels"]?.text).toBe('{"tier":"web"}');
   });
 

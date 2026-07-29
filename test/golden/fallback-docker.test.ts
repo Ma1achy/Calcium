@@ -104,7 +104,9 @@ describe("C07 §5 — docker's real JSON through the fallback, unadapted", () =>
     const table = doc.blocks.find((b) => b.kind === "table");
     if (table?.kind !== "table") throw new Error("the list shape did not produce a table");
 
-    expect(table.columns.map((c) => c.key)).toEqual([
+    // The marker leads and names no field (§5); the fields follow, in docker's order.
+    expect(table.columns[0]?.role).toBe("expand");
+    expect(table.columns.filter((c) => c.role === undefined).map((c) => c.key)).toEqual([
       "ID",
       "Names",
       "Image",
@@ -155,9 +157,14 @@ describe("C07 §5 — docker's real JSON through the fallback, unadapted", () =>
     // 3 except by coincidence of content, and nothing exceeds the cap.
     const asked = new Map(table.columns.map((c) => [c.key, c.minWidth]));
     expect(asked.get("Names")).toBe(14);
+    // The marker asks for one cell and is outside the field cap.
+    expect(table.columns[0]?.minWidth).toBe(1);
+    expect(table.columns).toHaveLength(8);
     expect(asked.get("State")).toBe(7);
     expect(asked.get("Status")).toBe(23);
-    expect([...asked.values()].every((w) => w >= 3 && w <= 24)).toBe(true);
+    expect(
+      table.columns.filter((c) => c.role === undefined).every((c) => c.minWidth >= 3 && c.minWidth <= 24),
+    ).toBe(true);
 
     // **D38's mechanism is live.** At 80 the total exceeds the terminal, so columns
     // drop by priority — last-appearing first — and every dropped field reaches the

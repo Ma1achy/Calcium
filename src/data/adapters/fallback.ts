@@ -159,6 +159,30 @@ function keyValueBlock(obj: Record<string, Json>, id: string): Block {
   });
 }
 
+/**
+ * The marker column, declared unconditionally (§5).
+ *
+ * C11 draws the expand marker only into a column that declares the rôle and will
+ * not synthesise one (C11 I16), so for a generated table the producer has to —
+ * otherwise the fields that drop at a narrow width are reachable with nothing on
+ * screen saying so.
+ *
+ * **Outside `MAX_COLUMNS`.** The cap bounds fields; a marker is not a field, and
+ * charging the affordance a field would hide data to reveal that data is hidden.
+ *
+ * Unconditional, because a column set is built once and the width is not known
+ * here. Per-row blankness is C11's — a row that cannot be opened draws nothing.
+ */
+const EXPAND_COLUMN: ColumnDef = Object.freeze({
+  key: "",
+  label: "",
+  align: "left" as const,
+  priority: Number.MAX_SAFE_INTEGER,
+  minWidth: 1,
+  sortable: false,
+  role: "expand" as const,
+});
+
 function columnsFor(keys: readonly string[], rows: readonly Json[]): readonly ColumnDef[] {
   // Priority descends with position so C11 drops the last-appearing column
   // first (D38). The far side's ordering is the only signal available about
@@ -168,7 +192,7 @@ function columnsFor(keys: readonly string[], rows: readonly Json[]): readonly Co
   // with widths measured from the content, a table narrower than the terminal is
   // correct, because every column already has what it asked for. C11 §3 step 8
   // leaves the residual unused for the same reason.
-  return keys.slice(0, MAX_COLUMNS).map((key, i) => ({
+  const fields = keys.slice(0, MAX_COLUMNS).map((key, i) => ({
     key,
     label: stripControl(key),
     align: "left" as const,
@@ -176,6 +200,11 @@ function columnsFor(keys: readonly string[], rows: readonly Json[]): readonly Co
     minWidth: askedWidth(key, rows),
     sortable: true,
   }));
+
+  // The marker leads, and its priority is the highest there is: C11 never drops
+  // the highest-priority column (I3), so the affordance survives every width at
+  // which the table renders at all.
+  return [EXPAND_COLUMN, ...fields];
 }
 
 function tableBlocks(
