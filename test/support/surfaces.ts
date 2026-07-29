@@ -225,7 +225,9 @@ function cols(
 ): readonly ColumnDef[] {
   return rows.map(([key, priority, minWidth, flex]) => ({
     key,
-    label: key,
+    // `expand` and `glyph` are one cell wide and headed by nothing — a label there
+    // would truncate to an ellipsis, which is what the illustrations show as blank.
+    label: key === "expand" || key === "glyph" ? "" : key,
     align: "left" as const,
     priority,
     minWidth,
@@ -259,10 +261,10 @@ const S03_TABLE: Block = block({
     ["mr", 10, 6],
   ]),
   rows: [
-    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m" }),
-    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m" }),
-    cellsOfRow("2e8a04c", { uuid: "2e8a04c", kind: "experiment", family: "graphsage", status: "failed", detail: "OOM at ep 3", metric: "—", age: "1h 12m" }),
-    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m" }),
+    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m", owner: "malachy", mr: "!1248" }),
+    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m", owner: "malachy", mr: "!1201" }),
+    cellsOfRow("2e8a04c", { uuid: "2e8a04c", kind: "experiment", family: "graphsage", status: "failed", detail: "OOM at ep 3", metric: "—", age: "1h 12m", owner: "priya", mr: "!1188" }),
+    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m", owner: "malachy", mr: "—" }),
   ],
 });
 
