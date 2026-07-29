@@ -167,7 +167,15 @@ The 24-cell cap is a judgement and the only one here. A single 200-character fie
 
 Lowering the column cap was the alternative and it is worse: fields are lost *and* the survivors still get three cells each. Legibility and reachability both improve from the width change; only reachability improves from the cap.
 
-**Open, and newly visible because the mechanism is now live: the affordance is invisible.** A generated table declares no column with `role: "expand"`, so at 80 cells three of docker's fields drop, every row becomes expandable, and nothing on screen says so — C11 draws the marker only into a column a surface declared, and it declines to synthesise one or to reserve a gutter because either would move width arithmetic the surfaces state (C11 I16). Under the old uniform minimum this could not arise, since nothing ever dropped. The remedy is a decision for this section rather than for C11: a leading `role: "expand"` column of `minWidth` 1 costs three cells with its gap, and whether it counts toward the eight-column cap is the part that needs deciding.
+### The fallback declares the expand column
+
+**A generated table's first column is `role: "expand"`, `minWidth` 1.** C11 draws the marker only into a column a surface declared, and it will not synthesise one or reserve a gutter, because either would move width arithmetic the surfaces state (C11 I16) — that invariant is right, and it keeps a surface in control of its own column set. But *something* has to declare the column, and for a generated table the producer is this adapter.
+
+Without it the affordance is invisible: at 80 cells three of docker's fields drop, every row becomes expandable, and nothing on screen says so. Under the old uniform `minWidth` this could not arise, because nothing ever dropped — the measured widths are what made it visible.
+
+**It does not count toward the eight-column cap.** The cap bounds *fields* — how much of an unknown object to show — and a marker is not a field. Making the affordance cost a field would be hiding data in order to reveal that data is hidden, so a seven-field payload renders seven fields plus a marker, and an eleven-field payload renders eight plus a marker.
+
+**It is declared unconditionally, not when something drops.** Whether anything drops depends on the width, and a column set is built once before any width is known — so a conditional column would mean either re-deriving the columns per render, which no other producer does, or guessing. S03 §3 does the same thing: the column is always present and the glyph is per-row, which is what C11's "blank when the row is not expandable" rule is for.
 
 ### Resolved: the list shape was illegible, and D38 was satisfied vacuously
 
