@@ -188,7 +188,9 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I4): a 2 MiB stream of mixed CJK, emoji and ASCII → decoded byte-identically, at every chunk size from 1 to 65536.
+- **T2.1** (I4): mixed CJK, emoji and ASCII → decoded byte-identically, at **every chunk size from 1 to 256** over a payload containing every rune width at every alignment, and at 4096, 65535 and 65536 over 2 MiB.
+
+  *The range was "1 to 65536" over 2 MiB, which is 137 GiB of decoding and would not finish inside a unit tier — but the reason to change it is not the runtime.* What can break a streaming decoder is a multi-byte sequence split at a particular byte offset, and there are at most three interior offsets in a UTF-8 rune. Sweeping chunk sizes 1 to 256 across a payload of mixed widths exercises every one of them many times over; chunk size 40,000 exercises the same offsets as 400 and takes a hundred times as long to say so. The large sizes are kept for a different claim — that the *bound* and the queue behave at realistic pipe-chunk sizes — and 2 MiB is where that is worth asserting.
 - **T2.2** (I3): a source scan finds no write to the real `process.stdout` in `process/`.
 - **T2.3** (I12): the module graph shows no import from `terminal/`.
 - **T2.4** (I8): a source scan finds no timer or escalation logic in `process/`.
