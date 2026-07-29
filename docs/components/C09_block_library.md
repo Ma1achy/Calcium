@@ -37,6 +37,8 @@ type RenderContext = Readonly<{
   focus:        FocusState | null;    // C11 / C15 use it; most kinds ignore it
   tick:         number;               // monotonic animation counter — see below
   onAction:     (a: Action) => void;
+  measureChild: MeasureFn;            // Seam 1, on the render side — see below
+  renderChild:  (block: Block, width: number) => ReactElement;
 }>;
 
 function cells(text: string): number;          // grapheme-aware display width
@@ -64,6 +66,8 @@ function createBlockRegistry(opts: { defaults?: boolean }): BlockRegistry;
 `measure` on the registry is the dispatcher, and it passes **itself** as each definition's `measureChild`. That is how `panel`, `group` and a table's expanded detail measure children whose kind they do not know, without any kind importing the registry.
 
 `measure` and `render` on the registry are the dispatching entry points. An unregistered kind resolves to the `raw` definition rather than throwing — a document referencing an unknown kind still renders, degraded.
+
+**`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close.
 
 **Animation state arrives through `ctx.tick`.** `steps` shows a spinner, and a renderer must stay pure, so the frame index cannot come from a clock inside the block. `tick` is a monotonic counter incremented by C03's `spinner` commit; a renderer computes `frames[tick % frames.length]`. Nothing else in C09 reads it, and `measure` never does — animation must never change height.
 
