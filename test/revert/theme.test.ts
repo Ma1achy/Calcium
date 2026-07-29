@@ -7,6 +7,32 @@ import { caps, store, SURFACES, SYNTAX_SLOTS, TONES, withTone } from "../support
 
 const VARIANTS = ["dark", "light"] as const;
 
+/** WCAG relative luminance, computed here so the test does not lean on the code it guards. */
+function relativeLuminance(hex: string): number {
+  const to = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = [1, 3, 5].map((i) => to(Number.parseInt(hex.slice(i, i + 2), 16) / 255)) as [
+    number,
+    number,
+    number,
+  ];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** The cube index a tone resolves to at depth 8, as a luminance. */
+function eightBit(current: ReturnType<typeof store>["current"], tone: string): number {
+  const colour = resolve(`tone.${tone}`, current, caps(8)).colour;
+  const index = colour !== undefined && colour.kind === "ansi256" ? colour.index : -1;
+
+  if (index >= 232) {
+    const v = 8 + (index - 232) * 10;
+    return relativeLuminance(`#${[v, v, v].map((c) => c.toString(16).padStart(2, "0")).join("")}`);
+  }
+  const levels = [0, 95, 135, 175, 215, 255];
+  const n = index - 16;
+  const [r, g, b] = [levels[Math.floor(n / 36)]!, levels[Math.floor((n % 36) / 6)]!, levels[n % 6]!];
+  return relativeLuminance(`#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("")}`);
+}
+
 describe("C10 fail-on-revert", () => {
   it("T6.1 (I2): emitting a colour at depth 1 → T1.2 and T5.3 fail", () => {
     const current = store().current;
@@ -123,6 +149,56 @@ describe("C10 fail-on-revert", () => {
     const collided = loadTheme(withTone("info", defaultTheme.dark.palettes["tone"]!.slots["ok"]!));
     expect(collided.ok).toBe(false);
     if (!collided.ok) expect(collided.error.map((e) => e.message).join()).toMatch(/must not render as one another/);
+  });
+
+  it("T6.15 (I6): a neighbour-wise walk → T1.10 fails while every adjacent check passes", () => {
+    // The revert that looks like a simplification, and the reason T1.10 asserts
+    // all pairs rather than adjacent ones.
+    //
+    // `info` and `identifier` are 0.030 apart — a real ranking — with two
+    // near-equal steps between them. A walk that exempts near-equal neighbours
+    // therefore leaves them unconstrained relative to each other, and they
+    // invert with no adjacent comparison ever failing. The test names that
+    // configuration explicitly so the guard cannot be weakened back to
+    // adjacency by someone who reads only the assertion.
+    const current = store().current;
+    const slots = current.tokens.palettes["tone"]!.slots;
+
+    const order = TONES.map((t) => ({ tone: t, lum: relativeLuminance(slots[t]!) })).sort(
+      (a, b) => a.lum - b.lum,
+    );
+    const at = (tone: string): number => order.findIndex((o) => o.tone === tone);
+
+    // The configuration: separated by more than the noise threshold, and not
+    // adjacent — so adjacency alone says nothing about the pair.
+    const gap = order[at("identifier")]!.lum - order[at("info")]!.lum;
+    expect(gap, "info and identifier are a real ranking").toBeGreaterThan(0.02);
+    expect(at("identifier") - at("info"), "with steps between them").toBeGreaterThan(1);
+
+    for (let i = at("info"); i < at("identifier"); i++) {
+      expect(
+        order[i + 1]!.lum - order[i]!.lum,
+        "and every step between them is below the threshold, so no adjacent check constrains the pair",
+      ).toBeLessThan(0.02);
+    }
+
+    // The pair holds anyway, because the assignment is over the set.
+    expect(eightBit(current, "info")).toBeLessThanOrEqual(eightBit(current, "identifier"));
+  });
+
+  it("T6.16 (I18): making colour a bare string → T2.18 fails and the writer guesses again", () => {
+    const rule = SCANS.find((s) => s.id === "SS36");
+    expect(rule?.scope).toBe("src/");
+    expect(rule?.allow, "no file may write an untagged colour").toEqual([]);
+
+    const current = store().current;
+    for (const tone of TONES) {
+      for (const depth of [24, 8, 4] as const) {
+        const colour = resolveTone(tone, current, caps(depth)).colour;
+        expect(typeof colour, `${tone} at depth ${depth}`).toBe("object");
+        expect(colour?.kind, `${tone} at depth ${depth}`).toBeTypeOf("string");
+      }
+    }
   });
 
   it("T6.14 (I17): dropping the 8-bit distinctness check → T2.17 fails", () => {

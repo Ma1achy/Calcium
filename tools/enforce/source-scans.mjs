@@ -128,6 +128,20 @@ export const SCANS = [
   // own, and the first version of this rule flagged both files that correctly
   // import the one Result there is. A declaration always continues into `<` or
   // `=`; an import member never does.
+  // A tag that is droppable gets dropped. C10 resolves a colour to a value that
+  // names its own depth, so the writer switches on a tag rather than inferring
+  // the depth from the format — and the consumer that infers wrong emits
+  // truecolour to a sixteen-colour terminal.
+  //
+  // Types hold that inside the tree. What types do not hold is a cast: a `Style`
+  // assembled by hand in a renderer with `colour: "#7faecf"` is one `as` away
+  // from compiling. This makes the untagged form unwritable rather than merely
+  // discouraged, which is the difference between a rule and a convention.
+  { id: "SS36", spec: "C10 I18 · C10 T2.19",
+    pattern: /\bcolour\s*:\s*["'`]/,
+    scope: "src/", allow: [],
+    why: "a resolved colour names its depth; there is no untagged form" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

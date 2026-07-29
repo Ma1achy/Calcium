@@ -2,7 +2,14 @@
 // the source scans that keep a palette from leaking out of its two consumers.
 import { readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { defaultTheme, floorFor, ratio, resolve, resolveTone } from "../../src/presentation/theme/index.js";
+import {
+  defaultTheme,
+  floorFor,
+  ratio,
+  resolve,
+  resolveTone,
+  type ColourRef,
+} from "../../src/presentation/theme/index.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
 
@@ -157,6 +164,45 @@ describe("C10 contract", () => {
         expect(new Set(values).size, `${variant} ${name} has two slots on one value`).toBe(values.length);
       }
     }
+  });
+
+  it("T2.18 (I18): every resolved colour names its depth, and the kinds are exactly three", () => {
+    // The list is written out literally rather than derived from the type. A
+    // list computed from `ColourValue` agrees with itself and passes on any
+    // addition, which is a rule with nothing to be wrong about — C05 T1.7c's
+    // shape, applied to a union that a renderer switches on.
+    const KINDS = ["rgb", "ansi256", "ansi16"];
+    const seen = new Set<string>();
+
+    for (const variant of VARIANTS) {
+      const current = store(variant).current;
+      const refs: ColourRef[] = [
+        ...TONES.map((t) => `tone.${t}` as const),
+        ...SYNTAX_SLOTS.map((s) => `syntax.${s}` as const),
+        ...SURFACES.map((s) => `surface.${s}` as const),
+      ];
+
+      for (const ref of refs) {
+        for (const depth of DEPTHS) {
+          const colour = resolve(ref, current, caps(depth)).colour;
+          if (colour === undefined) continue;
+
+          expect(typeof colour, `${ref} at depth ${depth} must not be a bare string`).toBe("object");
+          expect(KINDS, `${ref} at depth ${depth}`).toContain(colour.kind);
+          seen.add(colour.kind);
+        }
+      }
+    }
+
+    // And all three are reachable, so the check is not passing because two of
+    // them never occur.
+    expect([...seen].sort()).toEqual([...KINDS].sort());
+  });
+
+  it("T2.19 (I18): no string literal is assigned to a colour field anywhere in src/", () => {
+    const rule = SCANS.find((s) => s.id === "SS36");
+    expect(rule, "SS36 is gone from the scan table").toBeDefined();
+    expect(checkSourceScans(sourceFiles()).filter((v) => v.rule === "SS36")).toEqual([]);
   });
 
   it("T2.17 (I17): at depth 8 the five meaning tones stay distinct", () => {

@@ -76,6 +76,11 @@ const FABRICATED: readonly Fabrication[] = [
     source: "render({ alternateScreen: true }, ui);",
   },
   {
+    rule: "SS36",
+    file: "src/presentation/blocks/text.ts",
+    source: 'const style = { colour: "#7faecf", bold: true };',
+  },
+  {
     rule: "SS35",
     file: "src/data/manifest/types.ts",
     source: "export type Result<T, E> = { ok: true; value: T } | { ok: false; errors: E };",
