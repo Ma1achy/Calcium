@@ -135,9 +135,9 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
-| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/blocks/` | C09 T2.9 |
+| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/` | C09 T2.9 |
 | SS40 | The same, in the editor | `src/interaction/` | C17 I2, T2.4 |
-| SS24 | Mutable module state | `table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
+| SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
 | SS27 | Timer or escalation logic, including a `SIGTERM` literal | `process/` | C21 I8, I11, T2.4 |
@@ -168,6 +168,10 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 **Two named exceptions, each with its reason recorded.** `node-pty` ships darwin and win32 prebuilds only, so Linux compiles it; `--ignore-scripts` stays set for the whole tree and `make install` invokes that one build by name, which is a different thing from letting every package run arbitrary code. `esbuild` is transitive under vitest and its postinstall is *suppressed* — npm installs the platform binary as an optional dependency and the hook is a fallback we never reach. Listed rather than silently skipped, so that if a vitest upgrade makes it load-bearing there is a place the reason already lives. Anything else acquiring an install script fails the build.
 
 **SS26 is pending and has never been evaluated.** It scopes to `src/data/process/` and the scaffold created `src/data/process.ts` — a file, not a directory — so the prefix match finds nothing and the rule passes on every run. It came in with the scaffold and would not have fired had it been violated. The scope is corrected when C21 lands and creates the directory; until then the vacuity suite carries it as a named pending entry rather than counting it as enforcement. This is the defect the sixth kind of check exists to find, and it is recorded here rather than quietly fixed because the count of live rules should be honest.
+
+**SS23 scopes to `src/presentation/`, not to `blocks/`.** Its reason — display width comes from `cells()`, the same implementation the measurer uses, or measurement drifts — is a fact about presentation and not about one directory of it. Scoped to `blocks/`, it stopped seeing `src/presentation/table/` the day C11 created it, and C11 is the largest consumer of measurement in the tree. That is SS26's failure with a longer fuse: narrower reads as tighter and is looser, because it stops seeing new files. The same argument SS2 records, arriving through the same door twice.
+
+**SS24 names `src/presentation/table/` in full, and C11 creates the directory to match.** The inventory said `table/` while the scaffold held `src/presentation/table.ts` — a file — so the prefix match would have found nothing and the rule would have reported compliance from the day it was written. That is SS26 exactly, and it is recorded here because the fix was to choose the *implementation* layout to suit the rule rather than to loosen the rule: C11 implements into a directory. A rule with nothing to be wrong about passes exactly like a rule that is satisfied.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
 
@@ -310,6 +314,7 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 14. **Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule.** A rule with no such test is assumed vacuous until it has one. Every scan's scope is separately asserted to match at least one file in the tree; and where a rule enumerates named entities — mode owners, export names, file paths — those names are separately asserted to exist. A scope or a name that matches nothing is listed as pending, with its blocking component, and the pending entry fails once it becomes real.
 14b. **The inventory in this document equals what is implemented plus what is explicitly pending**, asserted as set equality over the rule ids. A rule listed here and never built is invisible to every other check — there is no code for a fabricated violation to fire against — so it fails at the point of being written down instead.
 15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for.
+16. **Every path the deferral map names exists** (TD3, §9a). A mapped file that is not there reports compliance because it cannot find what it was asked about, which is commitment 14's vacuity class inside the deferral machinery itself.
 
 ---
 
@@ -324,6 +329,14 @@ The moment C10 landed, three such deferrals surfaced: one about glyph substituti
 The rule reports them because it cannot tell the difference either: it fires on *implemented blocker, test still deferred*, and a mislabelled deferral satisfies that exactly. **The fix is not to make the rule cleverer.** A wrong blocker is a claim about which component owns a piece of work, and the only thing that can settle it is a person reading both specs — which is precisely what the failure forces, at the one moment the answer is cheap to establish.
 
 So the response to TD2 is two-branched, and both branches are ordinary: write the test, or restate what it is actually waiting for. An exemption is neither.
+
+### TD3 — a mapped source path must exist
+
+`COMPONENT_SOURCES` maps each component to the file whose existence means "implemented", and `defaultIsImplemented` returns false for a file that is not there. So **a mapped path that never existed exempts every deferral waiting on that component, silently and permanently** — the rule reports compliance, and the reason it reports compliance is that it cannot find the component it was asked about.
+
+This is not hypothetical. `C07` mapped to `src/data/adapters.ts` while C07 landed as `src/data/adapters/index.ts`, so every `waits on C07` todo has been exempt since the map was written. SS26's defect, inside the machinery built to catch SS26's defect — which is the honest reason it is a rule and not a correction: the class recurs, so the check covers the class.
+
+TD3 asserts every mapped path is a file that exists, with exceptions named and reasoned rather than tolerated — a component with no scaffold at all (C25 today) is a legitimate absence and is listed as one. It catches a mapping that was wrong when written and a mapping that a later component's own layout invalidates: C11 moving `src/presentation/table.ts` to `src/presentation/table/` to satisfy SS24 would otherwise have exempted C11's seven deferrals on the commit that made them writable.
 
 ---
 

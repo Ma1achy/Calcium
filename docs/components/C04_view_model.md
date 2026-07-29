@@ -263,6 +263,7 @@ type ColumnDef = Readonly<{
   maxWidth?: number;
   flex?:     boolean;                 // absorbs residual width
   sortable:  boolean;
+  role?:     "expand";                // C11 fills the cell; not view state (I30)
 }>;
 
 type TableRow = Readonly<{
@@ -278,6 +279,8 @@ type MergeRow = Omit<TableRow, "expanded">;
 ```
 
 `showHeader: false` gives a headerless list with per-row actions — the shape small lists need, without inventing a block type for it. `detail` being `Block[]` is what lets an expanded run row reveal a plot, a progress bar and a set of actions, composed from the same vocabulary rather than a bespoke detail renderer.
+
+**`role: "expand"` names the column C11 fills.** Every surface with an expandable table already declares an `expand` column of `minWidth` 1 whose content is drawn by C11 rather than supplied as data, and its cell is inside those surfaces' width arithmetic — so it must stay an ordinary column for planning while being extraordinary for content. The role is how a renderer recognises it. Two alternatives were rejected: a reserved `key === "expand"`, which puts a magic string in a generic engine and silently eats a far side's field of that name; and a gutter reserved by C11, which would move every drop total the S-series states. The role is declared by the surface, is not view state, and is not carried by `merge` any differently from the rest of `columns` — `expanded` remains the only view state on a table row (I9, I22). C11 I16 holds the other half: planning never reads it.
 
 **`ColumnDef` is declared here, not in C11.** It is part of a block's shape, and commitment 11 says every block shape is declared in C04 — the same split that gives C04 `Plot`'s shape while C12 rasterises it. C11 keeps `PlannedColumns` and `planColumns`, which are genuinely planning rather than content. The alternative considered and rejected was a type-only import from C11: it erases at build and so passes the module-graph check, which is precisely the objection — an L0 → L1 dependency that `make enforce` reports as clean is worse than one it catches.
 
@@ -481,6 +484,8 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I18** — `validateDocument` terminates on any input, including a cyclic one. A path-scoped seen-set refuses a cycle; it is not a depth limit, and it does not reject a legitimately shared subtree.
 - **I20** — `ErrorLike` requires `message` and nothing else. `code`, `stage`, `details` and `remediation` are optional, and a far side's richer envelope is a specialisation rather than a second type — so every failure in the system renders through one path (A01 B5).
 - **I20a** — `meta` carries the invocation record: `argv`, `stderr` and `transport` are present on every document C07 produces. They belong to `meta` because a block is content and the invocation is *about* the document, so any inspector reaches them uniformly without re-running anything (D49).
+- **I31** — Row ids are unique within a table, checked by `validateDocument` alongside I14's block ids. Three things address a row by id — `merge` upserts by it (I9), C16's focus names it, and a rendered row is keyed by it — so a duplicate is ambiguous in three ways at once. It is a separate invariant from I14 because the namespaces are separate: two tables may each hold a row `r1`, and a row id never collides with a block id. Raised from C11, the first component to depend on it.
+- **I30** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
 - **I21** — `patch` and `diff` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
 
 ---
@@ -503,6 +508,8 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 14. Substitution is 1:1 by column count, so a degraded frame occupies the same cells as an undegraded one (→ C09 I5).
 15. `validateDocument` and `validateBlock` are public, total, and the single enforcement point for I3 (I3, I4).
 16. Schema version is `tui.view/1`; mismatch is refused at the boundary (I2).
+17. A column may declare `role: "expand"`, which is presentation intent rather than view state (I30).
+18. Row ids are unique within their table, checked where block ids are (I31).
 17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it (I20a, D49).
 18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts (I13).
 19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump (I12).
@@ -543,6 +550,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.13** (I15, the composition test): `merge` → `merge` → `replace`. The two merges accumulate, new rows land in payload order after the existing ones, and view state survives on touched and untouched rows alike; the `replace` then discards all of it. Both halves asserted, because the second is a design decision and would otherwise read as a bug.
 - **T1.14** (I15): a failing patch in the middle of a sequence leaves the document at its last good state, and the following patch still applies to it.
 - **T1.15** (I14): `validateDocument` rejects a document with two blocks sharing an id, including when one of them is nested inside a `panel`.
+- **T1.16** (I31): `validateDocument` rejects a table with two rows sharing an `id`, and accepts the same ids used in two different tables. Row ids are unique within their table, not across the document — a block id and a row id are different namespaces.
 - **T1.16** (§3): constructing a `plot` with `form: "line"` and no `height` throws; `sparkline` without one does not.
 - **T1.17** (I18): a document whose `panel` contains itself is refused by `validateDocument` with a named error, and the call returns. A shared-but-acyclic subtree appearing twice validates — the seen-set is path-scoped, and a global one would fail this.
 - **T1.18** (I1, §4b): C24's `b` produces blocks frozen exactly once — the constructor is the only freeze point, asserted by spying on it.
@@ -612,6 +620,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.10** (I15): making `applyPatch` return a bare `ViewDocument` again, absorbing the four failures → T1.12 and T1.14 fail, and C23 loses the mechanism its §5 depends on.
 - **T6.11** (I16): typing the `merge` arm as `TableRow[]` → T1.8b fails to compile, which is the point: the guard is the type, not the runtime.
 - **T6.12** (I14): dropping the uniqueness check from `validateDocument` → T1.15 fails, and T1.12's duplicate-id case stops being reachable.
+- **T6.13** (I31): dropping the row-id uniqueness check → T1.16 fails, and `merge` upserts into whichever duplicate it reaches first while focus and the render key point at the other.
 - **T6.13** (I18): swapping the path-scoped seen-set for a global one → T1.17's shared-subtree half fails; removing it entirely hangs T3.15 rather than failing it, which is why T1.17 asserts the call *returns*.
 - **T6.14** (I17): removing the `max(1, …)` floor → T3.6b fails at all three kinds.
 - **T6.15** (§3): giving a `row` group's children the full width → T3.6c fails, and T2.1 fails at every width where a child wraps.
