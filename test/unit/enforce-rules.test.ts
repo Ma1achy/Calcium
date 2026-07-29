@@ -109,6 +109,15 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'const style = { colour: "#7faecf", bold: true };',
   },
   {
+    // The literal an adapter author writes when a document needs a status
+    // marker and the vocabulary is one token short. It compiles behind an
+    // `as`, it looks right on the machine it was written on, and it has no
+    // ASCII fallback.
+    rule: "SS39",
+    file: "src/data/adapters/docker.ts",
+    source: 'blocks.push({ kind: "notice", tone: "error", glyph: "✗", text });',
+  },
+  {
     rule: "SS35",
     file: "src/data/manifest/types.ts",
     source: "export type Result<T, E> = { ok: true; value: T } | { ok: false; errors: E };",

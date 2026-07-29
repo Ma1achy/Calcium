@@ -26,7 +26,7 @@ describe("C09 tier 6", () => {
       kind: "notice",
       id: "t6-1",
       tone: "error",
-      glyph: "✗",
+      glyph: "error",
       text: "x".repeat(97),
     });
     const kit = measurable();

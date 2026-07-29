@@ -11,9 +11,15 @@
 import { describe, expect, it } from "vitest";
 import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../support/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, LIGHT_THEME, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
-import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
+import {
+  GLYPH_SUBSTITUTIONS,
+  GLYPH_TOKENS,
+  glyphCells,
+  glyphFor,
+  SUBSTITUTIONS,
+} from "../../src/presentation/blocks/index.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -87,6 +93,42 @@ describe("C09 contract — measurement", () => {
     for (const [unicode, ascii] of SUBSTITUTIONS) {
       expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
       expect(cells(unicode), `${unicode} is one cell`).toBe(1);
+    }
+  });
+
+  it("T2.5b (I5, C04 §5): every `Glyph` is 1:1 by cell count, in both renderings", () => {
+    // The rule C04 commitment 10 has always stated and could not keep while the
+    // field was a free string: C09 substituted for the glyphs it owned and
+    // emitted a block-supplied character verbatim. Now every glyph a block can
+    // name is in this table, so the guarantee covers the whole field rather
+    // than most of it.
+    for (const [unicode, ascii] of GLYPH_SUBSTITUTIONS) {
+      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+      expect(cells(unicode), `${unicode} is one cell`).toBe(1);
+    }
+  });
+
+  it("T2.5c: `glyphCells` agrees with both renderings, which is what lets measure skip capabilities", () => {
+    // `measure` receives width and no capability record (C04 §5), so it can only
+    // be right if the two renderings are the same width. This asserts the thing
+    // the measurer actually relies on rather than the table it is derived from.
+    for (const token of GLYPH_TOKENS) {
+      expect(glyphCells(token)).toBe(cells(glyphFor(token, FULL_CAPS)));
+      expect(glyphCells(token)).toBe(cells(glyphFor(token, ASCII_CAPS)));
+    }
+  });
+
+  it("T2.5d: the vocabulary is complete — every `Glyph` resolves in both modes", () => {
+    // A token added to C04's union without a row in C09's table would resolve
+    // to `undefined` and render as the string "undefined". The `Record<Glyph,…>`
+    // makes that a type error; this is the runtime half, for a token arriving
+    // from a fixture.
+    for (const token of GLYPH_TOKENS) {
+      for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+        const drawn = glyphFor(token, caps);
+        expect(drawn, `${token} has no rendering`).toBeTruthy();
+        expect(drawn).not.toContain("undefined");
+      }
     }
   });
 

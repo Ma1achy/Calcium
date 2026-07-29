@@ -25,6 +25,7 @@ import {
   GLYPH_REQUIRED_TONES,
   type Block,
   type Cell,
+  type Glyph,
   type Notice,
   type Plot,
   type Tone,
@@ -67,7 +68,7 @@ export class BlockShapeError extends Error {
  * construction rather than at the renderer, which is where D29 says the
  * constraint belongs: the renderer has no way to invent one.
  */
-function requireGlyph(tone: Tone | undefined, glyph: string | undefined, where: string): void {
+function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: string): void {
   if (tone === undefined || !GLYPH_REQUIRED_TONES.has(tone)) return;
   if (glyph !== undefined && glyph.length > 0) return;
   throw new BlockShapeError(

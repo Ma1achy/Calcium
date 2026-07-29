@@ -233,7 +233,7 @@ describe("C04 fail-on-revert", () => {
       kind: "notice",
       id: "revert-wrap",
       tone: "error",
-      glyph: "✗",
+      glyph: "error",
       text: "x".repeat(97),
     });
 

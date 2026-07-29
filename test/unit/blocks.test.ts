@@ -145,7 +145,7 @@ describe("C09 §6 — kinds", () => {
     const kit = measurable();
     const text = "x".repeat(60);
     const bare = block({ kind: "notice", id: "n-bare", tone: "info", text });
-    const glyphed = block({ kind: "notice", id: "n-glyph", tone: "error", glyph: "✗", text });
+    const glyphed = block({ kind: "notice", id: "n-glyph", tone: "error", glyph: "error", text });
 
     expect(kit.measure(bare, 30)).toBe(2);
     expect(kit.measure(glyphed, 30), "two fewer columns per row").toBe(3);

@@ -18,6 +18,7 @@ import {
   type Block,
   type BlockKind,
   type DocumentStatus,
+  type Glyph,
   type Result,
   type ViewDocument,
 } from "./types.js";
@@ -29,6 +30,11 @@ const STATUSES: ReadonlySet<string> = new Set<DocumentStatus>([
   "error",
   "partial",
   "proposed",
+]);
+
+const GLYPHS: ReadonlySet<Glyph> = new Set<Glyph>([
+  "ok", "warn", "error", "info", "pending", "working", "running",
+  "queued", "cancelled", "expand", "collapse", "live", "bullet",
 ]);
 
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
@@ -73,11 +79,22 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
   notice: (b, e, at) => {
     requireString(b, "text", e, at);
     requireString(b, "tone", e, at);
+    requireGlyph(b["glyph"], e, at);
   },
   keyValue: (b, e, at) => requireArray(b, "rows", e, at),
   table: (b, e, at) => {
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
+    // The other half of I6's glyph rule. A `Cell` carries one too, and a table
+    // is where the far side's own status strings most often arrive.
+    if (isArray(b["rows"])) {
+      for (const row of b["rows"]) {
+        if (!isRecord(row) || !isRecord(row["cells"])) continue;
+        for (const [key, cell] of Object.entries(row["cells"])) {
+          if (isRecord(cell)) requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+        }
+      }
+    }
   },
   steps: (b, e, at) => requireArray(b, "steps", e, at),
   logs: (b, e, at) => requireArray(b, "lines", e, at),
@@ -124,6 +141,23 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
 });
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set(Object.keys(KIND_CHECKS));
+
+/**
+ * I6's second half — a glyph is a slot, never a character.
+ *
+ * The type carries this inside the tree; a document arriving from a fixture, an
+ * adapter's `as`, or a far side emitting `tui.view/1` has no type with it. A
+ * character reaching a block is what makes C09 §4's 1:1 substitution rule
+ * mostly-true rather than true, and mostly-true fails only under `LANG=C`.
+ */
+function requireGlyph(value: unknown, e: string[], at: string): void {
+  if (value === undefined) return;
+  if (typeof value === "string" && (GLYPHS as ReadonlySet<string>).has(value)) return;
+  e.push(
+    `${at}: "glyph" must be one of ${[...GLYPHS].join(", ")} (C04 I6) — ` +
+      `got ${JSON.stringify(value)}; a character has no ASCII fallback and no width guarantee`,
+  );
+}
 
 /** Children of a container, for the recursive walk. Total on malformed input. */
 function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {

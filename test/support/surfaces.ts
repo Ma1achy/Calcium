@@ -137,7 +137,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         id: "s08-warning",
         gapBefore: true,
         tone: "warn",
-        glyph: "▲",
+        glyph: "warn",
         text:
           "W004  ESCAPE_HATCH_USED\n" +
           "MultiMetricEarlyStopping replaces=prism.EarlyStopping\n" +

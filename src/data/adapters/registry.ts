@@ -118,7 +118,7 @@ function lastResortDocument(raw: RawResult, ctx: AdapterContext, detail: string)
         kind: "notice",
         id: "adapt-failed",
         tone: "error",
-        glyph: "✗",
+        glyph: "error",
         text: "Could not render this result.",
       },
     ],

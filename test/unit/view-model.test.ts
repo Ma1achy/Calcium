@@ -189,11 +189,14 @@ describe("C04 validation", () => {
     expect(() => block({ kind: "notice", id: "n", tone: "error", text: "failed" })).toThrow(
       BlockShapeError,
     );
+    // An empty glyph is now unrepresentable in the type, so this needs a cast
+    // to be written at all — and the runtime check stays, because a fixture
+    // arrives as JSON and the type does not travel with it.
     expect(() =>
-      block({ kind: "notice", id: "n", tone: "warn", text: "slow", glyph: "" }),
+      block({ kind: "notice", id: "n", tone: "warn", text: "slow", glyph: "" as never }),
     ).toThrow(BlockShapeError);
     expect(() =>
-      block({ kind: "notice", id: "n", tone: "error", text: "failed", glyph: "✗" }),
+      block({ kind: "notice", id: "n", tone: "error", text: "failed", glyph: "error" }),
     ).not.toThrow();
 
     // And inside a table cell, which is the other half of I6.

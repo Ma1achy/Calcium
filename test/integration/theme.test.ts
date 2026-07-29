@@ -65,7 +65,7 @@ describe("C10 integration", () => {
     const sequences = (["ok", "warn", "error"] as const).map((tone) => {
       const line =
         kit.renderToLines(
-          block({ kind: "notice", id: `theme-${tone}`, tone, glyph: "*", text: "state" }),
+          block({ kind: "notice", id: `theme-${tone}`, tone, glyph: "running", text: "state" }),
           40,
         )[0] ?? "";
       return line.slice(0, line.indexOf("m") + 1);

@@ -203,6 +203,27 @@ export const SCANS = [
     scope: "src/presentation/", allow: [],
     why: "renderers emit SGR from terminal/escapes.ts; an Ink colour prop discards the depth tag" },
 
+  // SS36's shape applied to glyphs, and the rule its own inventory row caught:
+  // SS39 was written into A03 and the commitment-14b check failed on that
+  // commit, which is exactly the point of it.
+  //
+  // The type closes `Glyph` inside the tree; this closes the cast. A `Notice`
+  // built with `as` takes a character without complaint, the same way a `Style`
+  // with `colour: "#7faecf"` would have without SS36 — and this failure is the
+  // quieter of the two. A wrong colour is visible to whoever wrote it; a glyph
+  // with no ASCII fallback is visible only under `LANG=C`, only to the users
+  // least able to say what they are looking at.
+  //
+  // The pattern matches a glyph position whose literal is *not* a token, so
+  // `glyph: "error"` passes and `glyph: "✗"` does not. Scoped to `src/`: the
+  // one file that holds the characters writes them as table rows rather than in
+  // a glyph position, so it needs no exemption — and an exemption nobody needs
+  // is a door left open.
+  { id: "SS39", spec: "C04 I6 · C09 §4",
+    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet)["'`])/,
+    scope: "src/", allow: [],
+    why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

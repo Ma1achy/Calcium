@@ -61,7 +61,7 @@ describe("C09 × C10", () => {
     const kit = measurable({ capabilities: { ...FULL_CAPS, colourDepth: 4 } });
     const notices = (["ok", "warn", "error"] as const).map((tone) =>
       kit.renderToLines(
-        block({ kind: "notice", id: `n-${tone}`, tone, glyph: "*", text: "status" }),
+        block({ kind: "notice", id: `n-${tone}`, tone, glyph: "running", text: "status" }),
         40,
       )[0] ?? "",
     );
@@ -77,7 +77,7 @@ describe("C09 × C10", () => {
   it("T4.3c (with C10): at depth 24 a tone is written as truecolour", () => {
     const line =
       measurable().renderToLines(
-        block({ kind: "notice", id: "n-24", tone: "ok", glyph: "+", text: "done" }),
+        block({ kind: "notice", id: "n-24", tone: "ok", glyph: "ok", text: "done" }),
         40,
       )[0] ?? "";
 

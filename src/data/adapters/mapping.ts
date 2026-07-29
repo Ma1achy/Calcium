@@ -18,19 +18,6 @@ import { block } from "../viewmodel/construct.js";
 import type { Block, DocumentStatus, ErrorLike } from "../viewmodel/types.js";
 import type { AdapterContext, RawResult } from "./types.js";
 
-/**
- * Written here because C04 I6 requires a glyph on `error` and `warn` and the
- * glyph vocabulary is L1 (C09 §4), which C07 must not import (MG7).
- *
- * **These reach an ASCII terminal unchanged.** C09 substitutes glyphs it chose
- * itself and emits a block-supplied one verbatim, so the 1:1 substitution rule
- * does not cover this path. That is a gap in the seam rather than in this file
- * — every producer of a toned notice has it, including C24's `b.notice.error` —
- * and it is recorded here rather than worked around, because a local workaround
- * would be a second glyph vocabulary.
- */
-const CROSS = "✗";
-
 /** What the mapping decides, before the adapter's blocks are known. */
 export type Outcome = Readonly<{
   status: DocumentStatus;
@@ -78,7 +65,9 @@ export function exitCodeOf(raw: RawResult): number {
 }
 
 function errorNotice(id: string, text: string): Block {
-  return block({ kind: "notice", id, tone: "error", glyph: CROSS, text: stripControl(text) });
+  // A slot, not a character (C04 §5). C09 §4 owns both renderings and the
+  // 1:1 rule, so this survives `LANG=C` without C07 knowing what it draws.
+  return block({ kind: "notice", id, tone: "error", glyph: "error", text: stripControl(text) });
 }
 
 function rawBlock(id: string, text: string): readonly Block[] {

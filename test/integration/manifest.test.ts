@@ -20,7 +20,7 @@ function errorDocument(error: ErrorLike, argv: readonly string[]): ViewDocument 
     schema: "tui.view/1",
     command: argv.join(" "),
     status: "error",
-    blocks: [{ kind: "notice", id: "e1", text: error.message, tone: "error", glyph: "✖" }],
+    blocks: [{ kind: "notice", id: "e1", text: error.message, tone: "error", glyph: "error" }],
     error,
     meta: {
       verb: argv[0] ?? null,

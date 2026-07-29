@@ -102,7 +102,7 @@ describe("C04 integration — the document lifecycle", () => {
     const failed = doc({
       status: "error",
       error: { message: "connection refused", code: "ECONNREFUSED", stage: "transport" },
-      blocks: [block({ kind: "notice", id: "n", tone: "error", glyph: "✗", text: "Could not connect." })],
+      blocks: [block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "Could not connect." })],
     });
 
     expect(validateDocument(failed).ok).toBe(true);

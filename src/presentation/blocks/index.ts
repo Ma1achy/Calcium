@@ -10,6 +10,15 @@
  */
 
 export { DEFAULT_DEFINITIONS } from "./defaults.js";
-export { glyphs, spinnerFrames, SUBSTITUTIONS, type GlyphSet } from "./glyphs.js";
+export {
+  glyphs,
+  glyphFor,
+  glyphCells,
+  spinnerFrames,
+  GLYPH_SUBSTITUTIONS,
+  GLYPH_TOKENS,
+  SUBSTITUTIONS,
+  type GlyphSet,
+} from "./glyphs.js";
 export { createBlockRegistry } from "./registry.js";
 export type { BlockDefinition, BlockRegistry, FocusState, RenderContext } from "./types.js";

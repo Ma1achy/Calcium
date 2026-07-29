@@ -70,6 +70,35 @@ export type Tone =
   | "meta"
   | "identifier";
 
+/**
+ * A glyph slot, never a character (I6, C09 §4).
+ *
+ * The identical argument to `Tone`, and the one commitment 10 could not keep
+ * while this was a string: C09 substitutes 1:1 by column count for the glyphs
+ * it owns, and emitted a block-supplied one verbatim. The guarantee held for
+ * the box drawing and failed for whatever an adapter wrote — under `LANG=C`,
+ * for the users least able to say what they were seeing.
+ *
+ * C09 §4 owns both renderings. Anything outside this vocabulary goes in the
+ * block's *text* — action labels like `↗ open` already do — and a vocabulary
+ * with an "or any string" arm is not a vocabulary.
+ */
+export type Glyph =
+  | "ok"
+  | "warn"
+  | "error"
+  | "info"
+  | "pending"
+  /** Starting, connecting, installing. Distinct from `running`: S11, S15. */
+  | "working"
+  | "running"
+  | "queued"
+  | "cancelled"
+  | "expand"
+  | "collapse"
+  | "live"
+  | "bullet";
+
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
 
@@ -84,7 +113,7 @@ export type Action =
 export type Cell = Readonly<{
   text: string;
   tone?: Tone;
-  glyph?: string;
+  glyph?: Glyph;
   spark?: readonly number[];
 }>;
 
@@ -140,7 +169,7 @@ export type Notice = Readonly<{
   kind: "notice";
   id: string;
   tone: Tone;
-  glyph?: string;
+  glyph?: Glyph;
   text: string;
 }> & Gap;
 

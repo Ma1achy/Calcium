@@ -11,6 +11,7 @@
  */
 
 export type {
+  Glyph,
   Action,
   Block,
   BlockKind,

@@ -8,9 +8,9 @@
  */
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
+import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
-import { glyphs } from "../glyphs.js";
+import { glyphFor, glyphCells, glyphs } from "../glyphs.js";
 import { clampSpans, fit, pad, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -29,9 +29,15 @@ function proseWidth(width: number, prefix: number): number {
   return normaliseWidth(normaliseWidth(width) - prefix);
 }
 
-/** The cells a leading glyph and its trailing space occupy. */
-function prefixCells(glyph: string | undefined): number {
-  return glyph === undefined || glyph === "" ? 0 : cells(glyph) + 1;
+/**
+ * The cells a leading glyph and its trailing space occupy.
+ *
+ * Takes the *token*, not a character, and needs no capabilities: both
+ * renderings are the same width by C09 §4's 1:1 rule, which is what lets
+ * `measure` be correct without seeing a capability record (C04 §5).
+ */
+function prefixCells(glyph: Glyph | undefined): number {
+  return glyph === undefined ? 0 : glyphCells(glyph) + 1;
 }
 
 // --- rule ------------------------------------------------------------------
@@ -95,7 +101,10 @@ export const noticeDefinition: BlockDefinition<Notice> = {
       wrapped.map((line, index) =>
         paint([
           {
-            text: index === 0 && block.glyph !== undefined ? `${block.glyph} ` : " ".repeat(prefix),
+            text:
+              index === 0 && block.glyph !== undefined
+                ? `${glyphFor(block.glyph, ctx.capabilities)} `
+                : " ".repeat(prefix),
             style,
           },
           { text: line, style },
