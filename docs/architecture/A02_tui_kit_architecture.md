@@ -97,7 +97,17 @@ Every component spec carries a commitment list and an invariant list, and they m
 
 The failure mode is specific and worth naming: **a claim restated downstream is a claim made where it cannot be tested, and the duplication is what hides that neither copy is backed.** Three rules were each stated in two specs and asserted in neither.
 
-Both rules are mechanical now, not advisory — see §8.
+**Both rules are mechanical, not advisory.** Every commitment carries one of three markers, and A03 SP1 fails the build without one:
+
+```
+3. …text… (I5)            backed by one invariant — the common case
+7. …text… (I3, I4)        the readable form of several
+6. …text… (→ C09 I5)      someone else's rule, cross-referenced
+```
+
+A commitment that fits none of the three is a § detail rather than a commitment, and belongs in the section that explains it. That is the demotion the audit applied to four of them: an exact column cap, a shell fallback, a layout breakpoint and a menu policy were §-level facts wearing contract clothes.
+
+The markers are what make the check exact. A word-overlap heuristic cannot do this — a commitment is the readable form, so it deliberately shares few words with the invariant it summarises — and it is why the audit was worth doing by hand first. **The categories are what told us which markers the template needed.**
 
 ---
 

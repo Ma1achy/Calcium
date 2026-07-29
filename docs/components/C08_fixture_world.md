@@ -212,6 +212,7 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 - **I13** — All three transports are substitutable: any test not concerning spawning passes against each (C06 I15).
 - **I14** — The world backs `EmulatedTransport` only. No test path reaches it.
 - **I15** — `record --diff` reports structural deltas only, and prints a count before any work begins. Its header also carries the authored ratio, which is the only place that number is read.
+- **I18** — A mutating verb changes the world, and the response it returns is `derived` from a recording of that verb rather than composed. Without mutation a demo cannot show a workflow, and a workflow is what a demo is for; without derivation the response is a fiction with no recording behind it (I10).
 - **I16** — The corpus file declares `schema: "tui.fixtures/1"`. An absent or unrecognised value fails the load; it is never assumed.
 - **I17** — `live` mode advances by reading the injected `clock` on each query. Nothing in C08 schedules, and no mode advances the world unasked.
 
@@ -219,25 +220,25 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 
 ## 6. Commitments
 
-1. Fixtures are recorded from the real CLI; authoring is the exception, marked, justified and counted.
-2. An authored fixture without a note fails the build; the authored ratio is reported per verb.
-3. `record --against <cli>` re-runs recordings against the current CLI and `record --diff` reports the structural drift. **Two flags, one job** — an earlier draft also named a `--verify`, and it was this same operation under a second name rather than a third operation.
-4. The world is seeded and fully deterministic; nothing in C08 reads a clock or a random source.
-5. `advance` and mutations are pure transitions.
-6. Three modes — frozen, stepped, live — with frozen the default.
-7. Mutating verbs mutate the world, so a demo can show a workflow end to end.
-8. Every query returns something; an unfixtured verb degrades to a plausible failure.
-9. Capture redacts values, never structure.
-10. C08 is app-side; the framework's only coupling is the handler closure.
-11. World output satisfies the same boundary contract as the real CLI, including the `__manifest__` endpoint.
-12. The world backs development only; tests run against the recorded corpus.
-13. `record --diff` scopes the reconciliation before it starts — every delta is one adapter line.
-14. The harness is `tui-kit`; the world is the app's. Apps implement `WorldDriver` and get recording, determinism and redaction for free.
-15. World transitions are pure; only the cell holding the current world is mutable.
-16. `live` mode takes an injected clock; nothing in C08 reads ambient time.
-17. `live` mode **pulls**: it reads the clock on each query and advances by the elapsed delta. Nothing in C08 schedules, because a world that advances unasked is a world whose reproducibility depends on real elapsed time.
-18. The corpus file is versioned `tui.fixtures/1` and stores `stdoutRaw`, deriving `stdout` at load. An unrecognised schema fails the load rather than being parsed hopefully.
-19. §7's tests are tagged by half. A **world** test is the reference app's to run, not a deferral `tui-kit` carries — the repo that owns the domain owns the assertion about it.
+1. Fixtures are recorded from the real CLI; authoring is the exception, marked, justified and counted (I1).
+2. An authored fixture without a note fails the build; the authored ratio is reported per verb (I1, I15).
+3. `record --against <cli>` re-runs recordings against the current CLI and `record --diff` reports the structural drift. **Two flags, one job** — an earlier draft also named a `--verify`, and it was this same operation under a second name rather than a third operation (I15).
+4. The world is seeded and fully deterministic; nothing in C08 reads a clock or a random source (I3, I4).
+5. `advance` and mutations are pure transitions (I5).
+6. Three modes — frozen, stepped, live — with frozen the default (I6).
+7. Mutating verbs mutate the world, so a demo can show a workflow end to end (I18).
+8. Every query returns something; an unfixtured verb degrades to a plausible failure (I7).
+9. Capture redacts values, never structure (I8).
+10. C08 is app-side; the framework's only coupling is the handler closure (I9).
+11. World output satisfies the same boundary contract as the real CLI, including the `__manifest__` endpoint (I11, I12).
+12. The world backs development only; tests run against the recorded corpus (I14).
+13. `record --diff` scopes the reconciliation before it starts — every delta is one adapter line (I15).
+14. The harness is `tui-kit`; the world is the app's. Apps implement `WorldDriver` and get recording, determinism and redaction for free (I9).
+15. World transitions are pure; only the cell holding the current world is mutable (I5).
+16. `live` mode takes an injected clock; nothing in C08 reads ambient time (I4).
+17. `live` mode **pulls**: it reads the clock on each query and advances by the elapsed delta. Nothing in C08 schedules, because a world that advances unasked is a world whose reproducibility depends on real elapsed time (I17).
+18. The corpus file is versioned `tui.fixtures/1` and stores `stdoutRaw`, deriving `stdout` at load. An unrecognised schema fails the load rather than being parsed hopefully (I16).
+19. §7's tests are tagged by half. A **world** test is the reference app's to run, not a deferral `tui-kit` carries — the repo that owns the domain owns the assertion about it (→ A04 §1).
 
 ---
 

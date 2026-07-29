@@ -109,6 +109,8 @@ Consequences that matter:
 - **I6** — C25 registers through C09's public `register`; it is not privileged.
 - **I7** — C25 holds no state. `measure` and `render` are pure over the block.
 - **I8** — C25 declares no block types. `Patch` and `Hunk` are C04's.
+- **I10** — A language C09's tokeniser does not recognise renders as plain text, never as an error. A diff of an unfamiliar file type is still a diff worth reading, and refusing to render it would make the renderer's language table a gate on content.
+- **I11** — Word-level intra-line highlighting is deferred, and the block shape does not foreclose it. `Hunk` carries whole lines; adding spans later is a field, not a redesign.
 - **I9** — Expansion of a collapsed region patches the document (C11 T4.7's mechanism), never mutates external state. C25 itself does not expand anything — it renders whatever `collapsedBefore` says.
 
 ---
@@ -133,16 +135,16 @@ Adding a background channel to `Style` is a C10 decision and should be taken del
 
 ## 7. Commitments
 
-1. C25 renders textual diffs; `diff` remains the structured comparison and the two never merge.
-2. Height is exact and width-independent; nothing wraps.
-3. A collapsed region is one row stating its own count.
-4. `+` and `-` carry the distinction; tone reinforces it and never replaces it.
+1. C25 renders textual diffs; `diff` remains the structured comparison and the two never merge (I8).
+2. Height is exact and width-independent; nothing wraps (I2).
+3. A collapsed region is one row stating its own count (I5).
+4. `+` and `-` carry the distinction; tone reinforces it and never replaces it (I4).
 5. Two layouts, chosen by width — unified when narrow, split when wide. The breakpoint is a §3 value, tuned against golden frames rather than promised (I2).
-6. C25 registers through C09's public mechanism and is not privileged.
-7. C25 declares no block types and holds no state.
-8. Tokenisation is C09's; `measure` never tokenises.
-9. An unregistered language renders as plain text, not an error.
-10. Word-level highlighting is deferred and the block shape does not foreclose it.
+6. C25 registers through C09's public mechanism and is not privileged (I6).
+7. C25 declares no block types and holds no state (I7, I8).
+8. Tokenisation is C09's; `measure` never tokenises (I3).
+9. An unregistered language renders as plain text, not an error (I10).
+10. Word-level highlighting is deferred and the block shape does not foreclose it (I11).
 
 ---
 

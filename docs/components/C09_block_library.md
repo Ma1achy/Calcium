@@ -309,6 +309,8 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I11** — A renderer throwing is contained: that block renders as an error block, the rest of the frame is unaffected. Compute, so no retry (A02 §7 rule 2).
 - **I12** — A sealed registry cannot be registered against.
 - **I13** — Every kind in C04's union has a registered default definition. Asserted exhaustively over the type.
+- **I17** — Whether a kind wraps or truncates is fixed per kind, not per block, so height stays a function of block and width. `code` is the one exception and it is explicit: the producer chooses through `wrap`, which is a field of the block and therefore visible to `measure`.
+- **I18** — Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the framework's only runtime L1 → L0-terminal edge, and it is deliberate: two ways of colouring a cell means two ways of degrading it, and only one of them would honour C10.
 - **I16** — Ink's layout width agrees with `cells()`. C09 hands Ink pre-broken lines, so Ink's own idea of how wide a string is must match the measurer's or a line it considers too long wraps and adds a row nothing counted. Asserted (T2.16), never assumed — a silent disagreement here breaks I1 for every kind at once.
 - **I15** — `gapBefore` is applied by the sequence, never by the block (C04 §3a, I19). `measure` never counts it; `measureSequence` and every container do.
 - **I14** — Control characters are stripped from every text field before measurement and render, by C09 and not by its callers. A far side's output cannot inject escape sequences into the frame: `\x1b[2J` cannot clear the screen, a cursor-position query cannot get its answer typed into the prompt, and a stray `\r` cannot make a measured row and a rendered row disagree. Stripping happens once, at the last point before both, so measurement and render cannot see different text.
@@ -317,18 +319,18 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 
 ## 8. Commitments
 
-1. C09 owns the registry; C04 owns the schema and the measurement contract.
-2. Fourteen kinds ship here; `table` and `plot` register from C11 and C12 through the public mechanism.
-3. `measure` and `render` are written and tested as a pair, per kind.
-4. Wrapping versus truncation is a per-kind decision, documented in §3, except `code`, where the producer chooses via `wrap`. `code` names `syntax` slots; every other kind names `tone` slots.
-5. Every capability substitution is 1:1 by cell count.
-6. `cells()` is grapheme-aware and shared; no kind measures width for itself.
-7. Truncation is grapheme-aware and never leaves a half-drawn glyph.
-8. Renderers receive capabilities and theme through context and read no environment.
-9. An unregistered kind degrades to `raw`; a throwing renderer is contained to its block.
-10. The registry seals at composition end.
-11. Adding a kind whose measurer needs capabilities is a design decision, not an implementation detail.
-12. Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the first runtime L1 → L0-terminal edge, and it is required rather than tolerated.
+1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
+2. Fourteen kinds ship here; `table` and `plot` register from C11 and C12 through the public mechanism (I13).
+3. `measure` and `render` are written and tested as a pair, per kind (I1).
+4. Wrapping versus truncation is a per-kind decision, documented in §3, except `code`, where the producer chooses via `wrap`. `code` names `syntax` slots; every other kind names `tone` slots (I17).
+5. Every capability substitution is 1:1 by cell count (I5).
+6. `cells()` is grapheme-aware and shared; no kind measures width for itself (I6).
+7. Truncation is grapheme-aware and never leaves a half-drawn glyph (I9).
+8. Renderers receive capabilities and theme through context and read no environment (I3).
+9. An unregistered kind degrades to `raw`; a throwing renderer is contained to its block (I10, I11).
+10. The registry seals at composition end (I12).
+11. Adding a kind whose measurer needs capabilities is a design decision, not an implementation detail (I2).
+12. Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the first runtime L1 → L0-terminal edge, and it is required rather than tolerated (I18).
 13. Ink paints pre-broken lines. Its layout width must agree with `cells()`, and the agreement is asserted (T2.16), never assumed (I16).
 14. **Control characters are stripped from every text field before measurement and render** (I14). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
 

@@ -273,30 +273,30 @@ Per submission.
 
 ## 8. Commitments
 
-1. Seven routes, one per `ParseResult` kind; `empty` produces no entry.
-2. The pending entry is appended before the subprocess starts.
-3. Validation travels from C18 and is never recomputed.
-4. The submission guard covers every foreground route and is checked before the pending entry is appended; streams are exempt.
-5. `$_` comes from `meta.resultId` alone; nothing is inferred.
-6. Patches coalesce at `"stream"`; settlement flushes at `"completion"`.
-7. Frozen entries keep streaming until settled.
-8. Cancellation settles as `partial` and retains output.
-9. Every stage failure produces a document; none kills the session.
-10. Built-ins apply before delegation.
-11. All cross-layer sequences live in §4.
-12. Local handlers ship for framework concerns; apps register their own.
+1. Seven routes, one per `ParseResult` kind; `empty` produces no entry (I1).
+2. The pending entry is appended before the subprocess starts (I3).
+3. Validation travels from C18 and is never recomputed (I4).
+4. The submission guard covers every foreground route and is checked before the pending entry is appended; streams are exempt (I5, I6).
+5. `$_` comes from `meta.resultId` alone; nothing is inferred (I7).
+6. Patches coalesce at `"stream"`; settlement flushes at `"completion"` (I8).
+7. Frozen entries keep streaming until settled (I9).
+8. Cancellation settles as `partial` and retains output (I10).
+9. Every stage failure produces a document; none kills the session (I2).
+10. Built-ins apply before delegation (I11).
+11. All cross-layer sequences live in §4 (I13).
+12. Local handlers ship for framework concerns; apps register their own (I14).
 13. `/help` renders from the manifest and C16's keymap, so help cannot drift from behaviour (I25).
-14. The displayed command equals the spawned command.
-15. Submissions are refused once C22 sets `session.stopping`.
-16. C23 supplies `onAction`; `exec` re-enters the normal submission path.
-17. `open` is scheme-checked and never shelled.
-18. Actions from frozen entries are refused.
-19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time.
+14. The displayed command equals the spawned command (I15).
+15. Submissions are refused once C22 sets `session.stopping` (I12).
+16. C23 supplies `onAction`; `exec` re-enters the normal submission path (I16).
+17. `open` is scheme-checked and never shelled (I17).
+18. Actions from frozen entries are refused (I18).
+19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time (I19).
 20. A stream silent for 120 s gets a muted stall notice, never an error (I26).
-21. View refreshes are staggered by offset and fail in isolation.
-22. C23 sets `meta.origin` on every append; provenance is never absent.
-23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point.
-24. `/debug` never re-runs; `{ } json` always does, and each surface says so.
+21. View refreshes are staggered by offset and fail in isolation (I20, I21).
+22. C23 sets `meta.origin` on every append; provenance is never absent (I22).
+23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point (I23).
+24. `/debug` never re-runs; `{ } json` always does, and each surface says so (I23).
 25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 
 ---

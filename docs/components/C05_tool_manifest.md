@@ -210,6 +210,8 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I10** — Validation never checks semantics — only shape, type, arity and declared relations.
 - **I11** — A sealed store cannot be reloaded.
 - **I12** — `local: true` tools are never spawned; `local: false` tools are never handled in-process.
+- **I16** — The manifest version is exposed and never enforced. C05 refuses no manifest for its version alone; a verb the manifest does not declare degrades to "not available here" at the point of use, because a far side that dropped one verb is still a far side worth talking to.
+- **I17** — A `hidden` tool is omitted from help and completion and remains fully invocable. Hiding is a presentation decision, never an access-control one — C05 has no notion of permission and a hidden verb that refused to run would be inventing one.
 - **I13** — C05 imports nothing from `terminal/`, `presentation/` or above.
 - **I14** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
 - **I15** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
@@ -218,20 +220,20 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 
 ## 7. Commitments
 
-1. The manifest is the single source of truth for verbs, sub-verbs, flags, enums, arity and local-vs-spawn.
-2. `tui-kit` owns the schema, loader and validator; the app owns the manifest content.
-3. A hand-written fixture manifest ships; far-side generation is a wiring-time concern.
-4. Sub-verbs are multi-token names, matched longest-first.
-5. Validation runs before any spawn, is pure, and produces `ErrorLike`.
-6. Validation checks shape only — never semantics.
-7. Unknown fields are ignored; malformed known fields are errors.
-8. Tool names are unique; duplicates fail parsing.
-9. The store seals at the end of composition and cannot be reloaded after.
-10. Version is exposed, not enforced. A missing tool degrades to "not available here".
-11. `hidden` tools are omitted from help and completion but remain invocable.
-12. `ArgType` carries no app-domain concepts; `pattern` is the extension point.
-13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix.
-14. Conflicts are directional in the check and deduplicated in the report.
+1. The manifest is the single source of truth for verbs, sub-verbs, flags, enums, arity and local-vs-spawn (I1).
+2. `tui-kit` owns the schema, loader and validator; the app owns the manifest content (→ A01 §2).
+3. A hand-written fixture manifest ships; far-side generation is a wiring-time concern (→ A01 §5).
+4. Sub-verbs are multi-token names, matched longest-first (I7).
+5. Validation runs before any spawn, is pure, and produces `ErrorLike` (I8, I9).
+6. Validation checks shape only — never semantics (I10).
+7. Unknown fields are ignored; malformed known fields are errors (I3).
+8. Tool names are unique; duplicates fail parsing (I6).
+9. The store seals at the end of composition and cannot be reloaded after (I11).
+10. Version is exposed, not enforced. A missing tool degrades to "not available here" (I16).
+11. `hidden` tools are omitted from help and completion but remain invocable (I17).
+12. `ArgType` carries no app-domain concepts; `pattern` is the extension point (I5).
+13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I14).
+14. Conflicts are directional in the check and deduplicated in the report (I15).
 
 ---
 

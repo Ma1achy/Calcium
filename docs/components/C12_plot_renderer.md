@@ -135,23 +135,24 @@ Under `unicode: "ascii"`, braille is unavailable.
 - **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 2` with, by `width` cells.
 - **I11** — C12 owns no state; every render is a pure function of block, width and context.
 - **I12** — C12 registers through C09's public `register`; it is not privileged.
+- **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise.
 - **I13** — Sparklines are exactly one row, at every width including 1.
 
 ---
 
 ## 8. Commitments
 
-1. Two forms — braille line plots with axes, and one-row sparklines — sharing a scaling core.
-2. Measured height is declared, never derived from data.
-3. An empty series occupies its declared height rather than collapsing.
-4. Points are joined with Bresenham, so a curve reads as a curve.
-5. Every degenerate series in §4 has a defined result and none throws.
-6. Downsampling is by per-column min/max, so spikes survive.
-7. At 1-bit, multi-series plots stack into strips summing exactly to `height`; labels live in the y-label column.
-8. Series that cannot be given a row are named in a legend, never dropped silently.
-9. The ASCII fallback keeps the cell grid identical and only loses subcell resolution.
-10. C12 holds no state and registers through the public mechanism.
-11. Braille rasterisation and Bresenham are ported from the mockup's working implementation.
+1. Two forms — braille line plots with axes, and one-row sparklines — sharing a scaling core (I1).
+2. Measured height is declared, never derived from data (I1).
+3. An empty series occupies its declared height rather than collapsing (I1).
+4. Points are joined with Bresenham, so a curve reads as a curve (I14).
+5. Every degenerate series in §4 has a defined result and none throws (I2, I3, I4).
+6. Downsampling is by per-column min/max, so spikes survive (I5).
+7. At 1-bit, multi-series plots stack into strips summing exactly to `height`; labels live in the y-label column (I6, I7).
+8. Series that cannot be given a row are named in a legend, never dropped silently (I8).
+9. The ASCII fallback keeps the cell grid identical and only loses subcell resolution (I9).
+10. C12 holds no state and registers through the public mechanism (I11, I12).
+11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
 
 ---
 

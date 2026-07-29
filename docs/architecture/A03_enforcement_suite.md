@@ -243,6 +243,34 @@ Not build gates — they need fixtures — but they are the checks that catch th
 
 ---
 
+## 7a. Spec properties
+
+The suite governs the source. **SP1 governs the documents the source is written against**, because a commitment nothing enforces diverges from the implementation without anything going red — and there is no reason the enforcement suite should stop at the `src/` boundary when the specs are the contract.
+
+| # | Rule | Scope | Declared |
+|---|---|---|---|
+| SP1 | Every commitment cites an invariant, several, or another spec's | `docs/components/` | A02 §1 |
+
+It runs in `make enforce` and its fire-tests are `test/unit/enforce-commitments.test.ts`.
+
+**Why this is exact where a heuristic was not.** The 2026-07-29 pairing audit read 355 invariants against 358 commitments by hand and found 103 mismatches — 57 commitments nothing enforced, 46 invariants nothing agreed to. A word-overlap check over the corpus cannot replace that reading: a commitment is the *readable* form, so it deliberately shares few words with the invariant it summarises, and the noise floor is higher than the signal.
+
+What makes a mechanical rule possible is that the audit produced **categories**, and a category becomes a marker the spec writes down:
+
+```
+3. …text… (I5)            backed by one invariant — the common case
+7. …text… (I3, I4)        the readable form of several
+6. …text… (→ C09 I5)      someone else's rule, cross-referenced
+```
+
+The check is then citation resolution rather than similarity: a commitment with no marker fails, a local citation naming an invariant the spec does not declare fails, and a cross-reference that does not resolve fails. That last one is the failure mode a citation rule invites — without it the rule degrades from "cites an invariant" to "contains a bracket", which is worse than no rule because it reads as enforced.
+
+**Architecture documents are cited by section.** A01–A04 declare no invariants, deliberately: A03's own SS and MG rules *are* the architecture's invariants in enforceable form, and giving those documents an invariant list would duplicate this one. So `(→ A01 A.1)` is accepted and not chased for an `I<n>`.
+
+The rule's own vacuity risk is specific and worth naming: **a document with no Commitments section produces no findings and looks compliant.** The fire-test asserts twenty-five specs and more than three hundred commitments before asserting that none of them fails.
+
+---
+
 ## 8. Running them
 
 | When | Which | Budget |

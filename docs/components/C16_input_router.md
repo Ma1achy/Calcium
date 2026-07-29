@@ -222,6 +222,7 @@ Two small machines, both with an injected clock.
 - **I11** — C16 never calls the frame scheduler. L4 commits.
 - **I12** — Bytes buffered during a paste are never dispatched as individual keys.
 - **I13** — C16 imports nothing from `terminal/`; raw mode is C01's and decoding is data-in.
+- **I16** — No chord support beyond modifiers. Terminals send no key-up event, so a two-key chord cannot be distinguished from two keystrokes without a timeout, and a timeout would make the same input mean different things at different typing speeds.
 - **I14** — `activeTarget` is pure over its inputs.
 - **I15** — Ctrl-D is dispatched only when the editor buffer is empty, and it opens a confirm rather than exiting. With text present it is consumed and discarded — never treated as EOF, and never as a delete-forward, because a keystroke that sometimes ends the session and sometimes edits the line is one nobody presses twice.
 
@@ -229,19 +230,19 @@ Two small machines, both with an injected clock.
 
 ## 9. Commitments
 
-1. C01 sets raw mode; C16 decodes the bytes.
-2. Focus is derived from what is on screen, plus one stored location — including which row — that resets only on append.
-3. Mouse events route by position through C15 then C14; keys route by focus.
-4. A paste is one event, whatever its size; the no-bracketed-paste fallback is a documented heuristic.
-5. No chord support beyond modifiers — terminals send no key-up.
-6. Exactly one handler consumes an event; unconsumed events are dropped.
-7. Ctrl-C cancels an in-flight verb ahead of every other meaning.
-8. Ctrl-C never dismisses a confirm.
+1. C01 sets raw mode; C16 decodes the bytes (I13).
+2. Focus is derived from what is on screen, plus one stored location — including which row — that resets only on append (I1, I2).
+3. Mouse events route by position through C15 then C14; keys route by focus (I3).
+4. A paste is one event, whatever its size; the no-bracketed-paste fallback is a documented heuristic (I6, I12).
+5. No chord support beyond modifiers — terminals send no key-up (I16).
+6. Exactly one handler consumes an event; unconsumed events are dropped (I4, I5).
+7. Ctrl-C cancels an in-flight verb ahead of every other meaning (I7).
+8. Ctrl-C never dismisses a confirm (I8).
 9. Ctrl-D at an empty prompt confirms exit; with text it does nothing (I15).
-10. Double-tap timing is 500 ms on an injected clock.
+10. Double-tap timing is 500 ms on an injected clock (I9).
 11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I25).
-12. Duplicate bindings fail at construction.
-13. C16 never commits a frame; L4 does.
+12. Duplicate bindings fail at construction (I10).
+13. C16 never commits a frame; L4 does (I11).
 
 ---
 

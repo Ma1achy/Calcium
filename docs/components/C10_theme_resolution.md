@@ -232,27 +232,30 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and declares its typographic fallback as `classes`, one entry per slot, a `decoration` palette does neither and is lint-restricted to declared art.
 - **I16** — `syntax` is consumed only by `code` and `patch` blocks; `spectrum` only by declared art. The list is closed at two; a third consumer is a spec change to §3, I16, T2.8 and A03 SS20 together.
 - **I17** — Within one palette and one variant, no two slots carry the same 24-bit value, and at 8-bit no two of `{ok, warn, error, info, accent}` resolve to the same index. A slot that renders as another slot bought nothing.
+- **I19** — A `defaultTheme` ships and satisfies every contrast floor, so the one required config field is one line to fill. A framework whose only required field has no working value is a framework nobody starts.
+- **I20** — Contrast is validated against `bg` and `bgElev`, the two surfaces text lands on, and never against `bgDeep`, which carries none. Validating against a surface no text meets would reject themes for a failure that cannot be seen.
+- **I21** — The shipped tokens are A01 Appendix A.1's catalogue, and T2.4 recomputes every ratio from them rather than trusting the recorded figures. The table is an assertion the suite upholds, not a record of intent.
 - **I18** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
 
 ---
 
 ## 8. Commitments
 
-1. Tones resolve to styles; blocks never see colours.
-2. Themes are authored in 24-bit hex and degrade at resolution.
-3. The 4-bit mapping is curated per theme, never computed by nearest-RGB.
-4. 8-bit quantisation preserves rank order.
-5. At 1-bit, ten tones collapse to three typographic classes, and glyphs carry the meaning.
-6. Contrast floors are validated at load; failures are rejected with named tones.
-7. Overrides are validated identically; an invalid one changes nothing.
-8. Switching is atomic; L4 invalidates the frame, C10 does not.
-9. Surfaces degrade on the same ladder and are absent at 1-bit.
-10. Resolution is memoised and the cache is cleared on any theme change.
-11. `defaultTheme` ships so the required `theme` field is one line to satisfy.
+1. Tones resolve to styles; blocks never see colours (I14, I1).
+2. Themes are authored in 24-bit hex and degrade at resolution (I13).
+3. The 4-bit mapping is curated per theme, never computed by nearest-RGB (I5).
+4. 8-bit quantisation preserves rank order (I6).
+5. At 1-bit, ten tones collapse to three typographic classes, and glyphs carry the meaning (I2, I15).
+6. Contrast floors are validated at load; failures are rejected with named tones (I3).
+7. Overrides are validated identically; an invalid one changes nothing (I4).
+8. Switching is atomic; L4 invalidates the frame, C10 does not (I10, I7).
+9. Surfaces degrade on the same ladder and are absent at 1-bit (I8).
+10. Resolution is memoised and the cache is cleared on any theme change (I11).
+11. `defaultTheme` ships so the required `theme` field is one line to satisfy (I19).
 12. C10 resolves whatever tokens it is given; the shipped catalogue and the Atom One Light decision are A01 Appendix A's, which is also where a correction to them belongs (→ A01 A.1).
-13. Contrast is validated against `bg` and `bgElev` — both surfaces text lands on. `bgDeep` is excluded because it carries none.
-14. No two slots of one palette render as one another: distinct in hex, and distinct at 8-bit for the five tones whose confusion would mislead.
-15. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them.
+13. Contrast is validated against `bg` and `bgElev` — both surfaces text lands on. `bgDeep` is excluded because it carries none (I20).
+14. No two slots of one palette render as one another: distinct in hex, and distinct at 8-bit for the five tones whose confusion would mislead (I17).
+15. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them (I21).
 
 ---
 

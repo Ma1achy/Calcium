@@ -181,18 +181,18 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 
 ## 10. Commitments
 
-1. Every candidate comes from the manifest or a registered source; nothing is hand-maintained.
-2. Static sources run per keystroke; dynamic sources only on `Tab`. Filesystem slots are dynamic, so paths have no ghost text and `Tab` is required.
-3. Requests carry sequence numbers and stale results are discarded.
+1. Every candidate comes from the manifest or a registered source; nothing is hand-maintained (I4).
+2. Static sources run per keystroke; dynamic sources only on `Tab`. Filesystem slots are dynamic, so paths have no ghost text and `Tab` is required (I3).
+3. Requests carry sequence numbers and stale results are discarded (I1).
 4. Typing during a pending request supersedes it and clears the spinner (I14).
-5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected.
-6. A failing source is dropped, not fatal.
+5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected (I9, I10).
+6. A failing source is dropped, not fatal (I6).
 7. Acceptance advances to the longest common prefix and stops; the menu-on-second-`Tab` behaviour is §4's, not contract (I5).
-8. Ghost text is a suggestion, accepted only by `Tab` or `→`.
-9. The menu is a C15 overlay; C19 supplies blocks and the overflow indicator.
-10. The tokeniser and the quoter are both shared with C18.
-11. Accepting produces one undo unit.
-12. `/` completes verbs; bare text completes executables and paths.
+8. Ghost text is a suggestion, accepted only by `Tab` or `→` (I7).
+9. The menu is a C15 overlay; C19 supplies blocks and the overflow indicator (I8).
+10. The tokeniser and the quoter are both shared with C18 (I5).
+11. Accepting produces one undo unit (I11).
+12. `/` completes verbs; bare text completes executables and paths (I13).
 13. Dynamic sources are the app's; static ones ship with the framework (I3).
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
 

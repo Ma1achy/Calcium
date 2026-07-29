@@ -263,28 +263,30 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I19** — Time enters C06 only through injected `now` and `schedule`. No ambient clock, no ambient timer.
 - **I20** — **No transport rewrites a result it did not construct.** `createFixtureTransport` replays a stored `RawResult` verbatim, `argv` included; `createEmulatedTransport` reports what its handler produced. Synthesis is confined to results C06 builds itself — a cancellation, an abort before dispatch — where there is nothing to report and the argv describes an invocation happening now. Whoever produces a result owns its `argv`; the transport carrying it does not.
 - **I22** — `timeoutMs: 0` schedules no timer at all. Not a very large timeout — none, asserted on the absence of the `schedule` call, because a timer armed with 0 and cleared later satisfies the weaker reading and kills every live view.
+- **I23** — `cwd` is read at spawn, never captured at construction. A captured string spawns every subsequent verb in the directory the session started in, which is the one bug a pass-through `cd` is guaranteed to produce.
+- **I24** — `createEmulatedTransport` takes a handler closure and C06 references no app type. The world stays app-side behind a function, which is what lets `prism-tui` and `docker-tui` each have one without the framework knowing either exists.
 - **I21** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
 
 ---
 
 ## 8. Commitments
 
-1. C06 reports; C07 interprets. No view model, no status mapping, no envelopes.
-2. `--json` is appended by transport, exactly once.
-3. Spawning uses an argv array; the shell is never in the loop.
-4. stdout and stderr stay separate; raw stdout is always retained.
-5. One escalation ladder for cancellation and timeout.
-6. Partial output is retained on every abnormal termination.
+1. C06 reports; C07 interprets. No view model, no status mapping, no envelopes (I2).
+2. `--json` is appended by transport, exactly once (I4).
+3. Spawning uses an argv array; the shell is never in the loop (I3).
+4. stdout and stderr stay separate; raw stdout is always retained (I5, I6).
+5. One escalation ladder for cancellation and timeout (I8).
+6. Partial output is retained on every abnormal termination (I7).
 7. `timeoutMs: 0` means unbounded, for live views (I22).
-8. Streaming emits exactly one `end`, always last.
-9. Malformed-line degradation needs 10% *and* a 10-line floor, depends on arrival order by design, and is sticky once tripped.
-10. One non-streaming invocation at a time; streams are exempt.
-11. Transport is selected per verb, defaulting when unmapped.
+8. Streaming emits exactly one `end`, always last (I9).
+9. Malformed-line degradation needs 10% *and* a 10-line floor, depends on arrival order by design, and is sticky once tripped (I12).
+10. One non-streaming invocation at a time; streams are exempt (I13).
+11. Transport is selected per verb, defaulting when unmapped (I14).
 12. Three implementations behind one interface, selected by one mode value; nothing else branches on mode. The **app's** entry point resolves `PRISM_TUI_TRANSPORT` and passes a constructed router through `TuiConfig.transport`; `tui-kit` has no binary and reads no environment (I18).
 13. Tests run against the recorded corpus, never the emulator's world, so emulator drift cannot mask a regression (I17).
-14. `cwd` is read at spawn time so pass-through `cd` is honoured.
-15. The **emulated** transport takes a handler closure; `tui-kit` references no app type. The fixture transport takes a corpus.
-16. Line buffering is bounded at 1 MB.
+14. `cwd` is read at spawn time so pass-through `cd` is honoured (I23).
+15. The **emulated** transport takes a handler closure; `tui-kit` references no app type. The fixture transport takes a corpus (I24).
+16. Line buffering is bounded at 1 MB (I11).
 17. All three implementations are substitutable in every test that does not concern spawning (I15).
 18. The fixture transport replays and nothing else — no clock, no world state (I16).
 19. Time enters only through injected `now` and `schedule` (I19).

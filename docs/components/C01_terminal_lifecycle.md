@@ -229,26 +229,26 @@ Nested suspend is refused — `suspend()` while already suspended throws. There 
 
 ## 6. Commitments
 
-1. Escape-sequence **literals** live only in `terminal/escapes.ts`.
+1. Escape-sequence **literals** live only in `terminal/escapes.ts` (I1).
    Ink's `alternateScreen` option is never passed — two owners of one piece
    of terminal state is the failure this component prevents.
-2. Capabilities are injected. C01 does not import C02.
-3. Construction installs handlers; `acquire()` is unreachable before that.
-4. `release()` is idempotent and emits the inverse of what was actually acquired, in reverse order.
-5. Release precedes diagnostics on every fault path.
-6. `suspend()` fully leaves the alternate screen.
-7. `resume()` neither repaints nor tracks contamination — C03 owns the flag, the L4 shell calls `invalidate()`. `SIGCONT` re-acquires and reports through `onResume`; it sets nothing.
-8. A capability absent from the record is never acquired.
-9. Alternate-screen acquisition failure is fatal and is the only fatal case in the system.
-10. `SIGTSTP` releases, removes its handler, and re-raises with default disposition.
-11. C21 never calls C01; the L4 shell orchestrates suspend and handoff.
-12. stdout is redirected at construction and restored at release. `writer` is the only handle that reaches the real stream, so "originating from the renderer" is structural rather than a claim nothing can check; everything else goes to the injected `debug` sink, which C01 owns.
-13. `onFatal` is required, not optional — the only fatal case in the system cannot have undefined handling.
-14. C01 owns `SIGWINCH` and emits one coherent dimension snapshot per event; it does not interpret it.
-15. `release()` while suspended tears down handlers and stdout redirection but emits no terminal sequence.
-16. `beforeRelease` gives layers above L0 a synchronous hook before the process exits; a throw from it never blocks the release.
-17. `released` is terminal — a new instance is constructed per session; the transition table in §5 is exhaustive and every cell is tested.
-18. Exit codes are 128 + signal, per signal: 130, 143, 129.
+2. Capabilities are injected. C01 does not import C02 (→ A02 §1).
+3. Construction installs handlers; `acquire()` is unreachable before that (I3).
+4. `release()` is idempotent and emits the inverse of what was actually acquired, in reverse order (I2, I6).
+5. Release precedes diagnostics on every fault path (I4).
+6. `suspend()` fully leaves the alternate screen (I7).
+7. `resume()` neither repaints nor tracks contamination — C03 owns the flag, the L4 shell calls `invalidate()`. `SIGCONT` re-acquires and reports through `onResume`; it sets nothing (I14).
+8. A capability absent from the record is never acquired (I10).
+9. Alternate-screen acquisition failure is fatal and is the only fatal case in the system (I13).
+10. `SIGTSTP` releases, removes its handler, and re-raises with default disposition (I15).
+11. C21 never calls C01; the L4 shell orchestrates suspend and handoff (→ A02 §2).
+12. stdout is redirected at construction and restored at release. `writer` is the only handle that reaches the real stream, so "originating from the renderer" is structural rather than a claim nothing can check; everything else goes to the injected `debug` sink, which C01 owns (I9).
+13. `onFatal` is required, not optional — the only fatal case in the system cannot have undefined handling (I13).
+14. C01 owns `SIGWINCH` and emits one coherent dimension snapshot per event; it does not interpret it (I12).
+15. `release()` while suspended tears down handlers and stdout redirection but emits no terminal sequence (I8).
+16. `beforeRelease` gives layers above L0 a synchronous hook before the process exits; a throw from it never blocks the release (I5).
+17. `released` is terminal — a new instance is constructed per session; the transition table in §5 is exhaustive and every cell is tested (I11).
+18. Exit codes are 128 + signal, per signal: 130, 143, 129 (I16).
 
 ---
 

@@ -181,6 +181,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I13** — `rev` increments on every applied patch and never decreases. It is the staleness signal for C14's height cache; without it a cached height survives a patch that changed it.
 - **I14** — The eviction marker is a real entry, never a downstream special case, and is itself never evicted.
 - **I15** — Overshoot is exposed as `overCap`; C13 does not act on it.
+- **I18** — `clear()` empties the transcript and leaves command history untouched. They are separate stores with separate lifetimes: a reader clearing the screen has not asked to forget what they typed, and the two being one call away from each other is exactly why the boundary is stated.
 - **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost.
 - **I16** — C13 imports nothing from `terminal/` or `presentation/`.
 
@@ -188,21 +189,21 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 
 ## 9. Commitments
 
-1. Every command appends an entry; the newest is live and the rest are frozen.
-2. Frozen means not focusable; it does not mean not updating.
-3. A streaming entry keeps receiving patches after it freezes.
-4. Freezing is implicit in appending; there is no public freeze.
-5. Ids are monotonic and never reused.
+1. Every command appends an entry; the newest is live and the rest are frozen (I1).
+2. Frozen means not focusable; it does not mean not updating (I4).
+3. A streaming entry keeps receiving patches after it freezes (I4).
+4. Freezing is implicit in appending; there is no public freeze (I2).
+5. Ids are monotonic and never reused (I3).
 6. The session cap is 100,000 blocks, evicting oldest-first (I17).
-7. The live entry and any streaming entry are never evicted; the cap yields instead.
-8. Eviction is counted and surfaced, never silent.
-9. Patching a settled or unknown entry is a no-op that is logged, not absorbed.
-10. `clear()` empties the transcript and leaves command history alone.
-11. `seq` is logical; C13 reads no clock.
-12. `Change` is granular so consumers avoid full remeasure.
-13. Every entry carries a monotonic `rev`, bumped on each applied patch, so downstream caches can detect staleness.
-14. The eviction marker is a synthetic entry, so row arithmetic needs no special case.
-15. Cap overshoot is exposed as `overCap` and acted on by L4.
+7. The live entry and any streaming entry are never evicted; the cap yields instead (I5, I6).
+8. Eviction is counted and surfaced, never silent (I7).
+9. Patching a settled or unknown entry is a no-op that is logged, not absorbed (I8).
+10. `clear()` empties the transcript and leaves command history alone (I18).
+11. `seq` is logical; C13 reads no clock (I9).
+12. `Change` is granular so consumers avoid full remeasure (I12).
+13. Every entry carries a monotonic `rev`, bumped on each applied patch, so downstream caches can detect staleness (I13).
+14. The eviction marker is a synthetic entry, so row arithmetic needs no special case (I14).
+15. Cap overshoot is exposed as `overCap` and acted on by L4 (I15).
 
 ---
 

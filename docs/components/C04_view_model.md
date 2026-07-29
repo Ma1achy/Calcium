@@ -469,6 +469,13 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I15** — `applyPatch` is fallible in its type and never throws. Every one of the four failure cases in §4 returns `{ok: false}` with an `ErrorLike`, and the input document is returned untouched and still frozen.
 - **I16** — A `merge` payload cannot carry view state. Structural, via `MergeRow`, not remembered: I9 holds because the field does not exist to be set.
 - **I17** — Every measurer returns at least 1 for a present block (§5). Only an empty container measures 0.
+- **I22** — Any view state that affects height is a field of the block. Nothing outside the document can change how tall it is, which is what makes `measure` a pure function of block and width (I7) rather than of block, width and wherever the expansion flag happened to live.
+- **I23** — `fill` is the default action and `exec` is reserved for reversible operations. An action a user has not read before it runs is the one thing this vocabulary will not produce by default, and D52's approval story is that default rather than a mechanism built on top of it.
+- **I24** — A `pills` block is exactly one logical row. Multi-row pill layouts are multiple blocks, so height stays declared rather than emerging from how many pills happened to fit.
+- **I25** — `merge` never deletes a row. A table sheds one through `replace`, and the adapter decides which it means — a merge that could delete would make a dropped row and an unmentioned row indistinguishable in the payload.
+- **I26** — `replace` is wholesale: view state is not carried across it. It is the exact complement of I9, and the pair is the whole of the update model — `merge` preserves, `replace` does not.
+- **I27** — Container widths are declared, not negotiated: `panel` and table detail at `w - 2`, a `column` group at `w`, a `row` group at an equal split. A weights field arrives when a surface needs one and not before.
+- **I28** — `form: "line"` requires an explicit `height`. There is no default, because a defaulted height on the one block kind whose height is not derivable is a silent disagreement with I7 waiting to happen.
 - **I19** — `gapBefore` is content: `merge` carries it, `measure` never counts it, and every sequence of blocks adds one row per block declaring it. A composer that inserts spacing of its own instead (C23 §2) makes a document's height unknowable from the document.
 - **I18** — `validateDocument` terminates on any input, including a cyclic one. A path-scoped seen-set refuses a cycle; it is not a depth limit, and it does not reject a legitimately shared subtree.
 - **I20** — `ErrorLike` requires `message` and nothing else. `code`, `stage`, `details` and `remediation` are optional, and a far side's richer envelope is a specialisation rather than a second type — so every failure in the system renders through one path (A01 B5).
@@ -479,36 +486,36 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 
 ## 7. Commitments
 
-1. `ViewDocument` is a pure, deeply immutable value with no reference to Ink, terminals or the network.
-2. Seventeen block kinds ship; the union is open and extended through C09's registry.
-3. `raw` renders anything, so the vocabulary is never blocking.
-4. View state that affects height lives in the block.
-5. Blocks name palette slots and glyph slots, never values or characters; `error` and `warn` tones carry glyphs.
+1. `ViewDocument` is a pure, deeply immutable value with no reference to Ink, terminals or the network (I1).
+2. Seventeen block kinds ship; the union is open and extended through C09's registry (→ C09 I13).
+3. `raw` renders anything, so the vocabulary is never blocking (→ C09 I10).
+4. View state that affects height lives in the block (I22).
+5. Blocks name palette slots and glyph slots, never values or characters; `error` and `warn` tones carry glyphs (I5, I6).
 6. Only `message` is required on `ErrorLike`; Prism's envelope is a specialisation (I20).
-7. `fill` is the default action; `exec` is reserved for reversible operations.
-8. `applyPatch` is pure; `merge` upserts by row id and preserves untouched rows.
-9. `measure(block, w)` equals rendered height at width `w`, and is pure and total.
+7. `fill` is the default action; `exec` is reserved for reversible operations (I23).
+8. `applyPatch` is pure; `merge` upserts by row id and preserves untouched rows (I8, I9).
+9. `measure(block, w)` equals rendered height at width `w`, and is pure and total (I7).
 10. `Glyph` is a closed vocabulary, which is what makes capability substitution a total guarantee rather than a mostly-true one — a free-string field would leave every unlisted character unsubstituted. The substitution itself is **C09's** and width-preservation is C09 I5: C04 cannot fail when a renderer breaks it (→ C09 I5).
-11. C04 owns the schema — **every** block variant is declared here; C09 owns the registry, C11 the table engine, C12 the plot renderer, C25 the patch renderer.
-12. The schema identifier is framework-named `tui.view/1`. `tui-kit` ships nothing Prism-branded.
-13. A `pills` block is one logical row; multi-row pill layouts are multiple blocks.
+11. C04 owns the schema — **every** block variant is declared here; C09 owns the registry, C11 the table engine, C12 the plot renderer, C25 the patch renderer (I11).
+12. The schema identifier is framework-named `tui.view/1`. `tui-kit` ships nothing Prism-branded (I2).
+13. A `pills` block is one logical row; multi-row pill layouts are multiple blocks (I24).
 14. Substitution is 1:1 by column count, so a degraded frame occupies the same cells as an undegraded one (→ C09 I5).
-15. `validateDocument` and `validateBlock` are public, total, and the single enforcement point for I3.
-16. Schema version is `tui.view/1`; mismatch is refused at the boundary.
+15. `validateDocument` and `validateBlock` are public, total, and the single enforcement point for I3 (I3, I4).
+16. Schema version is `tui.view/1`; mismatch is refused at the boundary (I2).
 17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it (I20a, D49).
-18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts.
-19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump.
+18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts (I13).
+19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump (I12).
 20. `patch` and `diff` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag (I21, D50).
-21. `applyPatch` returns a `PatchResult` and never throws. Four failure cases, each named, each leaving the input document untouched.
-22. Block ids are unique within a document, and `validateDocument` is where that is established.
-23. `merge` never deletes a row; `replace` is how a table sheds one, and the adapter decides which it means.
-24. `replace` is wholesale — view state is not carried across it.
-25. A `merge` payload cannot carry view state, by type rather than by rule.
-26. Container widths are declared: `panel` and table detail at `w - 2`, a `column` group at `w`, a `row` group at an equal split. No weights field until a surface needs one.
-27. Every measurer returns at least 1 for a present block.
-28. `form: "line"` requires `height`; there is no default.
-29. C04's constructors enforce the shape invariants and C24's `b` delegates to them. One enforcement point for I1.
-30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set.
+21. `applyPatch` returns a `PatchResult` and never throws. Four failure cases, each named, each leaving the input document untouched (I15).
+22. Block ids are unique within a document, and `validateDocument` is where that is established (I14).
+23. `merge` never deletes a row; `replace` is how a table sheds one, and the adapter decides which it means (I25).
+24. `replace` is wholesale — view state is not carried across it (I26).
+25. A `merge` payload cannot carry view state, by type rather than by rule (I16).
+26. Container widths are declared: `panel` and table detail at `w - 2`, a `column` group at `w`, a `row` group at an equal split. No weights field until a surface needs one (I27).
+27. Every measurer returns at least 1 for a present block (I17).
+28. `form: "line"` requires `height`; there is no default (I28).
+29. C04's constructors enforce the shape invariants and C24's `b` delegates to them. One enforcement point for I1 (I1).
+30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set (I18).
 
 ---
 

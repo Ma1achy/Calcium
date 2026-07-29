@@ -156,25 +156,26 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 - **I10** — A commit during a write is deferred with the strictest reason seen and acted on once the write returns: inline **once**, then by timer. A commit arising from that second write escalates to the timer rather than writing inline again.
 
   Inline-once bounds the chain at two writes; escalation means nothing is dropped. A render callback that commits on every render is pathological but legal, and without the escalation it drains forever — a livelock, not a recursion, which is why the depth argument in §3 does not catch it.
+- **I12** — Time enters C03 only through the injected `schedule`. No ambient timer, so a coalescing window is asserted against a counter rather than slept through — the same shape C06 I19 takes, stated here because the audit found this property committed to in one spec and made an invariant in the other.
 - **I11** — `lifecycle.acquired` is read at write time through a live view, never captured at construction.
 
 ---
 
 ## 7. Commitments
 
-1. Commits are classified by reason; `input`, `completion` and `resize` are immediate, `stream` and `spinner` are coalesced.
-2. Windows are 33 ms for stream and 100 ms for spinner, tunable at construction. Immediate reasons have no window and cannot be given one.
-3. An immediate commit cancels a pending one; final content is never lost.
-4. At most one timer is outstanding at a time.
-5. Nothing is written while the terminal is not acquired.
-6. Synchronised update wraps every write where supported, and markers are always balanced.
-7. `invalidate()` makes the next write a full repaint, and clears once that repaint returns.
-8. `resize` implies invalidation.
-9. C03 holds no frame content and owns no rendering.
-10. The timer is injected, so no test sleeps.
-11. C03 receives a live read-only view of C01 and cannot acquire or release.
-12. A commit arriving during a write is deferred and coalesced to the strictest reason, written inline at most once, and escalated to the timer thereafter. The chain is bounded at two writes and nothing is dropped.
-13. C03 writes only the synchronised-update markers, through an injected bound `write`. Frame bytes leave through `render()`, which C03 does not own.
+1. Commits are classified by reason; `input`, `completion` and `resize` are immediate, `stream` and `spinner` are coalesced (I2, I7).
+2. Windows are 33 ms for stream and 100 ms for spinner, tunable at construction. Immediate reasons have no window and cannot be given one (I2).
+3. An immediate commit cancels a pending one; final content is never lost (I4).
+4. At most one timer is outstanding at a time (I3).
+5. Nothing is written while the terminal is not acquired (I1).
+6. Synchronised update wraps every write where supported, and markers are always balanced (I6).
+7. `invalidate()` makes the next write a full repaint, and clears once that repaint returns (I5).
+8. `resize` implies invalidation (I7).
+9. C03 holds no frame content and owns no rendering (I8).
+10. The timer is injected, so no test sleeps (I12). C06 I19 states the same property for C06; the audit of 2026-07-29 found it a commitment here and an invariant there, which is what SP1 now prevents.
+11. C03 receives a live read-only view of C01 and cannot acquire or release (I11).
+12. A commit arriving during a write is deferred and coalesced to the strictest reason, written inline at most once, and escalated to the timer thereafter. The chain is bounded at two writes and nothing is dropped (I10).
+13. C03 writes only the synchronised-update markers, through an injected bound `write`. Frame bytes leave through `render()`, which C03 does not own (I6, I8).
 
 ---
 

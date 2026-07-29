@@ -5,7 +5,7 @@
 | **Type** | Audit record |
 | **Covers** | C01–C25 — 355 invariants against 358 commitments |
 | **Run** | 2026-07-29, after C08 |
-| **Status** | Findings only. **Nothing has been changed.** |
+| **Status** | Remediated. The findings below are the record; §Outcome says what was done |
 
 ---
 
@@ -361,6 +361,55 @@ commitment and it *is* lint-enforced, as A03 SS20 and SS21. A rule with
 enforcement and no commitment is the mirror of the problem this audit is about,
 and it suggests the enforcement suite should be read against the commitment lists
 as a separate pass.
+
+---
+
+## Outcome
+
+Five commits, one per category rather than one per spec — twenty-four documents
+were not fixed the same way twenty-four times.
+
+| | Ruling |
+|---|---|
+| **1** — module graph | Left as they are. One sentence in A02 §1: structural invariants carry no commitment, because they are enforced by A03 and consumed by no caller |
+| **2** — naked threshold | Seven gained invariants, four demoted to § detail |
+| **3 + 4** — borrowed and orphaned | One principle in A02 §1: **a spec commits only to what it can enforce**. Six borrowed claims and three register overclaims became cross-references; four own-behaviour claims gained invariants |
+| **6** — the disagreement | C17 I12 now carries both halves: three bindings, at least two terminal-independent |
+| **individuals** | C09 I14 (control characters) and C19 I2 (completion never blocks input) gained commitments |
+
+**Category 5's residue was resolved by the structural fix rather than by a pass of
+its own**, and that is the part worth recording. Requiring every commitment to
+cite forced each of the 343 uncited ones to be read against its invariant list,
+which surfaced the same gaps a per-finding pass would have — but exhaustively, and
+with the failure visible rather than argued. Roughly thirty invariants were added
+in the course of the annotation, each one a commitment that turned out to have
+nothing to point at.
+
+### The conclusion the audit turns on
+
+**C03 commitment 10 and C06 I19 state the same property — that the timer is
+injected, so no test sleeps — one as a commitment and one as an invariant, in two
+specs, by the same author, within weeks.** Neither is wrong. Nothing decided which
+it should be.
+
+That is the best evidence in the corpus that the pairing was accidental rather
+than designed, and it is why a remediation alone would not have been enough. The
+two lists were parallel prose with nothing checking they agreed, so a commitment
+could be added or an invariant deleted and no artefact noticed. Both specs now
+carry the invariant and both commitments cite it.
+
+### What stops it recurring
+
+A03 **SP1**: every commitment cites an invariant `(I5)`, several `(I3, I4)`, or
+another spec's `(→ C09 I5)`. A commitment with no marker fails `make enforce`; so
+does a citation naming an invariant its spec does not declare, and so does a
+cross-reference that does not resolve.
+
+The check is exact because the audit produced categories and **the categories
+became the markers**. A word-overlap heuristic could not have done this — a
+commitment is the readable form, so it deliberately shares few words with the
+invariant it summarises, and the noise floor sits above the signal. Doing the
+reading by hand first is what told us which markers the template needed.
 
 ---
 

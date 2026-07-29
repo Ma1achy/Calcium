@@ -222,19 +222,19 @@ The notice is muted rather than an error because the *command* may have succeede
 
 ## 10. Commitments
 
-1. Resolution is identity → registered → fallback; the identity path makes adapter deletion mechanical.
-2. Adapters are pure and fixture-tested with no process and no terminal.
-3. The fallback renders any JSON legibly and is total.
-4. Streaming works with no stream adapter, via the fallback.
-5. Cancellation yields `partial`, including an invocation aborted before anything was spawned. A01 B4 was corrected accordingly and now cites §4.
+1. Resolution is identity → registered → fallback; the identity path makes adapter deletion mechanical (I2).
+2. Adapters are pure and fixture-tested with no process and no terminal (I1).
+3. The fallback renders any JSON legibly and is total (I3).
+4. Streaming works with no stream adapter, via the fallback (I11).
+5. Cancellation yields `partial`, including an invocation aborted before anything was spawned. A01 B4 was corrected accordingly and now cites §4 (I6).
 6. Every verb's failure renders through one path, because `ErrorLike` needs only `message` — the shape is C04's (→ C04 I20).
 7. Fallback truncation is recorded, never silent — `meta.truncated` says so, and the caps themselves are §-level defaults rather than contract (I13).
-8. Explicit `--json` yields a `code` block, with no exceptions.
-9. An adapter throwing is contained, re-adapted through the fallback, and recorded in a muted notice.
-10. The registry seals at composition end, matching C05 and C09.
-11. Schema mismatch fails at startup, naming the offending adapter.
-12. Every produced document is valid per C04, on every path.
-13. Deleting an adapter because the far side converged is a success, not a regression.
+8. Explicit `--json` yields a `code` block, with no exceptions (I9).
+9. An adapter throwing is contained, re-adapted through the fallback, and recorded in a muted notice (I4).
+10. The registry seals at composition end, matching C05 and C09 (I8).
+11. Schema mismatch fails at startup, naming the offending adapter (I7).
+12. Every produced document is valid per C04, on every path (I5).
+13. Deleting an adapter because the far side converged is a success, not a regression (I2, I11).
 14. A degraded stream's remainder is composed from the `malformed` patches that follow the notice, plus the one that preceded it; C06 carries it nowhere else (I12, §6).
 15. The registry owns `meta`, so no adapter states provenance and none can state it wrongly (I13).
 16. `meta.exitCode` is finite on every path, and `-1` has one documented cause (I14).

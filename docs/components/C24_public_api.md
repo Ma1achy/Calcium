@@ -273,24 +273,27 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **I9** — Startup validation severities are those of §8, and each cites the spec that set it.
 - **I10** — The runtime entry exports no function that performs I/O except `createTui`.
 - **I11** — The reference app lives in its own repository and consumes `tui-kit` as a published dependency, so the unused-export scan runs against `prism-tui` plus the app's declared import manifest, refreshed on each version bump. It is a reported signal, not a build gate.
+- **I13** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.
+- **I14** — `tui-kit/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
+- **I15** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
 - **I12** — Every `b.*` builder sets a `gapBefore` default per its kind (§4), and an explicit `gapBefore` always wins over it. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 
 ---
 
 ## 10. Commitments
 
-1. Three entry points; `testing` and `fixtures` never reach production.
-2. Eleven of twenty-three components are invisible to consumers, and that is the measure of the layering.
-3. Every export is a compatibility obligation; an export used by neither app is removed. The claim is about the union of the two, since neither exercises the whole surface alone.
-4. Builders return frozen blocks, not descriptions.
-5. Ids are generated unless supplied, matter only for patched blocks, and are never rendered.
-6. A bare string is a cell; nothing is inferred from field names.
-7. `b.live` gives A02 §7's whole pattern by default, with fixed behaviour and overridable rendering.
-8. `b.live` works identically in a transcript entry and a pushed view, driven by C23 in both.
-9. Animation lives in block kinds; `measure` cannot see `tick`.
-10. `tui-kit/testing` ships the assertions, so no consumer reimplements them.
-11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect.
-12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them.
+1. Three entry points; `testing` and `fixtures` never reach production (I8).
+2. Eleven of twenty-three components are invisible to consumers, and that is the measure of the layering (I2).
+3. Every export is a compatibility obligation; an export used by neither app is removed. The claim is about the union of the two, since neither exercises the whole surface alone (I1).
+4. Builders return frozen blocks, not descriptions (I3).
+5. Ids are generated unless supplied, matter only for patched blocks, and are never rendered (I4).
+6. A bare string is a cell; nothing is inferred from field names (I5).
+7. `b.live` gives A02 §7's whole pattern by default, with fixed behaviour and overridable rendering (I6).
+8. `b.live` works identically in a transcript entry and a pushed view, driven by C23 in both (I13).
+9. Animation lives in block kinds; `measure` cannot see `tick` (I7).
+10. `tui-kit/testing` ships the assertions, so no consumer reimplements them (I14).
+11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect (I9).
+12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them (I15).
 13. Every builder sets a `gapBefore` default per kind, and an explicit value always wins (I12, §4).
 
 ---

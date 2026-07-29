@@ -178,6 +178,8 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I12** — C14 imports nothing from `terminal/`; dimensions arrive as data, and C14 never calls the frame scheduler. L4 orchestrates.
 - **I13** — The eviction marker is an ordinary entry (C13 I13); C14 holds no special case for it.
 - **I14** — Copy mode restores the prior follow state on exit.
+- **I17** — Cache invalidation is incremental, driven by C13's granular `Change`. An append invalidates nothing already measured; a patch invalidates one entry through its `rev`. Dropping the cache on every change would make the Fenwick tree pointless.
+- **I18** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
 - **I16** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
 - **I15** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
 
@@ -185,22 +187,22 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 
 ## 9. Commitments
 
-1. Scrolling is by display row, never by entry.
+1. Scrolling is by display row, never by entry (I1).
 2. Page movement is `viewportHeight − 1`, so a line of context carries over (I16).
-3. `followTail` is on at the bottom, off on any upward scroll, and restored by `End`.
-4. Content growing above a detached viewport never moves the visible rows.
-5. The anchor is an entry id plus a row offset, immune to eviction and index shifts.
-6. Heights are cached on `(entryId, rev, width)`; theme and capabilities are excluded.
-7. Cache invalidation is incremental, driven by C13's granular `Change`.
-8. The height index is a Fenwick tree; visibility is O(log n).
-9. Width changes drop the cache; height changes do not.
-10. The anchor is captured before remeasure and clamps within its entry.
-11. No overscan in v1; it is a measurable addition, not a default.
-12. Copy mode is mandatory because mouse is on by default; the clipboard writer is injected.
-13. Summed visible rows equal the viewport height exactly.
-14. C14 never calls C03; scrolling reports a change and L4 commits.
-15. The eviction marker is an ordinary entry and needs no special handling.
-16. `VisibleRange` marks the live entry; the frame draws the gutter, and no measurement includes it.
+3. `followTail` is on at the bottom, off on any upward scroll, and restored by `End` (I5).
+4. Content growing above a detached viewport never moves the visible rows (I4).
+5. The anchor is an entry id plus a row offset, immune to eviction and index shifts (I6).
+6. Heights are cached on `(entryId, rev, width)`; theme and capabilities are excluded (I3).
+7. Cache invalidation is incremental, driven by C13's granular `Change` (I17).
+8. The height index is a Fenwick tree; visibility is O(log n) (I9).
+9. Width changes drop the cache; height changes do not (I8).
+10. The anchor is captured before remeasure and clamps within its entry (I7).
+11. No overscan in v1; it is a measurable addition, not a default (I18).
+12. Copy mode is mandatory because mouse is on by default; the clipboard writer is injected (I11).
+13. Summed visible rows equal the viewport height exactly (I10).
+14. C14 never calls C03; scrolling reports a change and L4 commits (I12).
+15. The eviction marker is an ordinary entry and needs no special handling (I13).
+16. `VisibleRange` marks the live entry; the frame draws the gutter, and no measurement includes it (I15).
 
 ---
 

@@ -5,6 +5,7 @@ import { readdirSync, statSync } from "node:fs";
 import { checkModuleGraph } from "./module-graph.mjs";
 import { checkSourceScans } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
+import { checkCommitments, specFiles } from "./commitments.mjs";
 
 function walk(dir, out = []) {
   let entries;
@@ -18,17 +19,22 @@ function walk(dir, out = []) {
 }
 
 const files = walk("src");
+const specs = specFiles();
 const violations = [
   ...checkModuleGraph(files),
   ...checkSourceScans(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),
+  // The specs are enforced too. A03 governs the source; SP1 governs the
+  // documents the source is written against, because a commitment nothing
+  // enforces diverges from the implementation without anything going red.
+  ...checkCommitments(specs),
 ];
 
 const RED = "\x1b[31m", DIM = "\x1b[2m", GREEN = "\x1b[32m", RESET = "\x1b[0m";
 
 if (violations.length === 0) {
-  console.log(`${GREEN}✓${RESET} enforce · ${files.length} files · no violations`);
+  console.log(`${GREEN}✓${RESET} enforce · ${files.length} files · ${specs.length} specs · no violations`);
   process.exit(0);
 }
 

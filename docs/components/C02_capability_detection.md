@@ -123,17 +123,17 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 
 ## 6. Commitments
 
-1. Capabilities are detected once, at startup, from the environment, and are immutable thereafter.
-2. Detection is synchronous and never queries the terminal.
-3. `env` is injected, not read from `process`.
-4. Every field is always present; there is no partial record.
-5. Config overrides win unconditionally.
-6. Only C02 reads terminal environment variables; lint-enforced.
-7. Every capability has a named fallback owner and a test exercising it.
-8. Alternate screen is the only capability whose absence prevents the shell opening.
+1. Capabilities are detected once, at startup, from the environment, and are immutable thereafter (I1).
+2. Detection is synchronous and never queries the terminal (I2).
+3. `env` is injected, not read from `process` (I3).
+4. Every field is always present; there is no partial record (I1).
+5. Config overrides win unconditionally (I4).
+6. Only C02 reads terminal environment variables; lint-enforced (I5).
+7. Every capability has a named fallback owner and a test exercising it (I6).
+8. Alternate screen is the only capability whose absence prevents the shell opening (I7).
 9. `colourDepth` is reported, never interpreted. What a depth *means* for legibility is D29's rule and it is enforced where colour is chosen, not where it is detected — C02 has no view of what any block carries (→ C10 I2, C09 I5).
-10. `bmp` unicode and non-`none` image protocols are detected but unused in v1.
-11. Warnings about rejected overrides are returned to the caller, never printed.
+10. `bmp` unicode and non-`none` image protocols are detected but unused in v1 (I1).
+11. Warnings about rejected overrides are returned to the caller, never printed (I8).
 
 ---
 

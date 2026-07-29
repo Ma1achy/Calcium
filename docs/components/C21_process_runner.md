@@ -130,19 +130,19 @@ Per child handle.
 
 ## 9. Commitments
 
-1. `spawn` and `spawnShell` are separate methods so the shell boundary is visible at every call site.
-2. `spawnShell` is only ever given a string the user typed.
+1. `spawn` and `spawnShell` are separate methods so the shell boundary is visible at every call site (I1).
+2. `spawnShell` is only ever given a string the user typed (I1).
 3. `spawnShell` resolves the user's shell rather than assuming one; which variable it reads and what it falls back to is §2 detail (I1).
-4. Children are detached and signalled by group, so pipelines die whole.
-5. stdout and stderr stay separate and never reach the terminal.
-6. Decoding is streaming and multi-byte-safe.
-7. Buffers are bounded at 8 MiB per stream; overflow drains rather than blocking.
-8. `handoff` inherits stdio, does not detach, and refuses if raw mode is still set.
-9. C21 delivers signals; C06 owns the ladder.
-10. Signalling an exited child is false, not a throw.
-11. `cwd` is a function, read at spawn.
-12. `killAll` sends `SIGKILL` with no grace period, so C21 holds no timing policy anywhere.
-13. `exited` always resolves, spawn failure included.
+4. Children are detached and signalled by group, so pipelines die whole (I2).
+5. stdout and stderr stay separate and never reach the terminal (I3).
+6. Decoding is streaming and multi-byte-safe (I4).
+7. Buffers are bounded at 8 MiB per stream; overflow drains rather than blocking (I5).
+8. `handoff` inherits stdio, does not detach, and refuses if raw mode is still set (I6, I7).
+9. C21 delivers signals; C06 owns the ladder (I8).
+10. Signalling an exited child is false, not a throw (I9).
+11. `cwd` is a function, read at spawn (I10).
+12. `killAll` sends `SIGKILL` with no grace period, so C21 holds no timing policy anywhere (I11).
+13. `exited` always resolves, spawn failure included (I13).
 
 ---
 
