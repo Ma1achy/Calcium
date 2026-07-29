@@ -23,10 +23,13 @@ It also owns the promise that makes degradation safe. **No information is carrie
 ## 2. Tokens
 
 ```typescript
+type MonoClass = "emphasised" | "normal" | "deemphasised";
+
 type PaletteSpec = Readonly<{
   slots:      Readonly<Record<string, string>>;   // slot name → 24-bit hex
   carries:    "meaning" | "decoration";
   monochrome: "typographic" | "foreground";       // what 1-bit collapses to
+  classes?:   Readonly<Record<string, MonoClass>>; // required iff monochrome === "typographic"
 }>;
 
 type ThemeTokens = Readonly<{
@@ -47,8 +50,13 @@ type ThemeSet = Readonly<{ dark: ThemeTokens; light: ThemeTokens }>;
 
 type ColourRef = `${string}.${string}`;            // "tone.ok", "syntax.keyword", "spectrum.3"
 
+type ColourValue =
+  | Readonly<{ kind: "rgb";     hex: string }>     // depth 24
+  | Readonly<{ kind: "ansi256"; index: number }>   // depth 8,  16–255
+  | Readonly<{ kind: "ansi16";  index: number }>;  // depth 4,  0–15
+
 type Style = Readonly<{
-  colour?:    string;                 // already resolved to the terminal's depth
+  colour?:    ColourValue;            // already resolved to the terminal's depth
   bold?:      boolean;
   dim?:       boolean;
   inverse?:   boolean;
@@ -58,6 +66,10 @@ type Style = Readonly<{
 function resolve(ref: ColourRef, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
 function resolveTone(tone: Tone, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
 ```
+
+**`ColourValue` is tagged rather than a bare string**, and the tag is the point. C10 cannot write an escape (that is `terminal/escapes.ts` alone), so it hands out a description of a colour and something downstream turns it into SGR. A bare `"#7faecf"` or `"12"` makes that consumer re-derive the depth by inspecting the format, and the consumer that guesses wrong emits a truecolour sequence to a 16-colour terminal — precisely what T5.2 exists to catch. Naming the depth in the value means the writer switches on a tag it cannot misread.
+
+**The typographic fallback is declared, not inferred.** A `meaning` palette collapses to typographic classes at 1-bit (I15), and `classes` is where it says which slot lands in which. Inferring it would mean the framework knowing that `ok` is emphatic and `comment` is recessive — the same app-domain knowledge C05's `ArgType` refuses. An app registering its own `meaning` palette declares the mapping, and D29 stays true without the framework learning anyone's nouns.
 
 **A block names a palette slot; it never embeds a value.** That indirection is the whole point — it is what makes theme switching a swap, degradation mechanical, and contrast checkable. Scarcity was never the point, and an earlier draft forbidding all non-tone colour needed an escape hatch on its second real use, which is how you know a rule is wrong.
 
@@ -123,7 +135,11 @@ Prism's token sets are in A01 Appendix A.1 — ten tones, nine `syntax` slots an
 
 **The 4-bit rule is the one that matters.** Computing nearest-of-16 by RGB distance collapses tones onto each other — `dim` and `muted` both land on bright black, `warn` and `accent` both on yellow — and the result is a UI where distinctions silently vanish. Sixteen slots for ten tones needs a human decision, so each theme declares its own mapping and the framework validates that it is injective across the tones that must stay distinct.
 
-At 8-bit, "rank order preserved" means that if `dim` was darker than `default` in 24-bit it remains darker after quantisation. Nearest-neighbour alone can invert a pair; the resolver corrects for it.
+At 8-bit, "rank order preserved" means that if `dim` was darker than `default` in 24-bit it remains darker after quantisation. Nearest-neighbour alone can invert a pair; the resolver corrects for it, by assigning the palette in luminance order and never choosing an entry that would break monotonicity.
+
+**8-bit quantisation targets indices 16–255 only.** The first sixteen are whatever the emulator's own palette says they are — the same numbers a 4-bit theme deliberately curates — so quantising into them would make an 8-bit result depend on a user's terminal configuration while presenting itself as a measured nearest neighbour. 16–231 are the 6×6×6 cube and 232–255 the greyscale ramp, and both are fixed values a distance can honestly be computed against.
+
+A palette is therefore resolved **as a set**, once per `(theme, palette, depth)`, rather than slot by slot: rank order and distinctness are properties of the set, and a per-slot nearest-neighbour cannot see either.
 
 **Surfaces degrade too.** `bg`, `bgElev`, `bgDeep`, `border` and `borderStrong` are not tones, and the ladder applies to them identically: hex at 24-bit, quantised at 8-bit, curated at 4-bit, and **nothing at all at 1-bit** — no background is painted and borders are drawn with box characters alone. A component asking for a surface at 1-bit receives an empty `Style`, not black.
 
@@ -203,7 +219,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I12** — C10 reads no environment; capabilities are injected (C02 I5).
 - **I13** — `ThemeTokens` is authored in 24-bit hex only; no token file contains an ANSI index or a terminal-specific value. The curated 4-bit map is not token data and lives in its own module (§2), which is SS19's single named exception.
 - **I14** — A block names a palette slot and never embeds a colour value.
-- **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and has a typographic fallback, a `decoration` palette is neither and is lint-restricted to declared art.
+- **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and declares its typographic fallback as `classes`, one entry per slot, a `decoration` palette does neither and is lint-restricted to declared art.
 - **I16** — `syntax` is consumed only by `code` and `patch` blocks; `spectrum` only by declared art. The list is closed at two; a third consumer is a spec change to §3, I16, T2.8 and A03 SS20 together.
 - **I17** — Within one palette and one variant, no two slots carry the same 24-bit value, and at 8-bit no two of `{ok, warn, error, info, accent}` resolve to the same index. A slot that renders as another slot bought nothing.
 
