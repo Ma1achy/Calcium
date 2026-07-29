@@ -4,7 +4,15 @@
 // This is the tier that proves the component: every other test asserts what
 // C01 emitted, and this one asserts what the terminal was left in.
 import { beforeAll, describe, expect, it } from "vitest";
-import { control, runInPty, termiosFlags, trackDecset, type PtyRun } from "../support/pty.js";
+import {
+  control,
+  interactivePty,
+  quitVi,
+  runInPty,
+  termiosFlags,
+  trackDecset,
+  type PtyRun,
+} from "../support/pty.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
 
@@ -110,8 +118,37 @@ describe("C01 e2e — the terminal is given back", () => {
     60_000,
   );
 
-  it.todo(
-    "T5.5: launching vi through pass-through, quitting it, and exiting leaves the terminal clean — two nested alternate-screen users — waits on C21",
+  it(
+    "T5.5: launching vi through pass-through, quitting it, and exiting leaves the terminal clean",
+    async () => {
+      // Two nested alternate-screen users: C01's own, and vi's inside the
+      // suspend. Deferred since C01 and writable now that `handoff` exists.
+      //
+      // `interactivePty` rather than `runInPty`, because vi has to be *quit* —
+      // and the assertion is still made from outside, by folding the captured
+      // byte stream. The fixture composes the sequence, so what this shows is
+      // that the pieces work when composed; that an application composes them is
+      // C22's, and this file should not be read as covering it.
+      const pty = interactivePty(`${FIXTURE} process-handoff`);
+
+      try {
+        await pty.waitFor(/\[\?1049h/, 20_000);
+        await quitVi(pty);
+        await pty.waitFor(/HANDOFF/, 20_000);
+        expect(await pty.done()).toBe(0);
+      } finally {
+        pty.kill();
+      }
+
+      // Folded over everything that reached the terminal, vi's own sequences
+      // included: the alternate screen is off and the cursor is visible. A
+      // `suspend` that did not release, or a `resume` that did not restore,
+      // leaves one of those set — and a terminal a user has to `reset`.
+      const final = trackDecset(pty.output);
+      expect(final.altScreen).toBe(false);
+      expect(final.cursorVisible).toBe(true);
+    },
+    60_000,
   );
   it.todo(
     "T5.6: piping the shell to `cat` emits no escape sequence at all — waits on the L4 shell's TTY gate",

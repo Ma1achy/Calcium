@@ -217,6 +217,7 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T3.15** (I11): `killAll` with five live children including a pipeline → every group receives `SIGKILL`, `live` empties, and no timer is scheduled.
 - **T3.16**: a child spawning its own grandchild that outlives it → group signalling reaches the grandchild.
 - **T3.17**: output containing a null byte → passed through the decoder without truncating the stream.
+- **T3.18**: fifty short-lived children spawned at once → every one of them yields its whole output. Node's `exit` can fire before the stdio `data` events are delivered, so a runner that ends its streams on exit drops output still in flight — and the failure appears only under enough load to reorder the two.
 
 ### Tier 4 — integration
 
@@ -250,6 +251,8 @@ Six tiers. Every cell of the §7 table is covered. Tiers 1–3 use real short-li
 - **T6.10** (I11): skipping `killAll` at exit → T5.5 leaves orphans.
 - **T6.11** (I13): a spawn-failure path that leaves `exited` pending → T2.6 fails and a verb hangs forever.
 - **T6.12** (I14): reading `process.env.SHELL` or `process.stdin` directly → T2.7 fails, SS10's allow-list gains its second entry, and T3.8 can no longer be asserted without a test putting its own terminal into raw mode.
+- **T6.13** (I12): importing anything from `terminal/`, type-only included → T2.3 fails. The type-only form is the one to watch: it erases at build, so it would pass a rule that only counted runtime edges while being exactly the dependency that ends L0's independence.
+- **T6.14**: ending the streams when the child exits rather than when its stdio closes → T3.18 fails. `exit` and `close` are separate events because the first can precede the delivery of output, and conflating them loses a short command's entire stdout under load.
 
 ---
 

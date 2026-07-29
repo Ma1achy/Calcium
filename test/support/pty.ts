@@ -160,6 +160,30 @@ export function runInPty(
   });
 }
 
+/**
+ * Type something into `vi` and quit without saving.
+ *
+ * **ESC has to arrive alone.** A terminal cannot tell the ESC key from the first
+ * byte of an escape sequence except by what follows it, and neither can vi: send
+ * `\x1b:q!\r` in one write and the whole thing is read as a key sequence, so
+ * `:q!` lands in the buffer and the editor never exits. Written as two writes it
+ * works only while the reads happen to split there — which is how this passed in
+ * one file and hung in another, under nothing more than different load.
+ *
+ * So the text is confirmed on screen first, ESC is sent by itself, and the pause
+ * is what makes it unambiguous. A real timer, deliberately: the ambiguity being
+ * resolved is a timing property of terminals, and there is nothing to inject.
+ */
+export async function quitVi(pty: InteractivePty, text = "hello"): Promise<void> {
+  pty.type(`i${text}`);
+  await pty.waitFor(new RegExp(text), 20_000);
+
+  pty.type("\x1b");
+  await new Promise<void>((resolve) => void setTimeout(resolve, 250));
+
+  pty.type(":q!\r");
+}
+
 /** The control: a program that takes nothing and gives nothing back. */
 export function control(): Promise<PtyRun> {
   return runInPty("true");

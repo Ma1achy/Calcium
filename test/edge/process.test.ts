@@ -205,7 +205,7 @@ describe("C21 streams", () => {
     return expect(collect(stream.iterable)).resolves.toBe("before");
   });
 
-  it("T3.5: a child that exits before its output is delivered still yields all of it", async () => {
+  it("T3.18: a child that exits before its output is delivered still yields all of it", async () => {
     // The ordering `close` exists for. Node's `exit` can fire before the stdio
     // `data` events have been delivered, so a runner that ends its streams on
     // exit sets `ended` while output is still in flight and the T3.7 guard drops
