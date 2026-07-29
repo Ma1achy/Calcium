@@ -127,5 +127,6 @@ describe("C05 fail-on-revert", () => {
   });
 
   it.todo("T6.6: hardcoding an enum in the completion module → T4.3 fails — waits on C19");
-  it.todo("T6.8 (I12): spawning a local tool → T4.4 fails — waits on C06");
+  // T6.8 is written, in test/integration/transport.test.ts, beside the T4.4 it
+  // names.
 });

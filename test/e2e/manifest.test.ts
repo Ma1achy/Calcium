@@ -30,7 +30,7 @@ describe("C05 e2e", () => {
   });
 
   it.todo("T5.1: a session completes, validates and rejects for every tool, with no far side — waits on C22");
-  it.todo("T5.2: replacing the fixture with a manifest fetched from a real binary changes the surface — waits on C22 and C06");
+  it.todo("T5.2: replacing the fixture with a manifest fetched from a real binary changes the surface — waits on C22");
   it.todo("T5.3: a tool with no adapter renders through the fallback adapter — waits on C07 and C22");
   it.todo("T5.4: a manifest omitting a previously-present tool reports it unavailable — waits on C22");
 });

@@ -8,7 +8,36 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG20", "MG21"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG20", "MG21"];
+
+/**
+ * MG6 is a **third kind of rule**, and saying so is the point of this comment.
+ *
+ * MG1 catches upward edges. MG2 catches cycles within a layer. Neither catches a
+ * specific forbidden edge *within* a layer, which is what C06 → C04 is: both are
+ * L0 data, the edge goes sideways, and every existing rule reports it clean.
+ * Written as a special case of MG1 it would never fire, so the next sideways
+ * prohibition — C15 → C13 (MG13), C20 → C17 (MG18) — goes in this table rather
+ * than into the layer walk.
+ *
+ * **Type-only imports count here**, unlike everywhere else. C04's own spec makes
+ * the argument: a type-only import erases at build and so passes the layer walk,
+ * "which is precisely the objection — a dependency that `make enforce` reports
+ * as clean is worse than one it catches". C06 I1 says C06 never *references* a
+ * C04 type, and a reference is what an `import type` is.
+ */
+const FORBIDDEN_EDGES = [
+  {
+    rule: "MG6",
+    from: "src/data/transport/",
+    to: "src/data/viewmodel/",
+    spec: "C06 I1 · C06 T2.2",
+    why:
+      "C06 reports and C07 interprets — transport constructs no view model, so it " +
+      "references no C04 type. Type-only counts: erasing at build is what would " +
+      "make this pass while being the dependency the rule exists to prevent",
+  },
+];
 
 const IMPORT = /^\s*(?:import|export)\b([^'"]*?)from\s*['"]([^'"]+)['"]/gm;
 const BARE   = /^\s*import\s*['"]([^'"]+)['"]/gm;
@@ -25,14 +54,14 @@ function isTypeOnly(clause) {
   return /^type\b/.test(clause.trim());
 }
 
-function importsOf(file, readFile) {
+function importsOf(file, readFile, includeTypeOnly = false) {
   const src = readFile(file);
   const out = [];
 
   IMPORT.lastIndex = 0;
   let m;
   while ((m = IMPORT.exec(src))) {
-    if (isTypeOnly(m[1])) continue;
+    if (!includeTypeOnly && isTypeOnly(m[1])) continue;
     out.push(m[2]);
   }
 
@@ -177,10 +206,32 @@ function checkPresentationEdges(files, readFile) {
  * `readFile` is injected so the rule can be tested against fabricated modules at
  * layer paths that do not exist on disk — the same reason C02 takes its `env`.
  */
+/** MG6 and the sideways prohibitions that follow it — see `FORBIDDEN_EDGES`. */
+function checkForbiddenEdges(files, readFile) {
+  const violations = [];
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    for (const edge of FORBIDDEN_EDGES) {
+      if (!f.startsWith(edge.from)) continue;
+      for (const spec of importsOf(file, readFile, true)) {
+        const target = resolve(file, spec);
+        if (target === null || !target.startsWith(edge.to)) continue;
+        violations.push({
+          rule: edge.rule, file,
+          message: `imports ${spec} — ${edge.why}`,
+          spec: edge.spec,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [
     ...checkModeOwnership(files, readFile),
     ...checkPresentationEdges(files, readFile),
+    ...checkForbiddenEdges(files, readFile),
   ];
   for (const file of files) {
     const from = layerOf(file);

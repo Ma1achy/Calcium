@@ -75,10 +75,12 @@ describe("C05 integration", () => {
     expect(doc.status).toBe("error");
   });
 
-  it.todo("T4.1: a classified /-prefixed input validates before any transport call — waits on C18 and C06");
+  it.todo("T4.1: a classified /-prefixed input validates before any transport call — waits on C18");
   it.todo("T4.2: completion candidates for --status= come from the manifest's values — waits on C19");
   it.todo("T4.3: adding a flag to the fixture makes it completable with no TypeScript change — waits on C19");
-  it.todo("T4.4: a local tool never reaches the transport; a spawnable one always does — waits on C06");
-  it.todo("T4.5: streams: true selects the streaming transport path — waits on C06");
+  // T4.4 and T4.5 are written, in test/integration/transport.test.ts: the
+  // routing decision is C06's to be driven by and C05's to supply, and it reads
+  // better beside the transport than beside the loader. Named here so the pair
+  // is findable from the spec that declares them.
   it.todo("T4.7: help output is generated wholly from visibleTools — waits on the L4 shell");
 });

@@ -102,10 +102,30 @@ export const SCANS = [
     scope: "src/presentation/blocks/", allow: [],
     why: "display width comes from cells(), never .length" },
 
+  // The scope is real as of C06: `src/data/process/` is a directory now, holding
+  // C21's interface. This rule is the one A03 §2 names as never having been
+  // evaluated — it scoped to a directory while the tree had `process.ts`, a
+  // file, so `startsWith` never matched and it reported compliance for as long
+  // as anyone cared to look.
   { id: "SS26", spec: "C21 T2.2",
     pattern: /process\.stdout\.write/,
     scope: "src/data/process/", allow: [],
     why: "child output is piped; it never reaches the real terminal" },
+
+  // C06's central discipline, made mechanical. The two named things are the two
+  // that get added by someone being helpful: an exit-code comparison on the way
+  // to a status, and an `ErrorLike` built because the information was right
+  // there. Both compile, both pass review, and both put C07's judgement in a
+  // component that must not have one — after which a document's status depends
+  // on which of two files ran.
+  //
+  // Deliberately not scanning for `status`: C06 legitimately has none, but the
+  // word appears in prose and in C23's vocabulary, and a rule that fires on a
+  // comment gets deleted rather than obeyed.
+  { id: "SS25", spec: "C06 I2 · C06 T2.3",
+    pattern: /\bErrorLike\b|\bexitCode\s*[=!]==?\s*-?\d|\bexit(?:Code)?\s*[=!]==?\s*-?\d/,
+    scope: "src/data/transport/", allow: [],
+    why: "C06 reports and C07 interprets — no exit-code mapping, no envelope synthesis" },
 
   // Moved here from eslint's `no-console`, and stronger for it: this catches
   // console.error and console.warn, which the lint rule did not, and it cannot

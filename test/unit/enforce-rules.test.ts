@@ -68,6 +68,21 @@ const FABRICATED: readonly Fabrication[] = [
   },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
   { rule: "SS26", file: "src/data/process/runner.ts", source: 'process.stdout.write(chunk);' },
+  {
+    // The exit-code half of SS25. A `switch` on the code, on the way to a
+    // status, is the shape this rule exists to stop — C06 reports the number and
+    // C07 decides what it means (C06 I2).
+    rule: "SS25",
+    file: "src/data/transport/subprocess.ts",
+    source: "if (exit.exitCode === 2) return invalid;",
+  },
+  {
+    // The envelope half. The information is right there, which is exactly why
+    // someone builds one.
+    rule: "SS25",
+    file: "src/data/transport/fixture.ts",
+    source: "const error: ErrorLike = { message: stderr };",
+  },
   { rule: "SS28", file: "src/interaction/router.ts", source: "scheduler.invalidate();" },
   { rule: "SS33", file: "src/shell/execution.ts", source: 'console.error("failed");' },
   {
@@ -100,6 +115,16 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "MG3",
     file: "src/terminal/lifecycle.ts",
     source: 'import { open } from "../data/transport.js";',
+  },
+  {
+    // The sideways edge no other rule sees. Both files are L0 data, so MG1's
+    // layer walk reports it clean — and this is the *type-only* form, which
+    // every other module-graph rule deliberately ignores. MG6 is the one place
+    // an `import type` is an edge, because C06 I1 forbids the reference rather
+    // than the emit.
+    rule: "MG6",
+    file: "src/data/transport/subprocess.ts",
+    source: 'import type { ViewDocument } from "../viewmodel/types.js";',
   },
   {
     rule: "MG20",
@@ -239,9 +264,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
 describe("A03 commitment 14 — every scope reaches the tree", () => {
   // Rules whose scope matches nothing today, each with the component that will
   // create it. An entry here is a rule that is NOT being enforced.
-  const PENDING: Record<string, string> = {
-    SS26: "waits on C21 — the scope is src/data/process/ and the tree has src/data/process.ts",
-  };
+  // Empty, and that is the news. SS26 sat here from the day the rule was
+  // written: it scoped to `src/data/process/` while the tree had
+  // `src/data/process.ts`, a file, so it had never once been evaluated. C06
+  // needed C21's interface, the interface landed as `src/data/process/types.ts`,
+  // and the directory became real — at which point this list's own assertion
+  // failed, which is what a pending entry is for.
+  const PENDING: Record<string, string> = {};
 
   const files = srcFiles();
 

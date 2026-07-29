@@ -8,6 +8,7 @@ expectations, which is the same reason C02 takes its `env` by injection.
 |---|---|
 | `fake-terminal.ts` | `ALL_CAPABILITIES`, `capabilities()`, `fakeStdout()`, `fakeStdin()`, `fakeDebug()`, and `MODES` — the mode numbers by name, so no test pastes an escape literal |
 | `fake-scheduler.ts` | `fakeClock()`, `harness()`, `assertSeamNarrow()` for C03's tiers 1–3 |
+| `transport.ts` | `fakeRunner()`, `fakeChild()`, `clockOf()`, `invocation()`, `recorded()`, `drain()` for C06's tiers 1–3, and `transportCases()` — the three-transport shared suite I15 asserts. The runner is faked against C21 §2 rather than invented, so a drift from that interface fails here rather than on the day C21 lands |
 | `pty.ts` | `runInPty()`, `interactivePty()`, `control()`, `trackDecset()` for tier 5 |
 | `fixture.mjs` | The program tier 5 runs inside a PTY. Imports `dist/`, not `src/` |
 
