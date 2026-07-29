@@ -140,6 +140,10 @@ type Fixture = Readonly<{
 
 `createFixtureTransport` implements C08 §4 route 1 only — exact `verb` + `argv` match. Routes 2 and 3 belong to the handler. **On a miss it throws**, naming the verb and argv, because the alternative is a test asserting against a fixture that is not in the corpus and passing.
 
+**Replay does not rewrite the stored result.** The `argv` a recorded fixture carries is the argv the far side was actually invoked with, and §3 explains why that is the honest thing to report rather than a rewritten one. It is also the plainer reading of C08 I2: byte-for-byte means the stored record, not the stored record with a field substituted. A rewrite is normalisation at replay time under another name.
+
+The fixture's own `argv` — the `Fixture.argv` field, not `result.argv` — remains the *match key*, and is the invocation form without `--json`. Two argvs in one type reads like duplication and is not: one is what the corpus is indexed by, the other is what happened.
+
 ---
 
 ## 3. Invocation
@@ -154,7 +158,16 @@ C06 reports faithfully and interprets nothing:
 
 - Normal exit → `exitCode` set, `signal` null.
 - Killed → `exitCode` null, `signal` set.
-`argv` on the result is what was spawned, or for a fixture transport what *would* have been spawned — so a fixture-backed document reports the same reproducible command.
+
+**`argv` is what was actually spawned, and replay reports the recorded value verbatim.**
+
+D49 settles what `meta.argv` means: it answers what actually ran, without re-running it. That is a **historical fact about the data**, not a reproduction hint — and a recording captured a real invocation, so replay reports that invocation.
+
+An earlier draft had the fixture transport rewrite `argv` to what *would* have been spawned. It cannot know the binary, so it produced a command missing its first element; giving it one would have manufactured an argv for a command that never ran — a fiction dressed as a fact, and configuration the transport otherwise does not need.
+
+The case that looks like an objection is the informative one. A corpus recorded against `docker` and replayed in an app that now spawns `podman` reports `docker`, because `docker` is where the data came from, and the mismatch is a signal the corpus is stale. `meta.transport` already disambiguates: `"fixture"` beside `["docker","ps","--json"]` reads correctly as replayed data from that command. The two fields together are honest; the rewrite made one of them lie.
+
+Synthesis remains where there is nothing recorded to report: the emulated transport's world-generated results, and the results C06 constructs itself for a cancellation or a miss. Those describe an invocation that is happening now, not one that happened once.
 
 - `stdout` is the parsed JSON when parseable, `undefined` otherwise, with `parseError` explaining why. `stdoutRaw` is retained either way, so C07 can always fall back to a `raw` block.
 - `stderr` is captured separately and never merged into stdout (B3, A01 single-owner stdout).
@@ -248,6 +261,8 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I17** — The test runner selects `fixture`. Nothing in the test suite selects `emulated` *as a source of expected values*: `EmulatedTransport` is constructed only over a fixed handler, to assert interface parity (I15), and C08's world never appears in a test path (C08 I14). The qualifier is load-bearing — without it I17 and I15 contradict each other, since parity cannot be asserted for an implementation no test may construct.
 - **I18** — C06 reads no environment. `createTransport` takes `mode` as a parameter, and no module under `src/` resolves `PRISM_TUI_TRANSPORT`.
 - **I19** — Time enters C06 only through injected `now` and `schedule`. No ambient clock, no ambient timer.
+- **I20** — Replay reports the recorded result verbatim. `createFixtureTransport` rewrites no field of a stored `RawResult`, `argv` included. Synthesis is confined to results C06 constructs itself — a cancellation, a miss — where there is no recording to report.
+- **I21** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
 
 ---
 
@@ -272,6 +287,8 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 17. All three implementations are substitutable in every test that does not concern spawning (I15).
 18. The fixture transport replays and nothing else — no clock, no world state (I16).
 19. Time enters only through injected `now` and `schedule` (I19).
+20. Replay reports what was recorded, verbatim (I20). `meta.argv` is a historical fact about the data — what actually ran — not a reproduction hint, so a corpus recorded against one binary says so even when the app now spawns another. `meta.transport` disambiguates; the two fields together are honest.
+21. The parity suite compares the complete `RawResult` (I21). A suite that picks fields is a suite with holes exactly where nobody looked.
 
 ---
 
@@ -299,6 +316,12 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 - **T2.1** (I15): the full tier-1 and tier-3 suites run against **all three** transports; every assertion that does not concern spawning holds for each. The emulated case is constructed over a fixed handler returning a constant envelope.
 
   **This is not a D43 violation, and it looks like one.** D43 forbids tests *agreeing with an animated world* — asserting on values the emulator invents, so that drift in the world silently becomes the expected result. This suite asserts that three transports behave identically at the interface, over a handler that returns a fixed envelope; nothing here treats the emulator as a source of truth about the far side. Stated because the alternative reading — see `emulated` in the `describe.each`, remember D43, narrow the suite back to two — is the same silent narrowing I15's "does not concern spawning" clause exists to prevent.
+
+  **The suite compares the complete `RawResult`, not a chosen subset** (I21). A suite that picks fields is a suite with holes exactly where nobody looked. `argv` was the first such hole: it survived here and was found from C08's side, because the three transports were compared on `stdout`, `exitCode` and the shape of the patch sequence, and never on the field they actually disagreed about.
+
+  Comparison is field-complete in both places a `RawResult` appears — the settled return of `invoke`, and the `result` inside the terminal `end` patch. The second is the easier one to forget: `data`, `malformed` and `degraded` patches are compared whole already, so the streaming side reads as covered while carrying the same gap one level down.
+
+  Fields that cannot match are **named individually with a reason**, and the list is closed. A field is exempt by being on it, never by not being looked at — which is the same discipline the scan allow-lists take, and for the same reason: a rule that narrows to what it happens to cover stops seeing what it does not.
 - **T2.7** (I16): a source scan finds no clock read and no mutable module state in `fixture.ts`; replaying the same corpus twice yields deep-equal results.
 - **T2.8** (I17): a source scan finds no `emulated` mode selection in `test/`, and no test imports C08's world.
 - **T2.9** (I18): a source scan finds no `PRISM_TUI_TRANSPORT` anywhere in `src/`.
@@ -378,6 +401,8 @@ Real subprocesses.
 - **T6.12**: capturing `cwd` at construction → T3.22 fails.
 - **T6.13** (I11): removing the line cap → T3.16b fails on unbounded growth.
 - **T6.14**: typing the fixture transport against an app-defined world → the module-graph test in T2.2 fails.
+- **T6.18** (I21): narrowing the parity comparison to a chosen subset of `RawResult` → T2.1 fails on the field-completeness check, rather than passing with a hole. This is the revert that already happened once: the suite compared `stdout` and `exitCode`, `argv` diverged, and nothing went red until C08 recorded and replayed the same invocation.
+- **T6.19** (I20): rewriting a stored field at replay — `argv` being the one it was — → T2.1 fails on parity and C08 T2.7 fails on byte-for-byte. A fixture-backed document then reports a command that never ran.
 
 ---
 
