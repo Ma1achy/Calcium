@@ -64,6 +64,12 @@ function resolve(file, spec) {
  *
  * An export with no importer is fine: `SCROLL_REGION` has no consumer until
  * M-T6, and requiring one would force a dead export CLAUDE.md forbids.
+ *
+ * An export that does not *exist* is not fine, and is the third way a rule
+ * comes to have nothing to be wrong about (A03 §2). These rows named
+ * `SYNC_UPDATE` and `SCROLL_REGION` while `escapes.ts` exported neither: the
+ * lookup could never hit, so the rows reported compliance whatever the tree
+ * contained. `modeOwnersAreReal` is the assertion that they name something.
  */
 const MODE_OWNERS = {
   ALT_SCREEN:     "src/terminal/lifecycle.ts",
@@ -109,6 +115,21 @@ function checkModeOwnership(files, readFile) {
     }
   }
   return violations;
+}
+
+/**
+ * Which `MODE_OWNERS` rows name an export `escapes.ts` actually has.
+ *
+ * A row for an absent name is a row that cannot fire — it is not a wrong rule,
+ * it is a rule with nothing to be wrong about, which is the failure mode A03 §2
+ * names. Returned rather than thrown so the caller can list the pending ones
+ * (`SCROLL_REGION` waits on M-T6) and fail on the rest.
+ */
+export function modeOwnersAreReal(readFile = (f) => readFileSync(f, "utf8")) {
+  const src = readFile(`${ESCAPES}.ts`);
+  const exported = new Set([...src.matchAll(/^\s*export\s+const\s+(\w+)/gm)].map((m) => m[1]));
+  const missing = Object.keys(MODE_OWNERS).filter((name) => !exported.has(name));
+  return { exported: [...exported], missing, owned: Object.keys(MODE_OWNERS) };
 }
 
 /**

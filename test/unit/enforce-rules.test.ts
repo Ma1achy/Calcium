@@ -3,8 +3,8 @@
 //
 // This is not belt-and-braces. A rule that matches nothing passes, and passing
 // is what we look for: `make enforce` reports "no violations" identically
-// whether the suite is clean or the suite is broken. Two ways that happens, and
-// both have happened here:
+// whether the suite is clean or the suite is broken. Three ways that happens,
+// and all three have happened here:
 //
 //   - **The pattern cannot match a real specifier.** MG20 compared a resolved
 //     path against `src/terminal/escapes` while every NodeNext specifier ends
@@ -13,12 +13,21 @@
 //     tree has `src/data/process.ts` — a file, not a directory. `startsWith`
 //     never matches, so "no writes to real process.stdout in the process
 //     runner" has never once been checked.
+//   - **A named entity does not exist.** MG20's `MODE_OWNERS` assigned
+//     `SYNC_UPDATE` and `SCROLL_REGION` to C03 while `escapes.ts` exported
+//     neither, so those rows could not fire whatever the tree contained.
 //
-// The fabricated violation catches the first. The scope check catches the
-// second. Neither catches the other, which is why both are here.
+// None of the three was a wrong rule. Each was a rule with nothing to be wrong
+// about. The fabricated violation catches the first, the scope check the
+// second, the existence check the third; no one of them catches the others,
+// which is why all three are here (A03 §2, commitment 14).
 import { readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { checkModuleGraph, MODULE_GRAPH_RULES } from "../../tools/enforce/module-graph.mjs";
+import {
+  checkModuleGraph,
+  modeOwnersAreReal,
+  MODULE_GRAPH_RULES,
+} from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 
@@ -188,6 +197,47 @@ describe("A03 commitment 14 — every scope reaches the tree", () => {
       expect(matched.length, `${id} scans nothing — it cannot fail`).toBeGreaterThan(0);
     },
   );
+
+  it("every MODE_OWNERS row names an export escapes.ts actually has", () => {
+    // The third way a rule comes to have nothing to be wrong about, after an
+    // unmatchable pattern and a scope matching no files: an ownership row for a
+    // name that does not exist. The lookup can never hit, so the row reports
+    // compliance whatever the tree contains — which is exactly what these rows
+    // did while `SYNC_UPDATE` was unwritten (A03 §2).
+    const OWNER_PENDING: Record<string, string> = {
+      SCROLL_REGION: "waits on M-T6 — scroll-region acceleration is gated on measurement",
+    };
+
+    const { missing } = modeOwnersAreReal();
+
+    for (const name of missing) {
+      // The exemption is checked in the same direction as SS26's: when M-T6
+      // lands and the export appears, this fails and the entry must go.
+      expect(
+        OWNER_PENDING[name],
+        `MG20 owns ${name}, which escapes.ts does not export — that row cannot fire`,
+      ).toBeDefined();
+    }
+
+    for (const name of Object.keys(OWNER_PENDING)) {
+      expect(
+        missing,
+        `${name} is listed pending but escapes.ts now exports it`,
+      ).toContain(name);
+    }
+  });
+
+  it("the MODE_OWNERS existence check fires on a fabricated absent export", () => {
+    // Fabricated the same way every other rule is: a tree in which the name is
+    // genuinely gone, rather than a string built to fail the comparison.
+    const withoutSync = modeOwnersAreReal(
+      () => 'export const ALT_SCREEN = mode("a", "b");\nexport const CURSOR = mode("c", "d");\n',
+    );
+
+    expect(withoutSync.missing).toContain("SYNC_UPDATE");
+    expect(withoutSync.missing).toContain("MOUSE");
+    expect(withoutSync.exported).toEqual(["ALT_SCREEN", "CURSOR"]);
+  });
 
   it("no scan's allow list exempts a path that does not exist", () => {
     // An allow entry pointing at a moved file silently widens nothing, but it

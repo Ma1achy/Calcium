@@ -108,7 +108,7 @@ export function termiosFlags(report: string): Record<string, boolean> {
  */
 export function runInPty(
   program: string,
-  opts: { env?: Record<string, string>; jobControl?: boolean } = {},
+  opts: { env?: Record<string, string>; jobControl?: boolean; timeoutMs?: number } = {},
 ): Promise<PtyRun> {
   return new Promise((resolve, reject) => {
     // `set -m` gives the program its own foreground process group. Without it
@@ -132,7 +132,7 @@ export function runInPty(
     const timer = setTimeout(() => {
       term.kill();
       reject(new Error(`PTY run timed out: ${program}\n${output}`));
-    }, 20_000);
+    }, opts.timeoutMs ?? 20_000);
 
     term.onExit(({ exitCode }) => {
       clearTimeout(timer);
@@ -155,4 +155,85 @@ export function runInPty(
 /** The control: a program that takes nothing and gives nothing back. */
 export function control(): Promise<PtyRun> {
   return runInPty("true");
+}
+
+export type InteractivePty = {
+  /** Send bytes as a user would — through the PTY, not through a back channel. */
+  type(bytes: string): void;
+  /** Everything received so far. */
+  readonly output: string;
+  /** Resolve once `pattern` appears, or reject after `ms`. */
+  waitFor(pattern: RegExp, ms?: number): Promise<RegExpExecArray>;
+  done(): Promise<number>;
+  kill(): void;
+};
+
+/**
+ * A PTY the test can type into while the program runs.
+ *
+ * `runInPty` starts a program and waits, which cannot express C03's T5.2: the
+ * only honest input-to-frame latency is measured from the moment a keystroke
+ * enters the PTY to the moment the frame it caused leaves it. Timing inside the
+ * fixture would measure `commit()` calling `render()` synchronously, which is
+ * zero by construction and proves nothing.
+ */
+export function interactivePty(
+  program: string,
+  opts: { env?: Record<string, string>; cols?: number; rows?: number } = {},
+): InteractivePty {
+  const term = spawn("/bin/sh", ["-c", program], {
+    name: "xterm-256color",
+    cols: opts.cols ?? 80,
+    rows: opts.rows ?? 24,
+    env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
+  });
+
+  let output = "";
+  let exited: number | null = null;
+  const waiters: { re: RegExp; resolve: (m: RegExpExecArray) => void }[] = [];
+  const exitWaiters: ((code: number) => void)[] = [];
+
+  term.onData((d) => {
+    output += d;
+    for (let i = waiters.length - 1; i >= 0; i -= 1) {
+      const m = waiters[i]!.re.exec(output);
+      if (m !== null) {
+        waiters[i]!.resolve(m);
+        waiters.splice(i, 1);
+      }
+    }
+  });
+  term.onExit(({ exitCode }) => {
+    exited = exitCode;
+    for (const w of exitWaiters.splice(0)) w(exitCode);
+  });
+
+  return {
+    type: (bytes) => term.write(bytes),
+    get output() {
+      return output;
+    },
+    waitFor(re, ms = 15_000) {
+      const existing = re.exec(output);
+      if (existing !== null) return Promise.resolve(existing);
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error(`never saw ${String(re)} in:\n${output.slice(-2000)}`)),
+          ms,
+        );
+        waiters.push({
+          re,
+          resolve: (m) => {
+            clearTimeout(timer);
+            resolve(m);
+          },
+        });
+      });
+    },
+    done() {
+      if (exited !== null) return Promise.resolve(exited);
+      return new Promise((resolve) => exitWaiters.push(resolve));
+    },
+    kill: () => term.kill(),
+  };
 }

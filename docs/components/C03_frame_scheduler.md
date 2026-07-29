@@ -70,6 +70,14 @@ function createFrameScheduler(opts: {
 
 **Immediate reasons cannot be made coalesced.** `windows` may tune `stream` and `spinner` only; supplying a window for `input`, `completion` or `resize` is rejected at construction. A config file must not be able to introduce input lag (I2).
 
+**Windows are throughput ceilings, not deadlines.** `stream`'s 33 ms exists to cap streaming at ~30 fps; `spinner`'s 100 ms is an animation cadence. They encode different kinds of requirement, so the shortest ceiling governs: a pending timer is re-armed when a commit arrives whose window is **strictly shorter**, and left alone otherwise.
+
+The consequence is deliberate and asymmetric. A stream commit arriving under a pending spinner draws within its own 33 ms. A spinner tick arriving under a pending stream may land up to 33 ms past its 100 ms — a spinner briefly at 7.5 fps instead of 10, which nobody perceives. The reverse would put streaming at 10 fps, which is exactly what the window exists to prevent.
+
+What makes this cheap is that there is no frame content. Re-arming at 33 ms does not delay the spinner; it draws it *earlier*, at 33 rather than 100, because whatever renders draws current state. Only the *following* spinner tick can slip, and only by less than one stream window.
+
+A ceiling is also the only form of this rule C03 can implement. A deadline is *now + window*, and C03 has no clock — A03 SS1 forbids one in `src/`, and the injected timer reports that it fired, never how long it has been running. Comparing windows needs neither.
+
 **An immediate commit cancels any pending one and renders now.** Nothing is lost — the pending frame and the immediate frame would draw the same current state, so the earlier schedule is redundant rather than skipped.
 
 **A pending frame is always flushed before a transition the user is waiting on** (A01 §render discipline). In practice this falls out of the rule above: the completion commit is immediate, so the pending stream frame is superseded rather than dropped. Final content is never lost.
@@ -79,6 +87,8 @@ function createFrameScheduler(opts: {
 A render callback may cause a commit — a component measuring itself during render, a resize observed mid-paint. Writing is synchronous, so this arrives while a write is already in progress.
 
 **A commit during a write is deferred, not dropped and not recursive.** C03 records that a re-entrant commit occurred, with the strictest reason seen, and acts on it once the current write returns: immediately if that reason was immediate, otherwise by scheduling a fresh window from the end of the write (T3.15). Recursing would risk unbounded depth; dropping would lose the final state.
+
+**A commit re-entering the deferred write is escalated to the scheduler, not written inline.** I10 says nothing is dropped; T3.20 says the chain is not unbounded. For a render callback that commits on *every* invocation those two pull against each other, and exactly one reading satisfies both: drain once, and if the deferred write defers again, arm a timer rather than writing. An immediate reason gets a zero window, so the frame lands on the next turn instead of on this stack. The frame is kept, the stack is not, and an application stuck in a render loop renders at timer cadence rather than hanging.
 
 **Strictest** means: immediate outranks coalesced, and among coalesced the shorter window wins. Order among the three immediate reasons is unobservable, and that is not an accident — `resize` sets contamination eagerly at commit time even while deferring (§5), so the only thing that could distinguish the three has already taken effect by the time the deferred reason is chosen. Do not define an order there; it would have no effect.
 
@@ -123,7 +133,7 @@ Three states plus an orthogonal `contaminated` flag. `writing` is transient but 
 | From ↓ / call → | `commit(input\|completion)` | `commit(resize)` | `commit(stream\|spinner)` | `flush()` | `invalidate()` |
 |---|---|---|---|---|---|
 | **idle** | → writing → idle (T1.1) | set flag, → writing → idle (T1.10) | → pending, timer set (T1.3) | no-op (T3.1) | flag set, idle (T1.8) |
-| **pending** | cancel timer, → writing → idle (T1.5) | set flag, cancel timer, → writing → idle (T3.16) | → pending; timer unchanged unless the new deadline is strictly earlier, in which case it is replaced (T1.4, T3.12) | cancel timer, → writing → idle (T1.6) | flag set, pending (T3.6) |
+| **pending** | cancel timer, → writing → idle (T1.5) | set flag, cancel timer, → writing → idle (T3.16) | → pending; timer unchanged unless the arriving window is strictly shorter, in which case it is re-armed (T1.4, T3.12) | cancel timer, → writing → idle (T1.6) | flag set, pending (T3.6) |
 | **writing** | defer (T3.7) | defer, flag set (T3.17) | defer (T3.18) | no-op (T3.8) | flag set (T3.19) |
 
 Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()` and clears the flag once that repaint returns (T1.9, T3.5). `resize` sets that flag as part of the commit (I7).
@@ -134,7 +144,7 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 
 - **I1** — C03 never writes while `lifecycle.acquired` is false. A commit in that state is dropped silently.
 - **I2** — `input` and `completion` commits are never delayed by any amount, and their windows are not configurable.
-- **I3** — At most one timer is outstanding. A second coalesced commit within an open window never extends, slides or duplicates it; it may only shorten it to a strictly earlier deadline.
+- **I3** — At most one timer is outstanding. A coalesced commit within an open window never extends, slides or duplicates it. It re-arms the timer only when its own window is strictly shorter than the pending one; equal windows never re-arm, which is what makes T1.4 and T6.2's sliding-window revert bite.
 - **I4** — An immediate commit cancels a pending timer. A timer never fires after the frame it would have produced has already been drawn.
 - **I5** — A write while `contaminated` is a full repaint, and clears the flag once the repaint returns. A repaint that throws leaves the flag set, so the next write retries it (T3.5).
 - **I6** — Synchronised-update markers are emitted iff the capability is present, and are always balanced — every `2026 h` has a matching `2026 l`, including when the render callback throws.
@@ -210,7 +220,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.9**: `acquired` flips false while a timer is pending → the timer fires and writes nothing (I1); no throw, `pending` clears.
 - **T3.10**: `acquired` flips false and back to true while pending → the pending write happens once.
 - **T3.11**: a hundred `commit("stream")` calls in one synchronous block → exactly one timer, one render.
-- **T3.12** (I3): alternating `stream` and `spinner` commits → the earlier deadline wins in both orderings. Stream-then-spinner leaves the 33 ms timer alone; spinner-then-stream replaces the 100 ms timer with a 33 ms one. A later reason never pushes the frame out.
+- **T3.12** (I3): alternating `stream` and `spinner` commits → the shortest ceiling governs, in both orderings. Stream-then-spinner leaves the 33 ms timer alone — 100 is not shorter. Spinner-then-stream re-arms the 100 ms timer at 33 ms. A longer window never pushes the frame out.
 - **T3.13** (I2): `windows: { input: 50 }` at construction → **throws**. Same for `completion` and `resize`.
 - **T3.14** (I1): `flush()` from pending while `acquired` is false → the timer is cancelled, nothing is written, `pending` is false. The one path where an explicit flush discards a frame silently.
 - **T3.15** (I3, I10): a coalesced commit deferred during a write schedules a **fresh** window measured from the end of the write, not from the original commit. No timer is outstanding at that moment, so I3 holds.
@@ -218,7 +228,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.17** (I10): `commit("resize")` during a write → deferred, contamination flag set, and the deferred write is a repaint.
 - **T3.18** (I10): `commit("stream")` during a write → deferred and scheduled, not written immediately.
 - **T3.19**: `invalidate()` during a write → the flag applies to the *next* write, not the one in progress.
-- **T3.20** (I10): a render callback that commits on every invocation → exactly one deferred write follows, not an unbounded chain.
+- **T3.20** (I10): a render callback that commits on every invocation → exactly one deferred write follows, not an unbounded chain. The commit made during *that* write is escalated to a timer rather than dropped or written inline, so advancing the clock renders again — a render loop runs at timer cadence, and the stack stays flat.
 - **T3.21** (I10): `commit("stream")` then `commit("input")` both during one write → one deferred write, immediate, at the stricter reason.
 - **T3.22** (I11): `acquired` flips true after construction → the next commit writes. A snapshotted view would never write at all.
 - **T3.23** (§1): the starvation property, directly. With `windows: { stream: 16 }`, a long interleaving of `stream` commits at 16 ms and `input` commits at irregular offsets → every input frame is rendered at the tick its commit arrived, none is delayed behind a pending stream frame, and stream frames remain capped at one per window. This is what T4.6 and T5.2 assert against real components and real timers; here it is deterministic.
@@ -238,7 +248,9 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 
 PTY harness, real timers, real terminal.
 
-- **T5.1**: a 1,000 line/s stream for ten seconds → frame count is within 10% of 30/s at the 33 ms default, and CPU stays under 25% of one core.
+- **T5.1**: a 1,000 line/s stream for ten seconds → the frame rate sits **at or below** the 30.3/s ceiling the 33 ms default sets, does not collapse below 20/s, produces two orders of magnitude fewer frames than commits, and holds CPU under 25% of one core.
+
+  Stated as a ceiling approached from below, not a band around a cadence, for the same reason §3 calls windows ceilings rather than deadlines. The window is armed after the previous frame completes, so the real gap is *window + frame cost + timer slop* and the achieved rate is necessarily under 1000/window. A measured run gives ~25.7/s at ~39 ms per frame; an earlier draft asked for ±10% of 30.3/s, which no correct implementation can meet without becoming a fixed-cadence rate limiter — and a fixed cadence would need the elapsed time C03 has no way to read.
 - **T5.2**: typing continuously during that stream → input-to-frame latency p95 under 16 ms.
 - **T5.3**: on a synchronised-update-capable terminal, a full-screen repaint shows no intermediate state — asserted by sampling the PTY mid-write and finding either the old frame or the new one, never a mixture.
 - **T5.4**: dragging the terminal edge continuously → every frame is correct, none is blank, no corruption.
@@ -256,10 +268,10 @@ PTY harness, real timers, real terminal.
 - **T6.7** (I7): decoupling resize from invalidation → T1.10 fails.
 - **T6.8** (I8): adding a frame buffer or content parameter to `commit` → T2.2 fails.
 - **T6.9** (A02 §7): adding a `CommitReason` without a window → T2.5 fails at build time.
-- **T6.10** (I10): making a re-entrant commit recurse → T3.20 fails on call depth; dropping it → T3.21 fails on the lost frame.
+- **T6.10** (I10): making a re-entrant commit recurse → T3.20 fails on call depth; dropping it → T3.21 fails on the lost frame. Draining the deferral in a loop rather than escalating the second one → T3.20 hangs, which is the failure the escalation exists to prevent.
 - **T6.11** (I11): snapshotting `acquired` at construction → T3.22 fails.
 - **T6.12** (I2): allowing an immediate reason to be given a window → T3.13 fails. Distinct from T6.1: that reverts the behaviour, this reverts the construction-time rejection.
-- **T6.13** (I3): replacing the pending timer on every coalesced commit regardless of deadline → T1.4 fails, since the window would slide again. Never replacing it → T3.12 fails on the spinner-then-stream ordering. The rule is one-directional and both directions are held.
+- **T6.13** (I3): re-arming the pending timer on every coalesced commit, or on one whose window is merely *not longer* → T1.4 fails, since 33 against 33 would slide the window. Never re-arming → T3.12 fails on the spinner-then-stream ordering. Strictly-shorter is what holds both directions; either comparison relaxed by one step breaks one of them.
 - **T6.14** (C13): passing frame content to `write` rather than through `render()` → T2.7 fails on the third string.
 - **T6.15** (I11): snapshotting `acquired` in the L4 wiring rather than in C03 → T3.24 fails. The failure C03 cannot prevent structurally, so it is demonstrated instead.
 

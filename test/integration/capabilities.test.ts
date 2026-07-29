@@ -7,7 +7,10 @@
 //
 // A fake standing in for a counterparty before that counterparty's spec is
 // implemented would test the fake, not the seam.
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { detectCapabilities } from "../../src/terminal/capabilities.js";
+import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
+import { MODES } from "../support/fake-terminal.js";
 
 describe("C02 integration", () => {
   it.todo(
@@ -25,7 +28,32 @@ describe("C02 integration", () => {
   it.todo(
     "T4.5: unicode:'ascii' → the braille plot degrades to a block plot rather than emitting braille codepoints — waits on C12",
   );
-  it.todo("T4.6: synchronisedUpdate:false → frames carry no 2026 wrapper — waits on C03");
+  it("T4.6 (with C03): synchronisedUpdate:false → frames carry no 2026 wrapper", () => {
+    // Driven from C02's side: the record decides, and C03 obeys it. Both
+    // directions, because the negative alone passes when C03 wraps nothing.
+    const written: string[] = [];
+    function framesFor(env: Record<string, string>): string {
+      written.length = 0;
+      const capabilities = detectCapabilities(env).capabilities;
+      const scheduler = createFrameScheduler({
+        render: () => {},
+        repaint: () => {},
+        capabilities,
+        lifecycle: { acquired: true },
+        write: (s) => void written.push(s),
+        schedule: () => ({ [Symbol.dispose]: () => {} }),
+      });
+      scheduler.commit("input");
+      return written.join("");
+    }
+
+    expect(framesFor({ TERM: "xterm-256color" })).toBe("");
+    expect(framesFor({ TERM: "dumb" })).toBe("");
+
+    const wrapped = framesFor({ TERM: "xterm-kitty" });
+    expect(wrapped).toContain(MODES.syncOn);
+    expect(wrapped).toContain(MODES.syncOff);
+  });
   it.todo(
     "T4.7: altScreen:false → the shell prints help and exits 0 without acquiring anything — waits on L4",
   );

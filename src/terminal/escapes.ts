@@ -35,3 +35,13 @@ export const BRACKET_PASTE = mode("\x1b[?2004h", "\x1b[?2004l");
  * single key rather than only across `held`.
  */
 export const MOUSE = mode("\x1b[?1002h\x1b[?1006h", "\x1b[?1006l\x1b[?1002l");
+
+/**
+ * DECSET 2026 — synchronised update. C03's, and the only mode outside C01's set.
+ *
+ * The pair is *transactional*, not stateful: it opens and closes around one
+ * write and never persists across one. That is the whole reason C03 may emit it
+ * without contending with C01's ownership of terminal mode state — there is no
+ * state to own. `held` never contains it, and release never has to undo it.
+ */
+export const SYNC_UPDATE = mode("\x1b[?2026h", "\x1b[?2026l");
