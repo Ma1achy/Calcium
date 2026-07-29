@@ -70,6 +70,10 @@ If a cache is ever wanted, its shape is settled and it is not a per-registry clo
    narrower than the terminal rather than stretching columns arbitrarily
 ```
 
+**Step 3's `while` is a bound on the loop, not a filter over it.** Admission **stops** at the first column that does not fit; it does not skip that column and carry on to narrower ones. The two readings survive every reading of this sentence and differ by one cell in practice: at width 80, S03's admitted set reaches 72 cells through `age`, `kind` at 10 would take it to 84 and is refused, and `mr` at 6 needs exactly 80 and fits — so a skipping planner shows `mr` at a width whose drop table says `mr` goes. S03 §3's table at 80 is what pins it, and C11 T4.1 asserts it.
+
+It is also the better rule to be held to. A lower-priority column appearing at a width where a higher-priority one was refused is a drop order nobody chose, and D38's promise is that the order is reviewable.
+
 Step 4 is what stops the degenerate case: at width 20 with a 40-cell column, the table renders one truncated column rather than nothing. `overflowed` records it so a caller can react.
 
 Step 5 matters for usability — dropping the `owner` column must not reorder `uuid` and `status`. Priority governs survival, never position.

@@ -21,7 +21,7 @@ function defs(columns: readonly SurfaceColumn[]): readonly ColumnDef[] {
   return columns.map((c) => ({
     key: c.key,
     label: c.key,
-    align: "left" as const,
+    align: c.align,
     priority: c.priority,
     minWidth: c.minWidth,
     flex: c.flex,
@@ -48,6 +48,21 @@ describe("C11 tier 4 — the planner against the surfaces", () => {
     describe(surface.label, () => {
       const parsed = surfaceColumns(surface.file)[surface.table] ?? [];
       const stated = surfaceDrops(surface.file, surface.drops);
+
+      it("T4.1 (CP6): every field of the column table was read, not just the ones that move a drop", () => {
+        // **The parser's own vacuity, and it was live.** `surfaceColumns` read by
+        // position, so declaring `Align` shifted `Flex` one right in five files and
+        // every flex column silently became false. Nothing failed: flex changes
+        // widths, not which columns drop, so the drop-order assertions below all
+        // still passed. A positional reader is a fixture that agrees with itself.
+        //
+        // So each field is asserted to have arrived, per surface, against something
+        // only that field can produce.
+        expect(parsed.some((c) => c.flex), "no flex column parsed").toBe(true);
+        expect(parsed.every((c) => c.align === "left" || c.align === "right")).toBe(true);
+        expect(parsed.every((c) => c.priority > 0), "a priority read as NaN or zero").toBe(true);
+        expect(parsed.every((c) => c.minWidth >= 1)).toBe(true);
+      });
 
       it("T4.1 (CP6): the spec's tables were read, not assumed", () => {
         // The vacuity guard. A parser that found nothing would make every

@@ -24,6 +24,41 @@ have caught §2 without anyone reading it.
 
 ---
 
+## When an illustration and its tables disagree
+
+**The tables win — unless the illustration encodes an intent the tables never
+stated, in which case the finding is a missing declaration rather than a wrong
+picture.** The distinction decides what gets edited, and getting it backwards
+either enshrines a drawing error or deletes a real decision.
+
+Three instances, and all three were the second kind:
+
+| Where | What the figure carried | What was missing |
+|---|---|---|
+| A01 Appendix A.1 | Palette values taken from a mockup | Validation against the contrast floors |
+| S03 §2 | Columns in an order §3's priorities contradict | Nothing — the picture was simply wrong, *and* it also carried the next row |
+| S03 §3, S05 §3, S06 §5, S15 §5 | `metric`, `age`, `errors`, `p99`, `req/s`, `p50`, `versions` right-aligned | `align`, which `ColumnDef` requires |
+
+**Illustrations are where intent leaks in without being recorded.** They are drawn
+by eye against an idea of how the thing should look; the spec text is written
+separately, and nothing compares them. That is the commitment/invariant divergence
+one artefact over — two parallel descriptions of the same thing, with no mechanism
+asserting they agree — and it has now produced a defect three times.
+
+S03 §2 is the case that shows both halves at once. Its column *order* was a drawing
+error and §3's table won; its right *alignment* was an unstated intent and the
+table changed to record it. Same figure, same commit, opposite verdicts.
+
+The mechanical part of this is covered: row counts are read from the markdown by
+`test/contract/surfaces.test.ts`, and every stated drop order is checked against
+`planColumns` (A03 CP6). What has no mechanism is alignment, truncation side, and
+anything else a figure can show that a table can omit — S14 §7 records a
+left-truncating `key` column that `ColumnDef` cannot express at all, found while
+declaring `align`. The check for those is a person comparing a figure to a table,
+which is what this section is for.
+
+---
+
 ## 1. Separator rows belong to nobody — **resolved: `gapBefore`**
 
 Almost every surface draws a blank row between block regions. S08's success frame

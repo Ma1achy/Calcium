@@ -53,19 +53,21 @@ Error rate is toned independently of health so the number itself carries the sig
 
 Display order is the declared order below; priority governs survival only (C11 I4).
 
-| Column | Priority | Min | Flex | Sortable |
-|---|---|---|---|---|
-| expand | 100 | 1 | — | — |
-| glyph | 100 | 1 | — | — |
-| name | 95 | 16 | yes | yes |
-| replicas | 85 | 7 | — | yes |
-| status | 80 | 10 | — | yes |
-| errors | 70 | 7 | — | yes |
-| version | 65 | 7 | — | yes |
-| p99 | 60 | 6 | — | yes |
-| req/s | 50 | 7 | — | yes |
-| p50 | 40 | 6 | — | yes |
-| age | 30 | 5 | — | yes |
+| Column | Priority | Min | Align | Flex | Sortable |
+|---|---|---|---|---|---|
+| expand | 100 | 1 | left | — | — |
+| glyph | 100 | 1 | left | — | — |
+| name | 95 | 16 | left | yes | yes |
+| replicas | 85 | 7 | left | — | yes |
+| status | 80 | 10 | left | — | yes |
+| errors | 70 | 7 | **right** | — | yes |
+| version | 65 | 7 | left | — | yes |
+| p99 | 60 | 6 | **right** | — | yes |
+| req/s | 50 | 7 | **right** | — | yes |
+| p50 | 40 | 6 | **right** | — | yes |
+| age | 30 | 5 | **right** | — | yes |
+
+**`align` is declared here as it is in S03 §3**, and for the same reason: it is required on `ColumnDef` and the figure in §2 right-aligns five of these columns on a field this table did not state. `replicas` stays left — `3/3` is a ratio rather than a number, and its values are all the same width, so the illustration cannot be read as evidence either way.
 
 | Width | Drops |
 |---|---|

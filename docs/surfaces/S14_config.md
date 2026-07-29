@@ -148,14 +148,27 @@ The expanded reset row states what is cleared:
 
 Priorities are still declared, because C11 requires them and a future column would need somewhere to sit in the order. They are simply never exercised, and saying so is better than inventing a drop sequence for widths that do not occur.
 
-| Column | Priority | Min |
-|---|---|---|
-| expand | 100 | 1 |
-| key | 95 | 20 |
-| value | 90 | 16 |
-| source | 70 | 8 |
+| Column | Priority | Min | Align |
+|---|---|---|---|
+| expand | 100 | 1 | left |
+| key | 95 | 20 | left |
+| value | 90 | 16 | left |
+| source | 70 | 8 | left |
+
+Every column is left-aligned: nothing here is a number, and `24` in `terminal.colour_depth` is a value in a column of values rather than a numeric column. `align` is stated because `ColumnDef` requires it (C04 §3) and a table that leaves it unstated is a table whose figure decides it.
+
+The contexts region below the second rule is a table too, and it declared no columns at all — the same gap S15 §5 had. It is headerless (`showHeader: false`), which is the shape C04 §3 names for a small list with row actions:
+
+| Column | Priority | Min | Align | Flex |
+|---|---|---|---|---|
+| glyph | 100 | 1 | left | — |
+| name | 95 | 13 | left | — |
+| url | 80 | 29 | left | yes |
+| token | 60 | 18 | left | — |
 
 Key paths truncate from the **left**, keeping the leaf. Keys are sorted, so adjacent rows share their namespace; truncating the leaf would render `ui.theme` and `ui.show_banner` identically. Values truncate from the right.
+
+**That left truncation is not expressible today, and this is the place it is recorded.** `ColumnDef` has no truncation-side field, and C11 truncates from the right unconditionally (C09 I9's marker rule says nothing about which end). So this paragraph states an intent the schema cannot carry — the same class as the missing `align`, found while fixing it. It needs a field on `ColumnDef` and a clause in C09's truncation rule before this surface renders as drawn; until then a narrow `key` column shows `ui.show_ba…` rather than `…show_banner`.
 
 ## 8. Interactions
 

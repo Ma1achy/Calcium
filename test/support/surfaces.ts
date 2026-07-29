@@ -12,7 +12,7 @@
 // let S07 draw a `diff` with no header through four revisions of the spec.
 import { readFileSync } from "node:fs";
 import { block } from "../../src/data/viewmodel/index.js";
-import type { Block, Cell, ColumnDef, TableRow } from "../../src/data/viewmodel/index.js";
+import type { Block, Cell, ColumnDef, Glyph, TableRow } from "../../src/data/viewmodel/index.js";
 
 export type SurfaceFrame = Readonly<{
   /** The spec file, and which fenced illustration inside it. */
@@ -101,6 +101,7 @@ export type SurfaceColumn = Readonly<{
   key: string;
   priority: number;
   minWidth: number;
+  align: "left" | "right";
   flex: boolean;
   sortable: boolean;
 }>;
@@ -116,22 +117,36 @@ export type SurfaceColumn = Readonly<{
 export function surfaceColumns(file: string): readonly (readonly SurfaceColumn[])[] {
   return tables(file)
     .filter((t) => t.header[0] === "Column" && t.header[1] === "Priority")
-    .map((t) =>
-      t.rows.flatMap((row): SurfaceColumn[] => {
+    .map((t) => {
+      // **By header name, never by position.** The columns of these tables differ
+      // between surfaces — S03 has `Sortable` and `Source`, S06 has neither — and
+      // declaring `Align` shifted `Flex` one right in five files at once. A
+      // positional reader survives that silently: it read `left` as the flex flag
+      // and every flex column became false, which changes no drop order and so
+      // fails no test. Same class as the illustrations this file exists to check.
+      const at = (name: string): number => t.header.findIndex((h) => h === name);
+      const col = { priority: at("Priority"), min: at("Min"), align: at("Align"), flex: at("Flex"), sortable: at("Sortable") };
+
+      return t.rows.flatMap((row): SurfaceColumn[] => {
+        const cell = (i: number): string => (i < 0 ? "" : (row[i] ?? ""));
         const names = (row[0] ?? "").split("·").map((n) => n.trim().replace(/`/g, ""));
-        const mins = (row[2] ?? "").split("·").map((m) => Number(m.trim()));
-        const priority = Number(row[1]);
-        const flex = (row[3] ?? "") === "yes";
-        const sortable = (row[4] ?? "") === "yes";
+        const mins = cell(col.min).split("·").map((m) => Number(m.trim()));
+        const priority = Number(cell(col.priority));
+        // `**right**` — the spec emphasises the exceptions, so the marker is part
+        // of the value as written.
+        const align = cell(col.align).replace(/\*/g, "") === "right" ? "right" : "left";
+        const flex = cell(col.flex) === "yes";
+        const sortable = cell(col.sortable) === "yes";
         return names.map((key, i) => ({
           key,
           priority,
           minWidth: mins[i] ?? mins[0] ?? 1,
+          align: align as "left" | "right",
           flex,
           sortable,
         }));
-      }),
-    );
+      });
+    });
 }
 
 export type SurfaceDrops = Readonly<{ width: number; dropped: readonly string[] }>;
@@ -219,27 +234,45 @@ const S08_RESOLVED: Block = block({
 // table region depends on which columns survive: a dropped column becomes an
 // expand row, and an expand row is a row.
 
-/** A column set from a surface's §3, in declared order. */
-function cols(
-  rows: readonly (readonly [key: string, priority: number, min: number, flex?: boolean])[],
-): readonly ColumnDef[] {
-  return rows.map(([key, priority, minWidth, flex]) => ({
-    key,
+/**
+ * A surface's declared columns, as `ColumnDef`s — **read from its own column
+ * table**, never restated here.
+ *
+ * The same discipline as the row count. A fixture carrying its own priorities and
+ * minimums would compose to the illustrated height forever while §3 drifted, and
+ * §3 is the half that C11's planner is checked against (A03 CP6). Reading it means
+ * a change to a surface's columns flows into its illustrated height on the next
+ * run.
+ */
+function cols(file: string, table = 0): readonly ColumnDef[] {
+  const declared = surfaceColumns(file)[table] ?? [];
+  if (declared.length === 0) throw new Error(`${file} table ${String(table)} declares no columns`);
+
+  return declared.map((c) => ({
+    key: c.key,
     // `expand` and `glyph` are one cell wide and headed by nothing — a label there
     // would truncate to an ellipsis, which is what the illustrations show as blank.
-    label: key === "expand" || key === "glyph" ? "" : key,
-    align: "left" as const,
-    priority,
-    minWidth,
-    sortable: true,
-    ...(flex === true ? { flex: true } : {}),
-    ...(key === "expand" ? { role: "expand" as const } : {}),
+    label: c.key === "expand" || c.key === "glyph" ? "" : c.key,
+    align: c.align,
+    priority: c.priority,
+    minWidth: c.minWidth,
+    sortable: c.sortable,
+    ...(c.flex ? { flex: true } : {}),
+    ...(c.key === "expand" ? { role: "expand" as const } : {}),
   }));
 }
 
-function cellsOfRow(id: string, values: Readonly<Record<string, string>>): TableRow {
+function cellsOfRow(
+  id: string,
+  values: Readonly<Record<string, string>>,
+  glyph?: Glyph,
+): TableRow {
   const out: Record<string, Cell> = {};
   for (const [key, text] of Object.entries(values)) out[key] = { text };
+  // The glyph column carries a slot and no text — one cell wide, and C11 draws the
+  // character (C09 §4). The illustrations show it, so the fixtures that regenerate
+  // them have to carry it.
+  if (glyph !== undefined) out["glyph"] = { text: "", glyph };
   return { id, cells: out };
 }
 
@@ -247,24 +280,12 @@ const S03_TABLE: Block = block({
   kind: "table",
   id: "s03-runs",
   gapBefore: true,
-  columns: cols([
-    ["expand", 100, 1],
-    ["glyph", 100, 1],
-    ["uuid", 90, 7],
-    ["family", 85, 12, true],
-    ["status", 80, 11],
-    ["detail", 65, 12, true],
-    ["metric", 60, 8],
-    ["age", 50, 6],
-    ["kind", 30, 10],
-    ["owner", 20, 8],
-    ["mr", 10, 6],
-  ]),
+  columns: cols("docs/surfaces/S03_ps_list.md"),
   rows: [
-    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m", owner: "malachy", mr: "!1248" }),
-    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m", owner: "malachy", mr: "!1201" }),
-    cellsOfRow("2e8a04c", { uuid: "2e8a04c", kind: "experiment", family: "graphsage", status: "failed", detail: "OOM at ep 3", metric: "—", age: "1h 12m", owner: "priya", mr: "!1188" }),
-    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m", owner: "malachy", mr: "—" }),
+    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m", owner: "malachy", mr: "!1248" }, "running"),
+    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m", owner: "malachy", mr: "!1201" }, "ok"),
+    cellsOfRow("2e8a04c", { uuid: "2e8a04c", kind: "experiment", family: "graphsage", status: "failed", detail: "OOM at ep 3", metric: "—", age: "1h 12m", owner: "priya", mr: "!1188" }, "error"),
+    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m", owner: "malachy", mr: "—" }, "queued"),
   ],
 });
 
@@ -272,19 +293,7 @@ const S05_TABLE: Block = block({
   kind: "table",
   id: "s05-services",
   gapBefore: true,
-  columns: cols([
-    ["expand", 100, 1],
-    ["glyph", 100, 1],
-    ["name", 95, 16, true],
-    ["replicas", 85, 7],
-    ["status", 80, 10],
-    ["errors", 70, 7],
-    ["version", 65, 7],
-    ["p99", 60, 6],
-    ["req/s", 50, 7],
-    ["p50", 40, 6],
-    ["age", 30, 5],
-  ]),
+  columns: cols("docs/surfaces/S05_serving.md"),
   rows: ["digit-classifier", "flow-predictor", "volatility-estimator", "orderbook-pressure"].map(
     (name, i) => cellsOfRow(name, { name, replicas: "3/3", status: "healthy", errors: "0.02%", version: "de29117", p99: "45ms", "req/s": "432", p50: "18ms", age: `${String(i + 2)}d` }),
   ),
@@ -294,15 +303,7 @@ const S06_FAMILIES: Block = block({
   kind: "table",
   id: "s06-families",
   gapBefore: true,
-  columns: cols([
-    ["expand", 100, 1],
-    ["glyph", 100, 1],
-    ["family", 95, 18, true],
-    ["serving", 85, 7],
-    ["latest", 80, 7],
-    ["versions", 60, 8],
-    ["updated", 40, 7],
-  ]),
+  columns: cols("docs/surfaces/S06_models.md"),
   rows: ["digit-classifier", "flow-predictor", "orderbook-pressure", "latency-anomaly-gnn", "fill-rate"].map(
     (family) => cellsOfRow(family, { family, serving: "de29117", latest: "de29117", versions: "4", updated: "2h ago" }),
   ),
@@ -312,16 +313,7 @@ const S06_VERSIONS: Block = block({
   kind: "table",
   id: "s06-versions",
   gapBefore: true,
-  columns: cols([
-    ["expand", 100, 1],
-    ["glyph", 100, 1],
-    ["version", 95, 7],
-    ["state", 85, 9],
-    ["metric", 70, 12, true],
-    ["run", 60, 7],
-    ["mr", 50, 6],
-    ["created", 40, 7],
-  ]),
+  columns: cols("docs/surfaces/S06_models.md", 1),
   rows: ["de29117", "b4f0c12", "9e2a55d", "1f0c8b3"].map((version) =>
     cellsOfRow(version, { version, state: "serving", metric: "AUC 0.912", run: "c4e1f23", mr: "!1244", created: "2h ago" }),
   ),
@@ -331,12 +323,7 @@ const S14_KEYS: Block = block({
   kind: "table",
   id: "s14-keys",
   gapBefore: true,
-  columns: cols([
-    ["expand", 100, 1],
-    ["key", 95, 22, true],
-    ["value", 90, 24, true],
-    ["source", 70, 8],
-  ]),
+  columns: cols("docs/surfaces/S14_config.md"),
   rows: [
     ["current_context", "fmx-prod", "config"],
     ["ui.theme", "dark", "config"],
@@ -355,12 +342,7 @@ const S14_CONTEXTS: Block = block({
   id: "s14-contexts",
   gapBefore: true,
   showHeader: false,
-  columns: cols([
-    ["glyph", 100, 1],
-    ["name", 95, 13],
-    ["url", 80, 29, true],
-    ["token", 60, 18],
-  ]),
+  columns: cols("docs/surfaces/S14_config.md", 1),
   rows: [
     cellsOfRow("fmx-prod", { name: "fmx-prod", url: "https://prism.fmx.io/v1", token: "token valid · 30d" }),
     cellsOfRow("fmx-staging", { name: "fmx-staging", url: "https://staging.prism.fmx.io", token: "token expired" }),
@@ -371,18 +353,12 @@ const S15_SECRETS: Block = block({
   kind: "table",
   id: "s15-secrets",
   gapBefore: true,
-  columns: cols([
-    ["glyph", 100, 1],
-    ["name", 95, 22, true],
-    ["owner", 80, 15],
-    ["age", 60, 6],
-    ["note", 40, 15],
-  ]),
+  columns: cols("docs/surfaces/S15_identity.md"),
   rows: [
-    cellsOfRow("gitlab-readonly-token", { name: "gitlab-readonly-token", owner: "research-infra", age: "34d" }),
-    cellsOfRow("minio-research-creds", { name: "minio-research-creds", owner: "research-infra", age: "34d" }),
-    cellsOfRow("wandb-api-key", { name: "wandb-api-key", owner: "malachy", age: "12d" }),
-    cellsOfRow("huggingface-token", { name: "huggingface-token", owner: "malachy", age: "8d", note: "not accessible" }),
+    cellsOfRow("gitlab-readonly-token", { name: "gitlab-readonly-token", owner: "research-infra", age: "34d" }, "running"),
+    cellsOfRow("minio-research-creds", { name: "minio-research-creds", owner: "research-infra", age: "34d" }, "running"),
+    cellsOfRow("wandb-api-key", { name: "wandb-api-key", owner: "malachy", age: "12d" }, "running"),
+    cellsOfRow("huggingface-token", { name: "huggingface-token", owner: "malachy", age: "8d", note: "not accessible" }, "error"),
   ],
 });
 

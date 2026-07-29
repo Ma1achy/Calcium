@@ -106,15 +106,17 @@ The `Status`/`State` split is the instructive one: the human-readable field and 
 ▌   ⏎ inspect   ␣ expand   ≡ logs
 ```
 
-| Column | Priority | Min | Flex | From |
-|---|---|---|---|---|
-| expand · glyph | 100 | 1 · 1 | — | `State` |
-| id | 90 | 12 | — | `ID`, 12 chars |
-| name | 95 | 16 | yes | `Names`, first only |
-| state | 85 | 10 | — | `State` |
-| status | 70 | 18 | — | `Status`, verbatim |
-| image | 60 | 20 | — | `Image` |
-| ports | 40 | 20 | — | `Ports`, condensed |
+| Column | Priority | Min | Align | Flex | From |
+|---|---|---|---|---|---|
+| expand · glyph | 100 | 1 · 1 | left | — | `State` |
+| id | 90 | 12 | left | — | `ID`, 12 chars |
+| name | 95 | 16 | left | yes | `Names`, first only |
+| state | 85 | 10 | left | — | `State` |
+| status | 70 | 18 | left | — | `Status`, verbatim |
+| image | 60 | 20 | left | — | `Image` |
+| ports | 40 | 20 | left | — | `Ports`, condensed |
+
+`align` is stated because `ColumnDef` requires it (C04 §3). Nothing docker returns is a number — every field is a string, which R01 §4 lists as the sixth problem — so every column is left, and the adapter's job is not to make any of them look otherwise.
 
 State glyphs follow the framework's vocabulary: `running` → `●` ok, `restarting` → `▲` warn, `paused` → `▪` warn, `exited` → `✗` error, `created` → `○` muted.
 

@@ -27,11 +27,11 @@ At 100 columns, `--mine`, live:
 ▌ all ×11  training ×9  evaluation ×2
 ▌ ● running ×1  ✓ succeeded ×6  ✗ failed ×2  ○ queued ×1
 ▌
-▌       uuid     family          status       detail          metric    age     kind        owner
-▌ ▸  ●  a3f9b21  digit-classif…  running      ep 17/40        0.0372    23m     candidate   malachy
-▌ ▸  ✓  7c2d4e1  decoder-zoom    succeeded                    0.0089    41m     experiment  malachy
-▌ ▸  ✗  2e8a04c  graphsage       failed       OOM at ep 3     —         1h 12m  experiment  priya
-▌ ▸  ○  f410d99  flow-predictor  queued                       —         3m      candidate   malachy
+▌       uuid     family          status       detail            metric     age  kind        owner
+▌ ▸  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
+▌ ▸  ✓  7c2d4e1  decoder-zoom    succeeded                      0.0089     41m  experiment  malachy
+▌ ▸  ✗  2e8a04c  graphsage       failed       OOM at ep 3            —  1h 12m  experiment  priya
+▌ ▸  ○  f410d99  flow-predictor  queued                              —      3m  candidate   malachy
 ▌
 ▌ ⏎ detail  ␣ expand  ≡ logs  ⚡ events
 ```
@@ -52,12 +52,14 @@ The arithmetic, so the next reader does not have to derive it (`test/integration
 
 **`family` truncates at 98, and that is what the correction exposes.** `digit-classifier` is 16 cells and the column gets 14 — 12 declared plus its half of the residual. The old figure appeared to fit it only because it had dropped `owner` and spent those 10 cells on `family`. If a full family name at 100 columns matters more than `owner` does, the remedy is `owner`'s priority or `family`'s minimum in §3, not the picture.
 
-**`align` is not declared in §3, so this figure is left-aligned throughout.** The old one right-aligned `metric` and `age`, which reads better for numbers and is a real choice the column table does not currently record. `ColumnDef.align` is required (C04 §3); §3 should state it per column.
+**`metric` and `age` are right-aligned because §3 now declares it.** The old figure right-aligned them too, on a field the column table did not record — which is the third instance of an illustration carrying an unstated intent, and the reason `HEIGHT_AUDIT.md` now says what to do when a figure and a table disagree. The picture was right about the intent; what was missing was the declaration.
+
+Both figures in this section are generated from `planColumns` and C11's renderer, through the fixture in `test/support/surfaces.ts`, whose columns are read from §3's table rather than restated. A change to §3 changes them.
 
 Row 1 expanded:
 
 ```
-▌ ▾  ●  a3f9b21  digit-classif…  running      ep 17/40        0.0372    23m     candidate   malachy
+▌ ▾  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
 ▌     mr    !1248  auto-merged
 ▌     node  gpu-04.fmx.internal · 2×GPU · 16Gi
 ▌     ████████████░░░░░░░░░░░░░░░░  43%
@@ -76,19 +78,23 @@ Two things this figure does not draw, both because the component that draws them
 
 Eleven columns. Priority governs survival, never position (C11 I4).
 
-| Column | Priority | Min | Flex | Sortable | Source |
-|---|---|---|---|---|---|
-| expand | 100 | 1 | — | — | Synthesised by C11 |
-| glyph | 100 | 1 | — | — | `status` → the D-vocabulary glyph |
-| uuid | 90 | 7 | — | yes | `uuid`, first 7 cells |
-| family | 85 | 12 | yes | yes | `family`, else `name` |
-| status | 80 | 11 | — | yes | `status`, word only |
-| detail | 65 | 12 | yes | — | Epoch, failure reason, or headline metric |
-| metric | 60 | 8 | — | yes | `loss` or `headline`, plus `spark` |
-| age | 50 | 6 | — | yes | `age_minutes`, humanised |
-| kind | 30 | 10 | — | yes | `kind` |
-| owner | 20 | 8 | — | yes | `owner` |
-| mr | 10 | 6 | — | — | `mr`, an `open` action |
+| Column | Priority | Min | Align | Flex | Sortable | Source |
+|---|---|---|---|---|---|---|
+| expand | 100 | 1 | left | — | — | Synthesised by C11 |
+| glyph | 100 | 1 | left | — | — | `status` → the D-vocabulary glyph |
+| uuid | 90 | 7 | left | — | yes | `uuid`, first 7 cells |
+| family | 85 | 12 | left | yes | yes | `family`, else `name` |
+| status | 80 | 11 | left | — | yes | `status`, word only |
+| detail | 65 | 12 | left | yes | — | Epoch, failure reason, or headline metric |
+| metric | 60 | 8 | **right** | — | yes | `loss` or `headline`, plus `spark` |
+| age | 50 | 6 | **right** | — | yes | `age_minutes`, humanised |
+| kind | 30 | 10 | left | — | yes | `kind` |
+| owner | 20 | 8 | left | — | yes | `owner` |
+| mr | 10 | 6 | left | — | — | `mr`, an `open` action |
+
+**`align` is declared, not defaulted.** `ColumnDef.align` is required (C04 §3) and this table did not state it, so the figure in §2 drew `metric` and `age` right-aligned on a field the spec never declared — the third time an illustration has carried an intent the text does not record (see `HEIGHT_AUDIT.md`). Numbers right-align; that is the convention the drawing was following.
+
+C11 cannot derive it. It has no way to know a column holds numbers, and `metric` legitimately holds `—` for a run that never produced one — so a renderer inferring alignment from content would right-align a column until the first failure appeared in it.
 
 **Status is a word; the detail is a column.** `running · ep 17/40` as one cell would truncate to `running · ep 17/4…`, and a half-rendered status reads as a different status. Splitting them means the epoch or the failure reason drops as a *column* — cleanly, into the expand row — while the status word never truncates (C11 I10, satisfied by `min` equalling the longest word plus glyph).
 
