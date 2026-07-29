@@ -136,12 +136,16 @@ Ids are never reused after eviction, so a stale reference resolves to nothing ra
 patch(id, p):
   entry unknown            → no-op
   entry not streaming      → rejected, logged
-  otherwise                → doc = applyPatch(doc, p); notify
+  otherwise                → r = applyPatch(doc, p)
+                             r.ok  → doc = r.doc; notify
+                             !r.ok → doc unchanged; report r.error to the caller
 ```
 
 Patching a settled entry is rejected rather than ignored, because it means a stream outlived its `settle` — a bug in the caller worth surfacing rather than absorbing.
 
-`applyPatch` is C04's and pure; C13 holds the result. Row-level `merge` preserves untouched rows by reference, which is what stops a `--watch` tick from collapsing an expanded row or moving the viewport (C04 I9).
+`applyPatch` is C04's, pure, and **fallible in its type** (C04 §4, I15). It returns a `PatchResult`, so the four ways a patch can fail to fit a document — an I3-violating status transition, a `merge` against a non-table, an unknown or a duplicate `blockId` — arrive as values rather than as throws. C13 keeps the previous document on failure and hands the error up; C23 §5 is what decides the entry's fate. No `try` around the patch path, which matters because that path runs on every stream tick.
+
+Row-level `merge` preserves untouched rows by reference, which is what stops a `--watch` tick from collapsing an expanded row or moving the viewport (C04 I9). It also never removes a row — deletion goes through `replace` (C04 §4), so a tick that returns fewer rows leaves the transcript showing what it last knew rather than silently shedding entries.
 
 ---
 

@@ -136,27 +136,42 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
                            emptyMessage?: string }>;
 ```
 
-`Table`, `TableRow` and `Cell` are declared below; `ColumnDef` is C11's, since it describes planning rather than content. **Every block variant is declared here** — C11 and C12 own the table *engine* and the plot *renderer*, not the shapes. `id` is present on every variant because `ViewPatch` addresses blocks by it.
+`Table`, `TableRow`, `Cell` and `ColumnDef` are declared below. **Every block variant is declared here** — C11 and C12 own the table *engine* and the plot *renderer*, not the shapes. `id` is present on every variant because `ViewPatch` addresses blocks by it.
+
+**`form: "line"` requires `height`.** Omitting it is a construction error, not a default. A plot's height is a layout decision the surface must make, and a magic default produces silently wrong-sized plots that nobody notices are wrong. `height` is optional on the type only because `sparkline` does not take one; the constructor enforces the pairing.
 
 | Kind | Carries | Height at width `w` |
 |---|---|---|
 | `rule` | label, optional meta | 1 |
 | `notice` | tone, glyph, text | `ceil(len / w)` |
 | `keyValue` | rows of label/value | rows |
-| `table` | columns, rows, per-row `expanded` + `detail`, empty message, `showHeader` | `(showHeader ? 1 : 0)` + rows + expanded details, or + empty message when rows is empty |
+| `table` | columns, rows, per-row `expanded` + `detail`, empty message, `showHeader` | `(showHeader ? 1 : 0)` + rows + expanded details measured at `w - 2`, or + empty message when rows is empty |
 | `steps` | steps with state pending/active/done/failed | steps |
 | `logs` | lines with ts, level, message | lines — never wrapped, truncated with `…` |
 | `events` | ts, type, message | events |
-| `plot` | series, axis labels, `line \| sparkline` | declared `height`, or 1 for sparkline |
+| `plot` | series, axis labels, `line \| sparkline` | `sparkline` → 1; `line` → declared `height`, or `height + 2` with `axes: true` (C12 §3) |
 | `progress` | label, current, total | 1 |
 | `code` | language, text, `wrap` | lines when truncating; `Σ ceil(len / w)` when wrapping |
 | `diff` | field / a / b rows | rows + header |
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
 | `pills` | chips with actions | `ceil(totalWidth / w)` — one logical row that may wrap |
 | `tip` | text with fill actions | `ceil(len / w)` |
-| `panel` | title, children | children + 2 |
-| `group` | direction, children | derived from children |
+| `panel` | title, children | children measured at `w - 2`, + 2 |
+| `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
 | `raw` | pre-formatted text | lines |
+
+### Container widths, and the width a `row` group gives its children
+
+The three container kinds pass a width to `measureChild`, and until this was written down it was the largest hole in §5: two of them narrow the width and one of them splits it, and a measurer that passes `w` through unchanged agrees with nothing that renders.
+
+- **`panel`** measures children at `w - 2` — the border takes a column each side.
+- **`table`** measures an expanded row's `detail` at `w - 2`, matching `panel`, and matching the indent C11 §2 already applies.
+- **`group`, `direction: "column"`** measures every child at `w` and sums.
+- **`group`, `direction: "row"`** splits equally: `floor((w - gaps) / n)` where `gaps` is `n - 1` cells of gutter, one between each pair. Children are measured at that width and the group takes the `max`.
+
+**Equal split, with no weights field.** Uneven allocation is expressible as nested groups — S13's two-up-then-full-width is two groups and works under an equal split. A `weights` field would be a second layout system inside a block whose height rule already has to stay simple enough to hold I7. Add weights when a surface needs them, and not before.
+
+Because the floor rule below gives every child at least 1, a `row` group at a width too narrow to split still measures — `floor` can reach 0, and a child measured at width 0 is measured at width 1 (T3.2).
 
 A `pills` block is **one logical row**. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks, not one block that wraps — wrapping is overflow behaviour, not a layout choice.
 
@@ -190,8 +205,15 @@ type Table = Readonly<{
   emptyMessage?: string;
 }>;
 
-type TableOptions = Readonly<{
-  showHeader?: boolean;               // default true; false for headerless lists
+type ColumnDef = Readonly<{
+  key:       string;
+  label:     string;
+  align:     "left" | "right";
+  priority:  number;                  // higher survives longer
+  minWidth:  number;                  // cells, excluding the gap
+  maxWidth?: number;
+  flex?:     boolean;                 // absorbs residual width
+  sortable:  boolean;
 }>;
 
 type TableRow = Readonly<{
@@ -201,9 +223,14 @@ type TableRow = Readonly<{
   actions?:  readonly Action[];
   expanded?: boolean;                 // view state — never merged (I9)
 }>;
+
+/** A row as it may arrive in a `merge`. View state is absent by type (I9). */
+type MergeRow = Omit<TableRow, "expanded">;
 ```
 
 `showHeader: false` gives a headerless list with per-row actions — the shape small lists need, without inventing a block type for it. `detail` being `Block[]` is what lets an expanded run row reveal a plot, a progress bar and a set of actions, composed from the same vocabulary rather than a bespoke detail renderer.
+
+**`ColumnDef` is declared here, not in C11.** It is part of a block's shape, and commitment 11 says every block shape is declared in C04 — the same split that gives C04 `Plot`'s shape while C12 rasterises it. C11 keeps `PlannedColumns` and `planColumns`, which are genuinely planning rather than content. The alternative considered and rejected was a type-only import from C11: it erases at build and so passes the module-graph check, which is precisely the objection — an L0 → L1 dependency that `make enforce` reports as clean is worse than one it catches.
 
 ### View state lives in the block
 
@@ -244,10 +271,14 @@ type Action =
 type ViewPatch =
   | { op: "append";  block: Block }
   | { op: "replace"; blockId: string; block: Block }
-  | { op: "merge";   blockId: string; rows: readonly TableRow[] }
+  | { op: "merge";   blockId: string; rows: readonly MergeRow[] }
   | { op: "status";  status: ViewDocument["status"] };
 
-function applyPatch(doc: ViewDocument, patch: ViewPatch): ViewDocument;
+type PatchResult =
+  | Readonly<{ ok: true;  doc: ViewDocument }>
+  | Readonly<{ ok: false; error: ErrorLike }>;
+
+function applyPatch(doc: ViewDocument, patch: ViewPatch): PatchResult;
 
 function validateDocument(doc: unknown): Result<ViewDocument, readonly string[]>;
 function validateBlock(block: unknown): Result<Block, readonly string[]>;
@@ -255,7 +286,65 @@ function validateBlock(block: unknown): Result<Block, readonly string[]>;
 
 `applyPatch` is pure and returns a new document; C13 holds the result.
 
-`merge` is what makes `--watch` cheap: rows are upserted by `id`, unchanged rows keep their identity, and **view state is never merged** — an expanded row stays expanded because the incoming row is not permitted to carry the flag at all. Without row-level merge every tick replaces the whole table and any open detail collapses under the user.
+### Patch application can fail, and says so in its type
+
+A `status` patch to `"error"` on a document with no `error` field produces a document that violates I3. That is not hypothetical and not rare — it is one of four ways a well-typed patch meets a document it does not fit:
+
+| Failure | Why it is a failure and not a no-op |
+|---|---|
+| A `status` transition that would violate I3 | The result would be an invalid document, and I3 is enforced by `validateDocument` rather than by convention |
+| `merge` against a block that is not a `table` | Rows have nowhere to go; silently discarding them loses a `--watch` tick |
+| An unknown `blockId` on `replace` or `merge` | The caller is addressing something that is not there — a bug worth surfacing, exactly as C13 §6 surfaces a patch to a settled entry |
+| A duplicate `blockId` in the document | Addressing is ambiguous; there is no correct block to act on |
+
+**It returns rather than throws.** This runs on every stream tick, in the render path, from a function I4 calls total. A pure data function that throws there is worse than one that returns: C23 §5 must handle the failure either way, and only one of the two forms can be handled without a `try` around the hot loop. C23 settles the entry with what it had; C13's §6 keeps the previous document.
+
+The earlier reading, in which an unknown `blockId` was a silent no-op (T1.10), is withdrawn. Absorbing that case makes a mis-addressed stream indistinguishable from a stream with nothing to say.
+
+### `merge` upserts, and never deletes
+
+`merge` is what makes `--watch` cheap: rows are upserted by `id`, unchanged rows keep their identity, and **view state is never merged** — an expanded row stays expanded because `MergeRow` is not permitted to carry the flag at all. Without row-level merge every tick replaces the whole table and any open detail collapses under the user.
+
+**A row absent from the payload is untouched, not removed.** Absence from one tick is not evidence of absence: a watch tick that returns fewer rows because a query timed out must not silently delete them. Deletion is expressible — `replace` with a fresh `Table` — and the adapter is the layer that knows whether a missing row means *gone* or means *not reported this time*.
+
+### `replace` is wholesale
+
+`replace` substitutes the block entire. View state in the outgoing block is **not** carried over; the block is now a different block.
+
+The alternative — inheriting `expanded` for rows whose id survives — was rejected on its failure mode rather than its cost. It would leave `replace` and `merge` differing only in deletion semantics, and it would let an expansion survive onto a row that happens to share an id with something semantically different. Wholesale is the behaviour that can be reasoned about from the call site.
+
+### The three operations compose
+
+Patches apply in sequence, each to the result of the last, and the sequence is defined:
+
+- `merge` then `merge` accumulates. New rows are appended in payload order after the existing rows; rows already present are updated in place and keep their position. View state survives both, on touched and untouched rows alike.
+- `replace` after any number of `merge`s discards the accumulated view state along with the block. This is the design, not an oversight — see above.
+- A failing patch mid-sequence leaves the document at its last good state. `applyPatch` returns the failure and no partial mutation is possible, because it never mutates.
+
+---
+
+## 4a. Block ids are unique within a document
+
+`replace` and `merge` both address blocks by `id`, so a document with two blocks sharing one is not addressable. `validateDocument` checks it, across nested children as well as top-level blocks, and `applyPatch` fails rather than guessing when it meets one.
+
+This is why a `merge` against the wrong kind is a failure rather than a no-op: once ids are unique, an id that resolves to a non-`table` is unambiguously the caller's mistake, and there is no second candidate it might have meant.
+
+---
+
+## 4b. Constructors, and what C24's `b` is
+
+C04 ships a constructor per block kind. They are not a second way to build a block and C24's builders are not a parallel implementation — **`b` is built on these**.
+
+- **C04's constructors enforce the shape invariants.** Deep freeze (I1), a glyph on `error` and `warn` tones (I6), `height` present for `form: "line"` (§3). They take a *complete* block and return a frozen one.
+- **C24's `b` is the ergonomic layer over them** — generated ids, bare strings accepted as cells, action helpers. It adds convenience and delegates enforcement. **`b` never freezes or validates directly.** If it did, I1 would have two places to be wrong, and the one that drifts is always the one with fewer tests.
+
+Stated here rather than only in C24 because the failure is asymmetric: an implementer reading C24 alone will reasonably freeze in the builder, and nothing about a frozen block reveals that it was frozen twice.
+
+### Validation terminates on a cycle
+
+A `ViewDocument` is a tree, but nothing stops a hand-assembled one — from a test, or a bad adapter — from containing a cycle through `panel.children` or a row's `detail`. `validateDocument` must **refuse** it rather than recurse.
+
+The mechanism is a **path-scoped seen-set**: a container is added on descent and removed on ascent, so a cycle is caught exactly and a subtree that legitimately appears in two places is not. Not a depth limit, which puts an arbitrary number in the spec and answers "how deep is too deep" instead of the question actually asked. One mechanism, named, because two is two places to disagree.
 
 ---
 
@@ -275,6 +364,7 @@ Container kinds — `panel`, `group`, and a `table`'s expanded detail — measur
 
 Requirements on every measurer:
 
+- **At least 1** — a block that is present occupies at least one row. `ceil(cells("") / w)` is 0 and an empty `notice` renders as one row; a `code` block's blank line is a line. Stated once, as a rule over every kind, rather than as seventeen per-kind special cases — the arithmetic that reaches 0 is the same arithmetic in each of them. The only kinds that legitimately measure 0 are containers with no children (`group`, T3.5), which are not present content but the absence of it.
 - **Pure** — same block, width and `measureChild`, same answer, always. Cacheable, and C14 caches it.
 - **Total** — no input produces a throw. Malformed content measures as something, even if that something is 1.
 - **Monotone in content** — adding a row never decreases height. Not enforceable generically, but a property test per block kind.
@@ -301,6 +391,11 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I11** — C04 imports nothing from `terminal/`, `presentation/` or above. Verified on the module graph.
 - **I12** — `status: "proposed"` is never produced by an adapter. C07 constructs documents from what a command returned, and a proposed change has not run. Reserved for the agent path; unused in v1.
 - **I13** — `meta.origin` is always present. It is not optional, and no code path constructs a document without it — a provenance field that can be absent becomes a provenance field nobody trusts.
+- **I14** — Block ids are unique within a document, nested children included. Checked by `validateDocument`; `applyPatch` fails rather than guessing (§4a).
+- **I15** — `applyPatch` is fallible in its type and never throws. Every one of the four failure cases in §4 returns `{ok: false}` with an `ErrorLike`, and the input document is returned untouched and still frozen.
+- **I16** — A `merge` payload cannot carry view state. Structural, via `MergeRow`, not remembered: I9 holds because the field does not exist to be set.
+- **I17** — Every measurer returns at least 1 for a present block (§5). Only an empty container measures 0.
+- **I18** — `validateDocument` terminates on any input, including a cyclic one. A path-scoped seen-set refuses a cycle; it is not a depth limit, and it does not reject a legitimately shared subtree.
 
 ---
 
@@ -326,6 +421,16 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts.
 19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump.
 20. `patch` and `diff` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag.
+21. `applyPatch` returns a `PatchResult` and never throws. Four failure cases, each named, each leaving the input document untouched.
+22. Block ids are unique within a document, and `validateDocument` is where that is established.
+23. `merge` never deletes a row; `replace` is how a table sheds one, and the adapter decides which it means.
+24. `replace` is wholesale — view state is not carried across it.
+25. A `merge` payload cannot carry view state, by type rather than by rule.
+26. Container widths are declared: `panel` and table detail at `w - 2`, a `column` group at `w`, a `row` group at an equal split. No weights field until a surface needs one.
+27. Every measurer returns at least 1 for a present block.
+28. `form: "line"` requires `height`; there is no default.
+29. C04's constructors enforce the shape invariants and C24's `b` delegates to them. One enforcement point for I1.
+30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set.
 
 ---
 
@@ -343,10 +448,17 @@ Six tiers. No state machine, so no transition table.
 - **T1.6** (I9): `merge` upserts three rows into a ten-row table — seven rows are reference-identical afterwards, three are new.
 - **T1.7** (I9): `merge` against a table whose row 4 is `expanded: true`, not touching row 4 → row 4 is still expanded.
 - **T1.8** (I9): `merge` touching an expanded row, with the incoming row carrying `expanded: false` → the row stays expanded. Incoming view state is discarded, not merged.
-- **T1.8b** (I9): a `TableRow` type used in a `merge` payload cannot carry view-state fields — a compile-level test asserts the merge row type omits them.
+- **T1.8b** (I16): `MergeRow` cannot carry view-state fields — a compile-level test asserts the merge row type omits them.
 - **T1.9**: `status` patch changes only `status`.
-- **T1.10**: a patch referencing an unknown `blockId` is a no-op, not a throw.
-- **T1.11** (I7): `ErrorLike` with only `message` validates; `remediation` present produces a fill action when adapted.
+- **T1.10** (I15): a patch referencing an unknown `blockId` returns `{ok: false}`, not a throw and not a no-op.
+- **T1.11** (I3): `ErrorLike` with only `message` validates; `remediation` present produces a fill action when adapted.
+- **T1.12** (I15): each of the four failure cases in §4 returns `{ok: false}` with a populated `ErrorLike`, and in every one the input document is unchanged and still frozen.
+- **T1.13** (I15, the composition test): `merge` → `merge` → `replace`. The two merges accumulate, new rows land in payload order after the existing ones, and view state survives on touched and untouched rows alike; the `replace` then discards all of it. Both halves asserted, because the second is a design decision and would otherwise read as a bug.
+- **T1.14** (I15): a failing patch in the middle of a sequence leaves the document at its last good state, and the following patch still applies to it.
+- **T1.15** (I14): `validateDocument` rejects a document with two blocks sharing an id, including when one of them is nested inside a `panel`.
+- **T1.16** (§3): constructing a `plot` with `form: "line"` and no `height` throws; `sparkline` without one does not.
+- **T1.17** (I18): a document whose `panel` contains itself is refused by `validateDocument` with a named error, and the call returns. A shared-but-acyclic subtree appearing twice validates — the seen-set is path-scoped, and a global one would fail this.
+- **T1.18** (I1, §4b): C24's `b` produces blocks frozen exactly once — the constructor is the only freeze point, asserted by spying on it.
 
 ### Tier 2 — contract / interface
 
@@ -369,17 +481,20 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.2**: `measure` at width 0 — treated as 1; no infinity, no NaN.
 - **T3.3**: a `notice` whose text is exactly `w`, `w-1` and `w+1` characters → 1, 1 and 2 lines. The off-by-one boundary.
 - **T3.4**: a `table` with zero rows → header plus the empty message, not zero.
-- **T3.5**: a `group` with zero children → 0.
+- **T3.5**: a `group` with zero children → 0. The one legitimate zero (I17).
 - **T3.6**: a `panel` with zero children → 2, the borders alone.
+- **T3.6b** (I17): a `notice` with empty text, a `tip` with empty text, and a `code` block of one blank line → 1 each, not 0. The floor, at the three kinds whose arithmetic reaches zero.
+- **T3.6c** (§3): a `row` group of three children at width 80 measures each at `floor((80 - 2) / 3)` = 26 and returns the max; at width 2 the split floors to 0 and each child is measured at 1, and the group still returns ≥ 1.
 - **T3.7**: deeply nested `group` inside `panel` inside `group`, five levels → correct sum, no stack overflow.
 - **T3.8**: a block containing double-width CJK text → measured columns account for width 2 per glyph.
 - **T3.9**: a block containing a grapheme cluster (emoji with ZWJ and variation selector) → counted as one cell, not by code unit.
 - **T3.10**: a block containing a combining mark → the base character's width, not two.
 - **T3.11**: `logs` line longer than `w` → 1 line (truncated), not wrapped. Logs never wrap; this is the property that keeps a tail's height predictable.
 - **T3.12**: a `table` where every row is expanded → height includes every detail; collapsing all returns the original.
-- **T3.13**: `applyPatch` with a `merge` carrying an empty row array → document unchanged.
+- **T3.13**: `applyPatch` with a `merge` carrying an empty row array → `{ok: true}`, document unchanged.
+- **T3.13b** (§4): a `merge` whose payload omits half the existing rows → every omitted row survives. Absence is not deletion.
 - **T3.14**: a document at the 10,000-block cap (D40) → validation flags `truncated`, and measurement of the whole set completes within budget.
-- **T3.15**: circular structure passed as a block → refused by the validator rather than hanging the measurer.
+- **T3.15** (I18): circular structure passed as a block → refused by the validator rather than hanging the measurer.
 
 ### Tier 4 — integration
 
@@ -407,6 +522,13 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.7** (§1): moving the registry into C04, or importing theme into `viewmodel/` → T2.9 fails.
 - **T6.8** (I3): allowing `error` on an `ok` document → T1.2 fails.
 - **T6.9** (I10): adding an assembly-only block representation → T5.3 fails as a partial document renders differently mid-stream.
+- **T6.10** (I15): making `applyPatch` return a bare `ViewDocument` again, absorbing the four failures → T1.12 and T1.14 fail, and C23 loses the mechanism its §5 depends on.
+- **T6.11** (I16): typing the `merge` arm as `TableRow[]` → T1.8b fails to compile, which is the point: the guard is the type, not the runtime.
+- **T6.12** (I14): dropping the uniqueness check from `validateDocument` → T1.15 fails, and T1.12's duplicate-id case stops being reachable.
+- **T6.13** (I18): swapping the path-scoped seen-set for a global one → T1.17's shared-subtree half fails; removing it entirely hangs T3.15 rather than failing it, which is why T1.17 asserts the call *returns*.
+- **T6.14** (I17): removing the `max(1, …)` floor → T3.6b fails at all three kinds.
+- **T6.15** (§3): giving a `row` group's children the full width → T3.6c fails, and T2.1 fails at every width where a child wraps.
+- **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
 
 ---
 
@@ -416,7 +538,7 @@ The generic suite. **These run against every registered block kind, including ap
 |---|---|
 | The registry, and the measure/render implementations | C09 |
 | Tone → colour resolution | C10 |
-| Column priority and drop order | C11 |
+| Column *planning* — priority, drop order, `PlannedColumns` | C11. `ColumnDef` itself is here, being shape rather than plan |
 | Producing documents from verb JSON | C07 |
 | Holding documents, live-vs-frozen | C13 |
 | Using measured heights to virtualise | C14 |

@@ -48,6 +48,8 @@ With `axes: false` there is no y-label column and the plot area is the full `wid
 
 Exact and data-independent. An empty series occupies its declared height with a centred empty message rather than collapsing — a plot that changes height when data arrives would shift everything below it mid-stream.
 
+**`form: "line"` requires `height`, and omitting it is a construction error** (C04 §3). There is deliberately no default. `height` is optional on the type only because `sparkline` does not take one, and C04's constructor enforces the pairing rather than substituting a number. A defaulted height is the one way this component's central property — height declared, never derived — fails silently: the plot renders, nothing errors, and it is the wrong size on a surface nobody thought about.
+
 Width is `ctx.width`. For an axed line plot the plot area is `width − yLabelWidth − 3`, where `yLabelWidth` is the widest formatted y-label and 3 covers a space, the `│`, and a space.
 
 ---

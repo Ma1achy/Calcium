@@ -92,6 +92,10 @@ Two reasons, and the second is the load-bearing one. A `b.hunk` helper would inv
 
 The API's quality is mostly this, because an adapter is the thing a consumer writes a hundred times and a block is what an adapter returns.
 
+**`b` is the ergonomic layer over C04's constructors, not a second implementation** (C04 §4b). C04's constructors enforce the shape invariants — deep freeze (C04 I1), a glyph on `error` and `warn` tones (C04 I6), `height` present for `form: "line"` — and take a complete block. `b` adds the convenience: generated ids, bare strings accepted where a `Cell` is wanted, action helpers, sensible omissions.
+
+**`b` never freezes or validates directly.** It delegates both. Freezing here as well would give C04 I1 two enforcement points, and the one that drifts is always the one with fewer tests — a block frozen twice is indistinguishable from a block frozen once, right up until one of the two paths stops doing it.
+
 ```typescript
 export const b: {
   rule(label: string, meta?: string): Rule;
@@ -109,8 +113,8 @@ export const b: {
   steps(steps: StepInput[]): Steps;
   logs(lines: LogLine[]): Logs;
   events(events: EventLine[]): Events;
-  plot(spec: { series: Series[]; height?: number; axes?: boolean }): Plot;
-  spark(values: number[]): Plot;
+  plot(spec: { series: Series[]; height: number; axes?: boolean }): Plot;
+  spark(values: number[]): Plot;                   // the sparkline path; height 1
   progress(spec: { label: string; current: number; total: number }): Progress;
   code(language: string, text: string, opts?: { wrap?: boolean }): Code;
   diff(rows: DiffRow[]): Diff;
@@ -202,7 +206,7 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions;
 
 interface DocumentAssertions {
   isValid(): this;                                 // C04 validateDocument
-  measuresCorrectly(widths?: number[]): this;      // C09 T2.1, default 7 widths
+  measuresCorrectly(widths?: number[]): this;      // C09 T2.1, default 7 widths — wraps C04's conformance suite
   rendersAt(widths: number[]): this;               // no overflow, no negative widths
   degradesToAscii(): this;                         // C09 T2.2 — heights unchanged
   degradesTo1Bit(): this;                          // B04 B4.3 — glyph or word carries it
@@ -216,6 +220,8 @@ export function fakeFs(): FileSystem;
 export function fakeTerminal(size?: TerminalSize): FakeTerminal;
 export function withCapabilities(caps: Partial<TerminalCapabilities>): TestContext;
 ```
+
+**`measuresCorrectly` is a wrapper, not an implementation.** The conformance suite it runs is written with C04 — parameterised over a registry and a corpus, and deliberately free of anything test-runner-specific, returning failures as data so the caller asserts. C09's registry-completeness test, this method, and the reference app all drive the same code. It lives in `test/support/` until C09 exists to consume it, then moves here unchanged.
 
 **`degradesTo1Bit` is the one that earns the module.** It is B04's compliance sweep — every distinction carried by a glyph or a word — and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 

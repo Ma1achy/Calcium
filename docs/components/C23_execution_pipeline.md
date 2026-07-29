@@ -201,7 +201,7 @@ Every stage can fail, and none may kill the session (A02 §7).
 | Validation fails | Error document; nothing spawned |
 | Transport fails or times out | Error document from C07's mapping |
 | Adapter throws | C07 contains it; fallback rendering plus a muted notice |
-| Patch application throws | The entry is settled with what it had; a notice records the truncation |
+| Patch application fails | `applyPatch` returns `{ok: false}` (C04 §4, I15) — it does not throw. The entry is settled with what it had; a notice records the truncation, carrying the returned `ErrorLike`'s message |
 | A local handler throws | Error document naming the verb |
 | `transcript.append` throws | The only stage whose failure loses the outcome. Logged as a defect, the frame still commits, and I1's second exception names it rather than leaving the invariant false |
 | Commit throws | C03 contains it; contamination is flagged for the next frame |
@@ -226,7 +226,7 @@ Per submission.
 ## 7. Invariants
 
 - **I1** — Every submission produces exactly one transcript entry, with two named exceptions: `empty` produces none, and a failure of `transcript.append` itself produces none and is logged as a defect. No other path may produce zero or two.
-- **I2** — No stage failure escapes; every one produces a document.
+- **I2** — No stage failure escapes; every one produces a document. For patch application the mechanism is C04's `PatchResult` (C04 I15) rather than a caught throw: the failure is a value on the return path, so "settled with what it had" is something C23 *does* with a result, not something it recovers from.
 - **I3** — The pending entry is appended before the transport is invoked.
 - **I4** — Validation is carried from C18, never recomputed.
 - **I5** — A second submission on any foreground route while one is in flight is refused with a notice, never queued. C23's guard is authoritative; C06's is a backstop.

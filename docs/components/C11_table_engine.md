@@ -25,16 +25,7 @@ The governing constraint is **no horizontal scroll, ever** (D38). Horizontal scr
 ## 2. Public interface
 
 ```typescript
-type ColumnDef = Readonly<{
-  key:       string;
-  label:     string;
-  align:     "left" | "right";
-  priority:  number;                  // higher survives longer
-  minWidth:  number;                  // cells, excluding the gap
-  maxWidth?: number;
-  flex?:     boolean;                 // absorbs residual width
-  sortable:  boolean;
-}>;
+import type { ColumnDef } from "…/viewmodel";   // C04 — shape, not plan
 
 type PlannedColumns = Readonly<{
   visible:    readonly Readonly<{ key: string; width: number }>[];
@@ -48,7 +39,9 @@ function planColumns(cols: readonly ColumnDef[], width: number): PlannedColumns;
 const tableDefinition: BlockDefinition<Table>;   // registered into C09
 ```
 
-`Table`, `TableRow` and `Cell` are declared in **C04**; `ColumnDef` and `PlannedColumns` are planning types and belong here.
+`Table`, `TableRow`, `Cell` and `ColumnDef` are declared in **C04**, which owns every block shape (C04 commitment 11). `PlannedColumns` and `planColumns` belong here: they are the *plan*, derived from the shape and a width, and they are what C11 actually owns.
+
+An earlier draft placed `ColumnDef` here on the reasoning that it "describes planning rather than content". It does not — it is a field of `Table`, so C04 could not declare `Table` without it, and an L0 → L1 dependency was the consequence. The import above is C11 reaching *down*, which is the direction that holds.
 
 `planColumns` is pure and memoised on `(columns, width)`. It is called on every render and on every resize, and it must be cheap.
 

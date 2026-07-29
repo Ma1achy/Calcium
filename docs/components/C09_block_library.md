@@ -91,8 +91,12 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
 | `panel` | children + 2 | Border and title; children measured at `w - 2` |
-| `group` | sum or max of children | `column` sums, `row` takes the max |
+| `group` | sum or max of children | `column` sums children measured at `w`; `row` takes the max of children measured at `floor((w - gaps) / n)`, one cell of gutter between each pair (C04 §3) |
 | `raw` | lines | Pre-formatted, emitted as-is with control characters stripped |
+
+**Every measure in this table is floored at 1** for a block that is present (C04 I17). `ceil(cells("") / w)` is 0, and an empty `notice` still renders as a row; the floor is a rule over the table rather than a clause in three of its entries. The one legitimate zero is a container with no children, which is the absence of content rather than empty content.
+
+**Container widths are C04 §3's, not each measurer's invention** — `panel` and a table's expanded detail at `w - 2`, a `column` group at `w`, a `row` group at the equal split. A measurer that passes `w` through unchanged to a child agrees with nothing that renders, and it is the failure mode I1 cannot catch on its own, because it only shows once a child wraps.
 
 `table`, `plot` and `patch` are declared in C04's union but registered by C11, C12 and C25. C09 owns the registry and fourteen kinds; those three are large enough to be their own components and register into the same registry as an app-defined kind would — which is the proof that the extension mechanism is real rather than privileged.
 
