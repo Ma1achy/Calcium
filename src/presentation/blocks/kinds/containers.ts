@@ -21,6 +21,7 @@ import {
   normaliseWidth,
   placeable,
   ROW_GUTTER,
+  sequenceHeight,
 } from "../../../data/viewmodel/index.js";
 import type { Block, Group, MeasureFn, Panel } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
@@ -43,9 +44,9 @@ export const panelDefinition: BlockDefinition<Panel> = {
   kind: "panel",
 
   measure(block: Panel, width: number, measureChild: MeasureFn): number {
-    const widths = childWidths(block, width);
-    let total = 0;
-    for (const height of childHeights(block.children, widths, measureChild)) total += height;
+    // A panel's children are a sequence, so `gapBefore` applies inside a panel
+    // exactly as it does at a document's top level (C04 §3a).
+    const total = sequenceHeight(block.children, insetWidth(width), measureChild);
     // The border, one row each side. An empty panel is still two rows: the
     // border is content, unlike an empty group (C04 I17).
     return atLeastOne(total) + 2;
@@ -93,13 +94,16 @@ export const panelDefinition: BlockDefinition<Panel> = {
     const inside =
       block.children.length === 0 // cells-ok
         ? [createElement(Text, { key: "empty" }, " ")]
-        : block.children.map((child, index) =>
-            createElement(
+        : block.children.flatMap((child, index) => {
+            const drawn = createElement(
               Box,
               { key: child.id === "" ? String(index) : child.id },
               ctx.renderChild(child, inner),
-            ),
-          );
+            );
+            return child.gapBefore === true
+              ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
+              : [drawn];
+          });
 
     const body = createElement(
       Box,
@@ -111,9 +115,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // halves disagree, the frame draws a border that does not close — which is
     // the one place an I1 violation is visible in the frame rather than only in
     // the viewport's drift, six screenfuls later.
-    const heights = childHeights(block.children, childWidths(block, width), ctx.measureChild);
-    let total = 0;
-    for (const height of heights) total += height;
+    const total = sequenceHeight(block.children, inner, ctx.measureChild);
     const side = paint([
       { text: Array.from({ length: Math.max(1, total) }, () => g.vertical).join("\n"), style: dim },
     ]);
@@ -159,9 +161,11 @@ export const groupDefinition: BlockDefinition<Group> = {
     if (heights.length === 0) return 0; // cells-ok
 
     if (block.direction === "column") {
-      let total = 0;
-      for (const height of heights) total += height;
-      return atLeastOne(total);
+      // A column group is a sequence; a row group is not (C04 §3a). Children
+      // side by side have no "before" to put a gap in, so the field is ignored
+      // there rather than being an error — which is why the two branches do not
+      // share this line.
+      return atLeastOne(sequenceHeight(block.children, widths[0] ?? width, measureChild));
     }
 
     let tallest = 0;
@@ -173,17 +177,22 @@ export const groupDefinition: BlockDefinition<Group> = {
     const width = normaliseWidth(ctx.width);
     const widths = childWidths(block, width);
 
-    const children = block.children.slice(0, placeable(block, width)).map((child, index) =>
-      createElement(
-        Box,
-        {
-          key: child.id === "" ? String(index) : child.id,
-          width: widths[index] ?? 1,
-          flexDirection: "column",
-        },
-        ctx.renderChild(child, widths[index] ?? 1),
-      ),
-    );
+    const children = block.children
+      .slice(0, placeable(block, width))
+      .flatMap((child, index) => {
+        const drawn = createElement(
+          Box,
+          {
+            key: child.id === "" ? String(index) : child.id,
+            width: widths[index] ?? 1,
+            flexDirection: "column",
+          },
+          ctx.renderChild(child, widths[index] ?? 1),
+        );
+        return block.direction === "column" && child.gapBefore === true
+          ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
+          : [drawn];
+      });
 
     // A `row` group takes the max of its children, so a short child leaves the
     // rest of its column blank rather than pulling the group up. `alignItems`

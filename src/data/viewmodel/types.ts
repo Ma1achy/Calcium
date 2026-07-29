@@ -120,7 +120,21 @@ export type MergeRow = Omit<TableRow, "expanded">;
 
 // --- blocks ---------------------------------------------------------------
 
-export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }>;
+/**
+ * Every block may declare one blank row before it (C04 §3a).
+ *
+ * It is **content, not view state**: a `merge` carries it, unlike `expanded`
+ * (I9). The space before a block is a property of the document's shape rather
+ * than of what the user has done to it, so a `--watch` tick that rebuilds a
+ * table's rows must not close up the gap above it.
+ *
+ * The height rule lives at the *sequence*, never at the block — see
+ * `sequenceHeight` in `measure.ts`. Nothing else in the vocabulary produces
+ * vertical space, and every surface in the S-series draws it.
+ */
+export type Gap = Readonly<{ gapBefore?: boolean }>;
+
+export type Rule = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap;
 
 export type Notice = Readonly<{
   kind: "notice";
@@ -128,13 +142,13 @@ export type Notice = Readonly<{
   tone: Tone;
   glyph?: string;
   text: string;
-}>;
+}> & Gap;
 
 export type KeyValue = Readonly<{
   kind: "keyValue";
   id: string;
   rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[];
-}>;
+}> & Gap;
 
 export type Table = Readonly<{
   kind: "table";
@@ -144,7 +158,7 @@ export type Table = Readonly<{
   sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;
   showHeader?: boolean;
   emptyMessage?: string;
-}>;
+}> & Gap;
 
 export type Steps = Readonly<{
   kind: "steps";
@@ -154,19 +168,19 @@ export type Steps = Readonly<{
     detail?: string;
     state: "pending" | "active" | "done" | "failed";
   }>[];
-}>;
+}> & Gap;
 
 export type Logs = Readonly<{
   kind: "logs";
   id: string;
   lines: readonly Readonly<{ ts: string; level: string; message: string }>[];
-}>;
+}> & Gap;
 
 export type Events = Readonly<{
   kind: "events";
   id: string;
   events: readonly Readonly<{ ts: string; type: string; message: string }>[];
-}>;
+}> & Gap;
 
 export type Series = Readonly<{
   values: readonly number[];
@@ -189,7 +203,7 @@ export type Plot = Readonly<{
   xLabels?: readonly [string, string, string];
   yFormat?: "number" | "percent" | "bytes" | "duration";
   emptyMessage?: string;
-}>;
+}> & Gap;
 
 export type Progress = Readonly<{
   kind: "progress";
@@ -197,7 +211,7 @@ export type Progress = Readonly<{
   label: string;
   current: number;
   total: number;
-}>;
+}> & Gap;
 
 export type Code = Readonly<{
   kind: "code";
@@ -205,7 +219,7 @@ export type Code = Readonly<{
   language: string;
   text: string;
   wrap?: boolean;
-}>;
+}> & Gap;
 
 export type Diff = Readonly<{
   kind: "diff";
@@ -216,7 +230,7 @@ export type Diff = Readonly<{
     b: string;
     comparison?: "same" | "better" | "worse" | "changed";
   }>[];
-}>;
+}> & Gap;
 
 export type Hunk = Readonly<{
   header: string;
@@ -236,7 +250,7 @@ export type Patch = Readonly<{
   language: string;
   hunks: readonly Hunk[];
   layout?: "unified" | "split";
-}>;
+}> & Gap;
 
 export type Pills = Readonly<{
   kind: "pills";
@@ -247,31 +261,31 @@ export type Pills = Readonly<{
     action?: Action;
     active?: boolean;
   }>[];
-}>;
+}> & Gap;
 
 export type Tip = Readonly<{
   kind: "tip";
   id: string;
   text: string;
   actions?: readonly Action[];
-}>;
+}> & Gap;
 
 export type Panel = Readonly<{
   kind: "panel";
   id: string;
   title: string;
   children: readonly Block[];
-}>;
+}> & Gap;
 
 export type Group = Readonly<{
   kind: "group";
   id: string;
   direction: "row" | "column";
   children: readonly Block[];
-}>;
+}> & Gap;
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */
-export type Raw = Readonly<{ kind: "raw"; id: string; text: string }>;
+export type Raw = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
 
 export type Block =
   | Rule

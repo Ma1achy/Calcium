@@ -82,3 +82,44 @@ export function renderToLines(
   const lines = painted.split("\n");
   return lines.slice(0, Math.max(0, lines.length - 1));
 }
+
+/**
+ * The rows a *sequence* of blocks occupies — a document's top level.
+ *
+ * The other side of `measureSequence`: `gapBefore` is the only thing in C04's
+ * vocabulary that produces vertical space, and the surfaces are drawn with it,
+ * so composing a surface and counting rows is how an illustration becomes a
+ * checkable claim rather than a picture (docs/surfaces/HEIGHT_AUDIT.md).
+ */
+export function renderSequenceToLines(
+  registry: BlockRegistry,
+  blocks: readonly Block[],
+  width: number,
+  options: RenderOptions,
+): readonly string[] {
+  const ctx: RenderContext = {
+    width,
+    theme: options.theme,
+    capabilities: options.capabilities,
+    focus: options.focus ?? null,
+    tick: options.tick ?? 0,
+    onAction: options.onAction ?? (() => undefined),
+    measureChild: registry.measure,
+    renderChild: () => {
+      throw new Error("renderChild is supplied by the registry");
+    },
+  };
+
+  const painted = renderToString(
+    createElement(
+      Box,
+      { flexDirection: "column" },
+      registry.renderSequence(blocks, ctx),
+      createElement(Text, { key: "sentinel" }, SENTINEL),
+    ),
+    { columns: width },
+  );
+
+  const lines = painted.split("\n");
+  return lines.slice(0, Math.max(0, lines.length - 1));
+}

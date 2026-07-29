@@ -11,7 +11,7 @@ context, and what to read in what order.
 |---|---|
 | [`architecture/A02`](architecture/A02_tui_kit_architecture.md) | **The layer rule.** Six layers, imports go down only, L0's two halves never touch. Everything else assumes it |
 | [`architecture/A01`](architecture/A01_architecture_and_boundary.md) | 48 decisions and the boundary contract — argv in, JSON out |
-| [`architecture/A03`](architecture/A03_enforcement_suite.md) | The 87 checks `make enforce` executes, each citing the spec that declared it |
+| [`architecture/A03`](architecture/A03_enforcement_suite.md) | The 88 checks `make enforce` executes, each citing the spec that declared it |
 | [`../CLAUDE.md`](../CLAUDE.md) | The same rules, distilled to the ones violated by accident |
 
 ---

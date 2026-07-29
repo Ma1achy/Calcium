@@ -15,7 +15,7 @@
  * whichever width a child happens to wrap. A shared function cannot drift.
  */
 
-import type { Group, Panel } from "./types.js";
+import type { Block, Group, MeasureFn, Panel } from "./types.js";
 
 /**
  * Width 0 is treated as 1 (T3.2). No measurer divides by zero, and no caller
@@ -121,4 +121,42 @@ export function childWidths(block: Panel | Group, width: number): readonly numbe
   }
   const each = groupChildWidth(block.direction, width, block.children.length);
   return block.children.map(() => each);
+}
+
+/**
+ * The rows a *sequence* of blocks occupies: their heights, plus one row for
+ * each block declaring `gapBefore` (§3a, I19).
+ *
+ * A sequence is a document's top level, a `panel`'s children, or a `column`
+ * group's children — anything laid out one after another down the screen. A
+ * `row` group is not one: its children sit side by side, so a gap before one of
+ * them is meaningless and is ignored rather than being an error.
+ *
+ * **No measurer counts a gap.** A block measures the same wherever it appears,
+ * which is what lets C14 key its cache on the block and the width alone; the
+ * arithmetic that differs between a block and a run of them lives here, once,
+ * for the same reason `childWidths` does.
+ *
+ * The first block's gap is a leading blank row, not a special case. Dropping it
+ * would make the field mean two things depending on position, and a document
+ * assembled by concatenating two others would render differently from either.
+ */
+export function sequenceHeight(
+  blocks: readonly Block[],
+  width: number,
+  measureChild: MeasureFn,
+): number {
+  let total = 0;
+  for (const block of blocks) {
+    total += measureChild(block, width);
+    if (block.gapBefore === true) total += 1;
+  }
+  return total;
+}
+
+/** The gap rows a sequence contributes, without measuring anything. */
+export function gapRows(blocks: readonly Block[]): number {
+  let gaps = 0;
+  for (const block of blocks) if (block.gapBefore === true) gaps += 1;
+  return gaps;
 }

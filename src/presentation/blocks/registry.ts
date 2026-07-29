@@ -7,8 +7,9 @@
  * imports the registry (I7) — the layering at L1 holds because of this one
  * argument, and it is the most copied-wrong pattern in a block library.
  */
-import type { ReactElement } from "react";
-import { normaliseWidth } from "../../data/viewmodel/index.js";
+import { Box, Text } from "ink";
+import { createElement, type ReactElement } from "react";
+import { normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { paint, rows, tone } from "./paint.js";
@@ -118,6 +119,37 @@ class Registry implements BlockRegistry {
       // (T3.14). Compute, so no retry (A02 §7 rule 2).
       return 1;
     }
+  };
+
+  /**
+   * A sequence's rows: the blocks' heights plus one per `gapBefore` (C04 §3a).
+   *
+   * The gap belongs to the sequence and never to the block, so this is the only
+   * place the two arithmetics differ — and every composer, here and in L4, uses
+   * this rather than adding spacing of its own (C23 §2). A composer that
+   * inserted a row would make a document's height unknowable from the document.
+   */
+  measureSequence = (blocks: readonly Block[], width: number): number =>
+    sequenceHeight(blocks, normaliseWidth(width), this.measure);
+
+  renderSequence = (blocks: readonly Block[], ctx: RenderContext): ReactElement => {
+    const width = normaliseWidth(ctx.width);
+    const children: ReactElement[] = [];
+
+    blocks.forEach((block, index) => {
+      if (block.gapBefore === true) {
+        children.push(createElement(Text, { key: `gap-${index}` }, " "));
+      }
+      children.push(
+        createElement(
+          Box,
+          { key: block.id === "" ? `block-${index}` : block.id, flexDirection: "column" },
+          this.render(block, { ...ctx, width }),
+        ),
+      );
+    });
+
+    return createElement(Box, { flexDirection: "column", width }, children);
   };
 
   render = (block: Block, ctx: RenderContext): ReactElement => {

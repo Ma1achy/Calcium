@@ -4,7 +4,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { checkModuleGraph } from "./module-graph.mjs";
 import { checkSourceScans } from "./source-scans.mjs";
-import { checkDependencies } from "./dependencies.mjs";
+import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 
 function walk(dir, out = []) {
   let entries;
@@ -22,6 +22,7 @@ const violations = [
   ...checkModuleGraph(files),
   ...checkSourceScans(files),
   ...checkDependencies(),
+  ...checkPhantomImports(files),
 ];
 
 const RED = "\x1b[31m", DIM = "\x1b[2m", GREEN = "\x1b[32m", RESET = "\x1b[0m";

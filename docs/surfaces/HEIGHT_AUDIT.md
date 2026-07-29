@@ -16,9 +16,15 @@ one that is pending (A03 §9a).
 adjusting whichever side is easier to edit. Each row below says which side is
 wrong and why.
 
+**And it is a test now, not a reading.** `test/contract/surfaces.test.ts`
+composes each frame from the blocks its surface is drawn from and asserts the
+result is the number of rows the illustration draws — read from the markdown, so
+a fixture cannot agree with itself while the picture drifts. That is what would
+have caught §2 without anyone reading it.
+
 ---
 
-## 1. Separator rows belong to nobody — **unassigned seam**
+## 1. Separator rows belong to nobody — **resolved: `gapBefore`**
 
 Almost every surface draws a blank row between block regions. S08's success frame
 illustrates 17 rows and composes to 13; S12's panel illustrates 8 inner rows and
@@ -38,15 +44,21 @@ nobody has taken. Three ways it could be taken, and they are not equivalent:
 | L4 inserts a row between top-level blocks | The composition root's business (C23), invisible to `measure`, and it changes what C14 must virtualise: the transcript's height stops being the sum of its blocks' |
 | Surfaces stop drawing them | Honest, and denser than every illustration in the S-series |
 
-**It belongs to C23**, which is what composes a document into a transcript entry,
-and it needs a test wherever it lands: whichever answer is chosen, the sum C14
-virtualises has to agree with what the frame draws. Recorded here rather than
-resolved, because C09 cannot resolve it — a block library that invented spacing
-would be answering a question the composition root has not been asked yet.
+**Resolved as the first option, sharpened.** `gapBefore?: boolean` is a field on
+every block (C04 §3a), and the height rule lives at the *sequence* rather than
+the block: `measure(block, w)` never counts a gap, and a run of blocks is `Σ`
+their heights plus one row per `gapBefore`. So a block still measures the same
+wherever it appears — C14's cache stays keyed on the block and the width — and
+every composer uses one arithmetic, including a `panel`'s children and a
+`column` group's. C23 §2 commits to adding no spacing of its own, and C24's
+builders set the default per kind so an adapter that never thinks about rhythm
+gets the one the surfaces draw.
+
+S08's seventeen-against-thirteen is now a checked claim: four `gapBefore`s.
 
 ---
 
-## 2. S07's metrics region draws a `diff` with no header — **surface defect**
+## 2. S07's metrics region draws a `diff` with no header — **fixed in S07**
 
 S07 §2 illustrates the metrics comparison as five rows:
 
@@ -62,11 +74,13 @@ A `diff` measures **rows + 1** — C04 §3 says "rows + header" and C09 §3 says
 "rows + 1", so the header is unconditional in both. Rendered, this region is six
 rows. The identity region above it draws its header and is correct at eight.
 
-**The surface is wrong**, and it is wrong in the way that is cheapest to fix: the
-metrics `diff` needs its header drawn, as its sibling already has one. The
-alternative — making the header optional — would give `diff` a height rule that
-branches on a flag, which is exactly what C04 §3 refuses for `patch` and `diff`
-in the paragraph explaining why they are separate kinds.
+**The surface was wrong**, and S07 now draws the header its sibling region
+already had. The alternative — making the header optional — would give `diff` a
+height rule that branches on a flag, which is exactly what C04 §3 refuses for
+`patch` and `diff` in the paragraph explaining why they are separate kinds.
+
+The frame composes to twenty-one rows and the illustration draws twenty-one,
+asserted on every run.
 
 ---
 
@@ -130,6 +144,12 @@ and rendered heights disagree, and a surface that draws one by hand teaches
 readers to ignore it.
 
 ---
+
+## Where the check stands
+
+Composed and asserted: **S07 §2**, **S08 §2**, **S08 §3**. The rest is deferred
+below, each naming the component that makes it composable — a deferral whose
+blocker is wrong is indistinguishable from one that is pending (A03 §9a).
 
 ## Deferred, by component
 

@@ -2,7 +2,7 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 
 /** The rules this module implements. See MODULE_GRAPH_RULES for why. */
-export const DEPENDENCY_RULES = ["SS31", "SS32"];
+export const DEPENDENCY_RULES = ["SS31", "SS32", "SS38"];
 
 const INSTALL_HOOKS = ["preinstall", "install", "postinstall", "prepare"];
 
@@ -134,4 +134,69 @@ export function checkDependencies(io = {}) {
     }
   }
   return v;
+}
+
+/**
+ * SS38 — a bare import in `src/` of a package that is not a declared runtime
+ * dependency.
+ *
+ * SS31 compares `package.json` against `DEPENDENCIES.md`, and both were clean
+ * while `src/` imported `highlight.js`, which appeared in neither: `lowlight`
+ * depends on it, npm hoisted it, the import resolved, `tsc` was happy and every
+ * gate passed. That is the shape this catches — a **phantom dependency**, whose
+ * whole failure mode is that "it resolved, so it must be declared" is exactly
+ * the reasoning that does not hold.
+ *
+ * It breaks on someone else's release: the day `lowlight` drops the dependency,
+ * or a package manager stops hoisting, an import we never justified disappears.
+ * And it is a supply-chain hole in the meantime — a package nobody reviewed,
+ * pinned or wrote a row for, executing in the product.
+ *
+ * Scoped to `src/` because that is what ships. A test importing `vitest` is
+ * fine; `src/` importing anything but a runtime dependency is not, including a
+ * devDependency, which is absent from a consumer's install.
+ *
+ * Node builtins are not dependencies: `node:fs` is the runtime.
+ */
+const BARE_IMPORT = /^\s*(?:import|export)\b(?:[^'"]*?from\s*)?['"]([^'".][^'"]*)['"]/gm;
+
+/** `@scope/name/deep/path` → `@scope/name`; `pkg/sub` → `pkg`. */
+function packageOf(specifier) {
+  const parts = specifier.split("/");
+  return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : (parts[0] ?? specifier);
+}
+
+export function checkPhantomImports(files, io = {}) {
+  const readFile = io.readFile ?? ((f) => readFileSync(f, "utf8"));
+  const pkg = JSON.parse(readFile("package.json"));
+  const declared = new Set(Object.keys(pkg.dependencies ?? {}));
+  const dev = new Set(Object.keys(pkg.devDependencies ?? {}));
+
+  const violations = [];
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (!f.startsWith("src/")) continue;
+
+    const src = readFile(file);
+    BARE_IMPORT.lastIndex = 0;
+    let m;
+    while ((m = BARE_IMPORT.exec(src))) {
+      const specifier = m[1];
+      if (specifier.startsWith("node:")) continue;
+      const name = packageOf(specifier);
+      if (declared.has(name)) continue;
+
+      violations.push({
+        rule: "SS38",
+        file: f,
+        message: dev.has(name)
+          ? `imports "${name}", a devDependency — src/ ships, and a consumer's install does not have it`
+          : `imports "${name}", which is not a declared runtime dependency — a phantom ` +
+            `dependency resolves today because something else pulled it in, and disappears ` +
+            `on someone else's release`,
+        spec: "A04 §2 · C09 §4a",
+      });
+    }
+  }
+  return violations;
 }

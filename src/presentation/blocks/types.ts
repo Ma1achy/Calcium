@@ -54,6 +54,9 @@ export interface BlockRegistry {
   seal(): void;
   measure(block: Block, width: number): number;
   render(block: Block, ctx: RenderContext): ReactElement;
+  /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
+  measureSequence(blocks: readonly Block[], width: number): number;
+  renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }
