@@ -12,6 +12,8 @@
 // A fixture holding its own number agrees with itself forever.
 import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/testing/index.js";
 import { illustratedRows, SURFACE_FRAMES } from "../support/surfaces.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
@@ -19,7 +21,10 @@ import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 describe("the S-series' illustrated heights", () => {
   for (const frame of SURFACE_FRAMES) {
     it(`${frame.label} composes to the rows it draws`, () => {
+      // `table` is registered rather than shipped as a default (C09 §3), so a
+      // registry without it measures the five table-bearing surfaces as `raw`.
       const registry = createBlockRegistry({});
+      registry.register(tableDefinition as unknown as BlockDefinition);
       const drawn = illustratedRows(frame.file, frame.fence);
       const measured = registry.measureSequence(frame.blocks, frame.width);
       const rendered = renderSequenceToLines(registry, frame.blocks, frame.width, {
@@ -52,8 +57,9 @@ describe("the S-series' illustrated heights", () => {
   // The rest of the S-series, by the component that makes it composable. Each
   // is a table, a plot or a patch region: measuring one today measures the `raw`
   // fallback, which would assert nothing while looking like coverage.
-  it.todo("S03, S05, S06, S14, S15 compose to their illustrated rows — waits on C11");
-  it.todo("S04, S09, S13 compose to their illustrated rows — waits on C11 and C12");
+  // S03, S05, S06, S14 and S15 are above, composed and asserted — C11 registered
+  // `table` and their deferral expired with it.
+  it.todo("S04, S09, S13 compose to their illustrated rows — waits on C12");
   it.todo("S07 §3's patch region composes to its illustrated rows — waits on C25");
   it.todo("S01, S02, S10, S11, S12 compose to their illustrated rows — waits on C22");
 });

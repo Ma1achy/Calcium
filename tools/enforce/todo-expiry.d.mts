@@ -29,6 +29,15 @@ export declare function checkTodoExpiry(
   isImplemented?: (path: string) => boolean,
 ): Violation[];
 
+export declare const UNSCAFFOLDED: Readonly<Record<string, string>>;
+
+/** TD3 — every path the component map names must exist, exceptions named. */
+export declare function checkSourceMap(
+  sources?: Readonly<Record<string, string>>,
+  unscaffolded?: Readonly<Record<string, string>>,
+  exists?: (path: string) => boolean,
+): Violation[];
+
 export declare function collectTodos(
   dir?: string,
   readFile?: (file: string) => string,

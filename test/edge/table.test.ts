@@ -4,6 +4,8 @@ import { planColumns, tableDefinition } from "../../src/presentation/table/index
 import { psColumns, psTable } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
+import { validateDocument } from "../../src/data/viewmodel/index.js";
+import { doc } from "../support/blocks.js";
 import type { Block, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 
 const r = measurable({ definitions: [tableDefinition] });
@@ -207,6 +209,30 @@ describe("C11 tier 3 — edges", () => {
     expect(planColumns(psColumns(), 160).visible.some((v) => v.key === "metric")).toBe(true);
     const lines = r.renderToLines(block, 160).slice(1);
     expect(lines.map((line) => /u\d/.exec(visible(line))?.[0])).toEqual(["u0", "u1", "u2", "u3", "u4"]);
+  });
+
+  it("T3.15: two rows sharing an id are rejected by C04, not handled here", () => {
+    // C11 does not check it, and that is the point: a boundary rule checked in two
+    // places is two rules (C09 I6's argument, one layer down). What C11 depends on
+    // is that the document never reaches it — `merge` upserts by row id, focus
+    // names one, and a rendered row is keyed by one.
+    const columns = psColumns();
+    const duplicated: Table = {
+      kind: "table",
+      id: "dupes",
+      columns,
+      rows: [
+        { id: "r1", cells: { uuid: { text: "a" } } },
+        { id: "r1", cells: { uuid: { text: "b" } } },
+      ],
+    };
+    const result = validateDocument(doc({ blocks: [duplicated] }));
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.error.join(" ")).toContain("C04 I31");
+
+    // And C11 stays total on it rather than throwing: the validator is the gate,
+    // not the renderer (I7).
+    expect(() => r.measure(duplicated, 80)).not.toThrow();
   });
 
   it("T3.18: no flex column and a narrow table → residual width is unused, not stretched", () => {

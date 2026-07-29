@@ -88,10 +88,32 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     // The other half of I6's glyph rule. A `Cell` carries one too, and a table
     // is where the far side's own status strings most often arrive.
     if (isArray(b["rows"])) {
+      // I31 — row ids are unique within their table. Separate from I14's block
+      // ids because the namespaces are: two tables may each hold a row `r1`, and
+      // a row id never collides with a block id.
+      //
+      // Three things address a row by id and all three are ambiguous without
+      // this: `merge` upserts by it (I9), C16's focus names it (C11 I15), and a
+      // rendered row is keyed by it. Raised from C11, the first component to
+      // depend on it.
+      const rowIds = new Map<string, number>();
+
       for (const row of b["rows"]) {
-        if (!isRecord(row) || !isRecord(row["cells"])) continue;
+        if (!isRecord(row)) continue;
+        const id = row["id"];
+        if (isString(id)) rowIds.set(id, (rowIds.get(id) ?? 0) + 1);
+        if (!isRecord(row["cells"])) continue;
         for (const [key, cell] of Object.entries(row["cells"])) {
           if (isRecord(cell)) requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+        }
+      }
+
+      for (const [id, count] of rowIds) {
+        if (count > 1) {
+          e.push(
+            `${at}: row id "${id}" appears ${String(count)} times (C04 I31) — ` +
+              `merge upserts by row id and focus names one, so a duplicate has no correct target`,
+          );
         }
       }
     }

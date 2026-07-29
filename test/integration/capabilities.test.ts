@@ -13,7 +13,9 @@ import { createTerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { MODES, fakeDebug, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
-import { ONE_PER_KIND } from "../support/blocks.js";
+import { ONE_PER_KIND, psTable } from "../support/blocks.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { cells } from "../../src/presentation/text.js";
 import { ASCII_CAPS, measurable, visible } from "../support/render.js";
 import { store, TONES } from "../support/theme.js";
 
@@ -162,9 +164,43 @@ describe("C02 integration", () => {
     expect([...drawn].every((ch) => (ch.codePointAt(0) ?? 0) < 0x80)).toBe(true);
   });
 
-  it.todo(
-    "T4.4: unicode:'ascii' → a rendered table uses + - | and a sparkline uses .:|#; no codepoint above U+007F in the output — waits on C11 and C12",
-  );
+  it("T4.4: unicode:'ascii' → a rendered table emits no codepoint above U+007F", () => {
+    // The table half of this. A sparkline is C12's and the deferral below keeps it.
+    //
+    // A table draws more glyph rôles per row than any other kind — the expand
+    // marker, a status glyph per row, the truncation marker, the sort indicator —
+    // and every one has to substitute 1:1 by column count or the measured height is
+    // wrong for users with a non-UTF-8 locale and nobody else (C09 §4).
+    const table = psTable({ rows: 3, expanded: [1], sort: { key: "age", direction: "desc" } });
+    const kit = measurable({ definitions: [tableDefinition], capabilities: ASCII_CAPS });
+    // 100 rather than 80: `mr` drops there, so the expand markers are drawn, and
+    // `owner` is visible at its declared minimum of 8, so `malachy@fmx.io`
+    // truncates. Both markers in one frame is the point — each has an ASCII form
+    // and each is a place the 1:1 rule can break.
+    const drawn = kit.renderToLines(table, 100).map(visible);
+
+    expect(drawn.join("")).not.toBe("");
+    for (const line of drawn) {
+      const offending = [...line].filter((ch) => (ch.codePointAt(0) ?? 0) >= 0x80);
+      expect(offending, `beyond ASCII: ${offending.join(" ")}`).toEqual([]);
+    }
+    // The ASCII forms, present rather than merely not-Unicode: `>` for a collapsed
+    // row, `v` for an open one, `~` for a truncation, `v` for the descending sort.
+    const header = drawn[0] ?? "";
+    const open = drawn.find((l) => l.includes("a3f9b21")) ?? "";
+    const closed = drawn.find((l) => l.includes("2e8a04c")) ?? "";
+    expect(header, "the descending sort indicator").toContain("age v");
+    expect(open, "an expanded row").toContain("v ");
+    expect(closed, "a collapsed row").toContain("> ");
+    expect(drawn.join("\n"), "the ASCII truncation marker").toContain("malachy~");
+
+    // And the geometry is the Unicode case's, exactly.
+    const full = measurable({ definitions: [tableDefinition] });
+    expect(kit.measure(table, 100)).toBe(full.measure(table, 100));
+    expect(drawn.map((l) => cells(l))).toEqual(
+      full.renderToLines(table, 100).map((l) => cells(visible(l))),
+    );
+  });
   it.todo(
     "T4.5: unicode:'ascii' → the braille plot degrades to a block plot rather than emitting braille codepoints — waits on C12",
   );

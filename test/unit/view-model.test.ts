@@ -140,6 +140,30 @@ describe("C04 validation", () => {
     expect(nested.ok, "a duplicate hidden one level down").toBe(false);
   });
 
+  it("T1.16 (I31): duplicate row ids are refused, and two tables may share ids", () => {
+    // A different namespace from I14's, and the test says so in both directions —
+    // a check that rejected `r1` in two separate tables would break every merge
+    // fixture in the tree.
+    const table = (id: string, rowIds: readonly string[]) =>
+      block({
+        kind: "table",
+        id,
+        columns: [
+          { key: "name", label: "Name", align: "left", priority: 10, minWidth: 8, sortable: true },
+        ],
+        rows: rowIds.map((rid) => ({ id: rid, cells: { name: { text: rid } } })),
+      });
+
+    const dup = validateDocument(doc({ blocks: [table("t", ["r1", "r2", "r1"])] }));
+    expect(dup.ok).toBe(false);
+    expect(dup.ok === false && dup.error.join(" ")).toContain(`row id "r1" appears 2 times`);
+
+    const shared = validateDocument(
+      doc({ blocks: [table("t1", ["r1", "r2"]), table("t2", ["r1", "r2"])] }),
+    );
+    expect(shared.ok, "row ids are scoped to their table, not to the document").toBe(true);
+  });
+
   it("T1.17 (I18): a cyclic document is refused, and the call returns", () => {
     const inner: Record<string, unknown> = { kind: "raw", id: "inner", text: "x" };
     const outer: Record<string, unknown> = { kind: "panel", id: "outer", title: "T", children: [inner] };

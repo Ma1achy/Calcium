@@ -149,11 +149,12 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
   );
 
   // T5.4's second half — "keyboard navigation of a table still works end to
-  // end" — is not here. It needs C16 to route the keys and C11 to render the
-  // table, and both are stubs. Written now it would assert that a fixture I
-  // wrote navigates a structure I built, which is weaker than the title and
-  // would read as covered.
+  // end" — is not here. C11 now renders the table and exposes `focusableRowIds`,
+  // so the half that was waiting on C11 is done; what remains is the routing,
+  // which is C16's and is still a stub. Written now it would assert that a
+  // fixture I wrote navigates a structure I built, with nothing moving focus
+  // between them — weaker than the title, and it would read as covered.
   it.todo(
-    "T5.4b: inside tmux, keyboard navigation of a table works end to end — waits on C11 and C16",
+    "T5.4b: inside tmux, keyboard navigation of a table works end to end — waits on C16",
   );
 });

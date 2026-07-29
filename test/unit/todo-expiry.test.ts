@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACKNOWLEDGED_BACKLOG,
   blockersIn,
+  checkSourceMap,
   checkTodoExpiry,
   collectTodos,
   COMPONENT_SOURCES,
@@ -37,6 +38,35 @@ describe("todo expiry", () => {
       seen.sort(),
       violations.map((v) => v.message).join("\n"),
     ).toEqual([...ACKNOWLEDGED_BACKLOG].sort());
+  });
+
+  it("TD3: every path the map names exists", () => {
+    // The rule's own vacuity, closed. `defaultIsImplemented` returns false for a
+    // file that is not there, so a mapped path that never existed reports "not
+    // implemented" forever and every deferral waiting on that component is exempt
+    // — silently, and for the same reason SS26 passed: the check cannot find the
+    // thing it was asked about.
+    //
+    // C07 was the live instance, mapping to `src/data/adapters.ts` while C07 landed
+    // as `adapters/index.ts`.
+    const violations = checkSourceMap();
+    expect(violations.map((v) => `${v.rule} ${v.file}`), violations.map((v) => v.message).join("\n")).toEqual([]);
+  });
+
+  it("TD3 fires: a mapped path that does not exist, and an excuse that has expired", () => {
+    const missing = checkSourceMap({ C99: "src/nowhere/at-all.ts" }, {}, () => false);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.rule).toBe("TD3");
+    expect(missing[0]?.message).toContain("silently exempt");
+
+    // And the other direction, which is what stops the exception list outliving its
+    // reason: a component listed unscaffolded whose file now exists.
+    const arrived = checkSourceMap({ C99: "src/somewhere/real.ts" }, { C99: "not yet" }, () => true);
+    expect(arrived).toHaveLength(1);
+    expect(arrived[0]?.message).toContain("stops being an absence");
+
+    // A genuine absence, excused: no violation either way.
+    expect(checkSourceMap({ C99: "src/later.ts" }, { C99: "not yet" }, () => false)).toEqual([]);
   });
 
   it("TD1 fires: a todo whose blocker is not a recognisable id", () => {

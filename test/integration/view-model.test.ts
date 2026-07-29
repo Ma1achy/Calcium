@@ -214,8 +214,12 @@ describe("C04 integration — the document lifecycle", () => {
   it.todo(
     "T4.4: virtualising a 10,000-block transcript selects a range whose summed measured heights equal the viewport height exactly — waits on C14",
   );
+  // Restated rather than written: C11 landed, and the half this needs is C14's.
+  // The measured delta is assertable today (C11 T1.9, T6.7) and "subsequent blocks
+  // shift by it, mid-transcript, with no drift" is a claim about a viewport, which
+  // is the component that does not exist.
   it.todo(
-    "T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the height delta, with no drift — waits on C11 and C14",
+    "T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the height delta, with no drift — waits on C14",
   );
   it("T4.6: the same document under both themes produces identical line counts", () => {
     // Colour never changes row count (§5). A whole document, not one block:

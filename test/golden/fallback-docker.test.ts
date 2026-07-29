@@ -21,6 +21,7 @@ import { createFallbackAdapter } from "../../src/data/adapters/fallback.js";
 import type { AdapterContext, RawResult } from "../../src/data/adapters/types.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
+import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 
 /** R01 §4, verbatim — the fields and the awkwardness, not a tidied version. */
 const DOCKER_PS: readonly Record<string, string>[] = [
@@ -135,7 +136,49 @@ describe("C07 §5 — docker's real JSON through the fallback, unadapted", () =>
   //
   // Reading this output is a named step in C11's plan. The todo expiring is how
   // the deferral is enforced, not how the risk is discharged.
-  it.todo(
-    "the list shape renders legibly at 80, 120 and 160 with no adapter — waits on C11 (C07 §5 open risk)",
-  );
+  it("the list shape rendered at 80, 120 and 160 with no adapter", () => {
+    // Read on the commit that registered `table`. The finding is recorded in C07 §5
+    // and it is **not** about how wide the columns came out.
+    //
+    // Every fallback column is `minWidth: 3`, none is `flex`, and priority descends
+    // with position. So nothing ever drops: at any width above about 27 cells all
+    // seven columns are admitted, and every one of them squeezes toward three cells
+    // instead. `Status` — the field R01 §4 calls the human-readable one — renders as
+    // `Ex…`. And because nothing drops, **no row is ever expandable**: D38's promise
+    // that a shed column stays reachable is satisfied vacuously, by never shedding.
+    // The mechanism designed to keep information reachable is inert at exactly the
+    // widths where the table is least readable.
+    //
+    // That is worse than a table that sheds columns, and it is a statement about §5's
+    // defaults rather than about the planner: C11 gave every column what it asked
+    // for.
+    const doc = createFallbackAdapter().adapt(resultOf(DOCKER_PS), CTX);
+    const table = doc.blocks.find((b) => b.kind === "table");
+    if (table?.kind !== "table") throw new Error("the list shape did not produce a table");
+
+    // The two facts the finding rests on, asserted so the snapshot cannot be read
+    // as showing something else.
+    expect(table.columns.every((c) => c.minWidth === 3)).toBe(true);
+    expect(table.columns.some((c) => c.flex === true)).toBe(false);
+    for (const width of [80, 120, 160]) {
+      expect(planColumns(table.columns, width).dropped, `at ${String(width)}`).toEqual([]);
+    }
+
+    const registered = measurable({
+      definitions: [tableDefinition],
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+    });
+
+    const frame = [80, 120, 160]
+      .map((width) =>
+        [
+          `── unadapted · ${String(width)} cells`,
+          ...doc.blocks.flatMap((b) => registered.renderToLines(b, width)),
+        ].join("\n"),
+      )
+      .join("\n");
+
+    expect(frame).toMatchSnapshot();
+  });
 });

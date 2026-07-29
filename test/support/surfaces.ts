@@ -12,7 +12,7 @@
 // let S07 draw a `diff` with no header through four revisions of the spec.
 import { readFileSync } from "node:fs";
 import { block } from "../../src/data/viewmodel/index.js";
-import type { Block } from "../../src/data/viewmodel/index.js";
+import type { Block, Cell, ColumnDef, TableRow } from "../../src/data/viewmodel/index.js";
 
 export type SurfaceFrame = Readonly<{
   /** The spec file, and which fenced illustration inside it. */
@@ -209,6 +209,181 @@ const S08_RESOLVED: Block = block({
   ],
 });
 
+// --- the table-bearing surfaces (HEIGHT_AUDIT's C11 deferrals) -------------
+//
+// Each region is drawn from a `table`, so measuring one before C11 registered
+// measured the `raw` fallback — which is why HEIGHT_AUDIT deferred all five by
+// name rather than leaving them untested and unremarked.
+//
+// The columns are the surfaces' own, priorities included, because the height of a
+// table region depends on which columns survive: a dropped column becomes an
+// expand row, and an expand row is a row.
+
+/** A column set from a surface's §3, in declared order. */
+function cols(
+  rows: readonly (readonly [key: string, priority: number, min: number, flex?: boolean])[],
+): readonly ColumnDef[] {
+  return rows.map(([key, priority, minWidth, flex]) => ({
+    key,
+    label: key,
+    align: "left" as const,
+    priority,
+    minWidth,
+    sortable: true,
+    ...(flex === true ? { flex: true } : {}),
+    ...(key === "expand" ? { role: "expand" as const } : {}),
+  }));
+}
+
+function cellsOfRow(id: string, values: Readonly<Record<string, string>>): TableRow {
+  const out: Record<string, Cell> = {};
+  for (const [key, text] of Object.entries(values)) out[key] = { text };
+  return { id, cells: out };
+}
+
+const S03_TABLE: Block = block({
+  kind: "table",
+  id: "s03-runs",
+  gapBefore: true,
+  columns: cols([
+    ["expand", 100, 1],
+    ["glyph", 100, 1],
+    ["uuid", 90, 7],
+    ["family", 85, 12, true],
+    ["status", 80, 11],
+    ["detail", 65, 12, true],
+    ["metric", 60, 8],
+    ["age", 50, 6],
+    ["kind", 30, 10],
+    ["owner", 20, 8],
+    ["mr", 10, 6],
+  ]),
+  rows: [
+    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m" }),
+    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m" }),
+    cellsOfRow("2e8a04c", { uuid: "2e8a04c", kind: "experiment", family: "graphsage", status: "failed", detail: "OOM at ep 3", metric: "—", age: "1h 12m" }),
+    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m" }),
+  ],
+});
+
+const S05_TABLE: Block = block({
+  kind: "table",
+  id: "s05-services",
+  gapBefore: true,
+  columns: cols([
+    ["expand", 100, 1],
+    ["glyph", 100, 1],
+    ["name", 95, 16, true],
+    ["replicas", 85, 7],
+    ["status", 80, 10],
+    ["errors", 70, 7],
+    ["version", 65, 7],
+    ["p99", 60, 6],
+    ["req/s", 50, 7],
+    ["p50", 40, 6],
+    ["age", 30, 5],
+  ]),
+  rows: ["digit-classifier", "flow-predictor", "volatility-estimator", "orderbook-pressure"].map(
+    (name, i) => cellsOfRow(name, { name, replicas: "3/3", status: "healthy", errors: "0.02%", version: "de29117", p99: "45ms", "req/s": "432", p50: "18ms", age: `${String(i + 2)}d` }),
+  ),
+});
+
+const S06_FAMILIES: Block = block({
+  kind: "table",
+  id: "s06-families",
+  gapBefore: true,
+  columns: cols([
+    ["expand", 100, 1],
+    ["glyph", 100, 1],
+    ["family", 95, 18, true],
+    ["serving", 85, 7],
+    ["latest", 80, 7],
+    ["versions", 60, 8],
+    ["updated", 40, 7],
+  ]),
+  rows: ["digit-classifier", "flow-predictor", "orderbook-pressure", "latency-anomaly-gnn", "fill-rate"].map(
+    (family) => cellsOfRow(family, { family, serving: "de29117", latest: "de29117", versions: "4", updated: "2h ago" }),
+  ),
+});
+
+const S06_VERSIONS: Block = block({
+  kind: "table",
+  id: "s06-versions",
+  gapBefore: true,
+  columns: cols([
+    ["expand", 100, 1],
+    ["glyph", 100, 1],
+    ["version", 95, 7],
+    ["state", 85, 9],
+    ["metric", 70, 12, true],
+    ["run", 60, 7],
+    ["mr", 50, 6],
+    ["created", 40, 7],
+  ]),
+  rows: ["de29117", "b4f0c12", "9e2a55d", "1f0c8b3"].map((version) =>
+    cellsOfRow(version, { version, state: "serving", metric: "AUC 0.912", run: "c4e1f23", mr: "!1244", created: "2h ago" }),
+  ),
+});
+
+const S14_KEYS: Block = block({
+  kind: "table",
+  id: "s14-keys",
+  gapBefore: true,
+  columns: cols([
+    ["expand", 100, 1],
+    ["key", 95, 22, true],
+    ["value", 90, 24, true],
+    ["source", 70, 8],
+  ]),
+  rows: [
+    ["current_context", "fmx-prod", "config"],
+    ["ui.theme", "dark", "config"],
+    ["ui.show_banner", "true", "default"],
+    ["terminal.colour_depth", "24", "env"],
+    ["terminal.mouse", "true", "default"],
+    ["history.cap", "10000", "default"],
+  ].map(([key, value, source]) =>
+    cellsOfRow(key ?? "", { key: key ?? "", value: value ?? "", source: source ?? "" }),
+  ),
+});
+
+/** The contexts region: two rows, no header — the headerless list C04 §3 names. */
+const S14_CONTEXTS: Block = block({
+  kind: "table",
+  id: "s14-contexts",
+  gapBefore: true,
+  showHeader: false,
+  columns: cols([
+    ["glyph", 100, 1],
+    ["name", 95, 13],
+    ["url", 80, 29, true],
+    ["token", 60, 18],
+  ]),
+  rows: [
+    cellsOfRow("fmx-prod", { name: "fmx-prod", url: "https://prism.fmx.io/v1", token: "token valid · 30d" }),
+    cellsOfRow("fmx-staging", { name: "fmx-staging", url: "https://staging.prism.fmx.io", token: "token expired" }),
+  ],
+});
+
+const S15_SECRETS: Block = block({
+  kind: "table",
+  id: "s15-secrets",
+  gapBefore: true,
+  columns: cols([
+    ["glyph", 100, 1],
+    ["name", 95, 22, true],
+    ["owner", 80, 15],
+    ["age", 60, 6],
+    ["note", 40, 15],
+  ]),
+  rows: [
+    cellsOfRow("gitlab-readonly-token", { name: "gitlab-readonly-token", owner: "research-infra", age: "34d" }),
+    cellsOfRow("minio-research-creds", { name: "minio-research-creds", owner: "research-infra", age: "34d" }),
+    cellsOfRow("wandb-api-key", { name: "wandb-api-key", owner: "malachy", age: "12d" }),
+    cellsOfRow("huggingface-token", { name: "huggingface-token", owner: "malachy", age: "8d", note: "not accessible" }),
+  ],
+});
+
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
   {
     file: "docs/surfaces/S07_diff.md",
@@ -309,6 +484,127 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         id: "s08f-tip",
         gapBefore: true,
         text: "? T1-008 for the full rule                                    exit 1",
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S03_ps_list.md",
+    fence: 0,
+    label: "S03 §2 — the ps list at 100",
+    width: 98,
+    blocks: [
+      block({ kind: "rule", id: "s03-rule", label: "ps · 4 of 11 · --mine · last 24h" }),
+      block({
+        kind: "pills",
+        id: "s03-kinds",
+        gapBefore: true,
+        chips: [{ label: "all ×11" }, { label: "training ×9" }, { label: "evaluation ×2" }],
+      }),
+      block({
+        kind: "pills",
+        id: "s03-statuses",
+        chips: [
+          { label: "● running ×1" },
+          { label: "✓ succeeded ×6" },
+          { label: "✗ failed ×2" },
+          { label: "○ queued ×1" },
+        ],
+      }),
+      S03_TABLE,
+      block({
+        kind: "pills",
+        id: "s03-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "≡ logs" }, { label: "⚡ events" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S05_serving.md",
+    fence: 0,
+    label: "S05 §2 — the serving list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s05-rule", label: "serving · 7 healthy · 1 degraded" }),
+      S05_TABLE,
+      block({
+        kind: "pills",
+        id: "s05-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↻ restart" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S06_models.md",
+    fence: 0,
+    label: "S06 §2 — the family list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s06-rule", label: "models · 6 families · 14 versions" }),
+      S06_FAMILIES,
+      block({
+        kind: "pills",
+        id: "s06-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ versions" }, { label: "␣ expand" }, { label: "↑ promote" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S06_models.md",
+    fence: 1,
+    label: "S06 §3 — the version list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s06v-rule", label: "models · digit-classifier · 4 versions" }),
+      S06_VERSIONS,
+      block({
+        kind: "pills",
+        id: "s06v-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↑ promote" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S14_config.md",
+    fence: 0,
+    label: "S14 §2 — config, two table regions",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s14-rule", label: "config · ~/.prism/config.toml" }),
+      S14_KEYS,
+      block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", gapBefore: true }),
+      S14_CONTEXTS,
+      block({
+        kind: "pills",
+        id: "s14-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ edit" }, { label: "␣ expand" }, { label: "↕ switch context" }, { label: "⊘ reset" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S15_identity.md",
+    fence: 4,
+    label: "S15 §5 — the secrets list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s15-rule", label: "secrets · 4 · names only" }),
+      S15_SECRETS,
+      block({
+        kind: "notice",
+        id: "s15-notice",
+        gapBefore: true,
+        tone: "muted",
+        text: "Values are never shown by the CLI.",
+      }),
+      block({
+        kind: "pills",
+        id: "s15-actions",
+        gapBefore: true,
+        chips: [{ label: "≡ /secrets <target>" }],
       }),
     ],
   },
