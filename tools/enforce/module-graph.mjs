@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG20", "MG21"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG19", "MG20", "MG21"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -36,6 +36,26 @@ const FORBIDDEN_EDGES = [
       "C06 reports and C07 interprets — transport constructs no view model, so it " +
       "references no C04 type. Type-only counts: erasing at build is what would " +
       "make this pass while being the dependency the rule exists to prevent",
+  },
+  {
+    // The second instance of MG6's third kind, and it belongs here for exactly
+    // the reason recorded above: `terminal/` and `data/` are both L0, so the
+    // edge goes sideways and the layer walk reports it clean.
+    //
+    // What it guards is C21 §1's constraint. C21 cannot verify the terminal was
+    // released before a handoff, because it cannot see C01 — and the moment it
+    // can, it will, and the two halves of L0 stop being independently buildable.
+    // The temptation is concrete and it is I6: importing C01 to *ask* whether
+    // the lifecycle is suspended reads as more correct than probing `isRaw`.
+    rule: "MG19",
+    from: "src/data/process/",
+    to: "src/terminal/",
+    spec: "C21 I12 · C21 T2.3",
+    why:
+      "L0's two halves do not know about each other — C21 probes `stdin.isRaw` " +
+      "precisely because it cannot ask C01 whether the terminal was released. " +
+      "Type-only counts: a type import is a reference, and the independence " +
+      "claim is about knowledge, not about emitted code",
   },
 ];
 

@@ -171,6 +171,37 @@ export const SCANS = [
     scope: "src/data/process/", allow: [],
     why: "child output is piped; it never reaches the real terminal" },
 
+  // I8 and I11, made mechanical. Two things are banned and the asymmetry is the
+  // rule rather than an oversight:
+  //
+  //   - **Timers.** C21 holds no timing policy anywhere. The escalation ladder
+  //     and its two-second rungs are C06 §4, which is the component that knows
+  //     what a verb is. A grace period inside `killAll` is the specific thing
+  //     this catches, and it is the one someone adds while being careful.
+  //   - **`SIGTERM` as a literal.** C21 delivers whatever signal the caller
+  //     names; the only signal it names itself is `killAll`'s `SIGKILL`. So a
+  //     `SIGTERM` literal in `process/` means a ladder has migrated out of C06,
+  //     and the policy now exists in two places — after which which one runs
+  //     depends on the call path.
+  { id: "SS27", spec: "C21 I8 · C21 I11 · C21 T2.4",
+    pattern: /\bset(?:Timeout|Interval)\b|\bSIGTERM\b|\bescalat/i,
+    scope: "src/data/process/", allow: [],
+    why: "C21 delivers signals and holds no timing policy — the ladder is C06's, and a second copy is the one that drifts" },
+
+  // I14. The three ambient reads C21 does not make, because it is given all
+  // three (`env`, `stdin`, `debug`).
+  //
+  // `process.env` is SS10's already and this does not duplicate it: SS10 allows
+  // `terminal/capabilities.ts` and would keep allowing it if that file ever moved
+  // here. What this adds is `process.stdin`, which nothing else forbids and which
+  // is the read that would quietly make I6 untestable again — a probe against the
+  // real stdin can only be exercised by a test putting its own terminal into raw
+  // mode.
+  { id: "SS41", spec: "C21 I14 · C21 T2.7",
+    pattern: /process\.(?:env|stdin)\b/,
+    scope: "src/data/process/", allow: [],
+    why: "C21 reads nothing ambient; the environment and the raw-mode probe are injected, which is what makes I6 assertable" },
+
   // C06's central discipline, made mechanical. The two named things are the two
   // that get added by someone being helpful: an exit-code comparison on the way
   // to a status, and an `ErrorLike` built because the information was right

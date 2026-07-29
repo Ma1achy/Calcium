@@ -140,7 +140,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS24 | Mutable module state | `table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
-| SS27 | Timer or escalation logic | `process/` | C21 T2.4 |
+| SS27 | Timer or escalation logic, including a `SIGTERM` literal | `process/` | C21 I8, I11, T2.4 |
+| SS41 | `process.env` or `process.stdin` | `process/` | C21 I14, T2.7 |
 | SS28 | Scheduler calls | `input/`, `editor/`, `parser/`, `completion/`, `history/` | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
 | SS29 | Multi-store access | outside local handlers | C23 T2.7 |
 | SS30 | Second tokeniser or quoter | anywhere | C18 T2.3, C19 T2.4 |
