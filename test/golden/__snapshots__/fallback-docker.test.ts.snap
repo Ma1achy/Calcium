@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`C07 §5 — docker's real JSON through the fallback, unadapted > a single container object — the drill-down shape 1`] = `
+"[38;2;138;138;138m── [38;2;232;168;124mps[38;2;138;138;138m ──────────────────────────────────────────────────────────────────────────[39m
+[38;2;98;98;98mID       [39m  [38;2;212;212;212ma3f9b21c8d2e[39m
+[38;2;98;98;98mNames    [39m  [38;2;212;212;212mweb[39m
+[38;2;98;98;98mImage    [39m  [38;2;212;212;212mnginx:1.25[39m
+[38;2;98;98;98mState    [39m  [38;2;212;212;212mrunning[39m
+[38;2;98;98;98mStatus   [39m  [38;2;212;212;212mUp 3 hours[39m
+[38;2;98;98;98mPorts    [39m  [38;2;212;212;212m0.0.0.0:8080->80/tcp[39m
+[38;2;98;98;98mCreatedAt[39m  [38;2;212;212;212m2026-07-28 09:14:02 +0000[39m"
+`;
