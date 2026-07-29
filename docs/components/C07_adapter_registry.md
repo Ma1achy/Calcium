@@ -140,7 +140,7 @@ Total over any JSON. Never throws, never returns an empty document.
 | Input shape | Rendering |
 |---|---|
 | Object with scalar fields | `rule` (verb name) + `keyValue` |
-| Array of uniform objects | `table`, columns from the union of keys, capped at 8 by first appearance |
+| Array of uniform objects | `table`, columns from the union of keys, capped at 8 by first appearance, each column's `minWidth` **measured from its own widest value** and capped at 24 |
 | Object containing one array of uniform objects | `keyValue` for the scalars, `table` for the array |
 | Anything else | `code` block, pretty-printed JSON |
 | Unparseable stdout | `raw` block of `stdoutRaw` |
@@ -150,18 +150,35 @@ Caps: **8 columns** and **2,000 rows** per generated table. The row cap matters 
 
 Nested objects render as their JSON text inside a cell rather than being flattened. Flattening invents structure the tool did not declare, and a wrong table is worse than an honest blob.
 
-### Resolved: the list shape is illegible, and D38 is satisfied vacuously
+### `minWidth` is measured, not defaulted
 
-**The risk below was read on the commit that registered `table` (C11), and it was real.** The finding is against this section's defaults, exactly as recorded, and it is worse than "the columns come out narrow".
+**A generated column asks for the width of its own widest value, capped at 24 cells.** This replaces a uniform `minWidth: 3`, which was not a conservative default but a discarding of information the fallback already holds: it has every row in hand when it builds the columns.
 
-Every generated column gets `minWidth: 3`, no `flex`, no `maxWidth`, and `priority = MAX_COLUMNS - i`. Two consequences, and the second is the one that matters:
+Everything else follows from it. Columns ask for what they need, the total exceeds a narrow terminal, columns drop by priority, dropped columns reach the expand row, rows become expandable — and D38's guarantee stops being vacuously true. Under the uniform minimum nothing ever dropped, because every column squeezed to three cells instead, so no row was ever expandable and the promise that a shed column stays reachable held only because nothing was shed.
+
+It needs no domain knowledge. It is measurement of what a column contains, never interpretation of what it means: the header is included, because a column narrower than its own label is unreadable whatever its values; `cells()` is not available at L0, so the width is a code-unit count and C11 plans the real one from the content (C09 I6 — one width implementation, and this is not it).
+
+The 24-cell cap is a judgement and the only one here. A single 200-character field would otherwise force every other column out by priority, which is the failure mode of asking for what you need without a ceiling. 24 is wide enough for a URL fragment, a timestamp or an image tag, and beyond it truncation is the honest answer.
+
+**Two things deliberately unchanged, both of which the reading might have suggested moving.**
+
+- **Priority stays `MAX_COLUMNS - i`.** Field order is a fair proxy — the earlier keys of a JSON object tend to be the identifying ones — and nothing better is available without knowing what the fields mean. C11 I13 forbids the engine guessing; the same reasoning forbids the adapter guessing.
+- **No column is `flex`.** With content-derived widths a table narrower than the terminal is *correct*: nothing needs the residual, because every column already has what it asked for. C11 §3 step 8 rejects stretching columns arbitrarily, and that reasoning holds here unchanged.
+
+Lowering the column cap was the alternative and it is worse: fields are lost *and* the survivors still get three cells each. Legibility and reachability both improve from the width change; only reachability improves from the cap.
+
+### Resolved: the list shape was illegible, and D38 was satisfied vacuously
+
+**The risk below was read on the commit that registered `table` (C11), and it was real.** The finding was against this section's defaults, exactly as recorded, and it was worse than "the columns come out narrow". The remedy is the measured `minWidth` above; what follows is what the reading found, kept because the reasoning is the reason for that rule.
+
+Every generated column got `minWidth: 3`, no `flex`, no `maxWidth`, and `priority = MAX_COLUMNS - i`. Two consequences, and the second is the one that matters:
 
 - **Nothing is legible.** At 80, 120 and 160 cells, R01 §4's seven-column docker payload renders in 33 cells: `ID` at 3, `Names` at 3, and both `State` and `Status` as the header `St…`. The two fields R01 §4 exists to distinguish are indistinguishable, and the residual 127 cells at 160 are unused because no column is `flex` (C11 §3 step 8).
 - **Nothing is ever dropped, so nothing is ever reachable.** Every column squeezes to three cells rather than shedding, so `planColumns` returns an empty `dropped` at every width above about 27 — and since C11 derives expandability from `detail !== undefined || dropped.length > 0`, **no row is expandable**. D38's promise that a shed column stays reachable holds because nothing is shed. The mechanism designed to keep information reachable is inert precisely where the table is least readable.
 
-A table that sheds columns into an expand row is legible and complete. This one is neither, and it passes every structural assertion in §8: docker's field order is preserved, `Status` and `State` both survive, `Names` is unsplit, nothing is flattened. The snapshot is in `test/golden/fallback-docker.test.ts`.
+A table that sheds columns into an expand row is legible and complete. That one was neither, and it passed every structural assertion in §8 while being both — which is why the finding needed a rendered frame and a reader, and why §5's risk was recorded as a risk rather than as a test.
 
-The fix is a decision about this shape table rather than a defect to patch, so it is recorded and not taken here. Three candidates, and they are not exclusive: derive `minWidth` from the widest value in each column, which is the information the fallback already has and discards; mark the last column `flex` so the residual is used; or lower the column cap below 8 for narrow terminals so dropping happens and the expand row carries the rest. The third is the only one that makes D38's mechanism live.
+**Resolved by measuring `minWidth` from the content**, above. Two other candidates were considered: a `flex` last column, which uses the residual without making any column legible at a narrow width and without causing a single drop; and a lower column cap, which loses fields while leaving the survivors at three cells each. Neither is the change. Both legibility and reachability improve from the width; only reachability improves from the cap.
 
 **The original risk, as recorded before the read:** the list shape's legibility was asserted structurally but unproven visually until C11 registered `table`. If the rendered output were not legible without an adapter, the finding would be about this shape table and not about C11 — which is how it turned out.
 
