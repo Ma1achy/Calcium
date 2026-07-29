@@ -136,6 +136,34 @@ What it checks:
 
 **There is no `uuid`, `sigil` or `target` type.** Those are Prism concepts, and a framework that knows them is not general. Apps declare their own shapes with `type: "pattern"` and an anchored regex — Prism's target becomes `{ type: "pattern", pattern: "^[\\w.]+:[\\w]+$" }`, its sigils `{ type: "pattern", pattern: "^@[\\w-]+$" }`. Matching is syntactic; resolution is elsewhere.
 
+### The gate is permissive, and this is the rule
+
+**It rejects what the far side would certainly reject, never what it merely might.** An invocation that would have worked must not be stopped here — a pre-spawn gate that costs the user a working command has taken more than it saved, and the failure is silent, because the user simply believes the command is wrong.
+
+So both `--status=running` and `--status running` are accepted. The far side's own parser takes both forms, and picking one to enforce would be the framework deciding something the far side had already decided.
+
+Two consequences follow, and both are written down because neither is visible from the rule.
+
+**Completion always inserts `=`.** C19 has to choose a form — it inserts text, and text is one form or the other — and `=` is the unambiguous one: it cannot be read as a flag followed by a positional. One form taught, both accepted. Stated here and in C19 §5 so the two cannot drift apart.
+
+**A value beginning with `-` requires `=`, and the error says so.** `--since -1h` is a missing-value failure under this rule, because `-1h` reads as a flag and the alternative — guessing from the leading character — would make the same string mean two things on two tools. `--since=-1h` works. That is correct, and the default message is unhelpful about it:
+
+```
+not:  missing value for --since
+but:  --since expects a value; a value beginning with "-" must use
+      --since=-1h, or the parser reads it as a flag
+```
+
+The remediation quotes the token the user actually typed. Same principle as T6.9's `ArgType` message: the failure that says what to do instead earns its extra line.
+
+### Conflicts are directional
+
+`conflicts` is a declaration on one flag, and the schema has never required the other flag to declare it back. `--side-by-side` naming `conflicts: ["overlay"]` while `--overlay` names nothing is how an app ordinarily writes it, and **each declaration is checked in its own right** — a one-directional conflict is a violation and is reported.
+
+Deduplicating by name order assumed a symmetry that was never there, and dropped exactly those one-directional declarations: silently, because the pair was still *seen*, just never reported from the direction that declared it.
+
+The *report* is deduplicated on the unordered pair. One error for one mistake — a mutual declaration is one thing the user did wrong, and reporting it twice would be a worse message rather than a stricter check. T1.12 asserts the single error, and this paragraph is what stops the "optimisation" returning.
+
 ---
 
 ## 3a. The match index
@@ -183,6 +211,8 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I11** — A sealed store cannot be reloaded.
 - **I12** — `local: true` tools are never spawned; `local: false` tools are never handled in-process.
 - **I13** — C05 imports nothing from `terminal/`, `presentation/` or above.
+- **I14** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
+- **I15** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
 
 ---
 
@@ -200,6 +230,8 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 10. Version is exposed, not enforced. A missing tool degrades to "not available here".
 11. `hidden` tools are omitted from help and completion but remain invocable.
 12. `ArgType` carries no app-domain concepts; `pattern` is the extension point.
+13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix.
+14. Conflicts are directional in the check and deduplicated in the report.
 
 ---
 
@@ -227,6 +259,9 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.14** (I9): every validation failure is `ErrorLike` with a non-empty `message`.
 - **T1.15**: a `hidden: true` tool is absent from `visibleTools` **and** resolvable through `findTool` — asserted together, in one test. Split into two, both pass while the intent they encode goes missing.
 - **T1.15b**: `oneShot: true` is carried through parsing and is readable by C22's gate.
+- **T1.16** (I14): `--status running` and `--status=running` produce the same `args`. Both forms, one result — the permissive rule as an equality rather than as two separate passes.
+- **T1.17** (I14, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
+- **T1.18** (I15): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
 
 ### Tier 2 — contract / interface
 
@@ -258,6 +293,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T3.15**: duplicate flag names within one tool → parse error.
 - **T3.16**: a short flag colliding across two flags of the same tool → parse error.
 - **T3.17**: unicode in tool and flag names → handled, and completion matches on grapheme boundaries.
+- **T3.18**: a value-taking flag last in `argv`, with no token after it → the plain "requires a value" message. There is no token to quote and no `=` form to recommend, so the remediation is absent rather than invented.
 
 ### Tier 4 — integration
 
@@ -287,6 +323,9 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T6.7** (I2): a parse path that throws on malformed input → T2.3 fails.
 - **T6.8** (I12): spawning a `local` tool → T4.4 fails.
 - **T6.9** (I5): adding a domain-specific `ArgType` → T1.7c fails, with a message carrying the rule rather than the diff: *an `ArgType` describes a shape, not a domain concept — a uuid is a `pattern`, a target is a `string`*. A build failure that says what to do instead earns its extra line.
+- **T6.10** (I14): rejecting `--flag value` pre-spawn → T1.16 fails, and the gate starts refusing invocations the far side would have run.
+- **T6.11** (§3): reverting the `-`-value remediation to a bare "missing value" → T1.17 fails on the message, leaving the user to discover `=` for themselves.
+- **T6.12** (I15): deduplicating conflicts by name order rather than by the unordered pair → T1.18 fails on the one-directional case, which is the ordinary way an app declares it.
 
 ---
 

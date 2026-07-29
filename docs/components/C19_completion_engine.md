@@ -120,6 +120,8 @@ The mockup's algorithm (A01 Appendix A.2), which is the standard one and worth k
 5  many, no further prefix     → open the menu
 ```
 
+**An accepted flag value is inserted as `--flag=value`.** C05's gate accepts both that and `--flag value` (C05 §3), so completion is choosing a form rather than obeying one — and `=` is the form that cannot be misread as a flag followed by a positional. It is also the form that works when the value begins with `-`, which the space-separated form does not. One form taught, both accepted; the pair of sentences lives in both specs so they cannot drift.
+
 `Tab` twice opens the menu even on a single match (bash convention, `j22` R17). Some people always want to see what they matched, and the second press costs nothing.
 
 Ghost text is accepted by `Tab` or `→`. Any other key ignores it — it is a suggestion, never a commitment.
