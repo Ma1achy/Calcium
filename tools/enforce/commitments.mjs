@@ -37,13 +37,21 @@ const INVARIANT = /^-\s+\*\*(I\d+[a-z]?)\*\*/gm;
 const COMMITMENT = /^(\d+)\.\s+(.*)$/;
 
 /**
- * `(I5)`, `(I3, I4)`, `(I13, D50)` — a local citation, possibly among others.
+ * A parenthetical that is not a cross-reference. `(I5)`, `(I3, I4)`, `(I13, D50)`.
  *
  * The leading `(?!→)` is load-bearing: without it `(→ C04 I20)` reads as a local
  * citation of `I20` and the rule reports a dangling reference in the one spec
  * that got the cross-reference right. Found by running it, not by reading it.
+ *
+ * **Every invariant in the group is extracted, not just one.** The first version
+ * captured a single id per parenthetical, so `(I5, I99)` resolved `I99` and
+ * ignored `I5` — a summary commitment could carry a dangling citation beside a
+ * good one and pass. That is the "contains a bracket" degradation this rule
+ * exists to prevent, reappearing inside the rule itself, and the third pass over
+ * the citation graph is what found it.
  */
-const LOCAL = /\((?!→)(?:[^()]*?[\s,])?(I\d+[a-z]?)(?:[\s,][^()]*?)?\)/g;
+const GROUP = /\((?!→)([^()]*)\)/g;
+const INV_TOKEN = /\b(I\d+[a-z]?)\b/g;
 
 /** `(→ C09 I5)`, `(→ A01 A.1)`, `(→ C06 I3)`. */
 const CROSS = /\(→\s*([AC]\d{2})\s+([^)]+)\)/g;
@@ -91,9 +99,13 @@ export function commitmentsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
 function citations(text) {
   const local = [];
   const cross = [];
-  LOCAL.lastIndex = 0;
+  GROUP.lastIndex = 0;
   let m;
-  while ((m = LOCAL.exec(text))) local.push(m[1]);
+  while ((m = GROUP.exec(text))) {
+    INV_TOKEN.lastIndex = 0;
+    let t;
+    while ((t = INV_TOKEN.exec(m[1]))) local.push(t[1]);
+  }
   CROSS.lastIndex = 0;
   while ((m = CROSS.exec(text))) cross.push({ spec: m[1], target: m[2].trim() });
   return { local, cross };

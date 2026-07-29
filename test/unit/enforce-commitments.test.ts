@@ -176,6 +176,20 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
     expect(invariantsOf("docs/components/C99_x.md", at(source)).has("I20a")).toBe(true);
   });
 
+  it("SP1: every invariant in a multi-citation is resolved, not just one", () => {
+    // The hole the third pass found in this rule an hour after it shipped. The
+    // first parser captured one id per parenthetical, so `(I1, I99)` resolved
+    // I99 and ignored I1 — or resolved I1 and ignored I99, depending on where
+    // the lazy quantifier landed. Either way a summary commitment could carry a
+    // dangling citation beside a good one and pass, which is the "contains a
+    // bracket" degradation this rule exists to prevent, inside the rule itself.
+    const source = spec([["I1", "one."]], ["A summary of two (I1, I99)."]);
+    const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cites I99");
+  });
+
   it("SP1: a cross-reference is not read as a local citation", () => {
     // Found by running the rule, not by reading it. `(→ C04 I20)` matched the
     // local-citation pattern first and reported a dangling reference in the one
