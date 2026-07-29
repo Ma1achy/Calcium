@@ -15,6 +15,7 @@ import {
   fakeChild,
   fakeRunner,
   invocation,
+  rawResultKeys,
   recorded,
   result,
   transportCases,
@@ -161,12 +162,12 @@ describe("C06 reporting", () => {
     expect(r.signal).toBe(null);
     // No status, no envelope, no mapping. Everything a `RawResult` carries is a
     // fact; the judgement is C07's (SS25 is the mechanical half of this).
-    expect(Object.keys(r).sort()).toEqual(
-      [
-        "argv", "cancelled", "durationMs", "exitCode", "parseError",
-        "signal", "stderr", "stdout", "stdoutRaw", "timedOut",
-      ].sort(),
-    );
+    // Derived from a `RawResult` value rather than restated here. The list was
+    // a literal and `overflowed` broke it — which is the same restatement the
+    // parity suite's `rawResultKeys` exists to avoid, one file over: a field
+    // list written twice is a field list that disagrees with itself the first
+    // time either copy moves.
+    expect(Object.keys(r).sort()).toEqual(rawResultKeys());
   });
 
   it("T1.12: killed by signal → exitCode null, signal set", async () => {

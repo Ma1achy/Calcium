@@ -231,6 +231,7 @@ export function result(over: Partial<RawResult> = {}): RawResult {
     parseError: null,
     cancelled: false,
     timedOut: false,
+    overflowed: false,
     ...over,
   };
 }

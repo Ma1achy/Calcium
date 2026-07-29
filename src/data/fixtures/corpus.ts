@@ -70,11 +70,33 @@ export type CorpusFile = Readonly<{
  * optimistically at load would quietly turn one of the most important fixtures
  * in any corpus — the malformed one — into a well-formed document.
  */
+/**
+ * The value a field takes when a corpus written before it existed does not carry
+ * it. **Written down rather than inherited from `undefined`.**
+ *
+ * `overflowed` is the first additive field since the format was fixed, and it
+ * needs no schema bump: `tui.fixtures/1` refuses shapes that would *misparse*,
+ * and a boolean that was absent because nothing could set it reads as `false`
+ * correctly. What it must not do is arrive as `undefined` against a `boolean` —
+ * which is what a bare spread gives, and which reads identically to `false` at
+ * every call site and differently in the parity comparison.
+ *
+ * A field whose absence would mean something other than its default is a
+ * different case and does need the bump.
+ */
+const ABSENT_FIELD_DEFAULTS = Object.freeze({ overflowed: false });
+
 function hydrateResult(stored: StoredResult): RawResult {
-  if (stored.parseError !== null) return { ...stored, stdout: undefined };
+  if (stored.parseError !== null) {
+    return { ...ABSENT_FIELD_DEFAULTS, ...stored, stdout: undefined };
+  }
 
   try {
-    return { ...stored, stdout: stored.stdoutRaw === "" ? undefined : JSON.parse(stored.stdoutRaw) };
+    return {
+      ...ABSENT_FIELD_DEFAULTS,
+      ...stored,
+      stdout: stored.stdoutRaw === "" ? undefined : JSON.parse(stored.stdoutRaw),
+    };
   } catch (error) {
     // A stored `parseError: null` alongside unparseable bytes is a corrupt
     // corpus, not a recording of a broken far side. Say which.

@@ -34,6 +34,10 @@ export function createEmulatedTransport(handler: FixtureHandler): VerbTransport 
     parseError: null,
     cancelled: false,
     timedOut: false,
+    // A replay never crosses a buffer bound: nothing was spawned. Stated rather
+    // than defaulted, because the parity suite compares the complete result and
+    // an absent field reads identically to a false one at a call site.
+    overflowed: false,
     ...over,
   });
 

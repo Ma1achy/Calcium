@@ -18,7 +18,8 @@
 // differs from the value a test asks for, and a parameter with no observable
 // effect is a finding.
 import { spawn } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 /** A finished command: what it wrote and how it ended. */
 export type Ran = Readonly<{ stdout: string; stderr: string; code: number | null }>;
@@ -73,34 +74,79 @@ export async function groupMembers(pgid: number): Promise<readonly number[]> {
 }
 
 /**
- * Wait until a group holds none of `expected`, or give up naming the survivors.
+ * Wait until a process group is empty, or give up naming the survivors.
  *
- * Polled through `setImmediate` rather than a timer. `vitest.config.ts` names
- * `setTimeout` in `fakeTimers.toFake`, which decides *which* APIs are faked when
- * a test calls `vi.useFakeTimers()` — it does not fake them by default, so
- * timers here are real. `setImmediate` is used anyway: it is outside the faked
- * set either way, so this helper keeps working inside a test that does opt in.
- *
- * Each attempt spawns a real `ps`, which is what bounds the loop in wall time —
- * roughly a millisecond apiece, so the default 400 attempts is a fraction of a
- * second and not a spin.
+ * Bounded by elapsed time — see `until` below for why a count is not a bound.
+ * Polled through `setImmediate` so it keeps working inside a test that has opted
+ * into `vi.useFakeTimers()`.
  *
  * A timeout is a real failure and names what survived. "Group not empty" without
  * the pids sends the reader to `ps` by hand.
  */
-export async function waitForGroupEmpty(pgid: number, attempts = 400): Promise<void> {
+export async function waitForGroupEmpty(pgid: number, withinMs = 10_000): Promise<void> {
+  const started = Date.now();
   let last: readonly number[] = [];
 
-  for (let i = 0; i < attempts; i += 1) {
+  do {
     last = await groupMembers(pgid);
     if (last.length === 0) return;
     await new Promise<void>((resolve) => void setImmediate(resolve));
-  }
+  } while (Date.now() - started < withinMs);
 
   throw new HarnessError(
-    `group ${pgid} still holds ${last.join(", ")} after ${attempts} checks — ` +
+    `group ${pgid} still holds ${last.join(", ")} after ${withinMs}ms — ` +
       `the leader was signalled and the group was not`,
   );
+}
+
+/**
+ * Wait until a file contains `text`, or give up saying what it held instead.
+ *
+ * The companion to `scripts.ignoring`'s `logPath`. Polled through `setImmediate`
+ * for the same reason as `waitForGroupEmpty` — no timer — and bounded by
+ * attempts rather than by wall time, with the file's actual content in the
+ * failure so a missing marker is not reported as a bare timeout.
+ */
+export async function waitForFileToContain(
+  path: string,
+  text: string,
+  withinMs = 10_000,
+): Promise<void> {
+  let seen = "";
+
+  await until(withinMs, `${path} never contained ${JSON.stringify(text)}`, () => {
+    try {
+      seen = readFileSync(path, "utf8");
+    } catch {
+      seen = "<not created>";
+    }
+    return seen.includes(text);
+  });
+}
+
+/**
+ * Poll `ready` until it holds, bounded by *elapsed time* rather than by a count.
+ *
+ * **A count is not a bound.** `waitForFileToContain` was written with 2000
+ * attempts and gave up in about two milliseconds, long before a spawned process
+ * could exist — the loop body is a `readFileSync`, and `setImmediate` costs
+ * nothing. It read as "two thousand chances" and was "two milliseconds".
+ * `waitForGroupEmpty` had the same bound and only looked reasonable because it
+ * spawns a real `ps` each round, which throttled it by accident.
+ *
+ * `setImmediate` rather than a timer so this keeps working inside a test that
+ * has opted into `vi.useFakeTimers()`; `Date.now` because measuring elapsed time
+ * is what a bound means, and SS1's ban on ambient clocks scopes to `src/`.
+ */
+async function until(withinMs: number, what: string, ready: () => boolean): Promise<void> {
+  const started = Date.now();
+
+  do {
+    if (ready()) return;
+    await new Promise<void>((resolve) => void setImmediate(resolve));
+  } while (Date.now() - started < withinMs);
+
+  throw new HarnessError(`${what} within ${withinMs}ms`);
 }
 
 /**
@@ -194,13 +240,33 @@ export const scripts = {
    * the signal or died of it — the assertion and its negation look identical.
    * A line arriving after delivery cannot be produced by a dead process.
    */
-  ignoring(signals: readonly string[] = ["SIGHUP"]): readonly string[] {
+  ignoring(signals: readonly string[] = ["SIGHUP"], logPath?: string): readonly string[] {
+    // `logPath` is a second channel, and it exists because stdout is not always
+    // observable: a transport that collects the stream internally hands it over
+    // only after the child has exited, which is too late to drive a ladder one
+    // rung at a time. A file can be watched from outside whatever is reading the
+    // process.
+    const log =
+      logPath === undefined
+        ? ""
+        : `require("fs").appendFileSync(${JSON.stringify(logPath)},"caught:"+s+"\\n");`;
+
+    // Readiness goes to the same channel, and it is not decoration. A signal
+    // that arrives before node has installed its handler takes the *default*
+    // action, so a test that signals too early kills the child it meant to
+    // watch survive — and the result, an immediate exit on SIGINT, looks exactly
+    // like a component that never installed the handler at all.
+    const ready =
+      logPath === undefined
+        ? ""
+        : `require("fs").appendFileSync(${JSON.stringify(logPath)},"ready\\n");`;
+
     return [
       "node",
       "-e",
-      `${JSON.stringify(signals)}.forEach(s=>process.on(s,()=>` +
-        `process.stdout.write("caught:"+s+"\\n")));` +
-        `process.stdout.write("ready\\n");setInterval(()=>{},1000)`,
+      `${JSON.stringify(signals)}.forEach(s=>process.on(s,()=>{` +
+        `${log}process.stdout.write("caught:"+s+"\\n")}));` +
+        `${ready}process.stdout.write("ready\\n");setInterval(()=>{},1000)`,
     ];
   },
 
@@ -259,6 +325,29 @@ export const scripts = {
     return ["node", "-e", `process.stdout.write(Buffer.from(${JSON.stringify(hex)},"hex"))`];
   },
 } as const;
+
+/**
+ * The same program, as a file rather than as `node -e`.
+ *
+ * Needed by anything spawned *through C06*, which appends `--json` to every
+ * invocation (C06 §3, D16). `node -e script --json` fails with `node: bad
+ * option: --json`, because with `-e` there is no script path to end node's own
+ * option parsing and the flag is read as node's. Given a path, node stops
+ * parsing and hands the rest to the program.
+ *
+ * One source of truth: this takes a `scripts.*` argv and moves its body to disk
+ * rather than restating any program.
+ */
+export function asScriptFile(argv: readonly string[]): readonly string[] {
+  const source = argv[2];
+  if (argv[0] !== "node" || argv[1] !== "-e" || source === undefined) {
+    throw new HarnessError(`asScriptFile expects a \`node -e\` argv, got ${JSON.stringify(argv)}`);
+  }
+
+  const path = `${mkdtempSync(`${tmpdir()}/c21-script-`)}/program.js`;
+  writeFileSync(path, source);
+  return ["node", path];
+}
 
 /** Collect an `AsyncIterable<string>` into one string. */
 export async function collect(source: AsyncIterable<string>): Promise<string> {

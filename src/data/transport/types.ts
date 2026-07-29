@@ -39,6 +39,16 @@ export type RawResult = Readonly<{
   parseError: string | null;
   cancelled: boolean;
   timedOut: boolean;
+  /**
+   * The runner's buffer bound was crossed, so `stdoutRaw` is a prefix of what
+   * the far side wrote (C21 I5). Reported, never interpreted.
+   *
+   * **Not `meta.truncated`.** That says the fallback adapter capped rows (C07
+   * I13); this says bytes never arrived. The remedies differ — widen a cap in
+   * one case, reconsider what the far side is asked to emit in the other — and
+   * C07 §4 carries the open question of whether this reaches a document at all.
+   */
+  overflowed: boolean;
 }>;
 
 export type RawPatch =

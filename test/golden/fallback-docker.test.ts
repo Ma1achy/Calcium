@@ -75,6 +75,7 @@ function resultOf(stdout: unknown): RawResult {
     parseError: null,
     cancelled: false,
     timedOut: false,
+    overflowed: false,
   });
 }
 
