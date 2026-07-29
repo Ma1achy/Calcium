@@ -1,127 +1,104 @@
 # tui-kit
 
-**A framework for building terminal user interfaces over CLIs that emit structured JSON.**
+**A framework for building terminal interfaces out of structured data.**
 
-Point it at a binary, describe its verbs, and you get a fullscreen shell: scrollable
-transcript, tab completion, history, themes, live views, and graceful degradation
-down to a 60-column monochrome ASCII terminal.
+Describe what to show as data — a table, a curve, a log tail, a progress bar, a
+diff — and it renders, measures, themes and degrades. Describe what operations
+exist and it gives you completion, validation and help. You get a fullscreen shell
+with a scrollable transcript, history and live views.
 
-You write a manifest and some adapters. You do not write a terminal.
-
----
-
-## The idea in one line
-
-**Your CLI already knows how to do things. It just renders them badly.**
-
-Almost every serious CLI grew a `--json` flag, and almost none of them use it for
-anything but scripting. That flag is a full description of what the command found —
-types, relationships, states, timestamps — and it gets thrown away to print columns.
-
-tui-kit is the layer that turns the first into the second, without the CLI changing
-at all.
-
-```
-        you type                    tui-kit                        your CLI
-   ┌──────────────┐         ┌────────────────────┐         ┌──────────────────┐
-   │  /ps --mine  │ ──────► │  parse · validate  │ ──────► │   <cli> ps       │
-   └──────────────┘         │   against manifest │  argv   │   --mine --json  │
-                            └────────────────────┘         └──────────────────┘
-                                      ▲                              │
-                                      │                              │ JSON
-   ┌──────────────┐         ┌─────────┴──────────┐                   │
-   │   rendered   │ ◄────── │  adapter → blocks  │ ◄─────────────────┘
-   └──────────────┘         └────────────────────┘
-```
-
-The adapter is a pure function. **JSON in, blocks out.** That is the whole extension
-model — everything else is the framework's problem.
-
-Nothing in the framework knows what your domain is. It knows there is a tool with
-typed arguments that returns structured data, and every behaviour above is derived
-from that.
+You do not write a terminal.
 
 ---
 
-## Where it fits
+## What it is
 
-Anything that emits JSON and has more than a handful of verbs.
+Two halves, and they are useful separately.
 
-| | |
-|---|---|
-| **Container and cluster tooling** | `docker ps --format json`, `kubectl get -o json` |
-| **Cloud CLIs** | `aws`, `gcloud`, `az` — all JSON-native, all rendered as walls of text |
-| **CI and build systems** | job lists, log streams, artefact registries |
-| **Package and infra tooling** | `terraform show -json`, `npm ls --json` |
-| **Internal platform CLIs** | the case it was built for — a bespoke tool with thirty verbs and no interface |
+**A rendering layer that takes blocks and produces a terminal frame.** Sixteen
+block types, every one of which reports its height as a pure function of width, so
+a hundred thousand of them can be virtualised without being drawn. Themed by
+palette slot rather than by colour. Degrading down to a 60-column monochrome ASCII
+terminal without losing information.
 
-The last one is the sharpest. Internal tools accumulate verbs faster than they
-accumulate interface, and nobody has the budget to write a TUI for one. The whole
-point is that the interface costs a manifest and a handful of adapters.
+**A shell layer that turns typed operations into an interface.** You describe your
+operations once — verbs, flags, argument types, which are local and which spawn —
+and completion, pre-flight validation, help and history all derive from it. Nothing
+in the framework knows what your domain is.
+
+```
+        you describe                    tui-kit                      it renders
+   ┌──────────────────┐         ┌────────────────────┐         ┌──────────────┐
+   │  what operations │ ──────► │  parse · validate  │         │              │
+   │  exist, and how  │         │  complete · help   │         │  a frame,     │
+   └──────────────────┘         └────────────────────┘         │  measured,    │
+                                          │                    │  themed,      │
+   ┌──────────────────┐         ┌─────────▼──────────┐         │  degraded     │
+   │  structured data │ ──────► │  adapter → blocks  │ ──────► │              │
+   └──────────────────┘         └────────────────────┘         └──────────────┘
+```
+
+The adapter is a pure function: data in, blocks out. That is the whole extension
+model, and it is where an app spends nearly all of its effort.
 
 ---
 
-## What you write
+## The block vocabulary
 
-Using a container CLI as the example, because everyone has one installed:
+An adapter never draws. It returns blocks, and the framework renders them — so
+every app built on it looks consistent, degrades identically, and measures
+correctly without trying.
 
-```ts
-import { createTui, b, defaultTheme, type Adapter } from "@fmx/tui-kit";
-import manifest from "./manifest.json" with { type: "json" };
+```
+rule       ── ps · 4 of 11 · --mine ──────────────────────────────
 
-const ps: Adapter = {
-  schema: "tui.view/1",
-  adapt: (raw, ctx) => doc(ctx, [
-    b.rule(`containers · ${raw.stdout.length}`),
-    b.table({
-      columns: [
-        b.col("name",  { priority: 95, min: 16, flex: true }),
-        b.col("image", { priority: 60, min: 20 }),
-        b.col("state", { priority: 85, min: 10 }),
-      ],
-      rows: raw.stdout.map(c => b.row(c.ID, {
-        name:  c.Names.split(",")[0],
-        image: c.Image,
-        state: stateCell(c.State),
-      }, {
-        actions: [b.fill("≡ logs", `/logs ${c.ID.slice(0, 12)}`)],
-      })),
-      emptyMessage: "no containers running · try /ps --all",
-    }),
-  ]),
-};
+notice     ✓ deployed · a3f9b21
 
-createTui({ name: "ctr", binary: "docker", manifest, theme: defaultTheme,
-            adapters: { ps } });
+keyValue   name        web
+           status      ● running · 3 replicas
+           resources   2 CPU · 4Gi · node-04
+
+steps      ✓ resolving image         nginx:1.25
+           ✓ validating config       22 rules · 0 errors
+           ◐ rolling out             …
+
+progress   replica 7 / 10   ████████████████████░░░░░░░░  70%    eta 2m 10s
+
+plot         982 │⠉⠲⢄
+                 │    ⠑⠢⣀
+             311 │        ⠉⠒⠤⢄⣀⡀
+                 └────────────────────────────
+                  30m ago        15m       now
+
+table        id       name     status     detail       cpu       age
+           ▸ a3f9b21  web      running    3 replicas   12% ▁▂▃▅▆  23m
+           ▸ 7c2d4e1  api      healthy                  4%       41m
+
+diff       spec.replicas          2       →  3
+
+pills      all ×11    running ×9    stopped ×2
+
+logs       14:23:01.882  INFO   [server] request r-8f2a · 12ms
+           14:23:02.551  WARN   [pool] slow query (87ms · 95p)
+
+code       apiVersion: apps/v1
+           kind: Deployment
+           spec:
+             replicas: 2
+
+tip        next: /logs …   /status …
 ```
 
-That is a working shell. **Verbs with no adapter still render** through a fallback
-that turns any JSON into something legible — so you add them one at a time rather
-than all at once, and a verb shipping tomorrow is usable tomorrow.
+Plus `events`, `panel`, `group`, `patch` and `raw` — the escape hatch that renders
+anything, so the vocabulary never has to be complete for the tool to be usable.
 
-### Real JSON is awkward, and that is what adapters are for
-
-The example above is doing more than it looks. Real CLI output is rarely tidy:
-
-```json
-{"ID":"a3f9b21c8d2e","Names":"web,web-old","Image":"nginx:1.25",
- "State":"running","Status":"Up 3 hours","Ports":"0.0.0.0:8080->80/tcp"}
-```
-
-Capitalised keys. `Names` plural but usually singular. `Status` is *prose*
-(`Up 3 hours`) while `State` is the machine-readable one — and using the wrong field
-for the status glyph gives you a table that looks right and is wrong. Everything is a
-string, including the numbers.
-
-An adapter over tidy JSON teaches nothing. Absorbing an awkward far side **so it
-never has to change for you** is the job, and it is why the adapter layer exists
-rather than the framework consuming envelopes directly.
+**One invariant sits under all of it:** `measure(block, width)` equals the rows
+`render` occupies. Every kind, every width, both Unicode modes. That is what lets
+the viewport virtualise, and it is the most load-bearing property in the system.
 
 ---
 
-## What you get
-
-### The frame
+## The frame
 
 Four regions with fixed ownership. Only the viewport flexes.
 
@@ -153,9 +130,9 @@ Four regions with fixed ownership. Only the viewport flexes.
 The `▌` marks the **live block** — the newest result, navigable right now with the
 arrow keys. Everything above it is a frozen record that scrolls.
 
-### The transcript model
+### Three tiers, decided by one question
 
-Three tiers, decided by one question: **does it need single-letter keybindings?**
+**Does it need single-letter keybindings?**
 
 | | Behaviour |
 |---|---|
@@ -163,62 +140,91 @@ Three tiers, decided by one question: **does it need single-letter keybindings?*
 | **Live block** | Newest result, navigable in place. Lists, detail views |
 | **Pushed view** | Takes the screen, prompt goes away. Log tails, dashboards |
 
-A live block keeps the prompt, so letters still type. A pushed view needs `l` to mean
-"cycle log level" — so the prompt cannot coexist with it. That test is the whole rule.
+A live block keeps the prompt, so letters still type. A pushed view needs `l` to
+mean "cycle log level", and a prompt cannot coexist with that. That test is the
+whole rule.
 
 ---
 
-## Sixteen block types
+## Operations, described once
 
-An adapter never draws. It returns blocks, and the framework renders them — themed,
-measured, degradable, and identical across every app built on it.
+You write a manifest: verbs, flags, argument types, arity, which verbs are local
+and which spawn, which stream. Everything interactive falls out of it.
 
 ```
-rule       ── ps · 4 of 11 · --mine ──────────────────────────────
-
-notice     ✓ deployed · a3f9b21
-
-keyValue   name        web
-           status      ● running · 3 replicas
-           resources   2 CPU · 4Gi · node-04
-
-steps      ✓ resolving image         nginx:1.25
-           ✓ validating config       22 rules · 0 errors
-           ◐ rolling out             …
-
-progress   replica 7 / 10   ████████████████████░░░░░░░░  70%    eta 2m 10s
-
-plot         982 │⠉⠲⢄
-                 │    ⠑⠢⣀
-             311 │        ⠉⠒⠤⢄⣀⡀
-                 └────────────────────────────
-                  30m ago        15m       now
-
-diff       spec.replicas          2       →  3
-
-pills      all ×11    running ×9    stopped ×2
-
-logs       14:23:01.882  INFO   [server] request r-8f2a · 12ms
-           14:23:02.551  WARN   [pool] slow query (87ms · 95p)
-
-code       apiVersion: apps/v1
-           kind: Deployment
-           spec:
-             replicas: 2
-
-tip        next: /logs …   /status …
+completion    every flag and enum value, from the manifest — nothing hand-listed
+validation    a malformed invocation is rejected before anything is spawned
+help          rendered from the same table dispatch uses, so it cannot drift
+history       persisted, redacted, searchable
 ```
 
-Plus `table`, `events`, `panel`, `group` and `raw` — the escape hatch that renders
-anything, so the vocabulary never has to be complete for the tool to work.
+**Adding a flag makes it completable with no code change.** That is the property
+the manifest exists for, and it is asserted directly: a test adds a flag to a
+fixture manifest and checks it appears in completion, with a source scan forbidding
+any hardcoded verb, flag or enum list.
+
+The argument types stay deliberately generic — `string`, `int`, `bool`, `path`,
+`enum`, `duration`, `pattern`. A type describes a *shape the framework can
+validate without knowing what it means*. There is no `uuid` type, because a UUID is
+a pattern, and adding one would mean the framework had started knowing your nouns.
 
 ---
 
-## Things it does that are easy to underestimate
+## Where the data comes from
+
+Acquisition is behind an interface with three implementations, chosen by one
+environment variable:
+
+```
+   emulated      a stateful, animated world      → npm run dev
+   fixture       a recorded corpus, no clock     → npm test
+   subprocess    a real child process            → production
+```
+
+**Tests never run against the emulator.** An animated world serving tests becomes
+the thing tests agree with, and drift then hides regressions silently. Fixtures are
+*recorded* from the real source and replayed byte-for-byte, with provenance —
+authored ones are marked, justified and counted.
+
+Selection is **per operation**, so one verb can move from subprocess to native
+TypeScript without anything else changing.
+
+**Honestly: the built path assumes a subprocess.** The interface is real and has
+three implementations, but the result shape carries `argv`, an exit code and a
+signal — so a transport over HTTP or a socket would fit awkwardly today and the
+adapter would receive fields it has to ignore. If your data arrives some other way,
+the rendering half is what you want, and the acquisition half is where you would be
+doing new work.
+
+### Real data is awkward, and that is what adapters are for
+
+The shapes that actually turn up:
+
+```json
+{"ID":"a3f9b21c8d2e","Names":"web,web-old","Image":"nginx:1.25",
+ "State":"running","Status":"Up 3 hours","Ports":"0.0.0.0:8080->80/tcp"}
+```
+
+Capitalised keys. `Names` plural but usually singular. `Status` is *prose* while
+`State` is the machine-readable one — and using the wrong field for the status
+glyph gives you a table that looks right and is wrong. Everything is a string,
+including the numbers.
+
+An adapter over tidy data teaches nothing. Absorbing an awkward source **so it
+never has to change for you** is the job, and it is why this layer exists rather
+than the framework consuming your shapes directly.
+
+Anything with no adapter still renders, through a fallback that turns arbitrary
+structured data into something legible — so you add adapters one at a time, and an
+operation added tomorrow is usable tomorrow, unstyled.
+
+---
+
+## Things that are easy to underestimate
 
 ### Columns drop by priority — and nothing is lost
 
-Each column declares a priority and a minimum width. When the terminal narrows, the
+Each column declares a priority and a minimum width. When the terminal narrows the
 lowest survive last — and **everything dropped appears in the expanded row**, so no
 field is ever unreachable.
 
@@ -229,13 +235,13 @@ field is ever unreachable.
    60 cols   id        name  status  detail
 ```
 
-At 60 you can still identify a thing and know what happened to it. Everything else is
-one keystroke away.
+A row becomes expandable *because* columns dropped, whether or not it declared any
+detail. Without that, narrowing a terminal would silently destroy information.
 
 ### Degradation is real, not aspirational
 
-Four independent axes, and one rule across all of them: **no information is lost,
-only convenience.**
+Four independent axes, one rule across all of them: **no information is lost, only
+convenience.**
 
 ```
    24-bit truecolour  ─────►  256  ─────►  16  ─────►  monochrome
@@ -244,10 +250,9 @@ only convenience.**
    everything up      ─────────────────────────────►  nothing reachable
 ```
 
-A dropped column reaches the expand row. A lost colour is carried by a glyph. A lost
-glyph is carried by a word. An unreachable service says so rather than rendering
-empty. There is no width, depth, locale or outage at which it shows something
-*wrong* — only versions that take more keystrokes to read.
+A dropped column reaches the expand row. A lost colour is carried by a glyph. A
+lost glyph is carried by a word. An unreachable service says so rather than
+rendering empty.
 
 ```
    ✓ succeeded          →  under ASCII  →   + succeeded
@@ -255,8 +260,8 @@ empty. There is no width, depth, locale or outage at which it shows something
    ▲ degraded           →               →   ! degraded
 ```
 
-Substitutions are 1:1 by cell count, so a `LANG=C` session measures identically to a
-UTF-8 one and the column drop order is the same in both.
+Substitutions are 1:1 by cell count, so a `LANG=C` session measures identically to
+a UTF-8 one and the column drop order is the same in both.
 
 ### Failure is contained to the smallest thing that can report it
 
@@ -271,9 +276,8 @@ UTF-8 one and the column drop order is the same in both.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-One panel's query dies; the others keep working. The metrics backend being down does
-not stop you seeing what is running, and a whole-screen error would hide three working
-panels behind one broken one.
+One panel's query dies; the others keep working. A whole-screen error would hide
+three working panels behind one broken one.
 
 You get that from one builder:
 
@@ -282,34 +286,16 @@ b.live({ id: "metrics", every: 30_000, fetch: () => api.metrics(),
          render: data => b.kv({ cpu: data.cpu, memory: data.memory }) })
 ```
 
-Backoff, staleness marking, stagger offsets, teardown and the error rendering all come
-free. **The behaviour is fixed and only the rendering is overridable** — a guarantee
-you can switch off is not one.
-
-### It works with no backend at all
-
-Three transports behind one interface, chosen by an environment variable:
-
-```
-   emulated      a stateful, animated world      → npm run dev
-   fixture       a recorded corpus, no clock     → npm test
-   subprocess    your actual CLI                 → production
-```
-
-**Tests never run against the emulator.** An animated world serving tests becomes the
-thing tests agree with, and drift then hides regressions silently. Fixtures are
-*recorded* from the real CLI and replayed byte-for-byte, with provenance — authored
-ones are marked, justified and counted.
-
-Selection is **per verb**, so a verb can migrate from subprocess to native TypeScript
-without anything else changing.
+Backoff, staleness marking, stagger offsets, teardown and the error rendering all
+come free. **The behaviour is fixed and only the rendering is overridable** — a
+guarantee you can switch off is not one.
 
 ---
 
 ## The parts you do not write
 
-Twenty-four components. **Eleven of them you never touch** — and that is the measure
-of whether the layering worked.
+Twenty-five components. **Eleven of them you never touch** — and that is the
+measure of whether the layering worked.
 
 ```
    L5  app          your adapters, manifest, theme
@@ -317,43 +303,38 @@ of whether the layering worked.
    L4  shell        composition · execution pipeline
    L3  interaction  input · editor · parser · completion · history
    L2  viewport     transcript · scrolling · overlays
-   L1  presentation blocks · theme · tables · plots
-   L0  foundation   terminal | view model · transport · adapters
+   L1  presentation blocks · theme · tables · plots · patches
+   L0  foundation   terminal | view model · transport · adapters · process
 ```
 
-Imports go down only. L0's two halves never touch each other — which is what lets the
-terminal and the data layers be built in parallel, and it is checked mechanically
-rather than by discipline.
+Imports go down only, and L0's two halves never touch each other — checked
+mechanically rather than by discipline.
 
 Your extension points are five: **manifest content, adapters, theme tokens, the
-command prefix, and dynamic completion sources.** Everything else is the framework's.
+command prefix, and dynamic completion sources.**
 
 ---
 
 ## Some deliberate decisions
 
-**`/` prefix required.** `/ps` is your app's; `ps` is Unix's. That one character
-removed an entire class of collision, killed the need for an escape hatch, and let
-the prompt shrink from `(app) ❯` to `❯`.
-
-**Anything with a shell operator goes to your shell.** `/ps --json | jq '.x'` is
-handed to `sh -c` whole, with `/ps` rewritten to the real command. So globbing, brace
-expansion and quoting are all exactly right, because they are your actual shell doing
-them — rather than a reimplementation that is wrong in ways you find one at a time.
-
-**Actions fill the prompt; they do not run.** Clicking `↑ deploy` puts
-`/deploy a3f9b21 --confirm` in the input for you to read before you press enter. Only
-filter pills execute directly, because a filter is reversible.
+**Actions fill the prompt; they do not run.** Selecting `↑ deploy` puts
+`/deploy a3f9b21 --confirm` in the input for you to read before you press enter.
+Only filter pills execute directly, because a filter is reversible.
 
 **Frozen blocks are read-only.** Scroll back to a five-minute-old table and its
-actions are refused — its data is stale, and acting on stale data is exactly the
-mistake worth preventing.
+actions are refused. Its data is stale, and acting on stale data is the mistake
+worth preventing.
 
-**Blocks name palette slots, never colours.** That indirection is what makes theme
-switching a swap and colour degradation mechanical, rather than something each
-renderer reimplements badly.
+**Blocks name palette slots, never colours.** And glyphs are tokens, not
+characters — so both degrade mechanically instead of each renderer reimplementing
+it badly.
 
-**Measured height equals rendered height.** Every block reports its height as a pure
-function of width, so the viewport can virtualise a hundred thousand blocks without
-rendering them. It is the most load-bearing invariant in the system and the easiest to
-violate silently.
+**`/` prefix for the app's operations.** `/ps` is yours; `ps` is Unix's. One
+character removes an entire class of collision — and anything with a shell operator
+goes to your actual shell, so globbing and quoting are exactly right rather than a
+reimplemented subset.
+
+**Measured height equals rendered height.** The most load-bearing invariant in the
+system, and the easiest to violate silently.
+
+---
