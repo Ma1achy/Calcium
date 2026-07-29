@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` (registry, fallback, mapping) + app (the adapters) |
 | **Layer** | L0 data |
-| **Depends on** | C04 view model · C06 transport types. Both same layer, acyclic |
+| **Depends on** | C04 view model · C06 transport types · C05 `ToolDef`, for the exit-2 usage block. All same layer, acyclic |
 | **Consumed by** | L4 execution pipeline |
 | **Source** | A01 D11, D12, D15, B4, B5 · A01 §5 wiring · A02 §2, §6 |
 | **Status** | Draft |
@@ -48,6 +48,9 @@ type AdapterContext = Readonly<{
   verb:              string | null;
   width:             number;          // some adapters choose column sets by width
   userRequestedJson: boolean;         // the user typed --json explicitly
+  transport:         "emulated" | "fixture" | "subprocess" | "local";
+  origin:            "user" | "action" | "agent" | "refresh";
+  tool:              ToolDef | null;  // from C05 — the usage block's only source
 }>;
 
 type StreamContext = AdapterContext & Readonly<{ seq: number }>;
@@ -71,6 +74,27 @@ function createFallbackAdapter(): Adapter;
 
 The registry seals at the end of composition, matching C05's manifest store and C09's block registry. Late registration would let a document rendered early in a session differ from the same document rendered later, which is the kind of inconsistency nobody thinks to look for.
 
+### The registry owns `meta`
+
+An adapter returns a `ViewDocument`, and the registry **overwrites its `meta`** from the `RawResult` and the context, keeping only `resultId` and `adapter` from what the adapter supplied.
+
+This is not tidying. `meta.origin` and `meta.transport` are required by C04 (I13), and neither is derivable from a `RawResult` — so a `meta` assembled by the adapter is a `meta` that an app author has to get right a hundred times, once per verb, with I5 depending on all hundred. Provenance is the framework's to state: it knows what ran, how it ran and who asked. The adapter knows only what came back.
+
+The two exceptions are the two an adapter is the only one able to know. `resultId` is a **declaration** that this command produced an identifier (C04 §meta), which requires knowing which field of an arbitrary envelope is "the" one. `adapter` names the adapter, which the registry does know — but a composite adapter that delegates may want to say which branch ran.
+
+`meta.exitCode` is required and finite while `RawResult.exitCode` is null on two paths. Three values, each with one cause:
+
+| `RawResult` | `meta.exitCode` | Cause |
+|---|---|---|
+| `exitCode` non-null | it | The process ran and exited |
+| `signal` recognised | `128 + signum` | Killed — A01 D54, C01 §Signals (130, 143, 129) |
+| `signal` unrecognised | `128` | Killed; the number is not derivable from the name |
+| both null | `-1` | **The process never started** |
+
+**`-1` means "never started", not "unknown".** It has exactly two producers and they are one condition: a spawn failure, and an invocation whose signal was already aborted so nothing was spawned at all (C06 §3). A real child's exit never carries both null — one of code and signal is always set — so there is no third meaning hiding in the sentinel. A value standing for two unrelated conditions is unreadable a year later; this one stands for one.
+
+**The two producers share the code and split on status**, which is the mapping working rather than a collision. An aborted invocation carries `cancelled`, so it takes the first row of §4 and settles as `partial`; a spawn failure carries neither flag and falls to the last row as `UNEXPECTED_EXIT`. Nothing was started in both cases, and only one of them is a failure — an abort rendering as an error would be the same class of wrong that A01 B4 held before it was corrected.
+
 ---
 
 ## 4. Status and error mapping
@@ -81,7 +105,7 @@ Evaluated top to bottom; **the first match wins**. `cancelled` outranks `timedOu
 
 | Condition | Status | Document |
 |---|---|---|
-| `cancelled` | `partial` | Whatever was produced, plus a muted "cancelled" notice |
+| `cancelled` | `partial` | Whatever was produced, plus a muted "cancelled" notice. Includes the invocation aborted before anything was spawned — nothing ran, and nothing failed |
 | `timedOut` | `error` | `TIMEOUT` envelope naming the elapsed budget |
 | `exitCode === 0` | `ok` | Adapter output |
 | `exitCode === 1` | `error` | Envelope parsed from stdout; if absent, synthesised from stderr |
@@ -89,7 +113,9 @@ Evaluated top to bottom; **the first match wins**. `cancelled` outranks `timedOu
 | `signal !== null` | `error` | `KILLED_BY_SIGNAL` envelope |
 | anything else | `error` | `UNEXPECTED_EXIT` envelope, stderr as `raw` |
 
-**Cancellation produces `partial`, not `error`.** A01 B4 maps exit 130 to `error` while A01's cancellation rule says partial output is retained as `partial`; those conflict, and `partial` is right — the user asked for the stop, so it is not a failure, and the lines already shown stay useful. The `cancelled` flag from C06 is authoritative; exit 130 merely corroborates it. *(This corrects A01 §4 B4.)*
+**Cancellation produces `partial`, not `error`.** The user asked for the stop, so it is not a failure, and the lines already shown stay useful. The `cancelled` flag from C06 is authoritative; exit 130 merely corroborates it.
+
+*A01 B4 once mapped exit 130 to `error`, contradicting A01's own cancellation rule. It now reads as this section does and cites it. The correction has landed; what remains here is the reasoning, because the rule is easier to re-break than to re-derive.*
 
 `ErrorLike` requires only `message` (C04, F3). Where the far side supplies `code`, `stage`, `details` or `remediation` they are carried through; `remediation` naming a runnable command becomes a `fill` action. A failed `promote` and a failed `validate` therefore render identically, because the same code renders both.
 
@@ -125,12 +151,16 @@ Nested objects render as their JSON text inside a cell rather than being flatten
 | `RawPatch` | `ViewPatch` |
 |---|---|
 | `data` | Adapter's mapping, or `append` of a fallback block |
-| `malformed`, before `degraded` | `null` — ignored, already counted by C06 |
-| `degraded` | `append` of an empty `raw` block |
+| `malformed`, before `degraded` | `null` — ignored, already counted by C06. The line is **retained** in case `degraded` is next |
+| `degraded` | `append` of a `raw` block, seeded with the retained line if the immediately preceding patch was `malformed` |
 | `malformed`, after `degraded` | extends that `raw` block |
 | `end` | `status` patch, plus any terminal blocks |
 
 **`malformed` is read twice, and which reading applies depends on whether `degraded` has arrived.** Before it, a stray unparseable line among good ones is noise and is dropped. After it, the `malformed` patches *are* the remainder — they are what carries the rest of the stream as text.
+
+**The line that trips degradation arrives before the notice, and one line of retention is what keeps it.** C06 classifies a line and *then* tests the ratio (C06 §5), so the patch that pushed the stream over the threshold is emitted as `malformed` immediately before the `degraded` one. Read by arrival order alone it falls on the "dropped" side of the rule — and it is the first line of the remainder, so dropping it would make I12 false by exactly one line, silently, in every degraded stream.
+
+`adaptPatch` therefore holds the most recent `malformed` line, and seeds the `raw` block with it when `degraded` is the very next patch. One patch of lookbehind rather than a buffer: the fix belongs here rather than in C06, because reordering C06's emission would change a landed component's observable stream for a consumer that can just as well remember one line.
 
 An earlier draft had `degraded` carry a `remaining` string and this table append a raw block from it. The field was a fiction: C06 trips degradation on a completed line, and completing a line clears the buffer, so `remaining` was a partial line that was empty in almost every case (C06 §5). Redefining it as everything after the trip would have meant buffering the rest of the stream inside a streaming transport.
 
@@ -176,7 +206,9 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I9** — `userRequestedJson` produces a `code` block for every verb, with no per-verb exception.
 - **I10** — C07 imports nothing from `terminal/`, `presentation/` or above.
 - **I11** — No adapter is required for a verb to be usable.
-- **I12** — A degraded stream's remainder reaches the document. `malformed` patches are dropped before `degraded` arrives and compose the `raw` block after it — C06 supplies no other carrier for the remainder (C06 §5).
+- **I12** — A degraded stream's remainder reaches the document **whole**. `malformed` patches are dropped before `degraded` arrives and compose the `raw` block after it, except the one immediately preceding the notice — the line that tripped degradation, which seeds the block. C06 supplies no other carrier for the remainder (C06 §5).
+- **I13** — The registry owns `meta`. An adapter's `meta` is overwritten from the `RawResult` and the context, `resultId` and `adapter` excepted. No adapter can produce a document with absent or wrong provenance, which is what makes I5 hold without every app author holding it up.
+- **I14** — `meta.exitCode` is finite on every path. `-1` means the process never started and means nothing else.
 
 ---
 
@@ -186,7 +218,7 @@ The notice is muted rather than an error because the *command* may have succeede
 2. Adapters are pure and fixture-tested with no process and no terminal.
 3. The fallback renders any JSON legibly and is total.
 4. Streaming works with no stream adapter, via the fallback.
-5. Cancellation yields `partial`; A01 B4 is corrected accordingly.
+5. Cancellation yields `partial`, including an invocation aborted before anything was spawned. A01 B4 was corrected accordingly and now cites §4.
 6. `ErrorLike` needs only `message`; every verb's failure renders through one path.
 7. Fallback tables are capped at 8 columns and 2,000 rows; truncation is recorded, never silent.
 8. Explicit `--json` yields a `code` block, with no exceptions.
@@ -195,7 +227,9 @@ The notice is muted rather than an error because the *command* may have succeede
 11. Schema mismatch fails at startup, naming the offending adapter.
 12. Every produced document is valid per C04, on every path.
 13. Deleting an adapter because the far side converged is a success, not a regression.
-14. A degraded stream's remainder is composed from the `malformed` patches that follow the notice; C06 carries it nowhere else (I12, §6).
+14. A degraded stream's remainder is composed from the `malformed` patches that follow the notice, plus the one that preceded it; C06 carries it nowhere else (I12, §6).
+15. The registry owns `meta`, so no adapter states provenance and none can state it wrongly (I13).
+16. `meta.exitCode` is finite on every path, and `-1` has one documented cause (I14).
 
 ---
 
@@ -222,6 +256,9 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T1.15**: fallback table column cap — an array whose objects have twenty distinct keys → eight columns, chosen by first appearance.
 - **T1.16** (§6): each `RawPatch` kind maps as documented; `malformed` yields null.
 - **T1.17**: an adapter with no `adaptPatch` → `data` patches append fallback blocks.
+- **T1.18** (I13): an adapter returning a document whose `meta` claims `origin: "agent"`, `transport: "local"` and a wrong `argv` → all three are overwritten from the context and the `RawResult`; the adapter's `resultId` and `adapter` survive.
+- **T1.19** (I14): each `meta.exitCode` case — an exit code, `SIGTERM` → 143, an unrecognised signal name → 128, both null → −1.
+- **T1.20** (I14, §4): an invocation aborted before spawn → `partial` with `meta.exitCode` −1, not an error. Same code as a spawn failure, opposite status.
 
 ### Tier 2 — contract / interface
 
@@ -257,6 +294,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T3.18**: `end` patch arriving with `cancelled` → status patch is `partial`.
 - **T3.19**: a `degraded` patch followed by more `malformed` patches → the raw block is appended once and extended by each subsequent line, so the remainder reaches the document. The reachable case, C06's degradation being sticky.
 - **T3.19b**: `malformed` patches *before* any `degraded` one → dropped, no raw block. The same patch kind, read the opposite way, and the §6 table is the only thing saying which reading applies.
+- **T3.19c** (I12): the `malformed` patch immediately preceding `degraded` → seeds the raw block rather than being dropped. Driven by a real `createNdjsonReader` over a stream that degrades, not by hand-built patches, because the ordering under test is C06's and a fabricated sequence would assert the rule against itself.
 
 ### Tier 4 — integration
 
@@ -286,6 +324,8 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T6.8** (I11): making a verb require an adapter → T2.7 fails.
 - **T6.9** (§5): flattening nested objects into columns → T3.12 fails.
 - **T6.10** (I7): deferring schema checks to first use → T2.5 fails.
+- **T6.11** (I13): letting an adapter's `meta` through unmodified → T1.18 fails, and provenance becomes whatever a hundred adapters happened to write.
+- **T6.12** (I12): dropping the `malformed` patch that precedes `degraded` → T3.19c fails, and every degraded stream loses its first remainder line silently.
 
 ---
 

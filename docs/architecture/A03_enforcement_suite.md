@@ -36,13 +36,16 @@ The first four are **build gates**: they fail the build, not a test run, because
 
 This is not belt-and-braces. Every check here reports success the same way whether the tree is clean or the rule is broken, and a broken rule is indistinguishable from compliance at exactly the moment it matters.
 
-**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Three have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
+**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Four have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
 
 - **A pattern that cannot match a real subject.** MG20 compared a resolved specifier against `src/terminal/escapes` while every NodeNext specifier ends `.js`. It matched nothing and reported compliance.
 - **A scope that matches no files.** SS26 scopes to `src/data/process/`; the tree has `src/data/process.ts`, a file. `startsWith` never matches, so the rule has never once been evaluated.
 - **Ownership rows naming absent exports.** MG20's `MODE_OWNERS` assigned `SYNC_UPDATE` and `SCROLL_REGION` to C03 while `escapes.ts` exported neither. The rows governed names that did not exist, so they could not have fired whatever the tree contained.
+- **A rule inventoried here and never implemented.** SS3 had a row in this document from the start and no entry in `source-scans.mjs`. It could not fire, could not be fabricated against, and appeared in no report — and it also carried SS26's defect, scoping to `adapters/` while the tree held `adapters.ts`, a file. Two of the four failures in one rule, which is what a rule nobody built looks like.
 
-Every rule therefore ships with three things: a fabricated violation, an assertion that its scope reaches the tree, and — where the rule governs named entities — an assertion that those names exist. The three catch different failures. A fabricated violation is written at a path inside the declared scope, so it fires whether or not that scope describes anything; and a scope full of real files says nothing about whether the names a rule enumerates are real. All three are in `test/unit/enforce-rules.test.ts`.
+**The fourth is the one the other three do not catch, and it is a defect of this document rather than of the code.** A missing rule is invisible from the source side: `checkSourceScans` iterates the rows it has, so a row that was never written is not a rule that fails but a rule that is not there. The inventory is the only place it exists, and the inventory is prose. The check is therefore set equality — the ids in these tables equal the ids implemented plus the ids explicitly pending — so **a rule inventoried and never built fails on the commit that inventories it**, which is the commit where someone still remembers what it was for.
+
+Every rule therefore ships with four things: an implementation reachable from the inventory, a fabricated violation, an assertion that its scope reaches the tree, and — where the rule governs named entities — an assertion that those names exist. The three catch different failures. A fabricated violation is written at a path inside the declared scope, so it fires whether or not that scope describes anything; and a scope full of real files says nothing about whether the names a rule enumerates are real. All three are in `test/unit/enforce-rules.test.ts`.
 
 A rule whose scope or names are not yet real is listed there as **pending**, with the component that will create them; the pending entry is itself asserted, so it fails once the scope becomes real rather than outliving its reason.
 
@@ -90,7 +93,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 |---|---|---|---|
 | SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in `tui-kit` outside C22 | C22 T2.4 |
 | SS2 | `Math.random` | C08 | C08 T2.3 |
-| SS3 | clock reads | `adapters/` | C07 T2.2 |
+| SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 T2.2 |
 | SS4 | clock reads | `transcript/` | C13 T2.2 |
 | SS5 | clock reads | `viewport/` | C14 T2.4 |
 | SS6 | clock reads | `input/` | C16 T2.3 |
@@ -268,6 +271,7 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 12. Every failure names the rule, the file, the line and the declaring spec.
 13. MG and SS run pre-commit, because their violations become depended-upon within days.
 14. **Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule.** A rule with no such test is assumed vacuous until it has one. Every scan's scope is separately asserted to match at least one file in the tree; and where a rule enumerates named entities — mode owners, export names, file paths — those names are separately asserted to exist. A scope or a name that matches nothing is listed as pending, with its blocking component, and the pending entry fails once it becomes real.
+14b. **The inventory in this document equals what is implemented plus what is explicitly pending**, asserted as set equality over the rule ids. A rule listed here and never built is invisible to every other check — there is no code for a fabricated violation to fire against — so it fails at the point of being written down instead.
 15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for.
 
 ---
