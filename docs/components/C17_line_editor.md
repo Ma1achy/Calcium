@@ -145,7 +145,7 @@ Kill-append is a flag rather than a state: any non-kill operation clears it (T1.
 - **I9** — Control characters are stripped on insert; only `\n` survives as structure.
 - **I10** — C17 does not render and holds no geometry; width and gutter are parameters.
 - **I11** — The undo stack is bounded at 200 units, discarding the oldest.
-- **I12** — Newline insertion has at least two terminal-independent bindings.
+- **I12** — Newline has **three** bindings, of which **at least two are terminal-independent**. Both halves are load-bearing and they count different things: the three include Shift-Enter, which many terminals do not distinguish from Enter, so it cannot be one of the two that always work. An invariant stating only the weaker half would pass with Shift-Enter removed; one stating only the stronger half would pass with Ctrl-J removed. A test citing this fails on either.
 - **I13** — C17 imports nothing from `terminal/` and never commits a frame.
 
 ---
@@ -155,7 +155,7 @@ Kill-append is a flag rather than a state: any non-kill operation clears it (T1.
 1. The cursor is a grapheme index; display columns are computed separately.
 2. `displayRows` is a measurement contract and must match the rendered prompt, taking the gutter as a parameter rather than assuming one.
 3. Word motion uses three character classes, so flag values can be edited without disturbing flags.
-4. Newline has three bindings; Shift-Enter alone is unreliable and `j22` #11 is corrected.
+4. Newline has three bindings, at least two of them terminal-independent; Shift-Enter alone is unreliable and `j22` #11 is corrected (I12).
 5. Long input wraps visually and remains one command.
 6. One kill buffer, not a ring; consecutive kills append.
 7. Undo exists, is bounded at 200 units discarding oldest-first, and a paste is one unit at any size.

@@ -193,7 +193,8 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 10. The tokeniser and the quoter are both shared with C18.
 11. Accepting produces one undo unit.
 12. `/` completes verbs; bare text completes executables and paths.
-13. Dynamic sources are the app's; static ones ship with the framework.
+13. Dynamic sources are the app's; static ones ship with the framework (I3).
+14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
 
 ---
 
