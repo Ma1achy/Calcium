@@ -76,11 +76,11 @@ The registry seals at the end of composition, matching C05's manifest store and 
 
 ### The registry owns `meta`
 
-An adapter returns a `ViewDocument`, and the registry **overwrites its `meta`** from the `RawResult` and the context, keeping only `resultId` and `adapter` from what the adapter supplied.
+An adapter returns a `ViewDocument`, and the registry **overwrites its `meta`** from the `RawResult` and the context, keeping only `resultId`, `adapter` and `truncated` from what the adapter supplied.
 
 This is not tidying. `meta.origin` and `meta.transport` are required by C04 (I13), and neither is derivable from a `RawResult` — so a `meta` assembled by the adapter is a `meta` that an app author has to get right a hundred times, once per verb, with I5 depending on all hundred. Provenance is the framework's to state: it knows what ran, how it ran and who asked. The adapter knows only what came back.
 
-The two exceptions are the two an adapter is the only one able to know. `resultId` is a **declaration** that this command produced an identifier (C04 §meta), which requires knowing which field of an arbitrary envelope is "the" one. `adapter` names the adapter, which the registry does know — but a composite adapter that delegates may want to say which branch ran.
+**The three exceptions are the three the registry cannot know**, and the line between them and the rest is exactly that. `resultId` is a *declaration* that this command produced an identifier (C04 §meta), which requires knowing which field of an arbitrary envelope is "the" one. `truncated` is a statement about the blocks — the fallback's row cap fires inside the adapter, and a registry reading it off the outside would have to re-derive it from a document it did not build. `adapter` names what ran; the registry knows the registered name, but a composite adapter that delegates is the one that knows which branch answered.
 
 `meta.exitCode` is required and finite while `RawResult.exitCode` is null on two paths. Three values, each with one cause:
 
@@ -207,7 +207,7 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I10** — C07 imports nothing from `terminal/`, `presentation/` or above.
 - **I11** — No adapter is required for a verb to be usable.
 - **I12** — A degraded stream's remainder reaches the document **whole**. `malformed` patches are dropped before `degraded` arrives and compose the `raw` block after it, except the one immediately preceding the notice — the line that tripped degradation, which seeds the block. C06 supplies no other carrier for the remainder (C06 §5).
-- **I13** — The registry owns `meta`. An adapter's `meta` is overwritten from the `RawResult` and the context, `resultId` and `adapter` excepted. No adapter can produce a document with absent or wrong provenance, which is what makes I5 hold without every app author holding it up.
+- **I13** — The registry owns `meta`. An adapter's `meta` is overwritten from the `RawResult` and the context, `resultId`, `adapter` and `truncated` excepted — the three the registry cannot know. No adapter can produce a document with absent or wrong provenance, which is what makes I5 hold without every app author holding it up.
 - **I14** — `meta.exitCode` is finite on every path. `-1` means the process never started and means nothing else.
 
 ---
@@ -256,7 +256,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T1.15**: fallback table column cap — an array whose objects have twenty distinct keys → eight columns, chosen by first appearance.
 - **T1.16** (§6): each `RawPatch` kind maps as documented; `malformed` yields null.
 - **T1.17**: an adapter with no `adaptPatch` → `data` patches append fallback blocks.
-- **T1.18** (I13): an adapter returning a document whose `meta` claims `origin: "agent"`, `transport: "local"` and a wrong `argv` → all three are overwritten from the context and the `RawResult`; the adapter's `resultId` and `adapter` survive.
+- **T1.18** (I13): an adapter returning a document whose `meta` claims `origin: "agent"`, `transport: "local"` and a wrong `argv` → all three are overwritten from the context and the `RawResult`; the adapter's `resultId`, `adapter` and `truncated` survive.
 - **T1.19** (I14): each `meta.exitCode` case — an exit code, `SIGTERM` → 143, an unrecognised signal name → 128, both null → −1.
 - **T1.20** (I14, §4): an invocation aborted before spawn → `partial` with `meta.exitCode` −1, not an error. Same code as a spawn failure, opposite status.
 
