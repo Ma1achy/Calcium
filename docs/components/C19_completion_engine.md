@@ -174,6 +174,7 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 - **I10** — Dynamic results are cached on `(sourceId, contextKey)` and expire at their TTL.
 - **I11** — Accepting a candidate produces exactly one undo unit in C17.
 - **I12** — C19 imports nothing from `terminal/` and never commits a frame.
+- **I14** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
 - **I13** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
 
 ---
@@ -183,10 +184,10 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 1. Every candidate comes from the manifest or a registered source; nothing is hand-maintained.
 2. Static sources run per keystroke; dynamic sources only on `Tab`. Filesystem slots are dynamic, so paths have no ghost text and `Tab` is required.
 3. Requests carry sequence numbers and stale results are discarded.
-4. Typing during a pending request supersedes it and clears the spinner.
+4. Typing during a pending request supersedes it and clears the spinner (I14).
 5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected.
 6. A failing source is dropped, not fatal.
-7. Acceptance follows the common-prefix algorithm; `Tab` twice always shows the menu.
+7. Acceptance advances to the longest common prefix and stops; the menu-on-second-`Tab` behaviour is §4's, not contract (I5).
 8. Ghost text is a suggestion, accepted only by `Tab` or `→`.
 9. The menu is a C15 overlay; C19 supplies blocks and the overflow indicator.
 10. The tokeniser and the quoter are both shared with C18.

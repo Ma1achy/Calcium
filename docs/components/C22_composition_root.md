@@ -252,6 +252,7 @@ History flushes on **every** path including faults. Losing a session's history t
 - **I14** — C22 never auto-logins.
 - **I15** — An offline cluster degrades the session; system commands keep working.
 - **I16** — `stopped` is terminal.
+- **I17** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
 
 ---
 
@@ -267,7 +268,7 @@ History flushes on **every** path including faults. Losing a session's history t
 8. Session state is six fields with one writer each; nothing else lives here.
 9. `cwd` is exposed as a function so `cd` moves subsequent verbs.
 10. Chrome is app-supplied; the prompt gutter is C22's to pass, not C17's to assume.
-11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained.
+11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I17).
 12. Shutdown is one function, five callers, four ordered steps, with cleanup solely inside `beforeRelease`.
 13. Release precedes diagnostics; history flushes on every path.
 14. An offline cluster degrades rather than ends the session.

@@ -178,6 +178,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I12** — C14 imports nothing from `terminal/`; dimensions arrive as data, and C14 never calls the frame scheduler. L4 orchestrates.
 - **I13** — The eviction marker is an ordinary entry (C13 I13); C14 holds no special case for it.
 - **I14** — Copy mode restores the prior follow state on exit.
+- **I16** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
 - **I15** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
 
 ---
@@ -185,7 +186,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 ## 9. Commitments
 
 1. Scrolling is by display row, never by entry.
-2. Page movement is `viewportHeight − 1`, so a line of context carries over.
+2. Page movement is `viewportHeight − 1`, so a line of context carries over (I16).
 3. `followTail` is on at the bottom, off on any upward scroll, and restored by `End`.
 4. Content growing above a detached viewport never moves the visible rows.
 5. The anchor is an entry id plus a row offset, immune to eviction and index shifts.

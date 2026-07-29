@@ -132,7 +132,7 @@ Per child handle.
 
 1. `spawn` and `spawnShell` are separate methods so the shell boundary is visible at every call site.
 2. `spawnShell` is only ever given a string the user typed.
-3. The shell is `$SHELL`, falling back to `/bin/sh`.
+3. `spawnShell` resolves the user's shell rather than assuming one; which variable it reads and what it falls back to is §2 detail (I1).
 4. Children are detached and signalled by group, so pipelines die whole.
 5. stdout and stderr stay separate and never reach the terminal.
 6. Decoding is streaming and multi-byte-safe.

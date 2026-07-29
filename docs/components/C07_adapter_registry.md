@@ -228,7 +228,7 @@ The notice is muted rather than an error because the *command* may have succeede
 4. Streaming works with no stream adapter, via the fallback.
 5. Cancellation yields `partial`, including an invocation aborted before anything was spawned. A01 B4 was corrected accordingly and now cites §4.
 6. Every verb's failure renders through one path, because `ErrorLike` needs only `message` — the shape is C04's (→ C04 I20).
-7. Fallback tables are capped at 8 columns and 2,000 rows; truncation is recorded, never silent.
+7. Fallback truncation is recorded, never silent — `meta.truncated` says so, and the caps themselves are §-level defaults rather than contract (I13).
 8. Explicit `--json` yields a `code` block, with no exceptions.
 9. An adapter throwing is contained, re-adapted through the fallback, and recorded in a muted notice.
 10. The registry seals at composition end, matching C05 and C09.

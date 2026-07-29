@@ -181,6 +181,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I13** — `rev` increments on every applied patch and never decreases. It is the staleness signal for C14's height cache; without it a cached height survives a patch that changed it.
 - **I14** — The eviction marker is a real entry, never a downstream special case, and is itself never evicted.
 - **I15** — Overshoot is exposed as `overCap`; C13 does not act on it.
+- **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost.
 - **I16** — C13 imports nothing from `terminal/` or `presentation/`.
 
 ---
@@ -192,7 +193,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 3. A streaming entry keeps receiving patches after it freezes.
 4. Freezing is implicit in appending; there is no public freeze.
 5. Ids are monotonic and never reused.
-6. The session cap is 100,000 blocks, evicting oldest-first.
+6. The session cap is 100,000 blocks, evicting oldest-first (I17).
 7. The live entry and any streaming entry are never evicted; the cap yields instead.
 8. Eviction is counted and surfaced, never silent.
 9. Patching a settled or unknown entry is a no-op that is logged, not absorbed.

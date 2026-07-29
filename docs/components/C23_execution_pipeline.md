@@ -266,6 +266,7 @@ Per submission.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
 - **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
 - **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I19) and applied by the sequence (C09 I15). The rule has teeth in one direction only: C23 may not *add* rhythm.
+- **I26** — A stream producing nothing for 120 s appends a muted stall notice, and never an error. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
 - **I25** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
 
 ---
@@ -291,7 +292,7 @@ Per submission.
 17. `open` is scheme-checked and never shelled.
 18. Actions from frozen entries are refused.
 19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time.
-20. A stream silent for 120 s gets a muted stall notice, never an error.
+20. A stream silent for 120 s gets a muted stall notice, never an error (I26).
 21. View refreshes are staggered by offset and fail in isolation.
 22. C23 sets `meta.origin` on every append; provenance is never absent.
 23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point.

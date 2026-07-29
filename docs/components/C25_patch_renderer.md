@@ -137,7 +137,7 @@ Adding a background channel to `Style` is a C10 decision and should be taken del
 2. Height is exact and width-independent; nothing wraps.
 3. A collapsed region is one row stating its own count.
 4. `+` and `-` carry the distinction; tone reinforces it and never replaces it.
-5. Unified is the narrow layout, split the wide one, above 100 columns.
+5. Two layouts, chosen by width — unified when narrow, split when wide. The breakpoint is a §3 value, tuned against golden frames rather than promised (I2).
 6. C25 registers through C09's public mechanism and is not privileged.
 7. C25 declares no block types and holds no state.
 8. Tokenisation is C09's; `measure` never tokenises.

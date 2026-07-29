@@ -262,6 +262,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I18** — C06 reads no environment. `createTransport` takes `mode` as a parameter, and no module under `src/` resolves `PRISM_TUI_TRANSPORT`.
 - **I19** — Time enters C06 only through injected `now` and `schedule`. No ambient clock, no ambient timer.
 - **I20** — **No transport rewrites a result it did not construct.** `createFixtureTransport` replays a stored `RawResult` verbatim, `argv` included; `createEmulatedTransport` reports what its handler produced. Synthesis is confined to results C06 builds itself — a cancellation, an abort before dispatch — where there is nothing to report and the argv describes an invocation happening now. Whoever produces a result owns its `argv`; the transport carrying it does not.
+- **I22** — `timeoutMs: 0` schedules no timer at all. Not a very large timeout — none, asserted on the absence of the `schedule` call, because a timer armed with 0 and cleared later satisfies the weaker reading and kills every live view.
 - **I21** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
 
 ---
@@ -274,7 +275,7 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 4. stdout and stderr stay separate; raw stdout is always retained.
 5. One escalation ladder for cancellation and timeout.
 6. Partial output is retained on every abnormal termination.
-7. `timeoutMs: 0` means unbounded, for live views.
+7. `timeoutMs: 0` means unbounded, for live views (I22).
 8. Streaming emits exactly one `end`, always last.
 9. Malformed-line degradation needs 10% *and* a 10-line floor, depends on arrival order by design, and is sticky once tripped.
 10. One non-streaming invocation at a time; streams are exempt.

@@ -223,6 +223,7 @@ Two small machines, both with an injected clock.
 - **I12** — Bytes buffered during a paste are never dispatched as individual keys.
 - **I13** — C16 imports nothing from `terminal/`; raw mode is C01's and decoding is data-in.
 - **I14** — `activeTarget` is pure over its inputs.
+- **I15** — Ctrl-D is dispatched only when the editor buffer is empty, and it opens a confirm rather than exiting. With text present it is consumed and discarded — never treated as EOF, and never as a delete-forward, because a keystroke that sometimes ends the session and sometimes edits the line is one nobody presses twice.
 
 ---
 
@@ -236,7 +237,7 @@ Two small machines, both with an injected clock.
 6. Exactly one handler consumes an event; unconsumed events are dropped.
 7. Ctrl-C cancels an in-flight verb ahead of every other meaning.
 8. Ctrl-C never dismisses a confirm.
-9. Ctrl-D at an empty prompt confirms exit; with text it does nothing.
+9. Ctrl-D at an empty prompt confirms exit; with text it does nothing (I15).
 10. Double-tap timing is 500 ms on an injected clock.
 11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I25).
 12. Duplicate bindings fail at construction.
