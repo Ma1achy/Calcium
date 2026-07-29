@@ -75,6 +75,23 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/data/adapters/docker.ts",
     source: "const seed = Math.random();",
   },
+  {
+    // The shape a world author reaches for when a run needs a plausible loss
+    // curve. It reads perfectly well, and it makes every golden frame flake —
+    // which is the failure C08 §3 describes and the reason SS2 spans all of
+    // `src/` rather than only the fixture directory.
+    rule: "SS2",
+    file: "src/data/fixtures/rng.ts",
+    source: "const jitter = Math.random() * 0.1;",
+  },
+  {
+    // Not C08's file, deliberately. The rule is scoped to `src/` because a
+    // jittered retry in the execution pipeline is the same defect wearing a
+    // different coat, and a rule scoped to `fixtures/` would not see it.
+    rule: "SS2",
+    file: "src/shell/execution.ts",
+    source: "const backoff = base + crypto.randomUUID().length;",
+  },
   { rule: "SS26", file: "src/data/process/runner.ts", source: 'process.stdout.write(chunk);' },
   {
     // The exit-code half of SS25. A `switch` on the code, on the way to a
@@ -390,7 +407,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
    * that is NOT being enforced, and saying so is the point.
    */
   const PENDING_RULES: Record<string, string> = {
-    SS2: "C08 — the fixture world does not exist",
     SS4: "C13 — no transcript/",
     SS5: "C14 — no viewport/ rule yet",
     SS6: "C16",

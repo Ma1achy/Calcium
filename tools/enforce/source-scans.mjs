@@ -123,6 +123,25 @@ export const SCANS = [
     scope: "src/data/adapters/", allow: [],
     why: "adapters are pure: a fixture in, a document out, and nothing ambient in between" },
 
+  // A03 inventories SS2 as scoped to "C08". Written here it covers **all of
+  // `src/`**, and the widening is deliberate rather than incidental.
+  //
+  // C08 is the component with the *reason* — a fixture world that is randomised
+  // is a fixture world whose golden tests are flaky (C08 §3) — but no file under
+  // `src/` has business calling `Math.random`, and a rule scoped to
+  // `src/data/fixtures/` stops seeing the day someone reaches for a jittered
+  // retry in C23 or a sampled id in C13. That is SS26's failure with a longer
+  // fuse: narrower reads as tighter and is looser, because it stops seeing new
+  // files.
+  //
+  // Clock reads are SS1's, which already spans `src/` for the same reason. This
+  // is the other half of C08 I4 — the ban is on *ambient* sources, not on
+  // randomness: `createRng` is the injected one, and it takes its seed.
+  { id: "SS2", spec: "C08 I4 · C08 T2.3",
+    pattern: /\bMath\.random\b|\bcrypto\.randomUUID\b|\brandomBytes\s*\(/,
+    scope: "src/", allow: [],
+    why: "no ambient randomness; C08 ships a seeded generator and every draw comes from it" },
+
   // The scope is real as of C06: `src/data/process/` is a directory now, holding
   // C21's interface. This rule is the one A03 §2 names as never having been
   // evaluated — it scoped to a directory while the tree had `process.ts`, a

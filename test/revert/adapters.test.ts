@@ -249,11 +249,20 @@ describe("C07 fail-on-revert", () => {
     expect(violations.map((v) => v.rule)).toContain("SS1");
   });
 
-  it("randomness in an adapter is caught by SS3, which SS1 does not cover", () => {
+  it("randomness in an adapter is caught by SS3 and SS2, neither of which is SS1", () => {
+    // SS3 is the adapter-purity rule; SS2 arrived with C08 and spans all of
+    // `src/`, because no file here has business calling `Math.random` and a rule
+    // scoped to the fixture directory would stop seeing new ones.
+    //
+    // Two rules over one defect is not duplication to be cleaned up. They fail
+    // for different reasons — an adapter that is not a pure function of its
+    // input, and a draw from a source nothing seeded — and either could be
+    // narrowed later without the other going quiet.
     const violations = checkSourceScans(
       ["src/data/adapters/docker.ts"],
       () => "const id = Math.random().toString(36);",
     );
-    expect(violations.map((v) => v.rule)).toEqual(["SS3"]);
+    expect(violations.map((v) => v.rule).sort()).toEqual(["SS2", "SS3"]);
+    expect(violations.map((v) => v.rule)).not.toContain("SS1");
   });
 });
