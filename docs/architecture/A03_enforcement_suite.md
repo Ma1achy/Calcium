@@ -137,6 +137,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
 | SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
+| SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 §4, C05 §2 |
 
 **SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
 
@@ -153,6 +154,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 **SS26 is pending and has never been evaluated.** It scopes to `src/data/process/` and the scaffold created `src/data/process.ts` — a file, not a directory — so the prefix match finds nothing and the rule passes on every run. It came in with the scaffold and would not have fired had it been violated. The scope is corrected when C21 lands and creates the directory; until then the vacuity suite carries it as a named pending entry rather than counting it as enforcement. This is the defect the sixth kind of check exists to find, and it is recorded here rather than quietly fixed because the count of live rules should be honest.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
+
+**SS35 is SS30's shape applied to a type name.** C05's first draft declared its own `Result<T, E>` with `errors` plural where C04's has `error` singular — same name, same half of L0, and both compile. Nothing would have failed until a call site read `r.error` on the wrong one, which is a runtime `undefined` rather than a type error. One `Result` in the tree, declared in `data/viewmodel/types.ts`; a component wanting a plural puts it in the type argument.
 
 ---
 

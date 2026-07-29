@@ -129,7 +129,7 @@ The output of a delegated command is a `raw` block. If you piped it, you asked f
 
 ## 6. App and local commands
 
-A `/`-prefixed first token with no further slash is looked up with `findTool`, longest-match-first so `serving scale` beats `serving` (C05 I6).
+A `/`-prefixed first token with no further slash is looked up with `findTool`, longest-match-first so `serving scale` beats `serving` (C05 I7).
 
 | Outcome | Result |
 |---|---|
