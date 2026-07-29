@@ -130,6 +130,9 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 - **I11** — `released` is a terminal state. Every operation on a released instance throws except `release()` itself, which is a no-op (I2).
 - **I12** — `SIGWINCH` produces one coherent `{columns, rows}` snapshot per event (D31). Subscribers never see a mismatched pair.
 - **I13** — Failure to acquire the alternate screen is fatal and aborts before first paint. It is the only fatal case in the system (A02 §7).
+- **I14** — `SIGCONT` re-acquires terminal state and reports through `onResume`. It sets no flag: C01 states a fact about the terminal and L4 decides what it means, because a `contaminated` flag under two owners is the failure C01 exists to prevent, applied to itself (D53).
+- **I15** — `SIGTSTP` releases, removes its own handler, and re-raises with default disposition, so the shell's job control sees an ordinary stop rather than a process that swallowed it.
+- **I16** — Exit codes are `128 + signal`, per signal: 130 for `SIGINT`, 143 for `SIGTERM`, 129 for `SIGHUP`. One shutdown *path* is a property worth having; one shutdown *code* misreports a supervisor's signal as a user pressing Ctrl-C (D54).
 
 ---
 

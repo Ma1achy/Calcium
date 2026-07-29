@@ -227,7 +227,7 @@ The notice is muted rather than an error because the *command* may have succeede
 3. The fallback renders any JSON legibly and is total.
 4. Streaming works with no stream adapter, via the fallback.
 5. Cancellation yields `partial`, including an invocation aborted before anything was spawned. A01 B4 was corrected accordingly and now cites §4.
-6. `ErrorLike` needs only `message`; every verb's failure renders through one path.
+6. Every verb's failure renders through one path, because `ErrorLike` needs only `message` — the shape is C04's (→ C04 I20).
 7. Fallback tables are capped at 8 columns and 2,000 rows; truncation is recorded, never silent.
 8. Explicit `--json` yields a `code` block, with no exceptions.
 9. An adapter throwing is contained, re-adapted through the fallback, and recorded in a muted notice.

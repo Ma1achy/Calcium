@@ -238,7 +238,7 @@ Two small machines, both with an injected clock.
 8. Ctrl-C never dismisses a confirm.
 9. Ctrl-D at an empty prompt confirms exit; with text it does nothing.
 10. Double-tap timing is 500 ms on an injected clock.
-11. The keymap is declarative data; `/help` renders from it, so docs cannot drift.
+11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I25).
 12. Duplicate bindings fail at construction.
 13. C16 never commits a frame; L4 does.
 

@@ -266,6 +266,7 @@ Per submission.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
 - **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
 - **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I19) and applied by the sequence (C09 I15). The rule has teeth in one direction only: C23 may not *add* rhythm.
+- **I25** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
 
 ---
 
@@ -283,7 +284,7 @@ Per submission.
 10. Built-ins apply before delegation.
 11. All cross-layer sequences live in §4.
 12. Local handlers ship for framework concerns; apps register their own.
-13. `/help` renders from the manifest, so help cannot drift from behaviour.
+13. `/help` renders from the manifest and C16's keymap, so help cannot drift from behaviour (I25).
 14. The displayed command equals the spawned command.
 15. Submissions are refused once C22 sets `session.stopping`.
 16. C23 supplies `onAction`; `exec` re-enters the normal submission path.

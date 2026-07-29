@@ -471,6 +471,9 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I17** — Every measurer returns at least 1 for a present block (§5). Only an empty container measures 0.
 - **I19** — `gapBefore` is content: `merge` carries it, `measure` never counts it, and every sequence of blocks adds one row per block declaring it. A composer that inserts spacing of its own instead (C23 §2) makes a document's height unknowable from the document.
 - **I18** — `validateDocument` terminates on any input, including a cyclic one. A path-scoped seen-set refuses a cycle; it is not a depth limit, and it does not reject a legitimately shared subtree.
+- **I20** — `ErrorLike` requires `message` and nothing else. `code`, `stage`, `details` and `remediation` are optional, and a far side's richer envelope is a specialisation rather than a second type — so every failure in the system renders through one path (A01 B5).
+- **I20a** — `meta` carries the invocation record: `argv`, `stderr` and `transport` are present on every document C07 produces. They belong to `meta` because a block is content and the invocation is *about* the document, so any inspector reaches them uniformly without re-running anything (D49).
+- **I21** — `patch` and `diff` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
 
 ---
 
@@ -481,21 +484,21 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 3. `raw` renders anything, so the vocabulary is never blocking.
 4. View state that affects height lives in the block.
 5. Blocks name palette slots and glyph slots, never values or characters; `error` and `warn` tones carry glyphs.
-6. Only `message` is required on `ErrorLike`; Prism's envelope is a specialisation.
+6. Only `message` is required on `ErrorLike`; Prism's envelope is a specialisation (I20).
 7. `fill` is the default action; `exec` is reserved for reversible operations.
 8. `applyPatch` is pure; `merge` upserts by row id and preserves untouched rows.
 9. `measure(block, w)` equals rendered height at width `w`, and is pure and total.
-10. Capability-driven glyph substitution is width-preserving, and holds for **every** glyph a block can name — which is what closing `Glyph` to a vocabulary buys. A free-string field made this guarantee mostly-true.
+10. `Glyph` is a closed vocabulary, which is what makes capability substitution a total guarantee rather than a mostly-true one — a free-string field would leave every unlisted character unsubstituted. The substitution itself is **C09's** and width-preservation is C09 I5: C04 cannot fail when a renderer breaks it (→ C09 I5).
 11. C04 owns the schema — **every** block variant is declared here; C09 owns the registry, C11 the table engine, C12 the plot renderer, C25 the patch renderer.
 12. The schema identifier is framework-named `tui.view/1`. `tui-kit` ships nothing Prism-branded.
 13. A `pills` block is one logical row; multi-row pill layouts are multiple blocks.
-14. Capability-driven substitutions are 1:1 by column count.
+14. Substitution is 1:1 by column count, so a degraded frame occupies the same cells as an undegraded one (→ C09 I5).
 15. `validateDocument` and `validateBlock` are public, total, and the single enforcement point for I3.
 16. Schema version is `tui.view/1`; mismatch is refused at the boundary.
-17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it.
+17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it (I20a, D49).
 18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts.
 19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump.
-20. `patch` and `diff` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag.
+20. `patch` and `diff` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag (I21, D50).
 21. `applyPatch` returns a `PatchResult` and never throws. Four failure cases, each named, each leaving the input document untouched.
 22. Block ids are unique within a document, and `validateDocument` is where that is established.
 23. `merge` never deletes a row; `replace` is how a table sheds one, and the adapter decides which it means.

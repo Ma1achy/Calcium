@@ -186,7 +186,7 @@ Expansion happens **after** tokenising, so a UUID containing a space could not s
 3. Shell operators delegate the whole input to the user's shell, with `/verb` rewritten.
 4. Delegated output is a `raw` block.
 5. `j22`'s refusal of globbing and brace expansion is reversed — delegation gives correct semantics for free.
-6. App commands without operators spawn as argv arrays; D18 is unaffected.
+6. App commands without operators reach the transport as an argv array rather than a string, so delegation never widens the shell boundary; the array itself is C06's guarantee (→ C06 I3).
 7. Only trailing `&` and job-control words are refused.
 8. Tool lookup is longest-match; misses suggest at edit distance ≤ 2.
 9. Validation happens before spawning.

@@ -249,7 +249,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 9. Surfaces degrade on the same ladder and are absent at 1-bit.
 10. Resolution is memoised and the cache is cleared on any theme change.
 11. `defaultTheme` ships so the required `theme` field is one line to satisfy.
-12. Prism's light variant is Atom One Light; A01 Appendix A wins over `j22`.
+12. C10 resolves whatever tokens it is given; the shipped catalogue and the Atom One Light decision are A01 Appendix A's, which is also where a correction to them belongs (→ A01 A.1).
 13. Contrast is validated against `bg` and `bgElev` — both surfaces text lands on. `bgDeep` is excluded because it carries none.
 14. No two slots of one palette render as one another: distinct in hex, and distinct at 8-bit for the five tones whose confusion would mislead.
 15. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them.

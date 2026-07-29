@@ -131,7 +131,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 6. Only C02 reads terminal environment variables; lint-enforced.
 7. Every capability has a named fallback owner and a test exercising it.
 8. Alternate screen is the only capability whose absence prevents the shell opening.
-9. No information is carried by colour alone, anywhere in the system.
+9. `colourDepth` is reported, never interpreted. What a depth *means* for legibility is D29's rule and it is enforced where colour is chosen, not where it is detected — C02 has no view of what any block carries (→ C10 I2, C09 I5).
 10. `bmp` unicode and non-`none` image protocols are detected but unused in v1.
 11. Warnings about rejected overrides are returned to the caller, never printed.
 
