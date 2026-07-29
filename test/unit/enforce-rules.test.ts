@@ -56,6 +56,11 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/shell/session.ts",
     source: "render({ alternateScreen: true }, ui);",
   },
+  {
+    rule: "SS35",
+    file: "src/data/manifest/types.ts",
+    source: "export type Result<T, E> = { ok: true; value: T } | { ok: false; errors: E };",
+  },
 
   {
     rule: "MG1",

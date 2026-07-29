@@ -1,4 +1,4 @@
-// A03 §4 — SS1..SS32. Forbidden patterns, scoped by directory.
+// A03 §4 — SS1..SS35. Forbidden patterns, scoped by directory.
 import { readFileSync } from "node:fs";
 
 /** allow: paths (or prefixes) exempt from the rule. */
@@ -85,6 +85,21 @@ export const SCANS = [
     pattern: /\b(?:commit|flush|invalidate)\s*\(/,
     scope: "src/interaction/", allow: [],
     why: "L4 orchestrates; interaction never commits a frame" },
+
+  // C05's first draft declared its own `Result<T, E>` with `errors` plural where
+  // C04's has `error` singular. Same name, same half of L0, and both compile —
+  // nothing fails until a call site reads `r.error` on the wrong one and gets
+  // `undefined`. SS30's shape, applied to a type name.
+  //
+  // The trailing `[<=]` is what separates a declaration from an import: a
+  // multi-line `import { type Result, … }` puts `type Result,` on a line of its
+  // own, and the first version of this rule flagged both files that correctly
+  // import the one Result there is. A declaration always continues into `<` or
+  // `=`; an import member never does.
+  { id: "SS35", spec: "C04 §4 · C05 §2",
+    pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
+    scope: "src/", allow: ["src/data/viewmodel/types.ts"],
+    why: "one Result in the tree; two shapes under one name in one layer half compile and diverge quietly" },
 ];
 
 /**
