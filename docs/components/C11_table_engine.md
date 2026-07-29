@@ -112,6 +112,8 @@ Sort is view state on the block (C04 §3), so it survives freezing and is record
 - **Type-aware.** Numeric columns sort numerically, durations by magnitude, everything else lexically by grapheme. `12m` before `2h`, not after.
 - **Missing values sort last** in both directions. A column of mostly-empty cells should not bury the populated ones under either arrow.
 
+**The indicator is ` ↑` / ` ↓` appended to the active column's header** (A01 Appendix A.4). Its two characters are C09's, not C11's: C09 §4 owns both renderings of every character that enters a frame and the 1:1 width rule that makes ASCII degradation height-preserving, so they are a rôle in its glyph set (`^` and `v`) rather than a literal here. The indicator is appended *inside* the column's planned width, so a header whose label then exceeds that width truncates — geometry is the plan's, and an indicator that widened a column would make the header disagree with the rows beneath it.
+
 ---
 
 ## 5. Expansion and focus

@@ -195,6 +195,7 @@ Every substitution is **1:1 by column count** (C04 §5). This is the constraint 
 |---|---|---|
 | `─ │ ┌ ┐ └ ┘ ├ ┤` | `- \| + + + + + +` | 1 |
 | `…` | `~` | 1 |
+| `↑ ↓` | `^ v` | 1 |
 | `▁▂▃▄▅▆▇█` | `.:-=+*#@` | 1 |
 | Braille plot | Block plot | same grid |
 
