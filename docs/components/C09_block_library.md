@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` |
 | **Layer** | L1 presentation |
-| **Depends on** | C04 (types, measurement contract) · C10 (`resolveTone` — same layer, acyclic) · `TerminalCapabilities` injected |
+| **Depends on** | C04 (types, measurement contract) · C10 (`resolveTone` — same layer, acyclic) · `terminal/escapes.ts` (`sgr`, at run time — §3) · `TerminalCapabilities` injected |
 | **Consumed by** | C11 C12 (register through it) · C13 C14 (measurement) · C15 (overlays render blocks) · L4 |
 | **Source** | A01 D35–D37, F1 · A02 §2, §5 · C04 §5 |
 | **Status** | Draft |
@@ -101,6 +101,51 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 `table`, `plot` and `patch` are declared in C04's union but registered by C11, C12 and C25. C09 owns the registry and fourteen kinds; those three are large enough to be their own components and register into the same registry as an app-defined kind would — which is the proof that the extension mechanism is real rather than privileged.
 
 That it is three rather than one matters. A single privileged exception is indistinguishable from a special case; three components using the same public `register`, each removable by deleting its call, is the mechanism being exercised rather than described.
+
+### What a renderer emits, and what Ink is for
+
+**A renderer emits SGR. It never sets an Ink colour prop.** C10 resolves a tone
+to a `Style` whose colour names its own depth (C10 I18), and the renderer
+switches on `colour.kind` to write `38;2;r;g;b`, `38;5;n` or a 30–37 / 90–97
+index. The sequence itself comes from `terminal/escapes.ts`, which A03 SS14
+already names as the one module permitted an escape literal — and an SGR
+sequence is an escape literal, so this follows from the rule that exists rather
+than needing a new one.
+
+Ink's `color` prop is refused for two reasons, and the second is the one worth
+writing down. It re-derives the depth from the string's *format*, discarding the
+tag I18 exists to carry — two answers to one question, and the wrong one wins
+because it is the one Ink acts on. And the colour library behind it decides how
+much colour to emit from its own environment detection, which reports **no colour
+at all under a test runner**: goldens would pass in monochrome forever while
+production rendered truecolour, which is a suite verifying a rendering nobody
+ships. A03 SS37 makes the prop unwritable rather than discouraged.
+
+**This is the first runtime dependency from L1 on L0-terminal**, and it is
+required rather than merely allowed. Everything at L1 has so far touched
+`terminal/` through injected data and type-only imports; `presentation/blocks/*`
+importing `escapes.sgr` at run time is a new edge. It is legal — A03 MG1 forbids
+*upward* imports and L1 → L0 is downward — and it does not weaken the
+parallel-build property, which is L0's two halves not importing each other. It is
+recorded here so that a later tidying of the import is recognisable as wrong.
+A03 asserts it stays the only one: nothing in `src/presentation/` imports from
+`src/terminal/` beyond `escapes.js` and type-only capability imports.
+
+**Ink paints; it does not lay text out.** C09 breaks and truncates every line
+itself, through `cells()`, and hands Ink strings that already fit. Ink's own
+wrapping and truncation are not usable here: its truncation marker is `…`
+unconditionally, which is not the 1:1 ASCII substitution §4 requires, and a
+renderer that let Ink decide where a line breaks would be measuring one layout
+and rendering another.
+
+**C09 relies on Ink's layout width agreeing with `cells()`, and the agreement is
+asserted rather than assumed.** Ink still computes width for box sizing and
+alignment, using its own implementation; `cells()` is ours, because a width
+library would not be the implementation the measurer uses (DEPENDENCIES.md). Two
+implementations of one number is exactly the drift I6 exists to prevent, and here
+it cannot be removed — only pinned. T2.16 pins it over the adversarial corpus. A
+divergence is a finding about **which of the two is right**, reported before it is
+worked around; it is not a tolerance to widen.
 
 ### Wrapping versus truncation
 
@@ -228,6 +273,8 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 9. An unregistered kind degrades to `raw`; a throwing renderer is contained to its block.
 10. The registry seals at composition end.
 11. Adding a kind whose measurer needs capabilities is a design decision, not an implementation detail.
+12. Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the first runtime L1 → L0-terminal edge, and it is required rather than tolerated.
+13. Ink paints pre-broken lines. Its layout width must agree with `cells()`, and the agreement is asserted (T2.16), never assumed.
 
 ---
 
@@ -269,6 +316,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.8** (I4): a source scan finds no hex, ANSI or named colour in `blocks/`; `syntax` slots appear only in the `code` renderer.
 - **T2.9** (I6): a source scan finds no width computation outside `cells()` — no `.length` on a display string.
 - **T2.11** (I7): the module graph shows no kind importing the registry; container kinds resolve children solely through `measureChild`.
+- **T2.16** (§3): over the adversarial corpus — CJK, ZWJ sequences, variation selectors, combining marks — `cells(s)` equals the width Ink lays `s` out at. The one number two implementations compute, held to agreement rather than assumed into it.
+- **T2.17** (I4, §3): a source scan finds no `color=` or `backgroundColor=` prop in `src/presentation/` (A03 SS37), and no import from `src/terminal/` beyond `escapes.js` and type-only capability imports.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 
 ### Tier 3 — edge cases
@@ -325,6 +374,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.11** (I14): passing control characters through → T1.11 fails.
 - **T6.12** (I8): reading `tick` inside a measurer → T2.12 fails, and a spinner starts shifting the viewport.
 - **T6.13**: a renderer calling a clock for its spinner frame → T2.7's environment scan fails, and golden frames flake.
+- **T6.15** (§3): setting an Ink colour prop instead of emitting SGR → T2.17 fails, and every golden frame renders monochrome while production renders truecolour.
+- **T6.16** (§3): letting Ink wrap or truncate rather than pre-breaking through `cells()` → T2.1 fails at the wrapping widths, and T3.4's ASCII marker becomes `…` again.
 
 ---
 

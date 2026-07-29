@@ -141,6 +141,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 §4, C05 §2 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I18, T2.19 |
+| SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I4, T2.17 |
+| SS38 | An import from `src/terminal/` other than `escapes.js`, or a value import of anything else | `src/presentation/` | C09 §3, T2.17 |
 
 **SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
 
@@ -159,6 +161,10 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
 
 **SS36 exists because a tag that is droppable gets dropped.** C10 resolves a colour to a value that names its own depth — `rgb`, `ansi256`, `ansi16` — so the writer downstream switches on a tag rather than inferring the depth from the format, and the consumer that infers wrong emits truecolour to a sixteen-colour terminal. Types hold that inside the tree. What types do not hold is a cast, and a `Style` assembled by hand in a renderer with `colour: "#7faecf"` is one `as` away from compiling. The scan is what makes the untagged form unwritable rather than merely discouraged.
+
+**SS37 is SS36's other half.** SS36 makes an untagged colour unwritable inside the tree; SS37 stops the tag being discarded on the way out of it. Ink's `color` prop takes a string and re-derives the depth from its *format* — so a renderer handing it `"#7faecf"` has asked one question and got two answers, and the one that reaches the terminal is Ink's. Worse for the suite than for the frame: the colour library behind that prop decides how much colour to emit from its own environment detection, which reports none at all under a test runner. Every golden frame would render monochrome and pass, while production rendered truecolour. A rendering nobody ships, verified thoroughly. Renderers emit SGR from `terminal/escapes.ts` instead (C09 §3).
+
+**SS38 keeps the new edge singular.** C09 §3's `escapes.sgr` is the first runtime import from L1 to L0-terminal — legal under MG1, which forbids upward imports and not downward ones, and required rather than tolerated. What makes it safe is that it is one narrow import and not the beginning of a habit: the rule permits `escapes.js` and type-only capability imports, and fails on anything else `src/presentation/` reaches for in `src/terminal/`. Recorded as a rule rather than a paragraph because "tidy that import away" and "add one more like it" are both reasonable-looking edits.
 
 **SS35 is SS30's shape applied to a type name.** C05's first draft declared its own `Result<T, E>` with `errors` plural where C04's has `error` singular — same name, same half of L0, and both compile. Nothing would have failed until a call site read `r.error` on the wrong one, which is a runtime `undefined` rather than a type error. One `Result` in the tree, declared in `data/viewmodel/types.ts`; a component wanting a plural puts it in the type argument.
 

@@ -116,6 +116,8 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 ## 4. Invariants
 
 - **I1** — Escape-sequence **literals** live only in `terminal/escapes.ts`. Enforced by lint: no `\x1b` or `\u001b` literal anywhere else, and no bare mode number either (A03 SS14, SS15). C01 is the only owner of terminal **mode state** — the keys in §3's `held` set. C03 may emit synchronised-update markers because they are transactional (opened and closed around a single write, never persistent), not mode state.
+
+  **`escapes.ts` also holds `sgr()` and `SGR_RESET`, and neither is mode state.** An SGR sequence styles one run of text and holds nothing: it has no inverse to emit at release, it never enters §3's `held` set, and A03 MG20 — which asserts each *mode* export has exactly one owning component — has nothing to say about it. It lives in `escapes.ts` because I1 puts escape literals there and an SGR sequence is one. Its only caller is C09 §3, and that is the first runtime edge from L1 to L0-terminal.
 - **I2** — `release()` is idempotent. Calling it twice is a no-op the second time.
 - **I3** — Handlers are registered before any state is acquired. The constructor registers and `acquire()` is a separate call, but nothing structurally prevents a later change from calling `acquire()` from the constructor — so this is asserted by test, not assumed.
 - **I4** — On a fault path, release completes before any diagnostic is written.
