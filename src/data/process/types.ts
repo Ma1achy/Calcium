@@ -34,6 +34,15 @@ export interface ChildHandle {
   /** Always resolves, spawn failure included (C21 I13). */
   readonly exited: Promise<Exit>;
   readonly running: boolean;
+  /**
+   * The buffer bound was crossed and output was dropped (C21 I5).
+   *
+   * A field rather than a sentinel in the stream: a marker chunk is
+   * indistinguishable from content the child emitted, and C06 would read it as a
+   * line of NDJSON and report it malformed. A fact about a channel does not
+   * travel inside it.
+   */
+  readonly overflowed: boolean;
   /** Delivered to the process group. False on an already-exited child, never a throw (C21 I9). */
   signal(sig: string): boolean;
 }
@@ -46,6 +55,27 @@ export interface ChildHandle {
  * C21 delivers signals; **C06 owns the escalation ladder** and its timings
  * (C21 I8, C06 §4). Nothing in this interface schedules anything.
  */
+/**
+ * What C21 is given, because it reaches for nothing (C21 I14).
+ *
+ * Three ambient reads, three dependencies. `env` is where `$SHELL` is resolved
+ * from and what `SpawnOptions.env` overlays, since A03 SS10 bans `process.env`
+ * everywhere in `src/` outside C02. `debug` is where the shell-fallback warning
+ * goes, since SS33 bans `console.*` and C21 cannot import C01's writer.
+ *
+ * `stdin` is the one that earns the pattern rather than merely obeying it: it is
+ * the raw-mode probe of §5, and injected it makes **I6 assertable** — a test
+ * hands it `{ isRaw: true }`. Against the real `process.stdin` the same test
+ * would have to put the runner's own terminal into raw mode and hope to restore
+ * it, and an invariant checkable only by mutating global state is one that ends
+ * up unchecked.
+ */
+export type ProcessRunnerDeps = Readonly<{
+  env: Readonly<NodeJS.ProcessEnv>;
+  stdin: Readonly<{ isRaw?: boolean }>;
+  debug?: (line: string) => void;
+}>;
+
 export interface ProcessRunner {
   spawn(argv: readonly string[], opts: SpawnOptions): ChildHandle;
   spawnShell(command: string, opts: SpawnOptions): ChildHandle;

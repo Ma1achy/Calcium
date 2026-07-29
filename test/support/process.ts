@@ -140,15 +140,23 @@ export const scripts = {
     ];
   },
 
-  /** `chunk` repeated until at least `bytes` have been written (T3.3, T3.4). */
+  /**
+   * `chunk` repeated until at least `bytes` have been written (T3.3, T3.4).
+   *
+   * **No `process.exit` at the end, and that is not tidiness.** `process.exit`
+   * discards writes still queued on a pipe, so under load this program delivered
+   * 828 of the 4096 bytes it was asked for and the shortfall looked like a
+   * failure in whatever was reading. It returns instead, and node exits when
+   * stdout has drained — which is the only way a writer can promise what it
+   * wrote arrived.
+   */
   emitBytes(bytes = 1024, chunk = "x".repeat(64)): readonly string[] {
     return [
       "node",
       "-e",
       `const c=${JSON.stringify(chunk)};let n=0;` +
         `const pump=()=>{while(n<${bytes}){n+=Buffer.byteLength(c);` +
-        `if(!process.stdout.write(c)){process.stdout.once("drain",pump);return}}` +
-        `process.exit(0)};pump()`,
+        `if(!process.stdout.write(c)){process.stdout.once("drain",pump);return}}};pump()`,
     ];
   },
 
