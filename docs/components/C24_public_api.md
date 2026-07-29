@@ -146,6 +146,21 @@ export const b: {
 
 **A bare string is a cell with default tone.** `{ family: "digit-classifier" }` and `{ status: b.warn("degraded") }` in the same object, because most cells carry no tone and paying `{ text: … }` for all of them is the noise this removes.
 
+**`gapBefore` has a default per kind, and that is why adapters rarely set it.**
+C04 §3a puts vertical rhythm in the block; if every adapter had to think about it,
+half of them would not, and the surfaces would render dense while the specs drew
+them spaced. So the builders decide: `b.table`, `b.plot`, `b.panel`, `b.rule`,
+`b.steps`, `b.keyValue`, `b.diff`, `b.code` and `b.tip` set `gapBefore` when they
+are not the first block in the sequence they are built into; `b.pills`,
+`b.notice`, `b.progress`, `b.logs`, `b.events` and `b.raw` do not — a second
+`pills` row belongs against the first, and a run of notices is a list rather than
+a set of sections.
+
+**A default is not a policy.** Every builder takes an explicit `gapBefore` that
+wins, and a document assembled without builders has whatever its author wrote.
+The defaults exist so that the common case matches what the S-series draws, not
+so that the framework owns a surface's rhythm.
+
 **Nothing is inferred from field names.** A builder that guessed a tone from a key called `status` would work for four verbs and fail silently on the fifth.
 
 ---

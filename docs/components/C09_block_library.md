@@ -56,6 +56,8 @@ interface BlockRegistry {
   seal(): void;
   measure(block: Block, width: number): number;
   render(block: Block, ctx: RenderContext): ReactElement;
+  measureSequence(blocks: readonly Block[], width: number): number;
+  renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }
@@ -66,6 +68,15 @@ function createBlockRegistry(opts: { defaults?: boolean }): BlockRegistry;
 `measure` on the registry is the dispatcher, and it passes **itself** as each definition's `measureChild`. That is how `panel`, `group` and a table's expanded detail measure children whose kind they do not know, without any kind importing the registry.
 
 `measure` and `render` on the registry are the dispatching entry points. An unregistered kind resolves to the `raw` definition rather than throwing — a document referencing an unknown kind still renders, degraded.
+
+**`measureSequence` and `renderSequence` are where `gapBefore` is applied** (C04
+§3a). A block's own height never includes the gap before it, so a sequence —
+a document's top level, a `panel`'s children, a `column` group's children — is
+`Σ measure(b, w)` plus one row per block declaring `gapBefore`. Stated once, on
+the registry, because every composer needs the same arithmetic and a composer
+that inserted spacing of its own would make a document's height unknowable from
+the document (C23 §2). A `row` group is not a sequence: its children sit side by
+side, so a gap before one of them is ignored rather than being an error.
 
 **`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close.
 
@@ -124,6 +135,19 @@ much colour to emit from its own environment detection, which reports **no colou
 at all under a test runner**: goldens would pass in monochrome forever while
 production rendered truecolour, which is a suite verifying a rendering nobody
 ships. A03 SS37 makes the prop unwritable rather than discouraged.
+
+**A container whose two halves disagree draws a frame that does not close.** That
+is the reason `measureChild` is on the render context, and it is worth more than
+the requirement that prompted it. `panel` draws its own border because S13 puts
+the title inside it, and drawing the border means sizing the border column — from
+`measureChild`, because the frame must be as tall as the contents are *measured*
+to be. So the container contract checks itself: a child whose measurer and
+renderer disagree by a row produces a border with a gap in it, in the frame, at
+the moment it happens. Everywhere else in the system an I1 violation is silent
+until a viewport drifts six screenfuls later, which is why this one is stated
+here rather than left as an implementation detail — a future container that
+delegated its frame to a layout engine would lose the property without anything
+failing.
 
 **This is the first runtime dependency from L1 on L0-terminal**, and it is
 required rather than merely allowed. Everything at L1 has so far touched
@@ -260,6 +284,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I11** — A renderer throwing is contained: that block renders as an error block, the rest of the frame is unaffected. Compute, so no retry (A02 §7 rule 2).
 - **I12** — A sealed registry cannot be registered against.
 - **I13** — Every kind in C04's union has a registered default definition. Asserted exhaustively over the type.
+- **I15** — `gapBefore` is applied by the sequence, never by the block (C04 §3a, I19). `measure` never counts it; `measureSequence` and every container do.
 - **I14** — Control characters are stripped from every text field before measurement and render. A tool's output cannot inject escape sequences into the frame.
 
 ---
@@ -322,6 +347,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.11** (I7): the module graph shows no kind importing the registry; container kinds resolve children solely through `measureChild`.
 - **T2.16** (§3): over the adversarial corpus — CJK, ZWJ sequences, variation selectors, combining marks — `cells(s)` equals the width Ink lays `s` out at. The one number two implementations compute, held to agreement rather than assumed into it.
 - **T2.17** (I4, §3): a source scan finds no `color=` or `backgroundColor=` prop in `src/presentation/` (A03 SS37), and no import from `src/terminal/` beyond `escapes.js` and type-only capability imports.
+- **T2.18** (I15, C04 I19): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 
 ### Tier 3 — edge cases
@@ -379,6 +405,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.12** (I8): reading `tick` inside a measurer → T2.12 fails, and a spinner starts shifting the viewport.
 - **T6.13**: a renderer calling a clock for its spinner frame → T2.7's environment scan fails, and golden frames flake.
 - **T6.15** (§3): setting an Ink colour prop instead of emitting SGR → T2.17 fails, and every golden frame renders monochrome while production renders truecolour.
+- **T6.17** (I15): counting `gapBefore` inside `measure` instead of at the sequence → a block measures differently in a document than in a panel, and T2.18 fails.
 - **T6.16** (§3): letting Ink wrap or truncate rather than pre-breaking through `cells()` → T2.1 fails at the wrapping widths, and T3.4's ASCII marker becomes `…` again.
 
 ---

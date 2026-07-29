@@ -34,6 +34,23 @@ C18 classifies; C23 routes. Seven kinds, seven paths.
 | `app` | Transport → adapt → append (§3) |
 | `shell` | `spawnShell` → `raw` document (C18 §5) |
 
+### Composition inserts no spacing of its own
+
+**A document's vertical rhythm is declared by its blocks** — `gapBefore` (C04
+§3a) — and C23 adds nothing between them, before them or after them.
+
+The alternative is what this rules out: a composition root that put a blank row
+between top-level blocks would make a document's height depend on where it was
+rendered, so the height C14 virtualises against and the height the frame draws
+would be computed by different code with no reason to agree. It would also be
+invisible to `measure`, which is the one place the system checks anything about
+height at all.
+
+The rule has teeth in one direction only: C23 may not *add* rhythm. An adapter
+that produces a document with no gaps gets a dense one, and that is the adapter's
+choice to make — `b.*` supplies the defaults (C24 §4) so that choice is rarely
+made by accident.
+
 `empty` producing no entry is deliberate: pressing Enter on a blank prompt in a shell does nothing, and appending an empty block would fill the transcript with them.
 
 ### Local handlers

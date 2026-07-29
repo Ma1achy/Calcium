@@ -85,29 +85,32 @@ type Block =
 ```
 
 ```typescript
-type Rule     = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }>;
-type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: string; text: string }>;
+/** Every block may declare one blank row before it (§3a). */
+type Gap      = Readonly<{ gapBefore?: boolean }>;
+
+type Rule     = Readonly<{ kind: "rule"; id: string; label: string; meta?: string }> & Gap;
+type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: string; text: string }> & Gap;
 type KeyValue = Readonly<{ kind: "keyValue"; id: string;
-                           rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[] }>;
+                           rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[] }> & Gap;
 type Steps    = Readonly<{ kind: "steps"; id: string;
                            steps: readonly Readonly<{ label: string; detail?: string;
-                             state: "pending" | "active" | "done" | "failed" }>[] }>;
+                             state: "pending" | "active" | "done" | "failed" }>[] }> & Gap;
 type Logs     = Readonly<{ kind: "logs"; id: string;
-                           lines: readonly Readonly<{ ts: string; level: string; message: string }>[] }>;
+                           lines: readonly Readonly<{ ts: string; level: string; message: string }>[] }> & Gap;
 type Events   = Readonly<{ kind: "events"; id: string;
-                           events: readonly Readonly<{ ts: string; type: string; message: string }>[] }>;
+                           events: readonly Readonly<{ ts: string; type: string; message: string }>[] }> & Gap;
 type Progress = Readonly<{ kind: "progress"; id: string; label: string;
-                           current: number; total: number }>;
+                           current: number; total: number }> & Gap;
 type Code     = Readonly<{ kind: "code"; id: string; language: string; text: string;
-                           wrap?: boolean }>;   // default false — truncate
+                           wrap?: boolean }> & Gap;   // default false — truncate
 type Diff     = Readonly<{ kind: "diff"; id: string;
                            rows: readonly Readonly<{ field: string; a: string; b: string;
-                             comparison?: "same" | "better" | "worse" | "changed" }>[] }>;
+                             comparison?: "same" | "better" | "worse" | "changed" }>[] }> & Gap;
 type Patch    = Readonly<{ kind: "patch"; id: string;
                            path: string;               // the file, for the header
                            language: string;           // syntax palette, per hunk line
                            hunks: readonly Hunk[];
-                           layout?: "unified" | "split" }>;   // default: width-derived
+                           layout?: "unified" | "split" }> & Gap;   // default: width-derived
 type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@
                            lines: readonly Readonly<{
                              kind: "add" | "remove" | "context";
@@ -117,14 +120,14 @@ type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@
                            collapsedBefore?: number }>; // unchanged lines elided above
 type Pills    = Readonly<{ kind: "pills"; id: string;
                            chips: readonly Readonly<{ label: string; tone?: Tone;
-                             action?: Action; active?: boolean }>[] }>;
+                             action?: Action; active?: boolean }>[] }> & Gap;
 type Tip      = Readonly<{ kind: "tip"; id: string; text: string;
-                           actions?: readonly Action[] }>;
+                           actions?: readonly Action[] }> & Gap;
 type Panel    = Readonly<{ kind: "panel"; id: string; title: string;
-                           children: readonly Block[] }>;
+                           children: readonly Block[] }> & Gap;
 type Group    = Readonly<{ kind: "group"; id: string;
-                           direction: "row" | "column"; children: readonly Block[] }>;
-type Raw      = Readonly<{ kind: "raw"; id: string; text: string }>;
+                           direction: "row" | "column"; children: readonly Block[] }> & Gap;
+type Raw      = Readonly<{ kind: "raw"; id: string; text: string }> & Gap;
 
 type Series   = Readonly<{ values: readonly number[]; label?: string; tone?: Tone }>;
 type Plot     = Readonly<{ kind: "plot"; id: string;
@@ -133,7 +136,7 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
                            height?: number; axes?: boolean;
                            xLabels?: readonly [string, string, string];
                            yFormat?: "number" | "percent" | "bytes" | "duration";
-                           emptyMessage?: string }>;
+                           emptyMessage?: string }> & Gap;
 ```
 
 `Table`, `TableRow`, `Cell` and `ColumnDef` are declared below. **Every block variant is declared here** — C11 and C12 own the table *engine* and the plot *renderer*, not the shapes. `id` is present on every variant because `ViewPatch` addresses blocks by it.
@@ -159,6 +162,48 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
 | `panel` | title, children | children measured at `w - 2`, + 2 |
 | `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
 | `raw` | pre-formatted text | lines |
+
+A *sequence* of blocks — a document's top level, a `panel`'s children, a `column`
+group's children — occupies `Σ` of the above **plus one row for each block
+declaring `gapBefore`** (§3a). No block's own height includes its gap.
+
+### `gapBefore` — the one field that is vertical rhythm
+
+```typescript
+gapBefore?: boolean       // default false — one blank row before this block
+```
+
+Nothing else in the vocabulary produces vertical space, and the S-series draws it
+everywhere: S08's success frame illustrates seventeen rows and composes to
+thirteen, the four extra being blank rows between regions. Composed from the
+vocabulary as it stood, the surfaces could not be drawn.
+
+**It is content, not view state.** A `merge` carries it, unlike `expanded` (I9):
+the space before a block is a property of the document's shape rather than of
+what the user has done to it, and a `--watch` tick that rebuilt a table's rows
+must not close up the gap above it.
+
+**Height is stated at the sequence, not at the block.** `measure(block, w)` is
+unchanged and never counts the gap; a *sequence* of blocks occupies
+`Σ measure(b, w) + the number of them declaring gapBefore`. Two consequences,
+both intended:
+
+- A block measures the same wherever it appears, so C14's cache stays keyed on
+  the block and the width alone.
+- Every composer applies the same rule — the document's top level, a `panel`'s
+  children, a `column` group's children — because they are all sequences. A
+  `row` group is not: its children sit side by side, so a gap before one of them
+  is meaningless and is ignored rather than being an error.
+
+**It applies to the first block too.** `gapBefore` on the first block of a
+sequence is a leading blank row, because the alternative — silently dropping it —
+makes the field mean two things depending on position, and a document assembled
+by concatenating two others would then render differently from either.
+
+**Who sets it is C24's problem, not an adapter's.** `b.*` supplies defaults per
+kind (C24 §4): a `table` or a `plot` following anything gets one, a second
+`pills` row does not. An adapter that wants a different rhythm sets the field;
+one that does not think about it gets the rhythm the surfaces already draw.
 
 ### Container widths, and the width a `row` group gives its children
 
@@ -207,7 +252,7 @@ type Table = Readonly<{
   sort?:         Readonly<{ key: string; direction: "asc" | "desc" }>;
   showHeader?:   boolean;                // default true
   emptyMessage?: string;
-}>;
+}> & Gap;
 
 type ColumnDef = Readonly<{
   key:       string;
@@ -366,6 +411,10 @@ Container kinds — `panel`, `group`, and a `table`'s expanded detail — measur
 
 **`measure(block, w)` must equal the number of terminal rows that rendering `block` at width `w` actually occupies.** C14 virtualises by measured height without rendering; if the two disagree, the viewport drifts, scroll positions land wrong, and content jumps as the user scrolls past it. This is the most load-bearing invariant in the system and the hardest to hold, because it is violated silently.
 
+`measure` is a function of a block and a width, and the gap before a block is a
+property of the sequence it sits in — so no measurer counts it, and every
+composer does (§3a).
+
 Requirements on every measurer:
 
 - **At least 1** — a block that is present occupies at least one row. `ceil(cells("") / w)` is 0 and an empty `notice` renders as one row; a `code` block's blank line is a line. Stated once, as a rule over every kind, rather than as seventeen per-kind special cases — the arithmetic that reaches 0 is the same arithmetic in each of them. The only kinds that legitimately measure 0 are containers with no children (`group`, T3.5), which are not present content but the absence of it.
@@ -399,6 +448,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I15** — `applyPatch` is fallible in its type and never throws. Every one of the four failure cases in §4 returns `{ok: false}` with an `ErrorLike`, and the input document is returned untouched and still frozen.
 - **I16** — A `merge` payload cannot carry view state. Structural, via `MergeRow`, not remembered: I9 holds because the field does not exist to be set.
 - **I17** — Every measurer returns at least 1 for a present block (§5). Only an empty container measures 0.
+- **I19** — `gapBefore` is content: `merge` carries it, `measure` never counts it, and every sequence of blocks adds one row per block declaring it. A composer that inserts spacing of its own instead (C23 §2) makes a document's height unknowable from the document.
 - **I18** — `validateDocument` terminates on any input, including a cyclic one. A path-scoped seen-set refuses a cycle; it is not a depth limit, and it does not reject a legitimately shared subtree.
 
 ---
