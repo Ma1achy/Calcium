@@ -47,14 +47,17 @@ export function createBoundedStream(maxBytes: number): BoundedStream {
   };
 
   const enqueue = (text: string): void => {
-    if (text === "") return;
+    // Ignored after the end (C21 §7, T3.7). Without the guard a late chunk lands
+    // in the queue behind a `done` that has already been reported, and a
+    // consumer that iterates again sees output arrive from a child that exited.
+    if (text === "" || ended) return;
     queue.push(text);
     pump();
   };
 
   return {
     push(chunk: Uint8Array): void {
-      if (overflowed) return; // draining: read, decoded by nobody, dropped
+      if (overflowed || ended) return; // draining: read, decoded by nobody, dropped
 
       const room = maxBytes - delivered;
 

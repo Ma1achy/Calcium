@@ -534,6 +534,17 @@ describe("harness parameters — real processes", () => {
     expect((await run(scripts.emitBytes())).stdout.length).toBeLessThan(4096);
   });
 
+  it("scripts.emitRepeated(unit, times): both arguments shape the payload, and it survives past the argv limit", async () => {
+    expect((await run(scripts.emitRepeated("ab", 3))).stdout).toBe("ababab");
+    expect((await run(scripts.emitRepeated())).stdout).toBe("harnessharness");
+
+    // The reason this exists. `emit(unit.repeat(times))` at this size fails the
+    // spawn with E2BIG — Linux caps one argument at 128 KiB — and the empty
+    // output reads like the reader dropped it rather than like the spawn failed.
+    const big = await run(scripts.emitRepeated("日本語🚀", 20_000));
+    expect(big.stdout.length).toBe("日本語🚀".length * 20_000);
+  });
+
   it("scripts.exit(code): the code is the child's", async () => {
     expect((await run(scripts.exit(7))).code).toBe(7);
     expect((await run(scripts.exit())).code).toBe(3);

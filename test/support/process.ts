@@ -75,11 +75,15 @@ export async function groupMembers(pgid: number): Promise<readonly number[]> {
 /**
  * Wait until a group holds none of `expected`, or give up naming the survivors.
  *
- * Polled through `setImmediate` rather than a timer: tiers 1-4 run under
- * vitest's faked `setTimeout` (`vitest.config.ts`), so a sleep here would never
- * wake. Each attempt spawns a real `ps`, which is what bounds the loop in wall
- * time — roughly a millisecond apiece, so the default 400 attempts is a
- * fraction of a second and not a spin.
+ * Polled through `setImmediate` rather than a timer. `vitest.config.ts` names
+ * `setTimeout` in `fakeTimers.toFake`, which decides *which* APIs are faked when
+ * a test calls `vi.useFakeTimers()` — it does not fake them by default, so
+ * timers here are real. `setImmediate` is used anyway: it is outside the faked
+ * set either way, so this helper keeps working inside a test that does opt in.
+ *
+ * Each attempt spawns a real `ps`, which is what bounds the loop in wall time —
+ * roughly a millisecond apiece, so the default 400 attempts is a fraction of a
+ * second and not a spin.
  *
  * A timeout is a real failure and names what survived. "Group not empty" without
  * the pids sends the reader to `ps` by hand.
@@ -160,6 +164,22 @@ export const scripts = {
     ];
   },
 
+  /**
+   * `unit` repeated `times`, built **inside** the child (T2.1, T3.17).
+   *
+   * Not `emit(unit.repeat(times))`: Linux caps a single argument at 128 KiB
+   * (`MAX_ARG_STRLEN`, which is not `ARG_MAX` and is much smaller), so passing a
+   * large payload as an argv entry fails the spawn with `E2BIG` — and the empty
+   * output that follows reads like a decoder that dropped everything.
+   */
+  emitRepeated(unit = "harness", times = 2): readonly string[] {
+    return [
+      "node",
+      "-e",
+      `process.stdout.write(${JSON.stringify(unit)}.repeat(${times}))`,
+    ];
+  },
+
   /** Exit with `code` (T1.3). */
   exit(code = 3): readonly string[] {
     return ["node", "-e", `process.exit(${code})`];
@@ -204,14 +224,23 @@ export const scripts = {
     return ["node", "-e", `process.stdout.write(String(process.env[${JSON.stringify(name)}]))`];
   },
 
-  /** Spawn a detached grandchild that outlives its parent, then exit (T3.16). */
+  /**
+   * Spawn a grandchild in the same process group, announce its pid, stay alive
+   * (T3.16).
+   *
+   * The grandchild is what group signalling has to reach: it is not the handle's
+   * pid, nothing above knows it exists, and signalling the leader alone leaves it
+   * running. `stdio: "ignore"` so it holds no pipe — the claim under test is
+   * about signals, and a grandchild holding stdout open would confuse it with a
+   * claim about streams.
+   */
   grandchild(): readonly string[] {
     return [
       "node",
       "-e",
       `const{spawn}=require("child_process");` +
         `const g=spawn("node",["-e","setInterval(()=>{},1000)"],{stdio:"ignore"});` +
-        `process.stdout.write(String(g.pid)+"\\n");setTimeout(()=>process.exit(0),50)`,
+        `process.stdout.write(String(g.pid)+"\\n");setInterval(()=>{},1000)`,
     ];
   },
 

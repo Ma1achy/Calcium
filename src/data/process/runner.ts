@@ -81,11 +81,24 @@ export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
       settle = resolve;
     });
 
+    /**
+     * The child is gone. **The streams are not ended here**, and that is the
+     * subtle part.
+     *
+     * Node's `exit` can fire before the stdio `data` events have been delivered
+     * — which is the entire reason `close` exists as a separate event. Ending
+     * the streams on exit therefore sets `ended` while output is still in
+     * flight, and the T3.7 guard then drops it. The symptom is empty stdout from
+     * a child that ran perfectly, on short-lived commands, and only when the
+     * machine is loaded enough to reorder the two.
+     *
+     * So: `exited` settles on `exit`, and the streams end on their own `end` or
+     * on the child's `close`, which is the event that means the stdio is
+     * genuinely drained.
+     */
     const finish = (exit: Exit): void => {
       if (!running) return;
       running = false;
-      out.end();
-      err.end();
       settle(exit);
     };
 
@@ -116,9 +129,27 @@ export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
     child.stdout?.on("error", () => undefined);
     child.stderr?.on("error", () => undefined);
 
+    // A stream ends when the child closes it, not when the child exits (T3.5).
+    // A consumer of `cli tail --json | head` sees the stream finish while the
+    // child is still alive, and `exited` still waits for it to go.
+    child.stdout?.on("end", () => out.end());
+    child.stderr?.on("end", () => err.end());
+
+    // The backstop, and the ordering guarantee: `close` means every stdio
+    // stream is drained and closed. A child killed mid-write reaches here even
+    // if its pipes never emitted `end`.
+    child.on("close", () => {
+      out.end();
+      err.end();
+    });
+
     child.on("error", (error) => {
+      // No `close` follows some spawn failures, so this path ends the streams
+      // itself — after pushing the message, which is the order that matters.
       err.pushText(messageOf(error));
       finish({ code: null, signal: null });
+      out.end();
+      err.end();
     });
 
     // `exit`, not `close`: `close` waits for every pipe to be closed, and a
