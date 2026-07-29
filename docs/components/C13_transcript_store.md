@@ -112,6 +112,16 @@ Three rules make this safe:
 
 **Streaming entries are never evicted.** A long-running `--watch` scrolled far up is still receiving patches; dropping it would strand the stream with nowhere to write. If the cap cannot be met without evicting one, the cap is exceeded and the overshoot is reported rather than forcing the eviction.
 
+### 5a. Raw payload retention
+
+Off by default. When `debug.retainPayloads` is set (C22 §2), C13 retains the raw payload an adapter was given, for the **last N entries only**, evicting oldest first.
+
+This is what answers the question a rendered block cannot: *did the far side return something unexpected, or did the adapter mishandle it?* `/debug` shows it (C23 §2).
+
+**Retention is capped at N rather than covering every entry, and the reason is not squeamishness about memory.** Retaining every payload roughly doubles memory per entry against the 100,000-block cap, and a debug mode that makes a long session unusable is a debug mode nobody turns on — which means it is not available at the moment it is needed. Fifty covers any real debugging session, because the entry you are inspecting is almost always one you just ran.
+
+Payload eviction is **independent of the block cap**: it runs on its own N-entry window, so retention never evicts an entry and the cap never evicts a payload early. Two eviction policies sharing one counter would make each one's behaviour depend on the other's.
+
 **Eviction is reported, never silent.** `droppedBlocks` accumulates, and C13 maintains a **synthetic marker entry** at the head of the transcript carrying a single `notice` block naming the count. It is a real entry — frozen, settled, never itself evicted — so `totalRows` and every visibility query account for it with no special case downstream. A session that quietly loses its beginning is worse than one that says so.
 
 **Cap overshoot is reported too.** When the cap cannot be met because every candidate is live or streaming, `overCap` holds the excess block count. L4 surfaces it; C13 does not decide what to do about it.
@@ -126,12 +136,16 @@ Ids are never reused after eviction, so a stale reference resolves to nothing ra
 patch(id, p):
   entry unknown            → no-op
   entry not streaming      → rejected, logged
-  otherwise                → doc = applyPatch(doc, p); notify
+  otherwise                → r = applyPatch(doc, p)
+                             r.ok  → doc = r.doc; notify
+                             !r.ok → doc unchanged; report r.error to the caller
 ```
 
 Patching a settled entry is rejected rather than ignored, because it means a stream outlived its `settle` — a bug in the caller worth surfacing rather than absorbing.
 
-`applyPatch` is C04's and pure; C13 holds the result. Row-level `merge` preserves untouched rows by reference, which is what stops a `--watch` tick from collapsing an expanded row or moving the viewport (C04 I9).
+`applyPatch` is C04's, pure, and **fallible in its type** (C04 §4, I15). It returns a `PatchResult`, so the four ways a patch can fail to fit a document — an I3-violating status transition, a `merge` against a non-table, an unknown or a duplicate `blockId` — arrive as values rather than as throws. C13 keeps the previous document on failure and hands the error up; C23 §5 is what decides the entry's fate. No `try` around the patch path, which matters because that path runs on every stream tick.
+
+Row-level `merge` preserves untouched rows by reference, which is what stops a `--watch` tick from collapsing an expanded row or moving the viewport (C04 I9). It also never removes a row — deletion goes through `replace` (C04 §4), so a tick that returns fewer rows leaves the transcript showing what it last knew rather than silently shedding entries.
 
 ---
 
@@ -167,27 +181,29 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I13** — `rev` increments on every applied patch and never decreases. It is the staleness signal for C14's height cache; without it a cached height survives a patch that changed it.
 - **I14** — The eviction marker is a real entry, never a downstream special case, and is itself never evicted.
 - **I15** — Overshoot is exposed as `overCap`; C13 does not act on it.
+- **I18** — `clear()` empties the transcript and leaves command history untouched. They are separate stores with separate lifetimes: a reader clearing the screen has not asked to forget what they typed, and the two being one call away from each other is exactly why the boundary is stated.
+- **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost.
 - **I16** — C13 imports nothing from `terminal/` or `presentation/`.
 
 ---
 
 ## 9. Commitments
 
-1. Every command appends an entry; the newest is live and the rest are frozen.
-2. Frozen means not focusable; it does not mean not updating.
-3. A streaming entry keeps receiving patches after it freezes.
-4. Freezing is implicit in appending; there is no public freeze.
-5. Ids are monotonic and never reused.
-6. The session cap is 100,000 blocks, evicting oldest-first.
-7. The live entry and any streaming entry are never evicted; the cap yields instead.
-8. Eviction is counted and surfaced, never silent.
-9. Patching a settled or unknown entry is a no-op that is logged, not absorbed.
-10. `clear()` empties the transcript and leaves command history alone.
-11. `seq` is logical; C13 reads no clock.
-12. `Change` is granular so consumers avoid full remeasure.
-13. Every entry carries a monotonic `rev`, bumped on each applied patch, so downstream caches can detect staleness.
-14. The eviction marker is a synthetic entry, so row arithmetic needs no special case.
-15. Cap overshoot is exposed as `overCap` and acted on by L4.
+1. Every command appends an entry; the newest is live and the rest are frozen (I1).
+2. Frozen means not focusable; it does not mean not updating (I4).
+3. A streaming entry keeps receiving patches after it freezes (I4).
+4. Freezing is implicit in appending; there is no public freeze (I2).
+5. Ids are monotonic and never reused (I3).
+6. The session cap is 100,000 blocks, evicting oldest-first (I17).
+7. The live entry and any streaming entry are never evicted; the cap yields instead (I5, I6).
+8. Eviction is counted and surfaced, never silent (I7).
+9. Patching a settled or unknown entry is a no-op that is logged, not absorbed (I8).
+10. `clear()` empties the transcript and leaves command history alone (I18).
+11. `seq` is logical; C13 reads no clock (I9).
+12. `Change` is granular so consumers avoid full remeasure (I12).
+13. Every entry carries a monotonic `rev`, bumped on each applied patch, so downstream caches can detect staleness (I13).
+14. The eviction marker is a synthetic entry, so row arithmetic needs no special case (I14).
+15. Cap overshoot is exposed as `overCap` and acted on by L4 (I15).
 
 ---
 

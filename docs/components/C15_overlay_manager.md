@@ -145,6 +145,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I8** — Truncation is reported, never disguised; C15 renders no overflow indicator itself.
 - **I9** — C15 never writes to the transcript.
 - **I10** — An overlay anchored to an evicted row is dismissed rather than left dangling.
+- **I13** — No layer paints a backdrop, dim or otherwise. A terminal renders a dimmed region as damaged output rather than as depth, and the separation an overlay needs comes from its border and its position — which are things a cell grid can actually express.
 - **I11** — C15 imports nothing from `terminal/` **or C14**; the region arrives as data.
 - **I12** — Pushing returns a disposable; disposing is equivalent to `dismiss(id)`.
 
@@ -152,18 +153,18 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 
 ## 8. Commitments
 
-1. Overlays and pushed views are one mechanism with different placement.
-2. Layer content is blocks, so overlays are themed, degradable and measurable like everything else.
-3. Overlays always sort above views; at most one view exists.
-4. Pushing a second view is rejected as an orchestration bug.
-5. `Esc` pops the top dismissable layer; a confirm is not escapable.
-6. Placement flips before clamping.
-7. Truncation is reported; the owner renders its own indicator.
-8. No backdrop dimming — terminals render it as a fault, not as depth.
-9. `layout()` is pure and needs no resize invalidation.
-10. An overlay whose anchor is evicted is dismissed.
-11. C15 emits pop events; L4 composes the transcript trace.
-12. Push returns a disposable equivalent to dismissal.
+1. Overlays and pushed views are one mechanism with different placement (I1, I2).
+2. Layer content is blocks, so overlays are themed, degradable and measurable like everything else (I4).
+3. Overlays always sort above views; at most one view exists (I2, I1).
+4. Pushing a second view is rejected as an orchestration bug (I1).
+5. `Esc` pops the top dismissable layer; a confirm is not escapable (I3).
+6. Placement flips before clamping (I7).
+7. Truncation is reported; the owner renders its own indicator (I8).
+8. No backdrop dimming — terminals render it as a fault, not as depth (I13).
+9. `layout()` is pure and needs no resize invalidation (I5).
+10. An overlay whose anchor is evicted is dismissed (I10).
+11. C15 emits pop events; L4 composes the transcript trace (I9).
+12. Push returns a disposable equivalent to dismissal (I12).
 
 ---
 

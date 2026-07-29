@@ -6,7 +6,7 @@
 | **Package** | `tui-kit` (mechanism + a default set) + app (its own tokens) |
 | **Layer** | L1 presentation |
 | **Depends on** | C04 (`Tone`) · `TerminalCapabilities` injected |
-| **Consumed by** | C09 C11 C12 (every renderer) · L4 (`/theme`, config persistence) |
+| **Consumed by** | C09 C11 C12 C25 (every renderer) · L4 (`/theme`, config persistence) |
 | **Source** | A01 D29, D36, F4 · A01 Appendix A.1 · A02 §2, §6 |
 | **Status** | Draft |
 
@@ -23,10 +23,13 @@ It also owns the promise that makes degradation safe. **No information is carrie
 ## 2. Tokens
 
 ```typescript
+type MonoClass = "emphasised" | "normal" | "deemphasised";
+
 type PaletteSpec = Readonly<{
   slots:      Readonly<Record<string, string>>;   // slot name → 24-bit hex
   carries:    "meaning" | "decoration";
   monochrome: "typographic" | "foreground";       // what 1-bit collapses to
+  classes?:   Readonly<Record<string, MonoClass>>; // required iff monochrome === "typographic"
 }>;
 
 type ThemeTokens = Readonly<{
@@ -37,14 +40,23 @@ type ThemeTokens = Readonly<{
     bg: string; bgElev: string; bgDeep: string;
     border: string; borderStrong: string;
   }>;
+  fourBit:  FourBitMap;                             // the curated table, by reference
 }>;
+
+/** slot name → ANSI index, 0–15. Curated per theme (§3), never computed. */
+type FourBitMap = Readonly<Record<string, number>>;
 
 type ThemeSet = Readonly<{ dark: ThemeTokens; light: ThemeTokens }>;
 
 type ColourRef = `${string}.${string}`;            // "tone.ok", "syntax.keyword", "spectrum.3"
 
+type ColourValue =
+  | Readonly<{ kind: "rgb";     hex: string }>     // depth 24
+  | Readonly<{ kind: "ansi256"; index: number }>   // depth 8,  16–255
+  | Readonly<{ kind: "ansi16";  index: number }>;  // depth 4,  0–15
+
 type Style = Readonly<{
-  colour?:    string;                 // already resolved to the terminal's depth
+  colour?:    ColourValue;            // already resolved to the terminal's depth
   bold?:      boolean;
   dim?:       boolean;
   inverse?:   boolean;
@@ -55,6 +67,10 @@ function resolve(ref: ColourRef, theme: ResolvedTheme, caps: TerminalCapabilitie
 function resolveTone(tone: Tone, theme: ResolvedTheme, caps: TerminalCapabilities): Style;
 ```
 
+**`ColourValue` is tagged rather than a bare string**, and the tag is the point. C10 cannot write an escape (that is `terminal/escapes.ts` alone), so it hands out a description of a colour and something downstream turns it into SGR. A bare `"#7faecf"` or `"12"` makes that consumer re-derive the depth by inspecting the format, and the consumer that guesses wrong emits a truecolour sequence to a 16-colour terminal — precisely what T5.2 exists to catch. Naming the depth in the value means the writer switches on a tag it cannot misread.
+
+**The typographic fallback is declared, not inferred.** A `meaning` palette collapses to typographic classes at 1-bit (I15), and `classes` is where it says which slot lands in which. Inferring it would mean the framework knowing that `ok` is emphatic and `comment` is recessive — the same app-domain knowledge C05's `ArgType` refuses. An app registering its own `meaning` palette declares the mapping, and D29 stays true without the framework learning anyone's nouns.
+
 **A block names a palette slot; it never embeds a value.** That indirection is the whole point — it is what makes theme switching a swap, degradation mechanical, and contrast checkable. Scarcity was never the point, and an earlier draft forbidding all non-tone colour needed an escape hatch on its second real use, which is how you know a rule is wrong.
 
 ### The three shipped palettes
@@ -62,12 +78,18 @@ function resolveTone(tone: Tone, theme: ResolvedTheme, caps: TerminalCapabilitie
 | Palette | Carries | Contrast floor | At 1-bit | Consumed by |
 |---|---|---|---|---|
 | `tone` | meaning | yes | typographic classes (§3) | everything semantic |
-| `syntax` | meaning | yes | typographic | `code` blocks only |
+| `syntax` | meaning | yes | typographic | `code` and `patch` blocks only |
 | `spectrum` | decoration | none | default foreground | declared app art only |
 
 `resolveTone` is a convenience over `resolve` for the `tone` palette, which is the overwhelmingly common case and keeps `tone: "ok"` as the ergonomic form.
 
-**`syntax` exists because ten semantic tones are genuinely thin for highlighting.** Keyword, string, comment, number, type, function, operator and punctuation are eight distinct roles, and cramming them into `meta`/`info`/`accent`/`identifier` makes a YAML promote preview and a JSON envelope both worse. Prism renders one or the other on nearly every command.
+**`syntax` exists because ten semantic tones are genuinely thin for highlighting.** Keyword, string, comment, number, key, type, function, operator and punctuation are nine distinct roles, and cramming them into `meta`/`info`/`accent`/`identifier` makes a YAML promote preview and a JSON envelope both worse. Prism renders one or the other on nearly every command.
+
+`syntax.key` covers YAML and JSON keys and HTML attributes — `lowlight` emits these as `hljs-attr`, and none of the other eight fits. A manifest is mostly keys, and mapping them to `type` would be wrong in the one place highlighting matters most.
+
+**`syntax`'s consumer list is closed, and it is two.** It was `code` alone until C25; a patch line needs syntax *inside* a line that already carries an add/remove tone, which makes `patch` the only place in the system where two palettes meet on one line. Widening the list was a deliberate decision, not a discovered permission — and it stays closed at two. **A third consumer is a spec change**, to this table, to I16, to T2.8 and to A03 SS20 together. The friction is the point: `syntax` used casually stops meaning anything, and the four-place change is what makes a third consumer argue for itself.
+
+How a tone and a syntax slot compose on one line is **not yet decided** — `Style` has no background channel, and the options are recorded in C25 §6. That decision belongs here when it is taken.
 
 ### Adding a palette
 
@@ -80,9 +102,25 @@ That constraint is what keeps D29 true as the palette count grows: a decorative 
 
 Themes are authored in 24-bit hex regardless of the terminal. Degradation happens at resolution, so a theme file is written once and works everywhere.
 
-`theme` remains a required field of `TuiConfig` (A02 §6) — but `defaultTheme` exists so satisfying it is one line. A framework with no themes at all would make the reference app awkward for no gain; a framework that silently picks one would hide a decision the app should own.
+### Where the curated 4-bit map lives
 
-Prism's two token sets are in A01 Appendix A.1. The light variant is **Atom One Light**, not Solarized — `j22`'s wording is wrong and Appendix A wins.
+I13 forbids an ANSI index in a theme file. §3 requires a curated 4-bit map **per theme**. Both cannot hold of one file, and an earlier draft asserted both without noticing.
+
+They separate cleanly, because they are two different things wearing one word. **`ThemeTokens` is 24-bit hex only** — that is what I13 governs and what A03 SS19 scans. The curated map is a `FourBitMap` in its own module beside it, referenced by name from the token set. A theme is then a pair: the values, authored once and portable, and the mapping of those values onto sixteen slots, which is a decision about *this* terminal depth and belongs in a file that says so.
+
+SS19 is scoped to the directory with the map named as its one exception, not narrowed to the token files:
+
+```
+scope: "src/presentation/theme/", allow: ["src/presentation/theme/four-bit.ts"]
+```
+
+A `tokens-*.ts` scope stops seeing a new token file the day someone adds one — SS26's failure arriving through a different door. An allow-list of one named exception is auditable; a glob that might not match anything is not.
+
+`theme` remains a required field of `TuiConfig` (A02 §6, hook **2** — hook 3 is command policy) — but `defaultTheme` exists so satisfying it is one line. A framework with no themes at all would make the reference app awkward for no gain; a framework that silently picks one would hide a decision the app should own.
+
+Prism's token sets are in A01 Appendix A.1 — ten tones, nine `syntax` slots and `spectrum`, per variant, with the measured contrast ratio beside each value. The light variant is **Atom One Light**, not Solarized — `j22`'s wording is wrong and Appendix A wins.
+
+**A.1's values were corrected there, not here.** They were authored from the mockup and never validated, and six light tones missed the 4.5 floor with `muted` missing 2.5 on both variants' `bgElev`. The catalogue records what moved and why; this spec records the rule it was moved to satisfy, and T2.4 is what keeps the two agreeing.
 
 ---
 
@@ -97,7 +135,21 @@ Prism's two token sets are in A01 Appendix A.1. The light variant is **Atom One 
 
 **The 4-bit rule is the one that matters.** Computing nearest-of-16 by RGB distance collapses tones onto each other — `dim` and `muted` both land on bright black, `warn` and `accent` both on yellow — and the result is a UI where distinctions silently vanish. Sixteen slots for ten tones needs a human decision, so each theme declares its own mapping and the framework validates that it is injective across the tones that must stay distinct.
 
-At 8-bit, "rank order preserved" means that if `dim` was darker than `default` in 24-bit it remains darker after quantisation. Nearest-neighbour alone can invert a pair; the resolver corrects for it.
+At 8-bit, "rank order preserved" means that if `dim` was darker than `default` in 24-bit it remains darker after quantisation. Nearest-neighbour alone can invert a pair, so the resolver assigns luminance **levels** across the whole palette at once, minimising total perceptual distance subject to monotonicity between levels.
+
+### Why that, and not a nearest-neighbour walk
+
+Written down because it reads as over-engineering next to the obvious version, and the obvious version was tried twice. Both failures are here so nobody simplifies it back — **and neither would be caught by a pairwise test.**
+
+**Constrain as you go.** Walk the palette darkest first and refuse any entry darker than the last one assigned. Rank order holds, and it cascades: `meta`'s nearest lilac in the cube sits 0.11 lighter than its token, which raises the floor for its neighbour, which raises it again, and `ok` comes out near-white with `accent` a pale cream. A greedy walk cannot trade a small loss on one slot for a large saving on the next, and that trade is the entire question.
+
+**Exempt near-equal neighbours.** Let two slots whose source luminances are within noise of each other go unconstrained. The cascade stops, and transitivity goes with it: `info` and `identifier` are 0.030 apart — a real ranking — with two near-equal steps between them, so the pair inverts while **every adjacent comparison passes**. A test that walks neighbours cannot see this, which is why the invariant is stated over all pairs and the code is not written as a walk.
+
+Rank order is a property of the whole set, so the set is assigned as one problem. Levels begin where luminance has risen past the noise threshold; within a level the source expresses no order and none is imposed; between levels the order is absolute. Any pair separated by more than the threshold necessarily falls in different levels, which is exactly the invariant I6 states.
+
+**8-bit quantisation targets indices 16–255 only.** The first sixteen are whatever the emulator's own palette says they are — the same numbers a 4-bit theme deliberately curates — so quantising into them would make an 8-bit result depend on a user's terminal configuration while presenting itself as a measured nearest neighbour. 16–231 are the 6×6×6 cube and 232–255 the greyscale ramp, and both are fixed values a distance can honestly be computed against.
+
+A palette is therefore resolved **as a set**, once per `(theme, palette, depth)`, rather than slot by slot: rank order and distinctness are properties of the set, and a per-slot nearest-neighbour cannot see either.
 
 **Surfaces degrade too.** `bg`, `bgElev`, `bgDeep`, `border` and `borderStrong` are not tones, and the ladder applies to them identically: hex at 24-bit, quantised at 8-bit, curated at 4-bit, and **nothing at all at 1-bit** — no background is painted and borders are drawn with box characters alone. A component asking for a surface at 1-bit receives an empty `Style`, not black.
 
@@ -117,13 +169,23 @@ This is only safe because of D29. A failed row is not red — it is `✗` *and* 
 
 ## 4. Contrast
 
-Every tone is checked against the variant's `bg` **at theme load**, not at render. A theme that fails is rejected with a named error listing the offending tones.
+Every tone is checked **at theme load**, not at render. A theme that fails is rejected with a named error listing the offending tones and the ratios they achieved.
 
-| Tone group | Minimum ratio |
+**The algorithm is WCAG 2.1's**, named here because "validated" without a named ratio is unimplementable: relative luminance over linearised sRGB, and the ratio `(L₁ + 0.05) / (L₂ + 0.05)` with the lighter value as `L₁`.
+
+**Every tone is checked against both `bg` and `bgElev`, and must clear its floor on both.** Text lands on both: `bg` is the transcript, `bgElev` is every panel, overlay and confirm. A floor checked against one of the two surfaces text actually lands on is a floor with a gap in exactly the place nobody inspects — you would find it by squinting at a panel, which is not a test. Dark `muted` was the case in point at 2.31 on `bgElev`, and the correction in A01 A.1 is what this rule found.
+
+**`bgDeep` is excluded, and the exclusion is stated rather than left to omission**: it sits behind dim chrome and carries no text. If a surface ever paints text on it, then either that surface is wrong or this exclusion is — and the sentence makes that a decision someone has to take rather than a gap someone discovers.
+
+| Slot group | Minimum ratio |
 |---|---|
 | `default` `ok` `warn` `error` `info` `accent` `meta` `identifier` | 4.5 : 1 |
 | `dim` | 3 : 1 |
 | `muted` | 2.5 : 1 — intentionally recessive, but must remain readable |
+| every `syntax` slot except `comment` | 4.5 : 1 |
+| `syntax.comment` | 3 : 1 — recessive is the requirement, not a compromise on it. A comment that met 4.5 would not be a comment |
+
+The measured ratio of every shipped token is recorded in A01 A.1 beside its value, on both surfaces. A ratio with no number behind it cannot be seen to have regressed, and T2.4 recomputes all of them from the tokens the framework actually ships.
 
 Terminal contrast is not a perfect analogue of a browser's — background colours are the emulator's and a user may override them — so these are a floor against obviously broken themes, not an accessibility certification. That distinction is worth stating rather than implying compliance.
 
@@ -158,34 +220,45 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I3** — Contrast is validated at load. A failing theme or override is rejected, never partially applied.
 - **I4** — An invalid override leaves the current theme exactly as it was.
 - **I5** — The 4-bit mapping is declared per theme and injective across tones required to stay distinct.
-- **I6** — 8-bit quantisation preserves the lightness rank order of tones.
+- **I6** — 8-bit quantisation preserves the lightness rank order of tones, **over every pair** and not merely between neighbours. Two tones separated by more than the noise threshold in 24-bit do not invert at 8-bit.
 - **I7** — C10 triggers no repaint itself. It reports a change; L4 invalidates.
 - **I8** — Surfaces follow the same degradation ladder as tones, and vanish entirely at 1-bit.
 - **I9** — No tone resolves to the variant's own `bg`.
 - **I10** — Switching is atomic; no render observes a partially applied theme.
 - **I11** — The memo cache is keyed on `(tone, themeName, colourDepth)` and cleared on every switch and override.
 - **I12** — C10 reads no environment; capabilities are injected (C02 I5).
-- **I13** — Tokens are authored in 24-bit hex only; no theme file contains an ANSI index or a terminal-specific value.
+- **I13** — `ThemeTokens` is authored in 24-bit hex only; no token file contains an ANSI index or a terminal-specific value. The curated 4-bit map is not token data and lives in its own module (§2), which is SS19's single named exception.
 - **I14** — A block names a palette slot and never embeds a colour value.
-- **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and has a typographic fallback, a `decoration` palette is neither and is lint-restricted to declared art.
-- **I16** — `syntax` is consumed only by `code` blocks; `spectrum` only by declared art.
+- **I15** — Every palette declares `carries` and `monochrome`; a `meaning` palette is contrast-validated and declares its typographic fallback as `classes`, one entry per slot, a `decoration` palette does neither and is lint-restricted to declared art.
+- **I16** — `syntax` is consumed only by `code` and `patch` blocks; `spectrum` only by declared art. The list is closed at two; a third consumer is a spec change to §3, I16, T2.8 and A03 SS20 together.
+- **I17** — Within one palette and one variant, no two slots carry the same 24-bit value, and at 8-bit no two of `{ok, warn, error, info, accent}` resolve to the same index. A slot that renders as another slot bought nothing.
+- **I19** — A `defaultTheme` ships and satisfies every contrast floor, so the one required config field is one line to fill. A framework whose only required field has no working value is a framework nobody starts.
+- **I20** — Contrast is validated against `bg` and `bgElev`, the two surfaces text lands on, and never against `bgDeep`, which carries none. Validating against a surface no text meets would reject themes for a failure that cannot be seen.
+- **I21** — The shipped tokens are A01 Appendix A.1's catalogue, and T2.4 recomputes every ratio from them rather than trusting the recorded figures. The table is an assertion the suite upholds, not a record of intent.
+- **I18** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
 
 ---
 
 ## 8. Commitments
 
-1. Tones resolve to styles; blocks never see colours.
-2. Themes are authored in 24-bit hex and degrade at resolution.
-3. The 4-bit mapping is curated per theme, never computed by nearest-RGB.
-4. 8-bit quantisation preserves rank order.
-5. At 1-bit, ten tones collapse to three typographic classes, and glyphs carry the meaning.
-6. Contrast floors are validated at load; failures are rejected with named tones.
-7. Overrides are validated identically; an invalid one changes nothing.
-8. Switching is atomic; L4 invalidates the frame, C10 does not.
-9. Surfaces degrade on the same ladder and are absent at 1-bit.
-10. Resolution is memoised and the cache is cleared on any theme change.
-11. `defaultTheme` ships so the required `theme` field is one line to satisfy.
-12. Prism's light variant is Atom One Light; A01 Appendix A wins over `j22`.
+1. Tones resolve to styles; blocks never see colours (I14, I1).
+2. Themes are authored in 24-bit hex and degrade at resolution (I13).
+3. The 4-bit mapping is curated per theme, never computed by nearest-RGB (I5).
+4. 8-bit quantisation preserves rank order (I6).
+5. At 1-bit, ten tones collapse to three typographic classes, and glyphs carry the meaning (I2, I15).
+6. Contrast floors are validated at load; failures are rejected with named tones (I3).
+7. Overrides are validated identically; an invalid one changes nothing (I4).
+8. Switching is atomic; L4 invalidates the frame, C10 does not (I10, I7).
+9. Surfaces degrade on the same ladder and are absent at 1-bit (I8).
+10. Resolution is memoised and the cache is cleared on any theme change (I11).
+11. `defaultTheme` ships so the required `theme` field is one line to satisfy (I19).
+12. C10 resolves whatever tokens it is given; the shipped catalogue and the Atom One Light decision are A01 Appendix A's, which is also where a correction to them belongs (→ A01 A.1).
+13. Contrast is validated against `bg` and `bgElev` — both surfaces text lands on. `bgDeep` is excluded because it carries none (I20).
+14. No two slots of one palette render as one another: distinct in hex, and distinct at 8-bit for the five tones whose confusion would mislead (I17).
+15. C10 reads no environment. Capabilities arrive injected, so the same tokens and the same capability record resolve identically on any machine (I12, → C02 I5). Enforced by SS11.
+16. The `syntax` and `spectrum` palettes have closed consumer lists — `code` and `patch` for one, declared art for the other. A third consumer is a spec change in four places rather than a permission, because a palette used casually stops carrying what it declares (I16). Enforced by SS20 and SS21; C25 is the one widening, and it went through the spec.
+17. A resolved colour always names its depth. There is no untagged form and no bare string, so a 4-bit index and a 24-bit hex can never be confused at a call site that has already forgotten which it asked for (I18). Enforced by SS36.
+18. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them (I21).
 
 ---
 
@@ -204,7 +277,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.7** (I3): a theme whose `error` fails 4.5:1 → `loadTheme` returns errors naming `error`, no theme produced.
 - **T1.8**: a valid override merges and clears the cache.
 - **T1.9** (I9): a theme where a tone equals `bg` → rejected at load.
-- **T1.10** (I6): a token set whose 8-bit nearest neighbours would invert `dim` and `default` → resolution corrects the order.
+- **T1.10** (I6): rank order holds over **every pair** of tones separated by more than the noise threshold, not over adjacent ones. Asserted as all pairs deliberately: a neighbour-wise assertion passes against a neighbour-wise implementation that inverts `info` and `identifier`, which is the bug §3 records.
 - **T1.11**: `muted` at 2.5:1 passes; at 2.0:1 fails.
 - **T1.12** (I8): at depth 1, every surface resolves to an empty `Style` — no background is painted.
 - **T1.13** (I8): at depth 4, surfaces use the curated mapping, not computed nearest.
@@ -214,12 +287,19 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.1** (I1): `resolveTone` called a thousand times returns identical styles and performs no I/O.
 - **T2.2** (I11): with the cache warm, results are identical to cold results for every key.
 - **T2.3** (I5): for every shipped theme, the 4-bit mapping is injective across `{ok, warn, error, info, accent}` — the tones whose confusion would be misleading rather than merely dull.
-- **T2.4** (I3): every shipped theme passes every contrast floor. A theme cannot ship failing its own rule.
-- **T2.5** (I13): a source scan finds no ANSI index or terminal-specific value in any theme file.
+- **T2.4** (I3): every shipped theme passes every contrast floor, on `bg` **and** `bgElev`, recomputing the ratio from the shipped token rather than reading A01 A.1's recorded figure. A theme cannot ship failing its own rule, and the catalogue is an assertion this test upholds rather than a record of what someone intended.
+- **T2.5** (I13): a source scan over `theme/` finds no ANSI index or terminal-specific value, with `four-bit.ts` as the one named exception (A03 SS19) — and the rule is shown to fire against a fabricated violation, not only to pass against the tree.
 - **T2.6** (I12): a source scan finds no `process.env` read in `theme/`.
 - **T2.7**: every `Tone` in C04's union has an entry in every shipped theme — exhaustive over the type, so adding a tone without tokens fails the build.
-- **T2.8** (I16): a source scan finds no `syntax` reference outside `code` rendering, and no `spectrum` reference outside declared art.
+- **T2.8** (I16): a source scan finds no `syntax` reference outside `code` and `patch` rendering, and no `spectrum` reference outside declared art.
 - **T2.9** (I14): a source scan finds no hex literal in any block-producing module.
+- **T2.13** (§2): the `syntax` palette has exactly nine slots — keyword, string, comment, number, key, type, function, operator, punctuation — in every shipped theme. Adding a tenth without tokens fails the build, the same shape as T2.7.
+- **T2.14** (§2, I15): every `syntax` slot passes its §4 floor in both variants and against **both surfaces**, `syntax` being a `meaning` palette. `comment` is checked at 3 : 1 with the rest at 4.5.
+- **T2.16** (I17): per palette, per variant, no two slots share a 24-bit value. This is the test that caught `key`/`number` and, less obviously, light `number`/`type` — the second was created by the contrast correction itself, so nothing but recomputation could have found it.
+- **T2.18** (I18): over every ref × every depth, a returned `colour` is absent or an object whose `kind` is one of exactly `rgb`, `ansi256`, `ansi16` — never a string. The kinds are compared against a list **written out literally in the test**, the same shape as C05 T1.7c: a list derived from the type agrees with itself and passes on any addition.
+- **T2.19** (I18): a source scan finds no string literal assigned to a `colour` field anywhere in `src/` (A03 SS36). Types stop this inside the tree; the scan is what stops it arriving through a cast, which is how a tag gets dropped in practice.
+- **T2.17** (I17): at depth 8, `{ok, warn, error, info, accent}` resolve to five distinct values, per variant. I17's 24-bit half and T2.3's 4-bit half both miss this: two tones distinct in hex can quantise onto one 256-colour index, and that failure is invisible in truecolour — which is where every value was authored and every golden will be reviewed. `dim`, `muted` and `default` collapsing at low depth is acceptable and is deliberately not asserted.
+- **T2.15** (§3): at depth 1, every `syntax` slot collapses to a typographic class and emits no colour code — including `syntax.key`.
 
 ### Tier 3 — edge cases
 
@@ -263,6 +343,11 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.9** (I13): putting an ANSI index in a theme file → T2.5 fails.
 - **T6.10** (I7): C10 calling the scheduler directly → T4.4's spy fails, and L1 gains a dependency on L0-terminal.
 - **T6.11** (I8): painting a background at 1-bit → T1.12 fails.
+- **T6.12** (§4): validating against `bg` alone → T2.4 fails on `muted`, which measured 2.31 on `bgElev` before the correction. The revert is invisible in the transcript and shows up only inside a panel.
+- **T6.13** (I17): giving two slots the same value — the state `key` and `number` shipped in, and the state light `number` and `type` fell into when both were corrected to the floor → T2.16 fails, naming the pair.
+- **T6.14** (I17): dropping the 8-bit distinctness check → T2.17 fails. Nothing in a truecolour terminal would have shown it.
+- **T6.15** (I6): rewriting the 8-bit assignment as a neighbour-wise walk → T1.10 fails on `info` and `identifier`, **while every adjacent comparison still passes**. This is the revert that looks like a simplification, and §3 records both attempts that produced it.
+- **T6.16** (I18): making `Style.colour` a bare string, or adding an untagged form beside the union → T2.18 fails, and the writer downstream is back to guessing the depth from the format.
 
 ---
 

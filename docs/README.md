@@ -1,6 +1,6 @@
 # Specs
 
-52 documents. This page says which are authoritative for **this** repo, which are
+56 documents. This page says which are authoritative for **this** repo, which are
 context, and what to read in what order.
 
 ---
@@ -11,14 +11,14 @@ context, and what to read in what order.
 |---|---|
 | [`architecture/A02`](architecture/A02_tui_kit_architecture.md) | **The layer rule.** Six layers, imports go down only, L0's two halves never touch. Everything else assumes it |
 | [`architecture/A01`](architecture/A01_architecture_and_boundary.md) | 48 decisions and the boundary contract — argv in, JSON out |
-| [`architecture/A03`](architecture/A03_enforcement_suite.md) | The 73 checks `make enforce` executes, each citing the spec that declared it |
+| [`architecture/A03`](architecture/A03_enforcement_suite.md) | The 88 checks `make enforce` executes, each citing the spec that declared it |
 | [`../CLAUDE.md`](../CLAUDE.md) | The same rules, distilled to the ones violated by accident |
 
 ---
 
 ## Authoritative here
 
-**`components/` — C01 to C24.** These are the implementation contracts for this repo.
+**`components/` — C01 to C25.** These are the implementation contracts for this repo.
 One spec is one component is one MR. Each carries numbered **commitments**,
 **invariants**, and six test tiers. Cite invariant numbers in tests: `T3.7 (I5): …`.
 
@@ -54,7 +54,7 @@ import each other, so they can be built in parallel.
 terminal    C01 lifecycle → C02 capabilities → C03 scheduler
 data        C04 view model → C05 manifest → C06 transport → C07 adapters → C21 process
                     ↓
-presentation        C09 blocks → C10 theme → C11 table → C12 plot
+presentation        C09 blocks → C10 theme → C11 table → C12 plot → C25 patch
                     ↓
 viewport            C13 transcript → C14 viewport → C15 overlays
                     ↓
@@ -64,7 +64,7 @@ shell               C22 composition → C23 execution → C24 public API
 ```
 
 **Start with C01.** It is the highest-risk component — the one that can leave a
-terminal broken — and it is the template the other twenty-three follow.
+terminal broken — and it is the template the other twenty-four follow.
 
 **C04 is the other good starting point** if two agents are working: pure data, no
 terminal, testable headlessly, and it defines the vocabulary C09, C11, C12 and every
@@ -88,7 +88,7 @@ surface derive from.
 ## If a spec is wrong
 
 **Change the spec first.** A spec and an implementation that disagree is worse than
-either being wrong alone — and a silent divergence leaves 52 documents describing
+either being wrong alone — and a silent divergence leaves 56 documents describing
 something that no longer exists.
 
 If a spec is ambiguous, say so rather than choosing. Ambiguity found during

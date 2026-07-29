@@ -39,6 +39,7 @@ At 100 columns:
 ▌
 ▌ ── metrics ───────────────────────────────────────────────────────────────────
 ▌
+▌                        a3f9b21                        7c2d4e1
 ▌   loss                 0.0312       ↓ 16% better      0.0372
 ▌   val_accuracy         0.968        ↑  1% better      0.958
 ▌   auprc                0.912        ↓  2% worse       0.930
@@ -47,6 +48,17 @@ At 100 columns:
 ▌
 ▌   ≡ a3f9b21   ≡ 7c2d4e1   { } json
 ```
+
+**Both regions are `diff` blocks, and a `diff` always carries a header.** The
+metrics region was drawn without one, which made it five rows where the block
+renders six — C04 §3 gives a `diff` `rows + header` and C09 §3 gives it `rows +
+1`, unconditionally in both. Making the header optional would give the kind a
+height rule that branches on a flag, which is what C04 §3 refuses in the
+paragraph explaining why `diff` and `patch` are separate kinds.
+
+The blank rows are `gapBefore` on the block that follows each of them (C04 §3a);
+`test/contract/surfaces.test.ts` composes this frame and asserts it is the
+twenty-one rows drawn here.
 
 **The comparator column is between the values, not beside them.** Reading `0.0312 … 0.0372` across a gap and then finding the verdict at the end of the row makes the eye travel twice. Putting `↓ 16% better` in the middle means one scan answers both halves.
 

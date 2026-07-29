@@ -120,6 +120,8 @@ The mockup's algorithm (A01 Appendix A.2), which is the standard one and worth k
 5  many, no further prefix     → open the menu
 ```
 
+**An accepted flag value is inserted as `--flag=value`.** C05's gate accepts both that and `--flag value` (C05 §3), so completion is choosing a form rather than obeying one — and `=` is the form that cannot be misread as a flag followed by a positional. It is also the form that works when the value begins with `-`, which the space-separated form does not. One form taught, both accepted; the pair of sentences lives in both specs so they cannot drift.
+
 `Tab` twice opens the menu even on a single match (bash convention, `j22` R17). Some people always want to see what they matched, and the second press costs nothing.
 
 Ghost text is accepted by `Tab` or `→`. Any other key ignores it — it is a suggestion, never a commitment.
@@ -172,25 +174,27 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 - **I10** — Dynamic results are cached on `(sourceId, contextKey)` and expire at their TTL.
 - **I11** — Accepting a candidate produces exactly one undo unit in C17.
 - **I12** — C19 imports nothing from `terminal/` and never commits a frame.
+- **I14** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
 - **I13** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
 
 ---
 
 ## 10. Commitments
 
-1. Every candidate comes from the manifest or a registered source; nothing is hand-maintained.
-2. Static sources run per keystroke; dynamic sources only on `Tab`. Filesystem slots are dynamic, so paths have no ghost text and `Tab` is required.
-3. Requests carry sequence numbers and stale results are discarded.
-4. Typing during a pending request supersedes it and clears the spinner.
-5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected.
-6. A failing source is dropped, not fatal.
-7. Acceptance follows the common-prefix algorithm; `Tab` twice always shows the menu.
-8. Ghost text is a suggestion, accepted only by `Tab` or `→`.
-9. The menu is a C15 overlay; C19 supplies blocks and the overflow indicator.
-10. The tokeniser and the quoter are both shared with C18.
-11. Accepting produces one undo unit.
-12. `/` completes verbs; bare text completes executables and paths.
-13. Dynamic sources are the app's; static ones ship with the framework.
+1. Every candidate comes from the manifest or a registered source; nothing is hand-maintained (I4).
+2. Static sources run per keystroke; dynamic sources only on `Tab`. Filesystem slots are dynamic, so paths have no ghost text and `Tab` is required (I3).
+3. Requests carry sequence numbers and stale results are discarded (I1).
+4. Typing during a pending request supersedes it and clears the spinner (I14).
+5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected (I9, I10).
+6. A failing source is dropped, not fatal (I6).
+7. Acceptance advances to the longest common prefix and stops; the menu-on-second-`Tab` behaviour is §4's, not contract (I5).
+8. Ghost text is a suggestion, accepted only by `Tab` or `→` (I7).
+9. The menu is a C15 overlay; C19 supplies blocks and the overflow indicator (I8).
+10. The tokeniser and the quoter are both shared with C18 (I5).
+11. Accepting produces one undo unit (I11).
+12. `/` completes verbs; bare text completes executables and paths (I13).
+13. Dynamic sources are the app's; static ones ship with the framework (I3).
+14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
 
 ---
 

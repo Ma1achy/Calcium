@@ -159,20 +159,20 @@ Two independent machines.
 
 ## 9. Commitments
 
-1. History persists at `<stateDir>/history` with an index-aligned sidecar; `stateDir` is injected, never hardcoded.
-2. Newlines are escaped, so multi-line commands survive a round trip.
-3. Appends are immediate and write failures are non-fatal.
-4. The cap is 10,000, FIFO, rotating both files together.
-5. Corruption yields an empty history and a warning, never a failed start.
-6. Redaction is positional first, entropy second, with identifiers exempt — `j22`'s entropy-only rule is corrected.
-7. Redaction applies to disk only; the session keeps its values.
-8. The draft is stashed on the first `↑` and restored on `↓` past the newest.
-9. Navigation resets on edit and submit.
-10. Consecutive duplicates are stored once.
-11. Reverse search is a C15 overlay, substring and case-insensitive, most-recent-first.
-12. `/history clear` requires a confirm that `Esc` cannot dismiss.
-13. C20 returns strings; L4 applies them to the editor.
-14. Clock and filesystem are injected.
+1. History persists at `<stateDir>/history` with an index-aligned sidecar; `stateDir` is injected, never hardcoded (I12).
+2. Newlines are escaped, so multi-line commands survive a round trip (I7).
+3. Appends are immediate and write failures are non-fatal (I8).
+4. The cap is 10,000, FIFO, rotating both files together (I10).
+5. Corruption yields an empty history and a warning, never a failed start (I9).
+6. Redaction is positional first, entropy second, with identifiers exempt — `j22`'s entropy-only rule is corrected (I5).
+7. Redaction applies to disk only; the session keeps its values (I6).
+8. The draft is stashed on the first `↑` and restored on `↓` past the newest (I2).
+9. Navigation resets on edit and submit (I3).
+10. Consecutive duplicates are stored once (I4).
+11. Reverse search is a C15 overlay, substring and case-insensitive, most-recent-first (I13).
+12. `/history clear` requires a confirm that `Esc` cannot dismiss (I14).
+13. C20 returns strings; L4 applies them to the editor (I1).
+14. Clock and filesystem are injected (I11).
 
 ---
 

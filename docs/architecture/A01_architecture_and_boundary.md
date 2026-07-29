@@ -128,6 +128,12 @@ Reasoning lives in the scratchpads. These are the decisions.
 | D46 | `record --diff` scopes the reconciliation before it starts: every delta is one adapter line, and the count is printed before the work |
 | D47 | State paths resolve from `PRISM_TUI_STATE_DIR`, so standalone development never writes to a real install |
 | D48 | Integration is the five ordered steps of §5, gated on a green conformance suite. If it requires component rewrites or monorepo imports, a rule was broken |
+| D49 | **The invocation record lives in `meta`, and `origin` is required.** `argv`, `stderr` and `transport` answer what actually ran without re-running it; they belong in `meta` because a block is content and the invocation is *about* the document, so any inspector reaches them uniformly. `origin` is not a debugging field: shipped optional it would be unset, then unreliable, and the first agent feature is the one that must trust it |
+| D50 | **`patch` is a distinct block kind from `diff`, and they never merge.** One is rows of field comparisons, the other hunks of text with line numbers and two palettes. A merged kind's height would depend on which mode it is in, and C09 I1 — measured height equals rendered height — is the invariant that cannot bend. Rendered by C25, registered through C09 exactly as C11 and C12 do |
+| D51 | **`status: "proposed"` is reserved now and unused in v1.** Adding a `status` value later is a `tui.view/2` bump under C04 I2's rules, and the bump is the expensive part rather than the field. No adapter produces it: C07 constructs documents from what a command returned, and a proposed change has not run |
+| D52 | **The approval half of an agent harness already exists, because `fill` is propose-then-approve.** D8 made `fill` the default so a command is read before it runs; that is the same shape as an agent proposing and a human approving, with the human composing. An agent producing a document whose rows carry `fill` actions needs no new approval mechanism — approval is `fill`, refusal is not submitting, and the audit trail is the transcript. This is the reason the agent direction is cheap, and it will not be obvious to anyone reading this register later |
+| D53 | **`SIGCONT` re-acquires and reports; it sets no flag.** C01 owns terminal state and C03 owns contamination, so a `SIGCONT` re-acquisition needs an outbound channel or it is invisible to the only layer that could repaint after one. `onResume` is that channel, and it is the same shape as `onResize`: C01 states a fact about the terminal, L4 decides what it means. The rejected alternative — C01 setting `contaminated` — put one flag under two owners, which is the failure C01 exists to prevent, applied to itself |
+| D54 | **Exit codes are 128 + signal, per signal: 130, 143, 129.** One shutdown *path* is a property worth having; one shutdown *code* is a lie to whoever is supervising the process. A fixed 130 reports a user pressing Ctrl-C when the supervisor is what sent the signal |
 
 These were settled before the specs were written and lived only in the working scratchpad, which declares itself uncommitted. They are load-bearing — D43 in particular — and belong in the register.
 
@@ -135,13 +141,13 @@ These were settled before the specs were written and lived only in the working s
 
 | | |
 |---|---|
-| D26 | One module owns all six pieces of terminal state; no escape sequence is written elsewhere |
+| D26 | One module owns every piece of terminal state the process takes from the shell; no escape sequence is written elsewhere. C01 §3 names the keys rather than counting them — three places once said "six" and meant three different sets |
 | D27 | Cleanup handlers registered before acquisition; release before printing on fault paths |
 | D28 | Alternate screen is the only hard capability. Everything else degrades |
 | D29 | No information is carried by colour alone, anywhere |
 | D30 | Minimum 60 × 16, with a layout-engine-free fallback below it |
 | D31 | Dimensions read as one snapshot, the sole input to a frame. Resize is not debounced |
-| D32 | stdout is redirected at startup; non-renderer writes go to the debug log |
+| D32 | stdout is redirected at startup; every write not made through **C01's `writer`** goes to the debug sink. C01 owns both. "Non-renderer" is defined structurally — the renderer is whoever holds the privileged handle — because once `write` is replaced, no caller is distinguishable from inside it |
 | D33 | Contamination forces a full repaint from a cleared screen |
 | D34 | Mouse on by default; `/mouse` toggles; copy mode is mandatory; Shift-drag documented as the native-selection bypass |
 
@@ -231,18 +237,44 @@ Decisions that exist only in that JavaScript and CSS. Captured here so the mocku
 
 Tone resolution is the same in both; only the values change.
 
-| Tone | Dark | Light |
-|---|---|---|
-| `default` | `#d4d4d4` | `#383a42` |
-| `dim` | `#8a8a8a` | `#696c77` |
-| `muted` | `#5a5a5a` | `#a0a1a7` |
-| `ok` | `#87b86c` | `#50a14f` |
-| `warn` | `#d4b35a` | `#c18401` |
-| `error` | `#d47867` | `#e45649` |
-| `info` | `#7faecf` | `#0184bc` |
-| `accent` | `#e8a87c` | `#4078f2` |
-| `meta` | `#b89cd2` | `#a626a4` |
-| `identifier` | `#7fb8b8` | `#0997b3` |
+**These values were authored from the mockup and corrected to meet C10 §4's floors against both `bg` and `bgElev`.** Nine tones and two `syntax` slots moved; hue and saturation are held, and lightness is the minimum change that clears the floor. The measured ratios are recorded per value, and **C10 T2.4 recomputes them from the shipped tokens** — so this table is an assertion the suite upholds, not a record of intent. The mockup is still the thing anyone would compare against, and it now differs: do not restore its values without re-running that test.
+
+Ratios are `bg / bgElev`. Floors are 4.5 : 1, except `dim` at 3 : 1 and `muted` at 2.5 : 1.
+
+| Tone | Dark | | Light | |
+|---|---|---|---|---|
+| `default` | `#d4d4d4` | 11.74 / 10.73 | `#383a42` | 10.86 / 9.95 |
+| `dim` | `#8a8a8a` | 5.04 / 4.61 | `#696c77` | 5.01 / 4.59 |
+| `muted` | `#626262` | 2.85 / 2.61 | `#94959c` | 2.86 / 2.62 |
+| `ok` | `#87b86c` | 7.54 / 6.90 | `#3c793c` | 5.04 / 4.62 |
+| `warn` | `#d4b35a` | 8.62 / 7.88 | `#916301` | 5.04 / 4.62 |
+| `error` | `#d47867` | 5.54 / 5.06 | `#cd2d1e` | 5.04 / 4.62 |
+| `info` | `#7faecf` | 7.34 / 6.71 | `#0173a5` | 5.03 / 4.61 |
+| `accent` | `#e8a87c` | 8.56 / 7.82 | `#1f60f0` | 5.04 / 4.62 |
+| `meta` | `#b89cd2` | 7.23 / 6.61 | `#a626a4` | 5.86 / 5.37 |
+| `identifier` | `#7fb8b8` | 7.83 / 7.16 | `#07768c` | 5.06 / 4.63 |
+
+`muted` carries the thinnest margin in the table — 2.61 and 2.62 against a floor of 2.5 — and both variants moved to get there. The dark token was `#5a5a5a`, which measured 2.52 against `bg` and **2.31 against `bgElev`**: not "de-emphasised" but struggling, and struggling on the surface every panel and overlay paints. The figure is recorded rather than only the pass, because a nudge of a few points would break the check and nothing else would say so.
+
+**`syntax`** — nine slots, `lowlight`'s classes mapped in C09 §4a. Same lineage as the tones, so the two read as one design rather than two:
+
+| Slot | Dark | | Light | |
+|---|---|---|---|---|
+| `keyword` | `#c678dd` | 5.91 / 5.40 | `#a626a4` | 5.86 / 5.37 |
+| `string` | `#98c379` | 8.63 / 7.89 | `#3c793c` | 5.04 / 4.62 |
+| `comment` | `#676e7d` | 3.40 / 3.11 | `#86888f` | 3.39 / 3.11 |
+| `number` | `#d19a66` | 7.07 / 6.46 | `#916301` | 5.04 / 4.62 |
+| `key` | `#e06c75` | 5.45 / 4.98 | `#a8432c` | 5.74 / 5.26 |
+| `type` | `#e5c07b` | 10.08 / 9.21 | `#7a5401` | 6.50 / 5.95 |
+| `function` | `#61afef` | 7.37 / 6.73 | `#1f60f0` | 5.04 / 4.62 |
+| `operator` | `#56b6c2` | 7.35 / 6.72 | `#0173a5` | 5.03 / 4.61 |
+| `punctuation` | `#abb2bf` | 8.17 / 7.46 | `#383a42` | 10.86 / 9.95 |
+
+`comment` takes the 3 : 1 floor rather than 4.5. Recessive is the requirement, not a compromise on it — a comment that met 4.5 would not be a comment.
+
+Two collisions had to be broken, and C10 I17 is what found them. `lowlight` emits `hljs-attr` and `hljs-literal` in one colour, so **`key` and `number` were identical**; the ninth slot exists precisely because YAML keys had nowhere to go, and a `key` that renders as `number` buys nothing. It takes the attribute red in both variants.
+
+**Light `number` and `type` are the second, and it is the less obvious one.** They were the same hue at different lightness, and correcting both to the floor collapsed them onto one value — the correction *created* the collision, so only recomputation could have found it. `type` moves to a darker gold. That looks arbitrary read cold, and it is not.
 
 **Decorative** — the welcome art only (S02 §2), exempt from contrast floors:
 
@@ -250,6 +282,8 @@ Tone resolution is the same in both; only the values change.
 |---|---|---|
 | `spectrum.0`…`spectrum.7` | `#e8736b` `#e89866` `#e8c95e` `#a3d066` `#66c890` `#5fb5d4` `#7a8fe0` `#c187d4` | `#e45649` `#d19a66` `#c18401` `#50a14f` `#0997b3` `#0184bc` `#4078f2` `#a626a4` |
 | `spectrum.outline` | `#e8e8e8` | `#383a42` |
+
+`spectrum` keeps the mockup's values untouched. It declares `carries: "decoration"`, which is what exempts it (C10 I15) — several of its light entries are the tone values as they were *before* the correction above, and that is not an oversight. Art is not text, and a rule applied where it buys nothing is a rule people learn to ignore.
 
 The welcome art is **77 cells × 8 rows**, three glyphs (`█` U+2588, `▒` U+2592, space), stored verbatim as a fixture and reproduced in S02 §2. Columns 1–15 are the prism triangle in `spectrum.outline` on every row; column 16 is an unstyled separator; columns 17–77 are the wordmark, its eight rows taking `spectrum[0…7]` top to bottom. Two coloured spans per row, never per-glyph.
 

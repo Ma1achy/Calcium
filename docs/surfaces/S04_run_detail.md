@@ -180,6 +180,8 @@ The common block still renders; the kind-specific section falls back to a `code`
 | `{ } json` | `/ps <uuid> --json` | fill |
 | `!1248` | The MR URL | open |
 
+**`{ } json` re-runs the command; it does not show this entry's payload.** On a `--watch`, or against anything that changes between the two calls, it returns different data than the block it was opened from — so an adapter bug can render wrong here and then show a fresh payload that looks fine. That is honest: re-running is what the command says. To inspect *this* entry — its argv, transport, stderr and retained payload — use `/debug` (C23 §2), which never re-runs.
+
 Offered by kind and status, never unconditionally: `↑ promote` on succeeded candidates only, `⊘ cancel` on running or queued only, `◉ watch` on running only. `≡ logs` is always offered — a failed run's logs are the first thing anyone wants.
 
 While live, `↑`/`↓` move between actions and `⏎` fires the focused one. Once frozen, all are refused (C23 I18).
@@ -240,6 +242,7 @@ While live, `↑`/`↓` move between actions and `⏎` fires the focused one. On
 - **T3.11**: at 60 columns → the plot narrows; nothing overflows; the kv wraps its value column.
 - **T3.12**: a `--watch` merge patch on a running detail → the curve extends, the block does not change height (C12 I1 from this surface).
 
+- **T3.20** (`{ } json`): the interactions section states that `{ } json` re-runs and points at `/debug`. A caveat that can be tidied away is a caveat that will be.
 ### Tier 4 — integration
 
 - **T4.1** (with S03): `⏎` on a row appends this surface as a new entry; the list above freezes with its focus intact.

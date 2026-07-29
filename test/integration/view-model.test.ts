@@ -1,0 +1,233 @@
+// C04 tier 4 — integration. Real components, no real terminal.
+//
+// C04's integration partners are C07 (produces documents), C09 (measures them),
+// C13 (holds them and applies patches) and C14 (virtualises by measured height).
+// None of the four exists yet, so every T4 in the spec names its blocker.
+//
+// What can be integrated today is C04 with itself across a realistic sequence:
+// the document lifecycle a streaming verb actually produces. That is not a
+// substitute for T4.3, but it is the part of T4.3 that does not need C13.
+import { describe, expect, it } from "vitest";
+import { createFallbackAdapter } from "../../src/data/adapters/index.js";
+import type { Block } from "../../src/data/viewmodel/index.js";
+import {
+  applyPatch,
+  block,
+  validateDocument,
+  type Table,
+  type ViewDocument,
+} from "../../src/data/viewmodel/index.js";
+import { CORPUS, doc, tableOf } from "../support/blocks.js";
+import { DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { renderToLines } from "../../src/testing/index.js";
+import type { RenderContext } from "../../src/presentation/blocks/index.js";
+import { Box, Text } from "ink";
+import { createElement, type ReactElement } from "react";
+import {
+  checkMeasurement,
+  formatReport,
+  uncoveredKinds,
+} from "../support/measurement-conformance.js";
+
+function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
+  if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);
+  return r.doc;
+}
+
+/**
+ * A consumer's block kind, written the way a consumer would write one: two
+ * rows, resolved tones, no privileged access to anything.
+ */
+function renderBanner(block: Block, ctx: RenderContext): ReactElement {
+  const text = (block as unknown as { text: string }).text;
+  const lines = [`== ${text} ==`, "-".repeat(Math.max(1, ctx.width - 4))];
+  return createElement(
+    Box,
+    { flexDirection: "column" },
+    lines.map((line, i) => createElement(Text, { key: i }, line)),
+  );
+}
+
+describe("C04 integration — the document lifecycle", () => {
+  it("T4.0: a streaming verb's whole life — partial, patched fifty times, settled — stays valid and frozen", () => {
+    // The shape C23 drives: append a partial document, patch it as output
+    // arrives, settle it at the end. Every intermediate state is renderable
+    // (I10) and valid (I2, I3, I14), which is what makes a partial document
+    // safe to draw at any point.
+    let d = doc({ status: "partial", blocks: [tableOf(3)] });
+
+    // The user opens a row two ticks in.
+    const opened = d.blocks[0] as Table;
+    d = unwrap(
+      applyPatch(d, {
+        op: "replace",
+        blockId: "t",
+        block: { ...opened, rows: opened.rows.map((r) => (r.id === "r2" ? { ...r, expanded: true } : r)) },
+      }),
+    );
+
+    for (let tick = 0; tick < 50; tick += 1) {
+      d = unwrap(
+        applyPatch(d, {
+          op: "merge",
+          blockId: "t",
+          rows: [
+            { id: "r1", cells: { name: { text: `tick ${tick}` } } },
+            { id: `n${tick}`, cells: { name: { text: `row ${tick}` } } },
+          ],
+        }),
+      );
+
+      const r = validateDocument(d);
+      expect(r.ok, `tick ${tick}: ${r.ok === false ? r.error.join(", ") : ""}`).toBe(true);
+      expect(Object.isFrozen(d), `tick ${tick}: frozen`).toBe(true);
+      expect(
+        (d.blocks[0] as Table).rows.find((row) => row.id === "r2")?.expanded,
+        `tick ${tick}: the row the user opened is still open`,
+      ).toBe(true);
+    }
+
+    d = unwrap(applyPatch(d, { op: "status", status: "ok" }));
+
+    expect(d.status).toBe("ok");
+    expect((d.blocks[0] as Table).rows).toHaveLength(53);
+    expect(validateDocument(d).ok).toBe(true);
+  });
+
+  it("T4.0b: an error document assembled the way C07 assembles one", () => {
+    // C07 maps a transport failure to a document. The ordering matters: the
+    // error and the status must arrive together, because applyPatch will not
+    // let them arrive separately (I3, I15).
+    const failed = doc({
+      status: "error",
+      error: { message: "connection refused", code: "ECONNREFUSED", stage: "transport" },
+      blocks: [block({ kind: "notice", id: "n", tone: "error", glyph: "error", text: "Could not connect." })],
+    });
+
+    expect(validateDocument(failed).ok).toBe(true);
+
+    // And the sequence C23 must not attempt: patch the status first.
+    const wrongWay = applyPatch(doc({ status: "partial" }), { op: "status", status: "error" });
+    expect(wrongWay.ok, "there is no error to move to").toBe(false);
+    expect(wrongWay.ok === false && wrongWay.error.message).toContain("carries no");
+  });
+
+  it("T4.0c (I13): every document in the lifecycle carries an origin", () => {
+    // C23 sets it on every append, with no default and no path that omits it.
+    // Patching never changes it, which is what makes it trustworthy later.
+    let d = doc({ meta: { ...doc().meta, origin: "refresh" } });
+    d = unwrap(applyPatch(d, { op: "append", block: block({ kind: "raw", id: "x", text: "x" }) }));
+    d = unwrap(applyPatch(d, { op: "status", status: "partial" }));
+
+    expect(d.meta.origin).toBe("refresh");
+  });
+
+  it("T4.1: a fallback-adapted arbitrary JSON object produces a document passing every T2 contract test", () => {
+    // C04's vocabulary, exercised by the component that actually produces
+    // documents rather than by a literal written to satisfy the validator. The
+    // difference matters: a hand-built document is written by someone who has
+    // read C04, and the fallback is written against JSON nobody controls.
+    const shapes: unknown[] = [
+      { name: "web", replicas: 3 },
+      [{ id: "a" }, { id: "b" }],
+      { total: 2, items: [{ id: "a" }, { id: "b" }] },
+      [],
+      null,
+      "a bare string",
+      [{ a: 1 }, { b: 2 }],
+    ];
+
+    for (const stdout of shapes) {
+      const doc = createFallbackAdapter().adapt(
+        {
+          argv: ["prism", "ps", "--json"],
+          exitCode: 0,
+          signal: null,
+          stdout,
+          stdoutRaw: "",
+          stderr: "",
+          durationMs: 1,
+          parseError: null,
+          cancelled: false,
+          timedOut: false,
+        },
+        {
+          command: "/ps",
+          verb: "ps",
+          width: 100,
+          userRequestedJson: false,
+          transport: "fixture",
+          origin: "user",
+          tool: null,
+        },
+      );
+
+      const validity = validateDocument(doc);
+      expect(validity.ok, validity.ok ? "" : validity.error.join("; ")).toBe(true);
+      expect(doc.blocks.length).toBeGreaterThan(0);
+
+      // The measurement contract, at the widths C04 §5 names. A document that
+      // validates and cannot be measured is one that breaks scrolling instead
+      // of rendering wrongly, which is harder to trace.
+      for (const width of [40, 80, 120]) {
+        for (const b of doc.blocks) {
+          if (b.kind === "table") continue; // C11 registers the measurer.
+          expect(Number.isFinite(measurable().measure(b, width))).toBe(true);
+        }
+      }
+    }
+  });
+  it("T4.2: a custom block kind joins the T2.1 corpus by being registered, not by being listed", () => {
+    // The extension mechanism, held to the same contract as the defaults. The
+    // suite reads `registry.kinds`, so a consumer's kind is measured, rendered
+    // and checked without anyone editing a list — and a consumer's kind that
+    // breaks I1 fails the same assertion the built-ins do.
+    const registry = createBlockRegistry({});
+    registry.register({
+      kind: "banner",
+      measure: () => 2,
+      render: (b, ctx) => renderBanner(b, ctx),
+    });
+
+    const banner = { kind: "banner", id: "banner-1", text: "custom" } as unknown as Block;
+    const kit = {
+      measure: (b: Block, w: number) => registry.measure(b, w),
+      renderToLines: (b: Block, w: number) =>
+        renderToLines(registry, b, w, { theme: DARK_THEME, capabilities: FULL_CAPS }),
+      kinds: registry.kinds,
+    };
+
+    expect(kit.kinds, "discovery, not registration in two places").toContain("banner");
+    expect(
+      uncoveredKinds(kit, [banner]),
+      "every kind bar the custom one is a default; the point is that `banner` is not among the uncovered",
+    ).not.toContain("banner");
+
+    const report = checkMeasurement(kit, [banner], { widths: [40, 80] });
+    expect(report.failures, formatReport(report)).toEqual([]);
+  });
+  it.todo(
+    "T4.3: appending fifty documents and applying two hundred patches leaves every document valid and frozen — waits on C13",
+  );
+  it.todo(
+    "T4.4: virtualising a 10,000-block transcript selects a range whose summed measured heights equal the viewport height exactly — waits on C14",
+  );
+  it.todo(
+    "T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the height delta, with no drift — waits on C11 and C14",
+  );
+  it("T4.6: the same document under both themes produces identical line counts", () => {
+    // Colour never changes row count (§5). A whole document, not one block:
+    // this is the assertion C14 relies on when a theme switch invalidates the
+    // frame but not the measured heights.
+    const blocks = CORPUS.filter((b) => !["table", "plot", "patch"].includes(b.kind));
+    const dark = measurable({ theme: DARK_THEME });
+    const light = measurable({ theme: LIGHT_THEME });
+
+    for (const width of [40, 80, 120]) {
+      const darkRows = blocks.reduce((sum, b) => sum + dark.renderToLines(b, width).length, 0);
+      const lightRows = blocks.reduce((sum, b) => sum + light.renderToLines(b, width).length, 0);
+      expect(lightRows, `width ${width}`).toBe(darkRows);
+    }
+  });
+});

@@ -38,6 +38,8 @@ type TuiConfig = Readonly<{
   blocks?:            readonly BlockDefinition[];
   transport?:         TransportRouter;
 
+  debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
+
   clock?:    () => number;
   fs?:       FileSystem;
   stateDir?: string;                       // PRISM_TUI_STATE_DIR, default ~/.prism
@@ -74,6 +76,8 @@ interface TuiInstance {
 ```
 
 Four required fields. Every optional one has a working default: the fallback adapter, the `/` prefix policy, manifest-derived completion, default chrome, no extra blocks, subprocess transport, real clock and filesystem.
+
+`debug.retainPayloads` turns on C13's raw-payload retention (C13 §5a) so `/debug` can show what an adapter was actually given. Absent, nothing is retained. Present without a count, the default is 50 — a number rather than "all" because doubling memory against a 100,000-block cap is how a debug mode becomes one nobody turns on.
 
 `stateDir` resolves from `PRISM_TUI_STATE_DIR`, defaulting to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
 
@@ -248,26 +252,29 @@ History flushes on **every** path including faults. Losing a session's history t
 - **I14** — C22 never auto-logins.
 - **I15** — An offline cluster degrades the session; system commands keep working.
 - **I16** — `stopped` is terminal.
+- **I18** — `createTui` requires exactly four fields; every other has a working default. The count is the ergonomic claim R01 §1 tests — a working TUI built from the README without asking a question — and a fifth required field is a spec change rather than a convenience.
+- **I19** — Banner and identity fetches are non-blocking: input is accepted before either completes, and neither can delay the first frame. A shell that will not take a keystroke until a network call returns is a shell that hangs on a bad DNS entry.
+- **I17** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
 
 ---
 
 ## 11. Commitments
 
-1. Four required config fields; every other has a working default.
-2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` resolves from `PRISM_TUI_STATE_DIR`.
-3. Stores and the runner precede the lifecycle, which precedes any acquire.
-4. All four registries seal before input is accepted.
-5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate.
-6. The too-small render is layout-engine-free.
-7. Banner fetches are non-blocking and input is accepted before they finish.
-8. Session state is six fields with one writer each; nothing else lives here.
-9. `cwd` is exposed as a function so `cd` moves subsequent verbs.
-10. Chrome is app-supplied; the prompt gutter is C22's to pass, not C17's to assume.
-11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained.
-12. Shutdown is one function, five callers, four ordered steps, with cleanup solely inside `beforeRelease`.
-13. Release precedes diagnostics; history flushes on every path.
-14. An offline cluster degrades rather than ends the session.
-15. `stopped` is terminal.
+1. Four required config fields; every other has a working default (I18).
+2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` resolves from `PRISM_TUI_STATE_DIR` (I10).
+3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2).
+4. All four registries seal before input is accepted (I3).
+5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate (I8).
+6. The too-small render is layout-engine-free (I9).
+7. Banner fetches are non-blocking and input is accepted before they finish (I19).
+8. Session state is six fields with one writer each; nothing else lives here (I11).
+9. `cwd` is exposed as a function so `cd` moves subsequent verbs (I12).
+10. Chrome is app-supplied; the prompt gutter is C22's to pass, not C17's to assume (I13).
+11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I17).
+12. Shutdown is one function, five callers, four ordered steps, with cleanup solely inside `beforeRelease` (I4, I5).
+13. Release precedes diagnostics; history flushes on every path (I6, I7).
+14. An offline cluster degrades rather than ends the session (I15).
+15. `stopped` is terminal (I16).
 
 ---
 

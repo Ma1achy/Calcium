@@ -38,12 +38,17 @@ type TerminalCapabilities = Readonly<{
 function detectCapabilities(
   env: Readonly<NodeJS.ProcessEnv>,
   overrides?: Partial<TerminalCapabilities>,
-): TerminalCapabilities;
+): Readonly<{
+  capabilities: TerminalCapabilities;
+  warnings:     readonly string[];
+}>;
 
 function isUsable(caps: TerminalCapabilities): boolean;   // altScreen only
 ```
 
 `env` is passed in rather than read from `process`. That is what makes every detection rule testable as a table of inputs, and it is the only reason this component needs no mocking framework.
+
+**Warnings are returned, never emitted.** A rejected override (§3, T3.5) produces a warning string; C02 does not print it. Detection runs before the terminal is acquired and before C22 has a diagnostics path, and C22 §8 orders release before printing because that ordering is load-bearing. C22 surfaces the warnings on the restored primary screen along with every other diagnostic.
 
 ---
 
@@ -53,13 +58,19 @@ Environment-based. **C02 never queries the terminal and never awaits a reply.** 
 
 | Capability | Rule |
 |---|---|
-| `colourDepth` | `COLORTERM` ∈ {`truecolor`, `24bit`} → 24; `TERM` contains `256color` → 8; `TERM` = `dumb` or absent → 1; otherwise → 4 |
-| `unicode` | `LC_ALL` ∥ `LC_CTYPE` ∥ `LANG` contains `UTF-8` (case-insensitive) → `full`; otherwise → `ascii`. `bmp` is reserved and never produced in v1 |
+| `colourDepth` | Checked in order. `TERM` = `dumb` or absent → 1 — a dumb terminal renders no colour whatever `COLORTERM` claims; `COLORTERM` ∈ {`truecolor`, `24bit`} → 24; `TERM` contains `256color` → 8; otherwise → 4 |
+| `unicode` | POSIX precedence: take the **first** of `LC_ALL`, `LC_CTYPE`, `LANG` that is set and read only that one — a set `LC_ALL` suppresses the others even when they name a UTF-8 locale. It contains `UTF-8` (case-insensitive, hyphen optional) → `full`; otherwise, and when none is set → `ascii`. `bmp` is reserved and never produced in v1 |
 | `synchronisedUpdate` | `TERM_PROGRAM` ∈ {iTerm.app, WezTerm, ghostty, WindowsTerminal} ∥ `TERM` = `xterm-kitty` → true |
-| `bracketedPaste` | `TERM` ≠ `dumb` |
-| `mouse` | `TERM` ≠ `dumb` **and** `TMUX` unset. Disabled inside tmux by default — sequence passthrough is unreliable and keyboard parity means nothing is lost (D34) |
+| `bracketedPaste` | `TERM` present and ≠ `dumb` |
+| `mouse` | `TERM` present and ≠ `dumb`, **and** `TMUX` unset. Disabled inside tmux by default — sequence passthrough is unreliable and keyboard parity means nothing is lost (D34) |
 | `imageProtocol` | `TERM_PROGRAM` = iTerm.app → `iterm2`; `TERM` = `xterm-kitty` → `kitty`; otherwise `none`. Detected in v1, unused until Phase 1B |
 | `altScreen` | `TERM` present and ≠ `dumb` |
+
+**Which rules the `dumb` gate applies to.** `TERM = dumb` gates every rule derived from `TERM` — `colourDepth`, `bracketedPaste`, `mouse`, `altScreen`. It does **not** gate rules derived from `TERM_PROGRAM` — `synchronisedUpdate` and `imageProtocol` — because those describe the emulator, and `TERM=dumb` is a statement about terminfo. The case that makes this matter is an override of `altScreen: true` under `TERM=dumb` (T1.9): the user has said detection is wrong about their terminal, and iTerm2 supports synchronised update whatever `TERM` claims. Gating it would give them an alt screen that tears.
+
+`unicode` is derived from the locale and is gated by neither.
+
+**Absent `TERM` is treated as `dumb` throughout**, which is why three rows test presence rather than inequality alone. A record that has already concluded the shell cannot open has no business claiming bracketed paste. Absent `TERM` means nothing is known about the terminal, and the safe reading of nothing-known is nothing-supported. It is also what makes T3.1's "a complete record at minimum values" true as written rather than aspirational.
 
 Overrides from `[terminal]` in app config are applied last and win unconditionally. Detection by allowlist will be wrong somewhere, and a dev on an unusual terminal should not wait for a release.
 
@@ -75,15 +86,21 @@ synchronised_update = false
 
 Every capability has a defined fallback, and each is exercised by a test rather than merely written down.
 
-| Absent | Behaviour | Owner |
-|---|---|---|
-| Truecolour | Tones resolve to nearest 256- or 16-colour value; contrast floor preserved | C10 |
-| All colour | Tone becomes typographic — bold, dim, inverse | C10 |
-| Full Unicode | Box drawing → `+ - \|`; sparklines → `.:\|#`; braille plots → coarse block plot; badges lose glyphs | C09 C12 |
-| Synchronised update | Frames written unwrapped; tearing possible under heavy repaint, accepted | C03 |
-| Bracketed paste | Multi-line paste detected heuristically by inter-keystroke timing; a notice is committed on first use | C17 |
-| Mouse | Every mouse affordance has a keyboard equivalent, so nothing is lost — only convenience | C11 C15 |
-| Alternate screen | **The shell refuses to open**, prints help, exits 0 | L4 |
+The `Field` column names the record field each row covers, so this table and the
+implementation can be checked against each other exactly rather than by eye
+(T2.6). `colourDepth` appears twice — it degrades in two stages — and that is
+fine; what cannot happen is a field with no row, or a row for no field.
+
+| Absent | Field | Behaviour | Owner |
+|---|---|---|---|
+| Truecolour | `colourDepth` | Tones resolve to nearest 256- or 16-colour value; contrast floor preserved | C10 |
+| All colour | `colourDepth` | Tone becomes typographic — bold, dim, inverse | C10 |
+| Full Unicode | `unicode` | Box drawing → `+ - \|`; sparklines → `.:\|#`; braille plots → coarse block plot; badges lose glyphs | C09 C12 |
+| Synchronised update | `synchronisedUpdate` | Frames written unwrapped; tearing possible under heavy repaint, accepted | C03 |
+| Bracketed paste | `bracketedPaste` | Multi-line paste detected heuristically by inter-keystroke timing; a notice is committed on first use | C17 |
+| Mouse | `mouse` | Every mouse affordance has a keyboard equivalent, so nothing is lost — only convenience | C11 C15 |
+| Image protocol | `imageProtocol` | Nothing renders an image in v1, so its absence costs nothing; blocks that would carry one render their text form. Detected now so Phase 1B does not need a second detection pass | C09 |
+| Alternate screen | `altScreen` | **The shell refuses to open**, prints help, exits 0 | L4 |
 
 Alternate screen is the sole hard requirement (D28). A fullscreen application on the primary screen destroys the user's scrollback, which is worse than not running.
 
@@ -96,25 +113,27 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 - **I1** — The returned record is immutable and structurally complete. Every field is present; nothing is optional.
 - **I2** — Detection is synchronous and never performs I/O. No terminal query, no file read, no await.
 - **I3** — `detectCapabilities` is pure: same `env` and `overrides` produce a deeply equal record, always.
-- **I4** — Overrides win over detection, unconditionally, including for `altScreen`.
+- **I4** — A *valid* override wins over detection, unconditionally, including for `altScreen`. A value outside a field's domain is not an override — it is rejected, the detected value stands, and a warning is returned (T3.5).
 - **I5** — No component outside C02 reads `TERM`, `COLORTERM`, `TERM_PROGRAM`, `LANG`, `LC_ALL`, `LC_CTYPE` or `TMUX`. Lint-enforced.
 - **I6** — Every capability has a fallback owned by a named component (§4). A capability with no fallback cannot be added.
 - **I7** — `isUsable` depends on `altScreen` alone. No other capability can prevent the shell opening.
+- **I8** — Warnings are returned, never emitted. C02 decides what is wrong, never when the user is told.
 
 ---
 
 ## 6. Commitments
 
-1. Capabilities are detected once, at startup, from the environment, and are immutable thereafter.
-2. Detection is synchronous and never queries the terminal.
-3. `env` is injected, not read from `process`.
-4. Every field is always present; there is no partial record.
-5. Config overrides win unconditionally.
-6. Only C02 reads terminal environment variables; lint-enforced.
-7. Every capability has a named fallback owner and a test exercising it.
-8. Alternate screen is the only capability whose absence prevents the shell opening.
-9. No information is carried by colour alone, anywhere in the system.
-10. `bmp` unicode and non-`none` image protocols are detected but unused in v1.
+1. Capabilities are detected once, at startup, from the environment, and are immutable thereafter (I1).
+2. Detection is synchronous and never queries the terminal (I2).
+3. `env` is injected, not read from `process` (I3).
+4. Every field is always present; there is no partial record (I1).
+5. Config overrides win unconditionally (I4).
+6. Only C02 reads terminal environment variables; lint-enforced (I5).
+7. Every capability has a named fallback owner and a test exercising it (I6).
+8. Alternate screen is the only capability whose absence prevents the shell opening (I7).
+9. `colourDepth` is reported, never interpreted. What a depth *means* for legibility is D29's rule and it is enforced where colour is chosen, not where it is detected — C02 has no view of what any block carries (→ C10 I2, C09 I5).
+10. `bmp` unicode and non-`none` image protocols are detected but unused in v1 (I1).
+11. Warnings about rejected overrides are returned to the caller, never printed (I8).
 
 ---
 
@@ -143,8 +162,9 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T2.2** (I1): the record is frozen — mutation attempts do not change it.
 - **T2.3** (I3): called twice with the same input, results are deeply equal and not the same reference (no shared mutable state).
 - **T2.4** (I2): no async boundary — the function's return value is not a promise, and a fake timer advanced zero ticks still yields a complete record.
-- **T2.5** (I5): a source scan over built output finds no read of the seven environment variables outside `terminal/capabilities.ts`.
-- **T2.6** (I6): every capability field appears in the §4 degradation table with a named owner — asserted against a machine-readable copy of that table, so adding a field without a fallback fails the build.
+- **T2.5** (I5): a source scan over `src/` finds no read of the seven environment variables outside `terminal/capabilities.ts`. This is A03 SS10, executed from the test suite against the same scan definition `make enforce` uses.
+- **T2.6** (I6): every capability field appears in the §4 degradation table with a named owner, and the table names no field the record does not have — a bijection over §4's `Field` column, parsed at test time, so both adding a field without a fallback and leaving a stale row behind fail the build. Each row's owner must match the implementation's table for the field it names.
+- **T2.7** (I8): no warning is emitted. Across every T1 fixture and the T3.5 bad-override case, neither `stdout` nor `stderr` is written to; the rejected override appears in the returned `warnings` instead.
 
 ### Tier 3 — edge cases
 
@@ -152,11 +172,12 @@ A table of `env` fixtures. No mocks, no terminal.
 - **T3.2**: `TERM` set to an unknown value (`foo-bar-256`) → `256color` substring still yields 8. Substring matching is intended.
 - **T3.3**: contradictory env — `TERM=dumb` with `COLORTERM=truecolor` → `TERM=dumb` wins for `altScreen` and `mouse`; `colourDepth` is 1. Documents which rule dominates.
 - **T3.4**: `overrides` containing an unknown key → ignored, no throw.
-- **T3.5**: `overrides` containing an out-of-range value (`colourDepth: 12`) → rejected, detected value retained, warning logged. A bad config file never produces an invalid record.
+- **T3.5**: `overrides` containing an out-of-range value (`colourDepth: 12`) → rejected, detected value retained, a warning naming the field and the offending value returned in `warnings`. A bad config file never produces an invalid record.
 - **T3.6**: `TMUX` set but empty string → treated as unset; mouse enabled.
 - **T3.7**: `TERM_PROGRAM` with unexpected casing (`iterm.app`) → matched case-insensitively.
 - **T3.8**: `LANG` present but `LC_ALL=C` → `ascii`. Precedence, not presence.
 - **T3.9**: `env` containing prototype-polluting keys (`__proto__`) → ignored safely.
+- **T3.10**: `TERM=dumb` with `TERM_PROGRAM=iTerm.app` → `synchronisedUpdate` true, `imageProtocol` `iterm2`, `altScreen` false. Asserts the §3 gate boundary as intent rather than oversight: `TERM_PROGRAM` describes the emulator and survives a dumb terminfo, which is what makes an `altScreen: true` override usable.
 
 ### Tier 4 — integration
 

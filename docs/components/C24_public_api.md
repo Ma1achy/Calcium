@@ -46,8 +46,8 @@ export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
 // blocks — the type a consumer returns
 export type {
   Block, Rule, Notice, KeyValue, Table, TableRow, Cell, Steps, Logs, Events,
-  Plot, Series, Progress, Code, Diff, Pills, Tip, Panel, Group, Raw,
-  Tone, Action, ErrorLike, ViewDocument, ViewPatch,
+  Plot, Series, Progress, Code, Diff, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
+  Tone, Glyph, Action, ErrorLike, ViewDocument, ViewPatch,
 };
 
 // builders — §4
@@ -82,17 +82,25 @@ export { cells, truncate, planColumns };
 
 A consumer never constructs, inspects or drives any of them. If one is ever needed, that is a signal the layering has a gap — not a request to widen the export list.
 
+**No `b.hunk`, and no diff parser.** `Patch` is exported as a block shape, but nothing here turns two texts into hunks. That is the app's problem — hunks arrive from a diff tool or already structured from the far side, and the framework renders them.
+
+Two reasons, and the second is the load-bearing one. A `b.hunk` helper would invite hand-constructing diffs, which is not a thing anyone should do. And a diff algorithm shipped here would be a fourth runtime dependency or a few hundred lines of internal code that is wrong about rename detection quietly — the same bar DEPENDENCIES.md sets for everything else, applied to something the framework does not need in order to render.
+
 ---
 
 ## 4. Builders
 
 The API's quality is mostly this, because an adapter is the thing a consumer writes a hundred times and a block is what an adapter returns.
 
+**`b` is the ergonomic layer over C04's constructors, not a second implementation** (C04 §4b). C04's constructors enforce the shape invariants — deep freeze (C04 I1), a glyph on `error` and `warn` tones (C04 I6), `height` present for `form: "line"` — and take a complete block. `b` adds the convenience: generated ids, bare strings accepted where a `Cell` is wanted, action helpers, sensible omissions.
+
+**`b` never freezes or validates directly.** It delegates both. Freezing here as well would give C04 I1 two enforcement points, and the one that drifts is always the one with fewer tests — a block frozen twice is indistinguishable from a block frozen once, right up until one of the two paths stops doing it.
+
 ```typescript
 export const b: {
   rule(label: string, meta?: string): Rule;
   notice: {
-    (tone: Tone, text: string, glyph?: string): Notice;
+    (tone: Tone, text: string, glyph?: Glyph): Notice;
     ok(text: string): Notice;  warn(text: string): Notice;
     error(text: string): Notice;  info(text: string): Notice;
   };
@@ -105,11 +113,13 @@ export const b: {
   steps(steps: StepInput[]): Steps;
   logs(lines: LogLine[]): Logs;
   events(events: EventLine[]): Events;
-  plot(spec: { series: Series[]; height?: number; axes?: boolean }): Plot;
-  spark(values: number[]): Plot;
+  plot(spec: { series: Series[]; height: number; axes?: boolean }): Plot;
+  spark(values: number[]): Plot;                   // the sparkline path; height 1
   progress(spec: { label: string; current: number; total: number }): Progress;
   code(language: string, text: string, opts?: { wrap?: boolean }): Code;
   diff(rows: DiffRow[]): Diff;
+  patch(spec: { path: string; language: string; hunks: Hunk[];
+                layout?: "unified" | "split" }): Patch;
   pills(chips: ChipInput[]): Pills;
   tip(text: string, actions?: Action[]): Tip;
   panel(title: string, children: Block[]): Panel;
@@ -135,6 +145,21 @@ export const b: {
 **Ids are generated unless supplied.** They matter only for blocks a consumer will address with a `replace` or `merge` patch; supply one then, and otherwise ignore them. Row ids come from data (`b.row(r.uuid, …)`), ids are never rendered, and golden frames therefore never see them.
 
 **A bare string is a cell with default tone.** `{ family: "digit-classifier" }` and `{ status: b.warn("degraded") }` in the same object, because most cells carry no tone and paying `{ text: … }` for all of them is the noise this removes.
+
+**`gapBefore` has a default per kind, and that is why adapters rarely set it.**
+C04 §3a puts vertical rhythm in the block; if every adapter had to think about it,
+half of them would not, and the surfaces would render dense while the specs drew
+them spaced. So the builders decide: `b.table`, `b.plot`, `b.panel`, `b.rule`,
+`b.steps`, `b.keyValue`, `b.diff`, `b.code` and `b.tip` set `gapBefore` when they
+are not the first block in the sequence they are built into; `b.pills`,
+`b.notice`, `b.progress`, `b.logs`, `b.events` and `b.raw` do not — a second
+`pills` row belongs against the first, and a run of notices is a list rather than
+a set of sections.
+
+**A default is not a policy.** Every builder takes an explicit `gapBefore` that
+wins, and a document assembled without builders has whatever its author wrote.
+The defaults exist so that the common case matches what the S-series draws, not
+so that the framework owns a surface's rhythm.
 
 **Nothing is inferred from field names.** A builder that guessed a tone from a key called `status` would work for four verbs and fail silently on the fifth.
 
@@ -196,7 +221,7 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions;
 
 interface DocumentAssertions {
   isValid(): this;                                 // C04 validateDocument
-  measuresCorrectly(widths?: number[]): this;      // C09 T2.1, default 7 widths
+  measuresCorrectly(widths?: number[]): this;      // C09 T2.1, default 7 widths — wraps C04's conformance suite
   rendersAt(widths: number[]): this;               // no overflow, no negative widths
   degradesToAscii(): this;                         // C09 T2.2 — heights unchanged
   degradesTo1Bit(): this;                          // B04 B4.3 — glyph or word carries it
@@ -210,6 +235,8 @@ export function fakeFs(): FileSystem;
 export function fakeTerminal(size?: TerminalSize): FakeTerminal;
 export function withCapabilities(caps: Partial<TerminalCapabilities>): TestContext;
 ```
+
+**`measuresCorrectly` is a wrapper, not an implementation.** The conformance suite it runs is written with C04 — parameterised over a registry and a corpus, and deliberately free of anything test-runner-specific, returning failures as data so the caller asserts. C09's registry-completeness test, this method, and the reference app all drive the same code. It lives in `test/support/` until C09 exists to consume it, then moves here unchanged.
 
 **`degradesTo1Bit` is the one that earns the module.** It is B04's compliance sweep — every distinction carried by a glyph or a word — and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 
@@ -246,23 +273,28 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **I9** — Startup validation severities are those of §8, and each cites the spec that set it.
 - **I10** — The runtime entry exports no function that performs I/O except `createTui`.
 - **I11** — The reference app lives in its own repository and consumes `tui-kit` as a published dependency, so the unused-export scan runs against `prism-tui` plus the app's declared import manifest, refreshed on each version bump. It is a reported signal, not a build gate.
+- **I13** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.
+- **I14** — `tui-kit/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
+- **I15** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
+- **I12** — Every `b.*` builder sets a `gapBefore` default per its kind (§4), and an explicit `gapBefore` always wins over it. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 
 ---
 
 ## 10. Commitments
 
-1. Three entry points; `testing` and `fixtures` never reach production.
-2. Eleven of twenty-three components are invisible to consumers, and that is the measure of the layering.
-3. Every export is a compatibility obligation; an export used by neither app is removed. The claim is about the union of the two, since neither exercises the whole surface alone.
-4. Builders return frozen blocks, not descriptions.
-5. Ids are generated unless supplied, matter only for patched blocks, and are never rendered.
-6. A bare string is a cell; nothing is inferred from field names.
-7. `b.live` gives A02 §7's whole pattern by default, with fixed behaviour and overridable rendering.
-8. `b.live` works identically in a transcript entry and a pushed view, driven by C23 in both.
-9. Animation lives in block kinds; `measure` cannot see `tick`.
-10. `tui-kit/testing` ships the assertions, so no consumer reimplements them.
-11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect.
-12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them.
+1. Three entry points; `testing` and `fixtures` never reach production (I8).
+2. Eleven of twenty-three components are invisible to consumers, and that is the measure of the layering (I2).
+3. Every export is a compatibility obligation; an export used by neither app is removed. The claim is about the union of the two, since neither exercises the whole surface alone (I1).
+4. Builders return frozen blocks, not descriptions (I3).
+5. Ids are generated unless supplied, matter only for patched blocks, and are never rendered (I4).
+6. A bare string is a cell; nothing is inferred from field names (I5).
+7. `b.live` gives A02 §7's whole pattern by default, with fixed behaviour and overridable rendering (I6).
+8. `b.live` works identically in a transcript entry and a pushed view, driven by C23 in both (I13).
+9. Animation lives in block kinds; `measure` cannot see `tick` (I7).
+10. `tui-kit/testing` ships the assertions, so no consumer reimplements them (I14).
+11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect (I9).
+12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them (I15).
+13. Every builder sets a `gapBefore` default per kind, and an explicit value always wins (I12, §4).
 
 ---
 
@@ -287,6 +319,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **T2.4** (I3): no exported builder returns anything but a frozen block — a type-level test.
 - **T2.5** (I7): `Measure`'s signature does not include `tick` — a compile-level test.
 - **T2.6** (I10): a source scan finds no I/O in the runtime entry outside `createTui`.
+- **T2.9** (I12): every `b.*` builder is enumerated and asserted to set the §4 default for its kind; a builder added without a row fails. For each, an explicit `gapBefore: false` and `true` overrides the default.
 - **T2.7** (I5): a source scan finds no field-name-keyed tone or glyph table in `builders/`.
 - **T2.8**: every block kind in C04's union has a builder — exhaustive over the type.
 
@@ -326,6 +359,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I2): exporting one of the eleven absent components → T2.1 fails, and the layering starts leaking.
+- **T6.12** (I12): dropping a builder's `gapBefore` default → T2.9 fails on that kind. Without the enumeration the surfaces render dense while the S-series draws them spaced, which is the gap the audit found.
 - **T6.2** (I3): a builder returning a description → T2.4 fails, and consumers learn two type families.
 - **T6.3** (I5): inferring a tone from a field name → T2.7 fails, and the fifth verb breaks silently.
 - **T6.4** (I6): making backoff configurable → the isolation guarantee becomes optional.

@@ -118,7 +118,7 @@ Behaviour is proven at integration and e2e scope; unit-level assertions belong t
 
 PTY harness.
 
-- **B1.6**: for all five exit triggers, the terminal matches a control run of `true` on termios flags, DECSET modes, active buffer and scroll region.
+- **B1.6**: for all five exit triggers, the terminal matches a control run of `true` on termios flags, DECSET modes, active buffer and scroll region. **This test owns the shell-driven triggers** — `/exit`, Ctrl-D confirm and double Ctrl-C. C01 T5.1 covers only the three paths C01 owns without a shell, deliberately, because two tests claiming the same coverage is how one of them stops being maintained. The PTY harness and its DECSET tracker are shared; C01 §7 describes them.
 - **B1.7**: a crash mid-session leaves its stack readable in the primary-screen scrollback.
 - **B1.8**: launch, type over a still-loading banner, submit, exit — the keystrokes land and the banner still completes.
 - **B1.9**: launch offline → degraded banner, working system commands, clear verb errors.

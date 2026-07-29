@@ -25,16 +25,7 @@ The governing constraint is **no horizontal scroll, ever** (D38). Horizontal scr
 ## 2. Public interface
 
 ```typescript
-type ColumnDef = Readonly<{
-  key:       string;
-  label:     string;
-  align:     "left" | "right";
-  priority:  number;                  // higher survives longer
-  minWidth:  number;                  // cells, excluding the gap
-  maxWidth?: number;
-  flex?:     boolean;                 // absorbs residual width
-  sortable:  boolean;
-}>;
+import type { ColumnDef } from "…/viewmodel";   // C04 — shape, not plan
 
 type PlannedColumns = Readonly<{
   visible:    readonly Readonly<{ key: string; width: number }>[];
@@ -48,7 +39,9 @@ function planColumns(cols: readonly ColumnDef[], width: number): PlannedColumns;
 const tableDefinition: BlockDefinition<Table>;   // registered into C09
 ```
 
-`Table`, `TableRow` and `Cell` are declared in **C04**; `ColumnDef` and `PlannedColumns` are planning types and belong here.
+`Table`, `TableRow`, `Cell` and `ColumnDef` are declared in **C04**, which owns every block shape (C04 commitment 11). `PlannedColumns` and `planColumns` belong here: they are the *plan*, derived from the shape and a width, and they are what C11 actually owns.
+
+An earlier draft placed `ColumnDef` here on the reasoning that it "describes planning rather than content". It does not — it is a field of `Table`, so C04 could not declare `Table` without it, and an L0 → L1 dependency was the consequence. The import above is C11 reaching *down*, which is the direction that holds.
 
 `planColumns` is pure and memoised on `(columns, width)`. It is called on every render and on every resize, and it must be cheap.
 
@@ -131,24 +124,27 @@ Detail is indented by 2 cells, so it measures at `width − 2`. Detail blocks ar
 - **I9** — Measured height equals rendered height, including expanded details (C09 I1).
 - **I10** — A column whose `minWidth` equals its longest value is shown whole or dropped, never truncated.
 - **I11** — C11 owns no state. Sort order, expansion and focus all arrive as data.
+- **I13** — Column priority is declared by the surface, never inferred by C11. A table engine guessing which column matters would guess differently as data changed, and the drop order would stop being reviewable.
+- **I14** — Missing values sort last in both directions. Not first when ascending and last when descending — last either way, because a null is an absence of rank rather than the bottom of one, and a reader sorting to find the worst case should not find blanks.
+- **I15** — Focus is rendered by C11 and owned by C16. C11 holds no focus state; it draws what it is handed, which is what keeps I11 true for the one piece of state a table most looks like it should own.
 - **I12** — C11 registers through C09's public `register`; it is not privileged.
 
 ---
 
 ## 7. Commitments
 
-1. No horizontal scroll at any width.
-2. Columns drop by priority, lowest first; display order is preserved.
-3. The highest-priority column always survives, truncated if necessary.
-4. Every dropped column is reachable in the expanded detail, and dropping makes every row expandable.
-5. Column priorities are declared by the surface, not by C11.
-6. A column declaring its longest value as `minWidth` is never truncated.
-7. Sort is stable, type-aware, height-neutral, and pairs details with parents.
-8. Missing values sort last in both directions.
-9. Expansion is block state; detail measures through `measureChild`.
-10. Focus is rendered here and owned by C16.
-11. C11 holds no state and registers through the public mechanism.
-12. Golden frames at 80 / 100 / 120 / 160 pin the layouts (D39).
+1. No horizontal scroll at any width (I1).
+2. Columns drop by priority, lowest first; display order is preserved (I4).
+3. The highest-priority column always survives, truncated if necessary (I3, I5).
+4. Every dropped column is reachable in the expanded detail, and dropping makes every row expandable (I2).
+5. Column priorities are declared by the surface, not by C11 (I13).
+6. A column declaring its longest value as `minWidth` is never truncated (I10).
+7. Sort is stable, type-aware, height-neutral, and pairs details with parents (I8).
+8. Missing values sort last in both directions (I14).
+9. Expansion is block state; detail measures through `measureChild` (I9).
+10. Focus is rendered here and owned by C16 (I15).
+11. C11 holds no state and registers through the public mechanism (I11, I12).
+12. Golden frames at 80 / 100 / 120 / 160 pin the layouts (D39) (→ A01 §3).
 
 ---
 

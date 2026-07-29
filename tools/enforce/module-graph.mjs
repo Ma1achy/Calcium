@@ -2,17 +2,72 @@
 import { readFileSync } from "node:fs";
 import { layerOf } from "./layers.mjs";
 
-const IMPORT = /^\s*(?:import|export)\b[^'"]*?from\s*['"]([^'"]+)['"]/gm;
+/**
+ * The rules this module actually implements — A03 §3 inventories twenty, and
+ * seventeen of them wait on the components they govern. Declared as a list so
+ * the vacuity suite can assert every one of them has been shown to fire; a rule
+ * added here without a fabricated violation fails A03 commitment 14.
+ */
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG20", "MG21"];
+
+/**
+ * MG6 is a **third kind of rule**, and saying so is the point of this comment.
+ *
+ * MG1 catches upward edges. MG2 catches cycles within a layer. Neither catches a
+ * specific forbidden edge *within* a layer, which is what C06 → C04 is: both are
+ * L0 data, the edge goes sideways, and every existing rule reports it clean.
+ * Written as a special case of MG1 it would never fire, so the next sideways
+ * prohibition — C15 → C13 (MG13), C20 → C17 (MG18) — goes in this table rather
+ * than into the layer walk.
+ *
+ * **Type-only imports count here**, unlike everywhere else. C04's own spec makes
+ * the argument: a type-only import erases at build and so passes the layer walk,
+ * "which is precisely the objection — a dependency that `make enforce` reports
+ * as clean is worse than one it catches". C06 I1 says C06 never *references* a
+ * C04 type, and a reference is what an `import type` is.
+ */
+const FORBIDDEN_EDGES = [
+  {
+    rule: "MG6",
+    from: "src/data/transport/",
+    to: "src/data/viewmodel/",
+    spec: "C06 I1 · C06 T2.2",
+    why:
+      "C06 reports and C07 interprets — transport constructs no view model, so it " +
+      "references no C04 type. Type-only counts: erasing at build is what would " +
+      "make this pass while being the dependency the rule exists to prevent",
+  },
+];
+
+const IMPORT = /^\s*(?:import|export)\b([^'"]*?)from\s*['"]([^'"]+)['"]/gm;
 const BARE   = /^\s*import\s*['"]([^'"]+)['"]/gm;
 
-function importsOf(file) {
-  const src = readFileSync(file, "utf8");
+/**
+ * A statement-level `import type` / `export type` erases at build and creates no
+ * runtime edge, so it is not an import for the layer rule's purposes — C01 needs
+ * C02's `TerminalCapabilities` type while genuinely not importing C02.
+ *
+ * An inline `import { type X, y }` is NOT skipped: the statement still emits,
+ * and `y` is a real edge.
+ */
+function isTypeOnly(clause) {
+  return /^type\b/.test(clause.trim());
+}
+
+function importsOf(file, readFile, includeTypeOnly = false) {
+  const src = readFile(file);
   const out = [];
-  for (const re of [IMPORT, BARE]) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(src))) out.push(m[1]);
+
+  IMPORT.lastIndex = 0;
+  let m;
+  while ((m = IMPORT.exec(src))) {
+    if (!includeTypeOnly && isTypeOnly(m[1])) continue;
+    out.push(m[2]);
   }
+
+  BARE.lastIndex = 0;
+  while ((m = BARE.exec(src))) out.push(m[1]);
+
   return out;
 }
 
@@ -29,12 +84,159 @@ function resolve(file, spec) {
   return stack.join("/");
 }
 
-export function checkModuleGraph(files) {
+/**
+ * MG20 — each mode export of `escapes.ts` belongs to exactly one component.
+ *
+ * SS15 says where the digits may live; this says who may mean them. Asserted per
+ * sequence rather than per file, so C03's transactional exception for `2026`
+ * stays exactly one sequence wide rather than becoming "C03 may use escapes".
+ *
+ * An export with no importer is fine: `SCROLL_REGION` has no consumer until
+ * M-T6, and requiring one would force a dead export CLAUDE.md forbids.
+ *
+ * An export that does not *exist* is not fine, and is the third way a rule
+ * comes to have nothing to be wrong about (A03 §2). These rows named
+ * `SYNC_UPDATE` and `SCROLL_REGION` while `escapes.ts` exported neither: the
+ * lookup could never hit, so the rows reported compliance whatever the tree
+ * contained. `modeOwnersAreReal` is the assertion that they name something.
+ */
+const MODE_OWNERS = {
+  ALT_SCREEN:     "src/terminal/lifecycle.ts",
+  CURSOR:         "src/terminal/lifecycle.ts",
+  BRACKET_PASTE:  "src/terminal/lifecycle.ts",
+  MOUSE:          "src/terminal/lifecycle.ts",
+  SCROLL_REGION:  "src/terminal/frame-scheduler.ts",
+  SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
+};
+
+const ESCAPES = "src/terminal/escapes";
+const NAMED = /^\s*import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/gm;
+
+/**
+ * NodeNext import specifiers end `.js` while the file on disk is `.ts`, so a
+ * resolved specifier never equals a path. Comparing without the extension is
+ * what makes MG20 fire at all — with it, the rule silently matched nothing.
+ */
+const bare = (p) => p.replace(/\.(m|c)?[jt]sx?$/, "");
+
+function checkModeOwnership(files, readFile) {
   const violations = [];
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (bare(f) === ESCAPES) continue;
+    const src = readFile(file);
+
+    NAMED.lastIndex = 0;
+    let m;
+    while ((m = NAMED.exec(src))) {
+      const target = resolve(f, m[2]);
+      if (target === null || bare(target) !== ESCAPES) continue;
+      for (const raw of m[1].split(",")) {
+        const name = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0];
+        const owner = MODE_OWNERS[name];
+        if (owner === undefined || owner === f) continue;
+        violations.push({
+          rule: "MG20", file: f,
+          message: `imports ${name} from escapes.ts, but ${owner} owns that mode`,
+          spec: "C01 I1 · C01 T2.8",
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * Which `MODE_OWNERS` rows name an export `escapes.ts` actually has.
+ *
+ * A row for an absent name is a row that cannot fire — it is not a wrong rule,
+ * it is a rule with nothing to be wrong about, which is the failure mode A03 §2
+ * names. Returned rather than thrown so the caller can list the pending ones
+ * (`SCROLL_REGION` waits on M-T6) and fail on the rest.
+ */
+export function modeOwnersAreReal(readFile = (f) => readFileSync(f, "utf8")) {
+  const src = readFile(`${ESCAPES}.ts`);
+  const exported = new Set([...src.matchAll(/^\s*export\s+const\s+(\w+)/gm)].map((m) => m[1]));
+  const missing = Object.keys(MODE_OWNERS).filter((name) => !exported.has(name));
+  return { exported: [...exported], missing, owned: Object.keys(MODE_OWNERS) };
+}
+
+/**
+ * MG21 — `presentation/` reaches into `terminal/` for `escapes.js` and nothing
+ * else.
+ *
+ * C09 §3's `sgr` is the first runtime edge from L1 to L0-terminal. It is legal
+ * — MG1 forbids upward imports and this is downward — and it is *required*: an
+ * SGR sequence is an escape literal, and C01 I1 puts those in one module. What
+ * makes it safe is that it stays one narrow import rather than becoming the
+ * beginning of a habit.
+ *
+ * Two edits this exists to catch, and both look reasonable in review: tidying
+ * the import away (which would put an escape literal in `presentation/`, where
+ * SS14 forbids it), and adding one more like it.
+ *
+ * Type-only imports are not edges — `importsOf` already drops them, which is
+ * how `presentation/` keeps naming `TerminalCapabilities` without importing C02.
+ */
+function checkPresentationEdges(files, readFile) {
+  const violations = [];
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (!f.startsWith("src/presentation/")) continue;
+
+    for (const spec of importsOf(file, readFile)) {
+      const target = resolve(f, spec);
+      if (target === null || !target.startsWith("src/terminal/")) continue;
+      if (bare(target) === ESCAPES) continue;
+
+      violations.push({
+        rule: "MG21", file: f,
+        message:
+          `imports ${spec} from terminal/ at run time — presentation/ may import ` +
+          `escapes.js and nothing else (C09 §3); a capability type is an ` +
+          `\`import type\`, which is not an edge`,
+        spec: "C09 §3 · C09 T2.17",
+      });
+    }
+  }
+  return violations;
+}
+
+/**
+ * `readFile` is injected so the rule can be tested against fabricated modules at
+ * layer paths that do not exist on disk — the same reason C02 takes its `env`.
+ */
+/** MG6 and the sideways prohibitions that follow it — see `FORBIDDEN_EDGES`. */
+function checkForbiddenEdges(files, readFile) {
+  const violations = [];
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    for (const edge of FORBIDDEN_EDGES) {
+      if (!f.startsWith(edge.from)) continue;
+      for (const spec of importsOf(file, readFile, true)) {
+        const target = resolve(file, spec);
+        if (target === null || !target.startsWith(edge.to)) continue;
+        violations.push({
+          rule: edge.rule, file,
+          message: `imports ${spec} — ${edge.why}`,
+          spec: edge.spec,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [
+    ...checkModeOwnership(files, readFile),
+    ...checkPresentationEdges(files, readFile),
+    ...checkForbiddenEdges(files, readFile),
+  ];
   for (const file of files) {
     const from = layerOf(file);
     if (!from) continue;
-    for (const spec of importsOf(file)) {
+    for (const spec of importsOf(file, readFile)) {
       const target = resolve(file, spec);
       if (!target) continue;
       const to = layerOf(target);

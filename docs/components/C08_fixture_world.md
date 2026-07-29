@@ -30,7 +30,7 @@ The generic half is everything the docker reference app would want identically; 
 
 | Half | Package | Contains |
 |---|---|---|
-| **Harness** | `tui-kit` | `Fixture` type and provenance model · the record/verify tooling · redaction · the seeded RNG · the resolver · mode handling |
+| **Harness** | `tui-kit` | the provenance model · the record/verify tooling · redaction · the seeded RNG · the resolver · mode handling. The `Fixture` **type** is declared in C06 (C06 §2), which consumes it structurally; C08 owns every rule about it |
 | **World** | `prism-tui` | Runs, deployments, model versions, secrets · their transitions · the seed corpus ported from the mockup |
 
 Without this split every consuming app reimplements recording and determinism, which is the machinery most likely to be got wrong.
@@ -56,6 +56,10 @@ interface WorldDriver {
 `WorldDriver` is where the mutable cell lives. **Transitions are pure; the cell holding the current world is not.** `experiment submit` computes `next = submit(current, inv)` with a pure function and then assigns — so every transition is testable in isolation while the handler still satisfies C06's stateful-looking signature.
 
 `clock` is injected and required only in `live` mode. C08's own modules read no clock (I4); the demo build supplies one at the boundary, exactly as C03 takes an injected `schedule`.
+
+**Live mode pulls; it never pushes.** Nothing in that signature schedules anything, and that is deliberate. `live` reads `clock()` on each query and advances the world by the elapsed delta — it does not arm a timer.
+
+The reason is not that it saves a timer. A timer advances the world *without anyone asking*, so two runs of the same sequence with different real elapsed time produce different worlds, and the demo becomes irreproducible in the one dimension C08 exists to hold fixed. Reading per query makes the world a pure function of `(seed, elapsed)`, reproducible whenever `elapsed` is controlled — which is exactly what `frozen` and `stepped` control. It is also why `live` is the only mode that takes a clock: the other two have no elapsed to read.
 
 The harness answers `__manifest__` from the supplied manifest, so a fixture-backed session satisfies B6 like any other far side.
 
@@ -84,7 +88,26 @@ type Fixture = Readonly<{
 
 An `authored` fixture without a `note` fails the build. The friction is intentional: authoring should feel slightly worse than recording.
 
-**The authored ratio is reported.** A build prints the count per verb, and a verb whose fixtures are majority-authored is flagged. Not a failure — some verbs are genuinely hard to record — but visible, because the drift risk concentrates exactly there.
+**The authored ratio is reported, and `record --diff`'s header is where it is read.** The count per verb prints alongside the verb count, and a verb whose fixtures are majority-authored is flagged. Not a failure — some verbs are genuinely hard to record — but visible, because the drift risk concentrates exactly there, and because a ratio nobody reads is a field rather than a report. `--diff` is the command someone runs when they care about corpus health, so it is where the number belongs.
+
+### The corpus file
+
+The `Fixture` **type** is C06's (A02 §1). The corpus **file** is C08's, and it is not `JSON.stringify(fixture)`:
+
+```json
+{
+  "schema": "tui.fixtures/1",
+  "fixtures": [ … ]
+}
+```
+
+Two decisions the file makes that the type does not.
+
+**`stdoutRaw` is stored; `stdout` is derived at load.** `RawResult` carries both the parsed value and the string it was parsed from, and persisting both would duplicate the payload and let the two disagree. The string is what was recorded, so it is what is stored — which is also what keeps I2's "byte-for-byte" literally true rather than approximately.
+
+**`schema` is required, and an unrecognised value is a load failure.** The corpus is the only persisted artefact in the system besides history; it outlives the code that wrote it, and the paragraph above is already a format decision made before a single corpus exists. Unversioned, an old corpus misparses into a plausible-looking wrong shape and the failure surfaces somewhere else entirely. Versioned, it fails at the door and says what it needs. Same form as `tui.view/1` (C04 I2) and the manifest's schema field.
+
+**Scenario is a directory, not a field.** `--scenario` partitions the corpus on disk; `createFixtureTransport` takes a flat `readonly Fixture[]`. A scenario field would be one the structural consumer must ignore, which is precisely what A02 §1 forbids — the selection happens at load.
 
 ### Recording
 
@@ -186,30 +209,36 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 - **I10** — Every `derived` response is structurally identical to the recording it derives from — same keys, same types, different values.
 - **I11** — The harness answers `__manifest__` (B6) from the supplied manifest.
 - **I12** — The world's output satisfies the same contract the real CLI does (A01 B1–B8), so an adapter cannot pass against fixtures and fail against reality for contract reasons.
-- **I13** — All three transports are substitutable: any test not concerning spawning passes against each (C06 I14).
+- **I13** — All three transports are substitutable: any test not concerning spawning passes against each (C06 I15).
 - **I14** — The world backs `EmulatedTransport` only. No test path reaches it.
-- **I15** — `record --diff` reports structural deltas only, and prints a count before any work begins.
+- **I15** — `record --diff` reports structural deltas only, and prints a count before any work begins. Its header also carries the authored ratio, which is the only place that number is read.
+- **I18** — A mutating verb changes the world, and the response it returns is `derived` from a recording of that verb rather than composed. Without mutation a demo cannot show a workflow, and a workflow is what a demo is for; without derivation the response is a fiction with no recording behind it (I10).
+- **I16** — The corpus file declares `schema: "tui.fixtures/1"`. An absent or unrecognised value fails the load; it is never assumed.
+- **I17** — `live` mode advances by reading the injected `clock` on each query. Nothing in C08 schedules, and no mode advances the world unasked.
 
 ---
 
 ## 6. Commitments
 
-1. Fixtures are recorded from the real CLI; authoring is the exception, marked, justified and counted.
-2. An authored fixture without a note fails the build; the authored ratio is reported per verb.
-3. `fixtures record --verify` re-runs recordings against the current CLI and reports structural drift.
-4. The world is seeded and fully deterministic; nothing in C08 reads a clock or a random source.
-5. `advance` and mutations are pure transitions.
-6. Three modes — frozen, stepped, live — with frozen the default.
-7. Mutating verbs mutate the world, so a demo can show a workflow end to end.
-8. Every query returns something; an unfixtured verb degrades to a plausible failure.
-9. Capture redacts values, never structure.
-10. C08 is app-side; the framework's only coupling is the handler closure.
-11. World output satisfies the same boundary contract as the real CLI, including the `__manifest__` endpoint.
-12. The world backs development only; tests run against the recorded corpus.
-13. `record --diff` scopes the reconciliation before it starts — every delta is one adapter line.
-14. The harness is `tui-kit`; the world is the app's. Apps implement `WorldDriver` and get recording, determinism and redaction for free.
-15. World transitions are pure; only the cell holding the current world is mutable.
-16. `live` mode takes an injected clock; nothing in C08 reads ambient time.
+1. Fixtures are recorded from the real CLI; authoring is the exception, marked, justified and counted (I1).
+2. An authored fixture without a note fails the build; the authored ratio is reported per verb (I1, I15).
+3. `record --against <cli>` re-runs recordings against the current CLI and `record --diff` reports the structural drift. **Two flags, one job** — an earlier draft also named a `--verify`, and it was this same operation under a second name rather than a third operation (I15).
+4. The world is seeded and fully deterministic; nothing in C08 reads a clock or a random source (I3, I4).
+5. `advance` and mutations are pure transitions (I5).
+6. Three modes — frozen, stepped, live — with frozen the default (I6).
+7. Mutating verbs mutate the world, so a demo can show a workflow end to end (I18).
+8. Every query returns something; an unfixtured verb degrades to a plausible failure (I7).
+9. Capture redacts values, never structure (I8).
+10. C08 is app-side; the framework's only coupling is the handler closure (I9).
+11. World output satisfies the same boundary contract as the real CLI, including the `__manifest__` endpoint (I11, I12).
+12. The world backs development only; tests run against the recorded corpus (I14).
+13. `record --diff` scopes the reconciliation before it starts — every delta is one adapter line (I15).
+14. The harness is `tui-kit`; the world is the app's. Apps implement `WorldDriver` and get recording, determinism and redaction for free (I9).
+15. World transitions are pure; only the cell holding the current world is mutable (I5).
+16. `live` mode takes an injected clock; nothing in C08 reads ambient time (I4).
+17. `live` mode **pulls**: it reads the clock on each query and advances by the elapsed delta. Nothing in C08 schedules, because a world that advances unasked is a world whose reproducibility depends on real elapsed time (I17).
+18. The corpus file is versioned `tui.fixtures/1` and stores `stdoutRaw`, deriving `stdout` at load. An unrecognised schema fails the load rather than being parsed hopefully (I16).
+19. §7's tests are tagged by half. A **world** test is the reference app's to run, not a deferral `tui-kit` carries — the repo that owns the domain owns the assertion about it (→ A04 §1).
 
 ---
 
@@ -217,79 +246,103 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 
 Six tiers. **No state machine** in the A02 §7 sense: the world holds state, but its transitions are a data model rather than a lifecycle — there is no operation that is legal in one state and illegal in another. The harness's mode is fixed at construction. §3's operations are therefore covered by property tests rather than a transition table.
 
+### Which half a test belongs to
+
+C08's two halves ship from different repositories (A04 §1), so its test table does too. Each entry below is tagged **H** or **W**:
+
+| Tag | Repo | Asserts |
+|---|---|---|
+| **H** — harness | `tui-kit` | provenance, redaction, the corpus format, the resolver, modes, recording, `--diff` |
+| **W** — world | `prism-tui`, `docker-tui` | that a *particular* world advances, mutates and refuses as its domain requires |
+
+This is not a deferral list. A **W** row is not a test `tui-kit` is failing to run; it is a test `tui-kit` has no world to run it against, and it becomes the reference app's acceptance list (R01 §9). Left untagged, half this table would sit permanently red in a repo that cannot ever satisfy it, and a backlog nothing can clear is one people learn to scroll past.
+
+**A fixed test-double `WorldDriver` is not "the world" for I14's purposes.** The harness tests need something behind route 2, and a fake implementing the interface with constant answers is what they use. The qualifier is the same one C06 I17 already carries for `EmulatedTransport`: what D43 forbids is a test *agreeing with an animated world*, taking values the emulator invented as the expected result. A double that invents nothing cannot drift, and so cannot mask anything.
+
 ### Tier 1 — unit
 
-- **T1.1** (I3): `createWorld({seed: 42})` twice → deeply equal worlds.
-- **T1.2** (I3): the same seed and the same `advance` sequence → identical final world, run for a thousand steps.
-- **T1.3** (I3): different seeds → different worlds, but both structurally valid.
-- **T1.4** (I5): `advance` returns a new world; the input is unchanged and still frozen.
-- **T1.5**: a running run advances epochs over time; loss decreases monotonically; it reaches `succeeded` at its epoch total.
-- **T1.6**: a queued run transitions to running after its scheduled delay.
-- **T1.7**: each mutating verb produces the documented world change — six cases.
-- **T1.8** (I6): a world created with no mode is `frozen`; `advance` is required for any motion.
-- **T1.9** (I7): a verb with no fixture and no world support → a failure result, not a throw.
-- **T1.10**: §4 resolution order — a verb with both a fixture and world support replays the fixture.
-- **T1.11**: `WorldDriver.query` returning `null` → the resolver falls through to the generic failure.
-- **T1.12** (I5): a mutation computes a new world purely, then the cell is assigned; the previous world value is unchanged and still usable.
-- **T1.13** (I4): `mode: "live"` without a `clock` → construction throws; with one, `advance` is driven by it and by nothing else.
+- **W** — **T1.1** (I3): `createWorld({seed: 42})` twice → deeply equal worlds.
+- **W** — **T1.2** (I3): the same seed and the same `advance` sequence → identical final world, run for a thousand steps.
+- **W** — **T1.3** (I3): different seeds → different worlds, but both structurally valid.
+- **W** — **T1.4** (I5): `advance` returns a new world; the input is unchanged and still frozen.
+- **W** — **T1.5**: a running run advances epochs over time; loss decreases monotonically; it reaches `succeeded` at its epoch total.
+- **W** — **T1.6**: a queued run transitions to running after its scheduled delay.
+- **W** — **T1.7**: each mutating verb produces the documented world change — six cases.
+- **H** — **T1.8** (I6): a handler constructed with no mode is `frozen`; `advance` is required for any motion.
+- **H** — **T1.9** (I7): a verb with no fixture and no world support → a failure result, not a throw.
+- **H** — **T1.10**: §4 resolution order — a verb with both a fixture and world support replays the fixture.
+- **H** — **T1.11**: `WorldDriver.query` returning `null` → the resolver falls through to the generic failure.
+- **H** — **T1.12** (I5): the handler's cell is *assigned*, never mutated — the world value it held before a mutation is unchanged and still usable. The purity of the transition is the world's (T1.4); the discipline about the cell is the harness's.
+- **H** — **T1.13** (I4, I17): `mode: "live"` without a `clock` → construction throws.
+- **H** — **T1.14** (I3): the harness's seeded generator — same seed, same draw sequence, over a thousand draws; different seeds diverge. This is the determinism apps inherit rather than reimplement, so it is asserted here and not only in a world.
+- **H** — **T1.15** (I17): in `live` mode the world advances by the elapsed reading of the injected clock and by nothing else — a clock that does not move produces no motion across repeated queries, and no motion occurs between them.
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I1): every fixture in the corpus has a provenance; every `authored` one has a non-empty note. Build-time.
-- **T2.2** (I12, the important one): every fixture — recorded and authored alike — satisfies the A01 B1–B8 boundary contract, asserted by the **same** conformance suite that runs against the real CLI. Fixtures are held to the contract, not merely to a schema.
-- **T2.3** (I4): a source scan finds no `Math.random`, `Date.now`, `new Date()` or `performance.now` in C08.
-- **T2.4** (I13): the C06 tier-1 and tier-3 suites pass against the fixture transport.
-- **T2.5** (I8): no fixture matches the secret, token or home-path patterns.
-- **T2.6** (I9): the module graph shows `tui-kit` importing nothing from `prism-tui`.
-- **T2.7** (I2): each recorded fixture's stored bytes equal what replay emits.
-- **T2.8** (I10): every `derived` response is structurally identical to its source recording — key sets and types compared, values ignored.
-- **T2.9** (I11): `__manifest__` through the fixture handler returns the supplied manifest and satisfies C05's parser.
-- **T2.10** (I9): the module graph shows the `tui-kit` harness importing nothing from `prism-tui`; the reference app supplies its own `WorldDriver` and reuses the harness unchanged.
+- **H** — **T2.1** (I1): every fixture in a corpus has a provenance; every `authored` one has a non-empty note. Build-time.
+- **H** — **T2.2** (I12, the important one): every fixture — recorded and authored alike — satisfies the A01 B1–B8 boundary contract, asserted by the **same** conformance suite that runs against the real CLI. Fixtures are held to the contract, not merely to a schema.
+- **H** — **T2.3** (I4): a source scan finds no `Math.random`, `Date.now`, `new Date()` or `performance.now` in C08. Implemented as A03 SS2.
+- **H** — **T2.4** (I13): the C06 tier-1 and tier-3 suites pass against the fixture transport.
+- **H** — **T2.4b** (I14): no test path constructs a world. `EmulatedTransport` appears in `test/` only over a fixed handler or a constant `WorldDriver` double, never over something that animates — the qualifier C06 I17 carries, asserted rather than stated.
+- **H** — **T2.5** (I8): no fixture matches the secret, token or home-path patterns.
+- **H** — **T2.6** (I9): **the form this repo can hold.** MG8 as written — `tui-kit` importing nothing from `prism-tui` — has nothing here to fire at, and a rule with nothing to be wrong about passes exactly like a satisfied one (A03 §2). What is asserted here is that `src/` imports nothing outside the declared dependency set and nothing above itself. MG8 proper belongs to whichever repo holds both packages.
+- **H** — **T2.7** (I2, C06 I20): **every stored field, `argv` included.** A recorded fixture's `result` comes back from replay exactly as stored — no field is rewritten and none is excepted.
+
+  An earlier draft of this row carved out `argv`, because `createFixtureTransport` rewrote it to the spawned form and a test written to the literal claim would have failed on the behaviour as it then was. The rewrite is gone (C06 §3): `meta.argv` is a historical fact about the data, so replay reports the invocation that was actually recorded. The exception went with it, which is the better outcome — a byte-for-byte claim with one field carved out is a byte-for-byte claim that has already started to erode.
+- **H** — **T2.8** (I10): the structural comparator — key sets and types compared, values ignored. Applying it to a *particular* world's `derived` responses is **W**; that the comparator is right is asserted here, against fabricated pairs that differ by an added field, a dropped field and a changed type.
+- **H** — **T2.9** (I11): `__manifest__` through the fixture handler returns the supplied manifest and satisfies C05's parser.
+- **H** — **T2.10** (I9): the harness references no app type — `WorldDriver` is declared kit-side and every harness module is expressed in C06's and C05's vocabulary alone. Same caveat as T2.6 about what can be asserted from one repo.
+- **H** — **T2.11** (I16): a corpus file with no `schema`, or with an unrecognised one, fails to load and the error names what it needed. A corpus is not parsed on the assumption that its shape is current.
 
 ### Tier 3 — edge cases
 
-- **T3.1**: `advance` with delta 0 → world unchanged.
-- **T3.2**: `advance` with a very large delta → runs complete rather than overshooting into invalid states.
-- **T3.3**: `advance` with a negative delta → rejected, not silently reversed.
-- **T3.4**: cancelling an already-succeeded run → the documented refusal, matching the real CLI's.
-- **T3.5**: promoting a run that is not a succeeded candidate → the refusal shape from the recorded fixture.
-- **T3.6**: two mutations against the same base world → independent results; neither observes the other.
-- **T3.7**: a streaming query cancelled mid-iteration → terminates, and the world is untouched.
-- **T3.8**: a fixture whose `result` is a patch array → replayed as a stream with a terminal `end`.
-- **T3.9**: an empty world (`scenario: "empty"`) → every list verb returns its empty state; no verb throws.
-- **T3.10**: a world at scale — 10,000 runs — → a list query returns within 50 ms, matching the Page Down budget in A02 §7 since both bound a single interaction.
-- **T3.11**: a recorded fixture from an older `cliVersion` → replays, and the version mismatch is reported by `--verify`, not at replay.
-- **T3.12**: an authored fixture describing a malformed stream → the adapter's degradation path is exercised. This is a case recording genuinely cannot reach, and is why `authored` exists at all.
+- **H** — **T3.1**: `advance(0)` → the driver is not called, and the world value is unchanged.
+- **W** — **T3.2**: `advance` with a very large delta → runs complete rather than overshooting into invalid states.
+- **H** — **T3.3**: `advance` with a negative delta → rejected by the harness before it reaches the driver, not silently reversed.
+- **W** — **T3.4**: cancelling an already-succeeded run → the documented refusal, matching the real CLI's.
+- **W** — **T3.5**: promoting a run that is not a succeeded candidate → the refusal shape from the recorded fixture.
+- **W** — **T3.6**: two mutations against the same base world → independent results; neither observes the other.
+- **H** — **T3.7**: a streaming query cancelled mid-iteration → terminates, and `advance` was never called.
+- **H** — **T3.8**: a fixture whose `result` is a patch array → replayed as a stream with a terminal `end`.
+- **W** — **T3.9**: an empty world (`scenario: "empty"`) → every list verb returns its empty state; no verb throws.
+- **W** — **T3.10**: a world at scale — 10,000 runs — → a list query returns within 50 ms, matching the Page Down budget in A02 §7 since both bound a single interaction.
+- **H** — **T3.11**: a recorded fixture from an older `cliVersion` → replays, and the version mismatch is reported by `--diff`, not at replay.
+- **H** — **T3.12**: an authored fixture describing a malformed stream → the adapter's degradation path is exercised through C07's fallback. This is a case recording genuinely cannot reach, and is why `authored` exists at all.
+- **H** — **T3.13** (I8): redaction rewrites a value and leaves the structure alone — a fixture carrying a token in a nested field keeps its key set, its types and its array lengths, and loses only the value. A redaction that dropped the key would change the shape the adapter is tested against.
+- **H** — **T3.14** (I15): `--diff` over corpora that differ only in *values* reports nothing, and still prints its count. Silence and zero deltas are different outputs.
 
 ### Tier 4 — integration
 
-- **T4.1** (with C06, C07): every fixture adapts to a valid document passing C04's validator.
-- **T4.2** (with C07): a fixture and a real recording of the same verb produce documents that differ only in values, never in block structure.
-- **T4.3** (with C06): `stepped` mode plus a streaming verb → patches arrive in order, `end` last.
-- **T4.4** (with L4): a full demo scenario — submit, watch progress, promote, scale — runs entirely on fixtures.
-- **T4.5**: switching a single verb from fixture to subprocess mid-session (D13) → both render through the same adapter.
+- **W** — **T4.1** (with C06, C07): every fixture adapts to a valid document passing C04's validator.
+- **W** — **T4.2** (with C07): a fixture and a real recording of the same verb produce documents that differ only in values, never in block structure.
+- **H** — **T4.3** (with C06): `stepped` mode plus a streaming verb → patches arrive in order, `end` last.
+- **W** — **T4.4** (with L4): a full demo scenario — submit, watch progress, promote, scale — runs entirely on fixtures.
+- **W** — **T4.5**: switching a single verb from fixture to subprocess mid-session (D13) → both render through the same adapter.
+- **H** — **T4.6** (with C06, C21): the recording round trip. A scripted child → `record` → a corpus file → `createFixtureTransport` replaying it → deep-equal to what `createSubprocessTransport` returned for the same invocation. This is the assertion that the format C08 records into is the one C06 consumes, and recording composes over the subprocess transport precisely so that it cannot come apart.
 
 ### Tier 5 — e2e
 
-- **T5.1**: the whole application starts, runs every verb and exits cleanly with no Python installed. The standalone guarantee.
-- **T5.2**: the demo scenario in `live` mode for five minutes → progress is visible, the world stays consistent, memory is flat.
-- **T5.3**: golden frames captured against a frozen seeded world are byte-identical across a hundred runs. If this flakes, determinism is broken somewhere.
-- **T5.4** (drift, I15): `record --against` then `record --diff` against a real CLI reports zero structural differences, and prints the verb count either way. Run in CI where a far side is available; skipped otherwise with the skip recorded, not silent.
+- **W** — **T5.1**: the whole application starts, runs every verb and exits cleanly with no Python installed. The standalone guarantee.
+- **W** — **T5.2**: the demo scenario in `live` mode for five minutes → progress is visible, the world stays consistent, memory is flat.
+- **W** — **T5.3**: golden frames captured against a frozen seeded world are byte-identical across a hundred runs. If this flakes, determinism is broken somewhere.
+- **W** — **T5.4** (drift, I15): `record --against` then `record --diff` against a real CLI reports zero structural differences, and prints the verb count either way. Run in CI where a far side is available; skipped otherwise with the skip recorded, not silent.
 
 ### Tier 6 — fail-on-revert
 
-- **T6.1** (I4): reintroducing `Math.random` in a generator → T2.3 fails, and T5.3 flakes.
-- **T6.2** (I1): an authored fixture landing without a note → T2.1 fails.
-- **T6.3** (I12): a fixture that satisfies the adapter but violates the boundary contract → T2.2 fails. **This is the test that stops the fiction problem.**
-- **T6.4** (I5): mutating the world in place → T1.4 and T3.6 fail.
-- **T6.5** (I2): normalising a recording at replay → T2.7 fails.
-- **T6.6** (I6): defaulting to `live` → T5.3 flakes and T1.8 fails.
-- **T6.12** (I14): a test reaching the world → T2.4b fails, and emulator drift starts masking regressions.
-- **T6.7** (I9): `tui-kit` importing a C08 type → T2.6 fails.
-- **T6.8** (I7): a query path that throws on an unknown verb → T1.9 fails.
-- **T6.9** (I10): a world response that adds or drops a field relative to its recording → T2.8 fails. This is the drift the fiction problem hides behind.
-- **T6.10** (I9): moving the harness into `prism-tui` → T2.10 fails, and the reference app loses recording.
-- **T6.11** (I4): reading ambient time in live mode rather than the injected clock → T1.13 and T5.3 fail.
+- **H** — **T6.1** (I4): reintroducing `Math.random` in the harness → T2.3 fails. In a world, T5.3 flakes (**W**).
+- **H** — **T6.2** (I1): an authored fixture landing without a note → T2.1 fails.
+- **H** — **T6.3** (I12): a fixture that satisfies the adapter but violates the boundary contract → T2.2 fails. **This is the test that stops the fiction problem.**
+- **W** — **T6.4** (I5): mutating the world in place → T1.4 and T3.6 fail.
+- **H** — **T6.5** (I2): normalising a recording at replay → T2.7 fails.
+- **H** — **T6.6** (I6): defaulting to `live` → T1.8 fails. In a world, T5.3 flakes (**W**).
+- **H** — **T6.12** (I14): a test constructing a world → T2.4b fails, and emulator drift starts masking regressions.
+- **H** — **T6.7** (I9): the harness referencing an app type → T2.10 fails.
+- **H** — **T6.8** (I7): a query path that throws on an unknown verb → T1.9 fails.
+- **H** — **T6.9** (I10): a response that adds or drops a field relative to its recording → T2.8's comparator fails to report it.
+- **W** — **T6.10** (I9): moving the harness into `prism-tui` → the reference app loses recording, and R01 §7's second-consumer claim goes with it.
+- **H** — **T6.11** (I4, I17): arming a timer in `live` mode rather than reading the injected clock per query → T1.15 fails, and every world becomes a function of real elapsed time.
+- **H** — **T6.13** (I16): dropping `schema` from the corpus file, or accepting an unrecognised one → T2.11 fails, and the next format change misparses an old corpus into a plausible wrong shape instead of refusing it.
+- **H** — **T6.14** (I8): redacting structure rather than values — dropping a key that held a token instead of rewriting it → T3.13 fails, and every adapter is then tested against a shape the far side never emits.
 
 ---
 

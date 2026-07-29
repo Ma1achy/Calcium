@@ -34,6 +34,23 @@ C18 classifies; C23 routes. Seven kinds, seven paths.
 | `app` | Transport → adapt → append (§3) |
 | `shell` | `spawnShell` → `raw` document (C18 §5) |
 
+### Composition inserts no spacing of its own
+
+**A document's vertical rhythm is declared by its blocks** — `gapBefore` (C04
+§3a) — and C23 adds nothing between them, before them or after them.
+
+The alternative is what this rules out: a composition root that put a blank row
+between top-level blocks would make a document's height depend on where it was
+rendered, so the height C14 virtualises against and the height the frame draws
+would be computed by different code with no reason to agree. It would also be
+invisible to `measure`, which is the one place the system checks anything about
+height at all.
+
+The rule has teeth in one direction only: C23 may not *add* rhythm. An adapter
+that produces a document with no gaps gets a dense one, and that is the adapter's
+choice to make — `b.*` supplies the defaults (C24 §4) so that choice is rarely
+made by accident.
+
 `empty` producing no entry is deliberate: pressing Enter on a blank prompt in a shell does nothing, and appending an empty block would fill the transcript with them.
 
 ### Local handlers
@@ -48,9 +65,22 @@ interface LocalRegistry {
 }
 ```
 
-`tui-kit` ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/exit` calls `C22.stop`. An app registers its own alongside them.
+`tui-kit` ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
 
 A local handler is the only place a component above L0 may reach several stores at once, and it does so through C23 rather than laterally.
+
+#### `/debug` — inspecting what actually ran
+
+```
+/debug        the previous entry's invocation
+/debug <n>    n entries back
+```
+
+Renders a `keyValue` of `argv`, `transport`, `origin`, `exitCode`, `durationMs` and `adapter`, plus `stderr` as a `raw` block when non-empty, plus the retained raw payload as a `code` block when `--debug` is on (C13 §retention). It appends as an ordinary entry, so it scrolls and is itself inspectable.
+
+**It is a local command and not an action, and that is the whole design.** An action originating from a frozen entry is refused (I18), and inspecting an *older* entry is the entire point — an inspect action would be refused on every entry worth inspecting. Reading an entry's `meta` is not firing an action: nothing re-runs, nothing reaches the far side, and the stale-data footgun I18 exists to prevent does not arise. D5 is untouched.
+
+This is also what distinguishes `/debug` from `{ } json`, which several surfaces offer. `{ } json` **re-runs** the command with `--json` — honest, and what the command says, but on a `--watch` or a changing cluster it returns different data than the block it was opened from. `/debug` describes the entry in front of you.
 
 ---
 
@@ -116,6 +146,21 @@ An action from a **frozen** entry is refused (A01 D5, C13 §2): frozen entries h
 
 ---
 
+### Setting `origin`
+
+C23 is the only component that appends documents, so it is the only one that can set provenance. It sets `meta.origin` on **every** document it appends, with no default and no path that omits it (C04 I13):
+
+| Value | Set when |
+|---|---|
+| `user` | A typed submission from the prompt |
+| `action` | An `exec` action dispatched from a block (§3a) |
+| `refresh` | A time-driven tick — stall notice or part refresh (§3b) |
+| `agent` | Reserved. Nothing produces it in v1 |
+
+`origin` is not a debugging field. It is what makes a transcript legible once more than one thing is putting entries into it, and a provenance field that can be absent is one nobody trusts.
+
+---
+
 ## 3b. Time-driven updates
 
 Adapters are pure and read no clock (C07 I1); C15's layout is pure (C15 I5). **Anything periodic is therefore C23's, using C22's injected clock.**
@@ -173,7 +218,7 @@ Every stage can fail, and none may kill the session (A02 §7).
 | Validation fails | Error document; nothing spawned |
 | Transport fails or times out | Error document from C07's mapping |
 | Adapter throws | C07 contains it; fallback rendering plus a muted notice |
-| Patch application throws | The entry is settled with what it had; a notice records the truncation |
+| Patch application fails | `applyPatch` returns `{ok: false}` (C04 §4, I15) — it does not throw. The entry is settled with what it had; a notice records the truncation, carrying the returned `ErrorLike`'s message |
 | A local handler throws | Error document naming the verb |
 | `transcript.append` throws | The only stage whose failure loses the outcome. Logged as a defect, the frame still commits, and I1's second exception names it rather than leaving the invariant false |
 | Commit throws | C03 contains it; contamination is flagged for the next frame |
@@ -198,7 +243,7 @@ Per submission.
 ## 7. Invariants
 
 - **I1** — Every submission produces exactly one transcript entry, with two named exceptions: `empty` produces none, and a failure of `transcript.append` itself produces none and is logged as a defect. No other path may produce zero or two.
-- **I2** — No stage failure escapes; every one produces a document.
+- **I2** — No stage failure escapes; every one produces a document. For patch application the mechanism is C04's `PatchResult` (C04 I15) rather than a caught throw: the failure is a value on the return path, so "settled with what it had" is something C23 *does* with a result, not something it recovers from.
 - **I3** — The pending entry is appended before the transport is invoked.
 - **I4** — Validation is carried from C18, never recomputed.
 - **I5** — A second submission on any foreground route while one is in flight is refused with a notice, never queued. C23's guard is authoritative; C06's is a backstop.
@@ -218,32 +263,41 @@ Per submission.
 - **I19** — Stall detection and part refresh are C23's, on C22's injected clock. No adapter, view, layer or entry reads a clock.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success.
+- **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
+- **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
+- **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I19) and applied by the sequence (C09 I15). The rule has teeth in one direction only: C23 may not *add* rhythm.
+- **I26** — A stream producing nothing for 120 s appends a muted stall notice, and never an error. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
+- **I25** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
 
 ---
 
 ## 8. Commitments
 
-1. Seven routes, one per `ParseResult` kind; `empty` produces no entry.
-2. The pending entry is appended before the subprocess starts.
-3. Validation travels from C18 and is never recomputed.
-4. The submission guard covers every foreground route and is checked before the pending entry is appended; streams are exempt.
-5. `$_` comes from `meta.resultId` alone; nothing is inferred.
-6. Patches coalesce at `"stream"`; settlement flushes at `"completion"`.
-7. Frozen entries keep streaming until settled.
-8. Cancellation settles as `partial` and retains output.
-9. Every stage failure produces a document; none kills the session.
-10. Built-ins apply before delegation.
-11. All cross-layer sequences live in §4.
-12. Local handlers ship for framework concerns; apps register their own.
-13. `/help` renders from the manifest, so help cannot drift from behaviour.
-14. The displayed command equals the spawned command.
-15. Submissions are refused once C22 sets `session.stopping`.
-16. C23 supplies `onAction`; `exec` re-enters the normal submission path.
-17. `open` is scheme-checked and never shelled.
-18. Actions from frozen entries are refused.
-19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time.
-20. A stream silent for 120 s gets a muted stall notice, never an error.
-21. View refreshes are staggered by offset and fail in isolation.
+1. Seven routes, one per `ParseResult` kind; `empty` produces no entry (I1).
+2. The pending entry is appended before the subprocess starts (I3).
+3. Validation travels from C18 and is never recomputed (I4).
+4. The submission guard covers every foreground route and is checked before the pending entry is appended; streams are exempt (I5, I6).
+5. `$_` comes from `meta.resultId` alone; nothing is inferred (I7).
+6. Patches coalesce at `"stream"`; settlement flushes at `"completion"` (I8).
+7. Frozen entries keep streaming until settled (I9).
+8. Cancellation settles as `partial` and retains output (I10).
+9. Every stage failure produces a document; none kills the session (I2).
+10. Built-ins apply before delegation (I11).
+11. All cross-layer sequences live in §4 (I13).
+12. Local handlers ship for framework concerns; apps register their own (I14).
+13. `/help` renders from the manifest and C16's keymap, so help cannot drift from behaviour (I25).
+14. The displayed command equals the spawned command (I15).
+15. Submissions are refused once C22 sets `session.stopping` (I12).
+16. C23 supplies `onAction`; `exec` re-enters the normal submission path (I16).
+17. `open` is scheme-checked and never shelled (I17).
+18. Actions from frozen entries are refused (I18).
+19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time (I19).
+20. A stream silent for 120 s gets a muted stall notice, never an error (I26).
+21. View refreshes are staggered by offset and fail in isolation (I20, I21).
+22. C23 sets `meta.origin` on every append; provenance is never absent (I22).
+23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point (I23).
+24. `/debug` never re-runs; `{ } json` always does, and each surface says so (I23).
+25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 
 ---
 
@@ -277,6 +331,7 @@ Fake transport, fake stores.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I2): a fault injected at each of the eight stages in §5 → a document is appended and the session survives, eight times.
+- **T2.11** (I24): the composed height of an appended entry equals `measureSequence` over its blocks (C09 I15), for a document with gaps and one without. C23 contributing a single row of its own fails both.
 - **T2.2** (I1): across a thousand random submissions, entry count equals submission count minus empties.
 - **T2.3** (I13): a spy on every component proves no cross-layer effect originates outside C23.
 - **T2.4** (I8): commit reasons match the documented class for every route.
@@ -329,6 +384,7 @@ Fake transport, fake stores.
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I3): invoking the transport before appending → T1.4 fails, and slow verbs look like dropped keystrokes.
+- **T6.14** (I24): inserting a blank row between top-level blocks → T2.11 fails. Without it the change is invisible: the height C14 virtualises against and the height the frame draws are computed by different code, and nothing compares them.
 - **T6.2** (I4): recomputing validation → T1.5 fails, and two answers can disagree.
 - **T6.3** (I5): queueing a second verb → T1.6 fails, and `$_` becomes ambiguous.
 - **T6.13** (I5): scoping the guard to app verbs only → T3.16 fails, and the prompt accepts submissions over a running `sleep`.

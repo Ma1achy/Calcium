@@ -158,6 +158,8 @@ Row actions, surfaced on focus and in the expanded panel:
 | `{ } json` | `/ps <uuid> --json` | fill |
 | `!1248` | The MR URL | open |
 
+**`{ } json` re-runs the command; it does not show this entry's payload.** On a `--watch`, or against anything that changes between the two calls, it returns different data than the block it was opened from — so an adapter bug can render wrong here and then show a fresh payload that looks fine. That is honest: re-running is what the command says. To inspect *this* entry — its argv, transport, stderr and retained payload — use `/debug` (C23 §2), which never re-runs.
+
 **Every action is a fill except the MR link.** `↑ promote … --open-mr` is precisely the command that must be read before it runs (A01 D8), and `⊘ cancel` likewise. Only pills use `exec`, because a filter is reversible.
 
 `↑ promote` appears only on succeeded candidates; `⊘ cancel` only on running or queued rows. An action that would certainly be refused is not offered.
@@ -223,6 +225,7 @@ Once frozen, every action is refused (C23 I18) — the data is minutes old and a
 - **T3.11**: sorting on a column that later drops at a narrower width → the sort persists and reapplies when the column returns.
 - **T3.12**: two rows with the same `uuid` prefix → both shown in full; no collision.
 
+- **T3.20** (`{ } json`): the interactions section states that `{ } json` re-runs and points at `/debug`. A caveat that can be tidied away is a caveat that will be.
 ### Tier 4 — integration
 
 - **T4.1** (with C11): the §3 drop order is exactly what `planColumns` produces at each width.

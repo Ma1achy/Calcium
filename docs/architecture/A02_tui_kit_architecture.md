@@ -25,6 +25,19 @@ L0  foundation     terminal (C01 C02 C03)   ·   data (C04 C05 C06 C07 C21)
 
 **L0 has two halves that do not know about each other.** Terminal knows nothing of view models; data knows nothing of terminals. That independence is not incidental — it is what allows C04–C07 to be built in parallel with C01–C03, and it is the first thing a lint rule should protect.
 
+### Where a shared type is declared
+
+**A type belongs to the layer that consumes it structurally, not to the component with the most to say about it.**
+
+This has come up twice in ten components, both times as a draft that put the type with its domain expert and produced an edge in the wrong direction:
+
+- **`ColumnDef` → C04, not C11.** C11 has everything interesting to say about columns — priority, flex, drop order, planning. But `ColumnDef` is a field of `Table`, so C04 cannot declare `Table` without it, and the first draft's placement made L0 depend on L1. C11 keeps `PlannedColumns` and `planColumns`, which are genuinely plan rather than content (C04 §, C11 §).
+- **`Fixture` → C06, not C08.** C08 owns provenance, recording, redaction and the authored ratio — all the rules. But `createFixtureTransport` reads `Fixture`, and it is expressed in C06's own `RawResult` and `RawPatch`, so declaring it in C08 would have put a cycle inside L0 data (C06 §2, C08 §1a).
+
+The pattern in both: the component with the domain knowledge keeps the *rules*; the consumer holds the *shape*. C11's rejected alternative is worth remembering because it is the one that hides — a type-only import erases at build and so passes the module-graph check, which makes it worse than an edge `make enforce` catches.
+
+The next likely instance is C13/C14 over transcript entries.
+
 
 ```mermaid
 flowchart TD
@@ -74,6 +87,28 @@ L0T and L0D have no edge between them. That absence is the point.
 
 C11 and C12 sit beside C09 rather than under it: the table engine and plot renderer *are* block renderers, registered like any other.
 
+### Whose claim is this
+
+Every component spec carries a commitment list and an invariant list, and they must pair: **an invariant is what a test cites, so a commitment with no invariant is a promise nothing enforces.** Two rules decide the cases where they legitimately do not pair, and both answer the same question — whose claim is this.
+
+**Structural invariants carry no commitment.** An invariant asserting the module graph rather than behaviour — "C13 imports nothing from `terminal/` or `presentation/`" — is enforced by A03 and consumed by no caller, so a commitment would restate a build rule as a promise to a reader who cannot act on it. Ten specs carry such an invariant and none commits to it; that is one decision, not ten omissions.
+
+**A spec commits only to what it can enforce. A rule owned elsewhere is a cross-reference, not a commitment.** The test is whether the spec can *fail* when the rule is violated. C04 committed to capability substitution being width-preserving, which happens in C09's renderers: C04 cannot fail if it is broken, so C04's version was an overclaim, and C09 I5 is where the rule lives. C02 committed to D29 — no information carried by colour alone, anywhere — which C02 has no view of at all.
+
+The failure mode is specific and worth naming: **a claim restated downstream is a claim made where it cannot be tested, and the duplication is what hides that neither copy is backed.** Three rules were each stated in two specs and asserted in neither.
+
+**Both rules are mechanical, not advisory.** Every commitment carries one of three markers, and A03 SP1 fails the build without one:
+
+```
+3. …text… (I5)            backed by one invariant — the common case
+7. …text… (I3, I4)        the readable form of several
+6. …text… (→ C09 I5)      someone else's rule, cross-referenced
+```
+
+A commitment that fits none of the three is a § detail rather than a commitment, and belongs in the section that explains it. That is the demotion the audit applied to four of them: an exact column cap, a shell fallback, a layout breakpoint and a menu policy were §-level facts wearing contract clothes.
+
+The markers are what make the check exact. A word-overlap heuristic cannot do this — a commitment is the readable form, so it deliberately shares few words with the invariant it summarises — and it is why the audit was worth doing by hand first. **The categories are what told us which markers the template needed.**
+
 ---
 
 ## 2. Interfaces
@@ -108,7 +143,7 @@ interface VerbTransport {
 }
 ```
 
-Subprocess and fixture implementations are fully substitutable (C06 I14), and selection is **per verb** (D13) — which is what allows a verb to migrate from Python to native TypeScript without touching anything else.
+All three implementations are fully substitutable in every test that does not concern spawning (C06 I15), and selection is **per verb** (D13) — which is what allows a verb to migrate from Python to native TypeScript without touching anything else.
 
 ### Seam 3 — focus priority
 
@@ -343,3 +378,4 @@ The rule earns its place by finding gaps: applied to C01 it surfaced four untest
 17. Six test tiers, not seven. Behaviour cross-cuts scope and is carried by the existing tiers.
 18. Every stateful component enumerates its transition table; invalid transitions are tier-3 tests.
 19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one.
+20. **Every commitment cites an invariant, several, or another spec's.** §1's two rules for whose claim a commitment is are mechanical, not advisory: A03 SP1 fails the build on a commitment with no marker, on a citation naming an invariant its spec does not declare, and on a cross-reference that does not resolve. Self-referential deliberately — this is the document that states the rule, so it is the document that commits to it.

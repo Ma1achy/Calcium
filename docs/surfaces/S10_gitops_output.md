@@ -28,7 +28,7 @@ Getting that wrong means someone believes a promote has landed when it is sittin
 rule       verb · target
 steps      checks → generate → open MR
 notice     what will happen, and who has to do it        ← the payload
-code/diff  the artefact, or the change to it
+artefact   code, diff or patch — the thing written, or the change to it (§4, §4a)
 tip        next actions
 ```
 
@@ -101,6 +101,18 @@ Dry run still renders the artefact — seeing it is the point of the flag.
 ```
 
 A `diff` block of the changed fields only. `undeploy` likewise shows the file being removed rather than its contents.
+
+---
+
+## 4a. The artefact is a `patch` when there is something to diff against
+
+A resubmission changes two lines of a forty-line manifest, and rendering all forty leaves the reader to find them. Where the verb is changing something already deployed, the artefact block is a **`patch`** (C04, rendered by C25) against the current state: hunks, line numbers, and the change visible without hunting.
+
+The whole-manifest `code` form survives for exactly one case — **a first submission, where there is nothing to diff against.** A patch whose every line is an addition is a worse rendering of a new file than the file itself, and it also loses `code.wrap: true`, which matters precisely when nothing may be truncated.
+
+`patch` does not wrap (C25 I2) — a wrapped diff line destroys the gutter alignment that makes a diff readable. That is not the same compromise as truncating a manifest: a diff line truncated at the right is still recognisably the line that changed, whereas a manifest truncated at the right is a different manifest. The two blocks make opposite calls because they are answering different questions.
+
+§4's `scale` case is unaffected and stays a `diff`. A replica count is a structured change, not a textual one, and rendering it as hunks would be a worse fit than the field comparison it already uses.
 
 ---
 
@@ -186,6 +198,8 @@ File paths in steps truncate from the left, keeping the filename.
 8. The dirty-tree asymmetry is stated explicitly, with the reason.
 9. Partial failures name the branch, so work is never stranded silently.
 10. Artefact blocks set `code.wrap: true`; a manifest is never truncated.
+11. A change against something already deployed renders as a `patch`; the whole-manifest `code` form is kept only for a first submission, where there is nothing to diff against.
+12. `scale` stays a `diff` — a replica count is a structured change, not a textual one.
 11. No action approves, merges or retries.
 12. Nothing on this surface is reversible from this surface.
 
@@ -200,6 +214,8 @@ File paths in steps truncate from the left, keeping the filename.
 - **T1.3**: `candidates/` → `ok` tone and auto-merge wording; `serving/` → `warn` tone and review wording.
 - **T1.4**: the human-review notice contains the bypass sentence verbatim.
 - **T1.5**: `scale` produces a `diff` block, not a `code` block.
+- **T1.6**: a resubmission against a deployed manifest produces a `patch` block, not a `code` block, and a two-line change renders as two changed lines plus context.
+- **T1.7**: a *first* submission produces a `code` block with `wrap: true` — there is nothing to diff against, and a patch of all-additions is a worse rendering of a new file.
 - **T1.6**: `undeploy` names the file and does not render its contents.
 - **T1.7**: `--dry-run` renders the artefact and a notice stating nothing was written.
 - **T1.8**: no `--open-mr` → branch named, no MR row.
@@ -251,6 +267,8 @@ File paths in steps truncate from the left, keeping the filename.
 - **T6.2** (C3): using one tone for both merge paths → T1.3 fails, and a promote reads as landed.
 - **T6.3** (C4): dropping the bypass sentence → T1.4 fails, and the gate looks like a delay rather than a boundary.
 - **T6.4** (C5): rendering the whole YAML for `scale` → T1.5 fails, and one changed field is buried.
+- **T6.11** (C11): rendering the whole YAML for a resubmission → T1.6 fails, and a two-line change is buried in forty.
+- **T6.12** (C11): rendering a first submission as an all-additions patch → T1.7 fails, and a new manifest loses `code.wrap: true` along with it.
 - **T6.5** (C9): reporting a partial failure without the branch → T3.4 fails, and work is stranded.
 - **T6.6** (C10): omitting `wrap: true` on an artefact block → T3.2 fails, and a truncated manifest is read as the real one.
 - **T6.7** (C11): adding a retry or approve action → T2.4 fails.

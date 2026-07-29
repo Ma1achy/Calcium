@@ -27,9 +27,10 @@ It is also the thing that makes the framework general. `tui-kit` knows nothing a
 ## 2. Public interface
 
 ```typescript
-type ArgType =
-  | "string" | "int" | "bool" | "path"
-  | "enum" | "duration" | "pattern";
+const ARG_TYPES = [
+  "string", "int", "bool", "path", "enum", "duration", "pattern",
+] as const;
+type ArgType = (typeof ARG_TYPES)[number];
 
 type FlagDef = Readonly<{
   name:        string;                // long form, without "--"
@@ -64,7 +65,6 @@ type ValidationResult =
   | Readonly<{ ok: false; errors: readonly ErrorLike[] }>;
 
 type ManifestError = Readonly<{ path: string; message: string }>;
-type Result<T, E> = Readonly<{ ok: true; value: T }> | Readonly<{ ok: false; errors: E }>;
 
 type ToolDef = Readonly<{
   name:      string;                  // "ps", "serving scale" — spaces mean sub-verbs
@@ -74,7 +74,7 @@ type ToolDef = Readonly<{
   flags:     readonly FlagDef[];
   streams?:  boolean;                 // emits NDJSON patches rather than one document
   oneShot?:  boolean;                 // writes one frame to stdout and exits; bypasses the TTY gate
-  hidden?:   boolean;                 // omitted from help and completion
+  hidden?:   boolean;                 // omitted from help and completion, still invocable
 }>;
 
 type Manifest = Readonly<{
@@ -84,8 +84,9 @@ type Manifest = Readonly<{
   tools: readonly ToolDef[];
 }>;
 
-function parseManifest(raw: unknown): Result<Manifest, ManifestError[]>;
+function parseManifest(raw: unknown): Result<Manifest, readonly ManifestError[]>;
 function findTool(m: Manifest, tokens: readonly string[]): ToolMatch | null;
+function visibleTools(m: Manifest): readonly ToolDef[];
 function validateInvocation(tool: ToolDef, argv: readonly string[]): ValidationResult;
 
 interface ManifestStore {
@@ -96,7 +97,19 @@ interface ManifestStore {
 }
 ```
 
+`Result<T, E>` is **C04's**, imported rather than redeclared. An earlier draft of this section declared its own with `errors` plural where C04's has `error` singular — two shapes under one name, in one half of one layer, both of which compile. The plural now lives in the type argument, where it belongs: `Result<Manifest, readonly ManifestError[]>`. SS35 keeps it that way.
+
 `findTool` takes tokens rather than a string because sub-verbs are multi-token: `["serving","scale","web"]` matches the tool `serving scale` and leaves `["web"]` as arguments. **Longest match wins**, so `serving scale` is preferred over a hypothetical `serving`.
+
+### `ARG_TYPES` is closed, and this is the rule
+
+An `ArgType` describes a **shape the framework can validate without knowing what it means**. `enum`, `duration` and `pattern` qualify. `uuid` and `target` do not — a UUID is a `pattern` and a target is a `string`, and adding either means the framework has begun to know Prism's nouns. This is the union EX5 asserts stays empty.
+
+The list is a runtime constant with the type derived from it, so a new member without a validator row does not compile (T2.4) and a new member with one fails T1.7c against a list written out literally in the test.
+
+### `hidden` — invocable, not offered
+
+`visibleTools` omits a hidden tool; `findTool` still resolves it. That pair *is* the meaning of the field, and it is what makes it useful for a deprecation or an internal escape hatch: the verb keeps working for whoever knows its name while it leaves the help. A `hidden` that also stopped resolving would be a weak form of deleting the entry, and deleting the entry is how you delete a verb. T1.15 asserts the pair in one test, because separately both halves pass while the intent disappears between them.
 
 ---
 
@@ -122,6 +135,42 @@ What it checks:
 **It does not check semantics.** Whether a UUID exists, whether a family is deployed, whether a candidate is promotable — all far-side concerns. C05 rejects what is malformed, never what is merely wrong. Over-reaching here would put the framework in the business of knowing what Prism means.
 
 **There is no `uuid`, `sigil` or `target` type.** Those are Prism concepts, and a framework that knows them is not general. Apps declare their own shapes with `type: "pattern"` and an anchored regex — Prism's target becomes `{ type: "pattern", pattern: "^[\\w.]+:[\\w]+$" }`, its sigils `{ type: "pattern", pattern: "^@[\\w-]+$" }`. Matching is syntactic; resolution is elsewhere.
+
+### The gate is permissive, and this is the rule
+
+**It rejects what the far side would certainly reject, never what it merely might.** An invocation that would have worked must not be stopped here — a pre-spawn gate that costs the user a working command has taken more than it saved, and the failure is silent, because the user simply believes the command is wrong.
+
+So both `--status=running` and `--status running` are accepted. The far side's own parser takes both forms, and picking one to enforce would be the framework deciding something the far side had already decided.
+
+Two consequences follow, and both are written down because neither is visible from the rule.
+
+**Completion always inserts `=`.** C19 has to choose a form — it inserts text, and text is one form or the other — and `=` is the unambiguous one: it cannot be read as a flag followed by a positional. One form taught, both accepted. Stated here and in C19 §5 so the two cannot drift apart.
+
+**A value beginning with `-` requires `=`, and the error says so.** `--since -1h` is a missing-value failure under this rule, because `-1h` reads as a flag and the alternative — guessing from the leading character — would make the same string mean two things on two tools. `--since=-1h` works. That is correct, and the default message is unhelpful about it:
+
+```
+not:  missing value for --since
+but:  --since expects a value; a value beginning with "-" must use
+      --since=-1h, or the parser reads it as a flag
+```
+
+The remediation quotes the token the user actually typed. Same principle as T6.9's `ArgType` message: the failure that says what to do instead earns its extra line.
+
+### Conflicts are directional
+
+`conflicts` is a declaration on one flag, and the schema has never required the other flag to declare it back. `--side-by-side` naming `conflicts: ["overlay"]` while `--overlay` names nothing is how an app ordinarily writes it, and **each declaration is checked in its own right** — a one-directional conflict is a violation and is reported.
+
+Deduplicating by name order assumed a symmetry that was never there, and dropped exactly those one-directional declarations: silently, because the pair was still *seen*, just never reported from the direction that declared it.
+
+The *report* is deduplicated on the unordered pair. One error for one mistake — a mutual declaration is one thing the user did wrong, and reporting it twice would be a worse message rather than a stricter check. T1.12 asserts the single error, and this paragraph is what stops the "optimisation" returning.
+
+---
+
+## 3a. The match index
+
+`findTool` must stay sub-millisecond on a manifest of 5,000 tools (T3.14), and a linear scan comparing multi-token prefixes does not. Tools are indexed by name, with the longest token count tried first, so longest-match falls out of the walk order rather than out of a sort at the end.
+
+The index is built once per manifest and held in a `WeakMap` keyed on the **manifest object**, not on its content. Keyed on content, two manifests differing only in a field the key ignores would share an index — a bug that passes every other test in §8, which is why T2.8 asserts the identity property directly. Purity holds: same input, same output, no I/O, and the index dies with the manifest that produced it.
 
 ---
 
@@ -161,24 +210,30 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I10** — Validation never checks semantics — only shape, type, arity and declared relations.
 - **I11** — A sealed store cannot be reloaded.
 - **I12** — `local: true` tools are never spawned; `local: false` tools are never handled in-process.
+- **I16** — The manifest version is exposed and never enforced. C05 refuses no manifest for its version alone; a verb the manifest does not declare degrades to "not available here" at the point of use, because a far side that dropped one verb is still a far side worth talking to.
+- **I17** — A `hidden` tool is omitted from help and completion and remains fully invocable. Hiding is a presentation decision, never an access-control one — C05 has no notion of permission and a hidden verb that refused to run would be inventing one.
 - **I13** — C05 imports nothing from `terminal/`, `presentation/` or above.
+- **I14** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
+- **I15** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
 
 ---
 
 ## 7. Commitments
 
-1. The manifest is the single source of truth for verbs, sub-verbs, flags, enums, arity and local-vs-spawn.
-2. `tui-kit` owns the schema, loader and validator; the app owns the manifest content.
-3. A hand-written fixture manifest ships; far-side generation is a wiring-time concern.
-4. Sub-verbs are multi-token names, matched longest-first.
-5. Validation runs before any spawn, is pure, and produces `ErrorLike`.
-6. Validation checks shape only — never semantics.
-7. Unknown fields are ignored; malformed known fields are errors.
-8. Tool names are unique; duplicates fail parsing.
-9. The store seals at the end of composition and cannot be reloaded after.
-10. Version is exposed, not enforced. A missing tool degrades to "not available here".
-11. `hidden` tools are omitted from help and completion but remain invocable.
-12. `ArgType` carries no app-domain concepts; `pattern` is the extension point.
+1. The manifest is the single source of truth for verbs, sub-verbs, flags, enums, arity and local-vs-spawn (I1).
+2. `tui-kit` owns the schema, loader and validator; the app owns the manifest content (→ A01 §2).
+3. A hand-written fixture manifest ships; far-side generation is a wiring-time concern (→ A01 §5).
+4. Sub-verbs are multi-token names, matched longest-first (I7).
+5. Validation runs before any spawn, is pure, and produces `ErrorLike` (I8, I9).
+6. Validation checks shape only — never semantics (I10).
+7. Unknown fields are ignored; malformed known fields are errors (I3).
+8. Tool names are unique; duplicates fail parsing (I6).
+9. The store seals at the end of composition and cannot be reloaded after (I11).
+10. Version is exposed, not enforced. A missing tool degrades to "not available here" (I16).
+11. `hidden` tools are omitted from help and completion but remain invocable (I17).
+12. `ArgType` carries no app-domain concepts; `pattern` is the extension point (I5).
+13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I14).
+14. Conflicts are directional in the check and deduplicated in the report (I15).
 
 ---
 
@@ -196,7 +251,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.6** (I3): a manifest whose `tools[0].flags` is a string → parse error naming the path, no throw.
 - **T1.7** (I4): `type:"enum"` without `values` → parse error; `values` on a non-enum → parse error; `type:"pattern"` without `pattern` → parse error.
 - **T1.7b** (I4): an unanchored or syntactically invalid `pattern` → parse error, not a runtime throw at validation.
-- **T1.7c** (I5): the `ArgType` union contains no domain-specific member — asserted against a frozen list, so adding `uuid` or `target` fails the build.
+- **T1.7c** (I5): `ARG_TYPES` equals a list written out **literally in the test file**, so adding `uuid` or `target` fails the build. Literal rather than derived: a list computed from `ARG_TYPES` agrees with itself and passes on any addition, which is a rule with nothing to be wrong about.
 - **T1.8** (I6): two tools named `ps` → parse error, not last-wins.
 - **T1.9** (I7): tools `serving` and `serving scale` both present, tokens `["serving","scale","web"]` → matches `serving scale`, residual `["web"]`.
 - **T1.10** (I7): tokens `["serving"]` → matches `serving`, residual `[]`.
@@ -204,8 +259,11 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.12**: each validation check in §3 fires on a crafted argv and passes on the corrected one — ten cases, one per row.
 - **T1.13**: unknown flag `--open-mrr` against a tool with `--open-mr` → error carries the suggestion; `--zzzzz` → error with no suggestion.
 - **T1.14** (I9): every validation failure is `ErrorLike` with a non-empty `message`.
-- **T1.15**: `hidden: true` tools are excluded from a help listing but still resolve via `findTool`.
+- **T1.15**: a `hidden: true` tool is absent from `visibleTools` **and** resolvable through `findTool` — asserted together, in one test. Split into two, both pass while the intent they encode goes missing.
 - **T1.15b**: `oneShot: true` is carried through parsing and is readable by C22's gate.
+- **T1.16** (I14): `--status running` and `--status=running` produce the same `args`. Both forms, one result — the permissive rule as an equality rather than as two separate passes.
+- **T1.17** (I14, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
+- **T1.18** (I15): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
 
 ### Tier 2 — contract / interface
 
@@ -216,6 +274,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T2.5** (I12): every tool resolves to exactly one execution route; no tool is both local and spawnable.
 - **T2.6** (I13): the module graph shows no import from `terminal/` or above.
 - **T2.7**: `parseManifest` accepts its own serialised output — round-trip identity.
+- **T2.8** (I8): `findTool` over the same manifest twice returns deeply equal results, **and** a second manifest object with identical content does not observe the first's results. `findTool` caches its match index (§3a) and this is the first cache in the tree, so purity is asserted rather than argued. The second half is the load-bearing one: a cache keyed on content rather than object identity passes every other test in this suite and breaks the moment two manifests differ only in a field the key ignores. Asserted by comparing results — the test does not know the cache exists.
 
 ### Tier 3 — edge cases
 
@@ -232,10 +291,11 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T3.11**: a `requires` cycle between two flags → parse error, not an infinite loop at validation.
 - **T3.12**: `conflicts` naming a flag that does not exist → parse error.
 - **T3.13**: a tool name containing more spaces than any invocation supplies → never matches, no crash.
-- **T3.14**: a manifest 10 MB in size with 5,000 tools → parses within budget; `findTool` stays sub-millisecond.
+- **T3.14**: a manifest 10 MB in size with 5,000 tools → parses within budget; `findTool` stays sub-millisecond. **Measured: 9.6 MB parsed in 32 ms, `findTool` averaging 0.6 µs per call** — the bound is 1,000 µs, so there are three orders of magnitude of headroom, and a regression of ten times would still pass. The figure is here rather than only the bound because a bound with no measured value behind it is a bound nobody can tell has moved.
 - **T3.15**: duplicate flag names within one tool → parse error.
 - **T3.16**: a short flag colliding across two flags of the same tool → parse error.
 - **T3.17**: unicode in tool and flag names → handled, and completion matches on grapheme boundaries.
+- **T3.18**: a value-taking flag last in `argv`, with no token after it → the plain "requires a value" message. There is no token to quote and no `=` form to recommend, so the remediation is absent rather than invented.
 
 ### Tier 4 — integration
 
@@ -264,7 +324,10 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T6.6** (anti-drift): hardcoding an enum in the completion module → T4.3 fails when the fixture changes and the completion does not.
 - **T6.7** (I2): a parse path that throws on malformed input → T2.3 fails.
 - **T6.8** (I12): spawning a `local` tool → T4.4 fails.
-- **T6.9** (I5): adding a domain-specific `ArgType` → T1.7c fails.
+- **T6.9** (I5): adding a domain-specific `ArgType` → T1.7c fails, with a message carrying the rule rather than the diff: *an `ArgType` describes a shape, not a domain concept — a uuid is a `pattern`, a target is a `string`*. A build failure that says what to do instead earns its extra line.
+- **T6.10** (I14): rejecting `--flag value` pre-spawn → T1.16 fails, and the gate starts refusing invocations the far side would have run.
+- **T6.11** (§3): reverting the `-`-value remediation to a bare "missing value" → T1.17 fails on the message, leaving the user to discover `=` for themselves.
+- **T6.12** (I15): deduplicating conflicts by name order rather than by the unordered pair → T1.18 fails on the one-directional case, which is the ordinary way an app declares it.
 
 ---
 

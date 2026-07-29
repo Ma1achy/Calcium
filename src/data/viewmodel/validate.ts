@@ -1,0 +1,335 @@
+/**
+ * `validateDocument` and `validateBlock` — the single enforcement point for I3.
+ *
+ * C04 §4, §6 — see spec. Both are **total** (I4): any input yields a result and
+ * never a throw, including a cyclic one (I18). This is the boundary, so it is
+ * given hostile input by definition — a fixture, an adapter's output, a
+ * hand-assembled document in a test.
+ *
+ * The validator table is typed over the full `Block` union rather than built
+ * from a chain of `if`s, so **adding a kind without validating it stops
+ * compiling** (T2.10). Same shape as C03's `WINDOWS`, and for the same reason:
+ * a chain of `if`s takes a new member silently and defaults it to "fine", which
+ * is the one direction the mistake must not fall.
+ */
+
+import {
+  SCHEMA,
+  type Block,
+  type BlockKind,
+  type DocumentStatus,
+  type Glyph,
+  type Result,
+  type ViewDocument,
+} from "./types.js";
+
+export type Validity<T> = Result<T, readonly string[]>;
+
+const STATUSES: ReadonlySet<string> = new Set<DocumentStatus>([
+  "ok",
+  "error",
+  "partial",
+  "proposed",
+]);
+
+const GLYPHS: ReadonlySet<Glyph> = new Set<Glyph>([
+  "ok", "warn", "error", "info", "pending", "working", "running",
+  "queued", "cancelled", "expand", "collapse", "live", "bullet",
+]);
+
+const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
+const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh"]);
+
+// --- small total helpers --------------------------------------------------
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isString(v: unknown): v is string {
+  return typeof v === "string";
+}
+
+function isArray(v: unknown): v is readonly unknown[] {
+  return Array.isArray(v);
+}
+
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+// --- per-kind validation --------------------------------------------------
+
+type KindCheck = (b: Record<string, unknown>, e: string[], at: string) => void;
+
+function requireString(b: Record<string, unknown>, key: string, e: string[], at: string): void {
+  if (!isString(b[key])) e.push(`${at}: "${key}" must be a string`);
+}
+
+function requireArray(b: Record<string, unknown>, key: string, e: string[], at: string): void {
+  if (!isArray(b[key])) e.push(`${at}: "${key}" must be an array`);
+}
+
+/**
+ * One entry per member of the union. `Record<BlockKind, …>` is the assertion:
+ * a new kind without a row here is a type error, not a silent pass (T2.10).
+ */
+const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
+  rule: (b, e, at) => requireString(b, "label", e, at),
+  notice: (b, e, at) => {
+    requireString(b, "text", e, at);
+    requireString(b, "tone", e, at);
+    requireGlyph(b["glyph"], e, at);
+  },
+  keyValue: (b, e, at) => requireArray(b, "rows", e, at),
+  table: (b, e, at) => {
+    requireArray(b, "columns", e, at);
+    requireArray(b, "rows", e, at);
+    // The other half of I6's glyph rule. A `Cell` carries one too, and a table
+    // is where the far side's own status strings most often arrive.
+    if (isArray(b["rows"])) {
+      for (const row of b["rows"]) {
+        if (!isRecord(row) || !isRecord(row["cells"])) continue;
+        for (const [key, cell] of Object.entries(row["cells"])) {
+          if (isRecord(cell)) requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+        }
+      }
+    }
+  },
+  steps: (b, e, at) => requireArray(b, "steps", e, at),
+  logs: (b, e, at) => requireArray(b, "lines", e, at),
+  events: (b, e, at) => requireArray(b, "events", e, at),
+  plot: (b, e, at) => {
+    requireArray(b, "series", e, at);
+    if (b["form"] !== "line" && b["form"] !== "sparkline") {
+      e.push(`${at}: "form" must be "line" or "sparkline"`);
+    }
+    // §3 — no default. The validator says so as well as the constructor,
+    // because a document can arrive from a fixture without passing through one.
+    if (b["form"] === "line" && !isFiniteNumber(b["height"])) {
+      e.push(`${at}: form "line" requires a numeric "height" (C04 §3) — there is no default`);
+    }
+  },
+  progress: (b, e, at) => {
+    requireString(b, "label", e, at);
+    if (!isFiniteNumber(b["current"])) e.push(`${at}: "current" must be a finite number`);
+    if (!isFiniteNumber(b["total"])) e.push(`${at}: "total" must be a finite number`);
+  },
+  code: (b, e, at) => {
+    requireString(b, "language", e, at);
+    requireString(b, "text", e, at);
+  },
+  diff: (b, e, at) => requireArray(b, "rows", e, at),
+  patch: (b, e, at) => {
+    requireString(b, "path", e, at);
+    requireString(b, "language", e, at);
+    requireArray(b, "hunks", e, at);
+  },
+  pills: (b, e, at) => requireArray(b, "chips", e, at),
+  tip: (b, e, at) => requireString(b, "text", e, at),
+  panel: (b, e, at) => {
+    requireString(b, "title", e, at);
+    requireArray(b, "children", e, at);
+  },
+  group: (b, e, at) => {
+    requireArray(b, "children", e, at);
+    if (b["direction"] !== "row" && b["direction"] !== "column") {
+      e.push(`${at}: "direction" must be "row" or "column"`);
+    }
+  },
+  raw: (b, e, at) => requireString(b, "text", e, at),
+});
+
+const KNOWN_KINDS: ReadonlySet<string> = new Set(Object.keys(KIND_CHECKS));
+
+/**
+ * I6's second half — a glyph is a slot, never a character.
+ *
+ * The type carries this inside the tree; a document arriving from a fixture, an
+ * adapter's `as`, or a far side emitting `tui.view/1` has no type with it. A
+ * character reaching a block is what makes C09 §4's 1:1 substitution rule
+ * mostly-true rather than true, and mostly-true fails only under `LANG=C`.
+ */
+function requireGlyph(value: unknown, e: string[], at: string): void {
+  if (value === undefined) return;
+  if (typeof value === "string" && (GLYPHS as ReadonlySet<string>).has(value)) return;
+  e.push(
+    `${at}: "glyph" must be one of ${[...GLYPHS].join(", ")} (C04 I6) — ` +
+      `got ${JSON.stringify(value)}; a character has no ASCII fallback and no width guarantee`,
+  );
+}
+
+/** Children of a container, for the recursive walk. Total on malformed input. */
+function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
+  const kind = b["kind"];
+  if (kind === "panel" || kind === "group") {
+    return isArray(b["children"]) ? b["children"] : [];
+  }
+  if (kind === "table" && isArray(b["rows"])) {
+    const out: unknown[] = [];
+    for (const row of b["rows"]) {
+      if (isRecord(row) && isArray(row["detail"])) out.push(...row["detail"]);
+    }
+    return out;
+  }
+  return [];
+}
+
+/**
+ * The recursive walk. `path` is the **path-scoped** seen-set (I18): a container
+ * is added on descent and removed on ascent, so a cycle is caught exactly and a
+ * subtree that legitimately appears in two places is not. A global set would
+ * reject the second, honest occurrence and call it a cycle.
+ *
+ * `ids` accumulates across the whole document, because I14's uniqueness is a
+ * document-wide property, not a per-branch one.
+ */
+function walkBlock(
+  value: unknown,
+  errors: string[],
+  ids: Map<string, number>,
+  path: Set<unknown>,
+  at: string,
+): void {
+  if (!isRecord(value)) {
+    errors.push(`${at}: not an object`);
+    return;
+  }
+  if (path.has(value)) {
+    errors.push(`${at}: cyclic structure — a block contains itself (C04 I18)`);
+    return;
+  }
+
+  const kind = value["kind"];
+  if (!isString(kind)) {
+    errors.push(`${at}: "kind" must be a string`);
+    return;
+  }
+  const where = `${at} (${kind})`;
+
+  if (!isString(value["id"]) || value["id"].length === 0) {
+    errors.push(`${where}: "id" must be a non-empty string — ViewPatch addresses blocks by it`);
+  } else {
+    ids.set(value["id"], (ids.get(value["id"]) ?? 0) + 1);
+  }
+
+  // An unknown kind is not an error: the union is open and an app registers
+  // kinds through C09 (F1). It is unvalidatable here, and `raw` renders it
+  // degraded rather than nothing (C09 §2).
+  if (KNOWN_KINDS.has(kind)) {
+    KIND_CHECKS[kind as BlockKind](value, errors, where);
+  }
+
+  path.add(value);
+  const children = childBlocksOf(value);
+  for (const [i, child] of children.entries()) {
+    walkBlock(child, errors, ids, path, `${where} child ${i}`);
+  }
+  path.delete(value);
+}
+
+// --- public ---------------------------------------------------------------
+
+/** I4 — total. Any input yields a result, never a throw. */
+export function validateBlock(block: unknown): Validity<Block> {
+  const errors: string[] = [];
+  walkBlock(block, errors, new Map(), new Set(), "block");
+  return errors.length === 0
+    ? { ok: true, value: block as Block }
+    : { ok: false, error: Object.freeze(errors) };
+}
+
+function validateMeta(meta: unknown, errors: string[]): void {
+  if (!isRecord(meta)) {
+    errors.push(`meta: must be an object`);
+    return;
+  }
+  if (!(meta["verb"] === null || isString(meta["verb"]))) {
+    errors.push(`meta.verb: must be a string or null`);
+  }
+  for (const key of ["adapter", "stderr"]) {
+    if (!isString(meta[key])) errors.push(`meta.${key}: must be a string`);
+  }
+  for (const key of ["exitCode", "durationMs"]) {
+    if (!isFiniteNumber(meta[key])) errors.push(`meta.${key}: must be a finite number`);
+  }
+  if (typeof meta["truncated"] !== "boolean") errors.push(`meta.truncated: must be a boolean`);
+  if (!isArray(meta["argv"]) || !meta["argv"].every(isString)) {
+    errors.push(`meta.argv: must be an array of strings`);
+  }
+  if (!isString(meta["transport"]) || !TRANSPORTS.has(meta["transport"])) {
+    errors.push(`meta.transport: must be one of ${[...TRANSPORTS].join(", ")}`);
+  }
+  // I13 — required, and checked as such. A provenance field that can be absent
+  // becomes a provenance field nobody trusts.
+  if (!isString(meta["origin"]) || !ORIGINS.has(meta["origin"])) {
+    errors.push(
+      `meta.origin: required, one of ${[...ORIGINS].join(", ")} (C04 I13) — ` +
+        `it is not optional, and C23 sets it on every append`,
+    );
+  }
+}
+
+/** I4 — total. I2, I3, I14 and I18 are established here and nowhere else. */
+export function validateDocument(doc: unknown): Validity<ViewDocument> {
+  const errors: string[] = [];
+
+  if (!isRecord(doc)) {
+    return { ok: false, error: Object.freeze(["document: not an object"]) };
+  }
+
+  // I2 — checked on every document. An unrecognised version is refused at the
+  // boundary, not rendered.
+  if (doc["schema"] !== SCHEMA) {
+    errors.push(
+      `schema: expected "${SCHEMA}", got ${JSON.stringify(doc["schema"])} — ` +
+        `an unrecognised version is refused at the boundary, not rendered (C04 I2)`,
+    );
+  }
+
+  if (!isString(doc["command"])) errors.push(`command: must be a string`);
+
+  const status = doc["status"];
+  if (!isString(status) || !STATUSES.has(status)) {
+    errors.push(`status: must be one of ${[...STATUSES].join(", ")}`);
+  }
+
+  // I3 — `error` is present iff status is "error". Both directions, because
+  // only enforcing one is how the other becomes convention.
+  const hasError = doc["error"] !== undefined;
+  if (status === "error" && !hasError) {
+    errors.push(`error: required when status is "error" (C04 I3)`);
+  }
+  if (status !== "error" && hasError) {
+    errors.push(`error: present on a non-error document (status "${String(status)}") (C04 I3)`);
+  }
+  if (hasError && (!isRecord(doc["error"]) || !isString(doc["error"]["message"]))) {
+    errors.push(`error.message: the only required field on ErrorLike, and it must be a string`);
+  }
+
+  validateMeta(doc["meta"], errors);
+
+  const ids = new Map<string, number>();
+  if (!isArray(doc["blocks"])) {
+    errors.push(`blocks: must be an array`);
+  } else {
+    for (const [i, b] of doc["blocks"].entries()) {
+      walkBlock(b, errors, ids, new Set(), `blocks[${i}]`);
+    }
+  }
+
+  // I14 — unique within the document, nested children included. This is what
+  // makes `replace` and `merge` addressable at all.
+  for (const [id, count] of ids) {
+    if (count > 1) {
+      errors.push(
+        `blocks: id "${id}" appears ${count} times (C04 I14) — ` +
+          `ViewPatch addresses blocks by id, so a duplicate has no correct target`,
+      );
+    }
+  }
+
+  return errors.length === 0
+    ? { ok: true, value: doc as ViewDocument }
+    : { ok: false, error: Object.freeze(errors) };
+}

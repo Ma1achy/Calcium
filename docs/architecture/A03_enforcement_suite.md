@@ -19,7 +19,7 @@ Unwritten, they fail quietly. A component reads a clock and golden frames start 
 
 ---
 
-## 2. The five kinds of check
+## 2. The six kinds of check
 
 | Kind | Runs at | Cost | Catches |
 |---|---|---|---|
@@ -28,8 +28,30 @@ Unwritten, they fail quietly. A component reads a clock and golden frames start 
 | **Exhaustiveness** | Compile | 0 | A union member added without its handler |
 | **Type-level** | Compile | 0 | A shape that must not be constructible |
 | **Corpus** | Test | seconds | Properties over fixtures — measurement, contrast, drop orders |
+| **Vacuity** | Test | ~0 | A rule that matches nothing, and therefore passes |
 
 The first four are **build gates**: they fail the build, not a test run, because a layer violation merged and fixed later has already had time to be depended upon.
+
+**The sixth checks the other five.** Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule. A rule with no such test is assumed vacuous until it has one.
+
+This is not belt-and-braces. Every check here reports success the same way whether the tree is clean or the rule is broken, and a broken rule is indistinguishable from compliance at exactly the moment it matters.
+
+**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Four have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
+
+- **A pattern that cannot match a real subject.** MG20 compared a resolved specifier against `src/terminal/escapes` while every NodeNext specifier ends `.js`. It matched nothing and reported compliance.
+- **A scope that matches no files.** SS26 scopes to `src/data/process/`; the tree has `src/data/process.ts`, a file. `startsWith` never matches, so the rule has never once been evaluated.
+- **Ownership rows naming absent exports.** MG20's `MODE_OWNERS` assigned `SYNC_UPDATE` and `SCROLL_REGION` to C03 while `escapes.ts` exported neither. The rows governed names that did not exist, so they could not have fired whatever the tree contained.
+- **A rule inventoried here and never implemented.** SS3 had a row in this document from the start and no entry in `source-scans.mjs`. It could not fire, could not be fabricated against, and appeared in no report — and it also carried SS26's defect, scoping to `adapters/` while the tree held `adapters.ts`, a file. Two of the four failures in one rule, which is what a rule nobody built looks like.
+
+- **A checker that resolves one item and passes on the rest.** SP1 read a single invariant per parenthetical, so a commitment citing `(I5, I99)` resolved one and ignored the other: a dangling citation could ride alongside a good one and the rule reported it enforced. It shipped and was found the same day by the pass that reads its own output. Two instances of this in one day — the other was a fabricated fixture written as `- **I1 — text**` rather than `- **I1** — text`, so it parsed as no invariants at all and every citation in it read as dangling. **In both the rule was broken by what it was tested against rather than by what it checked**, which is a failure a fabricated violation invites rather than prevents: the fabrication is written by the same person, in the same sitting, under the same misreading as the rule.
+
+**The class extends past rules into the harnesses they run in.** A rule executes inside a fake terminal, a fake clock or a pseudo-terminal, and a harness parameter nobody has exercised is a mechanism that cannot be *seen* to have worked — the same defect from the other side. `runInPty` accepted an `env` record and hard-coded node-pty's `name`, which *is* the child's TERM, so `TERM=dumb` ran under `xterm-256color`; the parameter had never been passed until C02's tier 5 passed it. The standing rule is in `test/support/README.md`: **every helper parameter that shapes the environment under test carries an assertion that fails if the parameter is ignored**, and a parameter with no observable effect is reported rather than skipped, because it may mean the parameter should not exist.
+
+**The fourth is the one the other three do not catch, and it is a defect of this document rather than of the code.** A missing rule is invisible from the source side: `checkSourceScans` iterates the rows it has, so a row that was never written is not a rule that fails but a rule that is not there. The inventory is the only place it exists, and the inventory is prose. The check is therefore set equality — the ids in these tables equal the ids implemented plus the ids explicitly pending — so **a rule inventoried and never built fails on the commit that inventories it**, which is the commit where someone still remembers what it was for.
+
+Every rule therefore ships with four things: an implementation reachable from the inventory, a fabricated violation, an assertion that its scope reaches the tree, and — where the rule governs named entities — an assertion that those names exist. The three catch different failures. A fabricated violation is written at a path inside the declared scope, so it fires whether or not that scope describes anything; and a scope full of real files says nothing about whether the names a rule enumerates are real. All three are in `test/unit/enforce-rules.test.ts`.
+
+A rule whose scope or names are not yet real is listed there as **pending**, with the component that will create them; the pending entry is itself asserted, so it fails once the scope becomes real rather than outliving its reason.
 
 ---
 
@@ -58,6 +80,8 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG17 | C19 imports nothing from `terminal/` | C19 T2.5 |
 | MG18 | C20 imports nothing from `terminal/`; no C17 import | C20 T2.5, T2.6 |
 | MG19 | C21 imports nothing from `terminal/` | C21 T2.3 |
+| MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
+| MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I18, T2.17 |
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 
@@ -73,7 +97,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 |---|---|---|---|
 | SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in `tui-kit` outside C22 | C22 T2.4 |
 | SS2 | `Math.random` | C08 | C08 T2.3 |
-| SS3 | clock reads | `adapters/` | C07 T2.2 |
+| SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 T2.2 |
 | SS4 | clock reads | `transcript/` | C13 T2.2 |
 | SS5 | clock reads | `viewport/` | C14 T2.4 |
 | SS6 | clock reads | `input/` | C16 T2.3 |
@@ -92,35 +116,71 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS14 | `\x1b`, `\u001b` | outside `terminal/escapes.ts` | C01 I1, T2.5 |
-| SS15 | Mode sequences `1049 25 2004 1002 1006` | outside C01; `2026` outside C03 | C01 T2.8 |
+| SS15 | Mode numbers `1049 25 2004 1002 1006 2026` | outside `terminal/escapes.ts` | C01 I1, T2.8 |
 | SS16 | Hex, ANSI code, colour name | `viewmodel/` | C04 T2.7 |
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
 | SS18 | Hex literal | any block-producing module | C10 T2.9 |
-| SS19 | ANSI index or terminal-specific value | theme files | C10 T2.5 |
-| SS20 | `syntax` palette reference | outside `code` rendering | C10 T2.8 |
+| SS19 | ANSI index or terminal-specific value | `presentation/theme/`, allowing `four-bit.ts` | C10 I13, T2.5 |
+| SS20 | `syntax` palette reference | outside `code` and `patch` rendering | C10 T2.8 |
 | SS21 | `spectrum` palette reference | outside declared art | C10 T2.8 |
 | SS22 | Literal verb, flag or enum list | `completion/` | C19 T2.6 |
 
 **SS22 is the anti-drift check.** A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review.
 
+**SS19 scopes to the directory with one named exception, not to the token files.** C10 I13 forbids an ANSI index in token data, while C10 §3 requires a curated 4-bit map per theme — so exactly one file in `theme/` must contain indices, and it is named in the allow-list. Scoping the rule to `tokens-*.ts` instead would read as tighter and be looser: it stops seeing a new token file the day someone adds one, which is SS26's failure arriving through a different door. An allow-list of one exception is auditable; a glob that might not match anything is not.
+
+**SS15 scopes to `escapes.ts`, not to C01.** An earlier version said "outside C01", which contradicted SS14 and C01 I1: the literals are *required* to live in `escapes.ts`, so a rule forbidding them outside C01 fails on the one file that must contain them. Ownership of the *modes* is asserted separately, as MG20 — the escape module's named exports are imported only by their owning component. Two checks, because a single one cannot express both "the digits live in one file" and "the meaning belongs to one component".
+
 ### Structural prohibitions
 
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
-| SS23 | `.length`, `charAt`, `slice` on display text | outside the grapheme layer | C09 T2.9, C17 T2.4 |
+| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/blocks/` | C09 T2.9 |
+| SS40 | The same, in the editor | `src/interaction/` | C17 I2, T2.4 |
 | SS24 | Mutable module state | `table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
-| SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 |
+| SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
 | SS27 | Timer or escalation logic | `process/` | C21 T2.4 |
 | SS28 | Scheduler calls | `input/`, `editor/`, `parser/`, `completion/`, `history/` | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
 | SS29 | Multi-store access | outside local handlers | C23 T2.7 |
 | SS30 | Second tokeniser or quoter | anywhere | C18 T2.3, C19 T2.4 |
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
+| SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
+| SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
+| SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I29 |
+| SS36 | A string literal assigned to a `colour` field | `src/` | C10 I18, T2.19 |
+| SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I18, T2.17 |
+| SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
+| SS38 | A bare import of a package that is not a declared runtime dependency | `src/` | A04 §2, C09 §4a |
 
-**SS31 and SS32 are supply-chain gates.** `tui-kit` has two runtime dependencies because the specs need no more (A04 §2); a third appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
+**SS33 moved here from eslint's `no-console`, and got stronger for it.** It catches `console.error` and `console.warn`, which the lint rule did not, and it cannot fall silent because a parser could not read the file. It is also what makes C01's stdout redirection meaningful: a stray `console.log` in `src/` would be captured to the debug sink rather than corrupting a frame, but it should not exist in the first place.
+
+**SS34 is the two-owners check.** Ink 7 accepts `render({ alternateScreen })` and will enter and leave it itself. C01 holds the alternate screen, so Ink must not — `held` would stop describing what was taken, and release would emit sequences for state something else already released. The framework's own option is the tempting shortcut precisely because it looks simpler at the call site.
+
+**SS31 and SS32 are supply-chain gates.** `tui-kit` has three runtime dependencies because the specs need no more (A04 §2); a fourth appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
+
+**SS32 runs over the tree, not over our own manifest.** Checking only `package.json` would pass on a tree where every dependency ran code at install time, which is the thing the rule exists to prevent.
+
+**It checks `preinstall`, `install` and `postinstall` on dependencies — not `prepare`.** `prepare` runs in a package's own directory and for a git dependency; it never runs on a published tarball. Eighteen packages in this tree declare one and none of them executes. Flagging them would train everyone to ignore SS32, which is worse than not having it. Our own manifest is still checked on all four, and A04 commitment 13 is what keeps git dependencies out.
+
+**Two named exceptions, each with its reason recorded.** `node-pty` ships darwin and win32 prebuilds only, so Linux compiles it; `--ignore-scripts` stays set for the whole tree and `make install` invokes that one build by name, which is a different thing from letting every package run arbitrary code. `esbuild` is transitive under vitest and its postinstall is *suppressed* — npm installs the platform binary as an optional dependency and the hook is a fallback we never reach. Listed rather than silently skipped, so that if a vitest upgrade makes it load-bearing there is a place the reason already lives. Anything else acquiring an install script fails the build.
+
+**SS26 is pending and has never been evaluated.** It scopes to `src/data/process/` and the scaffold created `src/data/process.ts` — a file, not a directory — so the prefix match finds nothing and the rule passes on every run. It came in with the scaffold and would not have fired had it been violated. The scope is corrected when C21 lands and creates the directory; until then the vacuity suite carries it as a named pending entry rather than counting it as enforcement. This is the defect the sixth kind of check exists to find, and it is recorded here rather than quietly fixed because the count of live rules should be honest.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
+
+**SS36 exists because a tag that is droppable gets dropped.** C10 resolves a colour to a value that names its own depth — `rgb`, `ansi256`, `ansi16` — so the writer downstream switches on a tag rather than inferring the depth from the format, and the consumer that infers wrong emits truecolour to a sixteen-colour terminal. Types hold that inside the tree. What types do not hold is a cast, and a `Style` assembled by hand in a renderer with `colour: "#7faecf"` is one `as` away from compiling. The scan is what makes the untagged form unwritable rather than merely discouraged.
+
+**SS37 is SS36's other half.** SS36 makes an untagged colour unwritable inside the tree; SS37 stops the tag being discarded on the way out of it. Ink's `color` prop takes a string and re-derives the depth from its *format* — so a renderer handing it `"#7faecf"` has asked one question and got two answers, and the one that reaches the terminal is Ink's. Worse for the suite than for the frame: the colour library behind that prop decides how much colour to emit from its own environment detection, which reports none at all under a test runner. Every golden frame would render monochrome and pass, while production rendered truecolour. A rendering nobody ships, verified thoroughly. Renderers emit SGR from `terminal/escapes.ts` instead (C09 §3).
+
+**MG21 keeps the new edge singular.** C09 §3's `escapes.sgr` is the first runtime import from L1 to L0-terminal — legal under MG1, which forbids upward imports and not downward ones, and required rather than tolerated. What makes it safe is that it is one narrow import and not the beginning of a habit: the rule permits `escapes.js` and type-only capability imports, and fails on anything else `src/presentation/` reaches for in `src/terminal/`. It is an MG rule rather than an SS one because it is a question about the import graph, which the grep-class scans cannot ask: a multi-line `import type` spans lines, and only the graph checker knows a type-only import is not an edge. Recorded as a rule rather than a paragraph because "tidy that import away" and "add one more like it" are both reasonable-looking edits.
+
+**SS38 is the hole SS31 leaves.** SS31 compares `package.json` against `DEPENDENCIES.md`, and both were clean while `src/` imported `highlight.js`, which was in neither: `lowlight` depends on it, npm hoisted it, the import resolved, and every gate passed. That is a **phantom dependency**, and its whole failure mode is that *it resolved, so it must be declared* is exactly the reasoning that does not hold. It breaks on someone else's release — the day the intermediate drops the dependency or a package manager stops hoisting — and in the meantime it is a package nobody reviewed, pinned or wrote a row for, executing in the product. Scoped to `src/`, which ships: a test may import `vitest`, and `src/` may not, because a consumer's install has no devDependencies.
+
+**SS39 is SS36's shape applied to glyphs.** C04 I6 closes `Glyph` to a vocabulary, and the type holds that inside the tree — but a `Notice` assembled with `as` is one cast away from compiling with a character in it, which is exactly how `colour: "#7faecf"` would have survived without SS36. The rule is what makes the untokenised form unwritable rather than merely discouraged. It matters more than the colour case in one respect: a wrong colour is visible to whoever wrote it, and a glyph that breaks the 1:1 rule is visible only under `LANG=C`, only to users who cannot easily say what they are seeing.
+
+**SS35 is SS30's shape applied to a type name.** C05's first draft declared its own `Result<T, E>` with `errors` plural where C04's has `error` singular — same name, same half of L0, and both compile. Nothing would have failed until a call site read `r.error` on the wrong one, which is a runtime `undefined` rather than a type error. One `Result` in the tree, declared in `data/viewmodel/types.ts`; a component wanting a plural puts it in the type argument.
 
 ---
 
@@ -188,6 +248,34 @@ Not build gates — they need fixtures — but they are the checks that catch th
 
 ---
 
+## 7a. Spec properties
+
+The suite governs the source. **SP1 governs the documents the source is written against**, because a commitment nothing enforces diverges from the implementation without anything going red — and there is no reason the enforcement suite should stop at the `src/` boundary when the specs are the contract.
+
+| # | Rule | Scope | Declared |
+|---|---|---|---|
+| SP1 | Every commitment cites an invariant, several, or another spec's | `docs/components/` | A02 §1 |
+
+It runs in `make enforce` and its fire-tests are `test/unit/enforce-commitments.test.ts`.
+
+**Why this is exact where a heuristic was not.** The 2026-07-29 pairing audit read 355 invariants against 358 commitments by hand and found 103 mismatches — 57 commitments nothing enforced, 46 invariants nothing agreed to. A word-overlap check over the corpus cannot replace that reading: a commitment is the *readable* form, so it deliberately shares few words with the invariant it summarises, and the noise floor is higher than the signal.
+
+What makes a mechanical rule possible is that the audit produced **categories**, and a category becomes a marker the spec writes down:
+
+```
+3. …text… (I5)            backed by one invariant — the common case
+7. …text… (I3, I4)        the readable form of several
+6. …text… (→ C09 I5)      someone else's rule, cross-referenced
+```
+
+The check is then citation resolution rather than similarity: a commitment with no marker fails, a local citation naming an invariant the spec does not declare fails, and a cross-reference that does not resolve fails. That last one is the failure mode a citation rule invites — without it the rule degrades from "cites an invariant" to "contains a bracket", which is worse than no rule because it reads as enforced.
+
+**Architecture documents are cited by section.** A01–A04 declare no invariants, deliberately: A03's own SS and MG rules *are* the architecture's invariants in enforceable form, and giving those documents an invariant list would duplicate this one. So `(→ A01 A.1)` is accepted and not chased for an `I<n>`.
+
+The rule's own vacuity risk is specific and worth naming: **a document with no Commitments section produces no findings and looks compliant.** The fire-test asserts twenty-five specs and more than three hundred commitments before asserting that none of them fails.
+
+---
+
 ## 8. Running them
 
 | When | Which | Budget |
@@ -218,6 +306,23 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 11. `CP6` and `CP8` are the two corpus properties that have already found or would find defects reading does not.
 12. Every failure names the rule, the file, the line and the declaring spec.
 13. MG and SS run pre-commit, because their violations become depended-upon within days.
+14. **Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule.** A rule with no such test is assumed vacuous until it has one. Every scan's scope is separately asserted to match at least one file in the tree; and where a rule enumerates named entities — mode owners, export names, file paths — those names are separately asserted to exist. A scope or a name that matches nothing is listed as pending, with its blocking component, and the pending entry fails once it becomes real.
+14b. **The inventory in this document equals what is implemented plus what is explicitly pending**, asserted as set equality over the rule ids. A rule listed here and never built is invisible to every other check — there is no code for a fabricated violation to fire against — so it fails at the point of being written down instead.
+15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for.
+
+---
+
+## 9a. What a deferral rule finds that nobody expects
+
+`tools/enforce/todo-expiry.mjs` was written to answer one question: which deferred tests became writable when a component landed. It answers a second, and the second is worth more.
+
+**A blocker that is wrong is indistinguishable from a blocker that is pending.** A test deferred "waits on C10" when the work is actually C09's looks exactly like one legitimately waiting — for as long as C10 does not exist. Nothing distinguishes them, because both are simply not-yet.
+
+The moment C10 landed, three such deferrals surfaced: one about glyph substitution under ASCII, one about a measurer, one about a registry — all C09's work, and C10 §10 says as much in its own out-of-scope table. Each had been mislabelled at the moment it was written, and each would have sat mislabelled until someone re-read two specs side by side and noticed.
+
+The rule reports them because it cannot tell the difference either: it fires on *implemented blocker, test still deferred*, and a mislabelled deferral satisfies that exactly. **The fix is not to make the rule cleverer.** A wrong blocker is a claim about which component owns a piece of work, and the only thing that can settle it is a person reading both specs — which is precisely what the failure forces, at the one moment the answer is cheap to establish.
+
+So the response to TD2 is two-branched, and both branches are ordinary: write the test, or restate what it is actually waiting for. An exemption is neither.
 
 ---
 

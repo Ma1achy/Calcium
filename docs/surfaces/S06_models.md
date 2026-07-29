@@ -168,6 +168,8 @@ At 60 only the timestamp drops from each. `serving` and `latest` therefore survi
 | `↗ commit` | The commit URL | open | A commit is recorded |
 | `{ } json` | `/models … --json` | fill | Detail view |
 
+**`{ } json` re-runs the command; it does not show this entry's payload.** On a `--watch`, or against anything that changes between the two calls, it returns different data than the block it was opened from — so an adapter bug can render wrong here and then show a fresh payload that looks fine. That is honest: re-running is what the command says. To inspect *this* entry — its argv, transport, stderr and retained payload — use `/debug` (C23 §2), which never re-runs.
+
 `↑ promote` is offered on candidates only. Promoting the version already serving is a no-op the far side would refuse, and promoting a superseded one is a rollback — a real operation, but not one to offer as a row action beside its successor. Rollback goes through the command line deliberately.
 
 ---
@@ -228,6 +230,7 @@ At 60 only the timestamp drops from each. `serving` and `latest` therefore survi
 - **T3.11b**: at 80 columns → neither table drops anything. The arithmetic, asserted rather than assumed.
 - **T3.12**: two versions created in the same second → stable order, no flicker between renders.
 
+- **T3.20** (`{ } json`): the interactions section states that `{ } json` re-runs and points at `/debug`. A caveat that can be tidied away is a caveat that will be.
 ### Tier 4 — integration
 
 - **T4.1** (with C11): the §5 drop orders are exactly what `planColumns` produces, for both tables.
