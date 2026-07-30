@@ -100,12 +100,19 @@ Each of these produces code that compiles, passes review, and is wrong.
   settle, clear — and assert the *whole* state after each step. It is not a courtesy
   extended to components that look tricky: it has found something on every component
   it has been run against, and the two classes it catches are caught by nothing else.
-  A03 §2 records both. Each invariant constrains one operation and none constrains the
-  history, so "the rule is right and the moment is missing" is invisible to a reader
-  checking statements one at a time — C12's downsampling, C25's height, C13's `overCap`,
-  C14's cache and C14's index, five instances across four components. The other class is
-  a citation that resolves against the wrong invariant, which no mechanism can catch
-  (`docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says why one should not be built).
+  A03 §2 records three classes, and each invariant constrains one operation while none
+  constrains the history — so all three are invisible to a reader checking statements
+  one at a time. **The rule is right and the moment is missing**: C12's downsampling,
+  C25's height, C13's `overCap`, C14's cache and index. **Deltas read as state**: C13
+  emits two changes for one call and C14's handler ran against a half-applied store,
+  producing a blank screen that every assertion passed. **A citation resolving against
+  the wrong invariant**, which no mechanism can catch — `docs/COMMITMENT_INVARIANT_AUDIT.md`
+  §Fourth pass says why one should not be built.
+  Where the component composes a frame, **read the frame, not only the numbers**: an
+  arithmetically self-consistent viewport can still be describing a different document
+  than the one it holds. And a fixture must be shown to respond to the thing under test
+  before it is asserted against — `test/support/README.md` carries that rule and the two
+  instances that produced it.
 - **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
   initialise, serialise.
 

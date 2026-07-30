@@ -26,6 +26,7 @@
 import { spawn as spawnRaw } from "node:child_process";
 import { closeSync, openSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
+import { measureSequence, rowsDoc, wrappingDoc } from "../support/viewport.js";
 import { capabilities, fakeDebug, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 import {
   groupMembers,
@@ -45,6 +46,7 @@ import {
 } from "../support/transport.js";
 import { fakeWorld, steppableClock, worldResult } from "../support/world.js";
 import { doc, psColumns, psTable, tableOf } from "../support/blocks.js";
+import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { DARK_THEME, LIGHT_THEME, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
@@ -684,5 +686,58 @@ describe("harness parameters — real processes", () => {
     await new Promise<void>((resolve) => void child.on("close", () => resolve()));
 
     expect([...Buffer.concat(chunks)]).toEqual([0x61, 0x00, 0x62]);
+  });
+});
+
+/**
+ * The other half of `test/support/README.md`'s rule: a parameter can reach the
+ * thing it names and the *subject* still not respond.
+ *
+ * These are positive controls for C14's fixtures, and both are here because their
+ * absence let two tests pass while exercising nothing. Neither defect was a
+ * discarded option — `render.ts` honoured `definitions`, and `rowsDoc` built
+ * exactly the blocks it was asked for. The fixtures were simply inert with
+ * respect to what the tests varied, and the numbers agreed at every step.
+ *
+ * `groupMembers` is the same shape one layer down: an observation that returns a
+ * plausible answer from an environment where it saw nothing.
+ */
+describe("C14 fixtures respond to what their tests vary", () => {
+  it("wrappingDoc's height actually differs across widths", () => {
+    // The control for every resize assertion. A `raw` block measures one row at
+    // every width — it carries its text verbatim and never wraps — so a fixture
+    // built from `raw` reports "the width changed and nothing moved", which is
+    // indistinguishable from a viewport that ignored the resize.
+    const narrow = measureSequence(wrappingDoc("w").blocks, 20);
+    const wide = measureSequence(wrappingDoc("w").blocks, 200);
+
+    expect(narrow, "the fixture must wrap, or a resize test resizes nothing").toBeGreaterThan(wide);
+    expect(wide).toBeGreaterThanOrEqual(1);
+
+    // And the negative control, naming what the fixture must not be built from.
+    const raw = rowsDoc(1, "r");
+    expect(measureSequence(raw.blocks, 20)).toBe(measureSequence(raw.blocks, 200));
+  });
+
+  it("the viewport kit measures a table as a table, not as a fallback raw", () => {
+    // `table` is not a default kind — C11 registers it, which is what proves
+    // C09 §3's extension path — and an unregistered kind still renders, as
+    // `raw`, one row. So a kit without C11 measures a four-row table as 1 and
+    // reports that expanding a row changed no height.
+    const table = tableOf(4, "t");
+    expect(measureSequence([table], 80), "a four-row table is not one row").toBeGreaterThan(1);
+
+    const expanded = {
+      ...table,
+      rows: table.rows.map((r) =>
+        r.id === "r1"
+          ? { ...r, expanded: true, detail: [block({ kind: "raw", id: "d", text: "detail" })] }
+          : r,
+      ),
+    };
+    expect(
+      measureSequence([expanded], 80),
+      "expansion must change the height, or the index test asserts nothing",
+    ).toBeGreaterThan(measureSequence([table], 80));
   });
 });
