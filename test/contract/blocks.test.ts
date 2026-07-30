@@ -220,7 +220,7 @@ describe("C09 contract — the source rules", () => {
     expect(checkSourceScans(files).filter((v) => v.rule === "SS23")).toEqual([]);
   });
 
-  it("T2.11 (I7): no kind imports the registry", () => {
+  it("T2.11 (I7, MG9): no kind imports the registry", () => {
     // Seam 1's structural half. Container kinds resolve children solely through
     // the injected `measureChild` and `ctx.renderChild`; an import here would be
     // a cycle between the registry and the kinds registered into it.
