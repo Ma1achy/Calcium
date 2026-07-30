@@ -309,7 +309,9 @@ Proves the interface A02 §2 promises, so C03 and the shell can be written again
   1. The bare mode numbers `1049 25 2004 1002 1006 2026` appear in `src/` only in `terminal/escapes.ts` — A03 SS15. I1 requires the literals to live there, so a rule saying they appear "only in C01" would fail on the one file that must contain them.
   2. `escapes.ts`'s named export for each of those modes is imported only by `terminal/lifecycle.ts`, and `2026`'s only by `terminal/frame-scheduler.ts`. Asserted per sequence, so the transactional exception cannot widen silently.
 - **T2.9** (I1): `render()` is never called with `alternateScreen` — a source scan over `src/` (A03 SS34). Two owners of one piece of terminal state is the failure this component exists to prevent, and Ink's own option is the tempting shortcut.
-- **T2.10** (I17): `columns` and `rows` are read from a stream in `src/` only in `terminal/lifecycle.ts` — A03 SS42, imported from the enforcement tool rather than restated. Shown to fire against a fabricated violation **written in the form the real reader uses**, `stdout.columns` through a held handle, rather than a form invented for the test.
+- **T2.10** (I17): `columns` and `rows` are read from a stream in `src/` only in `terminal/lifecycle.ts` — A03 SS42, imported from the enforcement tool rather than restated. Shown to fire against a fabricated violation **copied from `lifecycle.ts` itself**, `stdout.columns` through a held handle, rather than a form invented for the test (A03 commitment 14a).
+
+  **The rule is keyed on the receiver**, and the reason is worth recording: a bare `.columns` also matches `block.columns` in `table/` and `plan.columns` in its planner — nine sites with nothing to do with a terminal — and annotating them would put a claim about terminal width on lines about table columns. The residual gap is stated rather than left to be found: a handle stored under a name outside the list escapes, and what closes that is the per-frame snapshot rather than a cleverer pattern.
 
 ### Tier 3 — edge cases
 

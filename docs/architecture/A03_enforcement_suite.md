@@ -143,8 +143,17 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS11 | `process.env` | `blocks/` | C09 T2.7 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
+| SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I17, T2.10 |
 
 **SS1 is the widest and the most valuable.** One injected clock, entering at C22 and nowhere else, is what makes golden frames reproducible and every timing test run on a fake.
+
+**SS42 is the fourth member of that family and the last ambient value that had no owner.** The clock enters at C22, `process.env` at C02, escape literals live in `escapes.ts` — and the terminal's dimensions were read wherever anyone wanted them, which today is one place by luck rather than by rule.
+
+**The rule is satisfied and the gap it guards is not closed, and both halves are deliberate.** C01 I12 gives a coherent snapshot per `SIGWINCH`; nothing gives one per frame, because `writer` is a `Proxy` over the real stdout and its `columns` is a read the consumer performs at whatever moment it performs it — and C01 exposes no initial size at all, so that handle is the only route to a width there is. **C01 T5.8 demonstrates it in a PTY**: a frame composed at 100 and written into 80 wraps, one row more than a control run at a stable width, and a wrap inside the alternate screen scrolls content the application has no record of.
+
+What SS42 buys is that a **second** live reader cannot appear quietly beside the one legitimate one. It does not buy the snapshot, and an accessor added with one caller and no rule requiring its use would look like it had. The fix belongs with whoever writes the frame path (M-T6), and C01 §5 states the boundary so it is not inferred from the absence of an accessor.
+
+**Keyed on the receiver, and that is the other direction of SS20's defect.** A bare `.columns` matches `block.columns` in `table/` and `plan.columns` in its planner — nine sites with nothing to do with a terminal — and annotating them would put a claim about terminal width on lines about table columns. So the receiver is named. The residual gap is stated rather than left to be found: a handle stored under a name outside that list escapes, and what closes it is the per-frame snapshot rather than a cleverer pattern.
 
 ### Forbidden literals
 

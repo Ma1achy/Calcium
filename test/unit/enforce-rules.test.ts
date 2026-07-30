@@ -240,6 +240,20 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import { detect } from "../../terminal/capabilities.js";',
   },
   {
+    // **Copied from `lifecycle.ts:310`**, per A03 commitment 14a: where a rule
+    // targets a code idiom, the fabricated violation comes from a real call site
+    // rather than being written fresh. SS20 is why — its fabrication was written to
+    // the rule's own assumption about how the code is spelled, so it reproduced the
+    // assumption and the rule never matched the idiom in use.
+    //
+    // The plausible version of the violation, too: a renderer that wants the width
+    // and has not been handed it. That is the second reader, and two readers at two
+    // moments in one frame is how a frame comes to be composed against two widths.
+    rule: "SS42",
+    file: "src/presentation/blocks/paint.ts",
+    source: "const width = stdout.columns;",
+  },
+  {
     // The edge a reader would reach for: a plot inside an expanded table row
     // wants a width, and `planColumns` has one. Written as a type-only import
     // deliberately — that is the form that erases at build and passes every other

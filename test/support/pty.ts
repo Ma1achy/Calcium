@@ -89,6 +89,57 @@ export function trackDecset(bytes: string): DecsetState {
   return state;
 }
 
+/**
+ * Where the cursor ends up, and whether anything wrapped.
+ *
+ * **A PTY is a kernel device with no emulator behind it**, which this file's opening
+ * paragraph says and which is why every other assertion here is a fold over the byte
+ * stream. The same applies to the width hazard, and it is worse: the thing that
+ * matters is not the too-long line but the *scroll* the emulator performs when it
+ * wraps one, and there is nothing to interrogate afterwards.
+ *
+ * So this models exactly enough of a terminal to see it: printable runs advance a
+ * column, a newline resets it, and a run that crosses `cols` wraps — which costs a
+ * row the writer never asked for. `wrapped` is the unrecoverable event, because a
+ * wrap inside the alternate screen scrolls content the application has no record of.
+ *
+ * Escape sequences are skipped rather than interpreted. That makes `rows` a lower
+ * bound rather than a position, which is enough: the comparison is against a control
+ * run through the same tracker, so an unmodelled cursor move is a constant on both
+ * sides.
+ */
+export type WrapState = {
+  /** Rows advanced, counting wraps. */
+  rows: number;
+  /** The widest printable run between newlines, in columns. */
+  widest: number;
+  /** Whether any run crossed the width in effect. */
+  wrapped: boolean;
+};
+
+const CSI = /\x1b(?:\[[0-9;?]*[a-zA-Z]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])/g;
+
+export function trackWrap(bytes: string, cols: number): WrapState {
+  const plain = bytes.replace(CSI, "");
+  const state: WrapState = { rows: 0, widest: 0, wrapped: false };
+
+  for (const line of plain.split("\n")) {
+    // `\r` returns to column zero, so only the longest segment after the last one
+    // is what the terminal is left holding.
+    const segments = line.split("\r");
+    const run = Math.max(...segments.map((s) => s.length)); // cells-ok — ASCII fixtures
+    if (run > state.widest) state.widest = run;
+    if (run > cols) {
+      state.wrapped = true;
+      state.rows += Math.ceil(run / cols);
+      continue;
+    }
+    state.rows += 1;
+  }
+
+  return state;
+}
+
 /** Termios flags compared against the control run. Negated form means off. */
 export function termiosFlags(report: string): Record<string, boolean> {
   const flags: Record<string, boolean> = {};
@@ -192,6 +243,14 @@ export function control(): Promise<PtyRun> {
 export type InteractivePty = {
   /** Send bytes as a user would — through the PTY, not through a back channel. */
   type(bytes: string): void;
+  /**
+   * Resize the PTY, which is what a user dragging a window does.
+   *
+   * `node-pty` has had this all along and the harness never exposed it, so nothing
+   * in the suite had ever changed a terminal's size mid-run — the parameter class
+   * `runInPty`'s `env` fell into, one function over.
+   */
+  resize(cols: number, rows: number): void;
   /** Everything received so far. */
   readonly output: string;
   /** Resolve once `pattern` appears, or reject after `ms`. */
@@ -247,6 +306,7 @@ export function interactivePty(
 
   return {
     type: (bytes) => term.write(bytes),
+    resize: (cols, rows) => term.resize(cols, rows),
     get output() {
       return output;
     },

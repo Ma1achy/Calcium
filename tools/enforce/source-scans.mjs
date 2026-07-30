@@ -72,6 +72,38 @@ export const SCANS = [
   // The pattern is the ANSI *form*, not a bare integer. `38;5;` and `\e[3Xm`
   // are what an index looks like when someone writes one by hand; a bare `9` in
   // a theme file is a length, a ratio, an array position.
+  // The fourth member of the clock / `process.env` / escape-literal family, and the
+  // last ambient value that had no owner. The clock enters at C22, `process.env` at
+  // C02, escape literals live in `escapes.ts` — and the terminal's dimensions were
+  // read wherever anyone wanted them, which today is one place by luck rather than
+  // by rule.
+  //
+  // **The rule is satisfied and the gap it guards is not closed.** C01 I12 gives a
+  // coherent snapshot per `SIGWINCH`; nothing gives one per frame, because `writer`
+  // is a `Proxy` over the real stdout and its `columns` is read at access time by
+  // whoever holds the handle. C01 T5.8 demonstrates it in a PTY: a frame composed at
+  // 100 and written at 80 wraps, and a wrap scrolls the alternate screen. What this
+  // buys is that a *second* live reader cannot appear quietly beside the one
+  // legitimate one; the snapshot belongs to whoever writes the frame path (M-T6).
+  //
+  // **Keyed on the receiver, and the reason is the other direction of SS20's defect.**
+  // A bare `\.columns` matches `block.columns` in `table/` and `plan.columns` in its
+  // planner — nine sites that have nothing to do with a terminal — and annotating
+  // them would put a claim about terminal width on lines about table columns. So the
+  // receiver is named: the stream handles a width can actually come from.
+  //
+  // The residual gap, stated rather than discovered: a handle stored under a name not
+  // in this list — `const out = lifecycle.writer; out.columns` — escapes. `out` is in
+  // the list for that reason and the list is not a proof. What closes it is the
+  // per-frame snapshot, not a cleverer regex.
+  //
+  // Its fabricated violation is `stdout.columns` through a held handle, copied from
+  // `lifecycle.ts` rather than invented (A03 commitment 14a).
+  { id: "SS42", spec: "C01 I17 · C01 T2.10",
+    pattern: /\b(?:stdout|stderr|stdin|writer|stream|out|term|tty)\s*\.\s*(?:columns|rows)\b/,
+    scope: "src/", allow: ["src/terminal/lifecycle.ts"],
+    why: "the terminal's dimensions are read in lifecycle.ts and handed down; width is the axis that wraps" },
+
   { id: "SS19", spec: "C10 I13 · C10 T2.5",
     pattern: /\b(?:38|48);5;\d|\bansi(?:16|256)?\s*[:=]\s*\d|\[\d{1,2}m/,
     scope: "src/presentation/theme/", allow: ["src/presentation/theme/four-bit.ts"],
