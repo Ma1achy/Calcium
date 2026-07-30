@@ -95,6 +95,17 @@ Each of these produces code that compiles, passes review, and is wrong.
   unimplemented. Both scripts printed `ok`. This is the fabricated-violation discipline
   applied to the tool that writes the rules, which is where it was missing: ask whether
   the change fired, not whether the suite is still green.
+- **Walk the component by hand before implementing it**, as a named step in the plan.
+  For a renderer, draw the figure; for a store, step a sequence — append, patch, evict,
+  settle, clear — and assert the *whole* state after each step. It is not a courtesy
+  extended to components that look tricky: it has found something on every component
+  it has been run against, and the two classes it catches are caught by nothing else.
+  A03 §2 records both. Each invariant constrains one operation and none constrains the
+  history, so "the rule is right and the moment is missing" is invisible to a reader
+  checking statements one at a time — C12's downsampling, C25's height, C13's `overCap`,
+  C14's cache and C14's index, five instances across four components. The other class is
+  a citation that resolves against the wrong invariant, which no mechanism can catch
+  (`docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says why one should not be built).
 - **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
   initialise, serialise.
 
