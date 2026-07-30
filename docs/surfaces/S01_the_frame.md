@@ -38,9 +38,9 @@ At 100 × 30, mid-session, with the live block navigable:
 ▌   all ×11    training ×9    evaluation ×2
 ▌   ● running ×1   ✓ succeeded ×6   ✗ failed ×2   ○ queued ×1
 ▌
-▌      uuid      kind       family             status             metric    age
-▌  ▸ ● a3f9b21  candidate  digit-classifier   running · ep 17/40  0.0372 ▁▂▃▅▆  23m
-▌  ▸ ✓ 7c2d4e1  experiment decoder-zoom       succeeded           0.0089    41m
+▌      uuid     family            status     detail     metric   age
+▌  ▸ ● a3f9b21  digit-classifier  running    ep 17/40   0.0372   23m
+▌  ▸ ✓ 7c2d4e1  decoder-zoom      succeeded             0.0089   41m
 ────────────────────────────────────────────────────────────────────────────────
 ❯ /promote a3f9b21 --open-mr
 ────────────────────────────────────────────────────────────────────────────────
@@ -48,6 +48,8 @@ At 100 × 30, mid-session, with the live block navigable:
 ```
 
 The `▌` gutter marks the live block (D6). The footer has switched to row keys because focus is in that block.
+
+**The table region is illustrative and now says what S03 §3 declares.** It drew `running · ep 17/40` as one status cell and `0.0372 ▁▂▃▅▆` as one metric cell — both of which S03 forbids, the first by commitment 2 with T6.1 as its fail-on-revert test, the second by the column split in §3. A spec contradicting a sibling spec's fail-on-revert test is worse than a stale picture, so it is corrected here rather than left until C22 makes this frame composable. The columns shown are the ten that survive at 80 in S03's drop order, minus `kind` and `owner` for space at this narrower illustration width; S03 §2 is the authority on the layout and this one is a frame with a table in it.
 
 ---
 
