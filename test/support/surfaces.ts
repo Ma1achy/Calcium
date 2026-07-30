@@ -221,6 +221,96 @@ const S08_STEPS_OK: Block = block({
   ],
 });
 
+/**
+ * S04 §3's training region — a rule, a plot, a progress bar and the metrics line.
+ *
+ * **The metrics line is a headerless `table`, not a `keyValue`.** The illustration
+ * draws three label/value pairs on one row, and `keyValue` is one row per pair — so
+ * as drawn it composes to three rows where the picture has one. That is the S08 §4
+ * finding again (a `keyValue` drawn as columns), and it takes the remedy S08 §4
+ * names: `table` with `showHeader: false`, which is the shape C04 §3 added the flag
+ * for. Recorded here because the fixture is where the choice becomes visible.
+ */
+const S04_LOSS_PLOT: Block = block({
+  kind: "plot",
+  id: "s04-loss",
+  gapBefore: true,
+  form: "line",
+  height: 5,
+  axes: true,
+  yFormat: "number",
+  xLabels: ["epoch 0", "epoch 20", "now"],
+  // Eighteen epochs, 0.82 down to the 0.0372 the metrics row states. Geometric so
+  // the last value is exactly the stated one rather than approximately it.
+  series: [
+    {
+      label: "loss",
+      values: Array.from({ length: 18 }, (_, i) => 0.82 * (0.0372 / 0.82) ** (i / 17)),
+    },
+  ],
+});
+
+const S04_METRICS: Block = block({
+  kind: "table",
+  id: "s04-metrics",
+  gapBefore: true,
+  showHeader: false,
+  columns: [
+    { key: "loss", label: "loss", align: "left", priority: 90, minWidth: 18, flex: true, sortable: false },
+    { key: "acc", label: "val_acc", align: "left", priority: 80, minWidth: 18, flex: true, sortable: false },
+    { key: "eta", label: "eta", align: "left", priority: 70, minWidth: 10, flex: true, sortable: false },
+  ],
+  rows: [
+    {
+      id: "m",
+      cells: {
+        loss: { text: "loss 0.0372 ↓" },
+        acc: { text: "val_acc 0.968 ↑" },
+        eta: { text: "eta 18m" },
+      },
+    },
+  ],
+});
+
+/**
+ * S09 §2's success frame — and it was never waiting on C12.
+ *
+ * The deferral said "S04, S09, S13 … waits on C12" and S09 has no plot: its
+ * composition is `rule, rule, steps, notice, rule, table, notice` (S09 T1.1). It
+ * became writable when C11 landed and stayed exempt for a whole component, because
+ * TD3 checks that a mapped path exists and nothing checks that a blocker names the
+ * right component (`HEIGHT_AUDIT.md`).
+ */
+const S09_SMOKE_STEPS: Block = block({
+  kind: "steps",
+  id: "s09-smoke",
+  gapBefore: true,
+  steps: [
+    { label: "1 batch through forward", state: "done", detail: "output shape (4, 10)" },
+    { label: "loss.compute on output + targets", state: "done", detail: "value 2.31" },
+    { label: "metrics.val_accuracy.update", state: "done", detail: "accepted" },
+    { label: "metrics.val_loss.update", state: "done", detail: "accepted" },
+    { label: "@prism.validate", state: "done", detail: "batch accepted" },
+  ],
+});
+
+const S09_USER_TESTS: Block = block({
+  kind: "table",
+  id: "s09-user-tests",
+  gapBefore: true,
+  showHeader: false,
+  columns: [
+    { key: "glyph", label: "", align: "left", priority: 100, minWidth: 1, sortable: false },
+    { key: "name", label: "name", align: "left", priority: 95, minWidth: 30, flex: true, sortable: true, truncateFrom: "start" },
+    { key: "duration", label: "duration", align: "right", priority: 60, minWidth: 6, sortable: true },
+  ],
+  rows: [
+    { id: "t1", cells: { glyph: { text: "", glyph: "ok" }, name: { text: "DigitClassifier::smoke_forward_shape" }, duration: { text: "0.04s" } } },
+    { id: "t2", cells: { glyph: { text: "", glyph: "ok" }, name: { text: "DigitClassifier::no_nan_in_weights" }, duration: { text: "0.02s" } } },
+    { id: "t3", cells: { glyph: { text: "", glyph: "ok" }, name: { text: "DigitClassifier::forward_is_deterministic" }, duration: { text: "0.06s" } } },
+  ],
+});
+
 const S08_RESOLVED: Block = block({
   kind: "keyValue",
   id: "s08-resolved",
@@ -374,6 +464,68 @@ const S15_SECRETS: Block = block({
 });
 
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
+  {
+    file: "docs/surfaces/S04_run_detail.md",
+    fence: 1,
+    label: "S04 §3 — the training region",
+    width: 76,
+    blocks: [
+      block({ kind: "rule", id: "s04-rule", label: "loss · epoch 17 / 40 · 43%" }),
+      S04_LOSS_PLOT,
+      block({
+        kind: "progress",
+        id: "s04-progress",
+        gapBefore: true,
+        label: "",
+        current: 17,
+        total: 40,
+      }),
+      S04_METRICS,
+    ],
+  },
+  {
+    file: "docs/surfaces/S09_test.md",
+    fence: 0,
+    label: "S09 §2 — test passed",
+    width: 78,
+    blocks: [
+      block({
+        kind: "rule",
+        id: "s09-rule",
+        label: "test · fmx_models.jobs.training:job · pytest",
+      }),
+      block({
+        kind: "rule",
+        id: "s09-smoke-rule",
+        gapBefore: true,
+        label: "implicit smoke test · structural · read-only · 1 batch",
+      }),
+      S09_SMOKE_STEPS,
+      block({
+        kind: "notice",
+        id: "s09-smoke-total",
+        gapBefore: true,
+        tone: "ok",
+        glyph: "ok",
+        text: "smoke passed · 1.1s · sinks not invoked · callbacks did not fire",
+      }),
+      block({
+        kind: "rule",
+        id: "s09-user-rule",
+        gapBefore: true,
+        label: "user tests · @prism.test · 3",
+      }),
+      S09_USER_TESTS,
+      block({
+        kind: "notice",
+        id: "s09-total",
+        gapBefore: true,
+        tone: "ok",
+        glyph: "ok",
+        text: "4 / 4 passed · 1 smoke + 3 user · 2.6s                            2.6s",
+      }),
+    ],
+  },
   {
     file: "docs/surfaces/S07_diff.md",
     fence: 0,

@@ -38,7 +38,8 @@ Instances, and the first three were the second kind:
 | A01 Appendix A.1 | Palette values taken from a mockup | Validation against the contrast floors |
 | S03 §2 | Columns in an order §3's priorities contradict | Nothing — the picture was simply wrong, *and* it also carried the next row |
 | S03 §3, S05 §3, S06 §5, S15 §5 | `metric`, `age`, `errors`, `p99`, `req/s`, `p50`, `versions` right-aligned | `align`, which `ColumnDef` requires |
-| S01 §2, S03 §2 | A number and a sparkline in one `metric` cell | Nothing — see the fourth verdict below |
+| S01 §2, S03 §2, S13 §2 | A number and a sparkline in one `metric` cell | Nothing — see the fourth verdict below |
+| S04 §3, S11 §2 | A plot area two cells right of its label, data flush to the axis | Nothing — C12 §2 declared three cells and the **figures were right**; see the fifth verdict |
 
 ### The fourth verdict: neither side is right
 
@@ -71,6 +72,59 @@ cell, which S03 commitment 2 forbids and S03 T6.1 is the fail-on-revert test for
 Both are corrected there now rather than left until C22 makes that frame composable:
 a spec that contradicts a sibling spec's fail-on-revert test is worse than a stale
 picture, because the test passes and the spec still says the wrong thing.
+
+**S13 §2 is the third instance, and it arrived with the S15 §5 gap attached.** Its
+Running panel is a table that declared no columns — so there was no priority to
+put `spark` below and no drop order for CP6 to check — and its sparkline was
+impossible twice over: five samples where the window is eight, and no `█` where
+normalising within `[min, max]` puts the maximum sample. Both fixed in S13 §2, by
+the same remedy S03 took, which is what a mechanical fix looks like the third time.
+
+### The fifth verdict: the figure is right and the declaration changes
+
+The other four are resolved by editing the figure, by declaring what the figure
+implied, or by changing the schema. **This one edits the prose.** C12 §2 declared
+the axed plot area as `width − yLabelWidth − 3`, for a space, the `│`, and a space.
+S04 §3 and S11 §2 both drew two — label, space, `│`, data flush against the axis.
+
+The figures won and §2 became `− 2`. A margin between an axis and its data is a
+habit from charts that have one; in a terminal it renders as the leftmost sample
+floating away from the line it belongs to. **The evidence is that two figures drew
+it independently**: one disagreeing with the text is a slip, two agreeing with each
+other against the text is the text being wrong.
+
+Worth separating from the first verdict class, because the remedy is opposite and
+the symptom identical. Both look like a figure and a table disagreeing; deciding by
+which artefact is easier to edit gets one of them backwards every time.
+
+### The braille figures, measured
+
+C12 landing made the curves checkable for the first time, and **neither illustrated
+plot could have been produced from any data.** Decoded into their dot grids
+(`U+2800 + mask`, dots 1,2,3,7 left and 4,5,6,8 right):
+
+| Figure | Cells | Dot grid | Empty interior dot columns | Curve reached |
+|---|---|---|---|---|
+| S04 §3 | 29 × 5 | 58 × 20 | **6, 7, 23, 36, 37** | 29 of a 38-cell area |
+| S11 §2 | 14 × 3 | 28 × 12 | **6, 7, 15** | 14 of a 28-cell area |
+
+Both are the **first** verdict class — drawing errors, and the tables win. Bresenham
+(C12 I14) inks every dot column a segment crosses, so an interior gap is only
+possible where a non-finite sample was filtered (C12 §4), and a loss curve has none.
+And C12 §4 spreads samples across the full width while the x-labels put `now` at the
+right edge, so a curve stopping three-quarters of the way along contradicts its own
+label row.
+
+S11 carried a third defect that turned out **not** to be the figure's: it drew two
+y-labels where §3 made three unconditional. §3 was the side that was wrong, because
+T3.2 renders `height: 1` with axes and three labels cannot be placed in one row — so
+the section contradicted its own test, and C12 I15 now collapses labels from the
+middle outward. The figure gains its midpoint.
+
+Both figures are regenerated from `plotDefinition` rather than redrawn, and both now
+end on the number their own metrics row states — S04's min label is the `loss 0.0372`
+beside it and S11's is `train_loss 0.312`, where the old figures' `0.04` and `0.31`
+only happened to resemble them.
 
 **Illustrations are where intent leaks in without being recorded.** They are drawn
 by eye against an idea of how the thing should look; the spec text is written
@@ -219,6 +273,18 @@ added `showHeader` for.
 
 ---
 
+## 4a. S04 §3's metrics line is a `keyValue` with three columns — **fixed in S04**
+
+The same defect as §4 above, and the first one with a **height delta**: the line
+draws three label/value pairs on one row, `keyValue` is one row per pair, so the
+region composed to fifteen rows against the thirteen it draws.
+
+Fixed by taking §4's own remedy — `table` with `showHeader: false` — rather than
+being recorded again. Two instances of one shape is a pattern; the second one
+should not be left as a finding when the first already names the fix.
+
+---
+
 ## 5. S08's `notice` continuation indent — **surface defect, no height delta**
 
 The warning region hangs its continuation lines eight cells in, under the code:
@@ -259,9 +325,24 @@ blocker is wrong is indistinguishable from one that is pending (A03 §9a).
 
 | Surface | Waits on |
 |---|---|
-| S03 `ps` list, S05 serving, S06 models, S14 config, S15 identity | **C11** — the illustrated region is a table |
-| S04 run detail, S09 test, S13 dashboard | **C11** and **C12** — tables and plots |
 | S07 §3 patch region | **C25** |
+| S13 dashboard | **C22** — see below |
+
+Composed and asserted: S03, S05, S06, S14, S15 (with C11), and **S04 §3 and S09
+§2 (with C12)**.
+
+**Two corrections to this table, and one of them had been wrong since it was
+written.** S09 was listed as waiting on C11 *and* C12 and has no plot at all — its
+composition is `rule, rule, steps, notice, rule, table, notice` (S09 T1.1) — so it
+became writable when C11 landed and stayed exempt for a whole component. A deferral
+whose blocker is wrong is indistinguishable from one that is pending (A03 §9a), and
+TD3 checks that a mapped path exists rather than that a blocker names the right
+component. That half has no mechanism; this row is the only place it was caught.
+
+**S13 moves to C22**, and not because of C12. Its illustration is a whole screen —
+an outer `panel` with a title and a footer, wrapping a `group` of five inner panels —
+which is the shape S01 and S12 already wait on C22 for. Its table and its sparkline
+are composable today; the frame around them is not.
 
 Each becomes measurable on the commit that registers its kind, and the
 composition-level assertion that all seventeen kinds are registered (C09 T2.6)

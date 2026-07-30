@@ -38,7 +38,7 @@ At 120 × 36:
 │ └────────────────────────────┘ └──────────────────────────────────────────┘ │
 │                                                                             │
 │ ┌ running · 3 ──────────────────────────────────────────────────────────────┐│
-│ │ ● a3f9b21  digit-classifier    ep 17/40  ████████░░░░  0.0372 ▁▂▃▅▆  23m  ││
+│ │ ● a3f9b21  digit-classifier  ep 17/40  ████████░░░░  0.0372 █▆▅▄▃▂▂▁  23m ││
 │ │ ● e2a9c41  account-risk        batch 4/8 ██████░░░░░░               45s   ││
 │ │ ○ f410d99  flow-predictor      queued                                3m   ││
 │ └───────────────────────────────────────────────────────────────────────────┘│
@@ -57,6 +57,25 @@ At 120 × 36:
 ```
 
 Five panels, laid out as a `group` of `panel`s (C04 §3) — the same block vocabulary as everything else, which is what makes it themed, ASCII-degradable and measurable without a bespoke renderer.
+
+### The Running panel's columns
+
+**Declared here because the region is a table and stated none** — the S15 §5 gap a fifth time, after S05 and S09 were the third and fourth. A table with no column table has no drop order, so nothing can check what this panel does at 100 or at 80, and A03 CP6 has nothing to compare.
+
+| Column | Priority | Min | Align | Trunc | Flex | Sortable |
+|---|---|---|---|---|---|---|
+| glyph | 100 | 1 | left | end | — | — |
+| uuid | 90 | 7 | left | end | — | — |
+| family | 85 | 16 | left | end | yes | — |
+| detail | 70 | 8 | left | end | — | — |
+| progress | 65 | 12 | left | end | — | — |
+| metric | 60 | 6 | **right** | end | — | — |
+| spark | 55 | 8 | left | end | — | — |
+| age | 50 | 4 | **right** | end | — | — |
+
+**`metric` and `spark` are two columns, and this is the third surface to learn it.** The figure drew `0.0372 ▁▂▃▅▆` in one cell, as S01 §2 and S03 §2 both did before being corrected: a cell holds one value, because C11 truncates a cell at its planned width and a number-plus-series either loses digits or becomes a shorter series that still reads as real. `spark` sits below `metric` in priority, so the decoration drops before the number does.
+
+The series was also not producible. A sparkline normalises within its window's `[min, max]` (A01 A.2), so the maximum sample is always the top glyph — and `▁▂▃▅▆` has no `█`. It drew five samples besides, where the window is eight. The figure now shows the real output for the last eight epochs of a run at 17 of 40, falling from 0.144 to the `0.0372` in the cell beside it: `█▆▅▄▃▂▂▁`, one glyph per sample, eight cells (C12 §2).
 
 ---
 

@@ -12,6 +12,7 @@
 // A fixture holding its own number agrees with itself forever.
 import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/testing/index.js";
@@ -21,10 +22,12 @@ import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 describe("the S-series' illustrated heights", () => {
   for (const frame of SURFACE_FRAMES) {
     it(`${frame.label} composes to the rows it draws`, () => {
-      // `table` is registered rather than shipped as a default (C09 §3), so a
-      // registry without it measures the five table-bearing surfaces as `raw`.
+      // `table` and `plot` are registered rather than shipped as defaults
+      // (C09 §3), so a registry without them measures the table- and plot-bearing
+      // surfaces as `raw` — which would assert nothing while looking like coverage.
       const registry = createBlockRegistry({});
       registry.register(tableDefinition as unknown as BlockDefinition);
+      registry.register(plotDefinition as unknown as BlockDefinition);
       const drawn = illustratedRows(frame.file, frame.fence);
       const measured = registry.measureSequence(frame.blocks, frame.width);
       const rendered = renderSequenceToLines(registry, frame.blocks, frame.width, {
@@ -58,8 +61,15 @@ describe("the S-series' illustrated heights", () => {
   // is a table, a plot or a patch region: measuring one today measures the `raw`
   // fallback, which would assert nothing while looking like coverage.
   // S03, S05, S06, S14 and S15 are above, composed and asserted — C11 registered
-  // `table` and their deferral expired with it.
-  it.todo("S04, S09, S13 compose to their illustrated rows — waits on C12");
+  // `table` and their deferral expired with it. **S04 §3 and S09 §2 joined them
+  // when C12 registered `plot`**, and S09 turned out never to have been waiting on
+  // C12 at all: it has no plot, and had been exempt since C11 landed because
+  // nothing checks that a blocker names the right component (HEIGHT_AUDIT).
+  //
+  // S13 moved to C22 rather than being composed here. Its illustration is a whole
+  // screen — an outer panel with a title and a footer around a `group` of five —
+  // which is the shape S01 and S12 already wait on C22 for. Its table and its
+  // sparkline compose today; the frame around them does not.
   it.todo("S07 §3's patch region composes to its illustrated rows — waits on C25");
-  it.todo("S01, S02, S10, S11, S12 compose to their illustrated rows — waits on C22");
+  it.todo("S01, S02, S10, S11, S12, S13 compose to their illustrated rows — waits on C22");
 });
