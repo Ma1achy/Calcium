@@ -212,7 +212,7 @@ a  killAll()                        C21 — SIGKILL, no grace
 b  flush history                    C20
 ```
 
-**Cleanup runs through `beforeRelease` and nowhere else.** An earlier draft had C22 call `killAll` and flush directly on the explicit paths and treated `beforeRelease` as a no-op afterwards — but C01 I13 runs it once before the *first* release, which had not yet happened, so both ran twice. A double history flush duplicates entries. One path, five callers, no special case.
+**Cleanup runs through `beforeRelease` and nowhere else.** An earlier draft had C22 call `killAll` and flush directly on the explicit paths and treated `beforeRelease` as a no-op afterwards — but C01 I5 runs it once before the *first* release, which had not yet happened, so both ran twice. A double history flush duplicates entries. One path, five callers, no special case.
 
 **Step 3 before step 4** is the rule that makes a crash debuggable: a stack printed onto the alternate screen is discarded when the screen is released, so the dev sees a flash and an empty shell. Restoring first puts the trace in the real scrollback where it can be read and pasted.
 
@@ -327,7 +327,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.15**: a fault during construction, after stores but before the lifecycle → nothing acquired, no cleanup needed, error surfaced.
 - **T3.16**: a fault during the first paint → `beforeRelease` runs, terminal restored, stack on the primary screen.
 - **T3.17**: `SIGKILL` — documented as unrecoverable; the test asserts the documentation exists rather than the behaviour.
-- **T3.18**: a `beforeRelease` that throws → logged, release still completes (C01 I13 from this side).
+- **T3.18**: a `beforeRelease` that throws → logged, release still completes (C01 I5 from this side).
 
 ### Tier 4 — integration
 
