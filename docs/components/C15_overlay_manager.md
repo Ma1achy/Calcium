@@ -26,7 +26,8 @@ The unifying decision: **overlays and pushed views are the same mechanism with d
 
 ```typescript
 type Placement =
-  | Readonly<{ kind: "anchored"; row: number; prefer: "above" | "below" }>
+  | Readonly<{ kind: "anchored"; row: number; rows?: number;   // the anchor's own extent, default 1
+               prefer: "above" | "below" }>
   | Readonly<{ kind: "centred" }>
   | Readonly<{ kind: "fill" }>;                  // views only
 
@@ -111,6 +112,8 @@ That is the payoff of the block vocabulary being a vocabulary rather than a rend
 
 **Overlays always sit above views.** A confirm raised from inside the dashboard appears over it, which is why A02's focus priority lists `overlay` above `pushedView`.
 
+**I2 holds by construction through `push`, and is enforced anyway.** A view is only ever pushed onto an empty stack — every other cell of §6's `push(view)` column is a rejection — so overlays always follow it in push order and a naive implementation sorting by push order alone satisfies I2 without ever knowing it. That makes the invariant true and its fail-on-revert test unfalsifiable, which is A03's vacuity class arriving in a spec rather than in a rule. The sort is therefore real code in `layout()`, and T6.2 constructs a mis-ordered stack directly rather than reaching it through `push`, which is possible because placement is a pure function of a stack it is handed.
+
 **At most one view.** Views do not nest in v1. Pushing a second is rejected as an orchestration bug — the drill-in path from the dashboard opens a live block in the transcript, not another view (A01 D7), so nesting is never needed.
 
 **Overlays nest freely.** Reverse-i-search over a completion menu is legitimate.
@@ -137,12 +140,18 @@ Overlays are content-sized and resolved in a fixed order:
 1  resolve width: min(layer.width ?? region.width, region.width)
 2  measure content at that width  → desired height
 3  clamp to floor(region.height × maxHeightFraction)   → truncated if reduced
-4  place at the preferred side of the anchor row
+4  place at the preferred side of the anchor span
+       above → rows [row − height, row − 1]
+       below → rows [row + rows, row + rows + height − 1]
 5  if it does not fit that side, flip to the other
 6  if it fits neither, take the larger side and clamp again
 7  clamp the top edge to the region; never negative, never past the bottom
 8  resolve left: 0, or centred within the region
 ```
+
+**The anchor is a span, not a row, and this is what a two-row prompt forced.** A prompt occupying rows 18 and 19 of a twenty-row region has no single row that places a menu correctly: anchoring on 18 and preferring `below` starts the menu on row 19, over the prompt's second line, and anchoring on 19 and preferring `above` ends it on row 18, over the prompt's first. Both preferences are wrong, and both produce a `Placed` in which every number is self-consistent — inside the region, non-negative, untruncated — so the whole of T2.2's corpus passes while the menu sits on top of the line it belongs to. It was found by drawing the frame.
+
+So `rows` defaults to 1 and names the anchor's own extent, and **the anchor's rows are never covered**: step 4's arithmetic excludes `[row, row + rows − 1]` on both sides. Written out rather than left to the word "below", because `row + 1` is the natural thing to write and it is right exactly when the anchor is one row tall.
 
 **Step 1 precedes step 2 and this is not tidiness.** Height is a function of width, so a forty-cell confirm measured at a hundred and twenty comes back one row tall and is drawn as three. Measuring at the region's width was the original wording and it was only ever right because nothing declared a narrower one.
 
@@ -207,6 +216,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I14** — `update` changes a layer's content, placement or width and never the stack's shape, its order, or its `dismissable`. A layer whose escapability changes mid-life makes C16's Ctrl-C ladder depend on when it looked.
 - **I15** — `layout()` omits a zero-height overlay and dismisses nothing. Acting on what it computed would cost I5.
 - **I16** — An overlay's width is `min(layer.width ?? region.width, region.width)`, and its content is measured at that width rather than at the region's. `Placed.left` is derived from it.
+- **I17** — An anchored overlay never covers its anchor's own rows, `[row, row + rows − 1]`, on either side of a flip. A single-row anchor is the default and the special case, not the general one.
 
 ---
 
@@ -227,6 +237,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 13. A layer changes in place through `update` — content, placement or width, never the stack's shape and never its escapability (I14).
 14. A zero-height overlay is omitted from the layout rather than dismissed by it (I15).
 15. An overlay's width is its owner's to declare, and its content is measured at that width; `left` follows from it (I16, I6).
+16. An anchor is a span rather than a row, and an overlay never covers it (I17).
 
 ---
 
@@ -260,6 +271,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.4** (I1, I2, I6, I14): a thousand random sequences of `push`, `pop`, `dismiss` and `update` — **sequences, not single calls**, and I1, I2 and I14 are asserted after *every* step rather than at the end. A component holding state is tested over its history: an invariant that constrains each operation says nothing about the path, and that is where C12, C13 and C14 each hid a defect.
 - **T2.5** (I9): the module graph shows no import from C13 in `overlay/` (MG13).
 - **T2.6** (I12): the module graph shows no import from `terminal/` or C14.
+- **T2.8** (I2): placement over a stack built by hand with an overlay beneath a view → the view is placed first and the overlay last. Reached without `push`, because `push` cannot produce this stack and that is exactly why the sort is otherwise untestable.
+- **T2.9** (I16, T3.5b): the anchor span, over a corpus of anchor rows and extents from 1 to 5 in regions of every height → the placed overlay never intersects `[row, row + rows − 1]` on either side of the flip.
 - **T2.7**: every `OverlayChange` variant is emitted by at least one operation — `push`, `pop`, `content` and both `dismiss` reasons, `explicit` and `anchorEvicted`. The second reason is emitted by a caller passing it, which is the whole of I10.
 
 ### Tier 3 — edge cases
@@ -269,7 +282,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.3** (I1): `push(view)` while a view exists → rejected, stack unchanged.
 - **T3.4** (I1): `push(view)` while overlays exist → rejected.
 - **T3.5** (I7): an overlay preferring `below` at a row with 2 rows beneath and 12 above → **flips above and shows its full height**. The classic bug, tested directly. A control above it asserts the fixture is taller than the room below, so a fixture that fits either way cannot report a pass.
-- **T3.5b** (I7): the same overlay against a prompt **two rows tall**. The anchor is the prompt's top row, so a flip that lands one row late overlaps the line the menu belongs to — and every number in `Placed` is still self-consistent. Read as a frame, not as an assertion.
+- **T3.5b** (I7): the same overlay against a prompt **two rows tall** — `row: 18, rows: 2` in a twenty-row region → the menu occupies rows 10–17 and touches neither prompt row. Both the single-row readings overlap it, and both produce a self-consistent `Placed`, so this is asserted as a frame and not only as numbers.
 - **T3.6** (I7): neither side fits → the larger side is taken and clamped; `truncated` true.
 - **T3.7**: an overlay taller than `maxHeightFraction` of the region → clamped, `truncated` true. A control asserts the same overlay is *un*truncated in a taller region, so a fixture that is always truncated cannot report a pass.
 - **T3.7b** (I7): the fraction clamp is applied before placement and the fit clamp after — asserted by an overlay that would flip differently if the two were swapped. The pair of clamps sharing a word is what makes this worth its own test.
@@ -311,7 +324,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I7): clamping before flipping → T3.5 fails, and menus become inexplicably small near the bottom.
-- **T6.2** (I2): sorting purely by push order → T1.4 and T5.3 fail; a confirm hides behind the dashboard.
+- **T6.2** (I2): removing the sort from `layout()` → T2.8 fails. **Not T1.4 or T5.3**, which was this test's original claim and was unfalsifiable: `push(view)` is rejected onto any non-empty stack, so those two never construct a stack in the wrong order and both pass under push order alone. The revert is only detectable against a hand-built stack, which is what T2.8 is.
 - **T6.3** (I1): allowing nested views → T3.3 fails and the `Esc` chain becomes ambiguous.
 - **T6.4** (I3): letting `Esc` dismiss a confirm → T1.9 fails; a stray keypress answers a question the user did not read.
 - **T6.5** (I4): rendering an overlay with raw React → T2.3 fails, and the overlay stops being themed or measurable.
