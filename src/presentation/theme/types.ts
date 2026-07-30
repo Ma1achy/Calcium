@@ -47,7 +47,7 @@ export type Surfaces = Readonly<{
    * changed line was specified and withdrawn: `syntax.comment` and `tone.muted`
    * are recessive by design and bound how much tint a diff background may carry,
    * and the first level spends nearly all of it — six units of one channel on
-   * dark `diffAdd`. Word-level emphasis is `underline`'s (C25 I11).
+   * dark `diffAdd`. Word-level emphasis is `underline`'s (C25 I10).
    */
   diffAdd: string;
   diffRemove: string;
@@ -80,7 +80,7 @@ export type ColourValue =
 export type Style = Readonly<{
   colour?: ColourValue;
   /**
-   * The second colour channel, and the last one (§4a, I22). Set only by
+   * The second colour channel, and the last one (§4a, I21). Set only by
    * `resolveBackground`, and only from a `surface` ref: a tone painted as a
    * background is a tone nothing measured a floor for in that role.
    */

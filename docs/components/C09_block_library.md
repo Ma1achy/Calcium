@@ -125,7 +125,7 @@ That it is three rather than one matters. A single privileged exception is indis
 ### What a renderer emits, and what Ink is for
 
 **A renderer emits SGR. It never sets an Ink colour prop.** C10 resolves a tone
-to a `Style` whose colour names its own depth (C10 I18), and the renderer
+to a `Style` whose colour names its own depth (C10 I24), and the renderer
 switches on `colour.kind` to write `38;2;r;g;b`, `38;5;n` or a 30–37 / 90–97
 index. The sequence itself comes from `terminal/escapes.ts`, which A03 SS14
 already names as the one module permitted an escape literal — and an SGR
@@ -134,7 +134,7 @@ than needing a new one.
 
 Ink's `color` prop is refused for two reasons, and the second is the one worth
 writing down. It re-derives the depth from the string's *format*, discarding the
-tag I18 exists to carry — two answers to one question, and the wrong one wins
+tag I15 exists to carry — two answers to one question, and the wrong one wins
 because it is the one Ink acts on. And the colour library behind it decides how
 much colour to emit from its own environment detection, which reports **no colour
 at all under a test runner**: goldens would pass in monochrome forever while
@@ -315,11 +315,11 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I11** — A renderer throwing is contained: that block renders as an error block, the rest of the frame is unaffected. Compute, so no retry (A02 §7 rule 2).
 - **I12** — A sealed registry cannot be registered against.
 - **I13** — Every kind in C04's union has a registered default definition. Asserted exhaustively over the type.
-- **I17** — Whether a kind wraps or truncates is fixed per kind, not per block, so height stays a function of block and width. `code` is the one exception and it is explicit: the producer chooses through `wrap`, which is a field of the block and therefore visible to `measure`.
-- **I18** — Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the framework's only runtime L1 → L0-terminal edge, and it is deliberate: two ways of colouring a cell means two ways of degrading it, and only one of them would honour C10.
+- **I14** — Whether a kind wraps or truncates is fixed per kind, not per block, so height stays a function of block and width. `code` is the one exception and it is explicit: the producer chooses through `wrap`, which is a field of the block and therefore visible to `measure`.
+- **I15** — Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the framework's only runtime L1 → L0-terminal edge, and it is deliberate: two ways of colouring a cell means two ways of degrading it, and only one of them would honour C10.
 - **I16** — Ink's layout width agrees with `cells()`. C09 hands Ink pre-broken lines, so Ink's own idea of how wide a string is must match the measurer's or a line it considers too long wraps and adds a row nothing counted. Asserted (T2.16), never assumed — a silent disagreement here breaks I1 for every kind at once.
-- **I15** — `gapBefore` is applied by the sequence, never by the block (C04 §3a, I19). `measure` never counts it; `measureSequence` and every container do.
-- **I14** — Control characters are stripped from every text field before measurement and render, by C09 and not by its callers. A far side's output cannot inject escape sequences into the frame: `\x1b[2J` cannot clear the screen, a cursor-position query cannot get its answer typed into the prompt, and a stray `\r` cannot make a measured row and a rendered row disagree. Stripping happens once, at the last point before both, so measurement and render cannot see different text.
+- **I17** — `gapBefore` is applied by the sequence, never by the block (C04 §3a, I19). `measure` never counts it; `measureSequence` and every container do.
+- **I18** — Control characters are stripped from every text field before measurement and render, by C09 and not by its callers. A far side's output cannot inject escape sequences into the frame: `\x1b[2J` cannot clear the screen, a cursor-position query cannot get its answer typed into the prompt, and a stray `\r` cannot make a measured row and a rendered row disagree. Stripping happens once, at the last point before both, so measurement and render cannot see different text.
 
 ---
 
@@ -328,7 +328,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 1. C09 owns the registry; C04 owns the schema and the measurement contract (I13).
 2. Fourteen kinds ship here; `table` and `plot` register from C11 and C12 through the public mechanism (I13).
 3. `measure` and `render` are written and tested as a pair, per kind (I1).
-4. Wrapping versus truncation is a per-kind decision, documented in §3, except `code`, where the producer chooses via `wrap`. `code` names `syntax` slots; every other kind names `tone` slots (I17).
+4. Wrapping versus truncation is a per-kind decision, documented in §3, except `code`, where the producer chooses via `wrap`. `code` names `syntax` slots; every other kind names `tone` slots (I14).
 5. Every capability substitution is 1:1 by cell count (I5).
 6. `cells()` is grapheme-aware and shared; no kind measures width for itself (I6).
 7. Truncation is grapheme-aware, never leaves a half-drawn glyph, and takes the end it removes from as a parameter (I9).
@@ -336,10 +336,10 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 9. An unregistered kind degrades to `raw`; a throwing renderer is contained to its block (I10, I11).
 10. The registry seals at composition end (I12).
 11. Adding a kind whose measurer needs capabilities is a design decision, not an implementation detail (I2).
-12. Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the first runtime L1 → L0-terminal edge, and it is required rather than tolerated (I18).
+12. Renderers emit SGR through `terminal/escapes.ts`, switching on the depth tag; no renderer sets an Ink colour prop. This is the first runtime L1 → L0-terminal edge, and it is required rather than tolerated (I15).
 13. Ink paints pre-broken lines. Its layout width must agree with `cells()`, and the agreement is asserted (T2.16), never assumed (I16).
 14. No renderer emits a colour. Every style comes from `resolve` against a declared palette slot, so degradation, theme switching and the 1-bit collapse happen in one place instead of once per kind (I4). Enforced by SS17 and, for the Ink-prop route, SS37.
-15. **Control characters are stripped from every text field before measurement and render** (I14). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
+15. **Control characters are stripped from every text field before measurement and render** (I18). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
 
 ---
 
@@ -360,7 +360,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.8**: `panel` measures children at `w - 2`, not `w`.
 - **T1.9**: `group` in `column` sums children; in `row` takes the max.
 - **T1.10** (I10): a block of unknown kind → renders via `raw`, no throw.
-- **T1.11** (I14): text containing `\x1b[31m` → stripped; the frame carries no injected styling.
+- **T1.11** (I18): text containing `\x1b[31m` → stripped; the frame carries no injected styling.
 - **T1.12**: `steps` renders a spinner frame while active and a settled glyph after.
 
 ### Tier 2 — contract / interface
@@ -383,7 +383,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.11** (I7): the module graph shows no kind importing the registry; container kinds resolve children solely through `measureChild`.
 - **T2.16** (§3): over the adversarial corpus — CJK, ZWJ sequences, variation selectors, combining marks — `cells(s)` equals the width Ink lays `s` out at. The one number two implementations compute, held to agreement rather than assumed into it.
 - **T2.17** (I4, §3): a source scan finds no `color=` or `backgroundColor=` prop in `src/presentation/` (A03 SS37), and no import from `src/terminal/` beyond `escapes.js` and type-only capability imports.
-- **T2.18** (I15, C04 I19): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
+- **T2.18** (I17, C04 I25): a sequence measures `Σ` its blocks plus one row per `gapBefore`, and renders exactly that many; a `row` group ignores the field.
 - **T2.10**: golden frames for every kind at four widths in both themes and both unicode modes.
 
 ### Tier 3 — edge cases
@@ -437,11 +437,11 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.9** (I13): adding a union member without a definition → T2.6 fails at build time.
 - **T6.10** (§3): wrapping `logs` instead of truncating → T5.4 shows reflow and T2.1 fails at narrow widths.
 - **T6.14** (§3): ignoring `wrap` on `code` → T1.6b fails, and a YAML manifest renders truncated.
-- **T6.11** (I14): passing control characters through → T1.11 fails.
+- **T6.11** (I18): passing control characters through → T1.11 fails.
 - **T6.12** (I8): reading `tick` inside a measurer → T2.12 fails, and a spinner starts shifting the viewport.
 - **T6.13**: a renderer calling a clock for its spinner frame → T2.7's environment scan fails, and golden frames flake.
 - **T6.15** (§3): setting an Ink colour prop instead of emitting SGR → T2.17 fails, and every golden frame renders monochrome while production renders truecolour.
-- **T6.17** (I15): counting `gapBefore` inside `measure` instead of at the sequence → a block measures differently in a document than in a panel, and T2.18 fails.
+- **T6.17** (I17): counting `gapBefore` inside `measure` instead of at the sequence → a block measures differently in a document than in a panel, and T2.18 fails.
 - **T6.16** (§3): letting Ink wrap or truncate rather than pre-breaking through `cells()` → T2.1 fails at the wrapping widths, and T3.4's ASCII marker becomes `…` again.
 
 ---

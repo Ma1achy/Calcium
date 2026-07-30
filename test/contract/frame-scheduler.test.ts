@@ -59,7 +59,7 @@ describe("C03 contract", () => {
     expect(scheduler.invalidate()).toBeUndefined();
   });
 
-  it("T2.3 (I11): the injected view is `acquired` only, and C03 cannot reach C01", () => {
+  it("T2.3 (I12): the injected view is `acquired` only, and C03 cannot reach C01", () => {
     const reached: string[] = [];
     // A full lifecycle, proxied. C03 must touch `acquired` and nothing else —
     // the view's *type* forbids more, and this asserts the runtime agrees.

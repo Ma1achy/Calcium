@@ -196,7 +196,7 @@ describe("C10 fail-on-revert", () => {
     expect(eightBit(current, "info")).toBeLessThanOrEqual(eightBit(current, "identifier"));
   });
 
-  it("T6.16 (I18): making colour a bare string → T2.18 fails and the writer guesses again", () => {
+  it("T6.16 (I24): making colour a bare string → T2.18 fails and the writer guesses again", () => {
     const rule = SCANS.find((s) => s.id === "SS36");
     expect(rule?.scope).toBe("src/");
     expect(rule?.allow, "no file may write an untagged colour").toEqual([]);
@@ -226,7 +226,7 @@ describe("C10 fail-on-revert", () => {
 
   // --- §4a ------------------------------------------------------------------
 
-  it("T6.17 (I23): widening the pairing to every tone is invisible in results", () => {
+  it("T6.17 (I22): widening the pairing to every tone is invisible in results", () => {
     // **The revert that no result catches, which is why the check is on the
     // pairing.** The obvious claim — ten tones against a diff background would
     // fail on slots that never land there — is wrong, and asserting it is how this
@@ -262,7 +262,7 @@ describe("C10 fail-on-revert", () => {
     }
   });
 
-  it("T6.18 (I23): dropping the gutter tones from the pairing → the gutter is unchecked", () => {
+  it("T6.18 (I22): dropping the gutter tones from the pairing → the gutter is unchecked", () => {
     // The other direction, and the quieter one: `syntax` alone leaves the numbers
     // and the `+`/`-` marker unmeasured on the surface they are drawn on. The
     // three that would go unchecked are named, so the loss is visible.
@@ -278,7 +278,7 @@ describe("C10 fail-on-revert", () => {
     }
   });
 
-  it("T6.19 (I22): letting `resolveBackground` take a palette ref → T1.15 fails", () => {
+  it("T6.19 (I21): letting `resolveBackground` take a palette ref → T1.15 fails", () => {
     // A tone painted behind text is a tone with no floor measured for it in that
     // role. The empty `Style` is the refusal.
     const current = store().current;
@@ -286,7 +286,7 @@ describe("C10 fail-on-revert", () => {
     expect(resolveBackground("syntax.keyword", current, caps(24))).toEqual({});
   });
 
-  it("T6.20 (I2, I24): emitting a diff background at depth 1 → T1.16 fails", () => {
+  it("T6.20 (I2, I23): emitting a diff background at depth 1 → T1.16 fails", () => {
     // The one signal a monochrome terminal cannot show becoming the one that
     // carries the meaning. At one bit the marker and the gutter are all there is.
     for (const variant of VARIANTS) {
@@ -297,7 +297,7 @@ describe("C10 fail-on-revert", () => {
     }
   });
 
-  it("T6.21 (I23): a diff background too strong for syntax → the theme is rejected at load", () => {
+  it("T6.21 (I22): a diff background too strong for syntax → the theme is rejected at load", () => {
     // The check doing what it is for, shown rather than trusted. A `diffAdd`
     // lifted to where a real tool would put it on a dark theme breaks `comment`
     // and `muted` first — the two recessive slots that bound the whole budget.

@@ -15,7 +15,7 @@
  * **The background covers the row to its full width.** A background that stops
  * where the text stops is ragged, and the row is the unit a reader sees. So every
  * row is padded to `layout.width` and the padding carries the background, and every
- * row leaves this file through one `line()` — which is what makes I10's clamp
+ * row leaves this file through one `line()` — which is what makes I9's clamp
  * mechanical rather than remembered. C12 needed the same funnel and found out the
  * hard way: nineteen rendered rows against a declared five, because one row skipped
  * the clamp and the terminal wrapped every one of them.
@@ -90,7 +90,7 @@ export function line(spans: readonly Span[], kind: Kind, layout: PatchLayout, ct
  *
  * The background arrives through C10's `resolveBackground` rather than by moving a
  * foreground value across, so the two channels cannot degrade differently (C10
- * I22), and `withBackground` merges rather than replaces so a span cannot gain a
+ * I21), and `withBackground` merges rather than replaces so a span cannot gain a
  * background and lose its foreground.
  */
 export function dress(spans: readonly Span[], kind: Kind, ctx: RenderContext): readonly Span[] {

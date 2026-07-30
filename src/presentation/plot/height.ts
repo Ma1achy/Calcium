@@ -38,7 +38,7 @@ export const AXIS_GUTTER = 2;
  * The plot area's row count, before axes.
  *
  * `height: 0` clamps to 1 (T3.1) rather than erroring: a zero-height plot is a
- * block that measures zero and renders nothing, which C09 I17's floor forbids
+ * block that measures zero and renders nothing, which C09 I14's floor forbids
  * anyway, so clamping here keeps one answer instead of two.
  */
 export function plotAreaRows(plot: PlotGeometry): number {

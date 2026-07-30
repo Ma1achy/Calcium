@@ -374,7 +374,7 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
     // The default is no focus, which is a different value from the one asked for.
     expect(plain[2]).not.toBe(focused[2]);
     // And focus changes appearance only: the geometry is identical, because
-    // `measure` never sees focus (C11 I15).
+    // `measure` never sees focus (C11 I14).
     expect(focused.length).toBe(plain.length); // cells-ok
     expect(focused.map((l) => cells(visible(l)))).toEqual(plain.map((l) => cells(visible(l))));
     // The rows that do not hold focus are untouched.

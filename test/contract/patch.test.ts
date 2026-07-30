@@ -101,7 +101,7 @@ describe("C25 contract", () => {
     expect(Object.keys(surface)).toEqual(["patchDefinition"]);
   });
 
-  it("T2.7 (I1, I10): no rendered row exceeds its width, at any width", () => {
+  it("T2.7 (I1, I9): no rendered row exceeds its width, at any width", () => {
     // Every row leaves through one `line()`, so this is mechanical rather than
     // remembered — and C12 is why it is asserted anyway: a row that skipped the
     // clamp there rendered nineteen rows against a declared five, because the

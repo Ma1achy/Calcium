@@ -212,9 +212,9 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 - **I13** — All three transports are substitutable: any test not concerning spawning passes against each (C06 I15).
 - **I14** — The world backs `EmulatedTransport` only. No test path reaches it.
 - **I15** — `record --diff` reports structural deltas only, and prints a count before any work begins. Its header also carries the authored ratio, which is the only place that number is read.
-- **I18** — A mutating verb changes the world, and the response it returns is `derived` from a recording of that verb rather than composed. Without mutation a demo cannot show a workflow, and a workflow is what a demo is for; without derivation the response is a fiction with no recording behind it (I10).
-- **I16** — The corpus file declares `schema: "tui.fixtures/1"`. An absent or unrecognised value fails the load; it is never assumed.
-- **I17** — `live` mode advances by reading the injected `clock` on each query. Nothing in C08 schedules, and no mode advances the world unasked.
+- **I16** — A mutating verb changes the world, and the response it returns is `derived` from a recording of that verb rather than composed. Without mutation a demo cannot show a workflow, and a workflow is what a demo is for; without derivation the response is a fiction with no recording behind it (I10).
+- **I17** — The corpus file declares `schema: "tui.fixtures/1"`. An absent or unrecognised value fails the load; it is never assumed.
+- **I18** — `live` mode advances by reading the injected `clock` on each query. Nothing in C08 schedules, and no mode advances the world unasked.
 
 ---
 
@@ -226,7 +226,7 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 4. The world is seeded and fully deterministic; nothing in C08 reads a clock or a random source (I3, I4).
 5. `advance` and mutations are pure transitions (I5).
 6. Three modes — frozen, stepped, live — with frozen the default (I6).
-7. Mutating verbs mutate the world, so a demo can show a workflow end to end (I18).
+7. Mutating verbs mutate the world, so a demo can show a workflow end to end (I16).
 8. Every query returns something; an unfixtured verb degrades to a plausible failure (I7).
 9. Capture redacts values, never structure (I8).
 10. C08 is app-side; the framework's only coupling is the handler closure (I9).
@@ -236,8 +236,8 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 14. The harness is `tui-kit`; the world is the app's. Apps implement `WorldDriver` and get recording, determinism and redaction for free (I9).
 15. World transitions are pure; only the cell holding the current world is mutable (I5).
 16. `live` mode takes an injected clock; nothing in C08 reads ambient time (I4).
-17. `live` mode **pulls**: it reads the clock on each query and advances by the elapsed delta. Nothing in C08 schedules, because a world that advances unasked is a world whose reproducibility depends on real elapsed time (I17).
-18. The corpus file is versioned `tui.fixtures/1` and stores `stdoutRaw`, deriving `stdout` at load. An unrecognised schema fails the load rather than being parsed hopefully (I16).
+17. `live` mode **pulls**: it reads the clock on each query and advances by the elapsed delta. Nothing in C08 schedules, because a world that advances unasked is a world whose reproducibility depends on real elapsed time (I18).
+18. The corpus file is versioned `tui.fixtures/1` and stores `stdoutRaw`, deriving `stdout` at load. An unrecognised schema fails the load rather than being parsed hopefully (I17).
 19. §7's tests are tagged by half. A **world** test is the reference app's to run, not a deferral `tui-kit` carries — the repo that owns the domain owns the assertion about it (→ A04 §1).
 
 ---
@@ -273,9 +273,9 @@ This is not a deferral list. A **W** row is not a test `tui-kit` is failing to r
 - **H** — **T1.10**: §4 resolution order — a verb with both a fixture and world support replays the fixture.
 - **H** — **T1.11**: `WorldDriver.query` returning `null` → the resolver falls through to the generic failure.
 - **H** — **T1.12** (I5): the handler's cell is *assigned*, never mutated — the world value it held before a mutation is unchanged and still usable. The purity of the transition is the world's (T1.4); the discipline about the cell is the harness's.
-- **H** — **T1.13** (I4, I17): `mode: "live"` without a `clock` → construction throws.
+- **H** — **T1.13** (I4, I18): `mode: "live"` without a `clock` → construction throws.
 - **H** — **T1.14** (I3): the harness's seeded generator — same seed, same draw sequence, over a thousand draws; different seeds diverge. This is the determinism apps inherit rather than reimplement, so it is asserted here and not only in a world.
-- **H** — **T1.15** (I17): in `live` mode the world advances by the elapsed reading of the injected clock and by nothing else — a clock that does not move produces no motion across repeated queries, and no motion occurs between them.
+- **H** — **T1.15** (I18): in `live` mode the world advances by the elapsed reading of the injected clock and by nothing else — a clock that does not move produces no motion across repeated queries, and no motion occurs between them.
 
 ### Tier 2 — contract / interface
 
@@ -292,7 +292,7 @@ This is not a deferral list. A **W** row is not a test `tui-kit` is failing to r
 - **H** — **T2.8** (I10): the structural comparator — key sets and types compared, values ignored. Applying it to a *particular* world's `derived` responses is **W**; that the comparator is right is asserted here, against fabricated pairs that differ by an added field, a dropped field and a changed type.
 - **H** — **T2.9** (I11): `__manifest__` through the fixture handler returns the supplied manifest and satisfies C05's parser.
 - **H** — **T2.10** (I9): the harness references no app type — `WorldDriver` is declared kit-side and every harness module is expressed in C06's and C05's vocabulary alone. Same caveat as T2.6 about what can be asserted from one repo.
-- **H** — **T2.11** (I16): a corpus file with no `schema`, or with an unrecognised one, fails to load and the error names what it needed. A corpus is not parsed on the assumption that its shape is current.
+- **H** — **T2.11** (I17): a corpus file with no `schema`, or with an unrecognised one, fails to load and the error names what it needed. A corpus is not parsed on the assumption that its shape is current.
 
 ### Tier 3 — edge cases
 
@@ -340,8 +340,8 @@ This is not a deferral list. A **W** row is not a test `tui-kit` is failing to r
 - **H** — **T6.8** (I7): a query path that throws on an unknown verb → T1.9 fails.
 - **H** — **T6.9** (I10): a response that adds or drops a field relative to its recording → T2.8's comparator fails to report it.
 - **W** — **T6.10** (I9): moving the harness into `prism-tui` → the reference app loses recording, and R01 §7's second-consumer claim goes with it.
-- **H** — **T6.11** (I4, I17): arming a timer in `live` mode rather than reading the injected clock per query → T1.15 fails, and every world becomes a function of real elapsed time.
-- **H** — **T6.13** (I16): dropping `schema` from the corpus file, or accepting an unrecognised one → T2.11 fails, and the next format change misparses an old corpus into a plausible wrong shape instead of refusing it.
+- **H** — **T6.11** (I4, I18): arming a timer in `live` mode rather than reading the injected clock per query → T1.15 fails, and every world becomes a function of real elapsed time.
+- **H** — **T6.13** (I17): dropping `schema` from the corpus file, or accepting an unrecognised one → T2.11 fails, and the next format change misparses an old corpus into a plausible wrong shape instead of refusing it.
 - **H** — **T6.14** (I8): redacting structure rather than values — dropping a key that held a token instead of rewriting it → T3.13 fails, and every adapter is then tested against a shape the far side never emits.
 
 ---

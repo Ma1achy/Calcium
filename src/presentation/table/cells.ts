@@ -83,7 +83,7 @@ export function rowSpans(
     const column = byKey.get(planned.key);
     const cell: Cell | undefined = row.cells[planned.key];
 
-    // The expand marker is the one cell C11 fills rather than reads (I16). A row
+    // The expand marker is the one cell C11 fills rather than reads (I15). A row
     // that cannot be opened leaves the column blank rather than drawing a marker
     // that does nothing when pressed.
     if (column?.role === "expand") {
@@ -132,7 +132,7 @@ export function rowSpans(
     // detail visible only in a golden, which is what D39 is for.
     const body = glyph === "" || text === "" ? glyph + text : `${glyph} ${text}`;
 
-    // **Focus is rendered, never owned** (I15). It changes the tone and nothing
+    // **Focus is rendered, never owned** (I14). It changes the tone and nothing
     // else — no marker, no extra row, no width. `measure` receives no focus at
     // all (C04 §5), so a focused row that occupied a different number of cells
     // or rows would be I9 broken by whichever row the user happened to be on.
@@ -140,7 +140,7 @@ export function rowSpans(
       ? tone("accent", ctx.theme, ctx.capabilities)
       : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
 
-    // The end a cell truncates from is the surface's (C04 I32) — a path keeps its
+    // The end a cell truncates from is the surface's (C04 I30) — a path keeps its
     // filename, a config key its leaf, an image its tag. C11 reads the field and
     // never infers it: a column of paths and a column of prose are
     // indistinguishable from their contents.

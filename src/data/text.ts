@@ -3,7 +3,7 @@
  * can reach.
  *
  * It began in `presentation/text.ts` beside `cells()`, which is where it is
- * used most: every renderer strips before it measures or draws (C09 I14). C07
+ * used most: every renderer strips before it measures or draws (C09 I18). C07
  * needs it too, and for a different reason — a tool's JSON reaching a block
  * carries whatever the tool put in it, and stripping at render would mean a
  * transcript, a `/debug` dump and a golden frame each hold text the block was

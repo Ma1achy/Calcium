@@ -29,7 +29,7 @@ function valueOf(row: TableRow, key: string): string {
  *
  * A surface's placeholder — S03 draws `—` for a metric a failed run never
  * produced — is data the surface chose to show, and reading it as absence would
- * be C11 inferring meaning from cell content, which is I13's objection one field
+ * be C11 inferring meaning from cell content, which is I12's objection one field
  * over. It sorts as the text it is.
  */
 function isMissing(value: string): boolean {
@@ -139,7 +139,7 @@ export function sortedRows(block: Table): readonly TableRow[] {
     const av = valueOf(a.row, sort.key);
     const bv = valueOf(b.row, sort.key);
 
-    // **Missing sorts last in both directions** (I14). Not first ascending and
+    // **Missing sorts last in both directions** (I13). Not first ascending and
     // last descending: a null is an absence of rank rather than the bottom of
     // one, and a reader sorting to find the worst case should not find blanks.
     // Compared before the direction is applied, which is what keeps it last

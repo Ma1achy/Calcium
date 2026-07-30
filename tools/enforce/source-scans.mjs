@@ -99,7 +99,7 @@ export const SCANS = [
   //
   // Its fabricated violation is `stdout.columns` through a held handle, copied from
   // `lifecycle.ts` rather than invented (A03 commitment 14a).
-  { id: "SS42", spec: "C01 I17 · C01 T2.10",
+  { id: "SS42", spec: "C01 I13 · C01 T2.10",
     pattern: /\b(?:stdout|stderr|stdin|writer|stream|out|term|tty)\s*\.\s*(?:columns|rows)\b/,
     scope: "src/", allow: ["src/terminal/lifecycle.ts"],
     why: "the terminal's dimensions are read in lifecycle.ts and handed down; width is the axis that wraps" },
@@ -255,7 +255,7 @@ export const SCANS = [
     scope: "src/data/process/", allow: [],
     why: "child output is piped; it never reaches the real terminal" },
 
-  // I8 and I11, made mechanical. Two things are banned and the asymmetry is the
+  // C21 I8 and I11, made mechanical. Two things are banned and the asymmetry is the
   // rule rather than an oversight:
   //
   //   - **Timers.** C21 holds no timing policy anywhere. The escalation ladder
@@ -272,7 +272,7 @@ export const SCANS = [
     scope: "src/data/process/", allow: [],
     why: "C21 delivers signals and holds no timing policy — the ladder is C06's, and a second copy is the one that drifts" },
 
-  // I14. The three ambient reads C21 does not make, because it is given all
+  // C21 I14. The three ambient reads C21 does not make, because it is given all
   // three (`env`, `stdin`, `debug`).
   //
   // `process.env` is SS10's already and this does not duplicate it: SS10 allows
@@ -333,7 +333,7 @@ export const SCANS = [
   // assembled by hand in a renderer with `colour: "#7faecf"` is one `as` away
   // from compiling. This makes the untagged form unwritable rather than merely
   // discouraged, which is the difference between a rule and a convention.
-  { id: "SS36", spec: "C10 I18 · C10 T2.19",
+  { id: "SS36", spec: "C10 I24 · C10 T2.19",
     pattern: /\bcolour\s*:\s*["'`]/,
     scope: "src/", allow: [],
     why: "a resolved colour names its depth; there is no untagged form" },

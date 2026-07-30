@@ -137,7 +137,7 @@ truncation audit found in three surfaces at once (S05 §5, S15 §5, this one).
 
 **Test names truncate from the start**, keeping the method name — `DigitClassifier::`
 is the same on every row, so cutting the other end makes every row read as the same
-test. `truncateFrom: "start"` names the end characters are removed from (C04 I32).
+test. `truncateFrom: "start"` names the end characters are removed from (C04 I30).
 
 `duration` is right-aligned: the figure draws it so, and comparing durations down a
 column is the whole reason it is there.

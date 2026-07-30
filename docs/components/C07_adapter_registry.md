@@ -162,14 +162,14 @@ The 24-cell cap is a judgement and the only one here. A single 200-character fie
 
 **Two things deliberately unchanged, both of which the reading might have suggested moving.**
 
-- **Priority stays `MAX_COLUMNS - i`.** Field order is a fair proxy — the earlier keys of a JSON object tend to be the identifying ones — and nothing better is available without knowing what the fields mean. C11 I13 forbids the engine guessing; the same reasoning forbids the adapter guessing.
+- **Priority stays `MAX_COLUMNS - i`.** Field order is a fair proxy — the earlier keys of a JSON object tend to be the identifying ones — and nothing better is available without knowing what the fields mean. C11 I12 forbids the engine guessing; the same reasoning forbids the adapter guessing.
 - **No column is `flex`.** With content-derived widths a table narrower than the terminal is *correct*: nothing needs the residual, because every column already has what it asked for. C11 §3 step 8 rejects stretching columns arbitrarily, and that reasoning holds here unchanged.
 
 Lowering the column cap was the alternative and it is worse: fields are lost *and* the survivors still get three cells each. Legibility and reachability both improve from the width change; only reachability improves from the cap.
 
 ### The fallback declares the expand column
 
-**A generated table's first column is `role: "expand"`, `minWidth` 1.** C11 draws the marker only into a column a surface declared, and it will not synthesise one or reserve a gutter, because either would move width arithmetic the surfaces state (C11 I16) — that invariant is right, and it keeps a surface in control of its own column set. But *something* has to declare the column, and for a generated table the producer is this adapter.
+**A generated table's first column is `role: "expand"`, `minWidth` 1.** C11 draws the marker only into a column a surface declared, and it will not synthesise one or reserve a gutter, because either would move width arithmetic the surfaces state (C11 I15) — that invariant is right, and it keeps a surface in control of its own column set. But *something* has to declare the column, and for a generated table the producer is this adapter.
 
 Without it the affordance is invisible: at 80 cells three of docker's fields drop, every row becomes expandable, and nothing on screen says so. Under the old uniform `minWidth` this could not arise, because nothing ever dropped — the measured widths are what made it visible.
 
@@ -273,7 +273,7 @@ The notice is muted rather than an error because the *command* may have succeede
 3. The fallback renders any JSON legibly and is total (I3).
 4. Streaming works with no stream adapter, via the fallback (I11).
 5. Cancellation yields `partial`, including an invocation aborted before anything was spawned. A01 B4 was corrected accordingly and now cites §4 (I6).
-6. Every verb's failure renders through one path, because `ErrorLike` needs only `message` — the shape is C04's (→ C04 I20).
+6. Every verb's failure renders through one path, because `ErrorLike` needs only `message` — the shape is C04's (→ C04 I28).
 7. Fallback truncation is recorded, never silent — `meta.truncated` says so, and the caps themselves are §-level defaults rather than contract (I13).
 8. Explicit `--json` yields a `code` block, with no exceptions (I9).
 9. An adapter throwing is contained, re-adapted through the fallback, and recorded in a muted notice (I4).

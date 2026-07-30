@@ -373,7 +373,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     guard("acquire");
     if (state === "acquired") return; // T3.5 — no-op, not an error.
 
-    // I13 — the record has already concluded the shell cannot open. Fatal
+    // I14 — the record has already concluded the shell cannot open. Fatal
     // before anything is emitted (T3.15).
     if (!capabilities.altScreen) {
       unwind();

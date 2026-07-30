@@ -265,9 +265,9 @@ Per submission.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
 - **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
-- **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I19) and applied by the sequence (C09 I15). The rule has teeth in one direction only: C23 may not *add* rhythm.
-- **I26** — A stream producing nothing for 120 s appends a muted stall notice, and never an error. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
-- **I25** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
+- **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I25) and applied by the sequence (C09 I17). The rule has teeth in one direction only: C23 may not *add* rhythm.
+- **I25** — A stream producing nothing for 120 s appends a muted stall notice, and never an error. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
+- **I26** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
 
 ---
 
@@ -285,14 +285,14 @@ Per submission.
 10. Built-ins apply before delegation (I11).
 11. All cross-layer sequences live in §4 (I13).
 12. Local handlers ship for framework concerns; apps register their own (I14).
-13. `/help` renders from the manifest and C16's keymap, so help cannot drift from behaviour (I25).
+13. `/help` renders from the manifest and C16's keymap, so help cannot drift from behaviour (I26).
 14. The displayed command equals the spawned command (I15).
 15. Submissions are refused once C22 sets `session.stopping` (I12).
 16. C23 supplies `onAction`; `exec` re-enters the normal submission path (I16).
 17. `open` is scheme-checked and never shelled (I17).
 18. Actions from frozen entries are refused (I18).
 19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time (I19).
-20. A stream silent for 120 s gets a muted stall notice, never an error (I26).
+20. A stream silent for 120 s gets a muted stall notice, never an error (I25).
 21. View refreshes are staggered by offset and fail in isolation (I20, I21).
 22. C23 sets `meta.origin` on every append; provenance is never absent (I22).
 23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point (I23).
@@ -331,7 +331,7 @@ Fake transport, fake stores.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I2): a fault injected at each of the eight stages in §5 → a document is appended and the session survives, eight times.
-- **T2.11** (I24): the composed height of an appended entry equals `measureSequence` over its blocks (C09 I15), for a document with gaps and one without. C23 contributing a single row of its own fails both.
+- **T2.11** (I24): the composed height of an appended entry equals `measureSequence` over its blocks (C09 I17), for a document with gaps and one without. C23 contributing a single row of its own fails both.
 - **T2.2** (I1): across a thousand random submissions, entry count equals submission count minus empties.
 - **T2.3** (I13): a spy on every component proves no cross-layer effect originates outside C23.
 - **T2.4** (I8): commit reasons match the documented class for every route.

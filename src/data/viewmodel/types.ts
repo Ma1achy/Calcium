@@ -131,18 +131,18 @@ export type ColumnDef = Readonly<{
   flex?: boolean;
   sortable: boolean;
   /**
-   * The column whose content a renderer supplies rather than the data (I30).
+   * The column whose content a renderer supplies rather than the data (I32).
    *
    * Surfaces declare an `expand` column of `minWidth` 1 whose cell is the
    * expand/collapse marker, and its cell is inside their drop arithmetic — so it
    * must stay an ordinary column for planning while being extraordinary for
-   * content. This is how C11 recognises it (C11 I16). Presentation intent, not
+   * content. This is how C11 recognises it (C11 I15). Presentation intent, not
    * view state: it never changes with what the user does, so `merge` carries it
    * like the rest of `columns` and I9 is untouched.
    */
   role?: "expand";
   /**
-   * Which end characters are removed from when a cell does not fit (I32).
+   * Which end characters are removed from when a cell does not fit (I30).
    *
    * `"end"` is the default and keeps the start, which is what prose wants.
    * `"start"` keeps the tail — a path's filename, a hierarchical key's leaf, a
@@ -253,7 +253,7 @@ export type Plot = Readonly<{
   xLabels?: readonly [string, string, string];
   yFormat?: "number" | "percent" | "bytes" | "duration";
   /**
-   * Pin the vertical range, independently and optionally (I33).
+   * Pin the vertical range, independently and optionally (I29).
    *
    * Absent, the range is the data's. Present, out-of-range values clamp to the
    * edge — never dropped, and never widening the range they were pinned against,

@@ -168,7 +168,7 @@ describe("C10 contract", () => {
     }
   });
 
-  it("T2.18 (I18): every resolved colour names its depth, and the kinds are exactly three", () => {
+  it("T2.18 (I24): every resolved colour names its depth, and the kinds are exactly three", () => {
     // The list is written out literally rather than derived from the type. A
     // list computed from `ColourValue` agrees with itself and passes on any
     // addition, which is a rule with nothing to be wrong about — C05 T1.7c's
@@ -201,7 +201,7 @@ describe("C10 contract", () => {
     expect([...seen].sort()).toEqual([...KINDS].sort());
   });
 
-  it("T2.19 (I18): no string literal is assigned to a colour field anywhere in src/", () => {
+  it("T2.19 (I24): no string literal is assigned to a colour field anywhere in src/", () => {
     const rule = SCANS.find((s) => s.id === "SS36");
     expect(rule, "SS36 is gone from the scan table").toBeDefined();
     expect(checkSourceScans(sourceFiles()).filter((v) => v.rule === "SS36")).toEqual([]);
@@ -238,7 +238,7 @@ describe("C10 contract", () => {
 
   // --- §4a, the diff surfaces ----------------------------------------------
 
-  it("T2.14a (I23): 48 ratios — twelve slots × two diff surfaces × two variants", () => {
+  it("T2.14a (I22): 48 ratios — twelve slots × two diff surfaces × two variants", () => {
     // Recomputed from the shipped tokens, never read from A01 A.1. The catalogue
     // is an assertion this upholds rather than a record of what someone intended,
     // which is T2.4's reason applied to the surfaces C25 made text-bearing.
@@ -262,7 +262,7 @@ describe("C10 contract", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
-  it("T2.14b (I23): the diff surfaces are paired with exactly those twelve slots", () => {
+  it("T2.14b (I22): the diff surfaces are paired with exactly those twelve slots", () => {
     // **Asserted on the pairing, not on its results**, because both ways of
     // getting it wrong pass a results-only check on a theme that happens to be
     // fine. Widening it to every `meaning` slot fails on seven tones that never
@@ -288,7 +288,7 @@ describe("C10 contract", () => {
     expect([...new Set(pairs.map(([, , surface]) => surface))].sort()).toEqual(["diffAdd", "diffRemove"]);
   });
 
-  it("T2.14c (I23, §4a): seven surfaces, and the withdrawn strong pair is absent", () => {
+  it("T2.14c (I22, §4a): seven surfaces, and the withdrawn strong pair is absent", () => {
     // The pair that was specified, measured and removed. Asserted absent rather
     // than merely unmentioned: a spec that measured something out and a token
     // file that quietly kept it is exactly the drift this suite exists to stop,
@@ -307,7 +307,7 @@ describe("C10 contract", () => {
     }
   });
 
-  it("T2.20 (I22): over every ref × every depth, `background` is absent or a tagged value", () => {
+  it("T2.20 (I21): over every ref × every depth, `background` is absent or a tagged value", () => {
     // T2.18's assertion for the second channel, and the kinds are written out
     // literally for the same reason: a list derived from the type agrees with
     // itself and passes on any addition.

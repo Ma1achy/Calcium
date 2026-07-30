@@ -156,8 +156,8 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 - **I10** — A commit during a write is deferred with the strictest reason seen and acted on once the write returns: inline **once**, then by timer. A commit arising from that second write escalates to the timer rather than writing inline again.
 
   Inline-once bounds the chain at two writes; escalation means nothing is dropped. A render callback that commits on every render is pathological but legal, and without the escalation it drains forever — a livelock, not a recursion, which is why the depth argument in §3 does not catch it.
-- **I12** — Time enters C03 only through the injected `schedule`. No ambient timer, so a coalescing window is asserted against a counter rather than slept through — the same shape C06 I19 takes, stated here because the audit found this property committed to in one spec and made an invariant in the other.
-- **I11** — `lifecycle.acquired` is read at write time through a live view, never captured at construction.
+- **I11** — Time enters C03 only through the injected `schedule`. No ambient timer, so a coalescing window is asserted against a counter rather than slept through — the same shape C06 I19 takes, stated here because the audit found this property committed to in one spec and made an invariant in the other.
+- **I12** — `lifecycle.acquired` is read at write time through a live view, never captured at construction.
 
 ---
 
@@ -172,8 +172,8 @@ Orthogonal: a write while `contaminated` calls `repaint()` rather than `render()
 7. `invalidate()` makes the next write a full repaint, and clears once that repaint returns (I5).
 8. `resize` implies invalidation (I7).
 9. C03 holds no frame content and owns no rendering (I8).
-10. The timer is injected, so no test sleeps (I12). C06 I19 states the same property for C06; the audit of 2026-07-29 found it a commitment here and an invariant there, which is what SP1 now prevents.
-11. C03 receives a live read-only view of C01 and cannot acquire or release (I11).
+10. The timer is injected, so no test sleeps (I11). C06 I19 states the same property for C06; the audit of 2026-07-29 found it a commitment here and an invariant there, which is what SP1 now prevents.
+11. C03 receives a live read-only view of C01 and cannot acquire or release (I12).
 12. A commit arriving during a write is deferred and coalesced to the strictest reason, written inline at most once, and escalated to the timer thereafter. The chain is bounded at two writes and nothing is dropped (I10).
 13. C03 writes only the synchronised-update markers, through an injected bound `write`. Frame bytes leave through `render()`, which C03 does not own (I6, I8).
 
@@ -206,7 +206,7 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 
 - **T2.1**: the returned object satisfies every member of `FrameScheduler`; `pending` and `contaminated` are getters.
 - **T2.2** (I8): C03 exposes no method accepting or returning frame content — asserted on the interface shape.
-- **T2.3** (I11): the injected `lifecycle` view has only `acquired`; passing a full lifecycle does not let C03 reach `acquire` or `release` (type-level, asserted by a compile test).
+- **T2.3** (I12): the injected `lifecycle` view has only `acquired`; passing a full lifecycle does not let C03 reach `acquire` or `release` (type-level, asserted by a compile test).
 - **T2.4** (I3): `pending` is true only while a timer is outstanding, for every reason in the enum.
 - **T2.5**: every `CommitReason` in the union has a window entry — asserted exhaustively over the type, so adding a reason without a window fails the build.
 - **T2.6** (A02 §1): the module graph contains no import from `data/`.
@@ -235,9 +235,9 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T3.19**: `invalidate()` during a write → the flag applies to the *next* write, not the one in progress.
 - **T3.20** (I10): a render callback that commits on every invocation → exactly one deferred write follows, not an unbounded chain. The commit made during *that* write is escalated to a timer rather than dropped or written inline, so advancing the clock renders again — a render loop runs at timer cadence, and the stack stays flat.
 - **T3.21** (I10): `commit("stream")` then `commit("input")` both during one write → one deferred write, immediate, at the stricter reason.
-- **T3.22** (I11): `acquired` flips true after construction → the next commit writes. A snapshotted view would never write at all.
+- **T3.22** (I12): `acquired` flips true after construction → the next commit writes. A snapshotted view would never write at all.
 - **T3.23** (§1): the starvation property, directly. With `windows: { stream: 16 }`, a long interleaving of `stream` commits at 16 ms and `input` commits at irregular offsets → every input frame is rendered at the tick its commit arrived, none is delayed behind a pending stream frame, and stream frames remain capped at one per window. This is what T4.6 and T5.2 assert against real components and real timers; here it is deterministic.
-- **T3.24** (I11): a scheduler constructed with an object literal capturing `acquired` — the mistake §2 warns L4 against — drops every frame after the first state change, silently: no throw, no output, no timer left behind. T3.22 proves the live view works; this proves the dead one fails, and fails in exactly the way described.
+- **T3.24** (I12): a scheduler constructed with an object literal capturing `acquired` — the mistake §2 warns L4 against — drops every frame after the first state change, silently: no throw, no output, no timer left behind. T3.22 proves the live view works; this proves the dead one fails, and fails in exactly the way described.
 
 ### Tier 4 — integration
 
@@ -274,11 +274,11 @@ PTY harness, real timers, real terminal.
 - **T6.8** (I8): adding a frame buffer or content parameter to `commit` → T2.2 fails.
 - **T6.9** (A02 §7): adding a `CommitReason` without a window → T2.5 fails at build time.
 - **T6.10** (I10): dropping a re-entrant commit → T3.21 fails on the lost frame. Draining the deferral in a loop rather than escalating the second one → T3.20 does not fail, it *hangs*: the chain is flat and infinite, so it exhausts the heap rather than the stack. That is the failure the escalation exists to prevent, and the reason I10 bounds the inline writes by count rather than by depth.
-- **T6.11** (I11): snapshotting `acquired` at construction → T3.22 fails.
+- **T6.11** (I12): snapshotting `acquired` at construction → T3.22 fails.
 - **T6.12** (I2): allowing an immediate reason to be given a window → T3.13 fails. Distinct from T6.1: that reverts the behaviour, this reverts the construction-time rejection.
 - **T6.13** (I3): re-arming the pending timer on every coalesced commit, or on one whose window is merely *not longer* → T1.4 fails, since 33 against 33 would slide the window. Never re-arming → T3.12 fails on the spinner-then-stream ordering. Strictly-shorter is what holds both directions; either comparison relaxed by one step breaks one of them.
 - **T6.14** (C13): passing frame content to `write` rather than through `render()` → T2.7 fails on the third string.
-- **T6.15** (I11): snapshotting `acquired` in the L4 wiring rather than in C03 → T3.24 fails. The failure C03 cannot prevent structurally, so it is demonstrated instead.
+- **T6.15** (I12): snapshotting `acquired` in the L4 wiring rather than in C03 → T3.24 fails. The failure C03 cannot prevent structurally, so it is demonstrated instead.
 
 ---
 

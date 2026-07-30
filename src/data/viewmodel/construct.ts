@@ -38,7 +38,7 @@ import {
  * passes anyway. That is the failure this function exists to make impossible.
  *
  * Cycles are tolerated here rather than refused: `seen` keeps the walk finite,
- * and refusal is `validateDocument`'s job (I18). A constructor that hung on a
+ * and refusal is `validateDocument`'s job (I27). A constructor that hung on a
  * cyclic literal would fail worse than one that freezes it and lets validation
  * name the problem.
  */
@@ -136,7 +136,7 @@ export function block<B extends Block>(spec: B): B {
  *
  * `seen` is path-scoped and keeps the walk finite on a cyclic literal, matching
  * `deepFreeze` and for the same reason: a constructor that hangs fails worse
- * than one that completes and lets `validateDocument` name the cycle (I18).
+ * than one that completes and lets `validateDocument` name the cycle (I27).
  */
 function* childrenOf(b: Block, seen: WeakSet<object> = new WeakSet()): Generator<Block> {
   if (seen.has(b)) return;

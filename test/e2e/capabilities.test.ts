@@ -39,7 +39,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
     async () => {
       // `TERM=dumb` gives `altScreen: false`, and C02 I7 makes that the single
       // gate on whether a shell can open. The refusal has to happen *before*
-      // C01 is constructed, because C01 I13 turns a record without the
+      // C01 is constructed, because C01 I14 turns a record without the
       // alternate screen into a fatal error — so a caller reading `isUsable` is
       // the whole mechanism, and this is what it looks like from outside.
       const run = await runInPty(`${FIXTURE}; echo EXIT=$?`, { env: { TERM: "dumb" } });

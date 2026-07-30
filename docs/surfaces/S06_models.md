@@ -130,7 +130,7 @@ Artefact SHAs are shown **truncated in the middle** — the leading and trailing
 | mr | 50 | 6 | left | — |
 | created | 40 | 7 | left | — |
 
-**`align` is declared on both tables** (C04 §3 requires it, and §2's figure right-aligns `versions`). Only `versions` is a number. `metric` reads `AUC 0.912` — a label and a value in one cell, so it aligns left despite ending in digits, and a renderer inferring alignment from content would get it wrong. That is why C11 does not infer (C11 I13's reasoning, one field over).
+**`align` is declared on both tables** (C04 §3 requires it, and §2's figure right-aligns `versions`). Only `versions` is a number. `metric` reads `AUC 0.912` — a label and a value in one cell, so it aligns left despite ending in digits, and a renderer inferring alignment from content would get it wrong. That is why C11 does not infer (C11 I12's reasoning, one field over).
 
 | Width | Families drop | Versions drop |
 |---|---|---|

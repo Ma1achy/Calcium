@@ -241,7 +241,7 @@ describe("C11 tier 1 — planColumns", () => {
     expect(focusableRowIds(block)).toEqual(["s", "m", "hm", "h", "d"]);
   });
 
-  it("T1.16 (I14): missing values sort last ascending and descending", () => {
+  it("T1.16 (I13): missing values sort last ascending and descending", () => {
     const rows = [
       { id: "empty", cells: { metric: { text: "" } } },
       { id: "high", cells: { metric: { text: "9" } } },
@@ -253,11 +253,11 @@ describe("C11 tier 1 — planColumns", () => {
 
     expect(focusableRowIds(asc)).toEqual(["low", "high", "empty", "absent"]);
     // Last either way — a null is an absence of rank, not the bottom of one. The
-    // missing rows also keep their relative order, which is I8 over I14.
+    // missing rows also keep their relative order, which is I8 over I13.
     expect(focusableRowIds(desc)).toEqual(["high", "low", "empty", "absent"]);
   });
 
-  it("T1.17 (I16): the expand marker fills a role column, and only a role column", () => {
+  it("T1.17 (I15): the expand marker fills a role column, and only a role column", () => {
     const collapsed = psTable({ rows: 2 });
     const opened = psTable({ rows: 2, expanded: [1] });
 
@@ -283,7 +283,7 @@ describe("C11 tier 1 — planColumns", () => {
     expect(rolelessFirst).toContain("#");
   });
 
-  it("T1.17 (I16): a row that cannot be expanded draws no marker", () => {
+  it("T1.17 (I15): a row that cannot be expanded draws no marker", () => {
     // At 160 nothing drops and no row declares detail, so nothing is expandable —
     // and a marker that did nothing when pressed would be worse than none.
     const plan = planColumns(psColumns(), 160);
@@ -291,7 +291,7 @@ describe("C11 tier 1 — planColumns", () => {
     expect(registry.renderToLines(psTable({ rows: 2 }), 160)[1] ?? "").not.toContain("▸");
   });
 
-  it("T1.18 (C04 I32): a column truncates from the end it declares", () => {
+  it("T1.18 (C04 I30): a column truncates from the end it declares", () => {
     // The end characters are *removed* from — so `start` keeps the leaf, which is
     // S14's key column, R01's image tag and S05's pod hash. Both directions are
     // exactly the planned width and both place one marker.

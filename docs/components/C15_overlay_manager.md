@@ -145,9 +145,9 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I8** — Truncation is reported, never disguised; C15 renders no overflow indicator itself.
 - **I9** — C15 never writes to the transcript.
 - **I10** — An overlay anchored to an evicted row is dismissed rather than left dangling.
-- **I13** — No layer paints a backdrop, dim or otherwise. A terminal renders a dimmed region as damaged output rather than as depth, and the separation an overlay needs comes from its border and its position — which are things a cell grid can actually express.
-- **I11** — C15 imports nothing from `terminal/` **or C14**; the region arrives as data.
-- **I12** — Pushing returns a disposable; disposing is equivalent to `dismiss(id)`.
+- **I11** — No layer paints a backdrop, dim or otherwise. A terminal renders a dimmed region as damaged output rather than as depth, and the separation an overlay needs comes from its border and its position — which are things a cell grid can actually express.
+- **I12** — C15 imports nothing from `terminal/` **or C14**; the region arrives as data.
+- **I13** — Pushing returns a disposable; disposing is equivalent to `dismiss(id)`.
 
 ---
 
@@ -160,11 +160,11 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 5. `Esc` pops the top dismissable layer; a confirm is not escapable (I3).
 6. Placement flips before clamping (I7).
 7. Truncation is reported; the owner renders its own indicator (I8).
-8. No backdrop dimming — terminals render it as a fault, not as depth (I13).
+8. No backdrop dimming — terminals render it as a fault, not as depth (I11).
 9. `layout()` is pure and needs no resize invalidation (I5).
 10. An overlay whose anchor is evicted is dismissed (I10).
 11. C15 emits pop events; L4 composes the transcript trace (I9).
-12. Push returns a disposable equivalent to dismissal (I12).
+12. Push returns a disposable equivalent to dismissal (I13).
 
 ---
 
@@ -180,7 +180,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.4** (I2): overlay pushed over a view → overlay is `top`.
 - **T1.5**: `pop` with two overlays → removes the top one only.
 - **T1.6**: `pop` with only a view → empty.
-- **T1.7** (I12): `dismiss(id)` removes that specific layer from any depth; the returned disposable does the same.
+- **T1.7** (I13): `dismiss(id)` removes that specific layer from any depth; the returned disposable does the same.
 - **T1.8** (I2): `pop` with a view plus an overlay → the overlay goes first.
 - **T1.9** (I3): `pop` on a non-dismissable top → returns null, stack unchanged.
 - **T1.10**: `dismiss` on a non-dismissable layer → removes it. Explicit resolution always works.
@@ -193,7 +193,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.3** (I4): every `Layer` in the corpus carries `Block[]`; a compile-level test rejects a React element in `content`.
 - **T2.4** (I1): across a thousand random push/pop sequences, at most one view is ever present.
 - **T2.5** (I9): a source scan finds no C13 import in `overlay/`.
-- **T2.6** (I11): the module graph shows no import from `terminal/` or C14.
+- **T2.6** (I12): the module graph shows no import from `terminal/` or C14.
 - **T2.7**: every `OverlayChange` variant is emitted by at least one operation.
 
 ### Tier 3 — edge cases

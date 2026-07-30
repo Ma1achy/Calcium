@@ -129,7 +129,7 @@ describe("C04 fail-on-revert", () => {
     expect(r.ok === false && r.error.message).toContain("more than once");
   });
 
-  it("T6.13 (I18): a global seen-set instead of a path-scoped one → T1.17b fails", () => {
+  it("T6.13 (I27): a global seen-set instead of a path-scoped one → T1.17b fails", () => {
     // A subtree legitimately appearing twice is not a cycle. A global set calls
     // the second occurrence one and refuses a legal document — the failure is a
     // false positive, which is why T1.17b asserts the *absence* of a cycle

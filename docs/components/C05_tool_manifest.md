@@ -210,11 +210,11 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I10** — Validation never checks semantics — only shape, type, arity and declared relations.
 - **I11** — A sealed store cannot be reloaded.
 - **I12** — `local: true` tools are never spawned; `local: false` tools are never handled in-process.
-- **I16** — The manifest version is exposed and never enforced. C05 refuses no manifest for its version alone; a verb the manifest does not declare degrades to "not available here" at the point of use, because a far side that dropped one verb is still a far side worth talking to.
-- **I17** — A `hidden` tool is omitted from help and completion and remains fully invocable. Hiding is a presentation decision, never an access-control one — C05 has no notion of permission and a hidden verb that refused to run would be inventing one.
-- **I13** — C05 imports nothing from `terminal/`, `presentation/` or above.
-- **I14** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
-- **I15** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
+- **I13** — The manifest version is exposed and never enforced. C05 refuses no manifest for its version alone; a verb the manifest does not declare degrades to "not available here" at the point of use, because a far side that dropped one verb is still a far side worth talking to.
+- **I14** — A `hidden` tool is omitted from help and completion and remains fully invocable. Hiding is a presentation decision, never an access-control one — C05 has no notion of permission and a hidden verb that refused to run would be inventing one.
+- **I15** — C05 imports nothing from `terminal/`, `presentation/` or above.
+- **I16** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
+- **I17** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
 
 ---
 
@@ -229,11 +229,11 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 7. Unknown fields are ignored; malformed known fields are errors (I3).
 8. Tool names are unique; duplicates fail parsing (I6).
 9. The store seals at the end of composition and cannot be reloaded after (I11).
-10. Version is exposed, not enforced. A missing tool degrades to "not available here" (I16).
-11. `hidden` tools are omitted from help and completion but remain invocable (I17).
+10. Version is exposed, not enforced. A missing tool degrades to "not available here" (I13).
+11. `hidden` tools are omitted from help and completion but remain invocable (I14).
 12. `ArgType` carries no app-domain concepts; `pattern` is the extension point (I5).
-13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I14).
-14. Conflicts are directional in the check and deduplicated in the report (I15).
+13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I16).
+14. Conflicts are directional in the check and deduplicated in the report (I17).
 
 ---
 
@@ -261,9 +261,9 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.14** (I9): every validation failure is `ErrorLike` with a non-empty `message`.
 - **T1.15**: a `hidden: true` tool is absent from `visibleTools` **and** resolvable through `findTool` — asserted together, in one test. Split into two, both pass while the intent they encode goes missing.
 - **T1.15b**: `oneShot: true` is carried through parsing and is readable by C22's gate.
-- **T1.16** (I14): `--status running` and `--status=running` produce the same `args`. Both forms, one result — the permissive rule as an equality rather than as two separate passes.
-- **T1.17** (I14, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
-- **T1.18** (I15): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
+- **T1.16** (I16): `--status running` and `--status=running` produce the same `args`. Both forms, one result — the permissive rule as an equality rather than as two separate passes.
+- **T1.17** (I16, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
+- **T1.18** (I17): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
 
 ### Tier 2 — contract / interface
 
@@ -272,7 +272,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T2.3** (I2): a fuzz corpus of a thousand malformed inputs — truncated JSON, wrong types at every position, deeply nested junk — produces errors, never a throw.
 - **T2.4**: every `ArgType` in the union has a validator — asserted exhaustively, so adding a type without one fails the build.
 - **T2.5** (I12): every tool resolves to exactly one execution route; no tool is both local and spawnable.
-- **T2.6** (I13): the module graph shows no import from `terminal/` or above.
+- **T2.6** (I15): the module graph shows no import from `terminal/` or above.
 - **T2.7**: `parseManifest` accepts its own serialised output — round-trip identity.
 - **T2.8** (I8): `findTool` over the same manifest twice returns deeply equal results, **and** a second manifest object with identical content does not observe the first's results. `findTool` caches its match index (§3a) and this is the first cache in the tree, so purity is asserted rather than argued. The second half is the load-bearing one: a cache keyed on content rather than object identity passes every other test in this suite and breaks the moment two manifests differ only in a field the key ignores. Asserted by comparing results — the test does not know the cache exists.
 
@@ -325,9 +325,9 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T6.7** (I2): a parse path that throws on malformed input → T2.3 fails.
 - **T6.8** (I12): spawning a `local` tool → T4.4 fails.
 - **T6.9** (I5): adding a domain-specific `ArgType` → T1.7c fails, with a message carrying the rule rather than the diff: *an `ArgType` describes a shape, not a domain concept — a uuid is a `pattern`, a target is a `string`*. A build failure that says what to do instead earns its extra line.
-- **T6.10** (I14): rejecting `--flag value` pre-spawn → T1.16 fails, and the gate starts refusing invocations the far side would have run.
+- **T6.10** (I16): rejecting `--flag value` pre-spawn → T1.16 fails, and the gate starts refusing invocations the far side would have run.
 - **T6.11** (§3): reverting the `-`-value remediation to a bare "missing value" → T1.17 fails on the message, leaving the user to discover `=` for themselves.
-- **T6.12** (I15): deduplicating conflicts by name order rather than by the unordered pair → T1.18 fails on the one-directional case, which is the ordinary way an app declares it.
+- **T6.12** (I17): deduplicating conflicts by name order rather than by the unordered pair → T1.18 fails on the one-directional case, which is the ordinary way an app declares it.
 
 ---
 

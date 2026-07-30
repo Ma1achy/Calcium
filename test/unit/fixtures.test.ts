@@ -244,13 +244,13 @@ describe("C08 §3 — modes", () => {
     expect(() => handler({ mode: "live" })).toThrow(/requires a clock/);
   });
 
-  it("T1.13 (I17): a clock passed to a non-live mode is refused, not ignored", () => {
+  it("T1.13 (I18): a clock passed to a non-live mode is refused, not ignored", () => {
     // Ignoring it produces a demo that does not move for reasons nothing
     // reports, which is worse than a construction error.
     expect(() => handler({ mode: "stepped", clock: () => 0 })).toThrow(/takes no clock/);
   });
 
-  it("T1.15 (I17): live advances by the clock's elapsed reading, per query", async () => {
+  it("T1.15 (I18): live advances by the clock's elapsed reading, per query", async () => {
     const clock = steppableClock(1_000);
     const world = fakeWorld({ ps: worldResult() });
     const h = handler({ world, mode: "live", clock: clock.now });
@@ -268,7 +268,7 @@ describe("C08 §3 — modes", () => {
     expect(world.deltas).toEqual([400, 500]);
   });
 
-  it("T1.15 (I17): a clock that does not move produces no motion", async () => {
+  it("T1.15 (I18): a clock that does not move produces no motion", async () => {
     const clock = steppableClock(1_000);
     const world = fakeWorld({ ps: worldResult() });
     const h = handler({ world, mode: "live", clock: clock.now });
@@ -277,7 +277,7 @@ describe("C08 §3 — modes", () => {
     expect(world.deltas).toEqual([]);
   });
 
-  it("T1.15 (I17): nothing advances between queries — pull, never push", async () => {
+  it("T1.15 (I18): nothing advances between queries — pull, never push", async () => {
     // The assertion that a timer would break. If anything scheduled, the world
     // would move while nobody asked, and reproducibility would depend on real
     // elapsed time rather than on (seed, elapsed).
@@ -291,7 +291,7 @@ describe("C08 §3 — modes", () => {
     expect(world.deltas).toEqual([]);
   });
 
-  it("T1.15 (I17): explicit advance in live mode is refused", () => {
+  it("T1.15 (I18): explicit advance in live mode is refused", () => {
     const clock = steppableClock();
     const h = handler({ world: fakeWorld(), mode: "live", clock: clock.now });
     expect(() => h.advance(100)).toThrow(/injected clock is what drives it/);

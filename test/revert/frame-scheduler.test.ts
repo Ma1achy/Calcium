@@ -162,7 +162,7 @@ describe("C03 fail-on-revert", () => {
     expect(kept.render, "the deferred frame must still be drawn").toHaveBeenCalledTimes(2);
   });
 
-  it("T6.11 (I11): snapshotting `acquired` at construction → T3.22 fails", () => {
+  it("T6.11 (I12): snapshotting `acquired` at construction → T3.22 fails", () => {
     const live = harness({ acquired: false });
     live.setAcquired(true);
     live.scheduler.commit("input");
@@ -213,7 +213,7 @@ describe("C03 fail-on-revert", () => {
     expect(written).toHaveLength(4);
   });
 
-  it("T6.15 (I11): snapshotting `acquired` in the L4 wiring → T3.24 fails", () => {
+  it("T6.15 (I12): snapshotting `acquired` in the L4 wiring → T3.24 fails", () => {
     const h = harness({ acquired: false, snapshotLifecycle: true });
     h.setAcquired(true);
 

@@ -260,7 +260,7 @@ describe("C05 validate", () => {
     expect(validateInvocation(scale(), ["web", "3", "--side-by-side"]).ok).toBe(true);
   });
 
-  it("T1.16 (I14): both flag-value forms produce the same args", () => {
+  it("T1.16 (I16): both flag-value forms produce the same args", () => {
     // The permissive rule as an equality rather than as two separate passes.
     // Rejecting the space-separated form here would reject an invocation the far
     // side would have run — the one failure mode a pre-spawn gate must not have.
@@ -271,7 +271,7 @@ describe("C05 validate", () => {
     if (spaced.ok && equals.ok) expect(spaced.args).toEqual(equals.args);
   });
 
-  it("T1.17 (I14, §3): a value beginning with - is refused with the form that works", () => {
+  it("T1.17 (I16, §3): a value beginning with - is refused with the form that works", () => {
     // Both halves in one test. The message is only right if the thing it
     // recommends actually works, and split in two, each half passes while the
     // pair stops being true — `--since=-1h` failing its own duration check would
@@ -291,7 +291,7 @@ describe("C05 validate", () => {
     if (accepted.ok) expect(accepted.args["since"]).toBe("-1h");
   });
 
-  it("T1.18 (I15): a conflict is reported once, whichever side declares it", () => {
+  it("T1.18 (I17): a conflict is reported once, whichever side declares it", () => {
     // One-directional is how an app ordinarily writes it, and deduplicating by
     // name order dropped exactly those. Mutual is one mistake, so it stays one
     // error — two would be a worse message rather than a stricter check.

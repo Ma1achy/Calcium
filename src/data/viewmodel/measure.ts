@@ -125,7 +125,7 @@ export function childWidths(block: Panel | Group, width: number): readonly numbe
 
 /**
  * The rows a *sequence* of blocks occupies: their heights, plus one row for
- * each block declaring `gapBefore` (§3a, I19).
+ * each block declaring `gapBefore` (§3a, I25).
  *
  * A sequence is a document's top level, a `panel`'s children, or a `column`
  * group's children — anything laid out one after another down the screen. A

@@ -146,8 +146,8 @@ Kill-append is a flag rather than a state: any non-kill operation clears it (T1.
 - **I10** — C17 does not render and holds no geometry; width and gutter are parameters.
 - **I11** — The undo stack is bounded at 200 units, discarding the oldest.
 - **I12** — Newline has **three** bindings, of which **at least two are terminal-independent**. Both halves are load-bearing and they count different things: the three include Shift-Enter, which many terminals do not distinguish from Enter, so it cannot be one of the two that always work. An invariant stating only the weaker half would pass with Shift-Enter removed; one stating only the stronger half would pass with Ctrl-J removed. A test citing this fails on either.
-- **I14** — Word motion uses three character classes — word, punctuation, whitespace — rather than two. A flag value can then be edited without the motion swallowing the flag: `--since=1h` is four stops, not one.
-- **I13** — C17 imports nothing from `terminal/` and never commits a frame.
+- **I13** — Word motion uses three character classes — word, punctuation, whitespace — rather than two. A flag value can then be edited without the motion swallowing the flag: `--since=1h` is four stops, not one.
+- **I14** — C17 imports nothing from `terminal/` and never commits a frame.
 
 ---
 
@@ -155,7 +155,7 @@ Kill-append is a flag rather than a state: any non-kill operation clears it (T1.
 
 1. The cursor is a grapheme index; display columns are computed separately (I1, I4).
 2. `displayRows` is a measurement contract and must match the rendered prompt, taking the gutter as a parameter rather than assuming one (I3).
-3. Word motion uses three character classes, so flag values can be edited without disturbing flags (I14).
+3. Word motion uses three character classes, so flag values can be edited without disturbing flags (I13).
 4. Newline has three bindings, at least two of them terminal-independent; Shift-Enter alone is unreliable and `j22` #11 is corrected (I12).
 5. Long input wraps visually and remains one command (I3).
 6. One kill buffer, not a ring; consecutive kills append (I8).
@@ -164,7 +164,7 @@ Kill-append is a flag rather than a state: any non-kill operation clears it (T1.
 9. Any edit clears redo (I7).
 10. Control characters are stripped on insert; `\n` is the only structural exception (I9).
 11. C17 never renders; the prompt composites its state with C19's ghost text (I10).
-12. C17 never commits a frame (I13).
+12. C17 never commits a frame (I14).
 13. **Every operation is grapheme-aware; nothing indexes by code unit** (I2). Not only the cursor — delete, kill, word motion, undo units and paste all count the same thing, because an editor that is grapheme-aware in most places is one where a family emoji breaks whichever operation was missed. Enforced by SS40, which is C17's own scan: C09's SS23 forbids the same expression and wants a different answer.
 
 ---
@@ -202,7 +202,7 @@ Six tiers. Every cell of the §7 table is covered.
 - **T2.3** (I6): a source scan finds no clock reference in `editor/`.
 - **T2.4** (I2): a source scan finds no `.length`, `charAt` or `slice` on buffer text outside the grapheme layer.
 - **T2.5** (I10): the interface exposes no render method and stores no width.
-- **T2.6** (I13): the module graph shows no import from `terminal/` and no scheduler call.
+- **T2.6** (I14): the module graph shows no import from `terminal/` and no scheduler call.
 - **T2.7**: every `Motion` in the union has an implementation — exhaustive over the type.
 - **T2.8**: undo then redo returns a buffer deeply equal to the original, for every corpus entry.
 

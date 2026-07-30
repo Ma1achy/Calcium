@@ -30,6 +30,7 @@ import {
 } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
+import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 
 /** A file that must fail `rule`, at a path inside its scope. */
 type Fabrication = { rule: string; file: string; source: string };
@@ -265,7 +266,7 @@ const FABRICATED: readonly Fabrication[] = [
 ];
 
 const scanIds = SCANS.map((s) => s.id);
-const implemented = [...scanIds, ...MODULE_GRAPH_RULES, ...DEPENDENCY_RULES];
+const implemented = [...scanIds, ...MODULE_GRAPH_RULES, ...DEPENDENCY_RULES, ...SPEC_RULES];
 
 function srcFiles(dir = "src", out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -281,8 +282,31 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // The assertion that makes the commitment enforceable rather than a habit:
     // a rule added to SCANS or to either RULES list without a case below fails
     // here, on the commit that adds it.
-    const covered = new Set([...FABRICATED.map((f) => f.rule), ...DEPENDENCY_RULES]);
+    const covered = new Set([
+      ...FABRICATED.map((f) => f.rule),
+      ...DEPENDENCY_RULES,
+      // The SP family's fabrications are in `enforce-commitments.test.ts`,
+      // beside the parser they exercise. Listing them here without checking that
+      // would be commitment 14 satisfied by assertion, so the next test reads
+      // that file and looks for them.
+      ...SPEC_RULES,
+    ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
+  });
+
+  it("every SP rule has a fabrication in the file that owns the parser", () => {
+    // The claim above, made checkable. Without this, adding `SP4` to `SPEC_RULES`
+    // would satisfy commitment 14 by being named in a set — which is the "rule
+    // inventoried and never implemented" failure moved one file across.
+    const suite = readFileSync("test/unit/enforce-commitments.test.ts", "utf8");
+    const titles = [...suite.matchAll(/\bit\("([^"]+)"/g)].map((m) => m[1] ?? "");
+
+    for (const rule of SPEC_RULES) {
+      expect(
+        titles.some((t) => t.startsWith(rule) && /\bfails\b|\bfires\b/.test(t)),
+        `${rule} has no test asserting it fires`,
+      ).toBe(true);
+    }
   });
 
   it.each(FABRICATED)("$rule fires on a fabricated violation", ({ rule, file, source }) => {
@@ -588,10 +612,18 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
 
   /**
    * The families implemented as data in `tools/enforce/`, and therefore the ones
-   * this equality can be exact about. `EX`, `TL`, `CP` and `SP` rows name a test
-   * id rather than a rule module — see the header.
+   * this equality can be exact about.
+   *
+   * **`SP` joined them, and it is the third widening of this pattern.** The
+   * header records `EX`, `TL`, `CP` and `SP` as families the equality could not
+   * speak for, because their rows name a test id rather than a rule module. That
+   * was true of `SP` only until SP2 and SP3 landed: the family is implemented as
+   * functions in `commitments.mjs`, which exports `SPEC_RULES` for exactly this —
+   * so adding an `SP4` row to A03 and building nothing now fails here, on the
+   * commit that writes it down. `EX`, `TL` and `CP` remain outside, and remain
+   * named rather than left looking covered.
    */
-  const RULE_FAMILIES = /^\|\s*((?:SS|MG)\d+)\s*\|/;
+  const RULE_FAMILIES = /^\|\s*((?:SS|MG|SP)\d+)\s*\|/;
 
   /** The ids A03 declares, read from the document rather than restated here. */
   function inventoriedRules(): readonly string[] {

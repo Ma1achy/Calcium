@@ -185,7 +185,7 @@ describe("C09 tier 6", () => {
       () => "return <Text color={style}>{text}</Text>;",
     ).filter((v) => v.rule === "SS37");
 
-    expect(fabricated, "the prop discards the depth tag C10 I18 carries").toHaveLength(1);
+    expect(fabricated, "the prop discards the depth tag C10 I24 carries").toHaveLength(1);
 
     // And the tag is doing work: the same colour at three depths is three
     // sequences, which is exactly what a format-sniffing consumer cannot do.

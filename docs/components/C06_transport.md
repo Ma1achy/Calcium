@@ -265,10 +265,10 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 - **I18** — C06 reads no environment. `createTransport` takes `mode` as a parameter, and no module under `src/` resolves `PRISM_TUI_TRANSPORT`.
 - **I19** — Time enters C06 only through injected `now` and `schedule`. No ambient clock, no ambient timer.
 - **I20** — **No transport rewrites a result it did not construct.** `createFixtureTransport` replays a stored `RawResult` verbatim, `argv` included; `createEmulatedTransport` reports what its handler produced. Synthesis is confined to results C06 builds itself — a cancellation, an abort before dispatch — where there is nothing to report and the argv describes an invocation happening now. Whoever produces a result owns its `argv`; the transport carrying it does not.
-- **I22** — `timeoutMs: 0` schedules no timer at all. Not a very large timeout — none, asserted on the absence of the `schedule` call, because a timer armed with 0 and cleared later satisfies the weaker reading and kills every live view.
-- **I23** — `cwd` is read at spawn, never captured at construction. A captured string spawns every subsequent verb in the directory the session started in, which is the one bug a pass-through `cd` is guaranteed to produce.
-- **I24** — `createEmulatedTransport` takes a handler closure and C06 references no app type. The world stays app-side behind a function, which is what lets `prism-tui` and `docker-tui` each have one without the framework knowing either exists.
-- **I21** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
+- **I21** — `timeoutMs: 0` schedules no timer at all. Not a very large timeout — none, asserted on the absence of the `schedule` call, because a timer armed with 0 and cleared later satisfies the weaker reading and kills every live view.
+- **I22** — `cwd` is read at spawn, never captured at construction. A captured string spawns every subsequent verb in the directory the session started in, which is the one bug a pass-through `cd` is guaranteed to produce.
+- **I23** — `createEmulatedTransport` takes a handler closure and C06 references no app type. The world stays app-side behind a function, which is what lets `prism-tui` and `docker-tui` each have one without the framework knowing either exists.
+- **I24** — The parity suite compares the **complete** `RawResult`, not a chosen subset, on both the settled path and inside the terminal `end` patch. Fields that cannot match across transports are named individually with a reason, and that list is closed: a field is exempt by being on it, never by not being looked at.
 
 ---
 
@@ -280,21 +280,21 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 4. stdout and stderr stay separate; raw stdout is always retained (I5, I6).
 5. One escalation ladder for cancellation and timeout (I8).
 6. Partial output is retained on every abnormal termination (I7).
-7. `timeoutMs: 0` means unbounded, for live views (I22).
+7. `timeoutMs: 0` means unbounded, for live views (I21).
 8. Streaming emits exactly one `end`, always last (I9).
 9. Malformed-line degradation needs 10% *and* a 10-line floor, depends on arrival order by design, and is sticky once tripped (I12).
 10. One non-streaming invocation at a time; streams are exempt (I13).
 11. Transport is selected per verb, defaulting when unmapped (I14).
 12. Three implementations behind one interface, selected by one mode value; nothing else branches on mode. The **app's** entry point resolves `PRISM_TUI_TRANSPORT` and passes a constructed router through `TuiConfig.transport`; `tui-kit` has no binary and reads no environment (I18).
 13. Tests run against the recorded corpus, never the emulator's world, so emulator drift cannot mask a regression (I17).
-14. `cwd` is read at spawn time so pass-through `cd` is honoured (I23).
-15. The **emulated** transport takes a handler closure; `tui-kit` references no app type. The fixture transport takes a corpus (I24).
+14. `cwd` is read at spawn time so pass-through `cd` is honoured (I22).
+15. The **emulated** transport takes a handler closure; `tui-kit` references no app type. The fixture transport takes a corpus (I23).
 16. Line buffering is bounded at 1 MB (I11).
 17. All three implementations are substitutable in every test that does not concern spawning (I15).
 18. The fixture transport replays and nothing else — no clock, no world state (I16).
 19. Time enters only through injected `now` and `schedule` (I19).
 20. Replay reports what was recorded, verbatim (I20). `meta.argv` is a historical fact about the data — what actually ran — not a reproduction hint, so a corpus recorded against one binary says so even when the app now spawns another. `meta.transport` disambiguates; the two fields together are honest.
-21. The parity suite compares the complete `RawResult` (I21). A suite that picks fields is a suite with holes exactly where nobody looked.
+21. The parity suite compares the complete `RawResult` (I24). A suite that picks fields is a suite with holes exactly where nobody looked.
 
 ---
 
@@ -323,7 +323,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 
   **This is not a D43 violation, and it looks like one.** D43 forbids tests *agreeing with an animated world* — asserting on values the emulator invents, so that drift in the world silently becomes the expected result. This suite asserts that three transports behave identically at the interface, over a handler that returns a fixed envelope; nothing here treats the emulator as a source of truth about the far side. Stated because the alternative reading — see `emulated` in the `describe.each`, remember D43, narrow the suite back to two — is the same silent narrowing I15's "does not concern spawning" clause exists to prevent.
 
-  **The suite compares the complete `RawResult`, not a chosen subset** (I21). A suite that picks fields is a suite with holes exactly where nobody looked. `argv` was the first such hole: it survived here and was found from C08's side, because the three transports were compared on `stdout`, `exitCode` and the shape of the patch sequence, and never on the field they actually disagreed about.
+  **The suite compares the complete `RawResult`, not a chosen subset** (I24). A suite that picks fields is a suite with holes exactly where nobody looked. `argv` was the first such hole: it survived here and was found from C08's side, because the three transports were compared on `stdout`, `exitCode` and the shape of the patch sequence, and never on the field they actually disagreed about.
 
   Comparison is field-complete in both places a `RawResult` appears — the settled return of `invoke`, and the `result` inside the terminal `end` patch. The second is the easier one to forget: `data`, `malformed` and `degraded` patches are compared whole already, so the streaming side reads as covered while carrying the same gap one level down.
 
@@ -409,7 +409,7 @@ Real subprocesses.
 - **T6.12**: capturing `cwd` at construction → T3.22 fails.
 - **T6.13** (I11): removing the line cap → T3.16b fails on unbounded growth.
 - **T6.14**: typing the fixture transport against an app-defined world → the module-graph test in T2.2 fails.
-- **T6.18** (I21): narrowing the parity comparison to a chosen subset of `RawResult` → T2.1 fails on the field-completeness check, rather than passing with a hole. This is the revert that already happened once: the suite compared `stdout` and `exitCode`, `argv` diverged, and nothing went red until C08 recorded and replayed the same invocation.
+- **T6.18** (I24): narrowing the parity comparison to a chosen subset of `RawResult` → T2.1 fails on the field-completeness check, rather than passing with a hole. This is the revert that already happened once: the suite compared `stdout` and `exitCode`, `argv` diverged, and nothing went red until C08 recorded and replayed the same invocation.
 - **T6.19** (I20): rewriting a stored field at replay — `argv` being the one it was — → T2.1 fails on parity and C08 T2.7 fails on byte-for-byte. A fixture-backed document then reports a command that never ran.
 
 ---

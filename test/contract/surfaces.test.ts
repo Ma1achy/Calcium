@@ -42,7 +42,7 @@ describe("the S-series' illustrated heights", () => {
           `height rule changed — the audit says which kind of finding that is`,
       ).toBe(drawn);
 
-      expect(rendered, `${frame.label}: measured and rendered must agree (I1)`).toHaveLength(
+      expect(rendered, `${frame.label}: measured and rendered must agree (C09 I1)`).toHaveLength(
         measured,
       );
     });

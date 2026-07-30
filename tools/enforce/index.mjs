@@ -5,7 +5,13 @@ import { readdirSync, statSync } from "node:fs";
 import { checkModuleGraph } from "./module-graph.mjs";
 import { checkSourceScans } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
-import { checkCommitments, specFiles } from "./commitments.mjs";
+import {
+  checkCommitments,
+  checkOrdering,
+  checkReferences,
+  referenceFiles,
+  specFiles,
+} from "./commitments.mjs";
 
 function walk(dir, out = []) {
   let entries;
@@ -20,6 +26,8 @@ function walk(dir, out = []) {
 
 const files = walk("src");
 const specs = specFiles();
+const references = referenceFiles();
+const { violations: refViolations, resolved } = checkReferences(references);
 const violations = [
   ...checkModuleGraph(files),
   ...checkSourceScans(files),
@@ -29,12 +37,19 @@ const violations = [
   // documents the source is written against, because a commitment nothing
   // enforces diverges from the implementation without anything going red.
   ...checkCommitments(specs),
+  // SP2 — the numbers locate what they name. SP3 — and everything that cites
+  // one of them resolves, which for eleven hundred references nothing did.
+  ...checkOrdering(specs),
+  ...refViolations,
 ];
 
 const RED = "\x1b[31m", DIM = "\x1b[2m", GREEN = "\x1b[32m", RESET = "\x1b[0m";
 
 if (violations.length === 0) {
-  console.log(`${GREEN}✓${RESET} enforce · ${files.length} files · ${specs.length} specs · no violations`);
+  console.log(
+    `${GREEN}✓${RESET} enforce · ${files.length} files · ${specs.length} specs · ` +
+      `${resolved} invariant references resolved · no violations`,
+  );
   process.exit(0);
 }
 

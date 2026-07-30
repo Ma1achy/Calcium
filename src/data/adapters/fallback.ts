@@ -163,7 +163,7 @@ function keyValueBlock(obj: Record<string, Json>, id: string): Block {
  * The marker column, declared unconditionally (§5).
  *
  * C11 draws the expand marker only into a column that declares the rôle and will
- * not synthesise one (C11 I16), so for a generated table the producer has to —
+ * not synthesise one (C11 I15), so for a generated table the producer has to —
  * otherwise the fields that drop at a narrow width are reachable with nothing on
  * screen saying so.
  *

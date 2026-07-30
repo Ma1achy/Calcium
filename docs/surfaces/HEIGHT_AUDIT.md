@@ -174,7 +174,7 @@ table, which is what this section is for.
 
 Declaring `align` turned up a second unstated intent in the same paragraph, and
 auditing it found the class is wider than the field that now expresses it.
-`ColumnDef.truncateFrom` (C04 I32) covers a table column; **nine places in the
+`ColumnDef.truncateFrom` (C04 I30) covers a table column; **nine places in the
 S-series state a side and only four are table columns.**
 
 | Surface | What truncates from the start | Expressible |

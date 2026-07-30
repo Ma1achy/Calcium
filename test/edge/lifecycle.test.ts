@@ -137,7 +137,7 @@ describe("C01 transition table — the tolerant cells", () => {
 });
 
 describe("C01 acquisition faults", () => {
-  it("T3.6 (I13, C9): the alternate-screen write throws → onFatal, nothing held", () => {
+  it("T3.6 (I14, C9): the alternate-screen write throws → onFatal, nothing held", () => {
     const stdout = fakeStdout();
     stdout.throwOn(0, new Error("write failed"));
     const { lifecycle, fatal } = harness({ stdout });

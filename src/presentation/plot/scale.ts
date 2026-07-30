@@ -57,14 +57,14 @@ export function finiteSamples(values: readonly number[]): readonly Sample[] {
 }
 
 /**
- * The range over every series, with either bound pinned by the block (C04 I33).
+ * The range over every series, with either bound pinned by the block (C04 I29).
  *
  * `null` when nothing finite exists anywhere — an all-`NaN` series is treated as
  * empty (§4), and the caller renders the empty message rather than scaling
  * against a range that does not exist.
  *
  * A pinned bound **replaces** the data's rather than widening to include it, and
- * out-of-range values clamp in `rowOf` below. That is C04 I33's whole point: a
+ * out-of-range values clamp in `rowOf` below. That is C04 I29's whole point: a
  * pinned axis exists so two plots can be compared, and a range that grew to fit
  * an outlier would defeat the only reason to pin one.
  *
@@ -127,7 +127,7 @@ function isNoise(lo: number, hi: number): boolean {
  * zero by zero — which is what §4's "flat line at vertical centre" means and
  * what T1.5 asserts produces no `NaN`.
  *
- * Out-of-range values clamp to the edge rather than escaping the grid (C04 I33,
+ * Out-of-range values clamp to the edge rather than escaping the grid (C04 I29,
  * T1.14). Dropping them would be the other option and it is worse: a pinned plot
  * of a series that briefly exceeds its ceiling should show the series pressed
  * against the ceiling, not a hole where it was.

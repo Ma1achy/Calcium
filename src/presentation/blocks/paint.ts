@@ -46,7 +46,7 @@ export function slot(
  * A surface, resolved into the **background** channel (C10 §4a).
  *
  * `slot` and `tone` fill `colour`; this fills `background`, and it is a separate
- * function rather than a flag because the two are not interchangeable — C10 I22
+ * function rather than a flag because the two are not interchangeable — C10 I21
  * takes a background only from a `surface` ref, since §4's floors are measured for
  * text *on* a surface and never for a tone behind it.
  *
@@ -169,7 +169,7 @@ export function clampSpans(
  * violated by the framework rather than by the kind.
  */
 export function rows(lines: readonly string[]): ReactElement {
-  // I17's floor, applied where every non-container renderer ends rather than in
+  // I14's floor, applied where every non-container renderer ends rather than in
   // each of them: a block that is present occupies at least one row, so a
   // `logs` with no lines renders one blank row rather than nothing. The
   // containers do not come through here, which is what keeps the one legitimate

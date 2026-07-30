@@ -57,11 +57,11 @@ afterEach(() => {
 });
 
 describe("C02 integration", () => {
-  it("T4.1 (with C01, I10): a record drives acquisition, and nothing absent from it is acquired", () => {
+  it("T4.1 (with C01 I10): a record drives acquisition, and nothing absent from it is acquired", () => {
     // **This test's title changed.** It read "a TERM=dumb record drives C01 to
     // acquire nothing beyond what is supported", which was written when C01 was
     // a spec and describes a contract C01 no longer has: a `TERM=dumb` record
-    // has `altScreen: false`, and C01 I13 makes that fatal *before a byte is
+    // has `altScreen: false`, and C01 I14 makes that fatal *before a byte is
     // emitted* rather than a partial acquisition. The old title implies C01
     // takes what it can and skips the rest; what it actually does is refuse.
     //
@@ -73,7 +73,7 @@ describe("C02 integration", () => {
 
     const refused = harness(dumb);
     expect(() => refused.lifecycle.acquire()).toThrow(/alternate screen unsupported/);
-    // I13, and the reason it is stated as "aborts before first paint": a
+    // C01 I14, and the reason it is stated as "aborts before first paint": a
     // terminal that cannot open must not be half-configured on the way to
     // finding out.
     expect(refused.stdout.output).toBe("");
@@ -91,7 +91,7 @@ describe("C02 integration", () => {
     expect(bytes).not.toContain(MODES.mouseSgrOn);
   });
 
-  it("T4.2 (with C01, I10): tmux gives mouse:false, and no 1002/1006 byte is emitted either way", () => {
+  it("T4.2 (with C01 I10): tmux gives mouse:false, and no 1002/1006 byte is emitted either way", () => {
     // tmux is the case the record exists for: everything else about a tmux
     // terminal says a modern emulator, and mouse reporting is the one thing
     // that does not pass through cleanly. So this is not a synthetic record —
