@@ -198,10 +198,17 @@ export const SCANS = [
   //
   // Anchored to the start of a line so a `let` inside a function body is what it
   // is: an ordinary local, in a pure function, which is not what this forbids.
+  //
+  // **`scope` is a list, because this rule has always had three.** A03 declares
+  // `table/`, `plot/` and `parser/`; the row named one, so two thirds of the rule
+  // could not fire and the row read as though it covered all three. Widening the
+  // field rather than adding a second row with the same id closes the class: C18
+  // needs the third scope, and a per-scope row is a shape the next reader has to
+  // notice rather than a list they add to.
   { id: "SS24", spec: "C11 I11 · C11 T2.6 · C12 T2.5 · C18 T2.2",
     pattern: /^(?:export\s+)?(?:let|var)\s/m,
-    scope: "src/presentation/table/", allow: [],
-    why: "C11 owns no state: a module-level binding is a cache two tables share and only one of them invalidates" },
+    scope: ["src/presentation/table/", "src/presentation/plot/"], allow: [],
+    why: "C11 and C12 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
 
   { id: "SS26", spec: "C21 T2.2",
     pattern: /process\.stdout\.write/,
@@ -342,12 +349,18 @@ export const SCANS = [
  * a fabricated violation at a path that does not exist on disk. A03 commitment
  * 14 requires one per rule — see `test/unit/enforce-rules.test.ts`.
  */
+/** A rule's scopes, as a list. A bare string is the one-scope case. */
+function scopesOf(scan) {
+  return Array.isArray(scan.scope) ? scan.scope : [scan.scope];
+}
+
 export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [];
   for (const scan of SCANS) {
+    const scopes = scopesOf(scan);
     for (const file of files) {
       const f = file.replaceAll("\\", "/");
-      if (!f.startsWith(scan.scope)) continue;
+      if (!scopes.some((s) => f.startsWith(s))) continue;
       if (scan.allow.some((a) => f === a || f.startsWith(a))) continue;
       const src = readFile(file);
       src.split("\n").forEach((line, i) => {

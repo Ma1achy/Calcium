@@ -109,11 +109,21 @@ const FABRICATED: readonly Fabrication[] = [
     source: "const backoff = base + crypto.randomUUID().length;",
   },
   {
-    // SS24 covers C11, C12 and C18; only `table/` exists, so this fabrication is
-    // the whole of the proof that the other two scopes will fire when they do.
+    // SS24 covers C11, C12 and C18. Two of the three scopes are real now, and
+    // both are fabricated against below rather than one standing in for the pair:
+    // the rule's `scope` is a list, and a list satisfied by its first entry is
+    // the vacuity this file exists for.
     rule: "SS24",
     file: "src/presentation/table/plan.ts",
     source: "let lastPlan = null;",
+  },
+  {
+    // C12's half. The cache someone reaches for is a memo of the last raster,
+    // because downsampling 50,000 points looks expensive — and the height, which
+    // is the only thing measured, never touches the data at all.
+    rule: "SS24",
+    file: "src/presentation/plot/scale.ts",
+    source: "let lastRange = null;",
   },
   { rule: "SS26", file: "src/data/process/runner.ts", source: 'process.stdout.write(chunk);' },
   {
@@ -228,6 +238,15 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "MG21",
     file: "src/presentation/blocks/notice.ts",
     source: 'import { detect } from "../../terminal/capabilities.js";',
+  },
+  {
+    // The edge a reader would reach for: a plot inside an expanded table row
+    // wants a width, and `planColumns` has one. Written as a type-only import
+    // deliberately — that is the form that erases at build and passes every other
+    // rule, which is why MG6 and MG19 both record that it counts here.
+    rule: "MG22",
+    file: "src/presentation/plot/definition.ts",
+    source: 'import type { PlannedColumns } from "../table/plan.js";',
   },
 ];
 
@@ -363,7 +382,15 @@ describe("A03 commitment 14 — every scope reaches the tree", () => {
 
   const files = srcFiles();
 
-  it.each(SCANS.map((s) => ({ id: s.id, scope: s.scope })))(
+  // **Flattened per scope, not per rule.** SS24 has three scopes declared and had
+  // one written down; a rule whose scopes are checked as a set would be satisfied
+  // by any one of them matching, which is how two thirds of a rule stays vacuous
+  // while its row reads as covered. Every scope answers for itself.
+  it.each(
+    SCANS.flatMap((s) =>
+      (Array.isArray(s.scope) ? s.scope : [s.scope]).map((scope) => ({ id: s.id, scope })),
+    ),
+  )(
     "$id's scope $scope matches at least one file",
     ({ id, scope }) => {
       const matched = files.filter((f) => f.replaceAll("\\", "/").startsWith(scope));
@@ -518,7 +545,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     MG16: "C18",
     MG17: "C19",
     MG18: "C20",
-    MG22: "C12 — no src/presentation/plot/ directory yet",
   };
 
   /**

@@ -127,7 +127,7 @@ describe("C11 tier 2 — planColumns as an interface", () => {
     expect(block.rows.every((row) => row.detail === undefined)).toBe(true);
 
     const plan = planColumns(psColumns(), 80);
-    expect(plan.dropped).toEqual(["kind", "owner", "mr"]);
+    expect(plan.dropped).toEqual(["spark", "kind", "owner", "mr"]);
 
     const lines = r.renderToLines(block, 80);
     for (const key of plan.dropped) {

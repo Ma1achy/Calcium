@@ -14,9 +14,11 @@ import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { MODES, fakeDebug, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 import { ONE_PER_KIND, psTable } from "../support/blocks.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
-import { ASCII_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { store, TONES } from "../support/theme.js";
 
 /**
@@ -201,9 +203,32 @@ describe("C02 integration", () => {
       full.renderToLines(table, 100).map((l) => cells(visible(l))),
     );
   });
-  it.todo(
-    "T4.5: unicode:'ascii' → the braille plot degrades to a block plot rather than emitting braille codepoints — waits on C12",
-  );
+  it("T4.5 (with C12): unicode:'ascii' → the ramp replaces braille, geometry unchanged", () => {
+    const plot = block({
+      kind: "plot",
+      id: "loss",
+      form: "line",
+      height: 6,
+      axes: true,
+      xLabels: ["epoch 0", "epoch 20", "now"],
+      series: [{ values: Array.from({ length: 30 }, (_, i) => 0.82 * 0.9 ** i) }],
+    });
+
+    const ascii = measurable({ definitions: [plotDefinition], capabilities: ASCII_CAPS });
+    const full = measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
+
+    const degraded = ascii.renderToLines(plot, 100);
+    expect(degraded.join(""), "no braille under ascii").not.toMatch(/[\u2800-\u28ff]/u);
+    expect(degraded.join(""), "the column ramp instead").toMatch(/[.:\-=+*#@]/u);
+    expect(degraded.join(""), "and an ASCII axis").toContain("+");
+
+    // Identical cell grid, only subcell resolution lost (C12 I9). Asserted on the
+    // row count and on the measured height, which is the pair C09 I1 turns on —
+    // per-row width is not the claim, because a ramp cell is one dot column and a
+    // braille cell is two, so the same sample lands in a different cell.
+    expect(degraded).toHaveLength(full.renderToLines(plot, 100).length);
+    expect(ascii.measure(plot, 100)).toBe(full.measure(plot, 100));
+  });
   it("T4.6 (with C03): synchronisedUpdate:false → frames carry no 2026 wrapper", () => {
     // Driven from C02's side: the record decides, and C03 obeys it. Both
     // directions, because the negative alone passes when C03 wraps nothing.

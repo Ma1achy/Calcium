@@ -38,7 +38,7 @@ describe("C11 tier 6", () => {
     // vanish from the header and reappear nowhere, and nothing else in the suite
     // notices — the frame is the right height and every row fits.
     const plan = planColumns(psColumns(), 60);
-    expect(plan.dropped).toEqual(["metric", "age", "kind", "owner", "mr"]);
+    expect(plan.dropped).toEqual(["metric", "spark", "age", "kind", "owner", "mr"]);
 
     const frame = r.renderToLines(psTable({ rows: 2, expanded: [1, 2] }), 60).join("\n");
     for (const key of plan.dropped) {

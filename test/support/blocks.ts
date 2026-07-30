@@ -13,6 +13,7 @@ import {
   type Block,
   type BlockKind,
   type ColumnDef,
+  type Plot,
   type Table,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
@@ -246,6 +247,10 @@ export function psColumns(): readonly ColumnDef[] {
     { key: "status", label: "status", align: "left", priority: 80, minWidth: 11, sortable: true },
     { key: "detail", label: "detail", align: "left", priority: 65, minWidth: 12, flex: true, sortable: false },
     { key: "metric", label: "metric", align: "right", priority: 60, minWidth: 8, sortable: true },
+    // The twelfth column (S03 §3). Low priority and no label: a cell holds one
+    // value, so the number and its series are separate columns, and decoration is
+    // what drops first when the width runs out.
+    { key: "spark", label: "", align: "left", priority: 15, minWidth: 8, sortable: false },
     { key: "age", label: "age", align: "right", priority: 50, minWidth: 6, sortable: true },
     { key: "kind", label: "kind", align: "left", priority: 30, minWidth: 10, sortable: true },
     { key: "owner", label: "owner", align: "left", priority: 20, minWidth: 8, sortable: true },
@@ -286,7 +291,15 @@ export function psTable(
     rows: Array.from({ length: count }, (_, i) => {
       const row: {
         id: string;
-        cells: Record<string, { text: string; tone?: "ok" | "error" | "muted"; glyph?: "running" | "ok" | "error" | "queued" }>;
+        cells: Record<
+          string,
+          {
+            text: string;
+            tone?: "ok" | "error" | "muted";
+            glyph?: "running" | "ok" | "error" | "queued";
+            spark?: readonly number[];
+          }
+        >;
         expanded?: boolean;
         detail?: readonly Block[];
       } = {
@@ -299,6 +312,15 @@ export function psTable(
           status: { text: states[i % states.length] ?? "running" }, // cells-ok
           detail: { text: `ep ${String(i + 1)}/40` },
           metric: { text: metrics[i % metrics.length] ?? "" }, // cells-ok
+          // A `spark` cell carries the series and no text — C12's `sparkline`
+          // renders it, and the eight samples are the eight cells the column
+          // declares as its minimum.
+          // `i % 5` and not `i`: the window is eight points, so a longer series
+          // buys nothing — and `lossCurve(12 + i)` over 10,000 rows allocated
+          // fifty million numbers and timed out T3.16, a test about the *planner's*
+          // cost. A fixture that dominates the measurement it appears in makes the
+          // budget it was written to check unmeasurable.
+          spark: { text: "", spark: lossCurve(12 + (i % 5)) },
           age: { text: ages[i % ages.length] ?? "1m" }, // cells-ok
           kind: { text: "candidate" },
           owner: { text: "malachy@fmx.io" },
@@ -352,3 +374,96 @@ export function tableOf(n: number, id = "t"): Table {
     })),
   });
 }
+
+/**
+ * A decaying loss curve of `n` epochs — the series every plot surface draws.
+ *
+ * Deterministic, and `Math.exp` rather than a random walk because A03 SS2 bans
+ * `Math.random()` across `src/` for exactly the reason it would bite here: a
+ * jittered curve makes every golden frame flake.
+ */
+export function lossCurve(n: number, floor = 0.04, start = 0.82): readonly number[] {
+  const span = Math.max(1, n / 3);
+  return Array.from({ length: n }, (_, i) => (start - floor) * Math.exp(-i / span) + floor);
+}
+
+/**
+ * A `plot`, with every parameter's default differing from any value a test asks
+ * for (`test/support/README.md`).
+ *
+ * **The parameter that could have been inert is `points`.** A plot's height is
+ * declared, so a test that passes ten thousand of them and counts rows passes
+ * identically if the argument is discarded — the row count is right either way.
+ * So `support-harness.test.ts` asserts `points` against rendered *content* (a
+ * downsampled curve inks columns a sparse one leaves blank) and `height` against
+ * the row count, which is the only pairing where each can fail alone.
+ */
+export function plotOf(
+  options: Readonly<{
+    id?: string;
+    points?: number;
+    height?: number;
+    axes?: boolean;
+    form?: Plot["form"];
+    series?: number;
+    yMin?: number;
+    yMax?: number;
+  }> = {},
+): Plot {
+  const count = options.points ?? 20;
+  const seriesCount = options.series ?? 1;
+
+  return block({
+    kind: "plot",
+    id: options.id ?? "plot",
+    form: options.form ?? "line",
+    height: options.height ?? 5,
+    axes: options.axes ?? true,
+    xLabels: ["epoch 0", "epoch 20", "now"],
+    series: Array.from({ length: seriesCount }, (_, s) => ({
+      values: lossCurve(count).map((v) => v * (1 + s * 0.2)),
+      label: `series ${s + 1}`,
+    })),
+    ...(options.yMin === undefined ? {} : { yMin: options.yMin }),
+    ...(options.yMax === undefined ? {} : { yMax: options.yMax }),
+  });
+}
+
+/**
+ * The corpus C12's conformance runs over: every degenerate series §4 names, both
+ * forms, the axed and bare cases, the multi-series cases including more series
+ * than rows, and the two `plot` fixtures the shared corpus already holds.
+ */
+export const PLOT_CORPUS: readonly Block[] = Object.freeze([
+  plotOf(),
+  plotOf({ id: "plot-bare", axes: false }),
+  plotOf({ id: "plot-h1", height: 1 }),
+  plotOf({ id: "plot-h2", height: 2 }),
+  plotOf({ id: "plot-dense", points: 10_000 }),
+  plotOf({ id: "plot-sparse", points: 3 }),
+  plotOf({ id: "plot-two", height: 8, series: 2 }),
+  plotOf({ id: "plot-many", height: 4, series: 10 }),
+  plotOf({ id: "plot-pinned", yMin: 0, yMax: 1 }),
+  plotOf({ id: "plot-spark", form: "sparkline", points: 8 }),
+  block({ kind: "plot", id: "plot-one-point", form: "line", height: 5, axes: true, series: [{ values: [7] }] }),
+  block({ kind: "plot", id: "plot-flat", form: "line", height: 5, axes: true, series: [{ values: [3, 3, 3, 3] }] }),
+  block({
+    kind: "plot",
+    id: "plot-holes",
+    form: "line",
+    height: 5,
+    axes: true,
+    series: [{ values: [1, 2, Number.NaN, 4, 5, Number.POSITIVE_INFINITY, 7, 8] }],
+  }),
+  block({
+    kind: "plot",
+    id: "plot-all-nan",
+    form: "line",
+    height: 5,
+    axes: true,
+    series: [{ values: [Number.NaN, Number.NaN] }],
+    emptyMessage: "No epochs yet.",
+  }),
+  ONE_PER_KIND.plot,
+  ...ADVERSARIAL.filter((b) => b.kind === "plot"),
+]);

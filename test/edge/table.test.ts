@@ -142,10 +142,10 @@ describe("C11 tier 3 — edges", () => {
 
   it("T3.9: every row expanded on a 500-row table measures exactly", () => {
     const block = psTable({ rows: 500, expanded: Array.from({ length: 500 }, (_, i) => i + 1), detail: true });
-    // 1 header + 500 rows + 500 × (3 dropped-column rows + 1 progress row) at 80.
+    // 1 header + 500 rows + 500 × (4 dropped-column rows + 1 progress row) at 80.
     const plan = planColumns(psColumns(), 80);
-    expect(plan.dropped.length).toBe(3); // cells-ok
-    expect(r.measure(block, 80)).toBe(1 + 500 + 500 * (3 + 1));
+    expect(plan.dropped.length).toBe(4); // cells-ok
+    expect(r.measure(block, 80)).toBe(1 + 500 + 500 * (4 + 1));
   });
 
   it("T3.10: detail containing a nested table measures through measureChild", () => {
@@ -261,7 +261,7 @@ describe("C11 tier 3 — edges", () => {
     const wide = planColumns(columns, 160);
     const narrow = planColumns(columns, 60);
     expect(wide.dropped).toEqual([]);
-    expect(narrow.dropped.length).toBe(5); // cells-ok
+    expect(narrow.dropped.length).toBe(6); // cells-ok
     // And back again: with no cache there is nothing to go stale, so the second
     // call at the original width is the original plan.
     expect(planColumns(columns, 160)).toEqual(wide);

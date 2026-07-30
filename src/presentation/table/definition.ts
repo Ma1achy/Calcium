@@ -145,7 +145,7 @@ export const tableDefinition: BlockDefinition<Table> = {
             width,
             paddingLeft: width - insetWidth(width),
           },
-          detailBlocks(block, row, plan).flatMap((child, index) => {
+          detailBlocks(block, row, plan, ctx.capabilities).flatMap((child, index) => {
             const drawn = createElement(
               Box,
               { key: child.id === "" ? String(index) : child.id },

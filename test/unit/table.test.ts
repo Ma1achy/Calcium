@@ -36,9 +36,9 @@ describe("C11 tier 1 — planColumns", () => {
   it("T1.2: columns drop lowest-priority-first at 120, 100, 80 and 60", () => {
     const columns = psColumns();
     expect(planColumns(columns, 120).dropped).toEqual([]);
-    expect(planColumns(columns, 100).dropped).toEqual(["mr"]);
-    expect(planColumns(columns, 80).dropped).toEqual(["kind", "owner", "mr"]);
-    expect(planColumns(columns, 60).dropped).toEqual(["metric", "age", "kind", "owner", "mr"]);
+    expect(planColumns(columns, 100).dropped).toEqual(["spark", "mr"]);
+    expect(planColumns(columns, 80).dropped).toEqual(["spark", "kind", "owner", "mr"]);
+    expect(planColumns(columns, 60).dropped).toEqual(["metric", "spark", "age", "kind", "owner", "mr"]);
   });
 
   it("T1.3 (I4): dropping a middle-priority column leaves the rest in declared order", () => {
@@ -47,7 +47,7 @@ describe("C11 tier 1 — planColumns", () => {
     // the columns that outrank them.
     const plan = planColumns(psColumns(), 80);
     expect(keys(plan)).toEqual(["expand", "glyph", "uuid", "family", "status", "detail", "metric", "age"]);
-    expect(plan.dropped).toEqual(["kind", "owner", "mr"]);
+    expect(plan.dropped).toEqual(["spark", "kind", "owner", "mr"]);
   });
 
   it("T1.4 (I3): width 20 with a 40-cell highest-priority column → one column, overflowed", () => {
@@ -123,8 +123,9 @@ describe("C11 tier 1 — planColumns", () => {
     const expanded = psTable({ rows: 4, expanded: [2] });
     expect(registry.measure(expanded, 120)).toBe(5);
 
-    // At 80 three columns drop, so every row gains a three-row `keyValue`.
-    expect(registry.measure(expanded, 80)).toBe(5 + 3);
+    // At 80 four columns drop — `spark` joined the set when S03 §3 split the metric
+    // from its series — so an expanded row gains a four-row `keyValue`.
+    expect(registry.measure(expanded, 80)).toBe(5 + 4);
   });
 
   it("T1.10: an empty table measures 2, not 0", () => {

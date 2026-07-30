@@ -11,6 +11,7 @@
  */
 import { glyphFor, glyphs } from "../blocks/glyphs.js";
 import { fit, pad, padStart, tone, type Span } from "../blocks/paint.js";
+import { sparkline } from "../plot/index.js";
 import { stripControl, truncate } from "../text.js";
 import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
@@ -92,6 +93,26 @@ export function rowSpans(
       spans.push({
         text: fit(marker, planned.width, ctx.capabilities),
         style: tone("dim", ctx.theme, ctx.capabilities),
+      });
+      return;
+    }
+
+    // **A `spark` cell is C12's, and it arrives as a function rather than a
+    // block** (C12 §2). A cell is not a block, so it cannot come through C09's
+    // registry, and rendering it as a `plot` would drag block dispatch into a cell.
+    // The import is the one sideways edge inside L1 that this file makes — legal
+    // because A02 §1 forbids cycles rather than sideways edges, and kept
+    // one-directional by MG22.
+    //
+    // Exactly `planned.width` cells and exactly one row (C12 I13), so a column
+    // holding one is the same height as a column without and the planner is
+    // indifferent to it. Which is why this returns before the truncation below:
+    // the series is already the width, and truncating it would drop the most
+    // recent samples — the ones it was shown for.
+    if (cell?.spark !== undefined) {
+      spans.push({
+        text: sparkline(cell.spark, planned.width, ctx.capabilities),
+        style: tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities),
       });
       return;
     }

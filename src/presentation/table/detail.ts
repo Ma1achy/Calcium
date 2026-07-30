@@ -13,8 +13,16 @@
  * *aggressively* safe, which is why the drop tables can be as aggressive as they
  * are.
  */
+import { sparkline } from "../plot/index.js";
 import type { Block, ColumnDef, KeyValue, Table, TableRow } from "../../data/viewmodel/index.js";
+import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import type { PlannedColumns } from "./plan.js";
+
+/**
+ * The cells a dropped `spark` gets in the expand row — A01 A.2's window, and the
+ * minimum S03 §3 declares for the column.
+ */
+const SPARK_CELLS = 8;
 
 /**
  * Whether the row can be opened, derived rather than declared.
@@ -43,6 +51,7 @@ export function detailBlocks(
   block: Table,
   row: TableRow,
   plan: PlannedColumns,
+  caps?: Pick<TerminalCapabilities, "unicode">,
 ): readonly Block[] {
   const own = row.detail ?? [];
   if (plan.dropped.length === 0) return own; // cells-ok
@@ -52,12 +61,40 @@ export function detailBlocks(
   const entries = plan.dropped.map((key) => {
     const column = byKey.get(key);
     const cell = row.cells[key];
-    const label = column === undefined ? key : column.label;
+
+    // **The key stands in for an empty label**, as it does in the header
+    // (`cells.ts`). S03's `spark` column has no label and a priority low enough to
+    // drop, so the expand row was gaining a blank-labelled entry: the value was
+    // reachable and nothing said what it was. D38 satisfied in form and not in
+    // substance, which is the shape of the C07 §5 finding one component over.
+    const declared = column === undefined ? "" : column.label;
+    const label = declared === "" ? key : declared;
+
     // A row missing a cell for a dropped column still gets its label. The field
     // is present and empty, which is a different statement from the field being
     // absent — and the conformance corpus grows tables by a row with no cells at
     // all, so this is a path the suite takes.
-    const value = cell === undefined ? "" : cell.text;
+    //
+    // **A `spark` cell's value is its series**, and its text is empty by design
+    // (C04 §3: a cell holds one value). Rendering the text alone would put the
+    // column in the expand row with nothing in it — the field named and its
+    // content gone, which is worse than either. Eight cells, the width A01 A.2
+    // windows to and the width the column declares.
+    //
+    // **`caps` is optional because `measure` does not have any and does not need
+    // them** (C04 §5). A `keyValue`'s height is its row count, and both ramps are
+    // one cell per glyph, so the placeholder measurement path and the rendered one
+    // occupy the same eight cells — which is what keeps I1 exact rather than
+    // approximately true. A renderer probing for its own capabilities is what C09
+    // I3 forbids, and threading them into `measure` to avoid a branch here would
+    // be that in a longer form.
+    const value =
+      cell?.spark === undefined
+        ? (cell?.text ?? "")
+        : caps === undefined
+          ? " ".repeat(SPARK_CELLS)
+          : sparkline(cell.spark, SPARK_CELLS, caps);
+
     return cell?.tone === undefined
       ? { label, value }
       : { label, value, tone: cell.tone };

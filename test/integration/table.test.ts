@@ -6,15 +6,16 @@
 // other — and both sides are read from the spec rather than restated, so neither
 // can quietly agree with itself.
 import { describe, expect, it } from "vitest";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { focusableRowIds, planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import {
   surfaceColumns,
   surfaceDrops,
   type SurfaceColumn,
 } from "../support/surfaces.js";
-import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { checkMeasurement, formatReport, uncoveredKinds } from "../support/measurement-conformance.js";
-import { TABLE_CORPUS, psColumns } from "../support/blocks.js";
+import { TABLE_CORPUS, psColumns, psTable } from "../support/blocks.js";
 import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 
 function defs(columns: readonly SurfaceColumn[]): readonly ColumnDef[] {
@@ -153,16 +154,43 @@ describe("C11 tier 4 — the table inside C09", () => {
     }
   });
 
-  // `Cell.spark` is in C04's type and C11 renders nothing for it: an inline
-  // sparkline is C12's rasterisation (C12 §1, and its `Consumed by` names table
-  // cells), and a second implementation here is what C09 I6 forbids one directory
-  // over. So the cell renders its text and the series is unread — visible in S03
-  // §2, whose figure draws `0.0372` where the mockup drew `0.0372 ▁▂▃▅▆`.
-  //
-  // Deferred with a blocker rather than left as a comment, because a gap nothing
-  // reports is a gap nobody finds: the seam is C11 calling C12's sparkline for a
-  // cell's `spark`, same layer and acyclic, and it changes this component.
-  it.todo("T4.4: a cell's `spark` renders inline and adds no rows — waits on C12");
+  // The seam, and the deferral that named it expired on the commit that made
+  // `src/presentation/plot/definition.ts` exist — which is TD0 doing exactly what
+  // it is for, one commit after the note above predicted it.
+  it("T4.4 (with C12): a cell's `spark` renders inline and adds no rows", () => {
+    const registry = measurable({
+      definitions: [tableDefinition, plotDefinition],
+      capabilities: FULL_CAPS,
+    });
+    const table = psTable({ id: "spark", rows: 3 });
+
+    // The series is rendered, not ignored. `psTable`'s `spark` cells carry values
+    // and no text, so a renderer that read `cell.text` and stopped would produce a
+    // blank column and pass every row-count assertion in this file.
+    const drawn = registry.renderToLines(table, 160);
+    expect(drawn.join("\n")).toMatch(/[▁▂▃▄▅▆▇█]/u);
+
+    // And it costs nothing in height: a spark is one row of exactly its planned
+    // width (C12 I13), which is what makes `planColumns` indifferent to it.
+    expect(registry.measure(table, 160)).toBe(1 + 3);
+    expect(drawn).toHaveLength(1 + 3);
+  });
+
+  it("T4.4 (with C12): the spark column is exactly its planned width", () => {
+    // Eight cells declared, eight glyphs drawn — one per sample, because a
+    // sparkline is not braille and has no subcell resolution to spend (C12 §3).
+    // A ninth glyph would push every column after it one cell right of its header.
+    const registry = measurable({
+      definitions: [tableDefinition, plotDefinition],
+      capabilities: FULL_CAPS,
+    });
+    const table = psTable({ id: "spark-width", rows: 1 });
+    const row = visible(registry.renderToLines(table, 160)[1] ?? "");
+    const run = /[▁▂▃▄▅▆▇█]+/u.exec(row);
+
+    expect(run).not.toBeNull();
+    expect([...(run?.[0] ?? "")]).toHaveLength(8);
+  });
 
   it("T4.6 (I15): focusableRowIds matches the rendered rows in order", () => {
     const registry = measurable({ definitions: [tableDefinition], capabilities: FULL_CAPS });
