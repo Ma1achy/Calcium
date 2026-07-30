@@ -87,6 +87,14 @@ Each of these produces code that compiles, passes review, and is wrong.
 - **A fail-on-revert test names the change that makes it fail**, not just the assertion.
   "Removing the idempotency guard → T3.14 fails" is the form.
 - **`make enforce` before opening an MR.** Five seconds. It is A03 executed.
+- **An edit script asserts every replacement matched.** `assert old in s` before every
+  `.replace()`, and a script that reports success having changed nothing is a failure.
+  Twelve invariants across four specs were lost this way — the commitments landed and
+  the invariants silently did not — and later an `SS` rule never reached `SCANS` while
+  `make enforce` stayed green, because the anchor named a rule that is inventoried and
+  unimplemented. Both scripts printed `ok`. This is the fabricated-violation discipline
+  applied to the tool that writes the rules, which is where it was missing: ask whether
+  the change fired, not whether the suite is still green.
 - **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
   initialise, serialise.
 

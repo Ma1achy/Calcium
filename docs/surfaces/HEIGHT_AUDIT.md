@@ -44,7 +44,7 @@ Instances, and the first three were the second kind:
 | S03 §3, S05 §3, S06 §5, S15 §5 | `metric`, `age`, `errors`, `p99`, `req/s`, `p50`, `versions` right-aligned | `align`, which `ColumnDef` requires |
 | S01 §2, S03 §2, S13 §2 | A number and a sparkline in one `metric` cell | Nothing — see the fourth verdict below |
 | S04 §3, S11 §2 | A plot area two cells right of its label, data flush to the axis | Nothing — C12 §2 declared three cells and the **figures were right**; see the fifth verdict |
-| C25 §2 (first draft) | A trailing `⋯ 31 unchanged lines` after the last hunk | `Hunk.collapsedBefore` covers the region *before* a hunk; the region after the last one is unrepresentable. Fourth verdict class, second instance — but with **one** figure, so the figure moves |
+| C25 §2 (first draft) | A trailing `⋯ 31 unchanged lines` after the last hunk | `Hunk.collapsedBefore` covers the region *before* a hunk; the region after the last one is unrepresentable. **Fourth verdict class, second instance** — resolved by `Patch.collapsedAfter`, because neither side was wrong |
 
 ### The fourth verdict: neither side is right
 
@@ -102,16 +102,28 @@ Worth separating from the first verdict class, because the remedy is opposite an
 the symptom identical. Both look like a figure and a table disagreeing; deciding by
 which artefact is easier to edit gets one of them backwards every time.
 
-**And the two-figures clause earned its keep immediately.** C25's illustration was
-drawn for the first time in the same fold-in, and its first draft carried a trailing
-`⋯ 31 unchanged lines` that `Hunk.collapsedBefore` cannot express — the field covers
-the region before a hunk, so the tail has nowhere to live. That is the fourth verdict
-class by symptom: a figure and a shape disagreeing about something the shape has to
-carry. But it is **one** figure, and one is a slip, so the row went rather than the
-shape. `Patch.collapsedAfter?: number` is recorded as open in C25 §9 with no consumer
-asking for it.
+**And applying the two-figures clause here was a mistake, which is worth keeping.**
+C25's illustration drew a trailing `⋯ 31 unchanged lines` that `Hunk.collapsedBefore`
+cannot express — the field covers the region before a hunk, so the tail has nowhere to
+live. It was filed as a figure slip on the reasoning that one figure disagreeing with
+a declaration is a slip and two agreeing against it is the declaration being wrong.
 
-The two classes are separated by a count, and the count is doing real work.
+**The count was the wrong test, and asking it was the error.** It separates the first
+verdict class from the fifth, and both of those resolve by *picking a side* — the
+count says which. This is the fourth class, where there is no side to pick: the figure
+was right that a tail gets elided, and `collapsedBefore` was right about the regions it
+covers. Counting figures cannot distinguish "one of these is wrong" from "both are
+right and the shape is short a field", because it never asks whether a side is wrong at
+all.
+
+So the question that comes first is **is either side wrong about what it describes** —
+and only if one of them is does the count decide which. `Patch.collapsedAfter` is the
+resolution, on `Patch` rather than `Hunk` so the interior regions stay one field's and
+nothing double-counts the gap between two hunks (C04 §3).
+
+And it is not a rare case, which is what should have prompted the second look: one hunk
+at line 18 of a two-hundred-line file elides fourteen lines above and a hundred and
+seventy below, and the larger of the two was the unrepresentable one.
 
 ### The braille figures, measured
 

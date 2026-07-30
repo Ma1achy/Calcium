@@ -110,7 +110,15 @@ describe("C12 tier 2 — totality", () => {
         expect(() => sparkline(values, width, FULL_CAPS)).not.toThrow();
       }
     }
-  });
+  },
+  // **An explicit budget, because 3.2 s against a 5 s default is not a margin.**
+  // The sweep is 12 corpora × 200 widths × three rasteriser entry points, one of
+  // the corpora being a 100,000-point series — real work rather than slowness, and
+  // its cost is what makes I2 a claim about every width rather than a spot check.
+  // Left at the default it passed on a quiet machine and timed out on a busy one,
+  // which is the shape of a test that gets its timeout raised by someone who does
+  // not know what it measures. Twenty seconds says the seconds are expected.
+  20_000);
 
   it("T2.3 (I10): no row exceeds its width and no plot exceeds its declared rows", () => {
     const m = measurable({ definitions: [plotDefinition] as never });

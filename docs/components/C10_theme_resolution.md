@@ -217,7 +217,11 @@ Terminal contrast is not a perfect analogue of a browser's — background colour
 
 Three of the four have under ten units of one channel between "this line changed" and "these words changed", which is not a second level; it is the same level twice. And the direction real tools take — lighter on dark, darker on light — is the direction that breaks `comment` and `muted` outright.
 
-**So word-level emphasis is not a background, and the channel that is actually free is `underline`.** `colour` is spoken for by syntax, `background` by the line kind, `bold` and `dim` by the 1-bit tone collapse (§5), and `inverse` would swap the two colour channels and destroy both. `underline` is unclaimed, it composes with everything above it, and — unlike a background — **it survives at 1-bit**, which makes it a better carrier than the thing it replaces. Recorded here rather than decided: word-level highlighting is deferred (C25 I11), and this is the constraint whoever builds it inherits.
+**So word-level emphasis is not a background, and the channel that is actually free is `underline`.** `colour` is spoken for by syntax, `background` by the line kind, `bold` and `dim` by the 1-bit tone collapse (§5), and `inverse` would swap the two colour channels and destroy both. `underline` is unclaimed and composes with everything above it.
+
+**And it degrades better than the thing it replaces, which is not a consolation.** A background is a surface and surfaces vanish entirely at 1-bit (I8) — that is why I24 has to insist the diff background is never the only signal. An attribute survives, because attributes are what the 1-bit collapse already uses to carry tone. So the emphasis the measurement forced is the one that still works on a monochrome terminal, and the design it replaced would have lost word-level highlighting there completely.
+
+**Worth stating in that order**, because a later theme with more headroom will look like permission to restore the background: the budget is spent *and* underline degrades better, and the second reason does not expire when the first does. Recorded rather than decided — word-level highlighting is deferred (C25 I11), and this is the constraint whoever builds it inherits.
 
 **The asymmetry between the two hues is real and not an authoring slip.** Luminance weights green at 0.7152 and red at 0.2126, so the same luminance budget buys a dark theme 73 units of red tint and 38 of green, and a light theme 45 units of green and 15 of red. The four values look balanced and their channel arithmetic is not.
 

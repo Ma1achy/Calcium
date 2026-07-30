@@ -52,13 +52,18 @@ C09 §3's sixteen kinds each have one. C25 had a measurement line and no picture
    22 +       prism.fmx.io/family: volatility
 22 23     replicas: 2
 23 24     template:
+⋯ 170 unchanged lines
 ```
 
-**Eleven rows, and the formula gives eleven**: one path header, one hunk header, eight lines, one collapse marker. Drawn without a panel gutter or blank separator rows, because both belong to whoever composes the block — S10 puts it in a panel — and a figure that includes them is a figure whose row count disagrees with §2's arithmetic. That disagreement is what the surface audit spends its time on, and the cheapest place to not create it is here.
+**Twelve rows, and the formula gives twelve**: one path header, one hunk header, eight lines, and two collapse markers — one before the hunk and one after it. Drawn without a panel gutter or blank separator rows, because both belong to whoever composes the block — S10 puts it in a panel — and a figure that includes them is a figure whose row count disagrees with §2's arithmetic. That disagreement is what the surface audit spends its time on, and the cheapest place to not create it is here.
 
 **Two corrections to this figure, both made by rendering it.** Its first draft indented every row under the header by two cells, which is decoration costing two columns on every line of the one block where the text column is what the reader came for; the rule now runs flush and so does everything below it. And its hunk header read `@@ -18,7 +18,9 @@` against lines that span six and seven — three context, one removed, two added, two context — so a reader deriving the counts from the drawn lines got different numbers from the header drawn above them. `Hunk.header` is a string the block carries verbatim and C25 computes nothing from it, which is precisely why a wrong one survives review: nothing in the renderer disagrees with it.
 
-**A trailing collapsed region cannot be drawn, and the first draft of this figure drew one.** `⋯ 31 unchanged lines` after the last hunk reads well and `Hunk.collapsedBefore` has nowhere to put it — the field covers the region before a hunk, so the regions before and between hunks are expressible and the one after the last hunk is not. One figure against a declared shape is a slip in the figure (C12's fifth verdict class needs *two* figures agreeing before the declaration is the thing that moves), so the row is gone rather than the shape widened. Recorded as open in §9: it wants `Patch.collapsedAfter?: number`, which is a C04 change with no consumer asking for it — S10 renders a manifest, where the interesting thing is never the tail.
+**The trailing collapsed region is `Patch.collapsedAfter`, and getting there took a wrong turn worth recording.** The figure's first draft drew `⋯ 31 unchanged lines` after the last hunk; `Hunk.collapsedBefore` covers the region *before* a hunk, so the tail had nowhere to live. That was first filed as a slip in the figure, on the reasoning that one figure disagreeing with a declaration is a slip and two agreeing against it is the declaration being wrong.
+
+**The count was the wrong test.** It distinguishes HEIGHT_AUDIT's first verdict class from its fifth — both of which resolve by picking a side, and the count says which side. This is the **fourth** class, where neither side is wrong about what it describes and the resolution is to change the shape: the figure was right that a tail gets elided, and `collapsedBefore` was right about the regions it covers. Counting figures cannot tell those apart, because there is no side to pick.
+
+And it is not a rare case. A single hunk at line 18 of a two-hundred-line file elides fourteen lines above and a hundred and seventy below — the larger number is the one that could not be stated. `collapsedAfter` hangs off `Patch` rather than `Hunk` so that the interior regions stay `collapsedBefore`'s alone and nothing double-counts the gap between two hunks; C04 §3 carries the reasoning.
 
 ### The row anatomy
 
@@ -141,7 +146,10 @@ unified                                  split
   + hunk.lines.length                      + pairedRows(hunk.lines)
   + (hunk.collapsedBefore ? 1 : 0)         + (hunk.collapsedBefore ? 1 : 0)
   )                                        )
++ (block.collapsedAfter ? 1 : 0)        + (block.collapsedAfter ? 1 : 0)
 ```
+
+**The tail is the block's row, not a hunk's**, and it is one row on the same terms as every `collapsedBefore` (I5). A patch with no hunks and a `collapsedAfter` is a header and a marker — two rows, and a legitimate shape: it says the file is unchanged and states how much of it there is.
 
 `pairedRows` walks each maximal run of consecutive changed lines and emits `max(removes, adds)` rows for it, one row per unchanged line otherwise. It reads the same field `lines.length` reads, so it tokenises nothing and allocates nothing — `measure` stays as cheap in split as in unified, which is what keeps C09 I1 affordable.
 
@@ -149,7 +157,7 @@ unified                                  split
 
 That is a claim about *alignment*, and it is separate from the arithmetic above. Wrapping would make height depend on the width of the content continuously; the layout breakpoint makes it depend on width in exactly one step, at a value the block declares. A sweep across the seven widths sees two values and knows which side of the breakpoint each is on — which is a weaker property than one value, and still strong enough to catch a wrap.
 
-A collapsed region is **one row** in both layouts, carrying its own count: `⋯ 12 unchanged lines`. The count comes from `collapsedBefore`, so measurement reads it directly rather than deriving it.
+A collapsed region is **one row** in both layouts, carrying its own count: `⋯ 12 unchanged lines`. The count comes from the field — `collapsedBefore` on a hunk, `collapsedAfter` on the block — so measurement reads it directly rather than deriving anything.
 
 ---
 
@@ -256,7 +264,7 @@ Consequences that matter:
 - **I2a** — Height is constant across every width that selects the same layout, and changes only at the layout breakpoint, by the number of rows pairing saves. `measure` is pure and total at every width. **The original I2 claimed width-independence outright and was incompatible with §3's split pairing** — the two were individually correct and jointly unsatisfiable, which is a defect class A03 §2 names and does not check.
 - **I3** — `measure` never tokenises and never reads capabilities except for the collapse marker's content budget (§3).
 - **I4** — Every `add` and `remove` line carries its prefix glyph regardless of colour depth. D29 at the source.
-- **I5** — A collapsed region occupies exactly one row and states its own count.
+- **I5** — A collapsed region occupies exactly one row and states its own count, wherever it sits: `collapsedBefore` before its hunk, `collapsedAfter` below the last one. The two are the same row rendered from different fields, and a patch elides in exactly three places — before, between, after — of which the first two are one field's and the third is the other's (→ C04 §3).
 - **I6** — C25 registers through C09's public `register`; it is not privileged.
 - **I7** — C25 holds no state. `measure` and `render` are pure over the block.
 - **I8** — C25 declares no block types. `Patch` and `Hunk` are C04's.
@@ -279,7 +287,11 @@ Consequences that matter:
 
 It is a **requirement rather than a preference**, which is what changed: §2's row anatomy cannot be expressed without it. The foreground is spoken for by syntax on all three line kinds, and bold and dim are spoken for by the 1-bit tone collapse (C10 §5), so there is no channel left. Option (b) would make added and removed lines the same colour, and option (c) would suppress highlighting on exactly the lines a reader most wants to read.
 
-**One level, and the second was measured out.** This section was written expecting two — a line background, and a stronger one for the precisely changed words within a line, which is what every real diff tool uses for word-level emphasis. C10 §4a measured the stronger pair against the contrast floors and there is no room for it: the recessive slots bound how much tint a diff background may carry, and the *first* level spends nearly all of it, leaving six to nine units of one channel on three of the four values. So word-level emphasis (I11) is **`underline`**, the one style channel nothing else claims, and it has the property a background does not — it survives at 1-bit.
+**One level, and the second was measured out.** This section was written expecting two — a line background, and a stronger one for the precisely changed words within a line, which is what every real diff tool uses for word-level emphasis. C10 §4a measured the stronger pair against the contrast floors and there is no room for it: the recessive slots bound how much tint a diff background may carry, and the *first* level spends nearly all of it, leaving six to nine units of one channel on three of the four values.
+
+**So word-level emphasis (I11) is `underline`, and it is a better answer than the one it replaces.** A background vanishes at 1-bit — that is C10 I8, and it is why I13 has to say the background is never the only signal. An attribute does not: attributes are already how the 1-bit collapse carries tone (C10 §5), so emphasis expressed as one degrades to *itself* rather than to nothing. A patch at one bit would have lost its word-level highlighting entirely under the design this replaces, and keeps it under this one.
+
+**Recorded because a wider budget will look like an invitation to undo it.** Someone authoring a theme with more headroom — a lighter `bg`, a less recessive `muted` — will find room for a second background and read this section as a constraint that has lifted. It has not: the constraint produced the better answer, and restoring the background trades a signal that survives monochrome for one that does not. The order is: the tint budget is spent, *and* underline degrades better. The second reason outlives the first.
 
 **Degradation needs no new principle.** C10 §4's surfaces already degrade to nothing at 1-bit and `resolve`'s surface path already implements it, so a diff background is a surface. What makes losing it lossless is I13.
 
@@ -411,8 +423,6 @@ Six tiers. No state machine, so no transition table (A02 §7).
 | A whole-file view with diff decoration | The editor, and it is the same component as the fullscreen view with more data (§3b) |
 
 ### Open
-
-**A trailing collapsed region cannot be expressed.** `Hunk.collapsedBefore` covers the region before a hunk, so the regions before and between hunks are representable and the one after the last hunk is not. §2 records that the first draft of the illustration drew one. It wants `Patch.collapsedAfter?: number`, which is a C04 shape change and additive — deliberately not taken, because there is no consumer: S10 renders a manifest against what is deployed, where the interesting thing is the change and never the tail. Recorded so that whoever wants it finds the reasoning rather than the field.
 
 **`code.startLine` is not landing here.** Scratchpad 6 §3 designs it — a number rather than a boolean, absent meaning no gutter, the width derived — and its consumer is S08, which is not built. It is additive and optional so nothing breaks, but it changes golden frames for every `code` fixture that opts in, and touching a built component for no consumer is the thing the discipline exists to prevent. `markLine` is weaker again and stays open.
 

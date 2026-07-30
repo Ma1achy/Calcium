@@ -71,9 +71,13 @@ Generalising it turned up three things the narrow pattern had been hiding, and n
 
 A mechanism would be n² prose comparison across 25 specs, which is not a check but a second reading of everything. So this is a note to the reader rather than a row in a table: **pairwise consistency between invariants is unenforced**, and the place it surfaces is the first time someone tries to satisfy two at once.
 
-**A second instance, one component later, and it was found the same way.** C25 I2 claimed height is independent of width; §3 chose the layout by width; and split layout pairs a removed line with its added counterpart on one row, so the row count differs across the breakpoint. Each defensible alone. It surfaced while drawing the illustration — the two figures gave nine rows and eleven from one block — and the resolution kept the invariant that carries load (I1, measurement equals rendered rows) and weakened the one that was a convenience (I2a, constant *within* a layout).
+**A second instance, one component later, and it was found the same way.** C25 I2 claimed height is independent of width; §3 chose the layout by width; and split layout pairs a removed line with its added counterpart on one row, so the row count differs across the breakpoint. Each defensible alone. It surfaced while drawing the illustration — the two figures gave ten rows and eleven from one block — and the resolution kept the invariant that carries load (I1, measurement equals rendered rows) and weakened the one that was a convenience (I2a, constant *within* a layout).
 
-Two instances in two consecutive components is worth stating plainly: this is not a rare pathology. Both were found by attempting the work — one by implementing, one by illustrating — and in both the invariants were each true. The prediction is that the next one is also found that way, and the note's value is that whoever finds it recognises the shape instead of assuming one of the two invariants is simply wrong.
+**Two instances in two consecutive components, and both were found the same way: by one implementation having to satisfy both at once.** C12's surfaced while writing the rasteriser, C25's while drawing the figure the renderer would be written against. In neither case did reading the invariants side by side reveal anything, because in both cases each invariant was true.
+
+That is the closest thing to a detection method there is, and it is worth stating as one rather than leaving it as a coincidence: **the contradiction surfaces when something must satisfy both simultaneously, and nowhere earlier.** A reader looking for the third instance should expect it at the moment of implementation, and should recognise the shape — two true statements, one impossible object — rather than concluding that one of the two is simply wrong. Neither was, either time.
+
+The mechanism remains n² prose comparison and remains untractable. What is tractable is the expectation.
 
 **The class extends past rules into the harnesses they run in.** A rule executes inside a fake terminal, a fake clock or a pseudo-terminal, and a harness parameter nobody has exercised is a mechanism that cannot be *seen* to have worked — the same defect from the other side. `runInPty` accepted an `env` record and hard-coded node-pty's `name`, which *is* the child's TERM, so `TERM=dumb` ran under `xterm-256color`; the parameter had never been passed until C02's tier 5 passed it. The standing rule is in `test/support/README.md`: **every helper parameter that shapes the environment under test carries an assertion that fails if the parameter is ignored**, and a parameter with no observable effect is reported rather than skipped, because it may mean the parameter should not exist.
 
@@ -82,6 +86,23 @@ Two instances in two consecutive components is worth stating plainly: this is no
 Every rule therefore ships with four things: an implementation reachable from the inventory, a fabricated violation, an assertion that its scope reaches the tree, and — where the rule governs named entities — an assertion that those names exist. The three catch different failures. A fabricated violation is written at a path inside the declared scope, so it fires whether or not that scope describes anything; and a scope full of real files says nothing about whether the names a rule enumerates are real. All three are in `test/unit/enforce-rules.test.ts`.
 
 A rule whose scope or names are not yet real is listed there as **pending**, with the component that will create them; the pending entry is itself asserted, so it fails once the scope becomes real rather than outliving its reason.
+
+### Records that cannot outlive their reason
+
+That pending entry is one of a family, and the family is worth naming because its members look unrelated and are the same idea: **a record of a gap, written so that closing the gap breaks the record.** Four mechanisms now:
+
+| | Records | Fails when |
+|---|---|---|
+| A **pending** rule entry | a scope or a name that is not real yet | the scope becomes real |
+| `ACKNOWLEDGED_BACKLOG` | deferrals whose blocker already exists | one is written, or a new one appears |
+| `UNSCAFFOLDED` | a component with no file in the tree at all | the file appears |
+| **A test that asserts a defect** | behaviour that is wrong and not yet fixable here | the defect is fixed |
+
+The fourth is new with C01 T5.8 and it inverts the usual reading, which is why it needs saying loudly rather than quietly. **That test is green because the bug exists.** A frame composed at 100 and written into an 80-column terminal wraps; it asserts the wrap, and the wrap is the failure C01 §5 documents and deliberately does not fix, because the per-frame snapshot belongs to whoever writes the frame path.
+
+So when the gap closes, the test fails — and **the danger is that someone reads a red test beside a fix and deletes it**, which loses the only notification that the boundary moved. A skipped test, a todo and a pending entry all announce themselves as incomplete; this one announces itself as passing. It therefore has to carry the inversion in its own name and in its body, both of which say what a failure means: not that the fix is wrong, but that the documented behaviour is no longer the behaviour, and the test is now describing history.
+
+The same discipline SS26's pending entry has, pointed at a defect rather than at a rule.
 
 ---
 
