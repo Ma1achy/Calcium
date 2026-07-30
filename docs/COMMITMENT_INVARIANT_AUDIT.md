@@ -297,7 +297,7 @@ worth naming here:
 The only place in the corpus where a commitment and its invariant state different
 numbers. §3 lists three. *The invariant is the weaker statement and should be
 raised to three*, or the commitment softened — but they cannot both stand, and
-today a test citing I12 passes with two bindings while the commitment promises
+today a test citing C17 I12 passes with two bindings while the commitment promises
 three.
 
 ---

@@ -255,7 +255,7 @@ export const SCANS = [
     scope: "src/data/process/", allow: [],
     why: "child output is piped; it never reaches the real terminal" },
 
-  // I8 and I11, made mechanical. Two things are banned and the asymmetry is the
+  // C21 I8 and I11, made mechanical. Two things are banned and the asymmetry is the
   // rule rather than an oversight:
   //
   //   - **Timers.** C21 holds no timing policy anywhere. The escalation ladder
@@ -272,7 +272,7 @@ export const SCANS = [
     scope: "src/data/process/", allow: [],
     why: "C21 delivers signals and holds no timing policy — the ladder is C06's, and a second copy is the one that drifts" },
 
-  // I14. The three ambient reads C21 does not make, because it is given all
+  // C21 I14. The three ambient reads C21 does not make, because it is given all
   // three (`env`, `stdin`, `debug`).
   //
   // `process.env` is SS10's already and this does not duplicate it: SS10 allows
