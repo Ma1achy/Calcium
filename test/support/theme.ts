@@ -31,7 +31,17 @@ export const SYNTAX_SLOTS = [
   "punctuation",
 ] as const;
 
-export const SURFACES = ["bg", "bgElev", "bgDeep", "border", "borderStrong"] as const;
+export const SURFACES = [
+  "bg",
+  "bgElev",
+  "bgDeep",
+  "border",
+  "borderStrong",
+  // §4a. Written out rather than derived from `Surfaces`, for T2.18's reason: a
+  // list taken from the type it checks agrees with itself on any addition.
+  "diffAdd",
+  "diffRemove",
+] as const;
 
 /** Only the depth is read; the rest is here so a call site reads honestly. */
 export function caps(colourDepth: TerminalCapabilities["colourDepth"]): Readonly<Pick<TerminalCapabilities, "colourDepth">> {

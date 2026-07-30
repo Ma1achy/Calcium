@@ -20,6 +20,11 @@ export const DARK: ThemeTokens = Object.freeze({
     bgDeep: "#141414",
     border: "#2c2c2c",
     borderStrong: "#3a3a3a",
+
+    // §4a — the two text-bearing diff surfaces. Authored against the check
+    // rather than before it, and A01 A.1 records all 48 measured ratios.
+    diffAdd: "#002600",
+    diffRemove: "#490000",
   }),
 
   palettes: Object.freeze({

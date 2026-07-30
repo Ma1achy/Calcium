@@ -57,6 +57,22 @@ export const DARK_FOUR_BIT: FourBitMap = Object.freeze({
   "surface.bgDeep": 0,
   "surface.border": 8,
   "surface.borderStrong": 7,
+  // §4a's two, and the one place a background lands on text at four bits.
+  //
+  // **No floor is measured against these, and none can be.** The sixteen are the
+  // terminal's own values, so a ratio computed here would be a ratio against a
+  // colour this process cannot see — which is why the check in `contrast.ts`
+  // covers 24-bit tokens and stops there. What makes an unmeasurable background
+  // acceptable at this depth and unacceptable at twenty-four is I24: the marker
+  // and the toned gutter carry the add/remove distinction on their own, so a
+  // background that reads badly costs legibility of the tint and no information.
+  //
+  // Plain rather than bright. The bright half of the sixteen is where the
+  // foreground tones live, and a background from the same half competes with the
+  // text sitting on it.
+  "surface.diffAdd": 2,
+  "surface.diffRemove": 1,
+
 });
 
 export const LIGHT_FOUR_BIT: FourBitMap = Object.freeze({
@@ -88,6 +104,10 @@ export const LIGHT_FOUR_BIT: FourBitMap = Object.freeze({
   "surface.bgDeep": 15,
   "surface.border": 7,
   "surface.borderStrong": 8,
+  // §4a, and the same reasoning as the dark map above.
+  "surface.diffAdd": 2,
+  "surface.diffRemove": 1,
+
 });
 
 /**

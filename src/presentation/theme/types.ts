@@ -38,6 +38,19 @@ export type Surfaces = Readonly<{
   bgDeep: string;
   border: string;
   borderStrong: string;
+  /**
+   * The line background of an added or removed patch row (C10 §4a). The first
+   * text-bearing surfaces besides `bg` and `bgElev`, which is what extends §4's
+   * contrast floors to them.
+   *
+   * **Two, not four.** A stronger pair for the precisely changed words within a
+   * changed line was specified and withdrawn: `syntax.comment` and `tone.muted`
+   * are recessive by design and bound how much tint a diff background may carry,
+   * and the first level spends nearly all of it — six units of one channel on
+   * dark `diffAdd`. Word-level emphasis is `underline`'s (C25 I11).
+   */
+  diffAdd: string;
+  diffRemove: string;
 }>;
 
 export type ThemeTokens = Readonly<{
@@ -66,6 +79,12 @@ export type ColourValue =
 
 export type Style = Readonly<{
   colour?: ColourValue;
+  /**
+   * The second colour channel, and the last one (§4a, I22). Set only by
+   * `resolveBackground`, and only from a `surface` ref: a tone painted as a
+   * background is a tone nothing measured a floor for in that role.
+   */
+  background?: ColourValue;
   bold?: boolean;
   dim?: boolean;
   inverse?: boolean;

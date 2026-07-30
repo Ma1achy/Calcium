@@ -4,9 +4,11 @@ import { readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   defaultTheme,
+  diffPairs,
   floorFor,
   ratio,
   resolve,
+  resolveBackground,
   resolveTone,
   type ColourRef,
 } from "../../src/presentation/theme/index.js";
@@ -230,6 +232,101 @@ describe("C10 contract", () => {
       }
       for (const surface of SURFACES) {
         expect(tokens.fourBit[`surface.${surface}`], `${variant} surface.${surface}`).toBeTypeOf("number");
+      }
+    }
+  });
+
+  // --- §4a, the diff surfaces ----------------------------------------------
+
+  it("T2.14a (I23): 48 ratios — twelve slots × two diff surfaces × two variants", () => {
+    // Recomputed from the shipped tokens, never read from A01 A.1. The catalogue
+    // is an assertion this upholds rather than a record of what someone intended,
+    // which is T2.4's reason applied to the surfaces C25 made text-bearing.
+    const failures: string[] = [];
+    let checked = 0;
+
+    for (const variant of VARIANTS) {
+      const tokens = defaultTheme[variant];
+      for (const [palette, slot, surface, hex] of diffPairs(tokens)) {
+        checked += 1;
+        const value = tokens.palettes[palette]?.slots[slot];
+        const measured = ratio(value as string, hex);
+        const floor = floorFor(slot);
+        if (measured < floor) {
+          failures.push(`${variant} ${palette}.${slot} on ${surface}: ${measured.toFixed(2)} < ${floor}`);
+        }
+      }
+    }
+
+    expect(checked, "twelve slots × two surfaces × two variants").toBe(48);
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("T2.14b (I23): the diff surfaces are paired with exactly those twelve slots", () => {
+    // **Asserted on the pairing, not on its results**, because both ways of
+    // getting it wrong pass a results-only check on a theme that happens to be
+    // fine. Widening it to every `meaning` slot fails on seven tones that never
+    // land on a diff background; narrowing it to `syntax` leaves the numbers and
+    // the marker unchecked on the surface they are drawn on.
+    const pairs = diffPairs(defaultTheme.dark);
+    const slots = [...new Set(pairs.map(([palette, slot]) => `${palette}.${slot}`))].sort();
+
+    expect(slots).toEqual([
+      "syntax.comment",
+      "syntax.function",
+      "syntax.key",
+      "syntax.keyword",
+      "syntax.number",
+      "syntax.operator",
+      "syntax.punctuation",
+      "syntax.string",
+      "syntax.type",
+      "tone.error",
+      "tone.muted",
+      "tone.ok",
+    ]);
+    expect([...new Set(pairs.map(([, , surface]) => surface))].sort()).toEqual(["diffAdd", "diffRemove"]);
+  });
+
+  it("T2.14c (I23, §4a): seven surfaces, and the withdrawn strong pair is absent", () => {
+    // The pair that was specified, measured and removed. Asserted absent rather
+    // than merely unmentioned: a spec that measured something out and a token
+    // file that quietly kept it is exactly the drift this suite exists to stop,
+    // and an unused surface with no floor behind it is what someone reaches for.
+    for (const variant of VARIANTS) {
+      const names = Object.keys(defaultTheme[variant].surfaces).sort();
+      expect(names, variant).toEqual([
+        "bg",
+        "bgDeep",
+        "bgElev",
+        "border",
+        "borderStrong",
+        "diffAdd",
+        "diffRemove",
+      ]);
+    }
+  });
+
+  it("T2.20 (I22): over every ref × every depth, `background` is absent or a tagged value", () => {
+    // T2.18's assertion for the second channel, and the kinds are written out
+    // literally for the same reason: a list derived from the type agrees with
+    // itself and passes on any addition.
+    const KINDS = ["rgb", "ansi256", "ansi16"];
+    const refs: ColourRef[] = [
+      ...SURFACES.map((s) => `surface.${s}` as ColourRef),
+      ...TONES.map((t) => `tone.${t}` as ColourRef),
+      ...SYNTAX_SLOTS.map((s) => `syntax.${s}` as ColourRef),
+    ];
+
+    for (const variant of VARIANTS) {
+      const current = store(variant).current;
+      for (const ref of refs) {
+        for (const depth of DEPTHS) {
+          const background = resolveBackground(ref, current, caps(depth)).background;
+          if (background === undefined) continue;
+          expect(typeof background, `${ref} at ${depth}`).toBe("object");
+          expect(KINDS, `${ref} at ${depth}`).toContain(background.kind);
+        }
       }
     }
   });

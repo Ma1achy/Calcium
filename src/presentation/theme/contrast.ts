@@ -75,6 +75,80 @@ export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, s
 }
 
 /**
+ * §4a — the two diff surfaces, and the twelve slots that land on them.
+ *
+ * **A separate pairing rather than two more entries in `textSurfaces`.**
+ * `textSurfaces` drives *every* `meaning` slot, so adding these there would bind
+ * all ten tones and all nine `syntax` slots to a diff background — and seven of
+ * the tones never appear on one.
+ *
+ * It is worth being exact about what that costs, because the obvious claim is
+ * wrong: **against the shipped tokens the widened check passes.** All seven clear
+ * their floors against both diff surfaces with room to spare, the tightest being
+ * `dim` at 4.74. So the widening is not caught by a failure today — which is
+ * precisely why it is worth a rule. What it does is bind seven slots to a
+ * constraint they do not have to satisfy, so a *later* theme is rejected for a
+ * failure nobody can see, and the fix will look like weakening the check.
+ *
+ * That is C10 §4's own argument for excluding `bgDeep` — do not validate against
+ * a surface no text meets — applied in the mirror: do not validate a slot against
+ * a surface that slot never lands on. The scope of a floor is where the text goes.
+ *
+ * Twelve, because the background covers the whole row: the nine `syntax` slots in
+ * the text, and the three tones the gutter uses. Narrowing it to `syntax` would
+ * leave the numbers and the marker unchecked on the surface they are drawn on,
+ * which is C10 T2.14b's other direction.
+ */
+const DIFF_SURFACES = Object.freeze(["diffAdd", "diffRemove"]);
+
+const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  syntax: Object.freeze([
+    "keyword", "string", "comment", "number", "key", "type", "function", "operator", "punctuation",
+  ]),
+  tone: Object.freeze(["ok", "error", "muted"]),
+});
+
+/** The pairing, exposed so the suite can assert its shape rather than its results. */
+export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, string, string, string])[] {
+  const out: (readonly [string, string, string, string])[] = [];
+  for (const surface of DIFF_SURFACES) {
+    const hex = (tokens.surfaces as Readonly<Record<string, string>>)[surface];
+    if (hex === undefined || !isHex(hex)) continue;
+    for (const [palette, slots] of Object.entries(DIFF_SLOTS)) {
+      for (const slot of slots) {
+        const value = tokens.palettes[palette]?.slots[slot];
+        if (value === undefined || !isHex(value)) continue;
+        out.push([palette, slot, surface, hex]);
+      }
+    }
+  }
+  return Object.freeze(out);
+}
+
+function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
+  const errors: ThemeError[] = [];
+
+  for (const [palette, slot, surface, hex] of diffPairs(tokens)) {
+    const value = tokens.palettes[palette]?.slots[slot];
+    if (value === undefined) continue;
+
+    const floor = floorFor(slot);
+    const measured = ratio(value, hex);
+    if (measured >= floor) continue;
+
+    errors.push({
+      path: `palettes.${palette}.${slot}`,
+      message:
+        `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${hex}), ` +
+        `below its floor of ${floor} : 1 — a diff background is a surface text ` +
+        `lands on, so the background moves rather than the slot`,
+    });
+  }
+
+  return errors;
+}
+
+/**
  * Every failure, not the first. A theme with four bad tones should be fixed in
  * one pass, and a validator that stops at the first turns that into four.
  */
@@ -96,6 +170,8 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   for (const [paletteName, palette] of Object.entries(tokens.palettes)) {
     errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg));
   }
+
+  errors.push(...validateDiffSurfaces(tokens));
 
   return Object.freeze(errors);
 }

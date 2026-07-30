@@ -77,4 +77,32 @@ describe("sgr — the depth tag decides the sequence", () => {
     // time would leave whichever it forgot bleeding into the next block.
     expect(SGR_RESET).toBe(seq("0"));
   });
+
+  it("T1.19 (C10 §4a): the background channel is the same tag against a different base", () => {
+    // 48 rather than 38, and 40/100 rather than 30/90. Written as one function
+    // over both channels precisely so this cannot drift — the failure being a
+    // background emitted as `38`, which paints the text instead of behind it and
+    // reads as a theme bug rather than a base off by ten.
+    expect(sgr({ background: { kind: "rgb", hex: "#002600" } })).toBe(seq("48;2;0;38;0"));
+    expect(sgr({ background: { kind: "ansi256", index: 110 } })).toBe(seq("48;5;110"));
+    expect(sgr({ background: { kind: "ansi16", index: 2 } })).toBe(seq("42"));
+    expect(sgr({ background: { kind: "ansi16", index: 10 } }), "the bright set").toBe(seq("102"));
+  });
+
+  it("T1.20 (C10 §4a): both channels in one sequence, foreground first", () => {
+    // A patch row is exactly this: a `syntax` slot in the text and a diff surface
+    // behind it, in one span. The order is the order `sgr` writes them and is
+    // asserted so a later reordering is a decision rather than a diff.
+    expect(
+      sgr({ colour: { kind: "rgb", hex: "#c678dd" }, background: { kind: "rgb", hex: "#002600" } }),
+    ).toBe(seq("38;2;198;120;221;48;2;0;38;0"));
+  });
+
+  it("T1.21 (C10 §4a): a four-bit background is never written as `48;5;n`", () => {
+    for (let i = 0; i < 16; i += 1) {
+      const written = sgr({ background: { kind: "ansi16", index: i } });
+      expect(written, `index ${i}`).not.toContain("48;5;");
+      expect(written).toBe(seq(String(i < 8 ? 40 + i : 100 + (i - 8))));
+    }
+  });
 });
