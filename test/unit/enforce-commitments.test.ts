@@ -15,8 +15,15 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   checkCommitments,
+  checkOrdering,
+  checkReferences,
   commitmentsOf,
+  expectedOrder,
+  invariantOrderOf,
   invariantsOf,
+  OWNERS,
+  REFERENCE_EXCEPTIONS,
+  referenceFiles,
   specFiles,
 } from "../../tools/enforce/commitments.mjs";
 
@@ -196,5 +203,262 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
     // spec that had got the cross-reference right.
     const source = spec([["I1", "one."]], ["Elsewhere's (→ C04 I20)."]);
     expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
+  });
+});
+
+// --- SP2 — the numbers locate what they name ------------------------------
+//
+// Every fabrication below **asserts that it parses to the ids intended before it
+// asserts a verdict.** A03 §2 records SP1 broken twice by its fixtures rather
+// than its logic — once by `- **I1 — text**`, which parses as no invariants at
+// all and makes every citation in it read as dangling. A fixture written by the
+// author of the rule, in the same sitting, carries the author's misreading; the
+// only cheap defence is to check that the fixture says what it looks like.
+
+/** Invariants alone, in the corpus's exact form. `spec()` needs commitments too. */
+function invariantList(ids: readonly string[]): string {
+  return ["# C99 — fabricated", "", "## Invariants", "", ...ids.map((id) => `- **${id}** — text.`), ""].join(
+    "\n",
+  );
+}
+
+describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
+  const FILE = "docs/components/C99_x.md";
+
+  /** Parses first, then judges. The fixture is the thing most likely to be wrong. */
+  function judge(ids: readonly string[]): readonly [string[], ReturnType<typeof checkOrdering>] {
+    const read = at(invariantList(ids), FILE);
+    const parsed = invariantOrderOf(FILE, read);
+    expect(parsed, "the fabrication does not parse to what it looks like").toEqual([...ids]);
+    return [parsed, checkOrdering([FILE], read)];
+  }
+
+  it("SP2: the real corpus, and it is a corpus", () => {
+    // The vacuity half. `checkOrdering` skips a spec declaring nothing, so a
+    // parser that stopped matching would report twenty-five clean documents.
+    const files = specFiles();
+    expect(files.length).toBe(25);
+
+    const total = files.reduce((n, f) => n + invariantOrderOf(f).length, 0);
+    expect(total, "355 invariants at the last audit; the parser must still see them").toBeGreaterThan(
+      340,
+    );
+
+    expect(checkOrdering(files), "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP2: an ordered list passes, lettered variants included", () => {
+    const [, clean] = judge(["I1", "I2", "I2a", "I3"]);
+    expect(clean).toEqual([]);
+  });
+
+  it("SP2: a transposition fails, naming the position and what belongs there", () => {
+    // C01's shape: an invariant appended to the end of a related group rather
+    // than the end of the list. The right editorial instinct, and the reason the
+    // remedy renumbers rather than reorders.
+    const [, violations] = judge(["I1", "I2", "I5", "I3", "I4"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP2");
+    expect(violations[0]?.message).toContain("position 3 holds I5 where I3 belongs");
+  });
+
+  it("SP2: a gap fails, and says which number is missing", () => {
+    const [, violations] = judge(["I1", "I2", "I4"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("gap");
+    expect(violations[0]?.message).toContain("I3 is not");
+  });
+
+  it("SP2: a duplicated id fails", () => {
+    // The class A03 §2 records for rule ids, in the invariant list: every check
+    // that compares sets sees one member, so the second invariant is invisible
+    // to all of them and a citation resolves to whichever a reader finds first.
+    const [, violations] = judge(["I1", "I2", "I2", "I3"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("declares I2 twice");
+  });
+
+  it("SP2: a lettered id whose base is elsewhere fails", () => {
+    // What the letter *means* is "a variant of I2", and the adjacency is the
+    // whole of how it says so. `I1, I2, I3, I2a` declares a variant four lines
+    // from the thing it varies, which reads as an ordering slip and is not one.
+    const [, violations] = judge(["I1", "I2", "I3", "I2a"]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("the invariant before it is I3");
+  });
+
+  it("SP2: expectedOrder carries the letter rather than the position", () => {
+    // The trap a positional renumber falls into, asserted directly because it is
+    // the one the renumber script got wrong on its first pass: C04's `I20a`
+    // follows `I20`, so when `I20` becomes `I28` the variant becomes `I28a` —
+    // not `I29`, and not whatever id happens to sit at that index.
+    expect(expectedOrder(["I5", "I6", "I6a", "I7"])).toEqual(["I1", "I2", "I2a", "I3"]);
+    expect(expectedOrder(["I1", "I2", "I2a"]), "already correct, so unchanged").toEqual([
+      "I1",
+      "I2",
+      "I2a",
+    ]);
+  });
+});
+
+// --- SP3 — every reference resolves ---------------------------------------
+
+describe("A03 SP3 — invariant references resolve outside the specs too", () => {
+  it("SP3: the real tree is clean, and the resolver saw it", () => {
+    // **Both halves, and the second is the whole point.** A resolver that walked
+    // nothing, or whose token pattern stopped matching, returns no violations —
+    // indistinguishable from a clean tree. So the count of references it actually
+    // resolved is asserted, four figures, against a corpus of ~1500.
+    const files = referenceFiles();
+    expect(files.length, "src, test, tools and the documents outside components/").toBeGreaterThan(
+      200,
+    );
+
+    const { violations, resolved } = checkReferences(files);
+    expect(resolved, "the resolver must see the corpus, not merely fail to object").toBeGreaterThan(
+      1000,
+    );
+    expect(
+      violations.map((v) => `${v.file} — ${v.message}`),
+      "run `make enforce` for the detail",
+    ).toEqual([]);
+  });
+
+  it("SP3: every owner-map entry matches something in the tree", () => {
+    // SS26's class, inside the map this rule depends on. A row for
+    // `src/presentation/blocks` when the tree holds `src/presentation/block/`
+    // silently un-owns every file under it, and every bare reference in them
+    // becomes an unowned one — or worse, resolves against a topic guess.
+    const files = referenceFiles();
+    for (const owner of OWNERS) {
+      expect(
+        files.some((f) => f.startsWith(owner.path)),
+        `OWNERS names ${owner.path}, which matches no file`,
+      ).toBe(true);
+    }
+  });
+
+  it("SP3: a qualified reference to an invariant that does not exist fails", () => {
+    const read = at("// C09 I99 says so.\n", "src/fake.ts");
+    const { violations } = checkReferences(["src/fake.ts"], read, {});
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP3");
+    expect(violations[0]?.message).toContain("cites C09 I99");
+  });
+
+  it("SP3 fires: the C02 test citing C01's invariants, restored", () => {
+    // **The fabrication is the real defect**, copied from the call site rather
+    // than invented (A03 commitment 14a). `test/integration/capabilities.test.ts`
+    // cited a bare `I13` about aborting before first paint — C01's rule, in a
+    // file about C02 — and had done since the file was written.
+    const read = at(
+      "    // I13, and the reason it is stated as \"aborts before first paint\".\n",
+      "test/integration/capabilities.test.ts",
+    );
+    const { violations } = checkReferences(["test/integration/capabilities.test.ts"], read, {});
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("cites C02 I13 (bare, by owner)");
+  });
+
+  it("SP3 fires: a bare reference in a file nothing owns", () => {
+    const read = at("Something about I5.\n", "docs/surfaces/S99_fake.md");
+    const { violations } = checkReferences(["docs/surfaces/S99_fake.md"], read, {});
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("nothing before it says which spec owns it");
+  });
+
+  it("SP3: an owner is authoritative and adjacency overrides it", () => {
+    // The two halves of resolution, in one file. `I2a` is C25's because the file
+    // is C25's, even though C14 is named in the sentence before it — proximity
+    // does not overrule an owner, and four of the first run's findings were
+    // exactly that mistake. `C10 I22` is C10's because it says so.
+    const read = at(
+      [
+        " * C14 virtualises on it.",
+        " * I2a is the weaker one.",
+        " * The surface comes from C10 I22.",
+        "",
+      ].join("\n"),
+      "src/presentation/patch/height.ts",
+    );
+
+    expect(checkReferences(["src/presentation/patch/height.ts"], read, {}).violations).toEqual([]);
+  });
+
+  it("SP3: a qualified reference wrapped across lines is still qualified", () => {
+    // **The rule's own first defect, found by running it.** `lines.ts` writes
+    // `(C10\n * I22)`, and a resolver reading one line at a time sees a bare
+    // `I22` in a C25 file and reports a defect that is not there. Adjacency is
+    // measured over the gap between the two tokens — whitespace and the leaders a
+    // wrapped line carries — rather than over a line.
+    const read = at(
+      [
+        "/**",
+        " * The background arrives through C10's `resolveBackground` (C10",
+        " * I22), so the two channels cannot degrade differently.",
+        " */",
+        "",
+      ].join("\n"),
+      "src/presentation/patch/lines.ts",
+    );
+
+    expect(checkReferences(["src/presentation/patch/lines.ts"], read, {}).violations).toEqual([]);
+  });
+
+  it("SP3: in a document, proximity is the only signal and it carries the paragraph", () => {
+    // The corpus cites in run-on lists — the pairing audit's appendix is
+    // `C03 I9 · C04 I10, I11, I19 · C05 …` — and in blockquotes that wrap mid
+    // sentence, so the scope crosses lines and ends at the blank one.
+    const read = at(
+      ["C04 I10, I11 and I12 are unbacked.", "", "And I1 is nobody's."].join("\n"),
+      "docs/surfaces/S99_fake.md",
+    );
+    const { violations } = checkReferences(["docs/surfaces/S99_fake.md"], read, {});
+
+    expect(violations, "the run-on list resolves; the id after the break does not").toHaveLength(1);
+    expect(violations[0]?.message).toContain("bare I1");
+  });
+
+  it("SP3: markdown code is a form being illustrated, not a reference", () => {
+    // Six exception entries the plan expected, replaced by one rule read off the
+    // corpus: every id inside a code span or a fenced block in the documents is
+    // an illustration — `(I3, I4)`, `T3.7 (I5): …`, `- **I1** — text` — and not
+    // one occurrence anywhere is a real reference.
+    const read = at(
+      ["Cite it as `T3.7 (I5): …` in the test name.", "", "```", "3. …text… (I99)", "```", ""].join(
+        "\n",
+      ),
+      "docs/surfaces/S99_fake.md",
+    );
+
+    expect(checkReferences(["docs/surfaces/S99_fake.md"], read, {}).violations).toEqual([]);
+  });
+
+  it("SP3: an exception whose reason has expired fails", () => {
+    // Both directions, `checkSourceMap`'s shape. An exception list that only
+    // grows is the silent-forever gap the rule exists to close, and the entry
+    // that outlives its file is how it grows.
+    const read = at("// C09 I5 resolves perfectly well.\n", "src/fake.ts");
+    const { violations } = checkReferences(["src/fake.ts"], read, { "src/fake.ts": "stale" });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("has outlived its reason");
+  });
+
+  it("SP3: the exception list is two entries, and both are fabrication sites", () => {
+    // Written out rather than counted, because the interesting fact is *which*:
+    // the only files excused are the two that fabricate specs for these very
+    // tests. Every other id in the tree resolves.
+    expect(Object.keys(REFERENCE_EXCEPTIONS).sort()).toEqual([
+      "test/unit/enforce-commitments.test.ts",
+      "tools/enforce/commitments.mjs",
+    ]);
   });
 });

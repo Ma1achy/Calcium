@@ -36,7 +36,7 @@ The first four are **build gates**: they fail the build, not a test run, because
 
 This is not belt-and-braces. Every check here reports success the same way whether the tree is clean or the rule is broken, and a broken rule is indistinguishable from compliance at exactly the moment it matters.
 
-**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Four have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
+**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Nine have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
 
 - **A pattern that cannot match a real subject.** MG20 compared a resolved specifier against `src/terminal/escapes` while every NodeNext specifier ends `.js`. It matched nothing and reported compliance.
 - **A scope that matches no files.** SS26 scopes to `src/data/process/`; the tree has `src/data/process.ts`, a file. `startsWith` never matches, so the rule has never once been evaluated.
@@ -54,6 +54,8 @@ This is not belt-and-braces. Every check here reports success the same way wheth
   **The mitigation differs, which is why it is a separate line.** MG20's class is caught by a fabricated violation; this one is not, because a fabrication written by the same author in the same sitting uses the same idiom the rule was written against. What catches it is a fabrication written in **the form the real consumer uses** — so the standing rule for the fabrication table is: where a rule targets a code idiom, the fabricated violation is **copied from a real call site**, not written fresh. If there is no real call site yet, the fabrication is copied from the first one that appears, and the rule is pending until then.
 
 - **A set equality that cannot see a duplicate.** The inventory check compares the ids in these tables against the ids implemented — as sets, so **two rows carrying one id collapse into one member and the check passes.** Found by collision rather than by reasoning: a new ambient-read rule was written as SS41, which C21 already holds, and the check went green with an inventoried rule nobody had implemented, because the id it was looking for was present for a different reason. The remedy is one assertion — the inventory declares no id twice — and it is the cheapest of all of them, which is why it had never been written. It reads the rows rather than the id set, because the set is precisely what cannot see this.
+
+- **A check that existed as a habit rather than a mechanism.** The other side of SS3: not a rule written down and never built, but one performed reliably and never written down. Invariant ordering was verified by ad-hoc script while the specs were written, caught every time, and never became a rule — so when the habit stopped, twenty of twenty-five specs drifted out of order and nothing went red, because nothing was missing and no citation dangled. **It is the hardest of these to notice, because there is no artefact to inspect.** The other eight are a rule that is present and broken; this is a rule that was never an artefact at all, and the only evidence it existed is that the corpus was clean while someone was watching. What made it findable was reading C04's invariant list end to end for an unrelated reason. SP2 is the mechanism it should have been.
 
 Generalising it turned up three things the narrow pattern had been hiding, and none of them was a violated rule:
 
@@ -325,8 +327,20 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | # | Rule | Scope | Declared |
 |---|---|---|---|
 | SP1 | Every commitment cites an invariant, several, or another spec's | `docs/components/` | A02 §1 |
+| SP2 | Invariants are numbered 1..n, in order, a lettered variant beside its base | `docs/components/` | A02 §1 |
+| SP3 | Every invariant reference resolves against the spec that owns it | `src/`, `test/`, `tools/`, `docs/` outside `components/` and `archive/` | A02 §1 |
 
-It runs in `make enforce` and its fire-tests are `test/unit/enforce-commitments.test.ts`.
+They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
+
+**SP2 is a check that existed as a habit rather than a mechanism**, which is the same class as SS3 (§2) approached from the other side: not a rule written down and never built, but a rule performed reliably and never written down. Ordering was verified by ad-hoc script while the specs were written and caught every time. When the habit stopped, the drift resumed — twenty of twenty-five specs, C04 declaring `…17, 22, 23, 24, 25, 26, 27, 28, 19, 29, 18, 20, 20a, 33, 32, 31, 30, 21` — and nothing went red, because nothing was missing and no citation dangled. The list had simply stopped locating anything.
+
+Every instance came from appending an invariant to the end of a *related group* rather than the end of the list, which is the right editorial instinct. So the rule's remedy is to renumber in document order and keep the grouping: **the numbers move, not the prose.**
+
+**SP3 is the surface SP1 was never asked about.** SP1 resolves citations inside `docs/components/`. The 367 qualified and 1133 bare references in `src/`, `test/`, `tools/`, the architecture documents and the surfaces were resolved by nothing at all — a test named `T3.7 (I5)` could cite an invariant that does not exist and stay green, which is SP1's own "reads as backed and is not" on a surface an order of magnitude larger. It found nine defects on the commit that introduced it, three of them a C02 test citing C01's invariants.
+
+Resolution is by explicit qualifier (`C10 I22`) first, then by a declared file-to-spec owner map, and a file with references and no owner **fails rather than being skipped** — §2's vacuity class, since a check that cannot find what it was asked about passes exactly like one that is satisfied. In a markdown document an id inside a code span or fenced block is a *form* being illustrated (`(I3, I4)`, `T3.7 (I5): …`) and is not read as a reference; every such occurrence in the corpus is an illustration and none is real.
+
+**Its boundary, stated rather than assumed.** SP3 proves a reference resolves against its owner. It cannot prove the owner is the intended one: a bare id in a misattributed file resolves silently when the number happens to exist in both specs, and the C02 test above was caught only because C02 happens to declare no invariant of that number. Qualified references are immune, and are preferred wherever a file's owner is not obvious from its path. Qualifying all eleven hundred is not the remedy — that is a diff of pure noise, and `T3.7 (I5)` in `test/unit/capabilities.test.ts` is unambiguous to a reader. Saying where the rule stops is what keeps it from being read as stronger than it is, which is the failure mode of everything in §2's list.
 
 **Why this is exact where a heuristic was not.** The 2026-07-29 pairing audit read 355 invariants against 358 commitments by hand and found 103 mismatches — 57 commitments nothing enforced, 46 invariants nothing agreed to. A word-overlap check over the corpus cannot replace that reading: a commitment is the *readable* form, so it deliberately shares few words with the invariant it summarises, and the noise floor is higher than the signal.
 
@@ -383,6 +397,8 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 15a. **A surface deferral's blocker is the right component** (TD4, §9a), checked from two things a surface spec already states: which section holds its illustration, and what the surface composes to. Half of it has no live subject once C25 lands, and the suite asserts that rather than leaving it to be assumed.
 15b. **No rule id appears twice in this document.** Every other check here compares sets, so a duplicated id is one member and the second rule is invisible to all of them (§2).
 16. **Every path the deferral map names exists** (TD3, §9a). A mapped file that is not there reports compliance because it cannot find what it was asked about, which is commitment 14's vacuity class inside the deferral machinery itself.
+17. **A spec's invariants are numbered 1..n, in order** (SP2, §7a). The numbers are what a citation resolves against, so a list that has stopped ascending has stopped locating anything — and this one drifted for twenty specs because it was a habit rather than a mechanism (§2). A lettered variant sits beside its base, because adjacency is the whole of what the letter says.
+18. **Every invariant reference resolves, everywhere, not only in the specs** (SP3, §7a). SP1 stops at `docs/components/`; the eleven hundred bare references in `src/`, `test/` and the other documents were resolved by nothing. **The rule states where it stops**: it proves a reference resolves against its owner, not that the owner is the intended one, and a qualified reference is preferred wherever a file's owner is not obvious from its path.
 
 ---
 
