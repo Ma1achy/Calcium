@@ -252,6 +252,19 @@ export type Plot = Readonly<{
   axes?: boolean;
   xLabels?: readonly [string, string, string];
   yFormat?: "number" | "percent" | "bytes" | "duration";
+  /**
+   * Pin the vertical range, independently and optionally (I33).
+   *
+   * Absent, the range is the data's. Present, out-of-range values clamp to the
+   * edge — never dropped, and never widening the range they were pinned against,
+   * because a pinned axis exists so two plots can be compared and a range that
+   * silently grew would defeat that.
+   *
+   * `yMin: 0` alone is the common case: a loss curve that autoscales its floor
+   * exaggerates every wobble near zero.
+   */
+  yMin?: number;
+  yMax?: number;
   emptyMessage?: string;
 }> & Gap;
 
