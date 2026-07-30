@@ -350,20 +350,9 @@ Resolution is by explicit qualifier (`C10 I22`) first, then by a declared file-t
 
 **Its boundary, stated rather than assumed.** SP3 proves a reference resolves against its owner. It cannot prove the owner is the intended one: a bare id in a misattributed file resolves silently when the number happens to exist in both specs, and the C02 test above was caught only because C02 happens to declare no invariant of that number. Qualified references are immune, and are preferred wherever a file's owner is not obvious from its path.
 
-**And the boundary is reached often enough to be a defect class rather than a caveat. Five known members as of 2026-07-30**, every one of them resolving and every one pointing at the wrong rule:
+**And the boundary is reached often enough to be a defect class rather than a caveat. Five known members as of 2026-07-30** — a C22 pair citing `C01 I17` for C01 I5, two C13 tests citing I14 for a `rev` rule, a C13 test citing I13 for the module graph, and C14 citing `C13 I13` for the marker. Every one resolves; every one points at the wrong rule. The members are tabulated once, in [`../COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass](../COMMITMENT_INVARIANT_AUDIT.md), together with why no mechanism follows and why a qualified reference is immune — that document is where the citation findings live, and a second copy here is a second thing to keep true.
 
-| Where | Cites | Means |
-|---|---|---|
-| C22 §3, twice | C01 I17 | C01 I5 — `beforeRelease` runs once before the first release |
-| C13 T1.7b, T6.11 | I14 | I13 — `rev` bumps on every applied patch |
-| C13 T2.4 | I13 | I18 — C13 imports nothing from `terminal/` or `presentation/` |
-| C14 I13 | C13 I13 | C13 I14 — the eviction marker is a real entry |
-
-Two people reading carefully found five, which is not a rare event but the ordinary rate.
-
-**No mechanism, and one should not be built.** A citation resolving to the wrong invariant is a semantic error; the only available check is word overlap between the citing text and the invariant's, which is precisely the heuristic the 2026-07-29 pairing audit abandoned — a commitment is the *readable* form of an invariant, so it deliberately shares few words with it, and the noise floor sits above the signal. The three C13 members were found the same way the C22 pair was: by someone reading the spec end to end in order to implement against it.
-
-That is the same detection method as §2's contradiction class, and it has the same consequence. **Both classes are found by doing the work and by nothing else**, which is the argument for the implementation walk being a scheduled step rather than a courtesy — it is the only pass either class has.
+Two things belong here rather than there. **This document has been on the other end of it**: SS37 declared C09 I4 for behaviour that is C09 I15, and MG21 declared a § where an invariant now exists. Both fired correctly the whole time and both were mislabelled, which is what these five are — so the population is one class and not two, and a rule's "Declared" column is as citable-and-wrong as a test's parenthetical. And **the detection method is §2's**: both this and the contradiction class surface when someone implements against the spec and by nothing else, each now three times or more, which is the argument for the by-hand walk being a scheduled step rather than a courtesy.
 
 **A dangling reference is not inert — it arms itself when the number gets used.** C22 §3 cited `C01 I17` twice, about `beforeRelease` running once before the first release, which is C01 I5 and always was. For months C01 declared no I17 at all, so both citations were dangling and nothing looked. Then the C25 commit added a real I17 — the width rule — and the two silently became *resolving* citations pointing at an unrelated invariant. SP3 would have caught them on any day before that one and on no day after, and what found them in the end was reading the renumber's diff. This is the boundary above with a date attached: the rule proves resolution, and resolution is exactly what the new invariant supplied. Qualifying all eleven hundred is not the remedy — that is a diff of pure noise, and `T3.7 (I5)` in `test/unit/capabilities.test.ts` is unambiguous to a reader. Saying where the rule stops is what keeps it from being read as stronger than it is, which is the failure mode of everything in §2's list.
 

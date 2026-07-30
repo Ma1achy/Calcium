@@ -56,37 +56,21 @@ does not apply itself.
 
 ## Counts
 
-| Spec | I | C | Commitments with no invariant | Invariants with no commitment |
-|---|---:|---:|---:|---:|
-| C01 terminal lifecycle | 13 | 18 | **5** | 0 |
-| C02 capability detection | 8 | 11 | 2 | 0 |
-| C03 frame scheduler | 11 | 13 | 2 | 1 |
-| C04 view model | 19 | 30 | **11** | 3 |
-| C05 tool manifest | 15 | 14 | 2 | **5** |
-| C06 transport | 21 | 21 | 3 | 1 |
-| C07 adapter registry | 14 | 16 | 2 | 1 |
-| C08 fixture world | 17 | 19 | 2 | 3 |
-| C09 block library | 15 | 13 | 2 | **5** |
-| C10 theme resolution | 18 | 15 | 3 | 4 |
-| C11 table engine | 12 | 12 | 2 | 2 |
-| C12 plot renderer | 13 | 11 | 1 | 2 |
-| C13 transcript store | 16 | 15 | 1 | 3 |
-| C14 viewport | 15 | 16 | 1 | 2 |
-| C15 overlay manager | 12 | 12 | 1 | 2 |
-| C16 input router | 14 | 13 | 2 | 1 |
-| C17 line editor | 13 | 12 | 2 | 1 |
-| C18 command parser | 13 | 14 | 2 | 1 |
-| C19 completion engine | 13 | 13 | 2 | 2 |
-| C20 history store | 15 | 14 | **0** | 1 |
-| C21 process runner | 13 | 13 | 1 | 1 |
-| C22 composition root | 16 | 15 | 3 | 1 |
-| C23 execution pipeline | 24 | 25 | 2 | **0** |
-| C24 public API | 12 | 13 | 1 | 2 |
-| C25 patch renderer | 9 | 10 | 2 | 2 |
-| **Total** | **355** | **358** | **57** | **46** |
+The per-spec counts recorded here were a working artefact of the 2026-07-29 pass
+and are not maintained. The specs are authoritative for what they declare. What
+this document records durably is the four categories, the two principles that came
+out of them, and the citation findings below.
 
-Roughly 84% of commitments and 87% of invariants pair cleanly. The audit is about
-the remainder.
+**Why the table went rather than being corrected.** It read as current, described a
+tree that no longer existed, and nothing checked it — the class this project keeps
+finding. The obvious remedy is the wrong one: "C13 declares eighteen invariants" is
+a fact with no failure mode anyone would act on, so a checker would be a build gate
+that fires on renumbering and means nothing when it does. A document that stops
+making a checkable claim needs no checker, and that is cheaper than either
+maintaining the table or enforcing it.
+
+Roughly 84% of commitments and 87% of invariants paired cleanly at the time of the
+pass. The audit is about the remainder.
 
 **A01–A04 are excluded and should stay excluded.** They declare commitments and no
 invariants by design: A03's SS and MG rules *are* the architecture's invariants,
@@ -482,6 +466,55 @@ commitment-backed.
 
 All 32 rules now trace: 25 to a component commitment through an invariant, seven
 to an architecture commitment (A02 1, 2, 20; A03 6, 15; A04 2, 3, 4).
+
+---
+
+## Fourth pass — citations that resolve against the wrong invariant
+
+**Five known instances as of 2026-07-30.** Not found by a pass; accumulated by
+people reading specs in order to implement against them.
+
+| Where | Cites | Means |
+|---|---|---|
+| C22 §3, twice | C01 I17 | C01 I5 — `beforeRelease` runs once before the first release |
+| C13 T1.7b, T6.11 | I14 | I13 — `rev` bumps on every applied patch |
+| C13 T2.4 | I13 | I18 — C13 imports nothing from `terminal/` or `presentation/` |
+| C14 I13 | C13 I13 | C13 I14 — the eviction marker is a real entry |
+
+**This is the third pass's third kind of A03 defect, arriving from the other
+side.** That pass found SS37 declaring C09 I4 for behaviour that is C09 I15, and
+MG21 declaring a § where an invariant now exists — rules pointing at the wrong
+invariant. These four rows are specs and tests doing the same thing. The class is
+one class; only the citing document differs.
+
+**A dangling reference is not inert — it arms itself when the number gets used.**
+The C22 pair is the case with a date attached. C01 declared no I17 for months, so
+both citations dangled and nothing looked; then the C25 commit added a real I17 —
+the width rule — and the two silently became *resolving* citations pointing at an
+unrelated invariant. A03 SP3 would have caught them on any day before that commit
+and on no day after. What found them in the end was reading the renumber's diff.
+
+**No mechanism, and one should not be built.** A citation resolving to the wrong
+invariant is semantic. The only mechanical check available is word overlap between
+the citing text and the invariant's — which is precisely the heuristic this audit
+opens by rejecting, and for a reason that has not weakened: a commitment is the
+*readable* form of an invariant, so it deliberately shares few words with it, and
+the noise floor sits above the signal. Sixty false positives is the measured cost,
+and it is paid to find a defect whose whole population is four rows.
+
+**A qualified reference is immune.** `C01 I17` cannot silently become correct for a
+different spec, because the spec is named. Bare ids are fine where a file's owner
+is obvious from its path — `T3.7 (I5)` in `test/unit/capabilities.test.ts` is
+unambiguous to a reader — and should be qualified wherever it is not. That is the
+same conclusion A03 §3 reaches about SP3's boundary, approached from the other
+side, and it is the only prevention either side offers.
+
+**The detection method is the one this project keeps arriving at.** Both this class
+and A03 §2's contradiction class surface when someone implements against the spec,
+and by nothing else. Each has now been found that way three times or more. That is
+an argument for the by-hand walk being a scheduled step in a component's plan
+rather than a courtesy someone happens to extend — it is the only pass either
+class gets.
 
 ---
 
