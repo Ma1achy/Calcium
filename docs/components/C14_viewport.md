@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` |
 | **Layer** | L2 viewport |
-| **Depends on** | C13 (entries, `Change`, `rev`) · C09 (`measure` via the registry) |
+| **Depends on** | C13 `TranscriptView` (entries, `Change`, `rev` — never the store, C13 I19) · C09 (`measureSequence` via the registry) |
 | **Consumed by** | L4 (renders the visible range) · C16 (scroll keys) · C15 (overlays sit above it) |
 | **Source** | A01 D1, D2, D34, D40 · A02 §2, §4, §7 · the Ink plan, phases 3–4 |
 | **Status** | Draft |

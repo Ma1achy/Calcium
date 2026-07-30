@@ -51,18 +51,25 @@ type TranscriptEntry = Readonly<{
   rev:       number;                  // bumped on every patch — C14's cache key
 }>;
 
-interface TranscriptStore {
+/**
+ * What a *reader* of the transcript gets. C14 and C16 take this, never the store.
+ */
+interface TranscriptView {
+  subscribe(cb: (change: Change) => void): Disposable;
+  readonly entries:    readonly TranscriptEntry[];
+  readonly liveId:     EntryId | null;
+  readonly blockCount: number;
+  readonly overCap:    number;
+}
+
+interface TranscriptStore extends TranscriptView {
   append(doc: ViewDocument, opts?: { streaming?: boolean; payload?: unknown }): EntryId;
   patch(id: EntryId, patch: ViewPatch): PatchOutcome;
   settle(id: EntryId): void;          // stream ended; entry stops accepting patches
   clear(): void;
-  subscribe(cb: (change: Change) => void): Disposable;
 
-  readonly entries:       readonly TranscriptEntry[];
-  readonly liveId:        EntryId | null;
-  readonly blockCount:    number;
   readonly droppedBlocks: number;
-  readonly overCap:       number;     // blocks above the cap that could not be evicted
+  payloadOf(id: EntryId): unknown;    // §5a; retention is off by default
 }
 
 type PatchOutcome =
@@ -81,6 +88,10 @@ type Change =
 `seq` is a logical counter, **not a timestamp**. C13 reads no clock — the same discipline as C08 — so golden frames and fixture-backed sessions are reproducible.
 
 `subscribe` reports *what* changed, not just *that* something did. C14 caches measured heights per entry, and an `append` needs only the new entry measured while an `evict` needs the anchor rechecked. A bare "something changed" callback would force a full remeasure on every log line.
+
+**`TranscriptView` is the surface every reader gets, and the store is what L4 holds.** C14's spec already declares it depends on "entries, `Change`, `rev`" and C16's on "the live entry"; splitting the interface is what makes those declarations structural rather than aspirational. Two things follow, and the second is the one that matters more.
+
+The retained raw payload (§5a) is reachable only through `payloadOf` on the store. `TranscriptEntry` carries no payload field, so the retention window is already invisible to anything reading `entries` — but a reader handed the whole store could call it, and a debug-only buffer arriving in the viewport is a seam nobody specified. And a reader handed the whole store could call `append`, `patch` or `clear`, which is worse: C14 recomputing an anchor by clearing the transcript is the kind of fix that works, ships, and is discovered from a bug report about a lost session.
 
 **`append` throws and `patch` returns, and the asymmetry is deliberate: the two failures are not the same kind.**
 
@@ -222,6 +233,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I16** — `clear()` empties the transcript and leaves command history untouched. They are separate stores with separate lifetimes: a reader clearing the screen has not asked to forget what they typed, and the two being one call away from each other is exactly why the boundary is stated.
 - **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost. The count recurses through nested blocks (`panel.children`, `group.children`, a row's `detail`) and never through rows.
 - **I18** — C13 imports nothing from `terminal/` or `presentation/`.
+- **I19** — Readers take `TranscriptView`, never `TranscriptStore`. The mutators and the §5a payload window are reachable only from L4, so no consumer above can append, clear, or see a debug buffer it was never given.
 
 ---
 
@@ -243,6 +255,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 14. The eviction marker is a synthetic entry, so row arithmetic needs no special case (I14).
 15. Cap overshoot is exposed as `overCap` and acted on by L4, and it is true after every call rather than only after `append` (I15).
 16. An invalid document raises rather than returning; a failed patch returns rather than raising (I8, I10).
+17. Readers get `TranscriptView`; only L4 holds the store, so nothing above can mutate the transcript or read a retained payload (I19).
 
 ---
 
@@ -276,6 +289,7 @@ Six tiers. Every cell of the §7 transition table is covered.
 - **T2.4** (I18): the module graph shows no import from `terminal/` or `presentation/`.
 - **T2.5** (I12): `subscribe` returns a disposable; disposing stops delivery mid-stream.
 - **T2.6**: every `Change` variant is emitted by at least one operation — exhaustive over the union.
+- **T2.7** (I19): `TranscriptView` exposes no mutator and no `payloadOf`. A compile-level assertion, so a consumer widening its parameter type back to `TranscriptStore` fails the build rather than a test.
 
 ### Tier 3 — edge cases
 
