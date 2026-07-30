@@ -24,7 +24,7 @@ export interface WorldDriver {
   query(inv: Invocation): RawResult | AsyncIterable<RawPatch> | null;
 
   /**
-   * Advance by `deltaMs`. **Pull, never push** (I17): the harness calls this;
+   * Advance by `deltaMs`. **Pull, never push** (I18): the harness calls this;
    * nothing in C08 schedules a call to it. See `handler.ts` for why.
    *
    * The transition is pure — a driver computes its next world and assigns its

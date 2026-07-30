@@ -59,7 +59,7 @@ export function worldResult(over: Partial<RawResult> = {}): RawResult {
   return result({ stdout: { from: "world" }, stdoutRaw: '{"from":"world"}', ...over });
 }
 
-/** A hand-driven clock. `live` mode reads this and nothing else (I17). */
+/** A hand-driven clock. `live` mode reads this and nothing else (I18). */
 export function steppableClock(start = 1_000): { now: () => number; set(ms: number): void } {
   let value = start;
   return {

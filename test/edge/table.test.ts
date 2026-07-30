@@ -267,7 +267,7 @@ describe("C11 tier 3 — edges", () => {
     expect(planColumns(columns, 160)).toEqual(wide);
   });
 
-  it("T3.19 (I16): a data column keyed `expand` with no role renders its own text", () => {
+  it("T3.19 (I15): a data column keyed `expand` with no role renders its own text", () => {
     const columns: readonly ColumnDef[] = [
       { key: "expand", label: "expand", align: "left", priority: 10, minWidth: 8, sortable: false },
       { key: "name", label: "name", align: "left", priority: 5, minWidth: 8, sortable: false },

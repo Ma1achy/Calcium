@@ -208,7 +208,7 @@ describe("C10 resolution", () => {
 
   // --- §4a, the second channel ---------------------------------------------
 
-  it("T1.14 (I22): the two functions differ in which channel they fill, and nothing else", () => {
+  it("T1.14 (I21): the two functions differ in which channel they fill, and nothing else", () => {
     const current = store().current;
 
     for (const surface of SURFACES) {
@@ -221,7 +221,7 @@ describe("C10 resolution", () => {
     }
   });
 
-  it("T1.15 (I22): a palette ref resolves to no background at all", () => {
+  it("T1.15 (I21): a palette ref resolves to no background at all", () => {
     // A rule rather than an omission. §4's floors are measured for text *on* a
     // surface, so painting a tone behind text asks for a guarantee nobody
     // computed — and a caller wanting `tone.ok` as a background is a caller who
@@ -233,7 +233,7 @@ describe("C10 resolution", () => {
     }
   });
 
-  it("T1.16 (I2, I24): at depth 1 a diff surface resolves to nothing", () => {
+  it("T1.16 (I2, I23): at depth 1 a diff surface resolves to nothing", () => {
     // What makes losing the background lossless: the marker and the toned gutter
     // are still there, so a diff at one bit is still a diff (C25 I13).
     for (const variant of ["dark", "light"] as const) {

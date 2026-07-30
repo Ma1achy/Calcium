@@ -234,7 +234,7 @@ export function doc(overrides: Partial<ViewDocument> = {}): ViewDocument {
 /**
  * S03's eleven columns, as `ColumnDef`s.
  *
- * `expand` carries `role: "expand"` — the marker column C11 fills (C11 I16) — and
+ * `expand` carries `role: "expand"` — the marker column C11 fills (C11 I15) — and
  * `status` declares `minWidth` equal to its longest value plus a glyph, which is
  * how I10 is expressed: the surface says "whole or dropped" by choosing that
  * minimum, and C11 enforces it generically.

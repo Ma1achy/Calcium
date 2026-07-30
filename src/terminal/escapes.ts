@@ -87,7 +87,7 @@ export const SGR_RESET = "\x1b[0m";
 /**
  * A style as the sequence that turns it on.
  *
- * **The depth comes from the tag, never from the format** (C10 I18). A hex
+ * **The depth comes from the tag, never from the format** (C10 I24). A hex
  * string is a hex string whether the terminal has twenty-four bits or four, so a
  * writer that inspects the value instead of the tag is a writer that eventually
  * emits truecolour to a sixteen-colour terminal. The switch below is the whole

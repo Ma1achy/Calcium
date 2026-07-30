@@ -39,8 +39,8 @@ const COMMITMENT = /^(\d+)\.\s+(.*)$/;
 /**
  * A parenthetical that is not a cross-reference. `(I5)`, `(I3, I4)`, `(I13, D50)`.
  *
- * The leading `(?!→)` is load-bearing: without it `(→ C04 I20)` reads as a local
- * citation of `I20` and the rule reports a dangling reference in the one spec
+ * The leading `(?!→)` is load-bearing: without it `(→ C04 I28)` reads as a local
+ * citation of `I28` and the rule reports a dangling reference in the one spec
  * that got the cross-reference right. Found by running it, not by reading it.
  *
  * **Every invariant in the group is extracted, not just one.** The first version
@@ -361,7 +361,7 @@ export function checkOrdering(files, readFile = (f) => readFileSync(f, "utf8")) 
 // reference resolves against its owner. It cannot prove the owner is the
 // intended one: a bare id in a misattributed file resolves silently when the
 // number happens to exist in both specs — `capabilities.test.ts` was caught only
-// because C02 declares no I10. Qualified references (`C10 I22`) are immune and
+// because C02 declares no I10. Qualified references (`C10 I21`) are immune and
 // are preferred where a file's owner is not obvious from its path. What is *not*
 // the answer is qualifying eleven hundred references: that is a diff of pure
 // noise, and `T3.7 (I5)` inside `test/unit/capabilities.test.ts` is unambiguous
@@ -516,7 +516,7 @@ function ownerOf(file) {
  * Every spec id and every invariant id, in the order they are written.
  *
  * **The resolver reads the way a person reads.** The corpus cites in run-on
- * lists — `C04 I10, I11, I19`, `C09 C9 ↔ I10 + I11` — where one spec id governs
+ * lists — `C04 I10, I11, I25`, `C09 C9 ↔ I10 + I11` — where one spec id governs
  * everything after it. A resolver that only understood `C04 I10` would call the
  * other two unowned, which in the pairing audit alone is seventy pointers it
  * would either misattribute or refuse.
@@ -541,8 +541,8 @@ const BREAK = /^\s*$|^#{1,6}\s|^---\s*$/;
  *
  * Whitespace, and the leaders a wrapped line carries — `*` in a doc comment,
  * `//` in a line comment, `>` in a blockquote. **A qualified reference wraps**,
- * and `lines.ts` had one: `(C10\n * I22)`. Read line by line that is a bare
- * `I22` in a C25 file, which SP3 reported as a defect on its first run. It was
+ * and `lines.ts` had one: `(C10\n * I21)`. Read line by line that is a bare
+ * `I21` in a C25 file, which SP3 reported as a defect on its first run. It was
  * the rule that was wrong, and this is why adjacency is measured over the gap
  * rather than over one line.
  */
@@ -620,7 +620,7 @@ export function scanReferences(file, src, options = {}) {
       cursor = m.index + m[0].length;
 
       if (m[1] !== undefined) {
-        // `C10 I22` — adjacency is explicit qualification and wins over
+        // `C10 I21` — adjacency is explicit qualification and wins over
         // everything, including an owner. Proximity that is *not* adjacent only
         // speaks where no owner does.
         adjacent = m[1];

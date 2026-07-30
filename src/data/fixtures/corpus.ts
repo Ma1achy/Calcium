@@ -1,7 +1,7 @@
 /**
  * The persisted format. Versioned, because it outlives the code that wrote it.
  *
- * C08 §2, I16 — see spec. The `Fixture` **type** is C06's (A02 §1); the corpus
+ * C08 §2, I17 — see spec. The `Fixture` **type** is C06's (A02 §1); the corpus
  * **file** is this module's, and the two are not the same shape.
  *
  * Three decisions the file makes that the type does not:
@@ -150,7 +150,7 @@ export function parseCorpus(text: string, source = "corpus"): readonly Fixture[]
   if (typeof file.schema !== "string") {
     throw new CorpusError(
       `${source} declares no schema. A corpus outlives the code that wrote it, ` +
-        `so its version is not optional — expected "${CORPUS_SCHEMA}" (C08 I16)`,
+        `so its version is not optional — expected "${CORPUS_SCHEMA}" (C08 I17)`,
     );
   }
   if (file.schema !== CORPUS_SCHEMA) {
@@ -158,7 +158,7 @@ export function parseCorpus(text: string, source = "corpus"): readonly Fixture[]
       `${source} declares schema "${file.schema}"; this build reads ` +
         `"${CORPUS_SCHEMA}". Re-record it rather than editing the version — the ` +
         `field exists so an old corpus fails here instead of misparsing into a ` +
-        `plausible wrong shape (C08 I16)`,
+        `plausible wrong shape (C08 I17)`,
     );
   }
   if (!Array.isArray(file.fixtures)) {

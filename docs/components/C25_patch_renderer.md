@@ -268,9 +268,9 @@ Consequences that matter:
 - **I6** — C25 registers through C09's public `register`; it is not privileged.
 - **I7** — C25 holds no state. `measure` and `render` are pure over the block.
 - **I8** — C25 declares no block types. `Patch` and `Hunk` are C04's.
-- **I10** — A language C09's tokeniser does not recognise renders as plain text, never as an error. A diff of an unfamiliar file type is still a diff worth reading, and refusing to render it would make the renderer's language table a gate on content.
-- **I11** — Word-level intra-line highlighting is deferred, and the block shape does not foreclose it. `Hunk` carries whole lines; adding spans later is a field, not a redesign. **Its carrier is decided and is not a background**: C10 §4a measured a stronger background pair and withdrew it, so a changed span takes `underline` over the line's background (→ C10 §4a).
-- **I9** — Expansion of a collapsed region patches the document (C11 T4.7's mechanism), never mutates external state. C25 itself does not expand anything — it renders whatever `collapsedBefore` says. There is no `expanded` flag: expansion *is* the rewrite.
+- **I9** — A language C09's tokeniser does not recognise renders as plain text, never as an error. A diff of an unfamiliar file type is still a diff worth reading, and refusing to render it would make the renderer's language table a gate on content.
+- **I10** — Word-level intra-line highlighting is deferred, and the block shape does not foreclose it. `Hunk` carries whole lines; adding spans later is a field, not a redesign. **Its carrier is decided and is not a background**: C10 §4a measured a stronger background pair and withdrew it, so a changed span takes `underline` over the line's background (→ C10 §4a).
+- **I11** — Expansion of a collapsed region patches the document (C11 T4.7's mechanism), never mutates external state. C25 itself does not expand anything — it renders whatever `collapsedBefore` says. There is no `expanded` flag: expansion *is* the rewrite.
 - **I12** — Every row carries the gutter in the line's tone and the text in `syntax` slots, for all three line kinds. Only the gutter varies by kind; the text is code in every case. Two palettes on one row is the general case in a patch, not an exception on some rows (§2).
 - **I12a** — In split layout the background belongs to a **side**, not to a row. A paired row changed in two directions, so one colour across it asserts the wrong change on one half — and the blank facing an unpaired addition would claim the other side gained the line too. Found by looking at a frame; no assertion in the suite disagreed with it.
 - **I13** — The line background is the third signal and never the only one. At 1-bit it resolves to nothing (C10 §4's surface rule), and the marker and the toned gutter both survive — which is what makes losing it lossless under D29.
@@ -289,7 +289,7 @@ It is a **requirement rather than a preference**, which is what changed: §2's r
 
 **One level, and the second was measured out.** This section was written expecting two — a line background, and a stronger one for the precisely changed words within a line, which is what every real diff tool uses for word-level emphasis. C10 §4a measured the stronger pair against the contrast floors and there is no room for it: the recessive slots bound how much tint a diff background may carry, and the *first* level spends nearly all of it, leaving six to nine units of one channel on three of the four values.
 
-**So word-level emphasis (I11) is `underline`, and it is a better answer than the one it replaces.** A background vanishes at 1-bit — that is C10 I8, and it is why I13 has to say the background is never the only signal. An attribute does not: attributes are already how the 1-bit collapse carries tone (C10 §5), so emphasis expressed as one degrades to *itself* rather than to nothing. A patch at one bit would have lost its word-level highlighting entirely under the design this replaces, and keeps it under this one.
+**So word-level emphasis (I10) is `underline`, and it is a better answer than the one it replaces.** A background vanishes at 1-bit — that is C10 I8, and it is why I13 has to say the background is never the only signal. An attribute does not: attributes are already how the 1-bit collapse carries tone (C10 §5), so emphasis expressed as one degrades to *itself* rather than to nothing. A patch at one bit would have lost its word-level highlighting entirely under the design this replaces, and keeps it under this one.
 
 **Recorded because a wider budget will look like an invitation to undo it.** Someone authoring a theme with more headroom — a lighter `bg`, a less recessive `muted` — will find room for a second background and read this section as a constraint that has lifted. It has not: the constraint produced the better answer, and restoring the background trades a signal that survives monochrome for one that does not. The order is: the tint budget is spent, *and* underline degrades better. The second reason outlives the first.
 
@@ -321,8 +321,8 @@ Attributes are already spoken for: bold and dim are how 1-bit carries tone (C10 
 6. C25 registers through C09's public mechanism and is not privileged (I6).
 7. C25 declares no block types and holds no state (I7, I8).
 8. Tokenisation is C09's; `measure` never tokenises (I3).
-9. An unregistered language renders as plain text, not an error (I10).
-10. Word-level highlighting is deferred and the block shape does not foreclose it (I11).
+9. An unregistered language renders as plain text, not an error (I9).
+10. Word-level highlighting is deferred and the block shape does not foreclose it (I10).
 11. All three line kinds are syntax-highlighted; only the gutter varies by kind, and every row therefore uses two palettes at once (I12, → C10 I16). In split layout the background is a side's rather than a row's (I12a).
 12. The line background is a third signal and never the only one; at 1-bit it is gone and the diff is still a diff (I13, → A01 D29).
 13. The collapsed form is capped at one viewport and cuts at hunk boundaries, stating how many hunks it dropped (I14).

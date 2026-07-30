@@ -63,7 +63,7 @@ export const DARK_FOUR_BIT: FourBitMap = Object.freeze({
   // terminal's own values, so a ratio computed here would be a ratio against a
   // colour this process cannot see — which is why the check in `contrast.ts`
   // covers 24-bit tokens and stops there. What makes an unmeasurable background
-  // acceptable at this depth and unacceptable at twenty-four is I24: the marker
+  // acceptable at this depth and unacceptable at twenty-four is I23: the marker
   // and the toned gutter carry the add/remove distinction on their own, so a
   // background that reads badly costs legibility of the tint and no information.
   //

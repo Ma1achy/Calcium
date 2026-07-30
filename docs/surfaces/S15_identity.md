@@ -126,7 +126,7 @@ Checked while `align` was being declared across the S-series, and this surface's
 | age | 60 | 6 | **right** | — |
 | note | 40 | 15 | left | — |
 
-No `expand` column: `/secrets` shows names only, so a row has nothing to reveal — and because nothing drops above 60 cells, nothing becomes reachable-but-unmarked either (C11 I16). Below that, S01's fallback replaces the frame.
+No `expand` column: `/secrets` shows names only, so a row has nothing to reveal — and because nothing drops above 60 cells, nothing becomes reachable-but-unmarked either (C11 I15). Below that, S01's fallback replaces the frame.
 
 `age` is right-aligned, which is the convention S03 §3 and S05 §3 follow and **the figure above does not** — it draws `8d` starting where `34d` does. One of the two is wrong and the convention wins: a column of durations read for the outlier is exactly the case right alignment exists for. The figure is corrected above.
 

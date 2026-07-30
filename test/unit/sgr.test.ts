@@ -3,7 +3,7 @@
 // C10 resolves a colour to a value that names its own depth and hands it over;
 // `sgr` is what turns it into a sequence (C10 §2, C09 §3). Every case here is a
 // different answer to the same question, chosen by the tag rather than by
-// inspecting the value — which is the whole reason C10 I18 exists, and the only
+// inspecting the value — which is the whole reason C10 I24 exists, and the only
 // place in the tree where that choice is made.
 import { describe, expect, it } from "vitest";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
@@ -12,14 +12,14 @@ const ESC = String.fromCharCode(27);
 const seq = (params: string): string => `${ESC}[${params}m`;
 
 describe("sgr — the depth tag decides the sequence", () => {
-  it("T1.16 (C10 I18): each depth writes its own form, chosen by the tag", () => {
+  it("T1.16 (C10 I24): each depth writes its own form, chosen by the tag", () => {
     expect(sgr({ colour: { kind: "rgb", hex: "#7faecf" } })).toBe(seq("38;2;127;174;207"));
     expect(sgr({ colour: { kind: "ansi256", index: 110 } })).toBe(seq("38;5;110"));
     expect(sgr({ colour: { kind: "ansi16", index: 4 } })).toBe(seq("34"));
     expect(sgr({ colour: { kind: "ansi16", index: 12 } }), "the bright set").toBe(seq("94"));
   });
 
-  it("T1.17 (C10 I18): the same colour at three depths is three sequences", () => {
+  it("T1.17 (C10 I24): the same colour at three depths is three sequences", () => {
     // The failure the tag prevents, stated as a test: a writer inspecting the
     // *value* has one answer for `#7faecf` whatever the terminal is, and the
     // one it picks is truecolour. These three are the same blue, resolved at

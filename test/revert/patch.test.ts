@@ -159,7 +159,7 @@ describe("C25 fail-on-revert", () => {
     expect(stepped.length, "at least one fixture must distinguish the arithmetics").toBeGreaterThan(0);
   });
 
-  it("T6.13 (I10): building a row outside `line()` → T2.7 finds a row over its width", () => {
+  it("T6.13 (I9): building a row outside `line()` → T2.7 finds a row over its width", () => {
     // C12's defect, guarded here rather than rediscovered: it rendered nineteen rows
     // at width 1 against a declared five, because one row skipped the clamp and the
     // terminal wrapped each of them.

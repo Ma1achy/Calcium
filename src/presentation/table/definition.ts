@@ -2,7 +2,7 @@
  * `tableDefinition` — the pair C09's registry holds, and the one that must agree
  * to the row (C09 I1).
  *
- * **Registered, not privileged** (I12, T2.5). This definition is not in
+ * **Registered, not privileged** (I16, T2.5). This definition is not in
  * `blocks/defaults.ts`: it reaches the registry through the same public
  * `register` an app-defined kind uses, and deleting that call removes the kind
  * with no fallback path. C12 and C25 do the same, and three registrants is what
@@ -180,7 +180,7 @@ function textOf(line: string): string {
  *
  * Sorted, because focus follows what the user sees: arrow keys moving through the
  * declared order while the screen shows another would land somewhere the reader
- * did not point at. **C11 holds no focus state** (I15) — this is a question about
+ * did not point at. **C11 holds no focus state** (I14) — this is a question about
  * the block, answered from the block.
  */
 export function focusableRowIds(block: Table): readonly string[] {

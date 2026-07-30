@@ -212,7 +212,7 @@ a  killAll()                        C21 — SIGKILL, no grace
 b  flush history                    C20
 ```
 
-**Cleanup runs through `beforeRelease` and nowhere else.** An earlier draft had C22 call `killAll` and flush directly on the explicit paths and treated `beforeRelease` as a no-op afterwards — but C01 I17 runs it once before the *first* release, which had not yet happened, so both ran twice. A double history flush duplicates entries. One path, five callers, no special case.
+**Cleanup runs through `beforeRelease` and nowhere else.** An earlier draft had C22 call `killAll` and flush directly on the explicit paths and treated `beforeRelease` as a no-op afterwards — but C01 I13 runs it once before the *first* release, which had not yet happened, so both ran twice. A double history flush duplicates entries. One path, five callers, no special case.
 
 **Step 3 before step 4** is the rule that makes a crash debuggable: a stack printed onto the alternate screen is discarded when the screen is released, so the dev sees a flash and an empty shell. Restoring first puts the trace in the real scrollback where it can be read and pasted.
 
@@ -252,25 +252,25 @@ History flushes on **every** path including faults. Losing a session's history t
 - **I14** — C22 never auto-logins.
 - **I15** — An offline cluster degrades the session; system commands keep working.
 - **I16** — `stopped` is terminal.
-- **I18** — `createTui` requires exactly four fields; every other has a working default. The count is the ergonomic claim R01 §1 tests — a working TUI built from the README without asking a question — and a fifth required field is a spec change rather than a convenience.
-- **I19** — Banner and identity fetches are non-blocking: input is accepted before either completes, and neither can delay the first frame. A shell that will not take a keystroke until a network call returns is a shell that hangs on a bad DNS entry.
-- **I17** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
+- **I17** — `createTui` requires exactly four fields; every other has a working default. The count is the ergonomic claim R01 §1 tests — a working TUI built from the README without asking a question — and a fifth required field is a spec change rather than a convenience.
+- **I18** — Banner and identity fetches are non-blocking: input is accepted before either completes, and neither can delay the first frame. A shell that will not take a keystroke until a network call returns is a shell that hangs on a bad DNS entry.
+- **I19** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
 
 ---
 
 ## 11. Commitments
 
-1. Four required config fields; every other has a working default (I18).
+1. Four required config fields; every other has a working default (I17).
 2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` resolves from `PRISM_TUI_STATE_DIR` (I10).
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2).
 4. All four registries seal before input is accepted (I3).
 5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate (I8).
 6. The too-small render is layout-engine-free (I9).
-7. Banner fetches are non-blocking and input is accepted before they finish (I19).
+7. Banner fetches are non-blocking and input is accepted before they finish (I18).
 8. Session state is six fields with one writer each; nothing else lives here (I11).
 9. `cwd` is exposed as a function so `cd` moves subsequent verbs (I12).
 10. Chrome is app-supplied; the prompt gutter is C22's to pass, not C17's to assume (I13).
-11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I17).
+11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I19).
 12. Shutdown is one function, five callers, four ordered steps, with cleanup solely inside `beforeRelease` (I4, I5).
 13. Release precedes diagnostics; history flushes on every path (I6, I7).
 14. An offline cluster degrades rather than ends the session (I15).
@@ -327,7 +327,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.15**: a fault during construction, after stores but before the lifecycle → nothing acquired, no cleanup needed, error surfaced.
 - **T3.16**: a fault during the first paint → `beforeRelease` runs, terminal restored, stack on the primary screen.
 - **T3.17**: `SIGKILL` — documented as unrecoverable; the test asserts the documentation exists rather than the behaviour.
-- **T3.18**: a `beforeRelease` that throws → logged, release still completes (C01 I17 from this side).
+- **T3.18**: a `beforeRelease` that throws → logged, release still completes (C01 I13 from this side).
 
 ### Tier 4 — integration
 

@@ -61,7 +61,7 @@ describe("C02 integration", () => {
     // **This test's title changed.** It read "a TERM=dumb record drives C01 to
     // acquire nothing beyond what is supported", which was written when C01 was
     // a spec and describes a contract C01 no longer has: a `TERM=dumb` record
-    // has `altScreen: false`, and C01 I13 makes that fatal *before a byte is
+    // has `altScreen: false`, and C01 I14 makes that fatal *before a byte is
     // emitted* rather than a partial acquisition. The old title implies C01
     // takes what it can and skips the rest; what it actually does is refuse.
     //
@@ -73,7 +73,7 @@ describe("C02 integration", () => {
 
     const refused = harness(dumb);
     expect(() => refused.lifecycle.acquire()).toThrow(/alternate screen unsupported/);
-    // C01 I13, and the reason it is stated as "aborts before first paint": a
+    // C01 I14, and the reason it is stated as "aborts before first paint": a
     // terminal that cannot open must not be half-configured on the way to
     // finding out.
     expect(refused.stdout.output).toBe("");

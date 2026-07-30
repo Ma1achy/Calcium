@@ -152,7 +152,7 @@ Session state survives. This is a render mode, not an error state: the frame ret
 
 S01 handles no keys. It reads `activeTarget` to choose a footer and renders the cursor where C17 says it is.
 
-Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` (C14 I16) and is **frame chrome, not block content** — it enters no measurement and no theme token beyond a tone.
+Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` (C14 I17) and is **frame chrome, not block content** — it enters no measurement and no theme token beyond a tone.
 
 ---
 

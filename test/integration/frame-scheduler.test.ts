@@ -56,7 +56,7 @@ function wire(env: Record<string, string> = { TERM: "xterm-256color" }): {
     repaint,
     capabilities,
     // The live view, not a snapshot: `acquired` is C01's own getter, so this is
-    // the wiring §2 requires and T3.24 shows the failure of (I11).
+    // the wiring §2 requires and T3.24 shows the failure of (I12).
     lifecycle,
     write: (s: string): void => void lifecycle.writer.write(s),
     schedule: clock.schedule,

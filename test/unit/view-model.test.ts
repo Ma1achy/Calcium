@@ -72,7 +72,7 @@ describe("C04 immutability", () => {
   });
 
   it("T1.1b (I1): a cyclic literal freezes rather than hanging the constructor", () => {
-    // Refusal is the validator's job (I18). A constructor that recursed forever
+    // Refusal is the validator's job (I27). A constructor that recursed forever
     // would fail worse than one that completes and lets validation name it.
     const child: Record<string, unknown> = { kind: "raw", id: "cyc-child", text: "x" };
     const parent: Record<string, unknown> = { kind: "panel", id: "cyc", title: "", children: [child] };
@@ -164,7 +164,7 @@ describe("C04 validation", () => {
     expect(shared.ok, "row ids are scoped to their table, not to the document").toBe(true);
   });
 
-  it("T1.17 (I18): a cyclic document is refused, and the call returns", () => {
+  it("T1.17 (I27): a cyclic document is refused, and the call returns", () => {
     const inner: Record<string, unknown> = { kind: "raw", id: "inner", text: "x" };
     const outer: Record<string, unknown> = { kind: "panel", id: "outer", title: "T", children: [inner] };
     (inner as { children?: unknown[] }).children = [outer];
@@ -179,7 +179,7 @@ describe("C04 validation", () => {
     expect(r.ok === false && r.error.join(" ")).toContain("cyclic structure");
   });
 
-  it("T1.17b (I18): a subtree appearing twice is not a cycle", () => {
+  it("T1.17b (I27): a subtree appearing twice is not a cycle", () => {
     // The seen-set is path-scoped for this case. A global one would call the
     // second, honest occurrence a cycle and refuse a legal document.
     const shared = { kind: "raw", id: "shared", text: "x" } as const;

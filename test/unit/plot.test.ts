@@ -317,7 +317,7 @@ describe("C12 tier 1 — pinned range", () => {
     expect(seriesRange([{ values: [0.2, 0.5, 0.3] }], { yMax: 1 })).toEqual({ min: 0.2, max: 1 });
   });
 
-  it("T1.14 (C04 I33): out-of-range values clamp to the edge and never widen the pin", () => {
+  it("T1.14 (C04 I29): out-of-range values clamp to the edge and never widen the pin", () => {
     const range = seriesRange([{ values: [0.2, 1.6, -0.4] }], { yMin: 0, yMax: 1 });
     expect(range).toEqual({ min: 0, max: 1 });
     if (range === null) throw new Error("unreachable");

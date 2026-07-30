@@ -99,7 +99,7 @@ export const SCANS = [
   //
   // Its fabricated violation is `stdout.columns` through a held handle, copied from
   // `lifecycle.ts` rather than invented (A03 commitment 14a).
-  { id: "SS42", spec: "C01 I17 · C01 T2.10",
+  { id: "SS42", spec: "C01 I13 · C01 T2.10",
     pattern: /\b(?:stdout|stderr|stdin|writer|stream|out|term|tty)\s*\.\s*(?:columns|rows)\b/,
     scope: "src/", allow: ["src/terminal/lifecycle.ts"],
     why: "the terminal's dimensions are read in lifecycle.ts and handed down; width is the axis that wraps" },
@@ -333,7 +333,7 @@ export const SCANS = [
   // assembled by hand in a renderer with `colour: "#7faecf"` is one `as` away
   // from compiling. This makes the untagged form unwritable rather than merely
   // discouraged, which is the difference between a rule and a convention.
-  { id: "SS36", spec: "C10 I18 · C10 T2.19",
+  { id: "SS36", spec: "C10 I24 · C10 T2.19",
     pattern: /\bcolour\s*:\s*["'`]/,
     scope: "src/", allow: [],
     why: "a resolved colour names its depth; there is no untagged form" },

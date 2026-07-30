@@ -137,7 +137,7 @@ describe("C11 tier 2 — planColumns as an interface", () => {
     expect(r.renderToLines(psTable({ rows: 3 }), 80).slice(1).every((l) => l.includes("▸"))).toBe(true);
   });
 
-  it("T2.5 (I12): `table` is registered through the public register, with no built-in fallback", () => {
+  it("T2.5 (I16): `table` is registered through the public register, with no built-in fallback", () => {
     // Removing the registration removes the kind. A registry without it renders a
     // table as `raw` — C09 §2's fallback for an unregistered kind — rather than
     // finding a privileged built-in.
@@ -194,7 +194,7 @@ describe("C11 tier 2 — planColumns as an interface", () => {
     }
   });
 
-  it("T2.9 (I16): the plan is identical with and without role: \"expand\"", () => {
+  it("T2.9 (I15): the plan is identical with and without role: \"expand\"", () => {
     const withRole = psColumns();
     const without = withRole.map((c) => {
       const { role: _role, ...rest } = c;

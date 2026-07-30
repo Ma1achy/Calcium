@@ -175,9 +175,9 @@ Expansion happens **after** tokenising, so a UUID containing a space could not s
 - **I10** — Only a trailing bare `&` and the job-control words are refused.
 - **I11** — The tokeniser is shared with C19; there is exactly one implementation.
 - **I12** — The prefix rule is a policy; the default is `/` and it is replaceable (F2).
-- **I14** — Output from a shell-delegated command reaches the transcript as a `raw` block. C18 does not parse it, because what the user's shell produced is text by construction and pretending otherwise would put a second envelope contract in the one place there is deliberately none.
-- **I15** — An unknown verb is matched against the manifest at a Levenshtein distance of **2** and no further (A01 A.2). Beyond the cutoff the suggestion is dropped for a generic hint, because a wrong suggestion costs more than none — it sends the reader to a verb that exists and does something else.
-- **I13** — C18 imports nothing from `terminal/` or `presentation/` and never commits a frame.
+- **I13** — Output from a shell-delegated command reaches the transcript as a `raw` block. C18 does not parse it, because what the user's shell produced is text by construction and pretending otherwise would put a second envelope contract in the one place there is deliberately none.
+- **I14** — An unknown verb is matched against the manifest at a Levenshtein distance of **2** and no further (A01 A.2). Beyond the cutoff the suggestion is dropped for a generic hint, because a wrong suggestion costs more than none — it sends the reader to a verb that exists and does something else.
+- **I15** — C18 imports nothing from `terminal/` or `presentation/` and never commits a frame.
 
 ---
 
@@ -186,11 +186,11 @@ Expansion happens **after** tokenising, so a UUID containing a space could not s
 1. `parse` is a pure total function; session state is context (I1, I2).
 2. Classification is a single-character check plus D23's slash rule (I3).
 3. Shell operators delegate the whole input to the user's shell, with `/verb` rewritten (I4, I5).
-4. Delegated output is a `raw` block (I14).
+4. Delegated output is a `raw` block (I13).
 5. `j22`'s refusal of globbing and brace expansion is reversed — delegation gives correct semantics for free (I4).
 6. App commands without operators reach the transport as an argv array rather than a string, so delegation never widens the shell boundary; the array itself is C06's guarantee (→ C06 I3).
 7. Only trailing `&` and job-control words are refused (I10).
-8. Tool lookup is longest-match; misses suggest at edit distance ≤ 2 (I15).
+8. Tool lookup is longest-match; misses suggest at edit distance ≤ 2 (I14).
 9. Validation happens before spawning (I6).
 10. `$_` expands after tokenising, in unquoted and double-quoted tokens, with the catalogued error wording (I7, I8).
 11. A leading built-in is intercepted, including before `&&` or `;`, so `cd x && make` behaves as it does in bash (I9).
@@ -230,7 +230,7 @@ Six tiers. No state machine — C18 is pure.
 - **T2.1** (I1): a fuzz corpus of ten thousand strings — control characters, unbalanced quotes, huge tokens, nulls — yields a result, never a throw.
 - **T2.2** (I2): a source scan finds no module state in `parser/`.
 - **T2.3** (I11): C18 and C19 import the same tokeniser symbol; a duplicate implementation fails the check.
-- **T2.4** (I13): the module graph shows no import from `terminal/` or `presentation/`, and no scheduler call.
+- **T2.4** (I15): the module graph shows no import from `terminal/` or `presentation/`, and no scheduler call.
 - **T2.5**: every `ParseResult` variant is produced by at least one corpus input — exhaustive over the union.
 - **T2.6** (I12): swapping the policy to a `:` prefix reclassifies the corpus consistently, with no other behaviour change.
 - **T2.7** (I6): a spy proves the transport is never touched during parsing.

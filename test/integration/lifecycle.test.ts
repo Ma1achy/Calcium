@@ -19,7 +19,7 @@ const live: TerminalLifecycle[] = [];
  * C01 and C03 wired the way L4 will wire them: the scheduler takes C01's
  * `acquired` getter as its live view and C01's `writer` as its `write`. Passing
  * `lifecycle` itself is what makes the view live — an object literal here would
- * capture `false` forever (C03 §2, C03 I11).
+ * capture `false` forever (C03 §2, C03 I12).
  */
 function wireScheduler(env: Record<string, string> = { TERM: "xterm-256color" }): {
   scheduler: FrameScheduler;

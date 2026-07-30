@@ -27,7 +27,7 @@ import { invocation, recorded, result } from "../support/transport.js";
 const MANIFEST = manifestFixture();
 
 describe("C08 §2 — the corpus file", () => {
-  it("T2.11 (I16): a round trip through the file preserves every fixture", () => {
+  it("T2.11 (I17): a round trip through the file preserves every fixture", () => {
     const corpus: readonly Fixture[] = [
       recorded({ id: "ps/empty" }),
       recorded({
@@ -51,12 +51,12 @@ describe("C08 §2 — the corpus file", () => {
     expect(parseCorpus(serialiseCorpus(corpus))).toEqual(corpus);
   });
 
-  it("T2.11 (I16): a corpus with no schema fails the load and says what it wanted", () => {
+  it("T2.11 (I17): a corpus with no schema fails the load and says what it wanted", () => {
     expect(() => parseCorpus(JSON.stringify({ fixtures: [] }))).toThrow(CorpusError);
     expect(() => parseCorpus(JSON.stringify({ fixtures: [] }))).toThrow(/declares no schema/);
   });
 
-  it("T2.11 (I16): an unrecognised schema fails, naming both versions", () => {
+  it("T2.11 (I17): an unrecognised schema fails, naming both versions", () => {
     // The failure has to name the file's version and the build's, or the reader
     // goes to the source to find out what it wanted.
     const text = JSON.stringify({ schema: "tui.fixtures/0", fixtures: [] });

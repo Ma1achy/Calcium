@@ -134,7 +134,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG18 | C20 imports nothing from `terminal/`; no C17 import | C20 T2.5, T2.6 |
 | MG19 | C21 imports nothing from `terminal/` | C21 T2.3 |
 | MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
-| MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I18, T2.17 |
+| MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I15, T2.17 |
 | MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
 
 **MG22 is a cycle rule, not a layer rule.** C11 imports C12's `sparkline` for a `Cell.spark` (C12 §2), which is legal: A02 §1 forbids importing *upward* and importing *cyclically*, and both directories are L1, so the layer walk sees nothing either way. What must never exist is the return edge — a plot reaching into the table engine for a column width or a truncation helper, which is exactly the shape a reader would reach for and which would close the cycle. Type-only counts, as MG6 and MG19 both record: a reference is a dependency whether or not it survives the build.
@@ -166,7 +166,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS11 | `process.env` | `blocks/` | C09 T2.7 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
-| SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I17, T2.10 |
+| SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I13, T2.10 |
 
 **SS1 is the widest and the most valuable.** One injected clock, entering at C22 and nowhere else, is what makes golden frames reproducible and every timing test run on a fake.
 
@@ -216,9 +216,9 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
 | SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
-| SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I29 |
-| SS36 | A string literal assigned to a `colour` field | `src/` | C10 I18, T2.19 |
-| SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I18, T2.17 |
+| SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
+| SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
+| SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
 | SS38 | A bare import of a package that is not a declared runtime dependency | `src/` | A04 §2, C09 §4a |
 

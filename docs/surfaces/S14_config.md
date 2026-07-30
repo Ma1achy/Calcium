@@ -168,7 +168,7 @@ The contexts region below the second rule is a table too, and it declared no col
 
 Key paths truncate from the **left**, keeping the leaf. Keys are sorted, so adjacent rows share their namespace; truncating the leaf would render `ui.theme` and `ui.show_banner` identically. Values truncate from the right.
 
-**Declared as `truncateFrom: "start"`** — the field names the end characters are removed from, so `start` is the one that keeps the leaf (C04 I32). It did not exist when this paragraph was first written: the intent was stated in prose, `ColumnDef` could not carry it, and C11 truncated from the right unconditionally, so a narrow `key` column showed `ui.show_ba…` where this surface wants `…show_banner`. Found while declaring `align`, which is the same class of leak.
+**Declared as `truncateFrom: "start"`** — the field names the end characters are removed from, so `start` is the one that keeps the leaf (C04 I30). It did not exist when this paragraph was first written: the intent was stated in prose, `ColumnDef` could not carry it, and C11 truncated from the right unconditionally, so a narrow `key` column showed `ui.show_ba…` where this surface wants `…show_banner`. Found while declaring `align`, which is the same class of leak.
 
 ## 8. Interactions
 

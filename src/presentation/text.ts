@@ -28,7 +28,7 @@
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 /**
- * Control characters, stripped before anything is measured or drawn (C09 I14).
+ * Control characters, stripped before anything is measured or drawn (C09 I18).
  *
  * The implementation moved down to `data/text.ts` when C07 landed: an adapter
  * must strip on the way *into* a block rather than on the way out to the screen
@@ -143,7 +143,7 @@ export function truncate(
   const budget = limit - 1; // the marker's own cell
   if (budget <= 0) return marker;
 
-  // `from` names the end characters are removed from (C04 I32), so `"start"` walks
+  // `from` names the end characters are removed from (C04 I30), so `"start"` walks
   // the clusters in reverse and keeps the tail. One walk, parameterised, rather
   // than two implementations: a second pass over the same grapheme stream would
   // round differently at the boundary in exactly the CJK and ZWJ cases this

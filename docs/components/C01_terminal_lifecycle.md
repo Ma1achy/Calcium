@@ -43,7 +43,7 @@ function createTerminalLifecycle(opts: {
   stdout: NodeJS.WriteStream;
   stdin:  NodeJS.ReadStream;
   capabilities: TerminalCapabilities;
-  onFatal: (err: unknown) => never;      // required — see I13
+  onFatal: (err: unknown) => never;      // required — see I14
   beforeRelease?: () => void;            // synchronous; runs before every release
   debug?: (line: string) => void;        // the debug sink (D32); defaults to a no-op
 }): TerminalLifecycle;
@@ -129,11 +129,11 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 - **I10** — A capability absent from the record is never acquired. No mouse in the record means no mouse sequence, ever.
 - **I11** — `released` is a terminal state. Every operation on a released instance throws except `release()` itself, which is a no-op (I2).
 - **I12** — `SIGWINCH` produces one coherent `{columns, rows}` snapshot per event (D31). Subscribers never see a mismatched pair. **Per signal, and not per frame** — `writer` is a live handle, so its `columns` is read by whoever holds it at the moment they read it, and nothing here guarantees a frame was composed against one width. §5 states the boundary; the frame path's snapshot belongs with whoever writes it.
-- **I17** — `columns` and `rows` are read in this file and nowhere else in `src/`. Enforced by A03 SS42, and it is the fourth member of the same family as the clock, `process.env` and the escape literals: one place reads it, everything else is handed the value. Width is the axis that wraps, and a wrap scrolls the alternate screen.
-- **I13** — Failure to acquire the alternate screen is fatal and aborts before first paint. It is the only fatal case in the system (A02 §7).
-- **I14** — `SIGCONT` re-acquires terminal state and reports through `onResume`. It sets no flag: C01 states a fact about the terminal and L4 decides what it means, because a `contaminated` flag under two owners is the failure C01 exists to prevent, applied to itself (D53).
-- **I15** — `SIGTSTP` releases, removes its own handler, and re-raises with default disposition, so the shell's job control sees an ordinary stop rather than a process that swallowed it.
-- **I16** — Exit codes are `128 + signal`, per signal: 130 for `SIGINT`, 143 for `SIGTERM`, 129 for `SIGHUP`. One shutdown *path* is a property worth having; one shutdown *code* misreports a supervisor's signal as a user pressing Ctrl-C (D54).
+- **I13** — `columns` and `rows` are read in this file and nowhere else in `src/`. Enforced by A03 SS42, and it is the fourth member of the same family as the clock, `process.env` and the escape literals: one place reads it, everything else is handed the value. Width is the axis that wraps, and a wrap scrolls the alternate screen.
+- **I14** — Failure to acquire the alternate screen is fatal and aborts before first paint. It is the only fatal case in the system (A02 §7).
+- **I15** — `SIGCONT` re-acquires terminal state and reports through `onResume`. It sets no flag: C01 states a fact about the terminal and L4 decides what it means, because a `contaminated` flag under two owners is the failure C01 exists to prevent, applied to itself (D53).
+- **I16** — `SIGTSTP` releases, removes its own handler, and re-raises with default disposition, so the shell's job control sees an ordinary stop rather than a process that swallowed it.
+- **I17** — Exit codes are `128 + signal`, per signal: 130 for `SIGINT`, 143 for `SIGTERM`, 129 for `SIGHUP`. One shutdown *path* is a property worth having; one shutdown *code* misreports a supervisor's signal as a user pressing Ctrl-C (D54).
 
 ---
 
@@ -246,19 +246,19 @@ Nested suspend is refused — `suspend()` while already suspended throws. There 
 4. `release()` is idempotent and emits the inverse of what was actually acquired, in reverse order (I2, I6).
 5. Release precedes diagnostics on every fault path (I4).
 6. `suspend()` fully leaves the alternate screen (I7).
-7. `resume()` neither repaints nor tracks contamination — C03 owns the flag, the L4 shell calls `invalidate()`. `SIGCONT` re-acquires and reports through `onResume`; it sets nothing (I14).
+7. `resume()` neither repaints nor tracks contamination — C03 owns the flag, the L4 shell calls `invalidate()`. `SIGCONT` re-acquires and reports through `onResume`; it sets nothing (I15).
 8. A capability absent from the record is never acquired (I10).
-9. Alternate-screen acquisition failure is fatal and is the only fatal case in the system (I13).
-10. `SIGTSTP` releases, removes its handler, and re-raises with default disposition (I15).
+9. Alternate-screen acquisition failure is fatal and is the only fatal case in the system (I14).
+10. `SIGTSTP` releases, removes its handler, and re-raises with default disposition (I16).
 11. C21 never calls C01; the L4 shell orchestrates suspend and handoff (→ A02 §2).
 12. stdout is redirected at construction and restored at release. `writer` is the only handle that reaches the real stream, so "originating from the renderer" is structural rather than a claim nothing can check; everything else goes to the injected `debug` sink, which C01 owns (I9).
-13. `onFatal` is required, not optional — the only fatal case in the system cannot have undefined handling (I13).
+13. `onFatal` is required, not optional — the only fatal case in the system cannot have undefined handling (I14).
 14. C01 owns `SIGWINCH` and emits one coherent dimension snapshot per event; it does not interpret it (I12).
 15. `release()` while suspended tears down handlers and stdout redirection but emits no terminal sequence (I8).
 16. `beforeRelease` gives layers above L0 a synchronous hook before the process exits; a throw from it never blocks the release (I5).
 17. `released` is terminal — a new instance is constructed per session; the transition table in §5 is exhaustive and every cell is tested (I11).
-18. Exit codes are 128 + signal, per signal: 130, 143, 129 (I16).
-19. The terminal's dimensions are read in one file, and I12's snapshot covers the signal path only. §5 states where the guarantee stops rather than leaving it inferred from the absence of an accessor, because the per-frame snapshot is the frame path's to make and a partial fix here would look like a whole one (I12, I17).
+18. Exit codes are 128 + signal, per signal: 130, 143, 129 (I17).
+19. The terminal's dimensions are read in one file, and I12's snapshot covers the signal path only. §5 states where the guarantee stops rather than leaving it inferred from the absence of an accessor, because the per-frame snapshot is the frame path's to make and a partial fix here would look like a whole one (I12, I13).
 
 ---
 
@@ -309,7 +309,7 @@ Proves the interface A02 §2 promises, so C03 and the shell can be written again
   1. The bare mode numbers `1049 25 2004 1002 1006 2026` appear in `src/` only in `terminal/escapes.ts` — A03 SS15. I1 requires the literals to live there, so a rule saying they appear "only in C01" would fail on the one file that must contain them.
   2. `escapes.ts`'s named export for each of those modes is imported only by `terminal/lifecycle.ts`, and `2026`'s only by `terminal/frame-scheduler.ts`. Asserted per sequence, so the transactional exception cannot widen silently.
 - **T2.9** (I1): `render()` is never called with `alternateScreen` — a source scan over `src/` (A03 SS34). Two owners of one piece of terminal state is the failure this component exists to prevent, and Ink's own option is the tempting shortcut.
-- **T2.10** (I17): `columns` and `rows` are read from a stream in `src/` only in `terminal/lifecycle.ts` — A03 SS42, imported from the enforcement tool rather than restated. Shown to fire against a fabricated violation **copied from `lifecycle.ts` itself**, `stdout.columns` through a held handle, rather than a form invented for the test (A03 commitment 14a).
+- **T2.10** (I13): `columns` and `rows` are read from a stream in `src/` only in `terminal/lifecycle.ts` — A03 SS42, imported from the enforcement tool rather than restated. Shown to fire against a fabricated violation **copied from `lifecycle.ts` itself**, `stdout.columns` through a held handle, rather than a form invented for the test (A03 commitment 14a).
 
   **The rule is keyed on the receiver**, and the reason is worth recording: a bare `.columns` also matches `block.columns` in `table/` and `plan.columns` in its planner — nine sites with nothing to do with a terminal — and annotating them would put a claim about terminal width on lines about table columns. The residual gap is stated rather than left to be found: a handle stored under a name outside the list escapes, and what closes that is the per-frame snapshot rather than a cleverer pattern.
 
@@ -322,7 +322,7 @@ Where the real defects live.
 - **T3.3**: nested `suspend()` throws.
 - **T3.4**: `resume()` without a prior `suspend()` throws.
 - **T3.5**: `acquire()` twice emits the sequence once; the second call is a no-op.
-- **T3.6** (I13, C9): alternate-screen write throws → `onFatal` is invoked, `acquired` stays false, and nothing further is emitted.
+- **T3.6** (I14, C9): alternate-screen write throws → `onFatal` is invoked, `acquired` stays false, and nothing further is emitted.
 - **T3.7**: a write throws *midway* through acquisition (at bracketed paste) → everything acquired so far is released in reverse, and `acquired` is false. Partial acquisition never leaves partial state.
 - **T3.8**: a write throws during release → remaining releases are still attempted, and the error is reported once at the end. One failing sequence does not strand the other five.
 - **T3.9**: `setRawMode` is absent (stdin is not a TTY) → treated as unsupported, skipped, no throw.
@@ -397,7 +397,7 @@ Tests whose only job is to fail loudly if a specific invariant is quietly undone
 - **T6.11** (I11): making `released` re-acquirable → T3.21 fails. A revived instance holds terminal state with no handler registered to release it — precisely the window I3 exists to close.
 - **T6.12** (I1): emitting a mode-setting sequence from C03, or a `2026` marker from C01 → T2.8 fails. The transactional exception stays exactly one sequence wide.
 - **T6.13** (I9): giving Ink `process.stdout` rather than `lifecycle.writer` → T1.7 fails, because the renderer's writes become indistinguishable from foreign ones and land in the debug sink. This is the regression that makes single-owner stdout a claim rather than a property.
-- **T6.14** (I17): reading `stdout.columns` in a second module — the plausible version being a renderer that wants the width without being handed it → T2.10 fails, naming the file. The regression is not that the read is wrong on its own; it is that two readers at two moments in one frame is how a frame comes to be composed against two widths.
+- **T6.14** (I13): reading `stdout.columns` in a second module — the plausible version being a renderer that wants the width without being handed it → T2.10 fails, naming the file. The regression is not that the read is wrong on its own; it is that two readers at two moments in one frame is how a frame comes to be composed against two widths.
 
 ---
 

@@ -177,11 +177,11 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
   });
 
   it("SP1: suffixed invariant ids resolve", () => {
-    // C04 I20a exists. A rule that only matched `I\\d+` would report it as
+    // C04 I28a exists. A rule that only matched `I\\d+` would report it as
     // dangling on the one spec that needed to interleave an invariant.
-    const source = spec([["I20a", "the suffixed one."]], ["Backed (I20a)."]);
+    const source = spec([["I28a", "the suffixed one."]], ["Backed (I28a)."]);
     expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
-    expect(invariantsOf("docs/components/C99_x.md", at(source)).has("I20a")).toBe(true);
+    expect(invariantsOf("docs/components/C99_x.md", at(source)).has("I28a")).toBe(true);
   });
 
   it("SP1: every invariant in a multi-citation is resolved, not just one", () => {
@@ -199,10 +199,10 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
   });
 
   it("SP1: a cross-reference is not read as a local citation", () => {
-    // Found by running the rule, not by reading it. `(→ C04 I20)` matched the
+    // Found by running the rule, not by reading it. `(→ C04 I28)` matched the
     // local-citation pattern first and reported a dangling reference in the one
     // spec that had got the cross-reference right.
-    const source = spec([["I1", "one."]], ["Elsewhere's (→ C04 I20)."]);
+    const source = spec([["I1", "one."]], ["Elsewhere's (→ C04 I28)."]);
     expect(checkCommitments(["docs/components/C99_x.md"], at(source))).toEqual([]);
   });
 });
@@ -294,9 +294,15 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
 
   it("SP2: expectedOrder carries the letter rather than the position", () => {
     // The trap a positional renumber falls into, asserted directly because it is
-    // the one the renumber script got wrong on its first pass: C04's `I20a`
-    // follows `I20`, so when `I20` becomes `I28` the variant becomes `I28a` —
-    // not `I29`, and not whatever id happens to sit at that index.
+    // the one the renumber script got wrong on its first pass. C04 declared
+    // `I20a` immediately after `I20`; `I20` was renumbered to `I28`, so the
+    // variant had to become `I28a` — not `I29`, and not whatever id happened to
+    // sit at that index, which is what a positional pass produces.
+    //
+    // **The ids in this comment are pre-renumber and stay that way.** A sentence
+    // describing a renumbering cannot itself be renumbered — the rewrite did
+    // exactly that here and turned it into nonsense, which is the same class as
+    // the note at the top of the pairing audit.
     expect(expectedOrder(["I5", "I6", "I6a", "I7"])).toEqual(["I1", "I2", "I2a", "I3"]);
     expect(expectedOrder(["I1", "I2", "I2a"]), "already correct, so unchanged").toEqual([
       "I1",
@@ -356,7 +362,9 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // **The fabrication is the real defect**, copied from the call site rather
     // than invented (A03 commitment 14a). `test/integration/capabilities.test.ts`
     // cited a bare `I13` about aborting before first paint — C01's rule, in a
-    // file about C02 — and had done since the file was written.
+    // file about C02 — and had done since the file was written. That id is as it
+    // stood then; C01's is `I14` after the renumber, and the fixture below is the
+    // original text rather than a translation of it.
     const read = at(
       "    // I13, and the reason it is stated as \"aborts before first paint\".\n",
       "test/integration/capabilities.test.ts",
@@ -379,12 +387,12 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // The two halves of resolution, in one file. `I2a` is C25's because the file
     // is C25's, even though C14 is named in the sentence before it — proximity
     // does not overrule an owner, and four of the first run's findings were
-    // exactly that mistake. `C10 I22` is C10's because it says so.
+    // exactly that mistake. `C10 I21` is C10's because it says so.
     const read = at(
       [
         " * C14 virtualises on it.",
         " * I2a is the weaker one.",
-        " * The surface comes from C10 I22.",
+        " * The surface comes from C10 I21.",
         "",
       ].join("\n"),
       "src/presentation/patch/height.ts",
@@ -395,15 +403,15 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
 
   it("SP3: a qualified reference wrapped across lines is still qualified", () => {
     // **The rule's own first defect, found by running it.** `lines.ts` writes
-    // `(C10\n * I22)`, and a resolver reading one line at a time sees a bare
-    // `I22` in a C25 file and reports a defect that is not there. Adjacency is
+    // `(C10\n * I21)`, and a resolver reading one line at a time sees a bare
+    // `I21` in a C25 file and reports a defect that is not there. Adjacency is
     // measured over the gap between the two tokens — whitespace and the leaders a
     // wrapped line carries — rather than over a line.
     const read = at(
       [
         "/**",
         " * The background arrives through C10's `resolveBackground` (C10",
-        " * I22), so the two channels cannot degrade differently.",
+        " * I21), so the two channels cannot degrade differently.",
         " */",
         "",
       ].join("\n"),
@@ -415,7 +423,7 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
 
   it("SP3: in a document, proximity is the only signal and it carries the paragraph", () => {
     // The corpus cites in run-on lists — the pairing audit's appendix is
-    // `C03 I9 · C04 I10, I11, I19 · C05 …` — and in blockquotes that wrap mid
+    // `C03 I9 · C04 I10, I11, I25 · C05 …` — and in blockquotes that wrap mid
     // sentence, so the scope crosses lines and ends at the blank one.
     const read = at(
       ["C04 I10, I11 and I12 are unbacked.", "", "And I1 is nobody's."].join("\n"),

@@ -158,7 +158,7 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     // I1 — a commit while unacquired is dropped in silence. Checked here rather
     // than at commit time because a timer armed while acquired may fire after
     // release (T3.9); and `acquired` is read through the live view on every
-    // write, never captured (I11, T3.22).
+    // write, never captured (I12, T3.22).
     if (!lifecycle.acquired) {
       state = "idle";
       return;

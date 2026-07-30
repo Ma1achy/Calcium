@@ -295,7 +295,7 @@ export function transportCases(): readonly Case[] {
       // not a recording of that invocation — it is a harness that never spawned
       // anything. Under the old rewrite the mismatch was invisible, because the
       // transport substituted the field; that is the same substitution that hid
-      // the divergence I21 exists to catch.
+      // the divergence I24 exists to catch.
       name: "fixture",
       make: (answer, patches, argv) =>
         createFixtureTransport([
@@ -352,7 +352,7 @@ function spawned(argv: readonly string[]): readonly string[] {
   return ["widget", ...withJson(argv)];
 }
 
-// --- field-complete parity (C06 I21) --------------------------------------
+// --- field-complete parity (C06 I24) --------------------------------------
 
 /**
  * Fields that cannot match across transports, each with its reason.

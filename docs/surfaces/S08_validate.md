@@ -215,7 +215,7 @@ Nothing on this surface mutates.
 
 ### Tier 4 — integration
 
-- **T4.1** (with C09): the `steps` block's spinner advances from `ctx.tick` and never changes measured height (C09 I14).
+- **T4.1** (with C09): the `steps` block's spinner advances from `ctx.tick` and never changes measured height (C09 I18).
 - **T4.2** (with C03): a fast validation produces one frame, not one per step.
 - **T4.3** (with C23): the tip's fills land in the prompt as one undo unit.
 - **T4.4** (with C16): `?` on an error code opens context help for that code.

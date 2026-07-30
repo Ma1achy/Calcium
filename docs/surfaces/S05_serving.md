@@ -146,7 +146,7 @@ had, found by auditing the truncation side.
 **Pod names truncate from the start**, keeping the hash suffix — the prefix is the
 deployment name you already know, and `volatility-estimator-7d8f9b-k2p1` cut the
 other way makes all three rows read alike. `truncateFrom: "start"` names the end
-characters are removed from (C04 I32); it did not exist when this paragraph first
+characters are removed from (C04 I30); it did not exist when this paragraph first
 stated the intent in prose.
 
 `restarts` and `age` are right-aligned, which the figure above draws and this table

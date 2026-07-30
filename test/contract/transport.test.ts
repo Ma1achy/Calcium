@@ -75,7 +75,7 @@ describe("C06 contract", () => {
     expect(transportCases().map((c) => c.name)).toEqual(["fixture", "emulated", "subprocess"]);
   });
 
-  describe("T2.1 (I21): parity compares the complete RawResult", () => {
+  describe("T2.1 (I24): parity compares the complete RawResult", () => {
     // The gap that let a real divergence through. The suite compared `stdout`,
     // `exitCode` and the shape of the patch sequence, `argv` diverged, and
     // nothing went red until C08 recorded and replayed the same invocation.

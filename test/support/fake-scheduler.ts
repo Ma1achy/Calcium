@@ -128,7 +128,7 @@ export type HarnessOptions = {
   /**
    * Build the lifecycle view as an object literal capturing `acquired` at
    * construction — L4's mistake, which C03 cannot prevent structurally. T3.24
-   * is the only caller (§2, I11).
+   * is the only caller (§2, I12).
    */
   snapshotLifecycle?: boolean;
 };

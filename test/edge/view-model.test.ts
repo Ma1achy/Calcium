@@ -83,7 +83,7 @@ describe("C04 width arithmetic at the boundaries", () => {
 });
 
 describe("C04 validation edges", () => {
-  it("T3.15 (I18): a cycle through a table's detail is refused, not followed", () => {
+  it("T3.15 (I27): a cycle through a table's detail is refused, not followed", () => {
     // The panel path is covered in tier 1. Detail is the other way down, and it
     // is the one an `expand` patch creates.
     const row: Record<string, unknown> = { id: "r1", cells: {}, detail: [] };

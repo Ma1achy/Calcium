@@ -116,7 +116,7 @@ The `Status`/`State` split is the instructive one: the human-readable field and 
 | image | 60 | 20 | left | **start** | — | `Image`, tag survives |
 | ports | 40 | 20 | left | **start** | — | `Ports`, host port survives |
 
-`Trunc` is `truncateFrom` (C04 I32) — the end characters are removed from, so `start` keeps the tail. `image` keeps its tag, because `ghcr.io/acme/api:2.4.1` truncated the other way reads as every other image from that registry; `ports` keeps the host port, which R3.4 already asserted while nothing could express it. `align` is stated because `ColumnDef` requires it (C04 §3). Nothing docker returns is a number — every field is a string, which R01 §4 lists as the sixth problem — so every column is left, and the adapter's job is not to make any of them look otherwise.
+`Trunc` is `truncateFrom` (C04 I30) — the end characters are removed from, so `start` keeps the tail. `image` keeps its tag, because `ghcr.io/acme/api:2.4.1` truncated the other way reads as every other image from that registry; `ports` keeps the host port, which R3.4 already asserted while nothing could express it. `align` is stated because `ColumnDef` requires it (C04 §3). Nothing docker returns is a number — every field is a string, which R01 §4 lists as the sixth problem — so every column is left, and the adapter's job is not to make any of them look otherwise.
 
 State glyphs follow the framework's vocabulary: `running` → `●` ok, `restarting` → `▲` warn, `paused` → `▪` warn, `exited` → `✗` error, `created` → `○` muted.
 

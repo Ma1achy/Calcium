@@ -222,9 +222,9 @@ Two small machines, both with an injected clock.
 - **I11** — C16 never calls the frame scheduler. L4 commits.
 - **I12** — Bytes buffered during a paste are never dispatched as individual keys.
 - **I13** — C16 imports nothing from `terminal/`; raw mode is C01's and decoding is data-in.
-- **I16** — No chord support beyond modifiers. Terminals send no key-up event, so a two-key chord cannot be distinguished from two keystrokes without a timeout, and a timeout would make the same input mean different things at different typing speeds.
-- **I14** — `activeTarget` is pure over its inputs.
-- **I15** — Ctrl-D is dispatched only when the editor buffer is empty, and it opens a confirm rather than exiting. With text present it is consumed and discarded — never treated as EOF, and never as a delete-forward, because a keystroke that sometimes ends the session and sometimes edits the line is one nobody presses twice.
+- **I14** — No chord support beyond modifiers. Terminals send no key-up event, so a two-key chord cannot be distinguished from two keystrokes without a timeout, and a timeout would make the same input mean different things at different typing speeds.
+- **I15** — `activeTarget` is pure over its inputs.
+- **I16** — Ctrl-D is dispatched only when the editor buffer is empty, and it opens a confirm rather than exiting. With text present it is consumed and discarded — never treated as EOF, and never as a delete-forward, because a keystroke that sometimes ends the session and sometimes edits the line is one nobody presses twice.
 
 ---
 
@@ -234,13 +234,13 @@ Two small machines, both with an injected clock.
 2. Focus is derived from what is on screen, plus one stored location — including which row — that resets only on append (I1, I2).
 3. Mouse events route by position through C15 then C14; keys route by focus (I3).
 4. A paste is one event, whatever its size; the no-bracketed-paste fallback is a documented heuristic (I6, I12).
-5. No chord support beyond modifiers — terminals send no key-up (I16).
+5. No chord support beyond modifiers — terminals send no key-up (I14).
 6. Exactly one handler consumes an event; unconsumed events are dropped (I4, I5).
 7. Ctrl-C cancels an in-flight verb ahead of every other meaning (I7).
 8. Ctrl-C never dismisses a confirm (I8).
-9. Ctrl-D at an empty prompt confirms exit; with text it does nothing (I15).
+9. Ctrl-D at an empty prompt confirms exit; with text it does nothing (I16).
 10. Double-tap timing is 500 ms on an injected clock (I9).
-11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I25).
+11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I26).
 12. Duplicate bindings fail at construction (I10).
 13. C16 never commits a frame; L4 does (I11).
 
@@ -254,7 +254,7 @@ Six tiers. Every cell of both §7 tables is covered.
 
 - **T1.1**: byte sequences decode to the documented keys — plain, ctrl, meta, arrows, function keys, `Esc`. Twenty cases.
 - **T1.2**: a lone `Esc` byte is distinguished from an escape sequence prefix by the documented disambiguation window.
-- **T1.3** (I14): `activeTarget` returns the documented target for each of the six conditions.
+- **T1.3** (I15): `activeTarget` returns the documented target for each of the six conditions.
 - **T1.3b** (I2): moving focus to `liveBlock`, then appending an entry → focus is back at `prompt`.
 - **T1.3c** (I3): a click at a transcript row resolves to that row's block, not to the focused target.
 - **T1.3d** (I3): a click inside an overlay's placed region resolves to the overlay even when focus is elsewhere.
@@ -272,7 +272,7 @@ Six tiers. Every cell of both §7 tables is covered.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I1): a spy proves `activeTarget` is recomputed on every dispatch, never cached across events.
-- **T2.2** (I14): `activeTarget` called a thousand times on the same inputs returns the same result and performs no I/O.
+- **T2.2** (I15): `activeTarget` called a thousand times on the same inputs returns the same result and performs no I/O.
 - **T2.3** (I9): a source scan finds no clock reference in `input/`.
 - **T2.4** (I10): a keymap with a duplicate `(target, key)` fails at construction, naming both bindings.
 - **T2.5**: every `FocusTarget` in the union has at least one default binding — exhaustive over the type.
@@ -284,7 +284,7 @@ Six tiers. Every cell of both §7 tables is covered.
 
 - **T3.1**: a paste of 100,000 characters → one event, delivered within budget, no per-character work.
 - **T3.2**: a paste containing `CSI 201~`-like bytes in its payload → terminated only by a true end marker.
-- **T3.3**: a paste containing control characters → stripped before the event is emitted (C09 I14 at the input boundary).
+- **T3.3**: a paste containing control characters → stripped before the event is emitted (C09 I18 at the input boundary).
 - **T3.4**: an unterminated paste — start marker, then the stream stalls → after a 1 s timeout the buffer is flushed as a paste rather than swallowing input forever.
 - **T3.5**: an end marker with no start → ignored.
 - **T3.6**: a second start marker while buffering → ignored, not nested.

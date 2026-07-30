@@ -287,7 +287,7 @@ describe("C03 acquisition moving underneath a timer", () => {
     expect(h.scheduler.pending).toBe(false);
   });
 
-  it("T3.10 (I1, I11): acquired flipping false and back while pending still writes once", () => {
+  it("T3.10 (I1, I12): acquired flipping false and back while pending still writes once", () => {
     const h = build();
 
     h.scheduler.commit("stream");
@@ -315,7 +315,7 @@ describe("C03 acquisition moving underneath a timer", () => {
     expect(h.render).not.toHaveBeenCalled();
   });
 
-  it("T3.22 (I11): acquired flipping true after construction lets the next commit write", () => {
+  it("T3.22 (I12): acquired flipping true after construction lets the next commit write", () => {
     const h = build({ acquired: false });
 
     h.scheduler.commit("input");
@@ -328,7 +328,7 @@ describe("C03 acquisition moving underneath a timer", () => {
     expect(h.render).toHaveBeenCalledTimes(1);
   });
 
-  it("T3.24 (I11): a snapshotted lifecycle view drops every frame, in silence", () => {
+  it("T3.24 (I12): a snapshotted lifecycle view drops every frame, in silence", () => {
     const h = build({ acquired: false, snapshotLifecycle: true });
 
     h.setAcquired(true);

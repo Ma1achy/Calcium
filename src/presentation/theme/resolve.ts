@@ -398,7 +398,7 @@ export function resolveTone(tone: Tone, theme: ResolvedTheme, caps: Caps): Style
 }
 
 /**
- * The same colour, in the other channel (§4a, I22).
+ * The same colour, in the other channel (§4a, I21).
  *
  * **`surface` refs only.** A palette ref returns the empty `Style`, and that is a
  * rule rather than an omission: §4's floors are measured for text *on* a surface,
@@ -407,7 +407,7 @@ export function resolveTone(tone: Tone, theme: ResolvedTheme, caps: Caps): Style
  * on it.
  *
  * Everything else is inherited rather than re-implemented — the depth ladder, the
- * curated 4-bit index, the memo, and the 1-bit vanishing that makes I24 lossless.
+ * curated 4-bit index, the memo, and the 1-bit vanishing that makes I23 lossless.
  * The one thing this function does is move the value from `colour` to
  * `background`, and it does it by resolving through `resolve` so the two channels
  * cannot degrade differently.

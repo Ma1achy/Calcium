@@ -82,7 +82,7 @@ type Candidate = Readonly<{ column: ColumnDef; index: number; min: number }>;
  * Pure and total (I7): every input returns a plan, including zero columns, zero
  * width and a negative one.
  *
- * `role` is never read here (I16). The expand marker is content, and a planner
+ * `role` is never read here (I15). The expand marker is content, and a planner
  * that reserved width for it would move every drop total the S-series states.
  */
 export function planColumns(cols: readonly ColumnDef[], width: number): PlannedColumns {

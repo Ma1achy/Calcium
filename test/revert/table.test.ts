@@ -193,7 +193,7 @@ describe("C11 tier 6", () => {
     expect(violations.filter((v) => v.rule === "SS24").length).toBeGreaterThan(0); // cells-ok
   });
 
-  it("T6.10 (I12): making `table` a privileged built-in → T2.5 fails", () => {
+  it("T6.10 (I16): making `table` a privileged built-in → T2.5 fails", () => {
     // The revert: adding `tableDefinition` to `blocks/defaults.ts`. The frame is
     // identical and the extension path stops being exercised by the framework
     // itself — which is the whole argument for three registrants rather than one.
@@ -222,7 +222,7 @@ describe("C11 tier 6", () => {
     expect(drawn).toEqual(["u-2", "u-10", "u-100"]);
   });
 
-  it("T6.13 (I16): recognising the expand column by key rather than role → T3.19 fails", () => {
+  it("T6.13 (I15): recognising the expand column by key rather than role → T3.19 fails", () => {
     // The revert: `key === "expand"`. It works for every surface in the tree and
     // eats a far side's field of that name — and a fallback table over a payload
     // with an `expand` column would show a marker where the data was.
@@ -238,7 +238,7 @@ describe("C11 tier 6", () => {
     expect(visible(r.renderToLines(block, 40)[1] ?? "")).toContain("data");
   });
 
-  it("T6.14 (I16): letting planColumns reserve for the expand role → T2.9 fails", () => {
+  it("T6.14 (I15): letting planColumns reserve for the expand role → T2.9 fails", () => {
     // The revert: two cells taken off the width when a role column is present, or
     // the role column widened to hold a marker plus a gap. Every drop table in the
     // S-series moves by the same two cells, and each one is a reviewed layout.

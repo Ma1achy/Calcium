@@ -89,7 +89,7 @@ describe("C05 fail-on-revert", () => {
     }
   });
 
-  it("T6.10 (I14): rejecting `--flag value` pre-spawn → T1.16 fails", () => {
+  it("T6.10 (I16): rejecting `--flag value` pre-spawn → T1.16 fails", () => {
     // The revert that looks like tightening. Requiring `=` is one line and one
     // fewer branch, and it starts refusing invocations the far side would have
     // run — silently, because the user concludes the command is wrong.
@@ -111,7 +111,7 @@ describe("C05 fail-on-revert", () => {
     expect(validateInvocation(toolNamed("ps"), ["--since=-1h"]).ok).toBe(true);
   });
 
-  it("T6.12 (I15): deduplicating conflicts by name order → T1.18 fails", () => {
+  it("T6.12 (I17): deduplicating conflicts by name order → T1.18 fails", () => {
     // The optimisation this guards: ordering the pair to deduplicate assumes a
     // symmetry the schema never required. It drops one-directional declarations
     // — the ordinary way an app writes them — while the pair is still *seen*,

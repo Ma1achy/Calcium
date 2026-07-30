@@ -174,8 +174,8 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 - **I10** — Dynamic results are cached on `(sourceId, contextKey)` and expire at their TTL.
 - **I11** — Accepting a candidate produces exactly one undo unit in C17.
 - **I12** — C19 imports nothing from `terminal/` and never commits a frame.
-- **I14** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
-- **I13** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
+- **I13** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
+- **I14** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
 
 ---
 
@@ -184,7 +184,7 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 1. Every candidate comes from the manifest or a registered source; nothing is hand-maintained (I4).
 2. Static sources run per keystroke; dynamic sources only on `Tab`. Filesystem slots are dynamic, so paths have no ghost text and `Tab` is required (I3).
 3. Requests carry sequence numbers and stale results are discarded (I1).
-4. Typing during a pending request supersedes it and clears the spinner (I14).
+4. Typing during a pending request supersedes it and clears the spinner (I13).
 5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected (I9, I10).
 6. A failing source is dropped, not fatal (I6).
 7. Acceptance advances to the longest common prefix and stops; the menu-on-second-`Tab` behaviour is §4's, not contract (I5).
@@ -192,7 +192,7 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 9. The menu is a C15 overlay; C19 supplies blocks and the overflow indicator (I8).
 10. The tokeniser and the quoter are both shared with C18 (I5).
 11. Accepting produces one undo unit (I11).
-12. `/` completes verbs; bare text completes executables and paths (I13).
+12. `/` completes verbs; bare text completes executables and paths (I14).
 13. Dynamic sources are the app's; static ones ship with the framework (I3).
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
 
@@ -205,7 +205,7 @@ Six tiers. Every cell of the §8 table is covered.
 ### Tier 1 — unit
 
 - **T1.1**: each `Slot` is detected from a canonical input and cursor — seven cases.
-- **T1.2** (I13): `/p` → verb slot; `gi` → executable slot.
+- **T1.2** (I14): `/p` → verb slot; `gi` → executable slot.
 - **T1.3**: `/ps --st` → flag-name slot with tool `ps` resolved.
 - **T1.4**: `/ps --status=` → flag-value slot carrying that `FlagDef`; ghost recomputes without a request.
 - **T1.4b** (I3): a `path` or `executable` slot → `ghost` returns null without touching the filesystem; `Tab` is required to get candidates.
@@ -285,7 +285,7 @@ Six tiers. Every cell of the §8 table is covered.
 - **T6.8** (I8): drawing the menu directly instead of through C15 → T2.8 and T4.4 fail, and it stops flipping.
 - **T6.9** (I9): a real timer for the spinner → T2.3 fails and the tests flake.
 - **T6.10** (I11): inserting a candidate character by character → T4.7 fails.
-- **T6.11** (I13): offering verbs for bare text → T1.2 fails.
+- **T6.11** (I14): offering verbs for bare text → T1.2 fails.
 
 ---
 

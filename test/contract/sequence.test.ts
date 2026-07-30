@@ -1,4 +1,4 @@
-// C09 T2.18 / C04 I19 — `gapBefore` is applied by the sequence, never by the block.
+// C09 T2.18 / C04 I25 — `gapBefore` is applied by the sequence, never by the block.
 //
 // Nothing else in C04's vocabulary produces vertical space, and every surface in
 // the S-series draws it. The rule that keeps that from becoming a second height
@@ -35,7 +35,7 @@ describe("C09 T2.18 — sequences", () => {
     expect(rowsOf(blocks)).toHaveLength(6);
   });
 
-  it("T2.18b (C04 I19): no block's own height includes its gap", () => {
+  it("T2.18b (C04 I25): no block's own height includes its gap", () => {
     // The property that keeps C14's cache keyed on the block and the width
     // alone: the same block measures the same with the field set and unset.
     const kit = measurable();

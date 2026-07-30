@@ -143,7 +143,7 @@ switch (mode) {
 
     // C02 I7 — `altScreen` alone decides whether a shell can open. A terminal
     // that cannot take the alternate screen gets help on the primary screen and
-    // a clean exit, and **nothing is constructed**: C01 I13 makes acquisition
+    // a clean exit, and **nothing is constructed**: C01 I14 makes acquisition
     // fatal, so the refusal has to happen before it, which is what a caller
     // reading `isUsable` is for.
     if (!isUsable(capabilities)) {

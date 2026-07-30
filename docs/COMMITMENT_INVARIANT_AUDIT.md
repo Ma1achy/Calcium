@@ -7,6 +7,15 @@
 | **Run** | 2026-07-29, after C08 |
 | **Status** | Remediated. The findings below are the record; §Outcome says what was done |
 
+> **The invariant ids in this document were renumbered on 2026-07-30, when SP2
+> landed and twenty specs were renumbered into document order. The findings are
+> unchanged; only the pointers moved.** This is a record of what was found on
+> 2026-07-29 and it has not been revised — no verdict, count or diagnosis below
+> has been touched. The ids were repointed so that a reader following one arrives
+> at the invariant the sentence is about, which is the whole use of an audit
+> nobody re-runs. `docs/archive/` was deliberately left as written, being
+> superseded by construction; this document is not.
+
 ---
 
 ## Why
@@ -123,7 +132,7 @@ largest invariant set in the corpus.
 Ten specs carry an invariant of the form "C*n* imports nothing from `terminal/`,
 `presentation/` or above", and in **ten of them it has no commitment**.
 
-> C04 I11 · C05 I13 · C07 I10 · C10 I12 · C13 I16 · C15 I11 · C18 I13 ·
+> C04 I11 · C05 I15 · C07 I10 · C10 I12 · C13 I18 · C15 I12 · C18 I15 ·
 > C19 I12 · C20 I15 · C21 I12
 
 **Diagnosis: the invariant is right and the commitment is correctly absent — but
@@ -249,7 +258,7 @@ the pattern is.
 once in A02.
 
 **Purity and totality (9).** C05 I2 (`parseManifest` total), C09 I2 (`measure`
-pure and total), C11 I7 (`planColumns` pure and total), C16 I14 (`activeTarget`
+pure and total), C11 I7 (`planColumns` pure and total), C16 I15 (`activeTarget`
 pure), C17 I2 (grapheme-aware throughout), C13 I11 (entries immutable), C05 I1
 (manifest immutable), C14 I2 (`topRow` always in range), C15 I6 (no layer exceeds
 its region).
@@ -260,15 +269,15 @@ quietly cost. C09 I2 is the sharpest: `measure` being pure and total is what C14
 virtualisation rests on, and the commitment list does not mention it.
 
 **Containment (5).** C12 I10 (a plot never emits outside its measured region),
-C15 I6, C09 I14 (control characters stripped before measure and render), C25 I9
+C15 I6, C09 I18 (control characters stripped before measure and render), C25 I11
 (expansion patches the document, never mutates external state), C22 I14 (C22 never
 auto-logins).
 
-*The commitment is missing.* C09 I14 is the one to look at first — it is the only
+*The commitment is missing.* C09 I18 is the one to look at first — it is the only
 thing in the corpus preventing a tool's output from injecting escape sequences
 into the frame, and it appears in no commitment list.
 
-**The gapBefore pair (2).** C04 I19 and C09 I15 both state that `gapBefore` is
+**The gapBefore pair (2).** C04 I25 and C09 I17 both state that `gapBefore` is
 content applied by the sequence. **Neither has a commitment.** This is the residue
 of `a333998`, which landed the rule as prose; invariants were added afterwards and
 the commitment lists never caught up. *The commitment is missing on both sides.*
@@ -349,11 +358,11 @@ Findings not falling into a category above, with a per-finding reading.
 
 ## Appendix — unbacked invariants, per spec
 
-C03 I9 · C04 I10, I11, I19 · C05 I1, I2, I4, I12, I13 · C06 I10 · C07 I10 ·
-C08 I2, I10, I13 · C09 I2, I7, I8, I14, I15 · C10 I9, I12, I16, I18 ·
-C11 I6, I7 · C12 I10, I13 · C13 I10, I11, I16 · C14 I2, I14 · C15 I6, I11 ·
-C16 I14 · C17 I2 · C18 I13 · C19 I2, I12 · C20 I15 · C21 I12 · C22 I14 ·
-C24 I10, I11 · C25 I1, I9
+C03 I9 · C04 I10, I11, I25 · C05 I1, I2, I4, I12, I15 · C06 I10 · C07 I10 ·
+C08 I2, I10, I13 · C09 I2, I7, I8, I18, I17 · C10 I9, I12, I16, I24 ·
+C11 I6, I7 · C12 I10, I13 · C13 I10, I11, I18 · C14 I2, I14 · C15 I6, I12 ·
+C16 I15 · C17 I2 · C18 I15 · C19 I2, I12 · C20 I15 · C21 I12 · C22 I14 ·
+C24 I10, I11 · C25 I1, I11
 
 One worth flagging separately: **C10 I16** — `syntax` is consumed only by `code`
 and `patch`, `spectrum` only by declared art, the list closed at two. It has no
@@ -375,7 +384,7 @@ were not fixed the same way twenty-four times.
 | **2** — naked threshold | Seven gained invariants, four demoted to § detail |
 | **3 + 4** — borrowed and orphaned | One principle in A02 §1: **a spec commits only to what it can enforce**. Six borrowed claims and three register overclaims became cross-references; four own-behaviour claims gained invariants |
 | **6** — the disagreement | C17 I12 now carries both halves: three bindings, at least two terminal-independent |
-| **individuals** | C09 I14 (control characters) and C19 I2 (completion never blocks input) gained commitments |
+| **individuals** | C09 I18 (control characters) and C19 I2 (completion never blocks input) gained commitments |
 
 **Category 5's residue was resolved by the structural fix rather than by a pass of
 its own**, and that is the part worth recording. Requiring every commitment to
@@ -426,7 +435,7 @@ is even, so that hypothesis is dead.
 
 **They cluster by subject: colour.** Six of the eight component-level gaps were
 palette rules — SS17, SS20, SS21, SS36, SS37 and SS11's C10 half — pointing at
-C09 I4, C10 I16, C10 I18 and C10 I12. That confirms the first audit from the
+C09 I4, C10 I16, C10 I24 and C10 I12. That confirms the first audit from the
 opposite side: C09 and C10 held the most unbacked invariants, five and four.
 **The enforcement suite is densest exactly where the commitment lists are
 thinnest**, and C10 alone had five rules aimed at it with three targeting
@@ -451,23 +460,23 @@ what a scan is for. SS40 is C17's, with its own fabricated violations.
 **SS35 enforced something nobody had agreed to.** One `Result` in the tree,
 declared against two § references and no invariant. The rule is right — two shapes
 under one name in one layer half compile and diverge quietly — so the fix is the
-contract, not the rule. C04 I29, on the same footing as C01 owning "escape
+contract, not the rule. C04 I26, on the same footing as C01 owning "escape
 literals live only in `escapes.ts`": C04 declares the type, so C04 owns its
 exclusivity.
 
 ### A third kind of A03 defect
 
 Not vacuous, not unimplemented — **pointing at the wrong invariant.** SS37
-declared C09 I4 while its behaviour is C09 I18, and MG21 declared a § where an
+declared C09 I4 while its behaviour is C09 I15, and MG21 declared a § where an
 invariant now exists. Both fire correctly and always did; both were mislabelled,
 and every previous check read the label rather than the target. The citation graph
 is the first thing that could tell the difference.
 
 ### Outcome
 
-Ten remediated: four commitments for C09 I4 and C10 I12/I16/I18, one for C17 I2,
+Ten remediated: four commitments for C09 I4 and C10 I12/I16/I24, one for C17 I2,
 MG6's citation completed on C06 commitment 1, A03's two wrong declarations
-corrected, SS23 split into SS23 and SS40, SS35 given C04 I29, and SP1 committed to
+corrected, SS23 split into SS23 and SS40, SS35 given C04 I26, and SP1 committed to
 in A02 commitment 20 — the rule enforcing commitment-backing was not itself
 commitment-backed.
 
@@ -481,7 +490,7 @@ to an architecture commitment (A02 1, 2, 20; A03 6, 15; A04 2, 3, 4).
 Every finding was read directly from the two lists. Where a pairing is partial —
 the commitment covers some of the invariant, or vice versa — I counted it as
 paired and did not report it, so **the counts understate**. Judgement calls that
-went that way include C02 C1/I1, C03 C11/I11, C05 C2/I13, C14 C7/I8, C23 C23/I23.
+went that way include C02 C1/I1, C03 C11/I11, C05 C2/I15, C14 C7/I8, C23 C23/I23.
 
 The categories are mine, not the specs'. Another reading might split Category 2
 differently or fold Category 4 into Category 3. The per-finding diagnoses in the

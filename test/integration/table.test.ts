@@ -192,7 +192,7 @@ describe("C11 tier 4 — the table inside C09", () => {
     expect([...(run?.[0] ?? "")]).toHaveLength(8);
   });
 
-  it("T4.6 (I15): focusableRowIds matches the rendered rows in order", () => {
+  it("T4.6 (I14): focusableRowIds matches the rendered rows in order", () => {
     const registry = measurable({ definitions: [tableDefinition], capabilities: FULL_CAPS });
     const block: Table = {
       kind: "table",

@@ -2,7 +2,7 @@
  * `validateDocument` and `validateBlock` — the single enforcement point for I3.
  *
  * C04 §4, §6 — see spec. Both are **total** (I4): any input yields a result and
- * never a throw, including a cyclic one (I18). This is the boundary, so it is
+ * never a throw, including a cyclic one (I27). This is the boundary, so it is
  * given hostile input by definition — a fixture, an adapter's output, a
  * hand-assembled document in a test.
  *
@@ -93,7 +93,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
       // a row id never collides with a block id.
       //
       // Three things address a row by id and all three are ambiguous without
-      // this: `merge` upserts by it (I9), C16's focus names it (C11 I15), and a
+      // this: `merge` upserts by it (I9), C16's focus names it (C11 I14), and a
       // rendered row is keyed by it. Raised from C11, the first component to
       // depend on it.
       const rowIds = new Map<string, number>();
@@ -204,7 +204,7 @@ function childBlocksOf(b: Record<string, unknown>): readonly unknown[] {
 }
 
 /**
- * The recursive walk. `path` is the **path-scoped** seen-set (I18): a container
+ * The recursive walk. `path` is the **path-scoped** seen-set (I27): a container
  * is added on descent and removed on ascent, so a cycle is caught exactly and a
  * subtree that legitimately appears in two places is not. A global set would
  * reject the second, honest occurrence and call it a cycle.
@@ -224,7 +224,7 @@ function walkBlock(
     return;
   }
   if (path.has(value)) {
-    errors.push(`${at}: cyclic structure — a block contains itself (C04 I18)`);
+    errors.push(`${at}: cyclic structure — a block contains itself (C04 I27)`);
     return;
   }
 
@@ -298,7 +298,7 @@ function validateMeta(meta: unknown, errors: string[]): void {
   }
 }
 
-/** I4 — total. I2, I3, I14 and I18 are established here and nowhere else. */
+/** I4 — total. I2, I3, I14 and I27 are established here and nowhere else. */
 export function validateDocument(doc: unknown): Validity<ViewDocument> {
   const errors: string[] = [];
 

@@ -121,7 +121,7 @@ describe("C08 tier 6 — what breaks when a rule is removed", () => {
     ).toBe(1);
   });
 
-  it("T6.11 (I17): arming a timer instead of reading the clock → T1.15 fails", async () => {
+  it("T6.11 (I18): arming a timer instead of reading the clock → T1.15 fails", async () => {
     // The revert this exists for: a `setInterval` in the handler. The world
     // would then move while nobody asked, and two runs with different real
     // elapsed time would produce different worlds.
@@ -145,7 +145,7 @@ describe("C08 tier 6 — what breaks when a rule is removed", () => {
     expect(world.deltas).toEqual([300]);
   });
 
-  it("T6.13 (I16): dropping `schema` from the corpus file → T2.11 fails", () => {
+  it("T6.13 (I17): dropping `schema` from the corpus file → T2.11 fails", () => {
     // Without the version, an old corpus misparses into a plausible-looking
     // wrong shape and the failure surfaces somewhere else entirely.
     expect(() => parseCorpus(JSON.stringify({ fixtures: [] }))).toThrow(/declares no schema/);

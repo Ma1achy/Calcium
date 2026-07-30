@@ -31,7 +31,7 @@ describe("cells (C09 §5)", () => {
     expect(cells("🇬🇧"), "a regional-indicator pair is one flag").toBe(2);
   });
 
-  it("T1.14 (I14): control characters are stripped before measuring", () => {
+  it("T1.14 (I18): control characters are stripped before measuring", () => {
     // A tool's output cannot inject styling into the frame. The measured width
     // is the width of what is drawn, which is the text without the sequence.
     const injected = `red${String.fromCharCode(27)}[31mtext`;
@@ -42,7 +42,7 @@ describe("cells (C09 §5)", () => {
   });
 
   it("T1.15: an empty string is zero cells — the floor is a block rule, not a width rule", () => {
-    // I17 floors a *block* at one row. `cells("")` is honestly 0, and a
+    // I14 floors a *block* at one row. `cells("")` is honestly 0, and a
     // measurer that fixed it here would hide the case the floor exists for.
     expect(cells("")).toBe(0);
   });

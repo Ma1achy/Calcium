@@ -108,7 +108,7 @@ export function createFixtureHandler(opts: FixtureHandlerOptions): EmulatedHandl
     // caller believes it will be used, and silently discarding it produces a
     // demo that does not move for reasons nothing reports.
     throw new Error(
-      `mode "${mode}" takes no clock — only "live" has elapsed time to read (I17).`,
+      `mode "${mode}" takes no clock — only "live" has elapsed time to read (I18).`,
     );
   }
 
@@ -116,7 +116,7 @@ export function createFixtureHandler(opts: FixtureHandlerOptions): EmulatedHandl
   const clock = opts.clock;
 
   // `live` reads the clock per query and advances by the delta since the last
-  // one. **Pull, never push** (I17). A timer would advance the world without
+  // one. **Pull, never push** (I18). A timer would advance the world without
   // anyone asking, so two runs of the same sequence with different real elapsed
   // time produce different worlds — reading here makes the world a pure function
   // of (seed, elapsed), and elapsed is what `frozen` and `stepped` control.
@@ -202,7 +202,7 @@ export function createFixtureHandler(opts: FixtureHandlerOptions): EmulatedHandl
       if (mode === "live") {
         throw new Error(
           `advance() in "live" mode — the injected clock is what drives it, and ` +
-            `by nothing else (I17). Two sources of elapsed time is one piece of ` +
+            `by nothing else (I18). Two sources of elapsed time is one piece of ` +
             `state with two owners.`,
         );
       }

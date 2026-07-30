@@ -195,7 +195,7 @@ describe("C09 §6 — kinds", () => {
     ).toContain("sparkline-3000");
   });
 
-  it("T1.11 (I14): an injected escape sequence is stripped, not passed through", () => {
+  it("T1.11 (I18): an injected escape sequence is stripped, not passed through", () => {
     const kit = measurable();
     const attack = `${String.fromCharCode(27)}[31mred`;
     const notice = block({ kind: "notice", id: "n-attack", tone: "info", text: attack });
