@@ -98,6 +98,27 @@ rather than by review:
   `test/support/render.ts` already warns that `definitions` is "the option that
   could have been inert"; this is the same option inert from the caller's side.
 
+**A compile-level negative needs the annotation that gives its literal a
+contextual type.** The third location of the same class, after the parameter and
+the subject: here the inert thing is the type check itself.
+
+```typescript
+const layer = { …, content: [reactElement] };          // nothing is checked
+const layer: Layer = { …, content: [reactElement] };   // now it is
+```
+
+An object literal assigned to an unannotated `const` has no contextual type, so
+TypeScript checks nothing about it and the `@ts-expect-error` above the offending
+field reports **an unused directive** rather than a caught error. C15's T2.3 was
+written this way and asserted nothing about I4 — a test whose entire purpose is
+"this does not compile" against a thing that was never compiled against anything.
+
+**The check is that removing the directive produces an error.** `tsc` gives this
+one free: an `@ts-expect-error` with nothing to suppress is itself an error
+(`TS2578`), so a compile-level negative that has gone vacuous fails the build
+rather than passing quietly. It is the only member of this family with a
+mechanism, and it is worth using deliberately rather than discovering.
+
 **The general form.** A fixture has a subject and the test has a variable. If
 the subject does not move when the variable does, the assertion is about
 nothing — and it looks exactly like an assertion about something, because the

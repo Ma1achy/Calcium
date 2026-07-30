@@ -124,6 +124,18 @@ So when the gap closes, the test fails — and **the danger is that someone read
 
 The same discipline SS26's pending entry has, pointed at a defect rather than at a rule.
 
+### Open: a tier-6 claim can be unreachable, and nothing checks
+
+**Found in C15, and it is the vacuity class in a location nobody has swept.** A tier-6 test states that a specific change breaks a named test — "sorting purely by push order → T1.4 and T5.3 fail". C15's T6.2 said that, and the change was unreachable: `push(view)` is rejected onto any non-empty stack, so a view only ever lands on an empty one, overlays always follow it in push order, and I2 holds by construction. Neither named test can construct a stack in the wrong order. The revert breaks nothing they can see, and the claim is decoration.
+
+This is not the fabricated-violation problem in a new coat. A fabricated violation proves a *rule* can fire; nothing proves a *revert* can. And the two failure modes differ: a rule that cannot fire reports compliance, while a tier-6 claim that cannot fire reports that a hazard is guarded when it is not — the test stays green under the very change it names.
+
+**Roughly two hundred and fifty such claims exist across twenty-five specs, and none is verified.** The verification sections have said since A03 was written that the reverts are run by hand as a checklist, and how consistently that has happened is not knowable from here.
+
+Deliberately not scheduled as a pass. Recorded because a finding taken between commits and not written down evaporates, and because the shape of the remedy is already known from C15: **make the revert reachable rather than delete the test.** T6.2's hazard is real — a confirm behind a dashboard — and the fix was to keep the sort as real code and reach it through a hand-built stack, which is possible because placement is a pure function of one. A tier-6 claim that cannot be reached is usually telling you the component has no seam at which the hazard is observable, and that is worth knowing whether or not the test survives.
+
+Whoever runs the pass should expect the answer to be a mix: some claims reachable and unverified, some reachable only through a seam that does not exist yet, and some — like T6.2 — describing a hazard that a *different* invariant already makes unreachable, where the honest edit is to say so rather than to keep the sentence.
+
 ---
 
 ## 3. Module graph
