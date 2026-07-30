@@ -19,6 +19,19 @@
  */
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
 
+/**
+ * Whether an elision is one, and it lives here because it decides a **row count**.
+ *
+ * `collapsedBefore: 0` is absent (T3.8): a collapse of nothing is not a collapse,
+ * and a marker for it claims there is hidden content to reveal. Keeping the
+ * predicate on the measurement side is what lets `height.ts` import the view model
+ * and nothing else — the property T6.5 asserts, because a `measure` that could
+ * reach the tokeniser is a `measure` that eventually does.
+ */
+export function isCollapsed(count: number | undefined): boolean {
+  return count !== undefined && count > 0;
+}
+
 /** §3's breakpoint. Unified below, split at and above. */
 export const SPLIT_AT = 100;
 
@@ -72,8 +85,7 @@ export function pairedRows(lines: Hunk["lines"]): number {
 /** The rows one hunk occupies: its header, its lines, and its collapse marker. */
 export function hunkRows(hunk: Hunk, layout: Layout): number {
   const body = layout === "split" ? pairedRows(hunk.lines) : hunk.lines.length; // cells-ok — a line count, not a width
-  const collapsed = hunk.collapsedBefore !== undefined && hunk.collapsedBefore > 0 ? 1 : 0;
-  return 1 + body + collapsed;
+  return 1 + body + (isCollapsed(hunk.collapsedBefore) ? 1 : 0);
 }
 
 /**
@@ -87,5 +99,12 @@ export function patchHeight(block: Patch, width: number): number {
   const layout = layoutFor(block, width);
   let rows = 1;
   for (const hunk of block.hunks) rows += hunkRows(hunk, layout);
+
+  // The tail is the block's row, not a hunk's (C04 §3). One row on the same terms
+  // as every `collapsedBefore`, and a patch with no hunks and a `collapsedAfter` is
+  // a header and a marker — two rows, and a legitimate shape: it says the file is
+  // unchanged and states how much of it there is.
+  if (isCollapsed(block.collapsedAfter)) rows += 1;
+
   return rows;
 }

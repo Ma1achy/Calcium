@@ -84,6 +84,47 @@ describe("C25 unit — height", () => {
     expect(lines(patch, NARROW).map(visible).join("\n")).toContain("1 unchanged line");
   });
 
+  it("T1.3a (I5, C04 §3): `collapsedAfter` is one row below everything", () => {
+    // The region `collapsedBefore` structurally cannot reach. On `Patch` rather than
+    // `Hunk` so the gap between two hunks belongs to exactly one field — see C04 §3.
+    const without = patchOf({ id: "p-no-tail", hunks: [hunkOf([" a", "+b"])] });
+    const withTail = patchOf({ id: "p-tail", hunks: [hunkOf([" a", "+b"])], collapsedAfter: 170 });
+
+    expect(measure(withTail, NARROW) - measure(without, NARROW)).toBe(1);
+
+    const drawn = lines(withTail, NARROW).map(visible);
+    expect(drawn[drawn.length - 1], "and it is the last row").toContain("170 unchanged lines");
+  });
+
+  it("T1.3b (I5): a file with no hunks and a tail is a header and a marker", () => {
+    // Two rows, and a legitimate shape: it says the file is unchanged and states how
+    // much of it there is. A zero-height block is one C14 cannot scroll to.
+    const patch = patchOf({ id: "p-unchanged", hunks: [], collapsedAfter: 200 });
+
+    expect(measure(patch, NARROW)).toBe(2);
+    expect(lines(patch, NARROW).map(visible).join("\n")).toContain("200 unchanged lines");
+  });
+
+  it("T1.3c (I5): `collapsedAfter: 0` is absent, exactly as `collapsedBefore: 0` is", () => {
+    const zero = patchOf({ id: "p-tail0", hunks: [hunkOf([" a", "+b"])], collapsedAfter: 0 });
+    const none = patchOf({ id: "p-tailnone", hunks: [hunkOf([" a", "+b"])] });
+
+    expect(measure(zero, NARROW)).toBe(measure(none, NARROW));
+    expect(lines(zero, NARROW).map(visible).join("\n")).not.toContain("unchanged");
+  });
+
+  it("T1.3d (§2): the illustration, both ends elided, is twelve rows", () => {
+    // §2's figure as data: one path header, one leading marker, one hunk header,
+    // eight lines, one trailing marker. The figure and the formula, checked against
+    // each other rather than each against itself.
+    const figure = patchOf({ id: "figure", hunks: [THE_ILLUSTRATION], collapsedAfter: 170 });
+
+    expect(measure(figure, NARROW)).toBe(12);
+    const drawn = lines(figure, NARROW).map(visible);
+    expect(drawn[1], "14 above").toContain("14 unchanged lines");
+    expect(drawn[drawn.length - 1], "170 below").toContain("170 unchanged lines");
+  });
+
   it("T1.5: the layout threshold at 99, 100 and 101", () => {
     const patch = patchOf();
     expect(layoutFor(patch as Patch, SPLIT_AT - 1)).toBe("unified");

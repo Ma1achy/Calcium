@@ -312,6 +312,20 @@ export type Patch = Readonly<{
   path: string;
   language: string;
   hunks: readonly Hunk[];
+  /**
+   * Unchanged lines elided **below the last hunk** (§3).
+   *
+   * On `Patch` rather than on `Hunk`, and the split is the decision. A patch elides
+   * context in three places — before the first hunk, between hunks, after the last —
+   * and `Hunk.collapsedBefore` covers the first two, every interior region belonging
+   * to exactly one hunk. A matching field on `Hunk` would double-count: the gap
+   * between hunk 1 and hunk 2 is 1's *after* and 2's *before*, so a producer would
+   * have to know which of two fields describes one region.
+   *
+   * Not a rare case: one hunk at line 18 of a 200-line file elides 14 lines above
+   * and 170 below.
+   */
+  collapsedAfter?: number;
   layout?: "unified" | "split";
 }> & Gap;
 

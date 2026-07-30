@@ -44,7 +44,14 @@ const MODES = [
  * where the background is gone and the marker is all that is left.
  */
 const CASES: readonly Readonly<{ label: string; block: Block; mono?: boolean }>[] = [
-  { label: "the illustration", block: patchOf({ hunks: [THE_ILLUSTRATION] }) },
+  // §2's figure exactly: fourteen lines elided above, a hunk, and a hundred and
+  // seventy below. Both ends, because the tail is the region `collapsedBefore`
+  // cannot reach and a figure without it was what hid the gap.
+  { label: "the illustration", block: patchOf({ hunks: [THE_ILLUSTRATION], collapsedAfter: 170 }) },
+  {
+    label: "unchanged file — a header and a tail",
+    block: patchOf({ id: "unchanged", hunks: [], collapsedAfter: 200 }),
+  },
   {
     label: "three hunks, wide numbers",
     block: patchOf({

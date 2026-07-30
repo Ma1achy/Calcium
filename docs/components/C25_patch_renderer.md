@@ -342,6 +342,10 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T1.2**: a three-hunk patch measures the sum across hunks plus one file header.
 - **T1.3** (I5): a hunk with `collapsedBefore: 12` measures one row more than the same hunk without it, and the marker states `12`.
 - **T1.4** (I5): `collapsedBefore: 1` still occupies exactly one row — a collapse of one is not expanded silently.
+- **T1.3a** (I5, → C04 §3): `collapsedAfter` adds exactly one row and it is the **last** row. The region `collapsedBefore` structurally cannot reach.
+- **T1.3b** (I5): a patch with no hunks and a `collapsedAfter` is two rows — a header and a marker. It says the file is unchanged and states how much of it there is, which is a legitimate thing for a patch to say.
+- **T1.3c** (I5): `collapsedAfter: 0` is absent, exactly as `collapsedBefore: 0` is.
+- **T1.3d** (§2): the illustration with both ends elided measures twelve, and the figure's two markers read 14 and 170. The figure and the formula checked against each other rather than each against itself.
 - **T1.5**: the layout threshold at widths 99, 100 and 101 → unified, split, split.
 - **T1.6**: an explicit `layout: "unified"` at width 200 stays unified.
 - **T1.7** (I4): every `add` line renders `+` and every `remove` renders `-`, at all four colour depths.
@@ -400,6 +404,8 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T6.10** (I14): capping the collapsed form by row count rather than at hunk boundaries → T3.10 fails with a half-rendered hunk.
 - **T6.11** (I16): making expansion itself configurable → T3.12 fails, and a dropped hunk becomes unreachable (D38).
 - **T6.2** (I1): counting a collapsed region as its collapsed line count → T1.3 fails.
+- **T6.15** (→ C04 §3): moving `collapsedAfter` onto `Hunk` beside `collapsedBefore` → one region gains two fields. The revert that looks symmetrical: the gap between hunk 1 and hunk 2 becomes 1's *after* and 2's *before*, so a producer has to know which describes it and a renderer has to decide which to believe. Asserted as three regions, three markers, no region described twice.
+- **T6.16** (I5): counting the tail as its elided line count → T1.3a fails.
 - **T6.3** (I6): making `patch` a privileged built-in → T2.3 fails.
 - **T6.4** (I4): rendering the add/remove distinction with tone alone → T4.2 fails at `colourDepth: 1`.
 - **T6.5** (I3): tokenising inside `measure` → T2.5 fails.

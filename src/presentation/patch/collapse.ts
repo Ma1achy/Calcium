@@ -31,14 +31,6 @@ import type { TerminalCapabilities } from "../../terminal/capabilities.js";
  */
 const ELLIPSIS: readonly [string, string] = Object.freeze(["⋯", "..."]);
 
-/**
- * `collapsedBefore: 0` is absent (T3.8). A collapse of nothing is not a collapse,
- * and rendering a marker for it would claim there is hidden content to reveal.
- */
-export function isCollapsed(count: number | undefined): boolean {
-  return count !== undefined && count > 0;
-}
-
 /** The marker's text at the capability in force. One row, its own count. */
 export function collapseText(count: number, caps: Pick<TerminalCapabilities, "unicode">): string {
   const ellipsis = caps.unicode === "ascii" ? ELLIPSIS[1] : ELLIPSIS[0];

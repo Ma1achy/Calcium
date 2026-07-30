@@ -516,6 +516,7 @@ export function patchOf(
     path?: string;
     language?: string;
     hunks?: readonly Hunk[];
+    collapsedAfter?: number;
     layout?: "unified" | "split";
   }> = {},
 ): Block {
@@ -526,7 +527,8 @@ export function patchOf(
     language: options.language ?? "yaml",
     hunks: options.hunks ?? [THE_ILLUSTRATION],
   };
-  return block(options.layout === undefined ? base : { ...base, layout: options.layout });
+  const withTail = options.collapsedAfter === undefined ? base : { ...base, collapsedAfter: options.collapsedAfter };
+  return block(options.layout === undefined ? withTail : { ...withTail, layout: options.layout });
 }
 
 /**
@@ -575,5 +577,14 @@ export const PATCH_CORPUS: readonly Block[] = Object.freeze([
     hunks: [hunkOf([" a: 1", "-b: 2", "-c: 3", "-d: 4", "+b: 9", " e: 5"])],
   }),
   patchOf({ id: "patch-wide-numbers", hunks: [hunkOf([" a: 1", "+b: 2"], { oldStart: 99_998, newStart: 99_999 })] }),
+
+  // The tail (C04 §3). Three shapes, because the field's whole point is the region
+  // `collapsedBefore` structurally cannot reach: a patch with both ends elided, one
+  // with only a tail, and the degenerate case of a file with no hunks at all — which
+  // says "unchanged, and this big" and is two rows.
+  patchOf({ id: "patch-both-ends", collapsedAfter: 170 }),
+  patchOf({ id: "patch-tail-only", hunks: [hunkOf([" a: 1", "+b: 2"])], collapsedAfter: 31 }),
+  patchOf({ id: "patch-tail-no-hunks", hunks: [], collapsedAfter: 200 }),
+  patchOf({ id: "patch-tail-zero", hunks: [hunkOf([" a: 1", "+b: 2"])], collapsedAfter: 0 }),
   ONE_PER_KIND.patch,
 ]);

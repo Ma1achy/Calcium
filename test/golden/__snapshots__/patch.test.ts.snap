@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`C25 T5.2 — golden frames > ascii dark at 80 1`] = `
-"── the illustration · measured 11 · rendered 11
+"── the illustration · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml -------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -13,6 +13,10 @@ exports[`C25 T5.2 — golden frames > ascii dark at 80 1`] = `
 [38;2;135;184;108m[48;2;0;38;0m  [39m [38;2;135;184;108m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m                                   [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml -------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 13 · rendered 13
 -- serving/volatility-estimator.yaml -------------------------------------------
 ... 9 unchanged lines
@@ -87,7 +91,7 @@ exports[`C25 T5.2 — golden frames > ascii dark at 80 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > ascii dark at 100 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -98,6 +102,10 @@ exports[`C25 T5.2 — golden frames > ascii dark at 100 1`] = `
                                                  │[38;2;135;184;108m[48;2;0;38;0m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m       [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m                               │[38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m                                 │[38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml ---------------------------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------
 ... 9 unchanged lines
@@ -169,7 +177,7 @@ exports[`C25 T5.2 — golden frames > ascii dark at 100 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > ascii dark at 120 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 -- serving/volatility-estimator.yaml -----------------------------------------------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -180,6 +188,10 @@ exports[`C25 T5.2 — golden frames > ascii dark at 120 1`] = `
                                                            │[38;2;135;184;108m[48;2;0;38;0m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m                 [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m                                         │[38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m                                           │[38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml -----------------------------------------------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml -----------------------------------------------------------------------------------
 ... 9 unchanged lines
@@ -251,7 +263,7 @@ exports[`C25 T5.2 — golden frames > ascii dark at 120 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > ascii dark at 160 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------------------------------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -262,6 +274,10 @@ exports[`C25 T5.2 — golden frames > ascii dark at 160 1`] = `
                                                                                │[38;2;135;184;108m[48;2;0;38;0m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m                                     [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m                                                             │[38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m                                                               │[38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml ---------------------------------------------------------------------------------------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------------------------------------------------------------------
 ... 9 unchanged lines
@@ -333,7 +349,7 @@ exports[`C25 T5.2 — golden frames > ascii dark at 160 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > ascii light at 80 1`] = `
-"── the illustration · measured 11 · rendered 11
+"── the illustration · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml -------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -345,6 +361,10 @@ exports[`C25 T5.2 — golden frames > ascii light at 80 1`] = `
 [38;2;60;121;60m[48;2;210;255;210m  [39m [38;2;60;121;60m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m                                   [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml -------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 13 · rendered 13
 -- serving/volatility-estimator.yaml -------------------------------------------
 ... 9 unchanged lines
@@ -419,7 +439,7 @@ exports[`C25 T5.2 — golden frames > ascii light at 80 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > ascii light at 100 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -430,6 +450,10 @@ exports[`C25 T5.2 — golden frames > ascii light at 100 1`] = `
                                                  │[38;2;60;121;60m[48;2;210;255;210m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m       [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m                               │[38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m                                 │[38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml ---------------------------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------
 ... 9 unchanged lines
@@ -501,7 +525,7 @@ exports[`C25 T5.2 — golden frames > ascii light at 100 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > ascii light at 120 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 -- serving/volatility-estimator.yaml -----------------------------------------------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -512,6 +536,10 @@ exports[`C25 T5.2 — golden frames > ascii light at 120 1`] = `
                                                            │[38;2;60;121;60m[48;2;210;255;210m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m                 [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m                                         │[38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m                                           │[38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml -----------------------------------------------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml -----------------------------------------------------------------------------------
 ... 9 unchanged lines
@@ -583,7 +611,7 @@ exports[`C25 T5.2 — golden frames > ascii light at 120 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > ascii light at 160 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------------------------------------------------------------------
 ... 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -594,6 +622,10 @@ exports[`C25 T5.2 — golden frames > ascii light at 160 1`] = `
                                                                                │[38;2;60;121;60m[48;2;210;255;210m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m                                     [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m                                                             │[38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m                                                               │[38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+... 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+-- serving/volatility-estimator.yaml ---------------------------------------------------------------------------------------------------------------------------
+... 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 -- serving/volatility-estimator.yaml ---------------------------------------------------------------------------------------------------------------------------
 ... 9 unchanged lines
@@ -665,7 +697,7 @@ exports[`C25 T5.2 — golden frames > ascii light at 160 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 dark at 80 1`] = `
-"── the illustration · measured 11 · rendered 11
+"── the illustration · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -677,6 +709,10 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 80 1`] = `
 [38;2;135;184;108m[48;2;0;38;0m  [39m [38;2;135;184;108m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m                                   [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 13 · rendered 13
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────
 ⋯ 9 unchanged lines
@@ -751,7 +787,7 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 80 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 dark at 100 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -762,6 +798,10 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 100 1`] = `
                                                  │[38;2;135;184;108m[48;2;0;38;0m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m       [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m                               │[38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m                                 │[38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────
 ⋯ 9 unchanged lines
@@ -833,7 +873,7 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 100 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 dark at 120 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -844,6 +884,10 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 120 1`] = `
                                                            │[38;2;135;184;108m[48;2;0;38;0m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m                 [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m                                         │[38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m                                           │[38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────
 ⋯ 9 unchanged lines
@@ -915,7 +959,7 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 120 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 dark at 160 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -926,6 +970,10 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 160 1`] = `
                                                                                │[38;2;135;184;108m[48;2;0;38;0m22[39m [38;2;135;184;108m+[39m [38;2;212;212;212m      [38;2;224;108;117mprism.fmx.io/family:[38;2;212;212;212m [38;2;152;195;121mvolatility[39m                                     [49m
 [38;2;98;98;98m22[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m                                                             │[38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m2[39m
 [38;2;98;98;98m23[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m                                                               │[38;2;98;98;98m24[39m [38;2;98;98;98m [39m [38;2;212;212;212m  [38;2;224;108;117mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ⋯ 9 unchanged lines
@@ -997,7 +1045,7 @@ exports[`C25 T5.2 — golden frames > utf8 dark at 160 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 light at 80 1`] = `
-"── the illustration · measured 11 · rendered 11
+"── the illustration · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -1009,6 +1057,10 @@ exports[`C25 T5.2 — golden frames > utf8 light at 80 1`] = `
 [38;2;60;121;60m[48;2;210;255;210m  [39m [38;2;60;121;60m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m                                   [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 13 · rendered 13
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────
 ⋯ 9 unchanged lines
@@ -1083,7 +1135,7 @@ exports[`C25 T5.2 — golden frames > utf8 light at 80 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 light at 100 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -1094,6 +1146,10 @@ exports[`C25 T5.2 — golden frames > utf8 light at 100 1`] = `
                                                  │[38;2;60;121;60m[48;2;210;255;210m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m       [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m                               │[38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m                                 │[38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────
 ⋯ 9 unchanged lines
@@ -1165,7 +1221,7 @@ exports[`C25 T5.2 — golden frames > utf8 light at 100 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 light at 120 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -1176,6 +1232,10 @@ exports[`C25 T5.2 — golden frames > utf8 light at 120 1`] = `
                                                            │[38;2;60;121;60m[48;2;210;255;210m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m                 [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m                                         │[38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m                                           │[38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────
 ⋯ 9 unchanged lines
@@ -1247,7 +1307,7 @@ exports[`C25 T5.2 — golden frames > utf8 light at 120 1`] = `
 `;
 
 exports[`C25 T5.2 — golden frames > utf8 light at 160 1`] = `
-"── the illustration · measured 10 · rendered 10
+"── the illustration · measured 11 · rendered 11
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ⋯ 14 unchanged lines
 @@ -18,6 +18,7 @@
@@ -1258,6 +1318,10 @@ exports[`C25 T5.2 — golden frames > utf8 light at 160 1`] = `
                                                                                │[38;2;60;121;60m[48;2;210;255;210m22[39m [38;2;60;121;60m+[39m [38;2;56;58;66m      [38;2;168;67;44mprism.fmx.io/family:[38;2;56;58;66m [38;2;60;121;60mvolatility[39m                                     [49m
 [38;2;148;149;156m22[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m                                                             │[38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m2[39m
 [38;2;148;149;156m23[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m                                                               │[38;2;148;149;156m24[39m [38;2;148;149;156m [39m [38;2;56;58;66m  [38;2;168;67;44mtemplate:[39m
+⋯ 170 unchanged lines
+── unchanged file — a header and a tail · measured 2 · rendered 2
+── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+⋯ 200 unchanged lines
 ── three hunks, wide numbers · measured 12 · rendered 12
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ⋯ 9 unchanged lines

@@ -17,8 +17,8 @@ import type { ReactElement } from "react";
 import { rows } from "../blocks/paint.js";
 import { cells } from "../text.js";
 import { atLeastOne, normaliseWidth } from "../../data/viewmodel/index.js";
-import { collapseText, isCollapsed } from "./collapse.js";
-import { hunkRows, layoutFor, patchHeight, type Layout } from "./height.js";
+import { collapseText } from "./collapse.js";
+import { hunkRows, isCollapsed, layoutFor, patchHeight, type Layout } from "./height.js";
 import { blankSide, dress, gutterSpans, line, textSpans } from "./lines.js";
 import { patchLayout, type PatchLayout } from "./layout.js";
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
@@ -201,6 +201,15 @@ export const patchDefinition: BlockDefinition<Patch> = {
 
     const out: string[] = [header(block, columns, ctx)];
     for (const hunk of block.hunks) out.push(...hunkLines(hunk, block, columns, ctx));
+
+    // The tail, below everything (C04 §3). The same row a `collapsedBefore` draws,
+    // from the block's field rather than a hunk's — which is why `collapseText` takes
+    // a count and not a hunk.
+    if (isCollapsed(block.collapsedAfter)) {
+      out.push(
+        line([{ text: collapseText(block.collapsedAfter as number, ctx.capabilities) }], "context", columns, ctx),
+      );
+    }
 
     return rows(out);
   },

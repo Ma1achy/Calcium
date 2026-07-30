@@ -43,6 +43,35 @@ describe("C25 fail-on-revert", () => {
     expect(k.measure(with40, 80) - k.measure(without, 80), "one row, not forty").toBe(1);
   });
 
+  it("T6.15 (C04 §3): putting `collapsedAfter` on `Hunk` → one region, two fields", () => {
+    // **The revert that looks symmetrical.** A `collapsedAfter` beside
+    // `collapsedBefore` on `Hunk` reads tidier and double-counts: the gap between
+    // hunk 1 and hunk 2 is 1's *after* and 2's *before*, so a producer has to know
+    // which of two fields describes one region and a renderer has to decide which to
+    // believe. Asserted as the property that makes the block's field unambiguous —
+    // there is exactly one place a tail can be declared.
+    const twoHunks = patchOf({
+      id: "p-two",
+      hunks: [hunkOf([" a", "+b"], { collapsedBefore: 9 }), hunkOf([" c", "+d"], { collapsedBefore: 40 })],
+      collapsedAfter: 170,
+    });
+
+    const drawn = kit().renderToLines(twoHunks, 80).map(visible).join("\n");
+    const markers = [...drawn.matchAll(/unchanged lines/g)].length; // cells-ok — a marker count
+
+    expect(markers, "three regions, three markers, and no region described twice").toBe(3);
+    expect(drawn).toContain("9 unchanged lines");
+    expect(drawn).toContain("40 unchanged lines");
+    expect(drawn).toContain("170 unchanged lines");
+  });
+
+  it("T6.16 (I5): counting the tail as its elided line count → T1.3a fails", () => {
+    const with170 = patchOf({ id: "p-t170", hunks: [hunkOf([" a", "+b"])], collapsedAfter: 170 });
+    const without = patchOf({ id: "p-t0", hunks: [hunkOf([" a", "+b"])] });
+
+    expect(kit().measure(with170, 80) - kit().measure(without, 80), "one row, not 170").toBe(1);
+  });
+
   it("T6.3 (I6): making `patch` a privileged built-in → T2.3 fails", () => {
     const bare = createBlockRegistry({});
     expect(bare.kinds, "patch must not ship as a default").not.toContain("patch");
@@ -75,7 +104,14 @@ describe("C25 fail-on-revert", () => {
     const imports = [...source.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
 
     expect(imports, "the measurement path imports one thing").toEqual(["../../data/viewmodel/index.js"]);
-    expect(source).not.toContain("tokenise");
+
+    // **Comments stripped first**, because the prose that explains a rule is not a
+    // violation of it. This assertion fired on the sentence "a `measure` that could
+    // reach the tokeniser is a `measure` that eventually does" — the file documenting
+    // the property it satisfies. A03 §4's scan runner skips comment lines for exactly
+    // this reason, after SS23 reported a doc comment about `frames.length`.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    expect(code, "no call to the tokeniser on the measurement path").not.toContain("tokenise");
   });
 
   it("T6.6 (§3): flipping the layout threshold → T1.5 fails and every line truncates at 60", () => {

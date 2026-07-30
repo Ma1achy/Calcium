@@ -146,6 +146,12 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "path", e, at);
     requireString(b, "language", e, at);
     requireArray(b, "hunks", e, at);
+    // A negative elision is not an elision, and it would render a marker claiming
+    // there is content to reveal above what the block actually holds.
+    const after = b["collapsedAfter"];
+    if (after !== undefined && (typeof after !== "number" || !Number.isInteger(after) || after < 0)) {
+      e.push(`${at}: "collapsedAfter" must be a non-negative integer`);
+    }
   },
   pills: (b, e, at) => requireArray(b, "chips", e, at),
   tip: (b, e, at) => requireString(b, "text", e, at),
