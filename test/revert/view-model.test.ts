@@ -18,7 +18,8 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { CORPUS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
-import { ASCII_CAPS, measurable } from "../support/render.js";
+import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
+import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
 import { checkAsciiParity, formatReport } from "../support/measurement-conformance.js";
@@ -301,7 +302,41 @@ describe("C04 fail-on-revert", () => {
     expect(existsSync("src/presentation/blocks/registry.ts"), "the registry lives at L1").toBe(true);
   });
 
-  it.todo("T6.9 (I10): an assembly-only block representation → T5.3 fails as a partial document renders differently mid-stream — waits on C13");
+  it("T6.9 (I10): an assembly-only block representation → a partial document renders differently mid-stream", () => {
+    // C13 landed, so a document can now be held *while incomplete* and compared
+    // against the same document complete. That is what I10 is about: no block
+    // kind may have an "assembling" form, because a `--watch` renders every
+    // intermediate state and a kind that looks different half-built flickers.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    // The default kinds only. `table`, `plot` and `patch` are registered by C11,
+    // C12 and C25 — an unregistered kind still renders, as `raw`, so building
+    // this out of tables would assert about `raw` while appearing to assert
+    // about tables. That is the inert-option trap `measurable` warns about.
+    const kinds = Object.values(ONE_PER_KIND).filter((b) => kit.kinds.includes(b.kind));
+    expect(kinds.length).toBeGreaterThan(10);
+
+    const alone = new Map(kinds.map((b) => [b.id, kit.renderToLines(b, 80).join("\n")]));
+
+    const store = createTranscriptStore();
+    const id = store.append(doc({ blocks: [kinds[0]!] }), { streaming: true });
+
+    // Grow the document one block at a time. At every intermediate state — a
+    // partial document, which is what a `--watch` renders continuously — each
+    // block already present must render exactly as it does complete.
+    for (let i = 1; i < kinds.length; i += 1) {
+      expect(store.patch(id, { op: "append", block: kinds[i]! })).toMatchObject({ ok: true });
+
+      for (const b of store.entries[0]!.doc.blocks) {
+        expect(
+          kit.renderToLines(b, 80).join("\n"),
+          `${b.kind} renders differently at stage ${i} than it does complete`,
+        ).toBe(alone.get(b.id));
+      }
+    }
+
+    store.settle(id);
+    expect(store.entries[0]?.doc.blocks).toHaveLength(kinds.length);
+  });
 
   it("T6.14 (I17): removing the max(1, …) floor → T3.6 fails at all three kinds", () => {
     // `ceil(cells("") / w)` is 0 and an empty notice renders as a row. The

@@ -18,6 +18,10 @@ describe("C04 e2e — the drift tests", () => {
     "T5.2: the same, at four terminal widths, with a resize between passes — waits on C14 and L4",
   );
   it.todo(
-    "T5.3: a --watch stream applying merge patches for sixty seconds — the viewport does not jump, and an expanded row stays expanded and stays put — waits on C13, C14 and L4",
+    // C13 landed and this no longer waits on it: the store applies the merges
+    // today (C13 T4.1b asserts the row identity half). What is left is entirely
+    // the viewport's — "does not jump" and "stays put" are claims about scroll
+    // position, and there is nothing yet to hold one.
+    "T5.3: a --watch stream applying merge patches for sixty seconds — the viewport does not jump, and an expanded row stays expanded and stays put — waits on C14 and L4",
   );
 });

@@ -175,5 +175,8 @@ describe("C12 tier 4 — a growing series", () => {
   });
 
   it.todo("T4.5: a plot in an expanded table row shifts blocks by its height — waits on C14");
-  it.todo("T4.6: a streamed series does not move the viewport — waits on C13");
+  // C13 landed and supplies the streaming half — a series patched tick by tick
+  // into a held document. "Does not move the viewport" is the other half, and a
+  // viewport is what does not exist.
+  it.todo("T4.6: a streamed series does not move the viewport — waits on C14");
 });

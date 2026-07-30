@@ -127,18 +127,27 @@ function checkShape(block: Block): void {
  */
 export function block<B extends Block>(spec: B): B {
   checkShape(spec);
-  for (const child of childrenOf(spec)) checkShape(child);
+  for (const child of descendants(spec)) checkShape(child);
   return deepFreeze(spec);
 }
 
 /**
- * Container children, so a nested block's shape is checked at construction too.
+ * Every nested block, transitively, so a nested block's shape is checked at
+ * construction too.
  *
  * `seen` is path-scoped and keeps the walk finite on a cyclic literal, matching
  * `deepFreeze` and for the same reason: a constructor that hangs fails worse
  * than one that completes and lets `validateDocument` name the cycle (I27).
+ *
+ * **Exported because C13 counts blocks against the session cap (C13 I17), and a
+ * second copy of this walk would miss the next container kind added here** —
+ * silently, in the component that decides what to evict. C04 §5 makes the same
+ * argument `cells()` makes: one implementation, or the two answers drift.
+ *
+ * It yields blocks and never rows. A table's rows are not blocks; a row's
+ * `detail` is. What to *count* is the caller's decision, not this walk's.
  */
-function* childrenOf(b: Block, seen: WeakSet<object> = new WeakSet()): Generator<Block> {
+export function* descendants(b: Block, seen: WeakSet<object> = new WeakSet()): Generator<Block> {
   if (seen.has(b)) return;
   seen.add(b);
 
@@ -150,7 +159,7 @@ function* childrenOf(b: Block, seen: WeakSet<object> = new WeakSet()): Generator
         : [];
   for (const child of nested) {
     yield child;
-    yield* childrenOf(child, seen);
+    yield* descendants(child, seen);
   }
 }
 
@@ -162,7 +171,7 @@ function* childrenOf(b: Block, seen: WeakSet<object> = new WeakSet()): Generator
 export function document(spec: ViewDocument): ViewDocument {
   for (const b of spec.blocks) {
     checkShape(b);
-    for (const child of childrenOf(b)) checkShape(child);
+    for (const child of descendants(b)) checkShape(child);
   }
   return deepFreeze(spec);
 }

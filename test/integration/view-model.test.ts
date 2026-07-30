@@ -2,11 +2,11 @@
 //
 // C04's integration partners are C07 (produces documents), C09 (measures them),
 // C13 (holds them and applies patches) and C14 (virtualises by measured height).
-// None of the four exists yet, so every T4 in the spec names its blocker.
+// C14 is the one still missing, so the T4s that name it still name it.
 //
-// What can be integrated today is C04 with itself across a realistic sequence:
-// the document lifecycle a streaming verb actually produces. That is not a
-// substitute for T4.3, but it is the part of T4.3 that does not need C13.
+// **T4.3 is written against the real store now.** It was deferred on C13 and the
+// deferral expired when C13 landed, which is what `todo-expiry` is for: the note
+// nobody would otherwise send to the person who could act on it.
 import { describe, expect, it } from "vitest";
 import { createFallbackAdapter } from "../../src/data/adapters/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
@@ -20,6 +20,7 @@ import {
 import { CORPUS, doc, tableOf } from "../support/blocks.js";
 import { DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { renderToLines } from "../../src/testing/index.js";
 import type { RenderContext } from "../../src/presentation/blocks/index.js";
 import { Box, Text } from "ink";
@@ -208,9 +209,42 @@ describe("C04 integration — the document lifecycle", () => {
     const report = checkMeasurement(kit, [banner], { widths: [40, 80] });
     expect(report.failures, formatReport(report)).toEqual([]);
   });
-  it.todo(
-    "T4.3: appending fifty documents and applying two hundred patches leaves every document valid and frozen — waits on C13",
-  );
+  it("T4.3: fifty documents and two hundred patches leave every document valid and frozen", () => {
+    // C13 landed, so this is writable. It is C04's test rather than C13's: the
+    // claim is that `applyPatch` composes — two hundred applications in sequence
+    // and nothing has drifted out of the schema or lost its freeze.
+    const store = createTranscriptStore({ cap: 100_000 });
+    const ids: string[] = [];
+
+    for (let d = 0; d < 50; d += 1) {
+      ids.push(
+        store.append(
+          doc({
+            command: `c${d}`,
+            blocks: [block({ kind: "raw", id: `d${d}-b0`, text: "seed" })],
+          }),
+          { streaming: true },
+        ),
+      );
+    }
+
+    for (let p = 0; p < 200; p += 1) {
+      const id = ids[p % ids.length]!;
+      const r = store.patch(id, {
+        op: "append",
+        block: block({ kind: "raw", id: `p${p}`, text: `patch ${p}` }),
+      });
+      expect(r, `patch ${p}`).toMatchObject({ ok: true });
+    }
+
+    for (const e of store.entries) {
+      expect(validateDocument(e.doc).ok, `${e.id} after patching`).toBe(true);
+      expect(Object.isFrozen(e.doc), `${e.id} frozen`).toBe(true);
+    }
+    // I1 from C13's side, as the arithmetic that makes "valid and frozen" mean
+    // something: forty-nine of the fifty are frozen and exactly one is live.
+    expect(store.entries.filter((e) => e.live)).toHaveLength(1);
+  });
   it.todo(
     "T4.4: virtualising a 10,000-block transcript selects a range whose summed measured heights equal the viewport height exactly — waits on C14",
   );
