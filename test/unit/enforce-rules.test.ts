@@ -518,6 +518,7 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     MG16: "C18",
     MG17: "C19",
     MG18: "C20",
+    MG22: "C12 — no src/presentation/plot/ directory yet",
   };
 
   /**

@@ -61,6 +61,10 @@ Generalising it turned up three things the narrow pattern had been hiding, and n
 
 `MG2` — no cycle within a layer — is the one genuinely unbuilt rule in the family. It blocks on nothing; it is listed pending with "nothing" as its blocker, because a rule not yet built and a rule nobody remembers are indistinguishable unless one of them is written down.
 
+**One gap is recorded here with no mechanism, because none is tractable.** SP1 and the pairing audit ask whether each commitment has an invariant and each invariant has a commitment. Neither asks whether two invariants can both be satisfied at once. C12 I5 and I14 are the first known instance: I5 kept a column's minimum and maximum under downsampling, I14 joined successive points with Bresenham, and keeping only the extremes leaves the join nothing to work from — **each correct alone, jointly unsatisfiable, and both pass every check in this document.** It is resolved by a composition clause on both (C12 §3), and it was found by trying to implement them rather than by any rule.
+
+A mechanism would be n² prose comparison across 25 specs, which is not a check but a second reading of everything. So this is a note to the reader rather than a row in a table: **pairwise consistency between invariants is unenforced**, and the place it surfaces is the first time someone tries to satisfy two at once.
+
 **The class extends past rules into the harnesses they run in.** A rule executes inside a fake terminal, a fake clock or a pseudo-terminal, and a harness parameter nobody has exercised is a mechanism that cannot be *seen* to have worked — the same defect from the other side. `runInPty` accepted an `env` record and hard-coded node-pty's `name`, which *is* the child's TERM, so `TERM=dumb` ran under `xterm-256color`; the parameter had never been passed until C02's tier 5 passed it. The standing rule is in `test/support/README.md`: **every helper parameter that shapes the environment under test carries an assertion that fails if the parameter is ignored**, and a parameter with no observable effect is reported rather than skipped, because it may mean the parameter should not exist.
 
 **The fourth is the one the other three do not catch, and it is a defect of this document rather than of the code.** A missing rule is invisible from the source side: `checkSourceScans` iterates the rows it has, so a row that was never written is not a rule that fails but a rule that is not there. The inventory is the only place it exists, and the inventory is prose. The check is therefore set equality — the ids in these tables equal the ids implemented plus the ids explicitly pending — so **a rule inventoried and never built fails on the commit that inventories it**, which is the commit where someone still remembers what it was for.
@@ -98,6 +102,11 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG19 | C21 imports nothing from `terminal/` | C21 T2.3 |
 | MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
 | MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I18, T2.17 |
+| MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
+
+**MG22 is a cycle rule, not a layer rule.** C11 imports C12's `sparkline` for a `Cell.spark` (C12 §2), which is legal: A02 §1 forbids importing *upward* and importing *cyclically*, and both directories are L1, so the layer walk sees nothing either way. What must never exist is the return edge — a plot reaching into the table engine for a column width or a truncation helper, which is exactly the shape a reader would reach for and which would close the cycle. Type-only counts, as MG6 and MG19 both record: a reference is a dependency whether or not it survives the build.
+
+MG2 would catch the cycle once closed; MG22 catches the edge that would close it, one commit earlier. That is the MG13/MG18 precedent and the reason the table holds specific prohibitions alongside the general walk.
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 

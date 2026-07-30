@@ -44,7 +44,12 @@ L3 interaction   interaction/
 L4 shell         shell/
 ```
 
-**Imports go DOWN only.** Never up, never sideways within a layer.
+**Imports go DOWN only.** Never up, and **never cyclically within a layer** —
+A02 §1's wording, which this line used to render as "never sideways". Sideways
+edges inside L1 are required rather than tolerated: C11 and C12 both import C09's
+paint helpers and C10's tones, and C11 imports C12's `sparkline` for a table cell.
+A rule the tree must break is a rule people learn to ignore. The enforceable
+version is acyclicity, and it is what MG1 and MG22 implement.
 
 **L0's two halves never import each other.** `terminal/` knows nothing of view
 models; `data/` knows nothing of terminals. That independence is what allows them
