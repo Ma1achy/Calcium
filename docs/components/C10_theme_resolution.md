@@ -39,8 +39,7 @@ type ThemeTokens = Readonly<{
   surfaces: Readonly<{
     bg: string; bgElev: string; bgDeep: string;
     border: string; borderStrong: string;
-    diffAdd: string; diffAddStrong: string;         // §4a — text-bearing surfaces
-    diffRemove: string; diffRemoveStrong: string;
+    diffAdd: string; diffRemove: string;            // §4a — text-bearing
   }>;
   fourBit:  FourBitMap;                             // the curated table, by reference
 }>;
@@ -201,14 +200,26 @@ Terminal contrast is not a perfect analogue of a browser's — background colour
 
 `Style` gains `background?: ColourValue` — the second colour channel and, deliberately, the last one. It is a **requirement** rather than a preference: C25 §2's row anatomy cannot be expressed without it, because on a changed diff line the foreground is spoken for by `syntax` and bold and dim are spoken for by the 1-bit tone collapse (§5). There is no channel left, and the alternatives are recorded in C25 §6.
 
-Four surfaces, and the pairing is why there are four rather than two:
+**Two surfaces, and the second level does not fit.** This section was drafted with four — a line background per kind, and a stronger pair for the precisely changed words within a line, which is what real diff tools use for word-level emphasis. Measuring it against the floors below withdrew the stronger pair, and the numbers are in A01 A.1 beside the two that remain.
 
 | Surface | For |
 |---|---|
 | `diffAdd` · `diffRemove` | the line background of an added or removed row |
-| `diffAddStrong` · `diffRemoveStrong` | the precisely changed words *within* such a row |
 
-**Two levels are needed, not one.** Word-level emphasis (C25 I11) has to be visible against the line background it sits inside, so a single value per line cannot express it — the span carries its own. The stronger pair is specified now and unused until word-level highlighting is built, which is the one thing here that is not immediately consumed: it is specified because deciding it later would mean re-measuring the whole table.
+**Why the second level cannot be a background.** The ceiling is set by the two recessive slots. `syntax.comment` takes 3 : 1 and `tone.muted` 2.5 : 1 by design — recessive is their requirement, not a compromise on it — and both already sit close to their floors against `bg`. So a diff background has very little luminance to move in, and the tint that fits is nearly all spent by the *first* level:
+
+| | Plain, shipped | Most tint that still clears | Separation |
+|---|---|---|---|
+| dark `diffAdd` | `#002600`, tint 38 | `#002c00`, tint 44 | **6 / 255** |
+| dark `diffRemove` | `#490000`, tint 73 | `#520000`, tint 82 | **9 / 255** |
+| light `diffAdd` | `#d2ffd2`, tint 45 | `#b7ffb7`, tint 72 | 27 / 255 |
+| light `diffRemove` | `#fff0f0`, tint 15 | `#ffe9e9`, tint 22 | **7 / 255** |
+
+Three of the four have under ten units of one channel between "this line changed" and "these words changed", which is not a second level; it is the same level twice. And the direction real tools take — lighter on dark, darker on light — is the direction that breaks `comment` and `muted` outright.
+
+**So word-level emphasis is not a background, and the channel that is actually free is `underline`.** `colour` is spoken for by syntax, `background` by the line kind, `bold` and `dim` by the 1-bit tone collapse (§5), and `inverse` would swap the two colour channels and destroy both. `underline` is unclaimed, it composes with everything above it, and — unlike a background — **it survives at 1-bit**, which makes it a better carrier than the thing it replaces. Recorded here rather than decided: word-level highlighting is deferred (C25 I11), and this is the constraint whoever builds it inherits.
+
+**The asymmetry between the two hues is real and not an authoring slip.** Luminance weights green at 0.7152 and red at 0.2126, so the same luminance budget buys a dark theme 73 units of red tint and 38 of green, and a light theme 45 units of green and 15 of red. The four values look balanced and their channel arithmetic is not.
 
 **Degradation needs no new principle.** These are surfaces, so they follow §3's ladder and vanish entirely at 1-bit (I8). What makes losing a diff background lossless under D29 is that the `+`/`-` marker and the toned gutter both survive it — the background is the third signal, never the only one (C25 I13).
 
@@ -216,13 +227,15 @@ Four surfaces, and the pairing is why there are four rather than two:
 
 These are the first **text-bearing** surfaces besides `bg` and `bgElev`, so §4's rule extends to them: everything painted on them must clear its floor against them.
 
-**The background covers the whole row, gutter included**, so the scope is the nine `syntax` slots *and* `tone.ok`, `tone.error`, `tone.muted` — the three the gutter uses. 12 slots × 4 surfaces × 2 variants, and A01 A.1 records each measured ratio as it does for `bg` and `bgElev`.
+**The background covers the whole row, gutter included**, so the scope is the nine `syntax` slots *and* `tone.ok`, `tone.error`, `tone.muted` — the three the gutter uses. 12 slots × 2 surfaces × 2 variants, and A01 A.1 records each of the 48 measured ratios as it does for `bg` and `bgElev`.
 
 Stated because the naive implementation is wrong in a way that looks right: adding these four to the list `bg` and `bgElev` are in would check **every** `meaning` slot against them, and ten tones against a diff background would fail on slots that never land there. The scope of a floor is where the text actually goes.
 
 **`bgDeep` stays excluded** for the reason §4 gives — it carries no text — and these four are included for the same reason inverted. That is the exclusion earning its keep: it was written as a decision someone would have to revisit, and this is the revisit.
 
-**Expect this to fail on first authoring**, and expect the *strong* pair to be the tight case. They exist to be distinguishable from the plain pair, so they are darker or more saturated, and that is exactly where nine syntax slots run out of room. If a strong background cannot carry them, **the background moves** — and if no strong background can, the finding is that word-level emphasis wants something other than a second background, which is worth knowing before it is built rather than after.
+**It did fail on first authoring, and the strong pair was the tight case exactly as predicted.** Not by a value being wrong — by there being no room for a second one. The plain pair moved to the values above and the strong pair does not exist, which is the check doing what it is for: it prevented a design rather than rejecting a colour.
+
+Recorded because the prediction and the outcome are worth having side by side. The expectation was that a strong background would be too strong for syntax and would have to move; the measurement said something narrower and more useful — that the *first* background spends nearly the whole budget, so there is no second one to place.
 
 ---
 
@@ -269,7 +282,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 - **I20** — Contrast is validated against `bg` and `bgElev`, the two surfaces text lands on, and never against `bgDeep`, which carries none. Validating against a surface no text meets would reject themes for a failure that cannot be seen.
 - **I21** — The shipped tokens are A01 Appendix A.1's catalogue, and T2.4 recomputes every ratio from them rather than trusting the recorded figures. The table is an assertion the suite upholds, not a record of intent.
 - **I22** — `Style` has exactly two colour channels, `colour` and `background`, and both are `ColourValue` or absent. `background` is set only by `resolveBackground`, and only from a `surface` ref — a palette slot never resolves into it, because a tone painted as a background is a tone nothing checked the floor for.
-- **I23** — The four diff surfaces are text-bearing, and every `syntax` slot and every gutter tone (`ok`, `error`, `muted`) clears its floor against all four in both variants (§4a). `bgDeep` remains excluded because it carries no text; the criterion is text, not the word "surface".
+- **I23** — The two diff surfaces are text-bearing, and every `syntax` slot and every gutter tone (`ok`, `error`, `muted`) clears its floor against both in both variants (§4a). There is no third or fourth: §4a measured a stronger pair for word-level emphasis and found under ten units of one channel between it and the plain pair, so word-level emphasis is `underline`'s and not a background's. `bgDeep` remains excluded because it carries no text; the criterion is text, not the word "surface".
 - **I24** — A diff background is the third signal and never the only one. At 1-bit it is absent, and the marker and the toned gutter carry the distinction alone (→ C25 I13, → A01 D29).
 - **I18** — A resolved colour always names its depth. There is no untagged form: `Style.colour` is absent or a `ColourValue`, never a bare string anywhere in the tree. The tag exists so a writer cannot guess, and a tag that is droppable is a tag that will be dropped.
 
@@ -296,7 +309,7 @@ There is no sealed state. Themes switch at runtime by design, which is the diffe
 17. A resolved colour always names its depth. There is no untagged form and no bare string, so a 4-bit index and a 24-bit hex can never be confused at a call site that has already forgotten which it asked for (I18). Enforced by SS36.
 18. The shipped tokens are the catalogue in A01 A.1, and T2.4 recomputes its ratios rather than trusting them (I21).
 19. `Style` has two colour channels and no more. `background` comes only from a `surface` ref through `resolveBackground`, because the floors are measured for surfaces and not for tones in that role (I22).
-20. The four diff surfaces are text-bearing, so the §4 floors extend to them — for the twelve slots that land on them and no others, the background covering the whole row (I23). The `bgDeep` exclusion is the criterion doing its job in the other direction.
+20. The two diff surfaces are text-bearing, so the §4 floors extend to them — for the twelve slots that land on them and no others, the background covering the whole row (I23). A second, stronger level was specified, measured and withdrawn; the floors left no room for it, and `underline` is what word-level emphasis has instead (§4a). The `bgDeep` exclusion is the criterion doing its job in the other direction.
 21. A diff background is a third signal that vanishes at 1-bit, where the marker and the toned gutter carry the distinction alone (I24, → A01 D29).
 
 ---
@@ -322,7 +335,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.13** (I8): at depth 4, surfaces use the curated mapping, not computed nearest.
 - **T1.14** (I22): `resolveBackground` on a `surface` ref returns a `Style` whose `background` is set and whose `colour` is absent; `resolve` on the same ref returns the mirror image. The two functions differ in which channel they fill and in nothing else.
 - **T1.15** (I22): `resolveBackground` on a palette ref — `tone.ok`, `syntax.keyword` — returns the empty `Style`. A tone cannot be painted as a background, because no floor was ever measured for it in that role.
-- **T1.16** (I2, I24): at depth 1, `resolveBackground` on all four diff surfaces returns the empty `Style`. The degradation that makes I24 lossless.
+- **T1.16** (I2, I24): at depth 1, `resolveBackground` on both diff surfaces returns the empty `Style`. The degradation that makes I24 lossless.
 
 ### Tier 2 — contract / interface
 
@@ -337,7 +350,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.9** (I14): a source scan finds no hex literal in any block-producing module.
 - **T2.13** (§2): the `syntax` palette has exactly nine slots — keyword, string, comment, number, key, type, function, operator, punctuation — in every shipped theme. Adding a tenth without tokens fails the build, the same shape as T2.7.
 - **T2.14** (§2, I15): every `syntax` slot passes its §4 floor in both variants and against **both surfaces**, `syntax` being a `meaning` palette. `comment` is checked at 3 : 1 with the rest at 4.5.
-- **T2.14a** (I23, §4a): every `syntax` slot and each of `tone.ok`, `tone.error`, `tone.muted` passes its floor against all four diff surfaces, in both variants — 96 ratios, recomputed from the shipped tokens rather than read from A01 A.1. The same shape as T2.4 and for the same reason.
+- **T2.14a** (I23, §4a): every `syntax` slot and each of `tone.ok`, `tone.error`, `tone.muted` passes its floor against both diff surfaces, in both variants — 48 ratios, recomputed from the shipped tokens rather than read from A01 A.1. The same shape as T2.4 and for the same reason.
+- **T2.14c** (I23, §4a): `surfaces` has exactly seven entries, and `diffAddStrong` and `diffRemoveStrong` are not among them. The withdrawn pair asserted absent rather than merely unmentioned — a spec that measured something out and a token file that quietly kept it is the drift this suite exists to stop.
 - **T2.14b** (I23): the diff surfaces are checked against **exactly** those twelve slots and no others. Asserted on the pairing itself rather than on its results: widening the check to every `meaning` slot would fail on tones that never land on a diff background, and narrowing it to `syntax` alone would leave the gutter unchecked on the surface it is drawn on.
 - **T2.20** (I22): over every ref × every depth, a returned `background` is absent or a `ColourValue` — the T2.18 assertion for the second channel, with the kinds written out literally for the same reason.
 - **T2.16** (I17): per palette, per variant, no two slots share a 24-bit value. This is the test that caught `key`/`number` and, less obviously, light `number`/`type` — the second was created by the contrast correction itself, so nothing but recomputation could have found it.

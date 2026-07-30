@@ -258,7 +258,7 @@ Consequences that matter:
 - **I7** — C25 holds no state. `measure` and `render` are pure over the block.
 - **I8** — C25 declares no block types. `Patch` and `Hunk` are C04's.
 - **I10** — A language C09's tokeniser does not recognise renders as plain text, never as an error. A diff of an unfamiliar file type is still a diff worth reading, and refusing to render it would make the renderer's language table a gate on content.
-- **I11** — Word-level intra-line highlighting is deferred, and the block shape does not foreclose it. `Hunk` carries whole lines; adding spans later is a field, not a redesign.
+- **I11** — Word-level intra-line highlighting is deferred, and the block shape does not foreclose it. `Hunk` carries whole lines; adding spans later is a field, not a redesign. **Its carrier is decided and is not a background**: C10 §4a measured a stronger background pair and withdrew it, so a changed span takes `underline` over the line's background (→ C10 §4a).
 - **I9** — Expansion of a collapsed region patches the document (C11 T4.7's mechanism), never mutates external state. C25 itself does not expand anything — it renders whatever `collapsedBefore` says. There is no `expanded` flag: expansion *is* the rewrite.
 - **I12** — Every row carries the gutter in the line's tone and the text in `syntax` slots, for all three line kinds. Only the gutter varies by kind; the text is code in every case. Two palettes on one row is the general case in a patch, not an exception on some rows (§2).
 - **I13** — The line background is the third signal and never the only one. At 1-bit it resolves to nothing (C10 §4's surface rule), and the marker and the toned gutter both survive — which is what makes losing it lossless under D29.
@@ -275,7 +275,7 @@ Consequences that matter:
 
 It is a **requirement rather than a preference**, which is what changed: §2's row anatomy cannot be expressed without it. The foreground is spoken for by syntax on all three line kinds, and bold and dim are spoken for by the 1-bit tone collapse (C10 §5), so there is no channel left. Option (b) would make added and removed lines the same colour, and option (c) would suppress highlighting on exactly the lines a reader most wants to read.
 
-Two levels are needed, not one: a line background for add and remove, and a **stronger** one for the precisely changed words within a line, which is what word-level emphasis will want (I11). One channel with a single value per line cannot express the second, so the span carries its own.
+**One level, and the second was measured out.** This section was written expecting two — a line background, and a stronger one for the precisely changed words within a line, which is what every real diff tool uses for word-level emphasis. C10 §4a measured the stronger pair against the contrast floors and there is no room for it: the recessive slots bound how much tint a diff background may carry, and the *first* level spends nearly all of it, leaving six to nine units of one channel on three of the four values. So word-level emphasis (I11) is **`underline`**, the one style channel nothing else claims, and it has the property a background does not — it survives at 1-bit.
 
 **Degradation needs no new principle.** C10 §4's surfaces already degrade to nothing at 1-bit and `resolve`'s surface path already implements it, so a diff background is a surface. What makes losing it lossless is I13.
 
