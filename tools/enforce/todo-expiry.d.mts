@@ -38,6 +38,16 @@ export declare function checkSourceMap(
   exists?: (path: string) => boolean,
 ): Violation[];
 
+export declare const KIND_OF_COMPONENT: Readonly<Record<string, string>>;
+
+/** TD4 — a surface deferral's blocker must be the right component (A03 §9a). */
+export declare function checkSurfaceDeferrals(
+  entries: readonly TodoEntry[],
+  kinds?: Readonly<Record<string, string>>,
+  readDir?: (dir: string) => readonly string[],
+  readFile?: (file: string) => string,
+): Violation[];
+
 export declare function collectTodos(
   dir?: string,
   readFile?: (file: string) => string,

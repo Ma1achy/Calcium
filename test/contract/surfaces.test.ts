@@ -70,6 +70,26 @@ describe("the S-series' illustrated heights", () => {
   // screen — an outer panel with a title and a footer around a `group` of five —
   // which is the shape S01 and S12 already wait on C22 for. Its table and its
   // sparkline compose today; the frame around them does not.
-  it.todo("S07 §3's patch region composes to its illustrated rows — waits on C25");
-  it.todo("S01, S02, S10, S11, S12, S13 compose to their illustrated rows — waits on C22");
+  // **S07's deferral is deleted rather than expired, and it was never C25's.**
+  // It read "S07 §3's patch region composes to its illustrated rows — waits on
+  // C25". S07 §2 draws two `diff` blocks and is asserted above; §3 is "Direction
+  // of improvement", a table of four verdicts with no illustration in it; and the
+  // only mention of `patch` in the whole file is the sentence explaining why
+  // `diff` and `patch` are separate kinds. The surface that draws a patch is
+  // S10 §4a, which has no illustration fence of its own and is inside the C22
+  // line below.
+  //
+  // Second wrong blocker in consecutive components, after S09's — and A03 TD4
+  // now fires on both halves of this one: §3 has no illustration, and S07's
+  // stated composition names no `patch`. The check would have failed on the
+  // commit that wrote it.
+  //
+  // **The C22 line names sections, which it did not.** TD4 requires it: an
+  // illustration belongs to a section, so a deferral naming only a surface cannot
+  // be checked against one — which is how S07's survived pointing at a section
+  // that had none. All six are their surface's `§2`, the whole-screen figure that
+  // wants an outer `panel` with a title and a footer.
+  it.todo(
+    "S01 §2, S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated rows — waits on C22",
+  );
 });

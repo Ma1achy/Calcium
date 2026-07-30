@@ -597,6 +597,33 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
    */
   const implementedIds = new Set(implemented);
 
+  it("A03 declares no rule id twice", () => {
+    // **The check that could not see a duplicate, and it was found by making one.**
+    // Every assertion in this block compares *sets*, so two rows carrying one id
+    // collapse into a single member: a new ambient-read rule written as SS41 —
+    // which C21 already holds — passed the missing-rule check, because the id it
+    // was looking for was present for an entirely different reason. An
+    // inventoried, unimplemented rule reported compliance, which is the failure
+    // A03 §2 opens with, reached through the mechanism built to prevent it.
+    //
+    // Reads the rows rather than the id set, deliberately: the set is what cannot
+    // see this.
+    const doc = readFileSync("docs/architecture/A03_enforcement_suite.md", "utf8");
+    const seen = new Map<string, number>();
+    for (const line of doc.split("\n")) {
+      const match = RULE_FAMILIES.exec(line);
+      if (match?.[1] === undefined) continue;
+      seen.set(match[1], (seen.get(match[1]) ?? 0) + 1);
+    }
+    const twice = [...seen.entries()].filter(([, n]) => n > 1).map(([id, n]) => `${id} ×${n}`);
+
+    expect(
+      twice,
+      `${twice.join(", ")} — two rows with one id are one member of every set ` +
+        `comparison below, so the second rule is invisible to all of them`,
+    ).toEqual([]);
+  });
+
   it("every rule A03 inventories is implemented, test-enforced or explicitly pending", () => {
     const missing = inventoriedRules().filter(
       (id) =>
