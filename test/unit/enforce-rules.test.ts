@@ -289,6 +289,30 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/viewport/transcript/store.ts",
     source: "const seq = Date.now();",
   },
+  {
+    // MG11, and the temptation is sharper than C13's because C14 genuinely needs
+    // a width. C01 I13 and SS42 give the terminal's dimensions exactly one
+    // reader; a viewport that reads them itself gets a second width at a second
+    // moment, and a frame composed against two widths wraps inside the alternate
+    // screen — which scrolls content the application has no record of.
+    rule: "MG11",
+    file: "src/viewport/viewport/viewport.ts",
+    source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
+  },
+  {
+    // SS13. Copied from the shape copy mode reaches for: yank has to put text
+    // somewhere and `pbcopy` is one line away. C14 §6 injects the writer for
+    // exactly that reason — a component that shells out cannot be unit-tested.
+    rule: "SS13",
+    file: "src/viewport/viewport/viewport.ts",
+    source: 'spawnSync("pbcopy", { input: rows.join("\\n") });',
+  },
+  {
+    // The `fs` half of the same rule: writing a scrollback dump to disk.
+    rule: "SS13",
+    file: "src/viewport/viewport/viewport.ts",
+    source: 'import { writeFileSync } from "node:fs";',
+  },
 ];
 
 const scanIds = SCANS.map((s) => s.id);
@@ -577,7 +601,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     SS8: "C19",
     SS9: "C20",
     SS12: "C10 — folded into SS11's scope for now",
-    SS13: "C14",
     SS18: "C10 — needs the block-producing module list",
     SS22: "C19",
     SS29: "C23",
@@ -599,7 +622,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // The rest of the MG family, which this check could not see until it read
     // more than `SS` rows. Each waits on the component whose directory it scopes
     // to; none of these exists, so the rule would have nothing to match.
-    MG11: "C14",
     MG12: "C15",
     MG13: "C15",
     MG14: "C16",

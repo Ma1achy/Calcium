@@ -399,6 +399,7 @@ export const OWNERS = [
   { path: "src/presentation/plot", spec: "C12" },
   { path: "src/presentation/patch", spec: "C25" },
   { path: "src/viewport/transcript", spec: "C13" },
+  { path: "src/viewport/viewport", spec: "C14" },
   { path: "src/testing", spec: "C09" },
 ];
 
@@ -437,6 +438,7 @@ export const TOPICS = {
   "text-width": "C09",
   theme: "C10",
   transcript: "C13",
+  viewport: "C14",
   transport: "C06",
   "view-model": "C04",
   world: "C08",

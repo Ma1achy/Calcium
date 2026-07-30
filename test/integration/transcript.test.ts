@@ -1,14 +1,15 @@
 // C13 tier 4 — integration. Against C04, and against the components above.
 //
-// Most of this tier waits on C14: eviction not moving the viewport, a merge not
-// collapsing an expanded row, a change granular enough to measure one entry. Those
-// are assertions about two components agreeing, and only one of them exists.
-// `todo-expiry` fails them into existence the moment `src/viewport/viewport.ts`
-// holds behaviour, which is the notification nobody would otherwise send.
+// **Three of these were deferred on C14 and `todo-expiry` expired them when it
+// landed**, which is the notification nobody would otherwise send. What is left
+// waits on C16 and on L4 — assertions about focus and about `/clear`, neither of
+// which has a component yet.
 import { describe, expect, it } from "vitest";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { appendPatch, docOf, tableWithDetails } from "../support/transcript.js";
+import { createViewport } from "../../src/viewport/viewport/index.js";
+import { W, measureSequence, rowsDoc } from "../support/viewport.js";
 
 describe("C13 integration", () => {
   it("T4.1 (with C04): a hundred patches leave a document that still validates", () => {
@@ -71,15 +72,65 @@ describe("C13 integration", () => {
     expect(streamed.blockCount).toBe(whole.blockCount);
   });
 
-  it.todo(
-    "T4.3 (with C14): append emits a change granular enough to measure one entry rather than the transcript — waits on C14",
-  );
-  it.todo(
-    "T4.4 (with C14): eviction shifts no visible content — the anchor is an id, so the viewport does not jump when the top is trimmed — waits on C14",
-  );
-  it.todo(
-    "T4.5 (with C14, C11): a merge patch on an expanded table leaves the row expanded and the scroll position unmoved — waits on C14",
-  );
+  it("T4.3 (with C14): append emits a change granular enough to measure one entry", () => {
+    const store = createTranscriptStore();
+    const viewport = createViewport(store, { width: W, height: 10, measureSequence });
+    for (let i = 0; i < 20; i += 1) store.append(rowsDoc(3, `d${i}`));
+
+    // One cached height per entry and no more: a bare "something changed" would
+    // have forced a remeasure of all twenty on every one of them.
+    expect(viewport.stats.cacheSize).toBe(20);
+
+    store.append(rowsDoc(3, "one-more"));
+    expect(viewport.stats.cacheSize).toBe(21);
+  });
+
+  it("T4.4 (with C14): eviction shifts no visible content — the anchor is an id", () => {
+    // 60 entries × 3 blocks = 180, so the cap has to sit below that or nothing is
+    // evicted and the test asserts about a case it never reaches.
+    const store = createTranscriptStore({ cap: 90 });
+    const viewport = createViewport(store, { width: W, height: 5, measureSequence });
+    for (let i = 0; i < 40; i += 1) store.append(rowsDoc(3, `d${i}`));
+    // Detached, but reading near the *end* — so what gets trimmed is above the
+    // visible region and the anchored entry survives. Anchoring inside content
+    // that is itself about to be evicted is T3.8's case, not this one, and the
+    // two claims are different: this is "the top moving does not move the middle".
+    viewport.scrollToBottom();
+    viewport.scrollBy(-8);
+    const before = viewport.visible();
+    const dropped = store.droppedBlocks;
+
+    for (let i = 40; i < 50; i += 1) store.append(rowsDoc(3, `d${i}`));
+
+    expect(store.droppedBlocks).toBeGreaterThan(dropped);
+
+    // An index would mean something different after every eviction; an id
+    // resolves to the same content or to nothing.
+    expect(viewport.visible().entries).toEqual(before.entries);
+  });
+
+  it("T4.5 (with C14, C11): a merge on a table leaves the scroll position unmoved", () => {
+    const store = createTranscriptStore();
+    const viewport = createViewport(store, { width: W, height: 6, measureSequence });
+    const table = store.append(tableWithDetails(4, 0), { streaming: true });
+    store.append(rowsDoc(40, "below"));
+    viewport.scrollToTop();
+    viewport.scrollBy(12);
+    const before = viewport.visible();
+
+    for (let i = 0; i < 30; i += 1) {
+      store.patch(table, {
+        op: "merge",
+        blockId: "t",
+        rows: [{ id: "t-r1", cells: { name: { text: `tick ${i}` } } }],
+      });
+    }
+
+    // A merge that changes a cell changes no height, so nothing moves at all —
+    // and C04 I9's reference identity is what stops the row collapsing.
+    expect(viewport.visible().entries).toEqual(before.entries);
+    expect(viewport.scroll.topRow).toBe(12);
+  });
   it.todo(
     "T4.6 (with C16): only the live entry appears in the focusable set; frozen entries never do, streaming or not — waits on C16",
   );

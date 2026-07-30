@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -99,6 +99,25 @@ const FORBIDDEN_EDGES = [
       "C13 holds view models and never renders them — measurement is C09's and " +
       "caching it is C14's. The edge is downward, so the layer walk permits it: " +
       "this is the rule that does not. Type-only counts",
+  },
+  {
+    // MG11. Downward again, like MG10's pair, and legal to every other rule.
+    //
+    // The temptation here is sharper than C13's, because C14 genuinely needs a
+    // width and a height — and `stdout.columns` is right there. C01 I13 and SS42
+    // say the terminal's dimensions have exactly one reader; C14 §5 says they
+    // arrive as data on `resize`. A viewport that reads them itself gets a second
+    // width, at a second moment, and a frame composed against two widths wraps
+    // inside the alternate screen, which scrolls content the application has no
+    // record of.
+    rule: "MG11",
+    from: "src/viewport/viewport/",
+    to: "src/terminal/",
+    spec: "C14 I12 · C14 T2.5",
+    why:
+      "dimensions arrive as data and C14 never calls the frame scheduler — a scroll " +
+      "reports a change and L4 commits, matching the C01 and C10 orchestration " +
+      "pattern. The edge is downward, so the layer walk permits it. Type-only counts",
   },
   {
     rule: "MG10",

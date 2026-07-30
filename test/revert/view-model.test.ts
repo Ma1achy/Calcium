@@ -20,6 +20,8 @@ import {
 import { CORPUS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
+import { createViewport } from "../../src/viewport/viewport/index.js";
+import { measureSequence } from "../support/viewport.js";
 import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
 import { checkAsciiParity, formatReport } from "../support/measurement-conformance.js";
@@ -248,7 +250,35 @@ describe("C04 fail-on-revert", () => {
   // C11's own T6.7 now covers the measurer half — a table measurer ignoring
   // `expanded` fails there, at every width. What is still deferred is this file's
   // claim, which is about viewport drift.
-  it.todo("T6.2 (I7): a measurer ignoring the expanded flag → T4.5 fails with viewport drift — waits on C14");
+  it("T6.2 (I7): a measurer ignoring the expanded flag → viewport drift", () => {
+    // `expanded` is view state that changes a height. A measurer reading the rows
+    // and not the flag returns the collapsed height for an open row, and the
+    // viewport places everything below it one detail-height too high — drift,
+    // not a wrong-looking block.
+    const store = createTranscriptStore();
+    const viewport = createViewport(store, { width: 80, height: 10, measureSequence });
+    const collapsed = tableOf(3, "t");
+    const id = store.append(doc({ blocks: [collapsed] }), { streaming: true });
+    const before = viewport.scroll.totalRows;
+
+    store.patch(id, {
+      op: "replace",
+      blockId: "t",
+      block: {
+        ...collapsed,
+        rows: collapsed.rows.map((r) =>
+          r.id === "r1"
+            ? { ...r, expanded: true, detail: [block({ kind: "raw", id: "d", text: "detail" })] }
+            : r,
+        ),
+      },
+    });
+
+    expect(viewport.scroll.totalRows).toBeGreaterThan(before);
+    expect(viewport.scroll.totalRows).toBe(
+      measureSequence(store.entries[0]?.doc.blocks ?? [], 80),
+    );
+  });
   it("T6.7a (§1): importing theme into viewmodel/ → T2.9 fails", () => {
     // The half of T6.7 that C10 landing made writable. A block names a palette
     // slot and never resolves one, so `viewmodel/` importing `theme/` is the

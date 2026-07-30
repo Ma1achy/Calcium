@@ -40,6 +40,16 @@ export const SCANS = [
   // SS1 already bans the clock across `src/`. This is not redundant with it —
   // SS1 allows `src/shell/session.ts`, and the point of C13 T2.2 and C14 T2.4 is
   // that L2 has no such exception and never acquires one.
+  // C14 T2.4's other half. The clock is SS4's; this is `fs` and the clipboard
+  // shell-out, which are the two side effects a viewport plausibly reaches for —
+  // copy mode has to put text somewhere, and `pbcopy` is one line away. C14 §6
+  // injects the writer for exactly that reason: a component that shells out
+  // cannot be unit-tested.
+  { id: "SS13", spec: "C14 I11 · C14 T2.4",
+    pattern: /require\(["']fs["']\)|from\s+["']node:fs["']|\b(?:pbcopy|xclip|wl-copy|clip\.exe)\b/,
+    scope: "src/viewport/", allow: [],
+    why: "C14 performs no I/O — the clipboard writer is injected, and a viewport that shells out cannot be unit-tested" },
+
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
     scope: "src/viewport/", allow: [],

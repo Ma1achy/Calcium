@@ -113,13 +113,17 @@ describe("todo expiry", () => {
     // existence counted, this rule would fail on all twenty-five the day it
     // landed and be deleted the same afternoon.
     const stubbed = checkTodoExpiry(
-      [{ file: "test/unit/fake.test.ts", title: "T9.3: c — waits on C14" }],
+      // **C15, not C14.** This named C14 until C14 landed, at which point the
+      // test asserting "a stub has not expired" was pointing at a component that
+      // had. The example has to be a component that is still a stub, and moving
+      // it is part of landing one — which is the rule catching its own fixture.
+      [{ file: "test/unit/fake.test.ts", title: "T9.3: c — waits on C15" }],
       COMPONENT_SOURCES,
       // The real predicate, against the real stub.
       undefined,
     );
 
-    expect(stubbed, "C14 is a stub, so nothing has expired").toEqual([]);
+    expect(stubbed, "C15 is a stub, so nothing has expired").toEqual([]);
   });
 
   it("a map entry with no deferred tests is not a violation", () => {

@@ -17,6 +17,10 @@ import {
   visible,
 } from "../support/render.js";
 import { checkMeasurement } from "../support/measurement-conformance.js";
+import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
+import { createViewport } from "../../src/viewport/viewport/index.js";
+import { measureSequence } from "../support/viewport.js";
+import { doc } from "../support/blocks.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 
 const withPlot = (): ReturnType<typeof measurable> =>
@@ -174,9 +178,49 @@ describe("C12 tier 4 — a growing series", () => {
     expect([...rowCounts]).toEqual([8]);
   });
 
-  it.todo("T4.5: a plot in an expanded table row shifts blocks by its height — waits on C14");
+  it("T4.5: a plot in an expanded table row shifts blocks by its height", () => {
+    const store = createTranscriptStore();
+    const viewport = createViewport(store, { width: 80, height: 10, measureSequence });
+    const plot = plotOf({ id: "p", form: "line", height: 6, points: 40 });
+    store.append(doc({ blocks: [block({ kind: "raw", id: "before", text: "before" })] }));
+    const id = store.append(doc({ blocks: [block({ kind: "raw", id: "x", text: "x" })] }), {
+      streaming: true,
+    });
+    const before = viewport.scroll.totalRows;
+
+    store.patch(id, { op: "append", block: plot });
+
+    // The plot's declared height is what the transcript grew by — a `line` plot
+    // measures its `height` exactly (C12), so this is the delta with no slack.
+    expect(viewport.scroll.totalRows - before).toBe(measureSequence([plot], 80));
+  });
   // C13 landed and supplies the streaming half — a series patched tick by tick
   // into a held document. "Does not move the viewport" is the other half, and a
   // viewport is what does not exist.
-  it.todo("T4.6: a streamed series does not move the viewport — waits on C14");
+  it("T4.6: a streamed series does not move the viewport", () => {
+    const store = createTranscriptStore();
+    const viewport = createViewport(store, { width: 80, height: 6, measureSequence });
+    const id = store.append(
+      doc({ blocks: [plotOf({ id: "p", form: "line", height: 6, points: 10 })] }),
+      { streaming: true },
+    );
+    store.append(doc({ blocks: [block({ kind: "raw", id: "r", text: "reading" })] }));
+    for (let i = 0; i < 30; i += 1) {
+      store.append(doc({ blocks: [block({ kind: "raw", id: `f${i}`, text: `filler ${i}` })] }));
+    }
+    viewport.scrollToBottom();
+    viewport.scrollBy(-4);
+    const visibleBefore = viewport.visible();
+
+    // The series grows; its declared height does not, so nothing moves at all.
+    for (let tick = 0; tick < 20; tick += 1) {
+      store.patch(id, {
+        op: "replace",
+        blockId: "p",
+        block: plotOf({ id: "p", form: "line", height: 6, points: 10 + tick * 5 }),
+      });
+    }
+
+    expect(viewport.visible().entries).toEqual(visibleBefore.entries);
+  });
 });
