@@ -17,4 +17,5 @@ export type {
   TranscriptEntry,
   TranscriptOptions,
   TranscriptStore,
+  TranscriptView,
 } from "./types.js";

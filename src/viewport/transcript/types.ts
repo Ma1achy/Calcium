@@ -74,7 +74,27 @@ export type TranscriptOptions = Readonly<{
   retainPayloads?: number;
 }>;
 
-export interface TranscriptStore {
+/**
+ * What a *reader* of the transcript gets (I19). C14 and C16 take this; only L4
+ * holds the store.
+ *
+ * Two things this makes structural rather than aspirational. The §5a payload
+ * window is reachable only through `payloadOf`, and a debug-only buffer arriving
+ * in the viewport is a seam nobody specified — `TranscriptEntry` carries no
+ * payload field, so the data was already invisible, and this closes the
+ * interface too. And a reader holding the store could `clear()` it: a viewport
+ * recomputing an anchor by emptying the transcript is the kind of fix that
+ * works, ships, and is found from a bug report about a lost session.
+ */
+export interface TranscriptView {
+  subscribe(cb: (change: Change) => void): Disposable;
+  readonly entries: readonly TranscriptEntry[];
+  readonly liveId: EntryId | null;
+  readonly blockCount: number;
+  readonly overCap: number;
+}
+
+export interface TranscriptStore extends TranscriptView {
   /**
    * Appends a document, freezing the previous live entry (§4).
    *
@@ -95,14 +115,7 @@ export interface TranscriptStore {
   /** Empties the transcript. Command history is C20's and is untouched (I16). */
   clear(): void;
 
-  subscribe(cb: (change: Change) => void): Disposable;
-
-  readonly entries: readonly TranscriptEntry[];
-  readonly liveId: EntryId | null;
-  readonly blockCount: number;
   readonly droppedBlocks: number;
-  /** Blocks above the cap that could not be evicted. True after every call (I15). */
-  readonly overCap: number;
 
   /** The retained raw payload, or `undefined` when retention is off or evicted (§5a). */
   payloadOf(id: EntryId): unknown;

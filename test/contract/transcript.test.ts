@@ -13,7 +13,7 @@ import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { appendPatch, docOf } from "../support/transcript.js";
 import { doc } from "../support/blocks.js";
-import type { Change } from "../../src/viewport/transcript/index.js";
+import type { Change, TranscriptView } from "../../src/viewport/transcript/index.js";
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -123,7 +123,37 @@ describe("C13 contract", () => {
     expect([...kinds].sort()).toEqual(["append", "clear", "evict", "patch", "settle"]);
   });
 
-  it("T2.7 (I15, I17): the reported numbers are the ones a consumer can act on", () => {
+  it("T2.7 (I19): TranscriptView exposes no mutator and no payloadOf", () => {
+    // A compile-level assertion. `npm run check` type-checks `test/`, so each
+    // `@ts-expect-error` below fails the *build* if it stops being an error —
+    // which is what widening a consumer's parameter back to `TranscriptStore`
+    // would do. A runtime check could not see it: the object passed at runtime
+    // is the store, and it has every one of these.
+    const view: TranscriptView = createTranscriptStore();
+
+    // @ts-expect-error — a reader cannot append.
+    void view.append;
+    // @ts-expect-error — a reader cannot patch.
+    void view.patch;
+    // @ts-expect-error — a reader cannot settle.
+    void view.settle;
+    // @ts-expect-error — a viewport recomputing an anchor by emptying the
+    // transcript is a fix that works, ships, and is found from a bug report.
+    void view.clear;
+    // @ts-expect-error — §5a's debug window is L4's, not a reader's.
+    void view.payloadOf;
+    // @ts-expect-error — droppedBlocks is the store's bookkeeping.
+    void view.droppedBlocks;
+
+    // What a reader does get.
+    expect(view.entries).toEqual([]);
+    expect(view.liveId).toBeNull();
+    expect(view.blockCount).toBe(0);
+    expect(view.overCap).toBe(0);
+    expect(typeof view.subscribe).toBe("function");
+  });
+
+  it("T2.8 (I15, I17): the reported numbers are the ones a consumer can act on", () => {
     // C14 and L4 read these four and nothing else. Asserting their relationship
     // here rather than only inside the cap tests is what makes them a contract
     // rather than an implementation detail that happens to hold.
