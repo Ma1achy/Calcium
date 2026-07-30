@@ -52,7 +52,7 @@ export type {
 
 export { GLYPH_REQUIRED_TONES, SCHEMA } from "./types.js";
 
-export { BlockShapeError, block, cell, deepFreeze, document } from "./construct.js";
+export { BlockShapeError, block, cell, deepFreeze, descendants, document } from "./construct.js";
 
 export { validateBlock, validateDocument, type Validity } from "./validate.js";
 

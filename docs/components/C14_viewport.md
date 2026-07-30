@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` |
 | **Layer** | L2 viewport |
-| **Depends on** | C13 (entries, `Change`, `rev`) · C09 (`measure` via the registry) |
+| **Depends on** | C13 `TranscriptView` (entries, `Change`, `rev` — never the store, C13 I19) · C09 (`measureSequence` via the registry) |
 | **Consumed by** | L4 (renders the visible range) · C16 (scroll keys) · C15 (overlays sit above it) |
 | **Source** | A01 D1, D2, D34, D40 · A02 §2, §4, §7 · the Ink plan, phases 3–4 |
 | **Status** | Draft |
@@ -45,7 +45,9 @@ type VisibleRange = Readonly<{
 }>;
 ```
 
-`live` is carried per entry so the frame can draw the gutter marker (`▌`, D6) beside the live block's rows without re-consulting C13 per row. **C14 marks; S01 draws.** The marker is frame chrome, not block content — putting it in a block would make it part of every measurement and every theme.
+`live` is carried per entry so the frame can draw the **live gutter** (`▌`, D6) beside the live block's rows without re-consulting C13 per row. **C14 marks; S01 draws.** The live gutter is frame chrome, not block content — putting it in a block would make it part of every measurement and every theme.
+
+**"The live gutter", never "the marker".** C13's eviction marker is an ordinary entry that costs the rows it measures (I13); this costs none. Calling both of them the marker left T1.17 reading as a claim about the eviction one, distinguishable only by which invariant it cited — which is precisely the citation defect class the audit records, arriving through a name rather than a number.
 
 `skipRows` lets an entry be partially visible at either edge — a 500-row log block scrolled halfway is one entry with `skipRows: 250`.
 
@@ -85,16 +87,37 @@ This is the Ink plan's "Page Up does not jump when a streaming message grows", a
 
 Deciding what is visible needs a prefix sum over entry heights. A linear walk is O(n) per frame and dies at a hundred thousand entries.
 
+**An entry's height is `measureSequence(entry.doc.blocks, width)`, not `Σ measure(b, w)`.** The two differ by one row per block declaring `gapBefore`, which C09 I17 applies at the sequence and never at the block — and a surface like S07 declares it on most of its blocks, so the natural summation is short on nearly every entry. Naming the function is the whole of the fix: "measured height" is otherwise ambiguous between two functions that disagree, and the symptom of picking the wrong one is §1's drift rather than anything that looks like a bug.
+
 **A Fenwick tree over per-entry heights.** Append is O(log n), patch is O(log n) on the delta, and the "which entry contains row R" query is O(log n). Eviction from the front is handled by an offset rather than a rebuild.
+
+**The offset is right for one eviction and wrong for a session.** C13's cap evicts continuously, so an offset that never compacts grows the array with *total appends ever* while the live entry count stays under the cap — a terminal left open all day is the normal case, not the extreme one. So the offset carries the common case and the array is **rebuilt when the evicted prefix exceeds the live entry count**:
+
+```
+on evict(n):
+  frontOffset += n
+  if frontOffset > liveCount: rebuild()
+```
+
+That keeps the array within twice the live count, and the rebuild is amortised O(1) per append because `frontOffset` evictions must accumulate to trigger one O(n) pass. The trigger is a property of the structure rather than a tuned constant, which is what stops it needing revisiting whenever the cap or a typical entry size changes.
 
 The index is derived state, maintained **incrementally** on append, patch and eviction, and **rebuilt wholesale only on a width change** — because a width change invalidates every height at once and an incremental path would be slower than a rebuild.
 
 ### The cache
 
 ```
-key:   (entryId, rev, width)
-value: measured height
+cache: Map<EntryId, { rev, width, height }>       // one slot per entry
+
+read(id, rev, width):
+  slot = cache.get(id)
+  slot !== undefined && slot.rev === rev && slot.width === width
+    ? slot.height
+    : miss
 ```
+
+**`(entryId, rev, width)` is a validity predicate, not a map key**, and saying so is what stops the wrong implementation being written. Read as a composite map key it describes a table holding one entry per revision — so a `--watch` at a thousand lines a second accumulates a thousand slots for one entry, which is the leak T3.18 exists to catch and T5.3 runs straight into. There is never a use for a previous revision's height: the moment `rev` moves, the old value is wrong.
+
+One slot per entry makes that structural. A patch overwrites, an `evict` deletes by id, a width change clears — C13's `Change` variants map onto the three operations directly, with no key enumeration and no eviction policy of its own. T3.18 then holds by construction rather than by a line in the table below that someone must remember to implement.
 
 **Theme and capabilities are deliberately absent from the key.** C09 §4 guarantees capability substitutions are 1:1 by cell count, and C10 T4.1 asserts geometry is identical across themes and colour depths. So a theme switch invalidates the *frame* (C03) but not a single cached height, and a `LANG=C` session measures identically to a UTF-8 one. That is a real payoff from constraints imposed three components upstream.
 
@@ -103,11 +126,17 @@ Invalidation:
 | Event | Effect |
 |---|---|
 | `append` | Measure one entry; push onto the index |
-| `patch` | `rev` changed → remeasure that entry, update the index by the delta |
+| `patch` | `rev` changed → remeasure that entry, **overwrite its slot**, update the index by the delta |
 | `settle` | Nothing; settling does not change content |
-| `evict` | Drop those keys; adjust the front offset |
+| `evict` | Delete those ids; advance the front offset, and rebuild if it now exceeds the live count |
 | `clear` | Drop everything |
 | Width change | Drop everything, rebuild the index |
+
+**The table reads as though each `Change` arrives at a store that changed only in that way, and C13 does not work like that.** One `transcript.append()` emits `append` **and then** `evict`, so when the `append` row above runs, the entry list has *already* lost its front and gained the eviction marker at its head. "Measure one entry; push onto the index" is correct only when nothing was evicted alongside, and the `evict` that follows is then repairing an index that desynchronised one row earlier.
+
+So the index **tracks the ids it currently mirrors** and diffs them against `entries`, rather than inferring the shape of the change from its kind. A pure tail append stays O(1) and a front eviction O(k) — the only two shapes C13 produces — and anything else rebuilds, which is correct at any cost and unreachable today. The failure this prevents is not a wrong number: it is `totalRows` of 0 and a blank screen with three entries in the transcript, which every assertion about anchors and clamping reports as a pass. **It was found by reading a frame, not by an assertion disagreeing.**
+
+**The post-conditions in I3 and I9 hold per public operation on the store, not per emitted change.** Between the `append` and the `evict` of a single call, the cache legitimately holds slots for entries that have just left. Asserting inside a `Change` callback would be asserting against a half-applied operation.
 
 C13's granular `Change` (I12) is what makes this incremental. A bare "something changed" would force a full remeasure on every log line, which at a thousand lines a second is the difference between working and not.
 
@@ -164,19 +193,19 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 
 ## 8. Invariants
 
-- **I1** — Measured heights are the sole basis for visibility; C14 never renders to decide.
+- **I1** — Measured heights are the sole basis for visibility; C14 never renders to decide. An entry's height is `measureSequence(doc.blocks, width)` and never `Σ measure(b, w)` — the two differ by one row per `gapBefore` (C09 I17), and the summation is the natural thing to write.
 - **I2** — `topRow` is always in `[0, max(0, totalRows − viewportHeight)]`.
-- **I3** — The cache key is `(entryId, rev, width)`. Theme, colour depth and unicode mode are excluded by construction.
+- **I3** — A cached height is valid iff its entry's `rev` and the current `width` both match the ones it was measured at. Theme, colour depth and unicode mode are excluded by construction. **This is a validity predicate over one slot per entry, not a composite map key**, so the cache holds at most one height per entry and a stale revision has nowhere to accumulate: after any number of patches, `cache.size ≤ entries.length`.
 - **I4** — Content growing above the viewport never moves the visible rows while detached.
 - **I5** — `followTail` is on iff the viewport is at the bottom.
 - **I6** — The anchor is an `EntryId` plus a row offset, never an index, so eviction cannot shift it.
 - **I7** — A row offset exceeding its entry's height after remeasure clamps to that entry's last row, never spilling into the next.
 - **I8** — Width changes invalidate the whole cache; height changes invalidate nothing.
-- **I9** — Visibility queries are O(log n) in entry count.
+- **I9** — Visibility queries are O(log n) in entry count, and the index does not grow with the session. Stated as a post-condition rather than as a rule about when a method runs, for the reason C13 I15 is: **after any operation, `index.length ≤ 2 × entries.length`.** The front offset carries the common eviction and the array is rebuilt once the evicted prefix exceeds the live count, which is amortised O(1) per append.
 - **I10** — Summed `takeRows` over a visible range equals `min(viewportHeight, totalRows)`, exactly.
 - **I11** — C14 reads no clock and performs no I/O; the clipboard writer is injected.
 - **I12** — C14 imports nothing from `terminal/`; dimensions arrive as data, and C14 never calls the frame scheduler. L4 orchestrates.
-- **I13** — The eviction marker is an ordinary entry (C13 I13); C14 holds no special case for it.
+- **I13** — The eviction marker is an ordinary entry (C13 I14); C14 holds no special case for it.
 - **I14** — Copy mode restores the prior follow state on exit.
 - **I15** — Cache invalidation is incremental, driven by C13's granular `Change`. An append invalidates nothing already measured; a patch invalidates one entry through its `rev`. Dropping the cache on every change would make the Fenwick tree pointless.
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
@@ -192,9 +221,9 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 3. `followTail` is on at the bottom, off on any upward scroll, and restored by `End` (I5).
 4. Content growing above a detached viewport never moves the visible rows (I4).
 5. The anchor is an entry id plus a row offset, immune to eviction and index shifts (I6).
-6. Heights are cached on `(entryId, rev, width)`; theme and capabilities are excluded (I3).
+6. A cached height is valid iff `rev` and `width` match; theme and capabilities are excluded. One slot per entry, so a stale revision cannot accumulate (I3).
 7. Cache invalidation is incremental, driven by C13's granular `Change` (I15).
-8. The height index is a Fenwick tree; visibility is O(log n) (I9).
+8. The height index is a Fenwick tree; visibility is O(log n), and the index stays within twice the live entry count rather than growing with the session (I9).
 9. Width changes drop the cache; height changes do not (I8).
 10. The anchor is captured before remeasure and clamps within its entry (I7).
 11. No overscan in v1; it is a measurable addition, not a default (I16).
@@ -202,7 +231,8 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 13. Summed visible rows equal the viewport height exactly (I10).
 14. C14 never calls C03; scrolling reports a change and L4 commits (I12).
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
-16. `VisibleRange` marks the live entry; the frame draws the gutter, and no measurement includes it (I18).
+16. `VisibleRange` marks the live entry; the frame draws the live gutter, and no measurement includes it (I18).
+17. An entry's height is `measureSequence`, so `gapBefore` is counted — never `Σ measure`, which is short by one row per gap (I1, C09 I17).
 
 ---
 
@@ -230,13 +260,17 @@ Fake heights, no rendering.
 - **T1.14** (I14): `exitCopy` restores the prior follow state, both ways.
 - **T1.15**: copy mode entered from inside a pushed view → keys route to copy mode, not the view.
 - **T1.16** (I18): exactly one visible entry reports `live: true`, and it is C13's `liveId`; a transcript with no live entry reports none.
-- **T1.17** (I18): measured heights are identical with and without the marker — it costs no rows.
+- **T1.17** (I18): measured heights are identical with and without the **live gutter** — it costs no rows. *Not the eviction marker, which is an ordinary entry and costs exactly the rows it measures (I13, C13 I14). Two different things were called "the marker" in one spec, and only the citation distinguished them.*
 
 ### Tier 2 — contract / interface
 
 - **T2.1** (I10): over a fuzz corpus of transcripts and scroll positions, summed visible rows always equal `min(viewportHeight, totalRows)`.
 - **T2.2** (I9): visibility query time grows logarithmically from 100 to 100,000 entries.
-- **T2.3** (I3): the cache key contains exactly `entryId`, `rev`, `width` — asserted on the key function, so adding theme silently is caught.
+- **T2.3** (I3): validity depends on exactly `entryId`, `rev` and `width` — asserted on the predicate, so adding theme silently is caught.
+- **T2.3b** (I3, the post-condition): after any number of patches, appends and evictions, `cache.size ≤ entries.length`. A composite map key passes T2.3 and fails this. Checked after each *operation*, never inside a `Change` callback — one `append()` emits two changes and the store is half-applied between them.
+- **T2.8** (I9, the post-condition): after any operation, `index.length ≤ 2 × entries.length`, over a session that appends and evicts continuously without ever resizing.
+- **T2.10** (I1, I6): after an `append` that evicts, the index still mirrors `entries` exactly — same length, same order, same total. The regression guard for a handler that assumed an `append` is a pure tail push, whose symptom was an empty viewport over a non-empty transcript.
+- **T2.9** (I1): an entry's height equals `measureSequence(doc.blocks, width)`, and for a document whose blocks declare *k* gaps it exceeds `Σ measure(b, w)` by exactly *k*. The two must be distinguishable by the test, or the wrong one passes.
 - **T2.4** (I11): a source scan finds no clock, no `fs`, no clipboard shell-out in `viewport/`.
 - **T2.5** (I12): the module graph shows no import from `terminal/`.
 - **T2.6** (I1): a spy on the block registry proves `render` is never called during a visibility query.
@@ -298,6 +332,9 @@ Fake heights, no rendering.
 - **T6.11** (I11): shelling out to a clipboard binary → T2.4 fails.
 - **T6.12** (I12): C14 calling `commit` directly → T4.8's spy fails, and L2 gains a dependency on L0-terminal.
 - **T6.13** (I13): special-casing the eviction marker → T4.3's cache-delta assertions fail on the marker entry.
+- **T6.14** (I3): reading `(entryId, rev, width)` as a composite map key → T2.3b fails, and a `--watch` at a thousand lines a second accumulates a slot per tick. T2.3 still passes, which is why T2.3b exists.
+- **T6.15** (I9): keeping the front offset and never rebuilding → T2.8 fails on a session that evicts without resizing, and the index outgrows the transcript it indexes.
+- **T6.16** (I1): summing `measure(b, w)` instead of calling `measureSequence` → T2.9 fails, and every entry with a `gapBefore` is short by one row per gap. The most likely single defect in this component, because the summation is what a reader writes.
 
 ---
 

@@ -178,13 +178,20 @@ describe("C03 integration", () => {
     expect(repaint).toHaveBeenCalledTimes(3);
   });
 
+  // C13 and C14 both landed, and neither is what this was waiting for: L1, L2
+  // and L3 never commit a frame, L4 does. "An append issues one commit(stream)"
+  // is a claim about the orchestration above the store, so the blocker is C22.
+  //
+  // The blocker clause is everything after "waits on", so the reasoning lives
+  // here rather than in the title — a title reading "waits on C22. Neither C13
+  // nor C14 …" names three blockers, two of which exist, and the rule fires.
   it.todo(
-    "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C13 and C14",
+    "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C22",
   );
   it.todo(
     "T4.5: a keystroke issues commit(input) and the frame is drawn before the next keystroke is processed — waits on C17",
   );
   it.todo(
-    "T4.6: typing while a stream commits at 16 ms intervals — every keystroke frame immediate, none behind a stream frame — waits on C17 and C13. T3.23 asserts the same property deterministically and does not wait on them",
+    "T4.6: typing while a stream commits at 16 ms intervals — every keystroke frame immediate, none behind a stream frame — waits on C17. T3.23 asserts the same property deterministically and does not wait on it",
   );
 });

@@ -79,6 +79,24 @@ A mechanism would be n² prose comparison across 25 specs, which is not a check 
 
 That is the closest thing to a detection method there is, and it is worth stating as one rather than leaving it as a coincidence: **the contradiction surfaces when something must satisfy both simultaneously, and nowhere earlier.** A reader looking for the third instance should expect it at the moment of implementation, and should recognise the shape — two true statements, one impossible object — rather than concluding that one of the two is simply wrong. Neither was, either time.
 
+**A third instance, one layer later, and the method is now three for three.** C13's cap, its never-evict rule and `overCap` are three claims about one situation: the cap bounds blocks, the live and streaming entries are exempt from eviction, and the excess is reported for L4 to act on. Each is correct alone. What none of them said is *when* the figure is computed — §4 ran the sweep inside `append` only, so after a `settle` relieved the pressure `overCap` still described the overshoot from before, and L4's warning outlived the condition. It surfaced while walking a sequence by hand against the three rules at once, which is the same moment as the other two: not while reading them, but while making one object satisfy all of them.
+
+**A fourth and a fifth, in the next component, and both are the same shape as C13's.** C14 I3 fixes a cached height's validity as `(entryId, rev, width)` and says nothing about the value's *lifetime* — read as a composite map key it holds one slot per revision, so a `--watch` accumulates a thousand slots for one entry while every other claim in the spec stays true. And §4's "eviction from the front is handled by an offset rather than a rebuild" is correct for one eviction and silent about a session: C13's cap evicts continuously, so the index grows with total appends ever. Each rule right, each *when* unstated.
+
+**The class has a single sentence now: the rule is correct and the moment is missing.** C12's I5/I14 and C25's I2 were two true statements and one impossible object; C13's `overCap`, C14's cache and C14's index are three rules that hold at the instant they are written and not across the sequence that follows. Both halves are invisible to a reader checking each statement, and both surface the moment one implementation has to satisfy all of them at once.
+
+**A second class, found the same way and needing two components rather than two invariants.** C13 emits `append` *and then* `evict` for one `transcript.append()` — a stream of deltas. C14's invalidation table reads each `Change` as a description of the store's current state, and the two contracts look perfectly compatible: every variant is handled, every handler is correct for the change it names. What is unstated is that one call produces two changes, so the first handler runs against a list that has already lost its front and gained the eviction marker.
+
+The symptom was `totalRows` of 0 over a transcript holding three entries — **a blank screen that every assertion reports as a pass**, because `topRow` really was 0 and the visible range really was consistent with it. Nothing was inconsistent. The viewport was describing a different document than the one it held.
+
+**The detection method differs from the contradiction class, which is why it is its own line.** A contradiction surfaces when one implementation must satisfy two invariants; this surfaces when one component consumes another's event stream and reads deltas as state. Both need the work done. Only this one needs two components, which means it cannot be found while either is being specified — and it is invisible to the module graph, which sees a legal downward edge, and to both test suites, which are each correct about their own component.
+
+The remedy generalises: **a consumer of a change stream tracks what it currently mirrors and diffs, rather than inferring the shape of the change from its kind.** C14 keeps the entry ids its index holds. The common shapes stay incremental and anything unexpected rebuilds, which is correct at any cost and reached only by a change the producer does not currently emit.
+
+**So the expectation is now a step rather than a hope.** Six instances across four components — five contradictions and one delta-versus-state — every one found by attempting the work and none by reading. A component's plan includes the walk: for a renderer, drawing the figure; for a store, stepping a sequence and asserting the whole state after each step; for anything that composes a frame, **reading the frame beside the numbers.** That last one is not interchangeable with the others. C14's blank screen was arithmetically self-consistent, so the walk that catches it is the one that looks at the output rather than at the values describing it.
+
+It is named as a step in `CLAUDE.md`'s Always list rather than left to whoever finds the component tricky, because it has found something on every component it has been run against.
+
 The mechanism remains n² prose comparison and remains untractable. What is tractable is the expectation.
 
 **The class extends past rules into the harnesses they run in.** A rule executes inside a fake terminal, a fake clock or a pseudo-terminal, and a harness parameter nobody has exercised is a mechanism that cannot be *seen* to have worked — the same defect from the other side. `runInPty` accepted an `env` record and hard-coded node-pty's `name`, which *is* the child's TERM, so `TERM=dumb` ran under `xterm-256color`; the parameter had never been passed until C02's tier 5 passed it. The standing rule is in `test/support/README.md`: **every helper parameter that shapes the environment under test carries an assertion that fails if the parameter is ignored**, and a parameter with no observable effect is reported rather than skipped, because it may mean the parameter should not exist.
@@ -106,6 +124,18 @@ So when the gap closes, the test fails — and **the danger is that someone read
 
 The same discipline SS26's pending entry has, pointed at a defect rather than at a rule.
 
+### Open: a tier-6 claim can be unreachable, and nothing checks
+
+**Found in C15, and it is the vacuity class in a location nobody has swept.** A tier-6 test states that a specific change breaks a named test — "sorting purely by push order → T1.4 and T5.3 fail". C15's T6.2 said that, and the change was unreachable: `push(view)` is rejected onto any non-empty stack, so a view only ever lands on an empty one, overlays always follow it in push order, and I2 holds by construction. Neither named test can construct a stack in the wrong order. The revert breaks nothing they can see, and the claim is decoration.
+
+This is not the fabricated-violation problem in a new coat. A fabricated violation proves a *rule* can fire; nothing proves a *revert* can. And the two failure modes differ: a rule that cannot fire reports compliance, while a tier-6 claim that cannot fire reports that a hazard is guarded when it is not — the test stays green under the very change it names.
+
+**Roughly two hundred and fifty such claims exist across twenty-five specs, and none is verified.** The verification sections have said since A03 was written that the reverts are run by hand as a checklist, and how consistently that has happened is not knowable from here.
+
+Deliberately not scheduled as a pass. Recorded because a finding taken between commits and not written down evaporates, and because the shape of the remedy is already known from C15: **make the revert reachable rather than delete the test.** T6.2's hazard is real — a confirm behind a dashboard — and the fix was to keep the sort as real code and reach it through a hand-built stack, which is possible because placement is a pure function of one. A tier-6 claim that cannot be reached is usually telling you the component has no seam at which the hazard is observable, and that is worth knowing whether or not the test survives.
+
+Whoever runs the pass should expect the answer to be a mix: some claims reachable and unverified, some reachable only through a seam that does not exist yet, and some — like T6.2 — describing a hazard that a *different* invariant already makes unreachable, where the honest edit is to say so rather than to keep the sentence.
+
 ---
 
 ## 3. Module graph
@@ -123,10 +153,10 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG7 | C07 imports nothing from `terminal/` or above | C07 T2.6 |
 | MG8 | `tui-kit` imports nothing from `prism-tui` | C08 T2.6, T2.10 |
 | MG9 | No block kind imports the registry | C09 T2.11 |
-| MG10 | C13 imports nothing from `terminal/` or `presentation/` | C13 T2.4 |
+| MG10 | C13 imports nothing from `terminal/` or `presentation/` | C13 I18, T2.4 |
 | MG11 | C14 imports nothing from `terminal/` | C14 T2.5 |
-| MG12 | C15 imports nothing from `terminal/` or C14 | C15 T2.6 |
-| MG13 | C15 imports nothing from C13 | C15 T2.5 |
+| MG12 | C15 imports nothing from `terminal/` or C14 | C15 I12, T2.6 |
+| MG13 | C15 imports nothing from C13 — the table's first *sideways* prohibition | C15 I9, T2.5 |
 | MG14 | C16 imports nothing from `terminal/` | C16 T2.7 |
 | MG15 | C17 imports nothing from `terminal/` | C17 T2.6 |
 | MG16 | C18 imports nothing from `terminal/` or `presentation/` | C18 T2.4 |
@@ -137,9 +167,15 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I15, T2.17 |
 | MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
 
+**MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
+
 **MG22 is a cycle rule, not a layer rule.** C11 imports C12's `sparkline` for a `Cell.spark` (C12 §2), which is legal: A02 §1 forbids importing *upward* and importing *cyclically*, and both directories are L1, so the layer walk sees nothing either way. What must never exist is the return edge — a plot reaching into the table engine for a column width or a truncation helper, which is exactly the shape a reader would reach for and which would close the cycle. Type-only counts, as MG6 and MG19 both record: a reference is a dependency whether or not it survives the build.
 
 MG2 would catch the cycle once closed; MG22 catches the edge that would close it, one commit earlier. That is the MG13/MG18 precedent and the reason the table holds specific prohibitions alongside the general walk.
+
+**MG13 is that precedent armed, and it is the first *sideways* prohibition in the table.** MG10 and MG11 are downward edges the layer walk permits; C13, C14 and C15 are all L2, so C15 → C13 is not merely permitted, it is invisible to every other rule at once — the walk sees no direction to object to and MG2 sees no cycle, because there is none. MG12 is its neighbour and covers the same component's other two reaches, C14 and `terminal/`.
+
+What MG13 guards is a fix the C15 spec pass rejected, and the fabrication is copied from it rather than invented (commitment 14a). C15's I10 asked the overlay manager to dismiss a layer whose anchor row had been evicted, and the only way to notice an eviction is to subscribe to the store. One import buys the detection and pays with C15's statelessness, `layout()`'s purity, and a second component in the tree reading a change stream as a description of current state — the class §2 records and C14 paid for in a blank screen. The reason is recorded by whoever raised the layer instead, and this rule is what stops the one-line version being rediscovered by someone reading I10 without §5 beside it.
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 
@@ -156,8 +192,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in `tui-kit` outside C22 | C22 T2.4 |
 | SS2 | `Math.random` | C08 | C08 T2.3 |
 | SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 T2.2 |
-| SS4 | clock reads | `transcript/` | C13 T2.2 |
-| SS5 | clock reads | `viewport/` | C14 T2.4 |
+| SS4 | clock reads | `src/viewport/` | C13 I9, T2.2 · C14 T2.4 |
+| SS5 | — folded into SS4 | — | C14 T2.4 |
 | SS6 | clock reads | `input/` | C16 T2.3 |
 | SS7 | clock reads | `editor/` | C17 T2.3 |
 | SS8 | clock reads | `completion/` | C19 T2.3 |
@@ -167,6 +203,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
 | SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I13, T2.10 |
+
+**SS4 and SS5 were written as two rules over nested scopes, which is one rule and one rule that can never fire.** SS4 named `transcript/` and SS5 named `viewport/`, with the same pattern — so anything SS4 could catch, SS5 caught first, and `transcript/` was a *file* until C13 landed, which is SS3's defect on top. SS4 now scopes to `src/viewport/` and SS5 is folded into it, the SS12-into-SS11 precedent. **It is not redundant with SS1**, which allows `src/shell/session.ts`: the claim these two tests make is that L2 has no clock exception and never acquires one.
 
 **SS1 is the widest and the most valuable.** One injected clock, entering at C22 and nowhere else, is what makes golden frames reproducible and every timing test run on a fake.
 
@@ -341,6 +379,10 @@ Every instance came from appending an invariant to the end of a *related group* 
 Resolution is by explicit qualifier (`C10 I22`) first, then by a declared file-to-spec owner map, and a file with references and no owner **fails rather than being skipped** — §2's vacuity class, since a check that cannot find what it was asked about passes exactly like one that is satisfied. In a markdown document an id inside a code span or fenced block is a *form* being illustrated (`(I3, I4)`, `T3.7 (I5): …`) and is not read as a reference; every such occurrence in the corpus is an illustration and none is real.
 
 **Its boundary, stated rather than assumed.** SP3 proves a reference resolves against its owner. It cannot prove the owner is the intended one: a bare id in a misattributed file resolves silently when the number happens to exist in both specs, and the C02 test above was caught only because C02 happens to declare no invariant of that number. Qualified references are immune, and are preferred wherever a file's owner is not obvious from its path.
+
+**And the boundary is reached often enough to be a defect class rather than a caveat. Five known members as of 2026-07-30** — a C22 pair citing `C01 I17` for C01 I5, two C13 tests citing I14 for a `rev` rule, a C13 test citing I13 for the module graph, and C14 citing `C13 I13` for the marker. Every one resolves; every one points at the wrong rule. The members are tabulated once, in [`../COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass](../COMMITMENT_INVARIANT_AUDIT.md), together with why no mechanism follows and why a qualified reference is immune — that document is where the citation findings live, and a second copy here is a second thing to keep true.
+
+Two things belong here rather than there. **This document has been on the other end of it**: SS37 declared C09 I4 for behaviour that is C09 I15, and MG21 declared a § where an invariant now exists. Both fired correctly the whole time and both were mislabelled, which is what these five are — so the population is one class and not two, and a rule's "Declared" column is as citable-and-wrong as a test's parenthetical. And **the detection method is §2's**: both this and the contradiction class surface when someone implements against the spec and by nothing else, each now three times or more, which is the argument for the by-hand walk being a scheduled step rather than a courtesy.
 
 **A dangling reference is not inert — it arms itself when the number gets used.** C22 §3 cited `C01 I17` twice, about `beforeRelease` running once before the first release, which is C01 I5 and always was. For months C01 declared no I17 at all, so both citations were dangling and nothing looked. Then the C25 commit added a real I17 — the width rule — and the two silently became *resolving* citations pointing at an unrelated invariant. SP3 would have caught them on any day before that one and on no day after, and what found them in the end was reading the renumber's diff. This is the boundary above with a date attached: the rule proves resolution, and resolution is exactly what the new invariant supplied. Qualifying all eleven hundred is not the remedy — that is a diff of pure noise, and `T3.7 (I5)` in `test/unit/capabilities.test.ts` is unambiguous to a reader. Saying where the rule stops is what keeps it from being read as stronger than it is, which is the failure mode of everything in §2's list.
 

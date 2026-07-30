@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -77,6 +77,103 @@ const FORBIDDEN_EDGES = [
       "C11 imports C12's sparkline, so the L1 edge between them is one-directional " +
       "by construction — a plot reaching back into the table engine closes a cycle " +
       "the layer walk cannot see, because both are L1. Type-only counts",
+  },
+  {
+    // **MG10 is MG6's third kind for a fourth reason, and the sharpest one yet:
+    // both of these edges go *downward*.** C13 is L2; `terminal/` is L0 and
+    // `presentation/` is L1, so MG1 reports an import of either as perfectly
+    // legal, and MG2 sees no cycle because there is none. Every rule in the
+    // suite passes an edge that C13 I18 forbids outright.
+    //
+    // What it guards is not layering but *knowledge*. C13 holds documents and
+    // decides what to evict; the moment it can measure one, it will, because
+    // "evict by height" reads as more correct than "evict by block count" — and
+    // the store would then depend on a width, a theme and a capability set, none
+    // of which it has any way to obtain honestly. The cap is on blocks (I17)
+    // precisely so this component never needs to render to do its job.
+    rule: "MG10",
+    from: "src/viewport/transcript/",
+    to: "src/presentation/",
+    spec: "C13 I18 · C13 T2.4",
+    why:
+      "C13 holds view models and never renders them — measurement is C09's and " +
+      "caching it is C14's. The edge is downward, so the layer walk permits it: " +
+      "this is the rule that does not. Type-only counts",
+  },
+  {
+    // MG11. Downward again, like MG10's pair, and legal to every other rule.
+    //
+    // The temptation here is sharper than C13's, because C14 genuinely needs a
+    // width and a height — and `stdout.columns` is right there. C01 I13 and SS42
+    // say the terminal's dimensions have exactly one reader; C14 §5 says they
+    // arrive as data on `resize`. A viewport that reads them itself gets a second
+    // width, at a second moment, and a frame composed against two widths wraps
+    // inside the alternate screen, which scrolls content the application has no
+    // record of.
+    rule: "MG11",
+    from: "src/viewport/viewport/",
+    to: "src/terminal/",
+    spec: "C14 I12 · C14 T2.5",
+    why:
+      "dimensions arrive as data and C14 never calls the frame scheduler — a scroll " +
+      "reports a change and L4 commits, matching the C01 and C10 orchestration " +
+      "pattern. The edge is downward, so the layer walk permits it. Type-only counts",
+  },
+  {
+    // MG13. The rule this table's header has named as its example since C06,
+    // finally armed — and it is a **sideways** prohibition where MG10 and MG11
+    // are downward ones. C13 and C15 are both L2, so the layer walk permits the
+    // edge and MG2 sees no cycle because there is none to see.
+    //
+    // What it guards is the finding that shaped C15's whole interface. The spec
+    // gave C15 a duty it had no information for — dismiss an overlay whose
+    // anchor row was evicted — and the one-line fix is to subscribe to the
+    // transcript. That buys detection and pays with C15's statelessness,
+    // `layout()`'s purity, and a second component reading a change stream,
+    // which is the class C14 paid for in a blank screen. The reason is recorded
+    // by the caller instead (C15 I10), and this is what stops the fix being
+    // rediscovered.
+    rule: "MG13",
+    from: "src/viewport/overlay/",
+    to: "src/viewport/transcript/",
+    spec: "C15 I9 · C15 I12 · C15 T2.5",
+    why:
+      "C15 holds no entry ids and writes nothing to the transcript — an anchor " +
+      "is a region row, and whoever raised the layer keeps it current through " +
+      "`update`. Sideways, so the layer walk permits it. Type-only counts",
+  },
+  {
+    // MG12, and a separate rule in A03's inventory rather than MG13's second
+    // row. C14 is the other component whose data would let C15 stop being
+    // handed a region, and `layout(region)` taking one as a parameter is the
+    // whole of I12 — a manager that can ask the viewport where it is has
+    // acquired state nothing can assert it pure over.
+    rule: "MG12",
+    from: "src/viewport/overlay/",
+    to: "src/viewport/viewport/",
+    spec: "C15 I12 · C15 T2.6",
+    why:
+      "the region arrives as data at `layout()`. Sideways, so the layer walk " +
+      "permits it. Type-only counts",
+  },
+  {
+    rule: "MG12",
+    from: "src/viewport/overlay/",
+    to: "src/terminal/",
+    spec: "C15 I12 · C15 T2.6",
+    why:
+      "no clock, no width, no escape sequence reaches a layer — C15 composes no " +
+      "frame and reads no dimension it was not given. Downward, and forbidden",
+  },
+  {
+    rule: "MG10",
+    from: "src/viewport/transcript/",
+    to: "src/terminal/",
+    spec: "C13 I18 · C13 I9 · C13 T2.4",
+    why:
+      "no clock, no width, no escape sequence reaches the transcript — `seq` is " +
+      "logical and the terminal's dimensions arrive as data at C14 if at all. " +
+      "Also downward, and also forbidden. Type-only counts",
   },
 ];
 

@@ -129,6 +129,8 @@ A click is positional. Sending it through focus priority would deliver a click o
 
 Wheel events are the exception: they are directional rather than targeted, and go to C14 unless a layer covers the pointer.
 
+"Covers the point" is both axes, and C15's `Placed` carries `top`, `left`, `height` and `width` for this reason — a centred confirm's horizontal extent is not recoverable from the region and the layer alone (C15 I6, F3 of that spec's interface pass). Nothing here computes a layer's position; it reads the one C15 placed.
+
 Mouse events are dropped entirely when `capabilities.mouse` is false, before decoding (T3.12).
 
 **Exactly one handler consumes a key.** No broadcast, no bubbling past the first consumer. Multiple handlers on one target are tried in registration order.
@@ -151,6 +153,10 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 | A pushed view | Pop it |
 | Prompt with text | Clear the input |
 | Prompt empty | Arm the exit confirm; a second within 500 ms raises it |
+
+**Three of those rungs are one question C15 answers in two parts.** `pop()` returns `null` both when the top layer refuses to be popped and when there is no layer at all, and this ladder needs those apart: one is a no-op and the other falls through to the prompt. So it reads `top` — `null` is the fall-through, `dismissable: false` is the no-op — and calls `pop()` only in the branch that should pop (C15 §3).
+
+The collapsed form, `if (pop()) handled`, does not merely send Ctrl-C nowhere. The three rungs are consecutive, so a `null` from a non-dismissable confirm falls through to the next one and **pops the pushed view beneath it** — Ctrl-C on an unanswered confirm closes the dashboard behind it and leaves the confirm sitting over a screen that changed. Found by drawing the frame for C15's fourth walk case, which is also where the requirement that the frame be byte-identical came from.
 
 **Cancellation outranks everything** because it is the most consequential and most time-sensitive intent. A user hitting Ctrl-C while a promote is running means the promote, not the dashboard they happen to be looking at. Stating the precedence matters — the alternative reading is defensible, and leaving it implicit guarantees the two get implemented differently.
 

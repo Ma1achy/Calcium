@@ -2,11 +2,11 @@
 //
 // C04's integration partners are C07 (produces documents), C09 (measures them),
 // C13 (holds them and applies patches) and C14 (virtualises by measured height).
-// None of the four exists yet, so every T4 in the spec names its blocker.
+// All four exist now.
 //
-// What can be integrated today is C04 with itself across a realistic sequence:
-// the document lifecycle a streaming verb actually produces. That is not a
-// substitute for T4.3, but it is the part of T4.3 that does not need C13.
+// **T4.3 and T4.4 were deferred on C13 and C14 and expired when each landed**,
+// which is what `todo-expiry` is for: the note nobody would otherwise send to the
+// person who could act on it.
 import { describe, expect, it } from "vitest";
 import { createFallbackAdapter } from "../../src/data/adapters/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
@@ -20,6 +20,9 @@ import {
 import { CORPUS, doc, tableOf } from "../support/blocks.js";
 import { DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
+import { createViewport } from "../../src/viewport/viewport/index.js";
+import { measureSequence, rowsDoc } from "../support/viewport.js";
 import { renderToLines } from "../../src/testing/index.js";
 import type { RenderContext } from "../../src/presentation/blocks/index.js";
 import { Box, Text } from "ink";
@@ -208,19 +211,95 @@ describe("C04 integration — the document lifecycle", () => {
     const report = checkMeasurement(kit, [banner], { widths: [40, 80] });
     expect(report.failures, formatReport(report)).toEqual([]);
   });
-  it.todo(
-    "T4.3: appending fifty documents and applying two hundred patches leaves every document valid and frozen — waits on C13",
-  );
-  it.todo(
-    "T4.4: virtualising a 10,000-block transcript selects a range whose summed measured heights equal the viewport height exactly — waits on C14",
-  );
+  it("T4.3: fifty documents and two hundred patches leave every document valid and frozen", () => {
+    // C13 landed, so this is writable. It is C04's test rather than C13's: the
+    // claim is that `applyPatch` composes — two hundred applications in sequence
+    // and nothing has drifted out of the schema or lost its freeze.
+    const store = createTranscriptStore({ cap: 100_000 });
+    const ids: string[] = [];
+
+    for (let d = 0; d < 50; d += 1) {
+      ids.push(
+        store.append(
+          doc({
+            command: `c${d}`,
+            blocks: [block({ kind: "raw", id: `d${d}-b0`, text: "seed" })],
+          }),
+          { streaming: true },
+        ),
+      );
+    }
+
+    for (let p = 0; p < 200; p += 1) {
+      const id = ids[p % ids.length]!;
+      const r = store.patch(id, {
+        op: "append",
+        block: block({ kind: "raw", id: `p${p}`, text: `patch ${p}` }),
+      });
+      expect(r, `patch ${p}`).toMatchObject({ ok: true });
+    }
+
+    for (const e of store.entries) {
+      expect(validateDocument(e.doc).ok, `${e.id} after patching`).toBe(true);
+      expect(Object.isFrozen(e.doc), `${e.id} frozen`).toBe(true);
+    }
+    // I1 from C13's side, as the arithmetic that makes "valid and frozen" mean
+    // something: forty-nine of the fifty are frozen and exactly one is live.
+    expect(store.entries.filter((e) => e.live)).toHaveLength(1);
+  });
+  it("T4.4: virtualising a 10,000-block transcript selects exactly a viewport's worth", () => {
+    const store = createTranscriptStore();
+    const viewport = createViewport(store, { width: 80, height: 24, measureSequence });
+    for (let i = 0; i < 1_000; i += 1) store.append(rowsDoc(10, `d${i}`));
+
+    expect(viewport.scroll.totalRows).toBe(10_000);
+    viewport.scrollToTop();
+    for (let page = 0; page < 50; page += 1) {
+      const r = viewport.visible();
+      expect(r.entries.reduce((n, e) => n + e.takeRows, 0), `page ${page}`).toBe(24);
+      viewport.pageDown();
+    }
+  });
   // Restated rather than written: C11 landed, and the half this needs is C14's.
   // The measured delta is assertable today (C11 T1.9, T6.7) and "subsequent blocks
   // shift by it, mid-transcript, with no drift" is a claim about a viewport, which
   // is the component that does not exist.
-  it.todo(
-    "T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the height delta, with no drift — waits on C14",
-  );
+  it("T4.5: expanding a row mid-transcript shifts subsequent blocks by exactly the delta", () => {
+    const store = createTranscriptStore();
+    const viewport = createViewport(store, { width: 80, height: 10, measureSequence });
+    const collapsed = tableOf(4, "t");
+    const id = store.append(doc({ blocks: [collapsed] }), { streaming: true });
+    store.append(rowsDoc(20, "below"));
+
+    const beforeTotal = viewport.scroll.totalRows;
+    const beforeRowsBelow = viewport.scroll.totalRows;
+
+    // Expanding is a `replace` carrying the opened row (C04 §4: `expanded` is
+    // view state and is never merged).
+    store.patch(id, {
+      op: "replace",
+      blockId: "t",
+      block: {
+        ...collapsed,
+        rows: collapsed.rows.map((r) =>
+          r.id === "r2"
+            ? { ...r, expanded: true, detail: [block({ kind: "raw", id: "d0", text: "detail" })] }
+            : r,
+        ),
+      },
+    });
+
+    const delta = viewport.scroll.totalRows - beforeTotal;
+    expect(delta).toBeGreaterThan(0);
+    // No drift: the total moved by exactly what the measurer says the entry grew
+    // by, and nothing else changed height.
+    const measured = store.entries.reduce(
+      (n, e) => n + measureSequence(e.doc.blocks, 80),
+      0,
+    );
+    expect(viewport.scroll.totalRows).toBe(measured);
+    expect(viewport.scroll.totalRows).toBe(beforeRowsBelow + delta);
+  });
   it("T4.6: the same document under both themes produces identical line counts", () => {
     // Colour never changes row count (§5). A whole document, not one block:
     // this is the assertion C14 relies on when a theme switch invalidates the

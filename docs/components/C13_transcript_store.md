@@ -51,19 +51,31 @@ type TranscriptEntry = Readonly<{
   rev:       number;                  // bumped on every patch — C14's cache key
 }>;
 
-interface TranscriptStore {
-  append(doc: ViewDocument, opts?: { streaming?: boolean }): EntryId;
-  patch(id: EntryId, patch: ViewPatch): void;
+/**
+ * What a *reader* of the transcript gets. C14 and C16 take this, never the store.
+ */
+interface TranscriptView {
+  subscribe(cb: (change: Change) => void): Disposable;
+  readonly entries:    readonly TranscriptEntry[];
+  readonly liveId:     EntryId | null;
+  readonly blockCount: number;
+  readonly overCap:    number;
+}
+
+interface TranscriptStore extends TranscriptView {
+  append(doc: ViewDocument, opts?: { streaming?: boolean; payload?: unknown }): EntryId;
+  patch(id: EntryId, patch: ViewPatch): PatchOutcome;
   settle(id: EntryId): void;          // stream ended; entry stops accepting patches
   clear(): void;
-  subscribe(cb: (change: Change) => void): Disposable;
 
-  readonly entries:       readonly TranscriptEntry[];
-  readonly liveId:        EntryId | null;
-  readonly blockCount:    number;
   readonly droppedBlocks: number;
-  readonly overCap:       number;     // blocks above the cap that could not be evicted
+  payloadOf(id: EntryId): unknown;    // §5a; retention is off by default
 }
+
+type PatchOutcome =
+  | Readonly<{ ok: true;  rev: number }>
+  | Readonly<{ ok: false; reason: "unknown" | "settled" }>
+  | Readonly<{ ok: false; reason: "patch"; error: ErrorLike }>;
 
 type Change =
   | Readonly<{ kind: "append";  id: EntryId }>
@@ -77,13 +89,27 @@ type Change =
 
 `subscribe` reports *what* changed, not just *that* something did. C14 caches measured heights per entry, and an `append` needs only the new entry measured while an `evict` needs the anchor rechecked. A bare "something changed" callback would force a full remeasure on every log line.
 
+**`TranscriptView` is the surface every reader gets, and the store is what L4 holds.** C14's spec already declares it depends on "entries, `Change`, `rev`" and C16's on "the live entry"; splitting the interface is what makes those declarations structural rather than aspirational. Two things follow, and the second is the one that matters more.
+
+The retained raw payload (§5a) is reachable only through `payloadOf` on the store. `TranscriptEntry` carries no payload field, so the retention window is already invisible to anything reading `entries` — but a reader handed the whole store could call it, and a debug-only buffer arriving in the viewport is a seam nobody specified. And a reader handed the whole store could call `append`, `patch` or `clear`, which is worse: C14 recomputing an anchor by clearing the transcript is the kind of fix that works, ships, and is discovered from a bug report about a lost session.
+
+**`append` throws and `patch` returns, and the asymmetry is deliberate: the two failures are not the same kind.**
+
+An invalid document reaching `append` is a defect in the caller. C23 built it, C07's `finish()` validated it, C04's constructors froze it — three layers had to fail for it to arrive, and there is no recovery a caller could sensibly perform. C23 §5 already names `transcript.append` the one stage whose failure loses the outcome, and handles it there. A `Result` would invite a caller to handle what they cannot, so an invalid document raises `TranscriptError` carrying `validateDocument`'s messages.
+
+A failed patch is ordinary and expected: a stream outliving its entry, a late patch arriving after `settle`, an adapter emitting something that does not fit the document. C23 §5 already has behaviour for it, so a value is the shape that behaviour needs. `PatchOutcome` distinguishes the three ways it can fail, because "unknown id" is a stale reference and "settled" is a caller bug and "patch" is a data problem, and only the third carries an `ErrorLike` to put in a notice.
+
+**`PatchOutcome` carries `rev` on success** so C14 can invalidate its height cache from the return value rather than re-reading `entries` to find the entry it just patched.
+
+`patch` returning a value is also what keeps C13 free of a logger. Commitment 9 says a rejected patch is "logged, not absorbed" — the *reporting* is C13's and the *logging* is the caller's, which is §5's principle applied to the patch path: C13 decides what is wrong, never what to do about it.
+
 ---
 
 ## 4. Appending and freezing
 
 ```
 append(doc):
-  1  validate the document (C04)         → invalid is rejected, not stored
+  1  validate the document (C04)         → invalid raises TranscriptError, nothing is stored
   2  freeze the current live entry, if any
   3  create the new entry, live = true
   4  enforce the cap (§5)
@@ -92,7 +118,7 @@ append(doc):
 
 Freezing is implicit in appending. There is no public `freeze` — an entry becomes frozen because a newer one arrived, never for any other reason, which is what makes "the last block is live" true by construction rather than by discipline.
 
-`clear()` empties the store, resets `droppedBlocks`, and clears the live id. Command history is C20's and is untouched (A01 §slash commands).
+`clear()` empties the store and resets `droppedBlocks`, `overCap` and the live id. Command history is C20's and is untouched (A01 §slash commands).
 
 ---
 
@@ -100,17 +126,40 @@ Freezing is implicit in appending. There is no public `freeze` — an entry beco
 
 The session cap is **100,000 blocks** (D40); per-document capping is C07's.
 
+**What counts as a block.** Rows do not (I17). Nested blocks do: the count recurses through `panel.children`, `group.children` and a table row's `detail`, because D40 caps what is *retained* and a `group` of five hundred children costing one makes the cap unenforceable.
+
+**A table's rows are not blocks, but a row's `detail` is a `Block[]`** (C04 §table, C11 I2) — and since D38 makes every row expandable when a column drops, `detail` is the common case rather than the exotic one. So the walk is not shallow, and a 2,000-row table is a real tree rather than a leaf.
+
+That is a statement about cost, not about correctness, and the cost is paid once: **each entry's block count is computed at `append` and stored on the entry**, with the store's total maintained as a running sum. Eviction subtracts a stored number. A patch recounts one entry — the same entry C14 must remeasure anyway on the `rev` bump, and counting is strictly cheaper than measuring, so the recount is dominated by work already being done on that path. Nothing walks the whole transcript, and there is no cache here to invalidate.
+
+### The sweep
+
 ```
-while blockCount > cap:
-  evict the oldest entry that is neither live nor streaming
-  if no such entry exists: stop
+sweep():
+  update the eviction marker, if any entries have ever been dropped
+  while blockCount > cap:
+    evict the oldest entry that is neither live, nor streaming, nor the marker
+    if no such entry exists: stop
+  overCap = max(0, blockCount − cap)
 ```
 
-Three rules make this safe:
+**It runs after `append`, `patch` and `settle`** — not after `append` alone. Each of the three can change the numbers the sweep governs: `append` adds an entry, an `op: "append"` patch adds a block to an existing one, and `settle` turns an unevictable entry into an evictable one.
+
+`settle` is the one that would hurt most if it were left out, and it fails in the direction that matters. After a stream settles, the true overshoot is *lower* than the last reported figure, so L4 would surface "over cap by 4,000 blocks" describing a condition that no longer holds — worse than not reporting at all, given I15 exists so L4 can act on the number.
+
+The marker is updated *before* the final count, because it carries a `notice` block of its own. Adding it afterwards would leave a store that had just evicted down to exactly the cap sitting one block above it until the next command.
+
+Three rules make eviction safe:
 
 **The live entry is never evicted.** Evicting what the user is looking at is never the right answer.
 
 **Streaming entries are never evicted.** A long-running `--watch` scrolled far up is still receiving patches; dropping it would strand the stream with nowhere to write. If the cap cannot be met without evicting one, the cap is exceeded and the overshoot is reported rather than forcing the eviction.
+
+**Eviction is reported, never silent.** `droppedBlocks` accumulates, and C13 maintains a **synthetic marker entry** at the head of the transcript carrying a single `notice` block naming the count. It is a real entry — frozen, settled, never itself evicted — so `totalRows` and every visibility query account for it with no special case downstream. A session that quietly loses its beginning is worse than one that says so.
+
+**Cap overshoot is reported too.** When the cap cannot be met because every candidate is live or streaming, `overCap` holds the excess block count. L4 surfaces it; C13 does not decide what to do about it.
+
+Ids are never reused after eviction, so a stale reference resolves to nothing rather than to the wrong entry.
 
 ### 5a. Raw payload retention
 
@@ -122,11 +171,7 @@ This is what answers the question a rendered block cannot: *did the far side ret
 
 Payload eviction is **independent of the block cap**: it runs on its own N-entry window, so retention never evicts an entry and the cap never evicts a payload early. Two eviction policies sharing one counter would make each one's behaviour depend on the other's.
 
-**Eviction is reported, never silent.** `droppedBlocks` accumulates, and C13 maintains a **synthetic marker entry** at the head of the transcript carrying a single `notice` block naming the count. It is a real entry — frozen, settled, never itself evicted — so `totalRows` and every visibility query account for it with no special case downstream. A session that quietly loses its beginning is worse than one that says so.
-
-**Cap overshoot is reported too.** When the cap cannot be met because every candidate is live or streaming, `overCap` holds the excess block count. L4 surfaces it; C13 does not decide what to do about it.
-
-Ids are never reused after eviction, so a stale reference resolves to nothing rather than to the wrong entry.
+The payload arrives as `append`'s `opts.payload` and is discarded unread when retention is off, so a caller need not know whether it is enabled.
 
 ---
 
@@ -134,14 +179,18 @@ Ids are never reused after eviction, so a stale reference resolves to nothing ra
 
 ```
 patch(id, p):
-  entry unknown            → no-op
-  entry not streaming      → rejected, logged
+  entry unknown            → { ok: false, reason: "unknown" }, store unchanged
+  entry not streaming      → { ok: false, reason: "settled" }, store unchanged
   otherwise                → r = applyPatch(doc, p)
-                             r.ok  → doc = r.doc; notify
-                             !r.ok → doc unchanged; report r.error to the caller
+                             r.ok  → doc = r.doc; rev++; sweep; notify
+                                     → { ok: true, rev }
+                             !r.ok → doc unchanged; rev unchanged; no notify
+                                     → { ok: false, reason: "patch", error: r.error }
 ```
 
-Patching a settled entry is rejected rather than ignored, because it means a stream outlived its `settle` — a bug in the caller worth surfacing rather than absorbing.
+Patching a settled entry is rejected rather than ignored, because it means a stream outlived its `settle` — a bug in the caller worth surfacing rather than absorbing. C13 surfaces it in the return value and does nothing else with it; C23 §5 decides what that means.
+
+**`rev` bumps only on an applied patch.** A rejected one leaves it untouched, or C14 invalidates a height that is still correct on every malformed tick a `--watch` produces.
 
 `applyPatch` is C04's, pure, and **fallible in its type** (C04 §4, I15). It returns a `PatchResult`, so the four ways a patch can fail to fit a document — an I3-violating status transition, a `merge` against a non-table, an unknown or a duplicate `blockId` — arrive as values rather than as throws. C13 keeps the previous document on failure and hands the error up; C23 §5 is what decides the entry's fate. No `try` around the patch path, which matters because that path runs on every stream tick.
 
@@ -173,17 +222,18 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I5** — The live entry is never evicted.
 - **I6** — Streaming entries are never evicted; the cap is exceeded rather than violating this.
 - **I7** — Eviction increments `droppedBlocks`; loss is never silent.
-- **I8** — Patching a settled or unknown entry never mutates the store.
+- **I8** — Patching a settled or unknown entry never mutates the store, and the rejection is returned as a `PatchOutcome` rather than logged here. C13 reports; the caller logs.
 - **I9** — C13 reads no clock; `seq` is a logical counter.
-- **I10** — Documents are validated on append; an invalid one is rejected, not stored.
+- **I10** — Documents are validated on append; an invalid one raises `TranscriptError` and is not stored. It is a caller defect, not a recoverable condition: C23 built the document, C07 validated it and C04 froze it, so three layers failed for it to arrive, and C23 §5 already owns the containment.
 - **I11** — `entries` is immutable; every mutation produces new values.
 - **I12** — `Change` names what changed, so consumers can update incrementally.
 - **I13** — `rev` increments on every applied patch and never decreases. It is the staleness signal for C14's height cache; without it a cached height survives a patch that changed it.
 - **I14** — The eviction marker is a real entry, never a downstream special case, and is itself never evicted.
-- **I15** — Overshoot is exposed as `overCap`; C13 does not act on it.
+- **I15** — Overshoot is exposed as `overCap`; C13 does not act on it. Stated as a post-condition, because a figure that is only true after one of the four methods is a figure L4 cannot act on: **after any public call, either `blockCount ≤ cap`, or `overCap = blockCount − cap` exactly and every entry above the cap is live, streaming or the marker.** The sweep therefore runs after `append`, `patch` and `settle`, and `clear()` returns `overCap` to zero with everything else.
 - **I16** — `clear()` empties the transcript and leaves command history untouched. They are separate stores with separate lifetimes: a reader clearing the screen has not asked to forget what they typed, and the two being one call away from each other is exactly why the boundary is stated.
-- **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost.
+- **I17** — The session cap is 100,000 blocks and eviction is oldest-first. The number is D40's and it is a cap on *blocks*, not entries — an entry holding nine thousand rows and one holding three cost what they cost. The count recurses through nested blocks (`panel.children`, `group.children`, a row's `detail`) and never through rows.
 - **I18** — C13 imports nothing from `terminal/` or `presentation/`.
+- **I19** — Readers take `TranscriptView`, never `TranscriptStore`. The mutators and the §5a payload window are reachable only from L4, so no consumer above can append, clear, or see a debug buffer it was never given.
 
 ---
 
@@ -197,13 +247,15 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 6. The session cap is 100,000 blocks, evicting oldest-first (I17).
 7. The live entry and any streaming entry are never evicted; the cap yields instead (I5, I6).
 8. Eviction is counted and surfaced, never silent (I7).
-9. Patching a settled or unknown entry is a no-op that is logged, not absorbed (I8).
-10. `clear()` empties the transcript and leaves command history alone (I16).
+9. Patching a settled or unknown entry is a no-op that is reported to the caller, not absorbed (I8).
+10. `clear()` empties the transcript, resets `droppedBlocks` and `overCap`, and leaves command history alone (I15, I16).
 11. `seq` is logical; C13 reads no clock (I9).
 12. `Change` is granular so consumers avoid full remeasure (I12).
 13. Every entry carries a monotonic `rev`, bumped on each applied patch, so downstream caches can detect staleness (I13).
 14. The eviction marker is a synthetic entry, so row arithmetic needs no special case (I14).
-15. Cap overshoot is exposed as `overCap` and acted on by L4 (I15).
+15. Cap overshoot is exposed as `overCap` and acted on by L4, and it is true after every call rather than only after `append` (I15).
+16. An invalid document raises rather than returning; a failed patch returns rather than raising (I8, I10).
+17. Readers get `TranscriptView`; only L4 holds the store, so nothing above can mutate the transcript or read a retained payload (I19).
 
 ---
 
@@ -218,23 +270,26 @@ Six tiers. Every cell of the §7 transition table is covered.
 - **T1.3**: appending over a live+settled entry → the previous becomes frozen+settled.
 - **T1.4** (I4): appending over a live+streaming entry → previous becomes frozen and **stays streaming**.
 - **T1.5** (I1): after ten appends, exactly one entry is live and it is the last.
-- **T1.6** (I10): an invalid document → rejected, store unchanged, error returned.
-- **T1.7**: `patch` on live+streaming → document updated, `rev` incremented, `patch` change emitted.
-- **T1.7b** (I14): a rejected patch does **not** bump `rev`; a cache keyed on it stays valid.
+- **T1.6** (I10): an invalid document → `TranscriptError` raised, store unchanged.
+- **T1.7**: `patch` on live+streaming → document updated, `rev` incremented, `patch` change emitted, `{ok: true, rev}` returned.
+- **T1.7b** (I13): a rejected patch does **not** bump `rev`; a cache keyed on it stays valid.
+- **T1.7c** (I8): the three `PatchOutcome` shapes — `unknown`, `settled`, `patch` — each arise from their own cause, and only `patch` carries an `ErrorLike`.
 - **T1.8** (I4): `patch` on frozen+streaming → applied. The watch-keeps-running case.
 - **T1.9**: `settle` on live+streaming → live, no longer streaming.
 - **T1.10**: `settle` on frozen+streaming → frozen, settled.
 - **T1.11**: `clear` → empty, `liveId` null, `droppedBlocks` zero.
 - **T1.12** (I12): each operation emits exactly one `Change` of the right kind.
+- **T1.13** (I4): all four `(live, streaming)` states are constructed and asserted by name in one test. The transitions are covered by T1.3, T1.4, T1.8–T1.10; this asserts the *states*, because a suite covering three of four reads exactly like one covering four, and frozen+streaming is the one that goes missing.
 
 ### Tier 2 — contract / interface
 
 - **T2.1** (I11): `entries` is frozen; mutation attempts do not change the store.
 - **T2.2** (I9): a source scan finds no `Date`, `performance` or `process.hrtime` in `transcript/`.
 - **T2.3** (I3): across a thousand appends and evictions, no id repeats.
-- **T2.4** (I13): the module graph shows no import from `terminal/` or `presentation/`.
+- **T2.4** (I18): the module graph shows no import from `terminal/` or `presentation/`.
 - **T2.5** (I12): `subscribe` returns a disposable; disposing stops delivery mid-stream.
 - **T2.6**: every `Change` variant is emitted by at least one operation — exhaustive over the union.
+- **T2.7** (I19): `TranscriptView` exposes no mutator and no `payloadOf`. A compile-level assertion, so a consumer widening its parameter type back to `TranscriptStore` fails the build rather than a test.
 
 ### Tier 3 — edge cases
 
@@ -242,20 +297,27 @@ Six tiers. Every cell of the §7 transition table is covered.
 - **T3.2**: `settle` with an unknown id → no-op.
 - **T3.3**: `patch` on the store's only entry while it is live+streaming → applies.
 - **T3.4**: `append` while a stream is mid-flight → the stream's next patch still lands on the now-frozen entry.
-- **T3.5** (I8): `patch` on a settled entry → rejected and logged; document untouched.
+- **T3.5** (I8): `patch` on a settled entry → `{ok: false, reason: "settled"}` returned; document untouched.
 - **T3.6**: `settle` twice → second is a no-op.
-- **T3.7** (I5): cap reached with the live entry oldest → live is not evicted; the next oldest goes.
+- **T3.7** (I5): the sweep reaches the live entry as the last remaining candidate → it is skipped, the sweep stops, and the excess is reported. *Not "the live entry is oldest": I1 makes the live entry the last, so it can only be oldest when it is the only entry, and then there is no next oldest to take instead. The constructible case is the sweep walking forward until nothing but the live entry is left.*
+- **T3.7b** (I15): `settle` on the entry that was blocking the sweep → the sweep runs on the `settle`, the entry is evicted, and `overCap` drops without waiting for another `append`.
+- **T3.7c** (I15): an `op: "append"` patch that carries the store over the cap → the sweep runs on the `patch`, not on the next command.
 - **T3.8** (I6): cap reached with every non-live entry streaming → nothing is evicted, the cap is exceeded, and the overshoot is reported.
 - **T3.9** (I7): eviction of three entries totalling 400 blocks → `droppedBlocks` increases by exactly 400.
 - **T3.9b** (I14): after any eviction, a marker entry exists at the head, is frozen and settled, and names the count. A second eviction updates it rather than adding another.
 - **T3.9c** (I14): the marker entry is never itself evicted, even at the cap.
 - **T3.8b** (I15): with every candidate streaming, `overCap` equals the excess and `droppedBlocks` is unchanged.
 - **T3.10**: a single document larger than the whole session cap → stored, cap exceeded, reported. Never silently truncated by C13, which is C07's job.
-- **T3.11**: `clear` while an entry is streaming → the entry is removed; subsequent patches to it are no-ops rather than resurrecting it.
+- **T3.11**: `clear` while an entry is streaming → the entry is removed; subsequent patches to it return `{ok: false, reason: "unknown"}` rather than resurrecting it.
+- **T3.11b** (I15): `clear` while over the cap → `overCap` and `droppedBlocks` both return to zero, and the marker goes with them.
 - **T3.12**: an id referencing an evicted entry → resolves to nothing, never to a different entry.
 - **T3.13**: 100,000 appends → memory bounded, and the operation stays within budget.
 - **T3.14**: a `merge` patch that touches no existing row → treated as an upsert, and untouched rows keep reference identity (C04 I9).
 - **T3.15**: `subscribe` callback that throws → other subscribers still receive the change; the store is unaffected.
+- **T3.16** (I17): a `group` of five hundred children counts five hundred and one, and a 2,000-row table whose every row carries a two-block `detail` counts 4,001. Rows never count; nested blocks always do.
+- **T3.17** (I15, the post-condition): a randomised sequence of `append`, `patch`, `settle` and `clear` against a small cap → after **every** call, `blockCount ≤ cap` or `overCap = blockCount − cap` exactly, and every entry above the cap is live, streaming or the marker.
+- **T3.18** (the sequence): one walk — append, patch, append, patch the now-frozen entry, evict, settle, clear — asserting `entries`, `liveId`, `blockCount`, `droppedBlocks`, `overCap` and the emitted `Change` after **every** step. Every invariant here constrains one operation and none constrains the history, and C13 renders nothing, so there is no frame to read: this is the substitute for the reading that found five defects in C25 and three in C12.
+- **T3.19** (§5a): with `retainPayloads: 3`, six appends → the last three payloads are retained and the first three are gone, while `blockCount`, `droppedBlocks` and `overCap` are identical to the same sequence with retention off. Two eviction policies, one counter each.
 
 ### Tier 4 — integration
 
@@ -286,7 +348,8 @@ Six tiers. Every cell of the §7 transition table is covered.
 - **T6.8** (I9): using a timestamp for `seq` → T2.2 fails and golden frames flake.
 - **T6.9** (I12): collapsing `Change` to a bare notification → T4.3 fails, and every log line triggers a full remeasure.
 - **T6.10** (I8): absorbing a patch to a settled entry → T3.5 fails, hiding a caller bug.
-- **T6.11** (I14): failing to bump `rev` on patch → C14's cache serves a stale height and the viewport drifts.
+- **T6.11** (I13): failing to bump `rev` on patch → C14's cache serves a stale height and the viewport drifts.
+- **T6.12** (I15): sweeping only on `append` → T3.7b fails, and after a stream settles L4 warns about an overshoot that no longer exists.
 
 ---
 

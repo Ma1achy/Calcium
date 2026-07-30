@@ -26,6 +26,35 @@ export const SCANS = [
     scope: "src/presentation/", allow: [],
     why: "renderers receive capabilities through ctx, never the environment" },
 
+  // A03 inventories SS4 as scoped to `transcript/` and SS5 to `viewport/`, which
+  // as written is SS3's defect twice over: `transcript/` was a *file*
+  // (`src/viewport/transcript.ts`) for the whole life of the project, and two
+  // rules with the same pattern where one scope contains the other means the
+  // narrower one can never fire on anything the wider one misses.
+  //
+  // **So SS4 takes the directory and SS5 is folded into it**, the SS12-into-SS11
+  // precedent, and for the standing reason: a rule covering a directory and
+  // naming its exceptions keeps seeing files nobody has written yet, and a rule
+  // scoped to one component's subdirectory stops at C14's front door.
+  //
+  // SS1 already bans the clock across `src/`. This is not redundant with it —
+  // SS1 allows `src/shell/session.ts`, and the point of C13 T2.2 and C14 T2.4 is
+  // that L2 has no such exception and never acquires one.
+  // C14 T2.4's other half. The clock is SS4's; this is `fs` and the clipboard
+  // shell-out, which are the two side effects a viewport plausibly reaches for —
+  // copy mode has to put text somewhere, and `pbcopy` is one line away. C14 §6
+  // injects the writer for exactly that reason: a component that shells out
+  // cannot be unit-tested.
+  { id: "SS13", spec: "C14 I11 · C14 T2.4",
+    pattern: /require\(["']fs["']\)|from\s+["']node:fs["']|\b(?:pbcopy|xclip|wl-copy|clip\.exe)\b/,
+    scope: "src/viewport/", allow: [],
+    why: "C14 performs no I/O — the clipboard writer is injected, and a viewport that shells out cannot be unit-tested" },
+
+  { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
+    pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
+    scope: "src/viewport/", allow: [],
+    why: "L2 reads no clock at all — `seq` is logical, so golden frames and fixture-backed sessions are reproducible" },
+
   // --- forbidden literals --------------------------------------------------
   { id: "SS14", spec: "C01 I1 · C01 T2.5",
     pattern: /\\x1b|\\u001b|\u001b/,

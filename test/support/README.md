@@ -65,6 +65,69 @@ Two things follow for anyone adding a helper here.
 
 ---
 
+## The fixture's *subject* is asserted to respond
+
+The rule above is about a parameter that never reaches the thing it names. This
+is the other half, and it is not the same defect: **the parameter arrived, the
+helper honoured it, and the subject it was applied to does not vary with the
+thing under test.** Nothing is discarded and nothing is ignored. The fixture is
+simply inert with respect to the assertion, and every test built on it passes
+without exercising anything.
+
+**Before asserting that X changes when Y changes, assert that the fixture's own
+X differs across Y.** That is the `groupMembers` positive control in its general
+form — an observation resting on an unchecked empty — moved from the helper's
+answer to the helper's subject.
+
+Two instances, both from C14 and both caught by their own tests failing to fail
+rather than by review:
+
+- **A `raw` block measures one row at every width.** It is the escape hatch and
+  carries its text verbatim, so it never wraps. A resize fixture built from
+  `raw` blocks *resized nothing*: heights were identical before and after, the
+  viewport correctly reported no change, and the test asserting that a width
+  change invalidates and remeasures passed having changed no width that mattered.
+  The control is one line — `expect(measureSequence(blocks, 20)).toBeGreaterThan(
+  measureSequence(blocks, 200))` — and it fails immediately on `raw`.
+- **`table`, `plot` and `patch` are not default kinds.** C11, C12 and C25
+  register them, which is what proves C09 §3's extension path — and an
+  unregistered kind still *renders*, as `raw`, one row. So a fixture using
+  `tableOf` against a bare `measurable()` produces a one-row block whose height
+  does not change when a row is expanded, and the test asserting that expansion
+  shifts everything below it passes against a table that was never a table.
+  `test/support/render.ts` already warns that `definitions` is "the option that
+  could have been inert"; this is the same option inert from the caller's side.
+
+**A compile-level negative needs the annotation that gives its literal a
+contextual type.** The third location of the same class, after the parameter and
+the subject: here the inert thing is the type check itself.
+
+```typescript
+const layer = { …, content: [reactElement] };          // nothing is checked
+const layer: Layer = { …, content: [reactElement] };   // now it is
+```
+
+An object literal assigned to an unannotated `const` has no contextual type, so
+TypeScript checks nothing about it and the `@ts-expect-error` above the offending
+field reports **an unused directive** rather than a caught error. C15's T2.3 was
+written this way and asserted nothing about I4 — a test whose entire purpose is
+"this does not compile" against a thing that was never compiled against anything.
+
+**The check is that removing the directive produces an error.** `tsc` gives this
+one free: an `@ts-expect-error` with nothing to suppress is itself an error
+(`TS2578`), so a compile-level negative that has gone vacuous fails the build
+rather than passing quietly. It is the only member of this family with a
+mechanism, and it is worth using deliberately rather than discovering.
+
+**The general form.** A fixture has a subject and the test has a variable. If
+the subject does not move when the variable does, the assertion is about
+nothing — and it looks exactly like an assertion about something, because the
+numbers agree. Write the control first: it is one line, it goes above the
+assertion it protects, and it is the difference between "the viewport did not
+move the content" and "there was no content that could have moved."
+
+---
+
 ## Two decisions made here that later components inherit
 
 Both were forced by one component and will silently shape every test written

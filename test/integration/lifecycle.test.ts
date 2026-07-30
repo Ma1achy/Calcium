@@ -165,7 +165,7 @@ describe("C01 integration", () => {
     "T4.5: startup ordering — the composition root's steps 6, 7, 8 execute in that order, asserted by an event log — waits on C22",
   );
   it.todo(
-    "T4.6: a SIGWINCH snapshot propagates to the viewport, which clamps scroll against it — waits on C14",
+    "T4.6: a SIGWINCH snapshot propagates to the viewport, which clamps scroll against it — waits on C22",
   );
   it("T4.7 (with C03): SIGCONT fires onResume, the shell invalidates, the next commit repaints", () => {
     const { scheduler, lifecycle, render, repaint } = wireScheduler();

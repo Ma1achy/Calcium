@@ -263,6 +263,82 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/presentation/plot/definition.ts",
     source: 'import type { PlannedColumns } from "../table/plan.js";',
   },
+  {
+    // The plausible version, and the reason MG10 is not covered by MG1: this
+    // edge goes *downward*, L2 to L1, so the layer walk permits it. What a
+    // reader reaches for is measurement — "evict the tallest" or "stop at the
+    // viewport's worth of rows" both read as more correct than a block count,
+    // and both would make the store depend on a width it cannot honestly obtain.
+    rule: "MG10",
+    file: "src/viewport/transcript/cap.ts",
+    source: 'import { createBlockRegistry } from "../../presentation/blocks/index.js";',
+  },
+  {
+    // The other half of I18, and the one that arrives as a convenience: a `seq`
+    // that is "obviously" better as a timestamp, or an eviction notice that
+    // wants to know how wide the terminal is before it phrases itself.
+    rule: "MG10",
+    file: "src/viewport/transcript/store.ts",
+    source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
+  },
+  {
+    // SS4. Copied from the idiom a store would actually use — `Date.now()` for a
+    // `seq` that someone wanted sortable across sessions — rather than written
+    // to the rule's own assumption, which is SS20's lesson (A03 commitment 14a).
+    rule: "SS4",
+    file: "src/viewport/transcript/store.ts",
+    source: "const seq = Date.now();",
+  },
+  {
+    // MG11, and the temptation is sharper than C13's because C14 genuinely needs
+    // a width. C01 I13 and SS42 give the terminal's dimensions exactly one
+    // reader; a viewport that reads them itself gets a second width at a second
+    // moment, and a frame composed against two widths wraps inside the alternate
+    // screen — which scrolls content the application has no record of.
+    rule: "MG11",
+    file: "src/viewport/viewport/viewport.ts",
+    source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
+  },
+  {
+    // SS13. Copied from the shape copy mode reaches for: yank has to put text
+    // somewhere and `pbcopy` is one line away. C14 §6 injects the writer for
+    // exactly that reason — a component that shells out cannot be unit-tested.
+    rule: "SS13",
+    file: "src/viewport/viewport/viewport.ts",
+    source: 'spawnSync("pbcopy", { input: rows.join("\\n") });',
+  },
+  {
+    // The `fs` half of the same rule: writing a scrollback dump to disk.
+    rule: "SS13",
+    file: "src/viewport/viewport/viewport.ts",
+    source: 'import { writeFileSync } from "node:fs";',
+  },
+  {
+    // MG13, and this fabrication is the one-line fix the C15 spec pass rejected
+    // — copied from it rather than invented, per A03 commitment 14a. I10 asked
+    // C15 to dismiss an overlay whose anchor row had been evicted, and the only
+    // way to notice is to subscribe to the store. It buys detection and pays
+    // with C15's statelessness, `layout()`'s purity, and a second component
+    // reading a change stream as state.
+    rule: "MG13",
+    file: "src/viewport/overlay/manager.ts",
+    source: 'import type { Change } from "../transcript/index.js";',
+  },
+  {
+    // MG12, the other reach: `layout()` takes a region as a parameter, and the
+    // viewport is right there holding one. A manager that can ask where it is
+    // has acquired state nothing can assert it pure over.
+    rule: "MG12",
+    file: "src/viewport/overlay/place.ts",
+    source: 'import type { ScrollState } from "../viewport/index.js";',
+  },
+  {
+    // MG12's downward half, which the layer walk permits: a layer that wants to
+    // know the terminal's width rather than the region's.
+    rule: "MG12",
+    file: "src/viewport/overlay/place.ts",
+    source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
+  },
 ];
 
 const scanIds = SCANS.map((s) => s.id);
@@ -545,14 +621,12 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
    * that is NOT being enforced, and saying so is the point.
    */
   const PENDING_RULES: Record<string, string> = {
-    SS4: "C13 — no transcript/",
-    SS5: "C14 — no viewport/ rule yet",
+    SS5: "folded into SS4's scope — SS4 covers all of src/viewport/, so a second rule with the same pattern and a contained scope could never fire on anything SS4 misses. The SS12-into-SS11 precedent",
     SS6: "C16",
     SS7: "C17",
     SS8: "C19",
     SS9: "C20",
     SS12: "C10 — folded into SS11's scope for now",
-    SS13: "C14",
     SS18: "C10 — needs the block-producing module list",
     SS22: "C19",
     SS29: "C23",
@@ -574,10 +648,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // The rest of the MG family, which this check could not see until it read
     // more than `SS` rows. Each waits on the component whose directory it scopes
     // to; none of these exists, so the rule would have nothing to match.
-    MG10: "C13 — no viewport/transcript.ts",
-    MG11: "C14",
-    MG12: "C15",
-    MG13: "C15",
     MG14: "C16",
     MG15: "C17",
     MG16: "C18",

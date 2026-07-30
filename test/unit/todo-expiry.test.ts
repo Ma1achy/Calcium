@@ -112,14 +112,21 @@ describe("todo expiry", () => {
     // The repo ships every component as a stub file exporting nothing. If mere
     // existence counted, this rule would fail on all twenty-five the day it
     // landed and be deleted the same afternoon.
+    // **Synthetic, and it has to be.** This named C14, then C15, and each time
+    // the named component landed the test asserting "a stub has not expired"
+    // was pointing at one that had — silently, because a fixture that stops
+    // exercising its case does not fail, it just stops. That is the inverse of
+    // a self-expiring record: validity resting on a fact about the tree that
+    // changes. C99 can never be built, so this is stable for the life of the
+    // project and nobody has to move it a third time.
     const stubbed = checkTodoExpiry(
-      [{ file: "test/unit/fake.test.ts", title: "T9.3: c — waits on C14" }],
-      COMPONENT_SOURCES,
-      // The real predicate, against the real stub.
+      [{ file: "test/unit/fake.test.ts", title: "T9.3: c — waits on C99" }],
+      { C99: "test/support/scaffold.ts" },
+      // The real predicate, against a real file holding only `export {}`.
       undefined,
     );
 
-    expect(stubbed, "C14 is a stub, so nothing has expired").toEqual([]);
+    expect(stubbed, "C99's file is a scaffold, so nothing has expired").toEqual([]);
   });
 
   it("a map entry with no deferred tests is not a violation", () => {
