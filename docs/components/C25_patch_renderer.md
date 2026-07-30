@@ -241,6 +241,8 @@ A `Patch` carries hunks and a path. It does not carry the file — the unchanged
 
 A C15 pushed view, the third after S12 and S13, so the conventions come free: `esc` pops, arrows and `PgUp`/`PgDn` scroll, `g`/`G` seek. The diff-specific pair is **`n` and `p`, next and previous hunk** — the one motion a diff has that a list does not.
 
+**The view owns that scroll, and C15 places the region's worth of it.** `Layer.content` is `Block[]` and this view's content is a single block, which the array carries with no special case; what it does not carry is a scroll offset, because C15 has none for views and should not grow one (C15 §4). Every motion above is this view recomputing which rows are visible and calling `update(id, { content })` — the same seam S12 uses for a fifty-thousand-line buffer. A second scroll model beside C14's is what A01 D3 spent a decision avoiding, and it would arrive here first.
+
 **Whole-file-with-changes is deferred to the editor, and they are the same component.** Both need the whole file, a scroll model independent of the transcript, and highlighting over a window rather than a fragment. Said explicitly because the alternative is two of them: a read-only file viewer with diff decoration is the smaller first target, it has its consumer in this feature, and it is the same component with editing turned off.
 
 ---
