@@ -99,18 +99,25 @@ S-series state a side and only four are table columns.**
 |---|---|---|
 | S14 §7 | `key` — the leaf, or `ui.theme` and `ui.show_banner` read alike | **yes**, declared |
 | R01 §5 | `image` keeps its tag, `ports` its host port | **yes**, declared |
-| S05 §5 | Pod names keep the hash suffix | no column table yet |
-| S09 §4 | Test names keep the method | no column table yet |
+| S05 §5 | Pod names keep the hash suffix | **yes**, declared |
+| S09 §4 | Test names keep the method | **yes**, declared |
 | S04 §4 | `image` — a `keyValue` row, not a column | no field on `keyValue` |
 | S08 §4 | Paths keep the filename and line — `keyValue` | no field on `keyValue` |
 | S15 §6 | Emails keep the domain — `keyValue` | no field on `keyValue` |
 | S10 §5 | File paths in a `steps` detail | no field on `steps` |
 | S11 §4 | Build log tails — `logs` lines | no field on `logs` |
 
-Two of those need a column table before they can declare anything, which is the
-S15 §5 finding again. Five are not table columns at all, and each has exactly one
-consumer — so a field on five more kinds is a schema decision rather than a fix,
-and it is recorded here rather than taken.
+**The four table columns are declared.** S05's pods and S09's user tests needed a
+column table first — they had none, which is the S15 §5 finding a third and fourth
+time — and both now state priorities, minimums, alignment and side.
+
+**The other five are strings, not columns, and the shape is settled**: C04 §3's
+`Truncatable`, a bare string meaning `"end"`, landing on `keyValue` values, `steps`
+detail and `logs` messages. One type rather than five fields, because the crux is
+identical at every site — the producer knows the side and the renderer knows the
+width, so it must be declared and cannot be pre-applied. It gets its own commit: a
+C04 schema change with a C09 consequence in every kind that renders a truncatable
+string is not something to fold into whichever component needed it next.
 
 S06 states a **third** value: SHAs truncated in the middle, keeping both ends,
 because that is what people compare by eye. It is deliberately outside the union.

@@ -285,7 +285,25 @@ type MergeRow = Omit<TableRow, "expanded">;
 
 **`truncateFrom` names the end characters are removed from, not the end that survives.** `"end"` removes from the end and keeps the start, which is what prose wants and is the default; `"start"` keeps the tail, which is what paths, hierarchical keys and hash-suffixed names want. The naming matters more than it looks: `truncate: "head" | "tail"` and `keep:` both invite the reader to guess which side is being described, and this is a field somebody sets once per column and never revisits — so it is named for the operation, in the direction the operation runs.
 
-Nine places in the S-series state a truncation side in prose. **Four of them are table columns and the rest are not** — `keyValue` values in S04, S08 and S15, `steps` detail in S10, `logs` lines in S11, a header in S02 — so this field expresses less than half the intent that exists, and the others still cannot say it. Adding it to one kind is the change the table needs; the class is recorded in `HEIGHT_AUDIT.md` rather than pre-empted here, because a field on five kinds with one consumer each is a schema decision and not a fix.
+Nine places in the S-series state a truncation side in prose. **Four of them are table columns and the rest are not** — `keyValue` values in S04, S08 and S15, `steps` detail in S10, `logs` lines in S11 — so this field expresses less than half the intent that exists.
+
+### `Truncatable` — settled, not yet landed
+
+The remaining five need the same thing said about a *string* rather than about a column, and the shape is settled rather than open:
+
+```typescript
+type Truncatable =
+  | string
+  | Readonly<{ text: string; truncateFrom: "start" | "end" }>;
+```
+
+A bare string means `"end"`. That is deliberately the pattern C24's builder already establishes — where a bare string is a cell with the default tone — so it reads as a familiar shorthand rather than as a second mechanism, and **every existing call site is unchanged**: a field typed `Truncatable` accepts everything a `string` field accepted.
+
+One type rather than five fields, because the crux is the same everywhere it appears: **the producer knows which side and the renderer knows the width**, so the side has to be declared and cannot be pre-applied. An adapter that truncated a path itself would be guessing at a width it does not have.
+
+It lands on `keyValue` values, `steps` detail and `logs` messages. `ColumnDef` keeps its own field rather than typing its cells as `Truncatable`, because a column truncates every cell in it the same way — the declaration belongs to the column, not repeated per row.
+
+**Its own commit, not a rider.** It is a C04 schema change with a C09 consequence in every kind that renders a truncatable string, and folding that into the commit of whichever component happened to need it next is how a schema change stops being reviewable. Until it lands, the five sites are recorded in `HEIGHT_AUDIT.md` with what each one wants.
 
 S06 states a third value — SHAs truncated **in the middle**, keeping both ends, because that is what people compare by eye. It is deliberately absent from the union: a middle truncation spends its marker between two kept halves, so the arithmetic is a different one (two budgets and a centred marker rather than one budget and a trailing one), and C09 I9's marker rule is written for the single-ended case. It arrives with a clause in that rule or not at all.
 

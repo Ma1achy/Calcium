@@ -128,7 +128,29 @@ The replicas line names *why* it is degraded rather than only that it is. `2/3` 
 
 Restarts are `warn`-toned above zero and `error`-toned above five. A pod that has restarted seven times in four minutes is the finding, and a plain number in default tone buries it among the zeroes.
 
-Pod names truncate **from the left**, keeping the hash suffix — the prefix is the deployment name you already know.
+### The pods table's columns
+
+Declared here because the region is a table and stated none — the same gap S15 §5
+had, found by auditing the truncation side.
+
+| Column | Priority | Min | Align | Trunc | Flex | Sortable |
+|---|---|---|---|---|---|---|
+| glyph | 100 | 1 | left | end | — | — |
+| name | 95 | 24 | left | **start** | yes | yes |
+| ready | 85 | 5 | left | end | — | yes |
+| status | 80 | 18 | left | end | — | yes |
+| restarts | 70 | 8 | **right** | end | — | yes |
+| age | 60 | 5 | **right** | end | — | yes |
+| node | 40 | 7 | left | end | — | yes |
+
+**Pod names truncate from the start**, keeping the hash suffix — the prefix is the
+deployment name you already know, and `volatility-estimator-7d8f9b-k2p1` cut the
+other way makes all three rows read alike. `truncateFrom: "start"` names the end
+characters are removed from (C04 I32); it did not exist when this paragraph first
+stated the intent in prose.
+
+`restarts` and `age` are right-aligned, which the figure above draws and this table
+did not state until now.
 
 ---
 
