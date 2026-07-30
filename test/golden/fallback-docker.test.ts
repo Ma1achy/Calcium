@@ -21,6 +21,7 @@ import { createFallbackAdapter } from "../../src/data/adapters/fallback.js";
 import type { AdapterContext, RawResult } from "../../src/data/adapters/types.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
+import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 
 /** R01 §4, verbatim — the fields and the awkwardness, not a tidied version. */
 const DOCKER_PS: readonly Record<string, string>[] = [
@@ -103,7 +104,9 @@ describe("C07 §5 — docker's real JSON through the fallback, unadapted", () =>
     const table = doc.blocks.find((b) => b.kind === "table");
     if (table?.kind !== "table") throw new Error("the list shape did not produce a table");
 
-    expect(table.columns.map((c) => c.key)).toEqual([
+    // The marker leads and names no field (§5); the fields follow, in docker's order.
+    expect(table.columns[0]?.role).toBe("expand");
+    expect(table.columns.filter((c) => c.role === undefined).map((c) => c.key)).toEqual([
       "ID",
       "Names",
       "Image",
@@ -135,7 +138,58 @@ describe("C07 §5 — docker's real JSON through the fallback, unadapted", () =>
   //
   // Reading this output is a named step in C11's plan. The todo expiring is how
   // the deferral is enforced, not how the risk is discharged.
-  it.todo(
-    "the list shape renders legibly at 80, 120 and 160 with no adapter — waits on C11 (C07 §5 open risk)",
-  );
+  it("the list shape rendered at 80, 120 and 160 with no adapter", () => {
+    // Read on the commit that registered `table`, and it failed the reading: under a
+    // uniform `minWidth: 3` the seven columns rendered in 33 cells at every width,
+    // `State` and `Status` both headed `St…`, and — the part that mattered — nothing
+    // ever dropped, so no row was ever expandable and D38's guarantee held only
+    // because nothing was shed.
+    //
+    // §5 now measures each column's `minWidth` from its own widest value, capped at
+    // 24. This snapshot is what that produces, and it is the artefact the risk was
+    // recorded against.
+    const doc = createFallbackAdapter().adapt(resultOf(DOCKER_PS), CTX);
+    const table = doc.blocks.find((b) => b.kind === "table");
+    if (table?.kind !== "table") throw new Error("the list shape did not produce a table");
+
+    // Measured, not defaulted: `Names` asks for 14 (`api,api-legacy`) and `State`
+    // for 7 (its own header, longer than `running`). Nothing is at the old floor of
+    // 3 except by coincidence of content, and nothing exceeds the cap.
+    const asked = new Map(table.columns.map((c) => [c.key, c.minWidth]));
+    expect(asked.get("Names")).toBe(14);
+    // The marker asks for one cell and is outside the field cap.
+    expect(table.columns[0]?.minWidth).toBe(1);
+    expect(table.columns).toHaveLength(8);
+    expect(asked.get("State")).toBe(7);
+    expect(asked.get("Status")).toBe(23);
+    expect(
+      table.columns.filter((c) => c.role === undefined).every((c) => c.minWidth >= 3 && c.minWidth <= 24),
+    ).toBe(true);
+
+    // **D38's mechanism is live.** At 80 the total exceeds the terminal, so columns
+    // drop by priority — last-appearing first — and every dropped field reaches the
+    // expand row, which is what makes every row expandable.
+    expect(planColumns(table.columns, 80).dropped).toEqual(["Status", "Ports", "CreatedAt"]);
+    expect(planColumns(table.columns, 160).dropped).toEqual([]);
+    // Still no `flex`, so at 160 the table is its own width rather than the
+    // terminal's — correct, because every column already has what it asked for.
+    expect(table.columns.some((c) => c.flex === true)).toBe(false);
+
+    const registered = measurable({
+      definitions: [tableDefinition],
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+    });
+
+    const frame = [80, 120, 160]
+      .map((width) =>
+        [
+          `── unadapted · ${String(width)} cells`,
+          ...doc.blocks.flatMap((b) => registered.renderToLines(b, width)),
+        ].join("\n"),
+      )
+      .join("\n");
+
+    expect(frame).toMatchSnapshot();
+  });
 });

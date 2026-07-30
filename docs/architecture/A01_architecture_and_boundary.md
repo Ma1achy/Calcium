@@ -289,6 +289,38 @@ The welcome art is **77 cells × 8 rows**, three glyphs (`█` U+2588, `▒` U+2
 
 Surfaces — dark `bg #1a1a1a`, `bg-elev #222222`, `bg-deep #141414`, `border #2c2c2c`, `border-hi #3a3a3a`; light `#fafafa`, `#f0f0f0`, `#e8e8e8`, `#d3d3d3`, `#c8c8c8`.
 
+**Two diff surfaces**, added with C25 and the first text-bearing surfaces besides `bg` and `bgElev` (C10 §4a) — the line background of an added or removed row:
+
+| | Dark | Light |
+|---|---|---|
+| `diffAdd` | `#002600` | `#d2ffd2` |
+| `diffRemove` | `#490000` | `#fff0f0` |
+
+**It was drafted with four and shipped with two.** The other pair was a stronger background for the precisely changed words within a changed line, which is how every real diff tool does word-level emphasis. Measuring it withdrew it: `syntax.comment` at 3 : 1 and `tone.muted` at 2.5 : 1 are recessive by design and already close to their floors, so the tint that fits is almost entirely spent by the first level — 6 units of one channel left on dark `diffAdd`, 9 on dark `diffRemove`, 7 on light `diffRemove`. That is not a second level. C10 §4a carries the table and names `underline` as what word-level emphasis has instead, it being the one style channel nothing else claims.
+
+Twelve slots clear their floor against each of the two, in both variants — the nine `syntax` slots and `tone.ok`, `tone.error`, `tone.muted`, the three the gutter uses, because the background covers the whole row. **48 ratios, and C10 T2.14a recomputes every one from the shipped tokens**, so this table is an assertion the suite upholds exactly as the palettes above are.
+
+| Slot | Floor | Dark `diffAdd` | Dark `diffRemove` | Light `diffAdd` | Light `diffRemove` |
+|---|---|---|---|---|---|
+| `syntax.keyword` | 4.5 | 5.58 | 5.56 | 5.52 | 5.52 |
+| `syntax.string` | 4.5 | 8.16 | 8.12 | 4.75 | 4.75 |
+| `syntax.comment` | 3 | 3.21 | 3.20 | 3.20 | 3.20 |
+| `syntax.number` | 4.5 | 6.67 | 6.64 | 4.76 | 4.76 |
+| `syntax.key` | 4.5 | 5.14 | 5.12 | 5.41 | 5.41 |
+| `syntax.type` | 4.5 | 9.52 | 9.47 | 6.13 | 6.13 |
+| `syntax.function` | 4.5 | 6.96 | 6.92 | 4.76 | 4.76 |
+| `syntax.operator` | 4.5 | 6.94 | 6.91 | 4.75 | 4.75 |
+| `syntax.punctuation` | 4.5 | 7.71 | 7.68 | 10.25 | 10.25 |
+| `tone.ok` | 4.5 | 7.13 | 7.09 | 4.75 | 4.75 |
+| `tone.error` | 4.5 | 5.23 | 5.21 | 4.76 | 4.76 |
+| `tone.muted` | 2.5 | **2.70** | **2.68** | **2.70** | **2.70** |
+
+`muted` carries the thinnest margin here as it does against `bg` and `bgElev`, and for the same reason: it is the quietest thing that must still be readable, so it is what every new surface is bounded by. The figures are recorded rather than only the pass, because a nudge of a few points would break the check and nothing else would say so.
+
+**The two hues are not symmetric in channel terms, and that is arithmetic rather than an authoring slip.** Luminance weights green at 0.7152 and red at 0.2126, so the same luminance budget buys a dark theme 73 units of red tint and only 38 of green, and a light theme 45 of green and only 15 of red. The four values look balanced on screen and their hex does not.
+
+**Authored against the check rather than before it**, deliberately. The palette correction above is the precedent: the light `number`/`type` collision was *created* by correcting both values to the floor, so only recomputation could have found it. Values chosen from a picture and recorded as if measured is the failure this appendix exists to prevent — and here the measurement did not move a value, it removed a design.
+
 **Discrepancy:** `j22` commits to "Solarized Light". The mockup implements **Atom One Light**. The mockup's is the better-engineered palette and the one to keep; the journey's wording is wrong.
 
 ### A.2 Algorithms

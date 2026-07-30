@@ -12,7 +12,7 @@
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { SGR_RESET, sgr } from "../../terminal/escapes.js";
-import { resolve, resolveTone, type Style } from "../theme/index.js";
+import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ResolvedTheme } from "../theme/index.js";
 import type { Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
@@ -40,6 +40,36 @@ export function slot(
   caps: TerminalCapabilities,
 ): Style {
   return resolve(ref, theme, caps);
+}
+
+/**
+ * A surface, resolved into the **background** channel (C10 §4a).
+ *
+ * `slot` and `tone` fill `colour`; this fills `background`, and it is a separate
+ * function rather than a flag because the two are not interchangeable — C10 I22
+ * takes a background only from a `surface` ref, since §4's floors are measured for
+ * text *on* a surface and never for a tone behind it.
+ *
+ * C25 is the only consumer and the only kind that paints a background at all.
+ */
+export function background(
+  ref: ColourRef,
+  theme: ResolvedTheme,
+  caps: TerminalCapabilities,
+): Style {
+  return resolveBackground(ref, theme, caps);
+}
+
+/**
+ * Two palettes on one span: a foreground from one, a background from another.
+ *
+ * The composition C10 I16 was widened for, in the one place it happens. Written as
+ * a merge rather than as two style objects at the call site so a span cannot end up
+ * carrying a background and losing its foreground, which is the shape of every
+ * mistake this seam invites.
+ */
+export function withBackground(style: Style | undefined, surface: Style): Style {
+  return surface.background === undefined ? (style ?? {}) : { ...style, background: surface.background };
 }
 
 /** The display width of a row of spans, measured on the text and not the styling. */

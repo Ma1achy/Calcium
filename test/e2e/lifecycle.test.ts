@@ -11,6 +11,7 @@ import {
   runInPty,
   termiosFlags,
   trackDecset,
+  trackWrap,
   type PtyRun,
 } from "../support/pty.js";
 
@@ -114,6 +115,68 @@ describe("C01 e2e — the terminal is given back", () => {
       expect(run.bytes).toContain("cycle-49");
       expect(run.bytes).toContain("SIGINT-LISTENERS=0");
       expectCleanTerminal(run);
+    },
+    60_000,
+  );
+
+  it(
+    "T5.8 (I12's boundary, §5): a frame composed at 100 and written at 80 wraps, and the wrap is a row nobody counted",
+    async () => {
+      // **This test asserts the hazard rather than the absence of it**, and that is
+      // deliberate. C01 I12 gives a coherent `{columns, rows}` snapshot per
+      // `SIGWINCH`; nothing gives one per *frame*. `writer` is a `Proxy` over the
+      // real stdout whose `get` forwards to the target, so `columns` is a read the
+      // consumer performs at whatever moment it performs it — and C01 exposes no
+      // initial size at all, so `writer.columns` is the only route to a width there
+      // is. A frame therefore *can* be composed against two widths.
+      //
+      // What that costs is not a wrong frame. It is a wrap, and a wrap inside the
+      // alternate screen scrolls content the application has no record of and cannot
+      // correct. So the assertion is on terminal state — folded from the byte stream,
+      // because a PTY is a kernel device with no emulator to interrogate (see the
+      // harness header) — and it is compared against a control run at a stable width.
+      //
+      // Forced with a handshake rather than raced: the fixture reads the width, says
+      // what it read, and writes only after `GO`. A race that reproduces sometimes is
+      // a test that fails sometimes for a reason nobody trusts.
+      //
+      // **It will fail when the gap closes, and that is the notification.** Whoever
+      // adds a per-frame snapshot and an initial-size accessor (M-T6) makes the two
+      // reported widths equal, and this test is where they find out that the
+      // behaviour it documents is no longer the behaviour.
+      const pty = interactivePty(`${FIXTURE} width-hazard`, { cols: 100, rows: 24 });
+      const composed = await pty.waitFor(/COMPOSED_AT (\d+)/, 20_000);
+
+      pty.resize(80, 24);
+      // A real pause, deliberately: what is being sequenced is the kernel delivering
+      // `SIGWINCH` to another process, and there is nothing to inject.
+      await new Promise<void>((resolve) => void setTimeout(resolve, 200));
+      pty.type("GO\n");
+
+      const wrote = await pty.waitFor(/WROTE (\d+) (\d+)/, 20_000);
+      await pty.done();
+
+      // 1. The mechanism: one frame's lifetime, two widths, and no resize event
+      //    consumed in between. The handle is live.
+      expect(composed[1], "composed against the width in effect at the start").toBe("100");
+      expect(wrote[2], "and the same handle reported a different width at write time").toBe("80");
+
+      // 2. The consequence, on terminal state rather than on the string.
+      const hazard = trackWrap(pty.output, 80);
+      expect(hazard.widest, "a 100-cell row went into an 80-column terminal").toBe(100);
+      expect(hazard.wrapped, "which the terminal wrapped").toBe(true);
+
+      // 3. And the control, through the same tracker, so an unmodelled cursor move
+      //    is a constant on both sides rather than a difference.
+      const control = interactivePty(`${FIXTURE} width-hazard`, { cols: 80, rows: 24 });
+      await control.waitFor(/COMPOSED_AT (\d+)/, 20_000);
+      control.type("GO\n");
+      await control.waitFor(/WROTE/, 20_000);
+      await control.done();
+
+      const clean = trackWrap(control.output, 80);
+      expect(clean.wrapped, "the control run does not wrap").toBe(false);
+      expect(hazard.rows, "the wrap costs a row nobody counted").toBeGreaterThan(clean.rows);
     },
     60_000,
   );

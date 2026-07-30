@@ -22,7 +22,8 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { ADVERSARIAL, doc, tableOf } from "../support/blocks.js";
-import { measurable } from "../support/render.js";
+import { measurable, visible } from "../support/render.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
@@ -253,7 +254,28 @@ describe("C04 measurement edges", () => {
     expect(kit.measure(noticeOf(41), 40)).toBe(2);
   });
 
-  it.todo("T3.4: a table with zero rows → header plus the empty message, not zero — waits on C11");
+  it("T3.4: a table with zero rows → header plus the empty message, not zero", () => {
+    // The one measurer whose natural arithmetic reaches zero and must not: a table
+    // is `1 + rows`, and a table with no rows still says so. C11 §5 states it as
+    // `1 + 1`, and C11 T1.10 asserts it from the other side.
+    const kit = measurable({ definitions: [tableDefinition] });
+    const empty = block({
+      kind: "table",
+      id: "edge-empty-table",
+      columns: [
+        { key: "name", label: "Name", align: "left", priority: 10, minWidth: 8, sortable: true },
+      ],
+      rows: [],
+      emptyMessage: "No results.",
+    });
+
+    expect(kit.measure(empty, 40)).toBe(2);
+    expect(kit.renderToLines(empty, 40)).toHaveLength(2);
+    // And it is the message that fills the second row, not a blank one — a table
+    // measuring 2 while drawing a header and nothing would satisfy the arithmetic
+    // and say nothing to the reader.
+    expect(visible(kit.renderToLines(empty, 40)[1] ?? "")).toContain("No results.");
+  });
 
   it("T3.8: double-width CJK text → two columns per glyph, not one", () => {
     // Ten glyphs, twenty columns: at width 20 it is one row and at 19 it is

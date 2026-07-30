@@ -63,11 +63,18 @@ export const SYNC_UPDATE = mode("\x1b[?2026h", "\x1b[?2026l");
  * `presentation/theme/` is L1, so the type cannot come from there without the
  * edge running the wrong way. C09 passes a `Style`, which satisfies this shape.
  */
+export type SgrColour =
+  | Readonly<{ kind: "rgb"; hex: string }>
+  | Readonly<{ kind: "ansi256"; index: number }>
+  | Readonly<{ kind: "ansi16"; index: number }>;
+
 export type SgrStyle = Readonly<{
-  colour?:
-    | Readonly<{ kind: "rgb"; hex: string }>
-    | Readonly<{ kind: "ansi256"; index: number }>
-    | Readonly<{ kind: "ansi16"; index: number }>;
+  colour?: SgrColour;
+  /**
+   * The second colour channel (C10 §4a). Same three tags, a different parameter
+   * base — 48 rather than 38, and 40/100 rather than 30/90.
+   */
+  background?: SgrColour;
   bold?: boolean;
   dim?: boolean;
   inverse?: boolean;
@@ -97,29 +104,37 @@ export function sgr(style: SgrStyle): string {
   if (style.underline === true) params.push(4);
   if (style.inverse === true) params.push(7);
 
-  const colour = style.colour;
-  if (colour !== undefined) {
-    switch (colour.kind) {
-      case "rgb": {
-        const [r, g, b] = rgbOf(colour.hex);
-        params.push(38, 2, r, g, b);
-        break;
-      }
-      case "ansi256":
-        params.push(38, 5, clampIndex(colour.index, 255));
-        break;
-      case "ansi16": {
-        // 0–7 are 30–37; 8–15 are the bright set, 90–97. Not `38;5;n` with a
-        // low index: a terminal at four-bit depth is one that does not
-        // necessarily understand the 256-colour form at all.
-        const i = clampIndex(colour.index, 15);
-        params.push(i < 8 ? 30 + i : 90 + (i - 8));
-        break;
-      }
-    }
-  }
+  if (style.colour !== undefined) params.push(...channel(style.colour, "fg"));
+  if (style.background !== undefined) params.push(...channel(style.background, "bg"));
 
   return params.length === 0 ? "" : `\x1b[${params.join(";")}m`;
+}
+
+/**
+ * One colour channel's parameters. Foreground and background differ only in
+ * their bases, and writing them once is what stops the two drifting — the
+ * failure being a background emitted as `38` and painting the text instead of
+ * behind it, which looks like a theme bug rather than a base off by ten.
+ */
+function channel(colour: SgrColour, where: "fg" | "bg"): readonly number[] {
+  const extended = where === "fg" ? 38 : 48;
+
+  switch (colour.kind) {
+    case "rgb": {
+      const [r, g, b] = rgbOf(colour.hex);
+      return [extended, 2, r, g, b];
+    }
+    case "ansi256":
+      return [extended, 5, clampIndex(colour.index, 255)];
+    case "ansi16": {
+      // 0–7 are 30–37 (40–47 behind); 8–15 are the bright set, 90–97 (100–107).
+      // Not `38;5;n` with a low index: a terminal at four-bit depth is one that
+      // does not necessarily understand the 256-colour form at all.
+      const i = clampIndex(colour.index, 15);
+      const [plain, bright] = where === "fg" ? [30, 90] : [40, 100];
+      return [i < 8 ? plain + i : bright + (i - 8)];
+    }
+  }
 }
 
 /** `#rrggbb` or `#rgb` to its three components. Malformed input reads as black. */

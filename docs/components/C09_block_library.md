@@ -42,7 +42,12 @@ type RenderContext = Readonly<{
 }>;
 
 function cells(text: string): number;          // grapheme-aware display width
-function truncate(text: string, width: number, caps: TerminalCapabilities): string;
+function truncate(
+  text: string,
+  width: number,
+  caps: TerminalCapabilities,
+  from?: "start" | "end",          // default "end" — removes from the end, keeps the start
+): string;
 
 interface BlockDefinition<B extends Block = Block> {
   kind:    string;
@@ -195,6 +200,7 @@ Every substitution is **1:1 by column count** (C04 §5). This is the constraint 
 |---|---|---|
 | `─ │ ┌ ┐ └ ┘ ├ ┤` | `- \| + + + + + +` | 1 |
 | `…` | `~` | 1 |
+| `↑ ↓` | `^ v` | 1 |
 | `▁▂▃▄▅▆▇█` | `.:-=+*#@` | 1 |
 | Braille plot | Block plot | same grid |
 
@@ -304,7 +310,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I6** — `cells()` is the single width implementation; no kind computes width independently.
 - **I7** — Container kinds measure children only through the injected `measureChild`. No kind imports the registry.
 - **I8** — `measure` never reads `ctx.tick`. Animation changes appearance, never geometry.
-- **I9** — Truncation never splits a grapheme cluster or leaves half a double-width glyph.
+- **I9** — Truncation never splits a grapheme cluster or leaves half a double-width glyph. **It takes the end it removes from as a parameter** — `"end"` by default, keeping the start; `"start"` keeps the tail and puts the marker at the head. Both are exactly `width` cells, both place one 1-cell marker, and neither splits a cluster: the two directions share one implementation for the same reason there is one `cells()`, because a second walk over the same grapheme stream would round differently at the boundary. Which end a column removes from is C04's `truncateFrom` (I32) and the surfaces' decision; a middle truncation is not in the union — it spends its marker between two kept halves, which is different arithmetic, and it arrives with a clause here or not at all.
 - **I10** — An unregistered kind renders through `raw`, never throws.
 - **I11** — A renderer throwing is contained: that block renders as an error block, the rest of the frame is unaffected. Compute, so no retry (A02 §7 rule 2).
 - **I12** — A sealed registry cannot be registered against.
@@ -325,7 +331,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 4. Wrapping versus truncation is a per-kind decision, documented in §3, except `code`, where the producer chooses via `wrap`. `code` names `syntax` slots; every other kind names `tone` slots (I17).
 5. Every capability substitution is 1:1 by cell count (I5).
 6. `cells()` is grapheme-aware and shared; no kind measures width for itself (I6).
-7. Truncation is grapheme-aware and never leaves a half-drawn glyph (I9).
+7. Truncation is grapheme-aware, never leaves a half-drawn glyph, and takes the end it removes from as a parameter (I9).
 8. Renderers receive capabilities and theme through context and read no environment (I3).
 9. An unregistered kind degrades to `raw`; a throwing renderer is contained to its block (I10, I11).
 10. The registry seals at composition end (I12).

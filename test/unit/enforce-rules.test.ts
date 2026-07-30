@@ -108,6 +108,23 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/shell/execution.ts",
     source: "const backoff = base + crypto.randomUUID().length;",
   },
+  {
+    // SS24 covers C11, C12 and C18. Two of the three scopes are real now, and
+    // both are fabricated against below rather than one standing in for the pair:
+    // the rule's `scope` is a list, and a list satisfied by its first entry is
+    // the vacuity this file exists for.
+    rule: "SS24",
+    file: "src/presentation/table/plan.ts",
+    source: "let lastPlan = null;",
+  },
+  {
+    // C12's half. The cache someone reaches for is a memo of the last raster,
+    // because downsampling 50,000 points looks expensive — and the height, which
+    // is the only thing measured, never touches the data at all.
+    rule: "SS24",
+    file: "src/presentation/plot/scale.ts",
+    source: "let lastRange = null;",
+  },
   { rule: "SS26", file: "src/data/process/runner.ts", source: 'process.stdout.write(chunk);' },
   {
     // The exit-code half of SS25. A `switch` on the code, on the way to a
@@ -221,6 +238,29 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "MG21",
     file: "src/presentation/blocks/notice.ts",
     source: 'import { detect } from "../../terminal/capabilities.js";',
+  },
+  {
+    // **Copied from `lifecycle.ts:310`**, per A03 commitment 14a: where a rule
+    // targets a code idiom, the fabricated violation comes from a real call site
+    // rather than being written fresh. SS20 is why — its fabrication was written to
+    // the rule's own assumption about how the code is spelled, so it reproduced the
+    // assumption and the rule never matched the idiom in use.
+    //
+    // The plausible version of the violation, too: a renderer that wants the width
+    // and has not been handed it. That is the second reader, and two readers at two
+    // moments in one frame is how a frame comes to be composed against two widths.
+    rule: "SS42",
+    file: "src/presentation/blocks/paint.ts",
+    source: "const width = stdout.columns;",
+  },
+  {
+    // The edge a reader would reach for: a plot inside an expanded table row
+    // wants a width, and `planColumns` has one. Written as a type-only import
+    // deliberately — that is the form that erases at build and passes every other
+    // rule, which is why MG6 and MG19 both record that it counts here.
+    rule: "MG22",
+    file: "src/presentation/plot/definition.ts",
+    source: 'import type { PlannedColumns } from "../table/plan.js";',
   },
 ];
 
@@ -356,7 +396,15 @@ describe("A03 commitment 14 — every scope reaches the tree", () => {
 
   const files = srcFiles();
 
-  it.each(SCANS.map((s) => ({ id: s.id, scope: s.scope })))(
+  // **Flattened per scope, not per rule.** SS24 has three scopes declared and had
+  // one written down; a rule whose scopes are checked as a set would be satisfied
+  // by any one of them matching, which is how two thirds of a rule stays vacuous
+  // while its row reads as covered. Every scope answers for itself.
+  it.each(
+    SCANS.flatMap((s) =>
+      (Array.isArray(s.scope) ? s.scope : [s.scope]).map((scope) => ({ id: s.id, scope })),
+    ),
+  )(
     "$id's scope $scope matches at least one file",
     ({ id, scope }) => {
       const matched = files.filter((f) => f.replaceAll("\\", "/").startsWith(scope));
@@ -447,6 +495,24 @@ describe("A03 commitment 14 — every scope reaches the tree", () => {
  * explicitly pending. **A rule written down and never built fails on the commit
  * that writes it down**, which is the commit where someone still remembers what
  * it was for.
+ *
+ * **And it read `SS` rows only, for its whole life.** Adding an `MG` row to A03
+ * and implementing nothing passed every gate — the check written to catch a rule
+ * that cannot fire could not see two thirds of the inventory. That is the same
+ * defect as a narrow scope (A03 §2, and the standing preference for a rule that
+ * covers a family and names its exceptions over one whose pattern quietly
+ * excludes what it never thought about).
+ *
+ * It now reads **every** rule family A03 tabulates, and the families divide in
+ * two:
+ *
+ *   - `SS` and `MG` are implemented as data in `tools/enforce/`, so "implemented"
+ *     is a set membership and the equality is exact in both directions.
+ *   - `EX`, `TL`, `CP` and `SP` name a *test id* in their last column rather than
+ *     a rule module — `C09 T2.6`, `B04 B4.3`. Asserting those exist is a
+ *     different mechanism against a different corpus, and it is not built. Named
+ *     here as an unchecked family rather than left to look covered, which is the
+ *     whole subject of this file.
  */
 describe("A03 commitment 14b — the inventory equals what is implemented", () => {
   /**
@@ -465,54 +531,173 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     SS13: "C14",
     SS18: "C10 — needs the block-producing module list",
     SS22: "C19",
-    SS24: "C11, C12, C18",
     SS29: "C23",
     SS30: "C18, C19",
-    SS31: "implemented in dependencies.mjs, not source-scans.mjs",
-    SS32: "implemented in dependencies.mjs, not source-scans.mjs",
-    SS38: "implemented in dependencies.mjs, not source-scans.mjs",
+
+    // SS31, SS32 and SS38 were here, each saying "implemented in
+    // dependencies.mjs, not source-scans.mjs" — which is not a pending rule but
+    // an implemented one filed in the wrong drawer, and it survived because the
+    // staleness check compared against `SCANS` alone. Three entries claiming a
+    // rule was off while it was on. They are gone; `implemented` covers all
+    // three modules.
+
+    // MG2 is the one genuinely unimplemented rule in the family: no cycle within
+    // a layer. Nothing blocks it — it is implementable against the tree today —
+    // and it is listed here rather than quietly omitted because that is the
+    // difference between a rule not yet built and a rule nobody remembers.
+    MG2: "nothing — implementable today, and the general form of MG13/MG18",
+
+    // The rest of the MG family, which this check could not see until it read
+    // more than `SS` rows. Each waits on the component whose directory it scopes
+    // to; none of these exists, so the rule would have nothing to match.
+    MG10: "C13 — no viewport/transcript.ts",
+    MG11: "C14",
+    MG12: "C15",
+    MG13: "C15",
+    MG14: "C16",
+    MG15: "C17",
+    MG16: "C18",
+    MG17: "C19",
+    MG18: "C20",
   };
 
-  /** The SS ids A03 declares, read from the document rather than restated here. */
-  function inventoriedScans(): readonly string[] {
+  /**
+   * Rules A03 inventories that are enforced by a **test** rather than by a row in
+   * `tools/enforce/`, each pointing at the file that carries it. A03's own
+   * "Declared" column already names these — `C04 T2.9`, `C09 T2.11` — so the
+   * mapping is read off the document rather than invented here.
+   *
+   * **This is a third category, and the distinction is load-bearing.** A03 §2
+   * opens by saying the first four kinds are build gates "because a layer
+   * violation merged and fixed later has already had time to be depended upon".
+   * A rule enforced in the corpus tier is enforced — but not at the gate, and a
+   * table that records only "implemented" cannot say which.
+   *
+   * Writing this list is what settled a question the plan got wrong: MG4, MG5,
+   * MG7, MG8 and MG9 looked unimplemented from the enforce side and are not. They
+   * had been enforced since their components landed, in the tier their spec row
+   * names.
+   */
+  const TEST_ENFORCED: Record<string, string> = {
+    MG4: "test/contract/view-model.test.ts",
+    MG5: "test/contract/manifest.test.ts",
+    MG7: "test/contract/adapters.test.ts",
+    MG8: "test/contract/fixtures.test.ts",
+    MG9: "test/contract/blocks.test.ts",
+  };
+
+  /**
+   * The families implemented as data in `tools/enforce/`, and therefore the ones
+   * this equality can be exact about. `EX`, `TL`, `CP` and `SP` rows name a test
+   * id rather than a rule module — see the header.
+   */
+  const RULE_FAMILIES = /^\|\s*((?:SS|MG)\d+)\s*\|/;
+
+  /** The ids A03 declares, read from the document rather than restated here. */
+  function inventoriedRules(): readonly string[] {
     const doc = readFileSync("docs/architecture/A03_enforcement_suite.md", "utf8");
     const ids = new Set<string>();
     for (const line of doc.split("\n")) {
-      const match = /^\|\s*(SS\d+)\s*\|/.exec(line);
+      const match = RULE_FAMILIES.exec(line);
       if (match?.[1] !== undefined) ids.add(match[1]);
     }
     return [...ids].sort();
   }
 
-  it("every SS rule A03 inventories is implemented or explicitly pending", () => {
-    const implemented = new Set(SCANS.map((s) => s.id));
-    const missing = inventoriedScans().filter(
-      (id) => !implemented.has(id) && PENDING_RULES[id] === undefined,
+  /**
+   * Every family that is implemented as data, in one set. `implemented` is the
+   * module-level list the fabrication check already uses, so the two cannot drift
+   * apart: a rule added to one is a rule this sees.
+   */
+  const implementedIds = new Set(implemented);
+
+  it("A03 declares no rule id twice", () => {
+    // **The check that could not see a duplicate, and it was found by making one.**
+    // Every assertion in this block compares *sets*, so two rows carrying one id
+    // collapse into a single member: a new ambient-read rule written as SS41 —
+    // which C21 already holds — passed the missing-rule check, because the id it
+    // was looking for was present for an entirely different reason. An
+    // inventoried, unimplemented rule reported compliance, which is the failure
+    // A03 §2 opens with, reached through the mechanism built to prevent it.
+    //
+    // Reads the rows rather than the id set, deliberately: the set is what cannot
+    // see this.
+    const doc = readFileSync("docs/architecture/A03_enforcement_suite.md", "utf8");
+    const seen = new Map<string, number>();
+    for (const line of doc.split("\n")) {
+      const match = RULE_FAMILIES.exec(line);
+      if (match?.[1] === undefined) continue;
+      seen.set(match[1], (seen.get(match[1]) ?? 0) + 1);
+    }
+    const twice = [...seen.entries()].filter(([, n]) => n > 1).map(([id, n]) => `${id} ×${n}`);
+
+    expect(
+      twice,
+      `${twice.join(", ")} — two rows with one id are one member of every set ` +
+        `comparison below, so the second rule is invisible to all of them`,
+    ).toEqual([]);
+  });
+
+  it("every rule A03 inventories is implemented, test-enforced or explicitly pending", () => {
+    const missing = inventoriedRules().filter(
+      (id) =>
+        !implementedIds.has(id) &&
+        TEST_ENFORCED[id] === undefined &&
+        PENDING_RULES[id] === undefined,
     );
 
     expect(
       missing,
       `A03 inventories ${missing.join(", ")} and nothing implements them. ` +
         `An unimplemented rule reports compliance exactly like a satisfied one — ` +
-        `implement it, or add it to PENDING_RULES with its blocking component.`,
+        `implement it, add it to TEST_ENFORCED with the test that carries it, or ` +
+        `add it to PENDING_RULES with its blocking component.`,
     ).toEqual([]);
   });
+
+  it.each(Object.entries(TEST_ENFORCED))(
+    "%s's test-enforced claim names it, in %s",
+    (rule, file) => {
+      // The claim, made checkable. "Enforced by a test somewhere" is the same
+      // shape of assertion as a rule with no fabricated violation: believed,
+      // never demonstrated. Requiring the rule id in the test's own name means
+      // the link is discoverable from either end, and it fails if the test is
+      // renamed away or the file is split.
+      expect(readFileSync(file, "utf8")).toContain(rule);
+    },
+  );
 
   it("nothing listed pending has quietly been implemented", () => {
     // The other direction, for the same reason the scope list checks its own
     // exemptions: a pending entry that outlives its reason is a rule everyone
     // believes is unenforced, and nobody checks the ones they think are off.
-    const implemented = new Set(SCANS.map((s) => s.id));
-    const stale = Object.keys(PENDING_RULES).filter((id) => implemented.has(id));
+    const stale = Object.keys(PENDING_RULES).filter(
+      (id) => implementedIds.has(id) || TEST_ENFORCED[id] !== undefined,
+    );
 
     expect(stale, `${stale.join(", ")} is listed pending but implemented`).toEqual([]);
   });
 
-  it("every implemented scan is inventoried in A03", () => {
+  it("nothing is listed pending that A03 does not inventory", () => {
+    // The fourth direction, and it exists because writing this check found the
+    // other three had a hole each. A pending entry for a rule no table declares
+    // is a rule that will never be implemented and never be missed: the missing
+    // check below cannot see it (there is no row), and the staleness check above
+    // cannot either (it is not implemented). It is a rule that exists only in a
+    // list of things not being done.
+    const inventoried = new Set(inventoriedRules());
+    const phantom = [...Object.keys(PENDING_RULES), ...Object.keys(TEST_ENFORCED)].filter(
+      (id) => !inventoried.has(id),
+    );
+
+    expect(phantom, `${phantom.join(", ")} is listed pending but A03 has no row`).toEqual([]);
+  });
+
+  it("every implemented rule is inventoried in A03", () => {
     // And the last direction: a rule in the code with no row in A03 is a rule
     // no one specified, which is how the suite grows past what it can justify.
-    const inventoried = new Set(inventoriedScans());
-    const unspecified = SCANS.map((s) => s.id).filter((id) => !inventoried.has(id));
+    const inventoried = new Set(inventoriedRules());
+    const unspecified = implemented.filter((id) => !inventoried.has(id));
 
     expect(unspecified, `${unspecified.join(", ")} is enforced but not inventoried`).toEqual([]);
   });

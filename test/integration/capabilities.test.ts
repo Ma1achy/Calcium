@@ -13,8 +13,12 @@ import { createTerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { MODES, fakeDebug, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
-import { ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, measurable, visible } from "../support/render.js";
+import { ONE_PER_KIND, psTable } from "../support/blocks.js";
+import { block } from "../../src/data/viewmodel/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { cells } from "../../src/presentation/text.js";
+import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { store, TONES } from "../support/theme.js";
 
 /**
@@ -162,12 +166,69 @@ describe("C02 integration", () => {
     expect([...drawn].every((ch) => (ch.codePointAt(0) ?? 0) < 0x80)).toBe(true);
   });
 
-  it.todo(
-    "T4.4: unicode:'ascii' → a rendered table uses + - | and a sparkline uses .:|#; no codepoint above U+007F in the output — waits on C11 and C12",
-  );
-  it.todo(
-    "T4.5: unicode:'ascii' → the braille plot degrades to a block plot rather than emitting braille codepoints — waits on C12",
-  );
+  it("T4.4: unicode:'ascii' → a rendered table emits no codepoint above U+007F", () => {
+    // The table half of this. A sparkline is C12's and the deferral below keeps it.
+    //
+    // A table draws more glyph rôles per row than any other kind — the expand
+    // marker, a status glyph per row, the truncation marker, the sort indicator —
+    // and every one has to substitute 1:1 by column count or the measured height is
+    // wrong for users with a non-UTF-8 locale and nobody else (C09 §4).
+    const table = psTable({ rows: 3, expanded: [1], sort: { key: "age", direction: "desc" } });
+    const kit = measurable({ definitions: [tableDefinition], capabilities: ASCII_CAPS });
+    // 100 rather than 80: `mr` drops there, so the expand markers are drawn, and
+    // `owner` is visible at its declared minimum of 8, so `malachy@fmx.io`
+    // truncates. Both markers in one frame is the point — each has an ASCII form
+    // and each is a place the 1:1 rule can break.
+    const drawn = kit.renderToLines(table, 100).map(visible);
+
+    expect(drawn.join("")).not.toBe("");
+    for (const line of drawn) {
+      const offending = [...line].filter((ch) => (ch.codePointAt(0) ?? 0) >= 0x80);
+      expect(offending, `beyond ASCII: ${offending.join(" ")}`).toEqual([]);
+    }
+    // The ASCII forms, present rather than merely not-Unicode: `>` for a collapsed
+    // row, `v` for an open one, `~` for a truncation, `v` for the descending sort.
+    const header = drawn[0] ?? "";
+    const open = drawn.find((l) => l.includes("a3f9b21")) ?? "";
+    const closed = drawn.find((l) => l.includes("2e8a04c")) ?? "";
+    expect(header, "the descending sort indicator").toContain("age v");
+    expect(open, "an expanded row").toContain("v ");
+    expect(closed, "a collapsed row").toContain("> ");
+    expect(drawn.join("\n"), "the ASCII truncation marker").toContain("malachy~");
+
+    // And the geometry is the Unicode case's, exactly.
+    const full = measurable({ definitions: [tableDefinition] });
+    expect(kit.measure(table, 100)).toBe(full.measure(table, 100));
+    expect(drawn.map((l) => cells(l))).toEqual(
+      full.renderToLines(table, 100).map((l) => cells(visible(l))),
+    );
+  });
+  it("T4.5 (with C12): unicode:'ascii' → the ramp replaces braille, geometry unchanged", () => {
+    const plot = block({
+      kind: "plot",
+      id: "loss",
+      form: "line",
+      height: 6,
+      axes: true,
+      xLabels: ["epoch 0", "epoch 20", "now"],
+      series: [{ values: Array.from({ length: 30 }, (_, i) => 0.82 * 0.9 ** i) }],
+    });
+
+    const ascii = measurable({ definitions: [plotDefinition], capabilities: ASCII_CAPS });
+    const full = measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
+
+    const degraded = ascii.renderToLines(plot, 100);
+    expect(degraded.join(""), "no braille under ascii").not.toMatch(/[\u2800-\u28ff]/u);
+    expect(degraded.join(""), "the column ramp instead").toMatch(/[.:\-=+*#@]/u);
+    expect(degraded.join(""), "and an ASCII axis").toContain("+");
+
+    // Identical cell grid, only subcell resolution lost (C12 I9). Asserted on the
+    // row count and on the measured height, which is the pair C09 I1 turns on —
+    // per-row width is not the claim, because a ramp cell is one dot column and a
+    // braille cell is two, so the same sample lands in a different cell.
+    expect(degraded).toHaveLength(full.renderToLines(plot, 100).length);
+    expect(ascii.measure(plot, 100)).toBe(full.measure(plot, 100));
+  });
   it("T4.6 (with C03): synchronisedUpdate:false → frames carry no 2026 wrapper", () => {
     // Driven from C02's side: the record decides, and C03 obeys it. Both
     // directions, because the negative alone passes when C03 wraps nothing.

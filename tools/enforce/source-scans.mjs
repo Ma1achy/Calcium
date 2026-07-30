@@ -72,23 +72,63 @@ export const SCANS = [
   // The pattern is the ANSI *form*, not a bare integer. `38;5;` and `\e[3Xm`
   // are what an index looks like when someone writes one by hand; a bare `9` in
   // a theme file is a length, a ratio, an array position.
+  // The fourth member of the clock / `process.env` / escape-literal family, and the
+  // last ambient value that had no owner. The clock enters at C22, `process.env` at
+  // C02, escape literals live in `escapes.ts` — and the terminal's dimensions were
+  // read wherever anyone wanted them, which today is one place by luck rather than
+  // by rule.
+  //
+  // **The rule is satisfied and the gap it guards is not closed.** C01 I12 gives a
+  // coherent snapshot per `SIGWINCH`; nothing gives one per frame, because `writer`
+  // is a `Proxy` over the real stdout and its `columns` is read at access time by
+  // whoever holds the handle. C01 T5.8 demonstrates it in a PTY: a frame composed at
+  // 100 and written at 80 wraps, and a wrap scrolls the alternate screen. What this
+  // buys is that a *second* live reader cannot appear quietly beside the one
+  // legitimate one; the snapshot belongs to whoever writes the frame path (M-T6).
+  //
+  // **Keyed on the receiver, and the reason is the other direction of SS20's defect.**
+  // A bare `\.columns` matches `block.columns` in `table/` and `plan.columns` in its
+  // planner — nine sites that have nothing to do with a terminal — and annotating
+  // them would put a claim about terminal width on lines about table columns. So the
+  // receiver is named: the stream handles a width can actually come from.
+  //
+  // The residual gap, stated rather than discovered: a handle stored under a name not
+  // in this list — `const out = lifecycle.writer; out.columns` — escapes. `out` is in
+  // the list for that reason and the list is not a proof. What closes it is the
+  // per-frame snapshot, not a cleverer regex.
+  //
+  // Its fabricated violation is `stdout.columns` through a held handle, copied from
+  // `lifecycle.ts` rather than invented (A03 commitment 14a).
+  { id: "SS42", spec: "C01 I17 · C01 T2.10",
+    pattern: /\b(?:stdout|stderr|stdin|writer|stream|out|term|tty)\s*\.\s*(?:columns|rows)\b/,
+    scope: "src/", allow: ["src/terminal/lifecycle.ts"],
+    why: "the terminal's dimensions are read in lifecycle.ts and handed down; width is the axis that wraps" },
+
   { id: "SS19", spec: "C10 I13 · C10 T2.5",
     pattern: /\b(?:38|48);5;\d|\bansi(?:16|256)?\s*[:=]\s*\d|\[\d{1,2}m/,
     scope: "src/presentation/theme/", allow: ["src/presentation/theme/four-bit.ts"],
     why: "tokens are 24-bit hex; the curated 4-bit map is the one file that holds indices" },
 
-  // The allow-lists name only what exists. `code.ts` and `patch.ts` arrive with
-  // C09 and C25 and will each have to add their own row — which is the friction
-  // C10 I16 asks for: `syntax` used casually stops meaning anything, and the
-  // list being closed at two is a spec change in four places, not a permission.
+  // **The pattern was correct about a syntax nobody writes**, and that is its own
+  // vacuity class (A03 §2). It required a word character after `syntax.`, and
+  // `code.ts` — its only consumer for two components, and the file the allow-list
+  // exists for — writes ``slot(`syntax.${token.slot}`, …)``. `$` is not `\w`, so
+  // the rule never matched the one idiom in use, its allow-list was never
+  // exercised, and a third consumer writing that form would have passed silently:
+  // the four-place friction C10 I16 asks for, unenforced at the only place it
+  // applies.
   //
-  // Until then these rules police a scope whose legitimate members do not exist,
-  // so the fabricated-violation test carries the whole weight of showing they
-  // can fire. A rule with nothing to be wrong about passes exactly like a
-  // satisfied one.
+  // The interpolated form is now the second alternative. And per A03 commitment
+  // 14a, its fabricated violation is **copied from `code.ts`** rather than written
+  // fresh — a fabrication written to the rule's own assumption reproduces the
+  // assumption, which is exactly how this survived.
+  //
+  // The allow-list names both legitimate members. C10 I16's list is closed at two
+  // and this is the enforceable form of it.
   { id: "SS20", spec: "C10 I16 · C10 T2.8",
-    pattern: /["'`]syntax\.\w|palettes\s*\.\s*syntax/,
-    scope: "src/", allow: ["src/presentation/theme/"],
+    pattern: /["'`]syntax\.(?:\w|\$\{)|palettes\s*\.\s*syntax/,
+    scope: "src/",
+    allow: ["src/presentation/theme/", "src/presentation/blocks/kinds/code.ts", "src/presentation/patch/"],
     why: "`syntax` is consumed by code and patch rendering only; the list is closed at two" },
 
   { id: "SS21", spec: "C10 I16 · C10 T2.8",
@@ -111,9 +151,25 @@ export const SCANS = [
   // `src/presentation/blocks/` alone, so the editor's `.length` was unpoliced
   // and recorded as covered — SS26's failure one directory over. The citation
   // graph is what found it; nothing had before.
+  // **The scope is `src/presentation/`, not `blocks/`.** Its reason — display width
+  // comes from `cells()`, the implementation the measurer uses — is a fact about
+  // presentation and not about one directory of it. Scoped to `blocks/` it stopped
+  // seeing `src/presentation/table/` the day C11 created it, and C11 is the largest
+  // consumer of measurement in the tree. Narrower reads as tighter and is looser,
+  // because it stops seeing new files: SS2's argument, and SS26's failure with a
+  // longer fuse.
   { id: "SS23", spec: "C09 T2.9",
     pattern: /\.length\b(?!.*\/\/ *cells-ok)/,
-    scope: "src/presentation/blocks/", allow: [],
+  //
+  // **`theme/` is named as the one exception, rather than the scope being narrowed
+  // back.** C10 resolves colours: its `.length` reads are over palette levels,
+  // contrast ceilings and error arrays, and none of it is text a terminal draws.
+  // Marking sixteen of them `// cells-ok` would put a claim about display width on
+  // lines that have nothing to do with display width, which is worse than the
+  // exemption — it teaches the annotation to mean "the scan complained". An
+  // allow-list of one directory is auditable; a glob that might stop matching is
+  // not (SS19's argument, recorded there).
+    scope: "src/presentation/", allow: ["src/presentation/theme/"],
     why: "display width comes from cells(), never .length" },
 
   { id: "SS40", spec: "C17 I2 · C17 T2.4",
@@ -166,6 +222,34 @@ export const SCANS = [
   // evaluated — it scoped to a directory while the tree had `process.ts`, a
   // file, so `startsWith` never matched and it reported compliance for as long
   // as anyone cared to look.
+  // C11 owns no state: sort order, expansion and focus all arrive as data (C11
+  // I11), and `planColumns` is pure and holds no cache (C11 §2). A module-level
+  // `let` in `table/` is how each of those stops being true — a memo keyed on the
+  // last width, a remembered sort order, a cached plan — and none of them changes
+  // a single frame in the suite, because the answers are correct. What changes is
+  // that two tables sharing the module disagree, and only when one of them
+  // resizes.
+  //
+  // **The scope names the directory, and C11 implements into one.** A03 inventoried
+  // this as `table/` while the scaffold held `src/presentation/table.ts`, a file,
+  // so `startsWith` would have matched nothing and the rule would have reported
+  // compliance from the day it was written — SS26, one directory over. The fix was
+  // to the layout, not to the rule.
+  //
+  // Anchored to the start of a line so a `let` inside a function body is what it
+  // is: an ordinary local, in a pure function, which is not what this forbids.
+  //
+  // **`scope` is a list, because this rule has always had three.** A03 declares
+  // `table/`, `plot/` and `parser/`; the row named one, so two thirds of the rule
+  // could not fire and the row read as though it covered all three. Widening the
+  // field rather than adding a second row with the same id closes the class: C18
+  // needs the third scope, and a per-scope row is a shape the next reader has to
+  // notice rather than a list they add to.
+  { id: "SS24", spec: "C11 I11 · C11 T2.6 · C12 T2.5 · C25 T2.4 · C18 T2.2",
+    pattern: /^(?:export\s+)?(?:let|var)\s/m,
+    scope: ["src/presentation/table/", "src/presentation/plot/", "src/presentation/patch/"], allow: [],
+    why: "C11, C12 and C25 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
+
   { id: "SS26", spec: "C21 T2.2",
     pattern: /process\.stdout\.write/,
     scope: "src/data/process/", allow: [],
@@ -305,12 +389,18 @@ export const SCANS = [
  * a fabricated violation at a path that does not exist on disk. A03 commitment
  * 14 requires one per rule — see `test/unit/enforce-rules.test.ts`.
  */
+/** A rule's scopes, as a list. A bare string is the one-scope case. */
+function scopesOf(scan) {
+  return Array.isArray(scan.scope) ? scan.scope : [scan.scope];
+}
+
 export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [];
   for (const scan of SCANS) {
+    const scopes = scopesOf(scan);
     for (const file of files) {
       const f = file.replaceAll("\\", "/");
-      if (!f.startsWith(scan.scope)) continue;
+      if (!scopes.some((s) => f.startsWith(s))) continue;
       if (scan.allow.some((a) => f === a || f.startsWith(a))) continue;
       const src = readFile(file);
       src.split("\n").forEach((line, i) => {

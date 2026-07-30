@@ -121,7 +121,7 @@ describe("C04 contract", () => {
     expect(fabricated.map((v) => v.rule)).toContain("SS16");
   });
 
-  it("T2.9 (I11): C04 imports nothing from terminal/, presentation/ or above", () => {
+  it("T2.9 (I11, MG4): C04 imports nothing from terminal/, presentation/ or above", () => {
     const files = [
       "src/data/viewmodel/index.ts",
       "src/data/viewmodel/types.ts",

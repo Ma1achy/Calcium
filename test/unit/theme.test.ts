@@ -7,6 +7,7 @@ import {
   loadTheme,
   ratio,
   resolve,
+  resolveBackground,
   resolveTone,
 } from "../../src/presentation/theme/index.js";
 import { caps, DEPTHS, store, SURFACES, TONES, withTone } from "../support/theme.js";
@@ -202,6 +203,44 @@ describe("C10 resolution", () => {
         kind: "ansi16",
         index: current.tokens.fourBit[`surface.${surface}`],
       });
+    }
+  });
+
+  // --- §4a, the second channel ---------------------------------------------
+
+  it("T1.14 (I22): the two functions differ in which channel they fill, and nothing else", () => {
+    const current = store().current;
+
+    for (const surface of SURFACES) {
+      const fg = resolve(`surface.${surface}`, current, caps(24));
+      const bg = resolveBackground(`surface.${surface}`, current, caps(24));
+
+      expect(bg.background, `surface.${surface}`).toEqual(fg.colour);
+      expect(bg.colour, "and nothing in the other channel").toBeUndefined();
+      expect(fg.background).toBeUndefined();
+    }
+  });
+
+  it("T1.15 (I22): a palette ref resolves to no background at all", () => {
+    // A rule rather than an omission. §4's floors are measured for text *on* a
+    // surface, so painting a tone behind text asks for a guarantee nobody
+    // computed — and a caller wanting `tone.ok` as a background is a caller who
+    // has not decided what reads on it.
+    const current = store().current;
+
+    for (const ref of ["tone.ok", "tone.error", "syntax.keyword", "spectrum.3"] as const) {
+      expect(resolveBackground(ref, current, caps(24)), ref).toEqual({});
+    }
+  });
+
+  it("T1.16 (I2, I24): at depth 1 a diff surface resolves to nothing", () => {
+    // What makes losing the background lossless: the marker and the toned gutter
+    // are still there, so a diff at one bit is still a diff (C25 I13).
+    for (const variant of ["dark", "light"] as const) {
+      const current = store(variant).current;
+      for (const surface of ["diffAdd", "diffRemove"] as const) {
+        expect(resolveBackground(`surface.${surface}`, current, caps(1)), surface).toEqual({});
+      }
     }
   });
 

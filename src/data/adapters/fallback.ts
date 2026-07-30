@@ -39,13 +39,52 @@ export const MAX_COLUMNS = 8;
 export const MAX_ROWS = 2_000;
 
 /**
- * Every fallback column gets the same one, and it is deliberately not measured.
- * C07 is L0 and `cells()` is L1 — a width computed here would be a second
- * implementation of the thing C09 I6 says has exactly one (CLAUDE.md). C11
- * plans real widths from the content; this is only the floor below which a
- * column is dropped rather than squeezed.
+ * The floor below which a column is dropped rather than squeezed.
+ *
+ * A column narrower than this shows nothing a reader can use, so it is the width
+ * even an empty column asks for.
  */
 const MIN_COLUMN_WIDTH = 3;
+
+/**
+ * The ceiling on a measured `minWidth` (§5).
+ *
+ * The one judgement in this file. Without it a single 200-character field forces
+ * every other column out by priority, which is the failure mode of asking for
+ * what you need. 24 cells holds a URL fragment, a timestamp or an image tag;
+ * beyond that, truncation is the honest answer and C11 marks it.
+ */
+const MAX_COLUMN_WIDTH = 24;
+
+/**
+ * The width a column asks for: its widest value, or its label, whichever is
+ * longer.
+ *
+ * **Measured rather than defaulted** (§5). A uniform minimum was not a
+ * conservative default but a discarding of information already in hand — every
+ * row is here — and the cost was a dead mechanism rather than narrow columns:
+ * nothing dropped, so no row was expandable, so D38's guarantee that a shed
+ * column stays reachable held only because nothing was ever shed.
+ *
+ * The label counts, because a column narrower than its own header is unreadable
+ * whatever its values.
+ *
+ * **This is a code-unit count and not a display width.** `cells()` is L1 and C09
+ * I6 says display width has exactly one implementation; a second one here would
+ * be that rule broken in the component least able to notice. So this is an ask,
+ * not a measurement of the frame: C11 plans the real widths from the content, and
+ * for the CJK and emoji cases this under-asks, which truncates a cell rather than
+ * misplacing a column.
+ */
+function askedWidth(key: string, rows: readonly Json[]): number {
+  let widest = stripControl(key).length;
+  for (const row of rows) {
+    if (!isPlainObject(row)) continue;
+    const text = textOf(row[key]);
+    if (text.length > widest) widest = text.length;
+  }
+  return Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, widest));
+}
 
 type Json = unknown;
 
@@ -120,18 +159,52 @@ function keyValueBlock(obj: Record<string, Json>, id: string): Block {
   });
 }
 
-function columnsFor(keys: readonly string[]): readonly ColumnDef[] {
+/**
+ * The marker column, declared unconditionally (§5).
+ *
+ * C11 draws the expand marker only into a column that declares the rôle and will
+ * not synthesise one (C11 I16), so for a generated table the producer has to —
+ * otherwise the fields that drop at a narrow width are reachable with nothing on
+ * screen saying so.
+ *
+ * **Outside `MAX_COLUMNS`.** The cap bounds fields; a marker is not a field, and
+ * charging the affordance a field would hide data to reveal that data is hidden.
+ *
+ * Unconditional, because a column set is built once and the width is not known
+ * here. Per-row blankness is C11's — a row that cannot be opened draws nothing.
+ */
+const EXPAND_COLUMN: ColumnDef = Object.freeze({
+  key: "",
+  label: "",
+  align: "left" as const,
+  priority: Number.MAX_SAFE_INTEGER,
+  minWidth: 1,
+  sortable: false,
+  role: "expand" as const,
+});
+
+function columnsFor(keys: readonly string[], rows: readonly Json[]): readonly ColumnDef[] {
   // Priority descends with position so C11 drops the last-appearing column
   // first (D38). The far side's ordering is the only signal available about
   // which column matters, and discarding it would be inventing a judgement.
-  return keys.slice(0, MAX_COLUMNS).map((key, i) => ({
+  //
+  // No column is `flex`, and that is a decision rather than an omission (§5):
+  // with widths measured from the content, a table narrower than the terminal is
+  // correct, because every column already has what it asked for. C11 §3 step 8
+  // leaves the residual unused for the same reason.
+  const fields = keys.slice(0, MAX_COLUMNS).map((key, i) => ({
     key,
     label: stripControl(key),
     align: "left" as const,
     priority: MAX_COLUMNS - i,
-    minWidth: MIN_COLUMN_WIDTH,
+    minWidth: askedWidth(key, rows),
     sortable: true,
   }));
+
+  // The marker leads, and its priority is the highest there is: C11 never drops
+  // the highest-priority column (I3), so the affordance survives every width at
+  // which the table renders at all.
+  return [EXPAND_COLUMN, ...fields];
 }
 
 function tableBlocks(
@@ -140,8 +213,11 @@ function tableBlocks(
   id: string,
   nextId: () => string,
 ): { blocks: readonly Block[]; truncated: boolean } {
-  const columns = columnsFor(keys);
   const kept = rows.slice(0, MAX_ROWS);
+  // Measured over the rows that are *kept*, so a column's width is the width of
+  // what the table actually shows. Measuring the truncated tail would size a
+  // column for a value no reader ever sees.
+  const columns = columnsFor(keys, kept);
   const dropped = rows.length - kept.length;
 
   const tableRows: readonly TableRow[] = kept.map((row, i) => {

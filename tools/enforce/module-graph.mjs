@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG19", "MG20", "MG21"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -56,6 +56,27 @@ const FORBIDDEN_EDGES = [
       "precisely because it cannot ask C01 whether the terminal was released. " +
       "Type-only counts: a type import is a reference, and the independence " +
       "claim is about knowledge, not about emitted code",
+  },
+  {
+    // The third instance, and the first where the *forward* edge is required.
+    //
+    // C11 imports C12's `sparkline` because a `Cell.spark` is not a block and
+    // cannot come through the registry (C12 §2). Both directories are L1, so the
+    // layer walk sees nothing in either direction — which means the return edge
+    // is legal to every rule in the suite and would close a cycle A02 §1 forbids.
+    //
+    // What makes it concrete rather than theoretical: a plot rendering inside a
+    // table's expanded detail wants a width, and `planColumns` has one. Reaching
+    // for it reads as reuse. MG2 would catch the cycle once closed; this catches
+    // the edge that closes it, one commit earlier.
+    rule: "MG22",
+    from: "src/presentation/plot/",
+    to: "src/presentation/table/",
+    spec: "A02 §1 · C12 §2",
+    why:
+      "C11 imports C12's sparkline, so the L1 edge between them is one-directional " +
+      "by construction — a plot reaching back into the table engine closes a cycle " +
+      "the layer walk cannot see, because both are L1. Type-only counts",
   },
 ];
 

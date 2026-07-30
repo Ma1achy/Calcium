@@ -1,0 +1,226 @@
+// C12 tier 6 — fail-on-revert.
+//
+// Each test names the change that makes it fail, per CLAUDE.md: "Removing the
+// idempotency guard → T3.14 fails" is the form. The point is not extra coverage —
+// it is that a reader who reverts one of these decisions is told which decision
+// they reverted, rather than being handed a diff of braille.
+import { describe, expect, it } from "vitest";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { plotHeight } from "../../src/presentation/plot/height.js";
+import { columnsOf, finiteSamples, rowOf, seriesRange } from "../../src/presentation/plot/scale.js";
+import { curveRows } from "../../src/presentation/plot/curve.js";
+import { createGrid, drawLine, foldBraille, setDot } from "../../src/presentation/plot/raster.js";
+import { sparkline } from "../../src/presentation/plot/sparkline.js";
+import { stripHeights } from "../../src/presentation/plot/strips.js";
+import { lossCurve, plotOf } from "../support/blocks.js";
+import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { block, type Plot, type Series } from "../../src/data/viewmodel/index.js";
+
+const m = (): ReturnType<typeof measurable> =>
+  measurable({ definitions: [plotDefinition] as never });
+
+describe("C12 tier 6 — fail-on-revert", () => {
+  it("T6.1 (I1): deriving height from series length → T1.1 fails, and streaming plots shift the viewport", () => {
+    // The revert: `measure` reading `block.series`. It is prevented by a type —
+    // `plotHeight` takes `PlotGeometry`, which has no `series` — so the revert
+    // requires widening that parameter first, which is the moment to stop.
+    const two = plotOf({ id: "two-points", points: 2, height: 6 });
+    const many = plotOf({ id: "many-points", points: 5_000, height: 6 });
+
+    expect(plotHeight(two)).toBe(8);
+    expect(plotHeight(many)).toBe(8);
+    expect(m().renderToLines(two, 80)).toHaveLength(8);
+    expect(m().renderToLines(many, 80)).toHaveLength(8);
+  });
+
+  it("T6.2 (I3): dividing by the range without guarding a constant series → T1.5 fails with NaN", () => {
+    // The revert: `(v - min) / (max - min)` with no `max === min` branch. A
+    // constant series then divides zero by zero and every dot row is `NaN`, which
+    // `setDot` discards — so the plot renders *blank* rather than throwing, and the
+    // failure is a missing curve rather than an error anybody sees.
+    const range = seriesRange([{ values: [3, 3, 3] }], {});
+    if (range === null) throw new Error("unreachable");
+
+    const row = rowOf(3, range, 16);
+    expect(Number.isNaN(row)).toBe(false);
+    expect(row).toBe(7);
+
+    const glyphRows = curveRows({ values: [3, 3, 3] }, range, 12, 4, FULL_CAPS);
+    expect(glyphRows.some((r) => [...r].some((c) => c !== "⠀"))).toBe(true);
+  });
+
+  it("T6.3 (I4): letting NaN reach the grid → T1.8 fails", () => {
+    // The revert: `finiteSamples` returning every value, or returning values
+    // without their indices. Either one closes the gap a filtered sample leaves,
+    // and the second is the tempting one — the array is shorter and the curve looks
+    // continuous, which is precisely the lie.
+    const values = [1, 2, Number.NaN, 4, 5];
+    expect(finiteSamples(values).map((s) => s.i)).toEqual([0, 1, 3, 4]);
+
+    const columns = columnsOf(finiteSamples(values), values.length, 10);
+    const joinable = columns.filter((c, i) => {
+      const next = columns[i + 1];
+      return next !== undefined && next.iFirst === c.iLast + 1;
+    });
+    // Three of the four adjacencies are joinable; the one across the hole is not.
+    expect(joinable).toHaveLength(2);
+  });
+
+  it("T6.4 (I5): downsampling by every-nth-point → T1.10 fails, and spikes vanish", () => {
+    // The revert: `columnsOf` keeping one sample per column instead of four. The
+    // spike at index 5,000 is not on any stride that lands on a column boundary, so
+    // it disappears — and a loss curve with a spike is *about* the spike.
+    const values = Array.from({ length: 10_000 }, (_, i) => (i === 5_000 ? 99 : 1));
+    const columns = columnsOf(finiteSamples(values), values.length, 112);
+    expect(columns.filter((c) => c.max === 99)).toHaveLength(1);
+
+    // And every-nth would also have given the column a single value, so `min` and
+    // `max` would be equal — the assertion that distinguishes the two strategies.
+    const spiked = columns.find((c) => c.max === 99);
+    expect(spiked?.min).toBe(1);
+  });
+
+  it("T6.5 (I6): overlaying multi-series at 1-bit → T3.10 fails, and the plot is unreadable", () => {
+    // The revert: dropping the `colourDepth === 1` branch in `render`. Two braille
+    // curves in one grid with no colour cannot be told apart, and there is no dash
+    // pattern that survives a 2×4 dot cell.
+    const two: readonly Series[] = [
+      { values: lossCurve(20), label: "train" },
+      { values: lossCurve(20).map((v) => v * 1.2), label: "val" },
+    ];
+    const b = block({ kind: "plot", id: "two", form: "line", height: 8, axes: true, series: two }) as Plot;
+    const mono = measurable({ definitions: [plotDefinition] as never, capabilities: MONO_CAPS });
+    const rendered = mono.renderToLines(b, 48).map(visible).join("\n");
+
+    // Stacked: both labels present, each on its own strip's first row.
+    expect(rendered).toContain("train");
+    expect(rendered).toContain("val");
+    expect(mono.renderToLines(b, 48)).toHaveLength(10);
+  });
+
+  it("T6.11 (I7): giving each strip a label row → T3.11c fails, and every stacked plot overflows", () => {
+    // The revert: pushing a label row before each strip. Σ then becomes
+    // `height + n`, and the block renders taller than it measured — C09 I1 broken
+    // for every multi-series plot, one row per series.
+    for (let n = 1; n <= 12; n += 1) {
+      for (let h = 1; h <= 20; h += 1) {
+        const heights = stripHeights(h, n);
+        if (heights === null) continue;
+        expect(heights.reduce((a, b) => a + b, 0), `n=${String(n)} h=${String(h)}`).toBe(h);
+      }
+    }
+
+    const four: readonly Series[] = Array.from({ length: 4 }, (_, i) => ({
+      values: lossCurve(12),
+      label: `s${String(i)}`,
+    }));
+    const b = block({ kind: "plot", id: "four", form: "line", height: 8, axes: true, series: four }) as Plot;
+    const mono = measurable({ definitions: [plotDefinition] as never, capabilities: MONO_CAPS });
+    expect(mono.renderToLines(b, 48)).toHaveLength(mono.measure(b, 48));
+  });
+
+  it("T6.12 (I8): dropping series that do not fit → T3.11b fails", () => {
+    // The revert: returning `stripHeights` of zero for the overflow, or slicing the
+    // series list to what fits. Both render without error and both lose data
+    // silently, which is the one outcome §5 rules out.
+    expect(stripHeights(4, 10)).toBeNull();
+
+    const ten: readonly Series[] = Array.from({ length: 10 }, (_, i) => ({
+      values: lossCurve(12).map((v) => v + i),
+      label: `s${String(i)}`,
+    }));
+    const b = block({ kind: "plot", id: "ten", form: "line", height: 4, axes: true, series: ten }) as Plot;
+    const rendered = measurable({ definitions: [plotDefinition] as never, capabilities: MONO_CAPS })
+      .renderToLines(b, 48)
+      .map(visible)
+      .join("\n");
+
+    expect(rendered).toContain("+9 more");
+  });
+
+  it("T6.6 (I9): an ASCII form of different cell dimensions → T2.4 fails", () => {
+    // The revert: an ASCII fold with a different dots-per-cell than the grid was
+    // sized for — say folding a 2-dot-wide grid one dot at a time. The plot then
+    // occupies twice the cells it measured.
+    const b = plotOf({ height: 6 });
+    const unicode = measurable({ definitions: [plotDefinition] as never, capabilities: FULL_CAPS });
+    const ascii = measurable({ definitions: [plotDefinition] as never, capabilities: ASCII_CAPS });
+
+    for (const width of [40, 80, 120]) {
+      expect(ascii.renderToLines(b, width)).toHaveLength(unicode.renderToLines(b, width).length);
+      for (const row of ascii.renderToLines(b, width)) {
+        expect([...visible(row)].length).toBeLessThanOrEqual(width);
+      }
+    }
+  });
+
+  it("T6.7 (I10): writing outside the declared region → T2.3 fails and the frame corrupts", () => {
+    // The revert: painting a row without `clampSpans`. This is not hypothetical —
+    // it is what the first version of `definition.ts` did, and at width 1 a plot of
+    // declared height 5 rendered nineteen rows, because the label column and the
+    // axis are seven cells and the terminal wrapped every one of them.
+    const b = plotOf({ height: 5 });
+    for (const width of [1, 2, 3, 5]) {
+      const lines = m().renderToLines(b, width);
+      expect(lines, `width ${String(width)}`).toHaveLength(7);
+      for (const row of lines) {
+        expect([...visible(row)].length, `width ${String(width)}`).toBeLessThanOrEqual(width);
+      }
+    }
+  });
+
+  it("T6.8 (I13): a sparkline occupying two rows → T1.13 fails, and every table row shifts", () => {
+    // The revert: a sparkline that wraps, which happens the moment it returns more
+    // than `width` cells. A table row containing one then grows, and the table's
+    // measured height is wrong for every row below it.
+    for (const width of [1, 3, 8, 40, 200]) {
+      const out = sparkline(lossCurve(60), width, FULL_CAPS);
+      expect(out).not.toContain("\n");
+      expect([...out], `width ${String(width)}`).toHaveLength(width);
+    }
+  });
+
+  it("T6.9 (I14): dropping Bresenham for point-plotting → T1.4 fails and steep curves dot", () => {
+    // The revert: `setDot` per sample with no `drawLine` between them. A curve
+    // moving faster than one dot column per sample becomes a scatter, and at 2×4
+    // subcell density a scatter is indistinguishable from noise.
+    const joined = createGrid(20, 40);
+    drawLine(joined, 0, 0, 3, 39);
+    const dotted = createGrid(20, 40);
+    setDot(dotted, 0, 0);
+    setDot(dotted, 3, 39);
+
+    const inked = (g: ReturnType<typeof createGrid>): number =>
+      foldBraille(g).filter((r) => [...r].some((c) => c !== "⠀")).length;
+
+    expect(inked(joined)).toBe(10);
+    expect(inked(dotted)).toBe(2);
+  });
+
+  it("T6.10 (I12): making `plot` a privileged built-in → T2.6 fails", () => {
+    // The revert: adding `plotDefinition` to `blocks/defaults.ts`. The kind would
+    // then work without anybody calling `register`, and the claim that C09's
+    // extension path is real — three registrants, none privileged — would be
+    // untestable, because the mechanism would no longer be on the only path.
+    expect(measurable().kinds).not.toContain("plot");
+    expect(m().kinds).toContain("plot");
+  });
+
+  it("T6.13 (I15): three unconditional y-labels → T3.2 renders outside its rows", () => {
+    // Not in §9's list, and it belongs there: §3 made three labels unconditional
+    // while T3.2 renders `height: 1` with axes, so the section contradicted its own
+    // test. The revert is placing a label at the midpoint row of a one-row area.
+    const b = plotOf({ height: 1 });
+    const lines = m().renderToLines(b, 40);
+    expect(lines).toHaveLength(3);
+
+    // One label, and it is the maximum: the extremes bound the data and the
+    // midpoint is interpolation between them, so the midpoint is what goes. Only
+    // the plot-area rows are examined — the x-label row carries `epoch 20`, which
+    // is a digit and not a y-label.
+    const area = lines.slice(0, 1);
+    const labelled = area.filter((row) => /[0-9]/u.test(visible(row)));
+    expect(labelled).toHaveLength(1);
+    expect(visible(area[0] ?? "")).toContain("0.82");
+  });
+});

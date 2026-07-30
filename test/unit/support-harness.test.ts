@@ -44,9 +44,11 @@ import {
   result,
 } from "../support/transport.js";
 import { fakeWorld, steppableClock, worldResult } from "../support/world.js";
-import { doc, tableOf } from "../support/blocks.js";
+import { doc, psColumns, psTable, tableOf } from "../support/blocks.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
-import { DARK_THEME, LIGHT_THEME, MONO_CAPS, measurable } from "../support/render.js";
+import { DARK_THEME, LIGHT_THEME, MONO_CAPS, measurable, visible } from "../support/render.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { cells } from "../../src/presentation/text.js";
 import { caps, mutable, store, withTone } from "../support/theme.js";
 import { largeManifest, toolNamed } from "../support/manifest.js";
 import { inkWidth } from "../support/ink.js";
@@ -339,10 +341,82 @@ describe("harness parameters — blocks, render, theme, manifest, ink", () => {
     expect(tableOf(2).id).toBe("t");
   });
 
-  // A `notice`, not a `table`: C11 is still a stub, so a table block falls
-  // through to `raw` and paints the same bytes under any theme. That is the
-  // fallback working, and it would have made both assertions below vacuous —
-  // which is the failure this whole file is about, met while writing it.
+  it("measurable({ definitions }): the kind reaches the registry, and the frame", () => {
+    // **The parameter that could have been inert.** An unregistered kind still
+    // renders — as `raw`, C09 §2's fallback — and still produces rows, so a test
+    // that registers `table`, draws one and counts lines passes whether or not the
+    // option arrived. The assertion is therefore on `kinds` and on content only the
+    // real renderer emits, with a default that genuinely lacks the kind.
+    const without = measurable({});
+    const with_ = measurable({ definitions: [tableDefinition] });
+
+    expect(without.kinds, "the default already had table").not.toContain("table");
+    expect(with_.kinds).toContain("table");
+
+    const block = psTable({ rows: 2 });
+    const bare = without.renderToLines(block, 100).join("\n");
+    const drawn = with_.renderToLines(block, 100).join("\n");
+
+    // `raw` prints the block as JSON; a table prints a header of column labels.
+    expect(bare).toContain('"kind":"table"');
+    expect(drawn).not.toContain('"kind":"table"');
+    expect(drawn).toContain("family");
+  });
+
+  it("measurable({ focus }): the focused row is drawn differently, and only it", () => {
+    const block = psTable({ rows: 3 });
+    const plain = measurable({ definitions: [tableDefinition] }).renderToLines(block, 100);
+    const focused = measurable({
+      definitions: [tableDefinition],
+      focus: { blockId: "ps", rowId: "r2" },
+    }).renderToLines(block, 100);
+
+    // The default is no focus, which is a different value from the one asked for.
+    expect(plain[2]).not.toBe(focused[2]);
+    // And focus changes appearance only: the geometry is identical, because
+    // `measure` never sees focus (C11 I15).
+    expect(focused.length).toBe(plain.length); // cells-ok
+    expect(focused.map((l) => cells(visible(l)))).toEqual(plain.map((l) => cells(visible(l))));
+    // The rows that do not hold focus are untouched.
+    expect(focused[1]).toBe(plain[1]);
+    expect(focused[3]).toBe(plain[3]);
+  });
+
+  it("psColumns() and psTable(...): each argument reaches the fixture", () => {
+    expect(psColumns().map((c) => c.key)).toContain("mr");
+    expect(psColumns().find((c) => c.key === "expand")?.role).toBe("expand");
+
+    // Defaults differ from every value asked for, so a builder ignoring its
+    // argument fails rather than passing quietly.
+    expect(psTable().rows).toHaveLength(4);
+    expect(psTable({ rows: 7 }).rows).toHaveLength(7);
+
+    expect(psTable().id).toBe("ps");
+    expect(psTable({ id: "other" }).id).toBe("other");
+
+    expect(psTable().rows.some((r) => r.expanded === true)).toBe(false);
+    expect(psTable({ rows: 3, expanded: [2] }).rows.map((r) => r.expanded)).toEqual([
+      undefined,
+      true,
+      undefined,
+    ]);
+
+    expect(psTable().rows.every((r) => r.detail === undefined)).toBe(true);
+    expect(psTable({ detail: true }).rows.every((r) => r.detail !== undefined)).toBe(true);
+
+    expect(psTable().sort).toBeUndefined();
+    expect(psTable({ sort: { key: "age", direction: "desc" } }).sort).toEqual({
+      key: "age",
+      direction: "desc",
+    });
+  });
+
+  // A `notice`, not a `table`. When this was written C11 was a stub; now C11
+  // exists and the reasoning is unchanged, because `measurable()` still has no
+  // `table` unless one is passed to `definitions` — C11 registers rather than
+  // shipping as a default (C09 §3). So a table block here would still fall
+  // through to `raw` and paint the same bytes under any theme, which is the
+  // fallback working and would have made both assertions below vacuous.
   const toned: Block = {
     kind: "notice",
     id: "n",

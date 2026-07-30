@@ -45,6 +45,40 @@ This is not belt-and-braces. Every check here reports success the same way wheth
 
 - **A checker that resolves one item and passes on the rest.** SP1 read a single invariant per parenthetical, so a commitment citing `(I5, I99)` resolved one and ignored the other: a dangling citation could ride alongside a good one and the rule reported it enforced. It shipped and was found the same day by the pass that reads its own output. Two instances of this in one day — the other was a fabricated fixture written as `- **I1 — text**` rather than `- **I1** — text`, so it parsed as no invariants at all and every citation in it read as dangling. **In both the rule was broken by what it was tested against rather than by what it checked**, which is a failure a fabricated violation invites rather than prevents: the fabrication is written by the same person, in the same sitting, under the same misreading as the rule.
 
+- **A fixture reader agreeing with itself.** The surface-audit parser — the tool built to stop illustrations and tables drifting apart — read each column table *by position*. Declaring `Align` in five surface specs shifted `Flex` one column right, so the parser read `left` as the flex flag: truthy, so every flex column became `false`. Nothing failed, because `flex` changes column *widths* and not which columns drop, and every assertion in the suite was about drop orders. **Only a field-specific assertion could see it** — one per parsed field, against something only that field can produce — and that is what the parser carries now, alongside reading by header name. This is C21's harness class arriving in a fixture reader rather than in a test helper: the same defect, in the code that exists to catch the family.
+
+- **A vacuity check with a narrow pattern.** The inventory equality above — the mechanism for the fourth failure, the one nothing else can reach — read `/^\|\s*(SS\d+)\s*\|/`. It saw 41 of 93 inventoried rules. Adding an `MG` row and implementing nothing passed `make enforce`, `make test` and every fire-test in the suite. **The check written to catch a rule that cannot fire could not see two thirds of the inventory**, which is the same defect as a narrow scope one level up: a pattern excludes what nobody thought about, and a family covered with named exceptions does not. It now reads every family implemented as data, and the two it cannot speak for are named below rather than left looking covered.
+
+- **A rule correct about a syntax nobody writes.** SS20 forbids a `syntax` palette reference outside `code` and `patch` rendering, and its pattern is ``/["'`]syntax\.\w|palettes\s*\.\s*syntax/``. Its one consumer, C09's `code.ts`, writes ``slot(`syntax.${token.slot}`, …)`` — `$` is not `\w`, so the rule has never matched the form the only caller uses, and its allow-list has never been exercised either. **This is not MG20's class.** MG20's pattern could match nothing at all; this one matches a form that is legal, idiomatic, and unwritten, while the idiom in use walks past. A rule can be correct about a syntax nobody uses.
+
+  **The mitigation differs, which is why it is a separate line.** MG20's class is caught by a fabricated violation; this one is not, because a fabrication written by the same author in the same sitting uses the same idiom the rule was written against. What catches it is a fabrication written in **the form the real consumer uses** — so the standing rule for the fabrication table is: where a rule targets a code idiom, the fabricated violation is **copied from a real call site**, not written fresh. If there is no real call site yet, the fabrication is copied from the first one that appears, and the rule is pending until then.
+
+- **A set equality that cannot see a duplicate.** The inventory check compares the ids in these tables against the ids implemented — as sets, so **two rows carrying one id collapse into one member and the check passes.** Found by collision rather than by reasoning: a new ambient-read rule was written as SS41, which C21 already holds, and the check went green with an inventoried rule nobody had implemented, because the id it was looking for was present for a different reason. The remedy is one assertion — the inventory declares no id twice — and it is the cheapest of all of them, which is why it had never been written. It reads the rows rather than the id set, because the set is precisely what cannot see this.
+
+Generalising it turned up three things the narrow pattern had been hiding, and none of them was a violated rule:
+
+| What | Why it survived |
+|---|---|
+| `SS31`, `SS32`, `SS38` listed **pending while implemented**, each entry saying "implemented in `dependencies.mjs`" | The staleness check compared against `SCANS` alone, so a rule implemented in a sibling module read as unimplemented forever. Three entries asserting a rule was off while it was on |
+| `MG4`, `MG5`, `MG7`, `MG8`, `MG9` looked unimplemented and were not | They are enforced by the contract test their own "Declared" column names. A **third category**, now tracked as one |
+| A pending entry for a rule no table declares would have been invisible | Neither the missing-rule check (no row) nor the staleness check (not implemented) can see it. A fourth direction, now asserted |
+
+**The third category is worth its own paragraph, because the distinction is the one this section opens with.** A rule enforced by a contract test *is* enforced — but not at the gate, and this section's first claim is that the build gates fail the build rather than a test run "because a layer violation merged and fixed later has already had time to be depended upon". A table recording only "implemented" cannot say which side of that line a rule sits on. So each test-enforced rule now names the file that carries it, and the claim is asserted rather than believed: the test's own name must cite the rule id, which fails if the test is renamed away or the file is split. `EX`, `TL`, `CP` and `SP` point at test ids across a different corpus and are **not** checked — named here as an unchecked family, which is the only honest state for them.
+
+`MG2` — no cycle within a layer — is the one genuinely unbuilt rule in the family. It blocks on nothing; it is listed pending with "nothing" as its blocker, because a rule not yet built and a rule nobody remembers are indistinguishable unless one of them is written down.
+
+**One gap is recorded here with no mechanism, because none is tractable.** SP1 and the pairing audit ask whether each commitment has an invariant and each invariant has a commitment. Neither asks whether two invariants can both be satisfied at once. C12 I5 and I14 are the first known instance: I5 kept a column's minimum and maximum under downsampling, I14 joined successive points with Bresenham, and keeping only the extremes leaves the join nothing to work from — **each correct alone, jointly unsatisfiable, and both pass every check in this document.** It is resolved by a composition clause on both (C12 §3), and it was found by trying to implement them rather than by any rule.
+
+A mechanism would be n² prose comparison across 25 specs, which is not a check but a second reading of everything. So this is a note to the reader rather than a row in a table: **pairwise consistency between invariants is unenforced**, and the place it surfaces is the first time someone tries to satisfy two at once.
+
+**A second instance, one component later, and it was found the same way.** C25 I2 claimed height is independent of width; §3 chose the layout by width; and split layout pairs a removed line with its added counterpart on one row, so the row count differs across the breakpoint. Each defensible alone. It surfaced while drawing the illustration — the two figures gave ten rows and eleven from one block — and the resolution kept the invariant that carries load (I1, measurement equals rendered rows) and weakened the one that was a convenience (I2a, constant *within* a layout).
+
+**Two instances in two consecutive components, and both were found the same way: by one implementation having to satisfy both at once.** C12's surfaced while writing the rasteriser, C25's while drawing the figure the renderer would be written against. In neither case did reading the invariants side by side reveal anything, because in both cases each invariant was true.
+
+That is the closest thing to a detection method there is, and it is worth stating as one rather than leaving it as a coincidence: **the contradiction surfaces when something must satisfy both simultaneously, and nowhere earlier.** A reader looking for the third instance should expect it at the moment of implementation, and should recognise the shape — two true statements, one impossible object — rather than concluding that one of the two is simply wrong. Neither was, either time.
+
+The mechanism remains n² prose comparison and remains untractable. What is tractable is the expectation.
+
 **The class extends past rules into the harnesses they run in.** A rule executes inside a fake terminal, a fake clock or a pseudo-terminal, and a harness parameter nobody has exercised is a mechanism that cannot be *seen* to have worked — the same defect from the other side. `runInPty` accepted an `env` record and hard-coded node-pty's `name`, which *is* the child's TERM, so `TERM=dumb` ran under `xterm-256color`; the parameter had never been passed until C02's tier 5 passed it. The standing rule is in `test/support/README.md`: **every helper parameter that shapes the environment under test carries an assertion that fails if the parameter is ignored**, and a parameter with no observable effect is reported rather than skipped, because it may mean the parameter should not exist.
 
 **The fourth is the one the other three do not catch, and it is a defect of this document rather than of the code.** A missing rule is invisible from the source side: `checkSourceScans` iterates the rows it has, so a row that was never written is not a rule that fails but a rule that is not there. The inventory is the only place it exists, and the inventory is prose. The check is therefore set equality — the ids in these tables equal the ids implemented plus the ids explicitly pending — so **a rule inventoried and never built fails on the commit that inventories it**, which is the commit where someone still remembers what it was for.
@@ -52,6 +86,23 @@ This is not belt-and-braces. Every check here reports success the same way wheth
 Every rule therefore ships with four things: an implementation reachable from the inventory, a fabricated violation, an assertion that its scope reaches the tree, and — where the rule governs named entities — an assertion that those names exist. The three catch different failures. A fabricated violation is written at a path inside the declared scope, so it fires whether or not that scope describes anything; and a scope full of real files says nothing about whether the names a rule enumerates are real. All three are in `test/unit/enforce-rules.test.ts`.
 
 A rule whose scope or names are not yet real is listed there as **pending**, with the component that will create them; the pending entry is itself asserted, so it fails once the scope becomes real rather than outliving its reason.
+
+### Records that cannot outlive their reason
+
+That pending entry is one of a family, and the family is worth naming because its members look unrelated and are the same idea: **a record of a gap, written so that closing the gap breaks the record.** Four mechanisms now:
+
+| | Records | Fails when |
+|---|---|---|
+| A **pending** rule entry | a scope or a name that is not real yet | the scope becomes real |
+| `ACKNOWLEDGED_BACKLOG` | deferrals whose blocker already exists | one is written, or a new one appears |
+| `UNSCAFFOLDED` | a component with no file in the tree at all | the file appears |
+| **A test that asserts a defect** | behaviour that is wrong and not yet fixable here | the defect is fixed |
+
+The fourth is new with C01 T5.8 and it inverts the usual reading, which is why it needs saying loudly rather than quietly. **That test is green because the bug exists.** A frame composed at 100 and written into an 80-column terminal wraps; it asserts the wrap, and the wrap is the failure C01 §5 documents and deliberately does not fix, because the per-frame snapshot belongs to whoever writes the frame path.
+
+So when the gap closes, the test fails — and **the danger is that someone reads a red test beside a fix and deletes it**, which loses the only notification that the boundary moved. A skipped test, a todo and a pending entry all announce themselves as incomplete; this one announces itself as passing. It therefore has to carry the inversion in its own name and in its body, both of which say what a failure means: not that the fix is wrong, but that the documented behaviour is no longer the behaviour, and the test is now describing history.
+
+The same discipline SS26's pending entry has, pointed at a defect rather than at a rule.
 
 ---
 
@@ -82,6 +133,11 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG19 | C21 imports nothing from `terminal/` | C21 T2.3 |
 | MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
 | MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I18, T2.17 |
+| MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
+
+**MG22 is a cycle rule, not a layer rule.** C11 imports C12's `sparkline` for a `Cell.spark` (C12 §2), which is legal: A02 §1 forbids importing *upward* and importing *cyclically*, and both directories are L1, so the layer walk sees nothing either way. What must never exist is the return edge — a plot reaching into the table engine for a column width or a truncation helper, which is exactly the shape a reader would reach for and which would close the cycle. Type-only counts, as MG6 and MG19 both record: a reference is a dependency whether or not it survives the build.
+
+MG2 would catch the cycle once closed; MG22 catches the edge that would close it, one commit earlier. That is the MG13/MG18 precedent and the reason the table holds specific prohibitions alongside the general walk.
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 
@@ -108,8 +164,17 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS11 | `process.env` | `blocks/` | C09 T2.7 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
+| SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I17, T2.10 |
 
 **SS1 is the widest and the most valuable.** One injected clock, entering at C22 and nowhere else, is what makes golden frames reproducible and every timing test run on a fake.
+
+**SS42 is the fourth member of that family and the last ambient value that had no owner.** The clock enters at C22, `process.env` at C02, escape literals live in `escapes.ts` — and the terminal's dimensions were read wherever anyone wanted them, which today is one place by luck rather than by rule.
+
+**The rule is satisfied and the gap it guards is not closed, and both halves are deliberate.** C01 I12 gives a coherent snapshot per `SIGWINCH`; nothing gives one per frame, because `writer` is a `Proxy` over the real stdout and its `columns` is a read the consumer performs at whatever moment it performs it — and C01 exposes no initial size at all, so that handle is the only route to a width there is. **C01 T5.8 demonstrates it in a PTY**: a frame composed at 100 and written into 80 wraps, one row more than a control run at a stable width, and a wrap inside the alternate screen scrolls content the application has no record of.
+
+What SS42 buys is that a **second** live reader cannot appear quietly beside the one legitimate one. It does not buy the snapshot, and an accessor added with one caller and no rule requiring its use would look like it had. The fix belongs with whoever writes the frame path (M-T6), and C01 §5 states the boundary so it is not inferred from the absence of an accessor.
+
+**Keyed on the receiver, and that is the other direction of SS20's defect.** A bare `.columns` matches `block.columns` in `table/` and `plan.columns` in its planner — nine sites with nothing to do with a terminal — and annotating them would put a claim about terminal width on lines about table columns. So the receiver is named. The residual gap is stated rather than left to be found: a handle stored under a name outside that list escapes, and what closes it is the per-frame snapshot rather than a cleverer pattern.
 
 ### Forbidden literals
 
@@ -135,9 +200,9 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
-| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/blocks/` | C09 T2.9 |
+| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/` | C09 T2.9 |
 | SS40 | The same, in the editor | `src/interaction/` | C17 I2, T2.4 |
-| SS24 | Mutable module state | `table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
+| SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
 | SS27 | Timer or escalation logic, including a `SIGTERM` literal | `process/` | C21 I8, I11, T2.4 |
@@ -168,6 +233,10 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 **Two named exceptions, each with its reason recorded.** `node-pty` ships darwin and win32 prebuilds only, so Linux compiles it; `--ignore-scripts` stays set for the whole tree and `make install` invokes that one build by name, which is a different thing from letting every package run arbitrary code. `esbuild` is transitive under vitest and its postinstall is *suppressed* — npm installs the platform binary as an optional dependency and the hook is a fallback we never reach. Listed rather than silently skipped, so that if a vitest upgrade makes it load-bearing there is a place the reason already lives. Anything else acquiring an install script fails the build.
 
 **SS26 is pending and has never been evaluated.** It scopes to `src/data/process/` and the scaffold created `src/data/process.ts` — a file, not a directory — so the prefix match finds nothing and the rule passes on every run. It came in with the scaffold and would not have fired had it been violated. The scope is corrected when C21 lands and creates the directory; until then the vacuity suite carries it as a named pending entry rather than counting it as enforcement. This is the defect the sixth kind of check exists to find, and it is recorded here rather than quietly fixed because the count of live rules should be honest.
+
+**SS23 scopes to `src/presentation/`, not to `blocks/`.** Its reason — display width comes from `cells()`, the same implementation the measurer uses, or measurement drifts — is a fact about presentation and not about one directory of it. Scoped to `blocks/`, it stopped seeing `src/presentation/table/` the day C11 created it, and C11 is the largest consumer of measurement in the tree. That is SS26's failure with a longer fuse: narrower reads as tighter and is looser, because it stops seeing new files. The same argument SS2 records, arriving through the same door twice.
+
+**SS24 names `src/presentation/table/` in full, and C11 creates the directory to match.** The inventory said `table/` while the scaffold held `src/presentation/table.ts` — a file — so the prefix match would have found nothing and the rule would have reported compliance from the day it was written. That is SS26 exactly, and it is recorded here because the fix was to choose the *implementation* layout to suit the rule rather than to loosen the rule: C11 implements into a directory. A rule with nothing to be wrong about passes exactly like a rule that is satisfied.
 
 **SS28 is the L4-orchestrates rule made checkable.** It caught four attempted violations during specification; as a scan it catches the fifth.
 
@@ -308,8 +377,12 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 12. Every failure names the rule, the file, the line and the declaring spec.
 13. MG and SS run pre-commit, because their violations become depended-upon within days.
 14. **Every rule ships with a test that fabricates a violation and asserts it fires, naming the rule.** A rule with no such test is assumed vacuous until it has one. Every scan's scope is separately asserted to match at least one file in the tree; and where a rule enumerates named entities — mode owners, export names, file paths — those names are separately asserted to exist. A scope or a name that matches nothing is listed as pending, with its blocking component, and the pending entry fails once it becomes real.
+14a. **Where a rule targets a code idiom, its fabricated violation is copied from a real call site rather than written fresh.** A fabrication written by the author of the rule, in the same sitting, reproduces the author's assumption about how the code is written — which is how SS20 came to be correct about a syntax its only consumer does not use (§2). Where no real call site exists yet, the rule is pending until one does.
 14b. **The inventory in this document equals what is implemented plus what is explicitly pending**, asserted as set equality over the rule ids. A rule listed here and never built is invisible to every other check — there is no code for a fabricated violation to fire against — so it fails at the point of being written down instead.
-15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for.
+15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for. For surface deferrals it is a check rather than a consequence: TD4 asserts the named blocker's kind appears in that surface's own composition, which is the one form of "wrong blocker" that is derivable from two things a surface spec already states (§9a).
+15a. **A surface deferral's blocker is the right component** (TD4, §9a), checked from two things a surface spec already states: which section holds its illustration, and what the surface composes to. Half of it has no live subject once C25 lands, and the suite asserts that rather than leaving it to be assumed.
+15b. **No rule id appears twice in this document.** Every other check here compares sets, so a duplicated id is one member and the second rule is invisible to all of them (§2).
+16. **Every path the deferral map names exists** (TD3, §9a). A mapped file that is not there reports compliance because it cannot find what it was asked about, which is commitment 14's vacuity class inside the deferral machinery itself.
 
 ---
 
@@ -324,6 +397,33 @@ The moment C10 landed, three such deferrals surfaced: one about glyph substituti
 The rule reports them because it cannot tell the difference either: it fires on *implemented blocker, test still deferred*, and a mislabelled deferral satisfies that exactly. **The fix is not to make the rule cleverer.** A wrong blocker is a claim about which component owns a piece of work, and the only thing that can settle it is a person reading both specs — which is precisely what the failure forces, at the one moment the answer is cheap to establish.
 
 So the response to TD2 is two-branched, and both branches are ordinary: write the test, or restate what it is actually waiting for. An exemption is neither.
+
+### TD3 — a mapped source path must exist
+
+`COMPONENT_SOURCES` maps each component to the file whose existence means "implemented", and `defaultIsImplemented` returns false for a file that is not there. So **a mapped path that never existed exempts every deferral waiting on that component, silently and permanently** — the rule reports compliance, and the reason it reports compliance is that it cannot find the component it was asked about.
+
+This is not hypothetical. `C07` mapped to `src/data/adapters.ts` while C07 landed as `src/data/adapters/index.ts`, so every `waits on C07` todo has been exempt since the map was written. SS26's defect, inside the machinery built to catch SS26's defect — which is the honest reason it is a rule and not a correction: the class recurs, so the check covers the class.
+
+TD3 asserts every mapped path is a file that exists, with exceptions named and reasoned rather than tolerated — a component with no scaffold at all (C25 today) is a legitimate absence and is listed as one. It catches a mapping that was wrong when written and a mapping that a later component's own layout invalidates: C11 moving `src/presentation/table.ts` to `src/presentation/table/` to satisfy SS24 would otherwise have exempted C11's seven deferrals on the commit that made them writable.
+
+### TD4 — a surface deferral's blocker must appear in that surface's own composition
+
+The paragraphs above say a wrong blocker cannot be told from a pending one and that the fix is a person reading two specs. **That is true of the general case and false of one important special case**, and the special case is where both known instances occurred.
+
+A surface deferral says "this illustration cannot be composed until C*nn* registers its kind". The surface's own spec declares the block sequence it composes to, and the surface tests already parse it. So the claim is checkable: if a deferral names C25 and the surface's sequence contains no `patch`, the deferral is wrong — not pending, wrong, and wrong on the day it was written.
+
+Both instances:
+
+| Deferral | Sequence | Named | Verdict |
+|---|---|---|---|
+| S09 §2 | `rule, rule, steps, notice, rule, table, notice` | C11 **and C12** | became writable with C11 and stayed exempt for a whole component |
+| S07 §3 | S07 draws two `diff` blocks; §3 is a verdict table with no illustration at all | C25 | never had a patch region; the surface that draws one is S10 §4a |
+
+The second is worse than the first and was found by looking once rather than by any rule. When S09's was corrected, the note here read that a wrong blocker is rarer than a missing one and that this was the first. It was the second within one component, which is the standing signal for covering the class instead of the instance.
+
+**Scoped to surface deferrals, deliberately.** The general form — does this blocker own this work — needs to know which component owns which behaviour, and that is this document's `Declared` column rather than anything derivable. The narrow form needs only two things a surface spec already states: what it composes to, and what it says it is waiting for. TD1 checks the blocker is *known*, TD3 that its path *exists*, and TD4 that it is the *right* component. Three directions, and TD4 is the one that had no mechanism.
+
+**A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
 
 ---
 

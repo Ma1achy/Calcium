@@ -396,3 +396,25 @@ function surface(ref: ColourRef, slot: string, theme: ResolvedTheme, depth: Dept
 export function resolveTone(tone: Tone, theme: ResolvedTheme, caps: Caps): Style {
   return resolve(`tone.${tone}`, theme, caps);
 }
+
+/**
+ * The same colour, in the other channel (§4a, I22).
+ *
+ * **`surface` refs only.** A palette ref returns the empty `Style`, and that is a
+ * rule rather than an omission: §4's floors are measured for text *on* a surface,
+ * so painting a tone as a background asks for a guarantee nobody computed. A
+ * caller wanting `tone.ok` behind text is a caller who has not decided what reads
+ * on it.
+ *
+ * Everything else is inherited rather than re-implemented — the depth ladder, the
+ * curated 4-bit index, the memo, and the 1-bit vanishing that makes I24 lossless.
+ * The one thing this function does is move the value from `colour` to
+ * `background`, and it does it by resolving through `resolve` so the two channels
+ * cannot degrade differently.
+ */
+export function resolveBackground(ref: ColourRef, theme: ResolvedTheme, caps: Caps): Style {
+  if (split(ref)[0] !== "surface") return NO_STYLE;
+
+  const asForeground = resolve(ref, theme, caps);
+  return asForeground.colour === undefined ? NO_STYLE : { background: asForeground.colour };
+}

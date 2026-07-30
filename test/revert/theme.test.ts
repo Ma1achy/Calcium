@@ -1,7 +1,17 @@
 // C10 tier 6 — fail-on-revert. Each names the edit that makes a test fail, so
 // the guard is legible from the change rather than from the assertion.
 import { describe, expect, it } from "vitest";
-import { defaultTheme, floorFor, loadTheme, ratio, resolve, resolveTone } from "../../src/presentation/theme/index.js";
+import {
+  defaultTheme,
+  diffPairs,
+  floorFor,
+  loadTheme,
+  ratio,
+  resolve,
+  resolveBackground,
+  resolveTone,
+  validateTokens,
+} from "../../src/presentation/theme/index.js";
 import { SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, store, SURFACES, SYNTAX_SLOTS, TONES, withTone } from "../support/theme.js";
 
@@ -212,5 +222,100 @@ describe("C10 fail-on-revert", () => {
       });
       expect(new Set(five).size).toBe(5);
     }
+  });
+
+  // --- §4a ------------------------------------------------------------------
+
+  it("T6.17 (I23): widening the pairing to every tone is invisible in results", () => {
+    // **The revert that no result catches, which is why the check is on the
+    // pairing.** The obvious claim — ten tones against a diff background would
+    // fail on slots that never land there — is wrong, and asserting it is how this
+    // test failed on the way in. Against the shipped tokens the widened check
+    // *passes*: every one of the seven tones that never appears on a changed row
+    // clears both diff surfaces, `dim` tightest at 4.74 against a floor of 3.
+    //
+    // So what the widening costs is not a failure now. It binds seven slots to a
+    // constraint they do not have to satisfy, and the bill arrives as a *later*
+    // theme rejected for something nobody can see — at which point the fix looks
+    // like weakening the check. This asserts the surplus explicitly so the reason
+    // for the narrow pairing survives someone reading only the passing suite.
+    const NEVER_ON_A_DIFF_ROW = ["default", "dim", "warn", "info", "accent", "meta", "identifier"];
+    const tokens = defaultTheme.dark;
+    const surplus: string[] = [];
+
+    for (const surface of ["diffAdd", "diffRemove"] as const) {
+      const hex = (tokens.surfaces as Readonly<Record<string, string>>)[surface] as string;
+      for (const slot of NEVER_ON_A_DIFF_ROW) {
+        const value = tokens.palettes["tone"]?.slots[slot] as string;
+        expect(
+          ratio(value, hex),
+          `tone.${slot} on ${surface}: the widened check would pass, which is why it is not caught`,
+        ).toBeGreaterThanOrEqual(floorFor(slot));
+        surplus.push(`tone.${slot}`);
+      }
+    }
+
+    // And the pairing does not contain them, which is the whole assertion.
+    const paired = new Set(diffPairs(tokens).map(([palette, slot]) => `${palette}.${slot}`));
+    for (const name of surplus) {
+      expect(paired.has(name), `${name} must not be in the diff pairing`).toBe(false);
+    }
+  });
+
+  it("T6.18 (I23): dropping the gutter tones from the pairing → the gutter is unchecked", () => {
+    // The other direction, and the quieter one: `syntax` alone leaves the numbers
+    // and the `+`/`-` marker unmeasured on the surface they are drawn on. The
+    // three that would go unchecked are named, so the loss is visible.
+    const tokens = defaultTheme.dark;
+    const gutter = ["ok", "error", "muted"];
+
+    for (const slot of gutter) {
+      const value = tokens.palettes["tone"]?.slots[slot] as string;
+      const hex = tokens.surfaces.diffAdd;
+      expect(ratio(value, hex), `tone.${slot} is measured, not assumed`).toBeGreaterThanOrEqual(
+        floorFor(slot),
+      );
+    }
+  });
+
+  it("T6.19 (I22): letting `resolveBackground` take a palette ref → T1.15 fails", () => {
+    // A tone painted behind text is a tone with no floor measured for it in that
+    // role. The empty `Style` is the refusal.
+    const current = store().current;
+    expect(resolveBackground("tone.ok", current, caps(24))).toEqual({});
+    expect(resolveBackground("syntax.keyword", current, caps(24))).toEqual({});
+  });
+
+  it("T6.20 (I2, I24): emitting a diff background at depth 1 → T1.16 fails", () => {
+    // The one signal a monochrome terminal cannot show becoming the one that
+    // carries the meaning. At one bit the marker and the gutter are all there is.
+    for (const variant of VARIANTS) {
+      const current = store(variant).current;
+      for (const surface of ["diffAdd", "diffRemove"] as const) {
+        expect(resolveBackground(`surface.${surface}`, current, caps(1)), surface).toEqual({});
+      }
+    }
+  });
+
+  it("T6.21 (I23): a diff background too strong for syntax → the theme is rejected at load", () => {
+    // The check doing what it is for, shown rather than trusted. A `diffAdd`
+    // lifted to where a real tool would put it on a dark theme breaks `comment`
+    // and `muted` first — the two recessive slots that bound the whole budget.
+    const tokens = defaultTheme.dark;
+    const broken = {
+      ...tokens,
+      surfaces: { ...tokens.surfaces, diffAdd: "#1b4721" },
+    };
+
+    const errors = validateTokens(broken);
+    const paths = errors.map((e) => e.path);
+
+    expect(errors.length, errors.map((e) => e.message).join("\n")).toBeGreaterThan(0);
+    expect(paths).toContain("palettes.syntax.comment");
+    expect(paths).toContain("palettes.tone.muted");
+    expect(errors.some((e) => e.message.includes("the background moves rather than the slot"))).toBe(
+      true,
+    );
+    expect(loadTheme({ dark: broken, light: defaultTheme.light }, "dark").ok).toBe(false);
   });
 });

@@ -22,54 +22,89 @@
 At 100 columns, `--mine`, live:
 
 ```
-▌ ── ps · 4 of 11 · --mine · last 24h ─────────────────────────────────────────
+▌ ── ps · 4 of 11 · --mine · last 24h ──────────────────────────────────────────────────────────────
 ▌
-▌   all ×11    training ×9    evaluation ×2
-▌   ● running ×1   ✓ succeeded ×6   ✗ failed ×2   ○ queued ×1
+▌ all ×11  training ×9  evaluation ×2
+▌ ● running ×1  ✓ succeeded ×6  ✗ failed ×2  ○ queued ×1
 ▌
-▌     uuid     kind        family            status       detail        metric      age
-▌ ▸ ● a3f9b21  candidate   digit-classifier  running      ep 17/40      0.0372 ▁▂▃▅▆  23m
-▌ ▸ ✓ 7c2d4e1  experiment  decoder-zoom      succeeded                  0.0089       41m
-▌ ▸ ✗ 2e8a04c  experiment  graphsage         failed       OOM at ep 3        —      1h 12m
-▌ ▸ ○ f410d99  candidate   flow-predictor    queued                          —         3m
+▌       uuid     family          status       detail            metric     age  kind        owner
+▌ ▸  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
+▌ ▸  ✓  7c2d4e1  decoder-zoom    succeeded                      0.0089     41m  experiment  malachy
+▌ ▸  ✗  2e8a04c  graphsage       failed       OOM at ep 3            —  1h 12m  experiment  priya
+▌ ▸  ○  f410d99  flow-predictor  queued                              —      3m  candidate   malachy
 ▌
-▌   ⏎ detail   ␣ expand   ≡ logs   ⚡ events   ↑ promote   ⊘ cancel
+▌ ⏎ detail  ␣ expand  ≡ logs  ⚡ events
 ```
+
+**This figure is `planColumns`' output, not a drawing.** The earlier one was drawn by hand before the priorities in §3 were fixed and never recomputed, and it was wrong in two ways that only arithmetic finds. It showed nine columns ordered `uuid · kind · family`, against §3's declared `uuid · family · status · detail · metric · spark · age · kind · owner · mr` — so the picture violated C11 I4, priority governs survival and never position, in the section whose own §3 opens by citing it. And it omitted `owner`, which survives here: the ten admitted columns sum to 94 cells with gaps, and 94 ≤ 98.
+
+The arithmetic, so the next reader does not have to derive it (`test/integration/table.test.ts` asserts all of it against the planner):
+
+| | Cells |
+|---|---|
+| Terminal | 100 |
+| Content, less S01's two-cell gutter | 98 |
+| Twelve minimums, `1+1+7+12+11+12+8+8+6+10+8+6` | 90 |
+| Eleven gaps at 2 | 22 |
+| **All twelve** | **112** — over by 14 |
+| Less `mr` (6 + a gap) | 104 — still over |
+| Less `spark` (8 + a gap) | **94** — fits, and the ten drawn above are what is left |
+| Residual to the two `flex` columns, `family` and `detail` | 4, two each |
+
+**`family` truncates at 98, and that is what the correction exposes.** `digit-classifier` is 16 cells and the column gets 14 — 12 declared plus its half of the residual. The old figure appeared to fit it only because it had dropped `owner` and spent those 10 cells on `family`. If a full family name at 100 columns matters more than `owner` does, the remedy is `owner`'s priority or `family`'s minimum in §3, not the picture.
+
+**`metric` and `age` are right-aligned because §3 now declares it.** The old figure right-aligned them too, on a field the column table did not record — which is the third instance of an illustration carrying an unstated intent, and the reason `HEIGHT_AUDIT.md` now says what to do when a figure and a table disagree. The picture was right about the intent; what was missing was the declaration.
+
+Both figures in this section are generated from `planColumns` and C11's renderer, through the fixture in `test/support/surfaces.ts`, whose columns are read from §3's table rather than restated. A change to §3 changes them.
 
 Row 1 expanded:
 
 ```
-▌ ▾ ● a3f9b21  candidate   digit-classifier  running      ep 17/40      0.0372 ▁▂▃▅▆  23m
-▌     owner     malachy@fmx.io
-▌     mr        !1248  auto-merged
-▌     node      gpu-04.fmx.internal · 2×GPU · 16Gi
+▌ ▾  ●  a3f9b21  digit-classif…  running      ep 17/40          0.0372     23m  candidate   malachy
+▌     mr    !1248  auto-merged
+▌     node  gpu-04.fmx.internal · 2×GPU · 16Gi
 ▌     ████████████░░░░░░░░░░░░░░░░  43%
 ▌     ≡ logs   ⚡ events   ◉ watch   ⊘ cancel   { } json
 ```
 
 The expanded detail carries the columns that dropped at this width (C11 I2) followed by the row's own detail blocks — a `progress` and a `pills` of actions.
 
+**`owner` is not in the expand row, because at 100 it is not dropped.** The earlier figure listed it there, which followed from the same uncorrected drawing: it had `owner` missing from the header, so the expand row was where it went. A field shown twice in one frame is the other half of that defect. At 60 columns `owner` does drop and does appear here — §6's narrow case, and T5.3 asserts it.
+
+**The sparkline is its own column now, and it is absent here because it drops at 100.** The earlier figure drew `0.0372 ▁▂▃▅▆` inside `metric`: 12 cells and a five-sample spark, in a column §3 declares at `min` 8 — matching neither the column nor A01 A.2's eight-point window. §3 splits them, and §3 says why.
+
 ---
 
 ## 3. Columns
 
-Eleven columns. Priority governs survival, never position (C11 I4).
+Twelve columns. Priority governs survival, never position (C11 I4).
 
-| Column | Priority | Min | Flex | Sortable | Source |
-|---|---|---|---|---|---|
-| expand | 100 | 1 | — | — | Synthesised by C11 |
-| glyph | 100 | 1 | — | — | `status` → the D-vocabulary glyph |
-| uuid | 90 | 7 | — | yes | `uuid`, first 7 cells |
-| family | 85 | 12 | yes | yes | `family`, else `name` |
-| status | 80 | 11 | — | yes | `status`, word only |
-| detail | 65 | 12 | yes | — | Epoch, failure reason, or headline metric |
-| metric | 60 | 8 | — | yes | `loss` or `headline`, plus `spark` |
-| age | 50 | 6 | — | yes | `age_minutes`, humanised |
-| kind | 30 | 10 | — | yes | `kind` |
-| owner | 20 | 8 | — | yes | `owner` |
-| mr | 10 | 6 | — | — | `mr`, an `open` action |
+| Column | Priority | Min | Align | Flex | Sortable | Source |
+|---|---|---|---|---|---|---|
+| expand | 100 | 1 | left | — | — | Synthesised by C11 |
+| glyph | 100 | 1 | left | — | — | `status` → the D-vocabulary glyph |
+| uuid | 90 | 7 | left | — | yes | `uuid`, first 7 cells |
+| family | 85 | 12 | left | yes | yes | `family`, else `name` |
+| status | 80 | 11 | left | — | yes | `status`, word only |
+| detail | 65 | 12 | left | yes | — | Epoch, failure reason, or headline metric |
+| metric | 60 | 8 | **right** | — | yes | `loss` or `headline`, the number alone |
+| spark | 15 | 8 | left | — | — | `Cell.spark` — the last 8 points (A01 A.2) |
+| age | 50 | 6 | **right** | — | yes | `age_minutes`, humanised |
+| kind | 30 | 10 | left | — | yes | `kind` |
+| owner | 20 | 8 | left | — | yes | `owner` |
+| mr | 10 | 6 | left | — | — | `mr`, an `open` action |
+
+**`align` is declared, not defaulted.** `ColumnDef.align` is required (C04 §3) and this table did not state it, so the figure in §2 drew `metric` and `age` right-aligned on a field the spec never declared — the third time an illustration has carried an intent the text does not record (see `HEIGHT_AUDIT.md`). Numbers right-align; that is the convention the drawing was following.
+
+C11 cannot derive it. It has no way to know a column holds numbers, and `metric` legitimately holds `—` for a run that never produced one — so a renderer inferring alignment from content would right-align a column until the first failure appeared in it.
 
 **Status is a word; the detail is a column.** `running · ep 17/40` as one cell would truncate to `running · ep 17/4…`, and a half-rendered status reads as a different status. Splitting them means the epoch or the failure reason drops as a *column* — cleanly, into the expand row — while the status word never truncates (C11 I10, satisfied by `min` equalling the longest word plus glyph).
+
+**The sparkline is its own column for the same reason, and the second instance is what makes it a principle: a cell holds one value.** `0.0372 ▁▂▃▅▆` is a number *and* a series in one cell, and C11 truncates a cell at its planned width — so at any width where that cell is short, either the number loses digits or the sparkline becomes a shorter series that reads as real. Neither is recoverable by the reader, and neither is distinguishable from correct output. Two cells cannot truncate into each other; the rule S03 learned once for `status`/`detail` is the rule, not that case's exception. (S04 §3 states the same thing for a gate's comparator and threshold, which makes three.)
+
+The arithmetic then works the right way round. Widening `metric` to 15 would cost 7 cells at every width and push `owner` out at 100. As its own column below `owner` in priority, the spark is what goes at 100 and `owner` survives — **decoration is lost before a data field is**, which is what priority is for.
+
+`spark` carries no label and no `sortable`: there is nothing to sort a series by that a reader would mean, and a header over eight ramp glyphs says less than the blank does. Its 8 cells are A.2's window, one glyph per sample (C12 §2), so the column is exactly the series and not a scaled version of it.
 
 ### What survives at each width
 
@@ -77,11 +112,11 @@ Derived from the priorities, and pinned by golden frames:
 
 | Width | Columns |
 |---|---|
-| 160 | all eleven |
-| 120 | all eleven, family flexed |
-| 100 | drops `mr` |
-| 80 | drops `mr`, `owner`, `kind` |
-| 60 | drops `mr`, `owner`, `kind`, `age`, `metric` |
+| 160 | all twelve, summing to 112 cells with gaps |
+| 120 | all twelve, family and detail flexed |
+| 100 | drops `mr`, `spark` |
+| 80 | drops `mr`, `spark`, `owner`, `kind` |
+| 60 | drops `mr`, `spark`, `owner`, `kind`, `age`, `metric` |
 
 At 60 the table is expand, glyph, uuid, family, status, detail — which is still enough to identify a run and know what happened to it, and everything else is one keystroke away in the expand row.
 

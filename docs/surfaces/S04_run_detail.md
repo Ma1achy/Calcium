@@ -51,20 +51,34 @@ Fields absent from the envelope are **omitted, not rendered empty**. A queued ru
 ```
 ▌ ── loss · epoch 17 / 40 · 43% ────────────────────────────────────────────────
 ▌
-▌   0.82 │⠉⠲⢄
-▌        │    ⠑⠢⣀
-▌   0.43 │       ⠉⠒⠤⣀⡀
-▌        │            ⠉⠒⠦⠤⣀⣀
-▌   0.04 │                   ⠉⠉⠒⠒⠤⠤⠤⣀⣀⣀
-▌        └──────────────────────────────────────
-▌         epoch 0            epoch 20         now
+▌   0.82 │⠉⠒⠢⢄⣀
+▌        │     ⠉⠑⠢⠤⢄⣀⡀
+▌   0.43 │           ⠈⠉⠉⠒⠒⠤⠤⣀⣀
+▌        │                    ⠉⠉⠉⠒⠒⠒⠒⠤⠤⠤⠤⣀⣀⣀⣀
+▌   0.04 │                                   ⠉⠉⠉⠉⠑⠒⠒⠒⠒⠒⠒⠒⠢⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⠤⢄⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀
+▌        └──────────────────────────────────────────────────────────────────────
+▌         epoch 0                        epoch 20                            now
 ▌
 ▌   ████████████░░░░░░░░░░░░░░░░  43%
 ▌
 ▌   loss 0.0372 ↓     val_acc 0.968 ↑     eta 18m
 ```
 
-A `plot`, a `progress`, and a `keyValue` of headline metrics with direction arrows. Arrows come from the metric's declared direction of improvement, not from the sign of the delta — a rising loss is worse and a rising accuracy is better, and only the far side knows which is which.
+**This curve is C12's output, not a drawing.** The earlier one was drawn by eye and could not have been produced from any data, in three independent ways that only the rasteriser finds:
+
+| What | Measured |
+|---|---|
+| Interior dot columns with no ink | **6, 7, 23, 36, 37** — Bresenham (C12 I14) inks every column a segment crosses, so the only defined gap is a filtered non-finite value (C12 §4), and a loss curve has none |
+| Where the curve stopped | 29 cells of a 38-cell plot area, while C12 §4 spreads the samples across the full width and the x-labels put `now` at the right edge |
+| The gutter | Two cells — label, space, `│` — against §2's declared three. Here the **figure was right**: the data sits flush against its own axis, and C12 §2 changed to `− 2` |
+
+The first two are drawing errors and the tables win; the third is the fifth verdict class in `HEIGHT_AUDIT.md` — a declaration changing because two figures drew the same thing independently.
+
+Height 5, width 76, eighteen epochs from 0.82 to 0.0372 — so the min label is the `loss 0.0372` the metrics row below states, which the old figure's `0.04` only happened to resemble. The three y-labels share one precision, taken from the span (C12 §3).
+
+A `plot`, a `progress`, and a **headerless `table`** of headline metrics with direction arrows. Arrows come from the metric's declared direction of improvement, not from the sign of the delta — a rising loss is worse and a rising accuracy is better, and only the far side knows which is which.
+
+**The metrics line was described as a `keyValue` and cannot be one.** It draws three label/value pairs on a single row, and `keyValue` is one row per pair (C09 §3) — so as written the region composed to fifteen rows against the thirteen it draws. This is the S08 §4 finding a second time, and it takes the same remedy: `table` with `showHeader: false`, which is the shape C04 §3 added the flag for. Found by composing the region rather than by reading it, which is what `test/contract/surfaces.test.ts` is for.
 
 A settled run drops the progress bar and the eta; the curve remains.
 

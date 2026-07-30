@@ -459,6 +459,62 @@ switch (mode) {
     break;
   }
 
+  // C01 T5.8 — the width hazard, forced rather than raced.
+  //
+  // The sequence is the one the hazard *is*: read the width, then have the terminal
+  // change, then write a frame composed against the width that was read. Forced with
+  // a handshake instead of a sleep, because a race that reproduces sometimes is a
+  // test that fails sometimes for a reason nobody trusts.
+  //
+  // **This composes against `writer.columns`**, which is the only route to a width
+  // there is: C01 exposes no initial size, and `onResize` fires on a signal rather
+  // than on demand. That is the finding, not a shortcut for the fixture — see C01 §5.
+  case "width-hazard": {
+    const lifecycle = make();
+    lifecycle.acquire();
+
+    const registry = createBlockRegistry();
+    const loadedTheme = loadTheme(defaultTheme, "dark");
+    if (!loadedTheme.ok) {
+      process.stderr.write("theme failed to load\n");
+      process.exit(4);
+    }
+
+    // Read once, and say what was read, so the test can resize *after* this point
+    // and know which width the frame was composed against.
+    const composedAt = lifecycle.writer.columns;
+    // **Through `writer`, not `process.stdout`.** C01 redirects `stdout.write` to the
+    // debug sink at construction (I9), so a marker written the ordinary way never
+    // leaves the process — which is the redirection working, and cost one probe run
+    // to remember.
+    lifecycle.writer.write(`\nCOMPOSED_AT ${String(composedAt)}\n`);
+
+    let go = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => {
+      go += chunk;
+      if (!go.includes("GO")) return;
+
+      // A block whose rendered rows are exactly `composedAt` cells wide. `rule` fills
+      // its width, which is what makes the too-long line unambiguous.
+      const lines = renderSequenceToLines(
+        registry,
+        [{ kind: "rule", id: "r", label: "width hazard", gapBefore: false }],
+        composedAt,
+        { theme: loadedTheme.value.current, capabilities: detectCapabilities(process.env).capabilities },
+      );
+
+      // The width the handle reports *now*, after the resize the test performed.
+      // If it differs from `composedAt`, the handle is live — which is the finding.
+      const atWriteTime = lifecycle.writer.columns;
+      for (const line of lines) lifecycle.writer.write(`${line}\n`);
+      lifecycle.release();
+      process.stdout.write(`\nWROTE ${String(lines.length)} ${String(atWriteTime)}\n`);
+      process.exit(0);
+    });
+    break;
+  }
+
   default:
     process.stderr.write(`unknown mode: ${String(mode)}\n`);
     process.exit(1);

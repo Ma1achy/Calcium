@@ -129,6 +129,7 @@ export function truncate(
   text: string,
   width: number,
   caps: Readonly<{ unicode: "full" | "bmp" | "ascii" }>,
+  from: "start" | "end" = "end",
 ): string {
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return "";
@@ -142,18 +143,29 @@ export function truncate(
   const budget = limit - 1; // the marker's own cell
   if (budget <= 0) return marker;
 
-  let out = "";
+  // `from` names the end characters are removed from (C04 I32), so `"start"` walks
+  // the clusters in reverse and keeps the tail. One walk, parameterised, rather
+  // than two implementations: a second pass over the same grapheme stream would
+  // round differently at the boundary in exactly the CJK and ZWJ cases this
+  // module exists for (C09 I9).
+  const clusters = [...GRAPHEMES.segment(clean)].map((s) => s.segment);
+  const order = from === "start" ? [...clusters].reverse() : clusters;
+
+  let kept = "";
   let used = 0;
-  for (const { segment } of GRAPHEMES.segment(clean)) {
+  for (const segment of order) {
     const w = clusterCells(segment);
     if (used + w > budget) break;
-    out += segment;
+    kept = from === "start" ? segment + kept : kept + segment;
     used += w;
   }
 
   // A double-width glyph refused at the boundary leaves a cell to fill, so the
-  // result is exactly `limit` cells rather than `limit - 1`.
-  return out + " ".repeat(budget - used) + marker;
+  // result is exactly `limit` cells rather than `limit - 1`. The padding sits
+  // beside the marker in both directions, which is what keeps the kept text
+  // flush against the end it was kept from.
+  const pad = " ".repeat(budget - used);
+  return from === "start" ? marker + pad + kept : kept + pad + marker;
 }
 
 /**
@@ -191,6 +203,41 @@ export function truncateParts(
   }
 
   return { kept, suffix: " ".repeat(budget - used) + marker };
+}
+
+/**
+ * Compare two strings by grapheme cluster (C11 \u00a74).
+ *
+ * Here rather than in C11 because this file owns the one segmenter (\u00a71's reason
+ * for `cells`, applied to ordering): a second `Intl.Segmenter` built in a sort
+ * comparator is both a per-call cost on every frame and a second answer to "where
+ * does a cluster end".
+ *
+ * Clusters are compared by code point, not by locale. `Intl.Collator` would read
+ * the ambient locale, which is A03 SS1's objection in a different coat \u2014 a table
+ * that sorts differently on a colleague's machine is a golden frame that cannot be
+ * shared, and C11 has no injected locale to take one from.
+ */
+export function compareByGrapheme(a: string, b: string): number {
+  if (a === b) return 0;
+  const left = [...GRAPHEMES.segment(stripControl(a))];
+  const right = [...GRAPHEMES.segment(stripControl(b))];
+  const shared = Math.min(left.length, right.length); // cells-ok
+
+  for (let i = 0; i < shared; i += 1) {
+    const l = left[i]?.segment ?? "";
+    const r = right[i]?.segment ?? "";
+    if (l === r) continue;
+    const lp = l.codePointAt(0) ?? 0;
+    const rp = r.codePointAt(0) ?? 0;
+    if (lp !== rp) return lp - rp;
+    // Same base, different cluster \u2014 a combining mark or a joiner. Ordered by the
+    // whole cluster's code units, which is arbitrary but total and stable.
+    return l < r ? -1 : 1;
+  }
+
+  // A prefix sorts before the string that extends it.
+  return left.length - right.length; // cells-ok
 }
 
 /**

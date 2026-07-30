@@ -13,6 +13,10 @@ import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
 import {
   GLYPH_SUBSTITUTIONS,
   GLYPH_TOKENS,
@@ -29,6 +33,12 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
  * declares them, and they resolve through the `raw` fallback here — which is
  * I10 working, not coverage. C11, C12 and C25 register them, and T2.6 is the
  * composition-level test that asserts all seventeen are present.
+ *
+ * **All three exist now, and the set stays.** It is not a list of the unbuilt; it
+ * is the list of kinds this file measures through the fallback *on purpose*,
+ * because measuring `table` here would measure `raw` and look like coverage. Each
+ * has its own tier-2 measurement against its own registry — C11 T2.1, C12 T2.1,
+ * C25 T2.1 — and T2.6 below is where the seventeen are asserted together.
  */
 const REGISTERED_ELSEWHERE = new Set(["table", "plot", "patch"]);
 
@@ -200,6 +210,52 @@ describe("C09 contract — measurement", () => {
     // the suite would report success over the gap.
     expect(uncoveredKinds(measurable(), CORPUS)).toEqual([]);
   });
+
+  it("T2.6c (I13): all seventeen kinds, and the three arrive through `register`", () => {
+    // **The composition-level half, assertable for the first time.** It waited on
+    // C25 because "every block kind" cannot be honest while one is unregistered,
+    // and a test that named the fourteen would have read as covering the union.
+    //
+    // The seventeen are written out literally rather than derived from `kinds`,
+    // for C05 T1.7c's reason: a list taken from the thing it checks agrees with
+    // itself and passes on any addition. Adding an eighteenth kind fails here,
+    // which is where the decision should be visible.
+    const kit = measurable({
+      definitions: [
+        tableDefinition as unknown as BlockDefinition<never>,
+        plotDefinition as unknown as BlockDefinition<never>,
+        patchDefinition as unknown as BlockDefinition<never>,
+      ],
+    });
+
+    expect([...kit.kinds].sort()).toEqual([
+      "code",
+      "diff",
+      "events",
+      "group",
+      "keyValue",
+      "logs",
+      "notice",
+      "panel",
+      "patch",
+      "pills",
+      "plot",
+      "progress",
+      "raw",
+      "rule",
+      "steps",
+      "table",
+      "tip",
+    ]);
+
+    // And the three are not privileged: a default registry lacks exactly them, so
+    // the seventeen are fourteen plus three registrations rather than seventeen
+    // shipped and three of them documented as optional.
+    const defaults = new Set(measurable().kinds);
+    for (const kind of REGISTERED_ELSEWHERE) {
+      expect(defaults.has(kind), `${kind} must not be a default`).toBe(false);
+    }
+  });
 });
 
 describe("C09 contract — the source rules", () => {
@@ -220,7 +276,7 @@ describe("C09 contract — the source rules", () => {
     expect(checkSourceScans(files).filter((v) => v.rule === "SS23")).toEqual([]);
   });
 
-  it("T2.11 (I7): no kind imports the registry", () => {
+  it("T2.11 (I7, MG9): no kind imports the registry", () => {
     // Seam 1's structural half. Container kinds resolve children solely through
     // the injected `measureChild` and `ctx.renderChild`; an import here would be
     // a cycle between the registry and the kinds registered into it.

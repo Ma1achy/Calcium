@@ -12,7 +12,7 @@
 // let S07 draw a `diff` with no header through four revisions of the spec.
 import { readFileSync } from "node:fs";
 import { block } from "../../src/data/viewmodel/index.js";
-import type { Block } from "../../src/data/viewmodel/index.js";
+import type { Block, Cell, ColumnDef, Glyph, TableRow } from "../../src/data/viewmodel/index.js";
 
 export type SurfaceFrame = Readonly<{
   /** The spec file, and which fenced illustration inside it. */
@@ -42,6 +42,140 @@ export function illustratedRows(file: string, fence: number): number {
   const found = fences(file)[fence];
   if (found === undefined) throw new Error(`${file} has no fenced block ${fence}`);
   return found.replace(/\n$/, "").split("\n").length;
+}
+
+// --- the S-series' column and drop tables (A03 CP6) ------------------------
+//
+// Read from the markdown for the same reason the row counts are. A fixture
+// restating S03's drop order would agree with itself while the spec drifted, and
+// the drop tables are the one part of a surface that was verified against an
+// independent implementation of the planner during specification — so a
+// disagreement locates a defect on one side or the other, which is only true if
+// the comparison reads what a human reads.
+
+/** A markdown table, as header cells and body rows of cells. */
+function tables(file: string): readonly Readonly<{ header: readonly string[]; rows: readonly (readonly string[])[] }>[] {
+  const lines = readFileSync(file, "utf8").split("\n");
+  const out: { header: readonly string[]; rows: (readonly string[])[] }[] = [];
+
+  const cellsOf = (line: string): readonly string[] =>
+    line
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((c) => c.trim());
+
+  for (let i = 0; i < lines.length; i += 1) { // cells-ok
+    const line = lines[i] ?? "";
+    const next = lines[i + 1] ?? "";
+    // A header is a `| … |` row followed by the `|---|` separator. Anything else
+    // beginning with a pipe is a body row of a table already open.
+    if (!line.trim().startsWith("|") || !/^\|[\s|:-]+\|$/.test(next.trim())) continue;
+
+    const header = cellsOf(line);
+    const rows: (readonly string[])[] = [];
+    let j = i + 2;
+    while (j < lines.length && (lines[j] ?? "").trim().startsWith("|")) {
+      rows.push(cellsOf(lines[j] ?? ""));
+      j += 1;
+    }
+    out.push({ header, rows });
+    i = j - 1;
+  }
+
+  return out;
+}
+
+/** The keys named in backticks in a cell. `none` and `all eleven` name none. */
+function keysIn(cell: string): readonly string[] {
+  return [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
+}
+
+/** The widths a drop row applies to — `160 · 120 · 100` is three. */
+function widthsIn(cell: string): readonly number[] {
+  return [...cell.matchAll(/\d+/g)].map((m) => Number(m[0]));
+}
+
+export type SurfaceColumn = Readonly<{
+  key: string;
+  priority: number;
+  minWidth: number;
+  align: "left" | "right";
+  truncateFrom: "start" | "end";
+  flex: boolean;
+  sortable: boolean;
+}>;
+
+/**
+ * A surface's declared columns, in declared order.
+ *
+ * S06 merges two into one row — `| expand · glyph | 100 | 1 · 1 | — |` — so a
+ * name containing `·` is split, its minimums with it. The merged form is the
+ * spec's, and reading it is cheaper than asking five surfaces to change shape for
+ * a test.
+ */
+export function surfaceColumns(file: string): readonly (readonly SurfaceColumn[])[] {
+  return tables(file)
+    .filter((t) => t.header[0] === "Column" && t.header[1] === "Priority")
+    .map((t) => {
+      // **By header name, never by position.** The columns of these tables differ
+      // between surfaces — S03 has `Sortable` and `Source`, S06 has neither — and
+      // declaring `Align` shifted `Flex` one right in five files at once. A
+      // positional reader survives that silently: it read `left` as the flex flag
+      // and every flex column became false, which changes no drop order and so
+      // fails no test. Same class as the illustrations this file exists to check.
+      const at = (name: string): number => t.header.findIndex((h) => h === name);
+      const col = {
+        priority: at("Priority"),
+        min: at("Min"),
+        align: at("Align"),
+        trunc: at("Trunc"),
+        flex: at("Flex"),
+        sortable: at("Sortable"),
+      };
+
+      return t.rows.flatMap((row): SurfaceColumn[] => {
+        const cell = (i: number): string => (i < 0 ? "" : (row[i] ?? ""));
+        const names = (row[0] ?? "").split("·").map((n) => n.trim().replace(/`/g, ""));
+        const mins = cell(col.min).split("·").map((m) => Number(m.trim()));
+        const priority = Number(cell(col.priority));
+        // `**right**` — the spec emphasises the exceptions, so the marker is part
+        // of the value as written.
+        const align = cell(col.align).replace(/\*/g, "") === "right" ? "right" : "left";
+        const truncateFrom = cell(col.trunc).replace(/\*/g, "") === "start" ? "start" : "end";
+        const flex = cell(col.flex) === "yes";
+        const sortable = cell(col.sortable) === "yes";
+        return names.map((key, i) => ({
+          key,
+          priority,
+          minWidth: mins[i] ?? mins[0] ?? 1,
+          align: align as "left" | "right",
+          truncateFrom: truncateFrom as "start" | "end",
+          flex,
+          sortable,
+        }));
+      });
+    });
+}
+
+export type SurfaceDrops = Readonly<{ width: number; dropped: readonly string[] }>;
+
+/**
+ * A surface's stated drop order, one entry per width.
+ *
+ * `column` selects which table's drops when a surface states two — S06 draws
+ * families and versions side by side in one table with two cells per row.
+ */
+export function surfaceDrops(file: string, column = 1): readonly SurfaceDrops[] {
+  const table = tables(file).find(
+    (t) => t.header[0] === "Width" && (t.header[column] ?? "") !== "",
+  );
+  if (table === undefined) return [];
+
+  return table.rows.flatMap((row) =>
+    widthsIn(row[0] ?? "").map((width) => ({ width, dropped: keysIn(row[column] ?? "") })),
+  );
 }
 
 // --- S07 diff --------------------------------------------------------------
@@ -87,6 +221,96 @@ const S08_STEPS_OK: Block = block({
   ],
 });
 
+/**
+ * S04 §3's training region — a rule, a plot, a progress bar and the metrics line.
+ *
+ * **The metrics line is a headerless `table`, not a `keyValue`.** The illustration
+ * draws three label/value pairs on one row, and `keyValue` is one row per pair — so
+ * as drawn it composes to three rows where the picture has one. That is the S08 §4
+ * finding again (a `keyValue` drawn as columns), and it takes the remedy S08 §4
+ * names: `table` with `showHeader: false`, which is the shape C04 §3 added the flag
+ * for. Recorded here because the fixture is where the choice becomes visible.
+ */
+const S04_LOSS_PLOT: Block = block({
+  kind: "plot",
+  id: "s04-loss",
+  gapBefore: true,
+  form: "line",
+  height: 5,
+  axes: true,
+  yFormat: "number",
+  xLabels: ["epoch 0", "epoch 20", "now"],
+  // Eighteen epochs, 0.82 down to the 0.0372 the metrics row states. Geometric so
+  // the last value is exactly the stated one rather than approximately it.
+  series: [
+    {
+      label: "loss",
+      values: Array.from({ length: 18 }, (_, i) => 0.82 * (0.0372 / 0.82) ** (i / 17)),
+    },
+  ],
+});
+
+const S04_METRICS: Block = block({
+  kind: "table",
+  id: "s04-metrics",
+  gapBefore: true,
+  showHeader: false,
+  columns: [
+    { key: "loss", label: "loss", align: "left", priority: 90, minWidth: 18, flex: true, sortable: false },
+    { key: "acc", label: "val_acc", align: "left", priority: 80, minWidth: 18, flex: true, sortable: false },
+    { key: "eta", label: "eta", align: "left", priority: 70, minWidth: 10, flex: true, sortable: false },
+  ],
+  rows: [
+    {
+      id: "m",
+      cells: {
+        loss: { text: "loss 0.0372 ↓" },
+        acc: { text: "val_acc 0.968 ↑" },
+        eta: { text: "eta 18m" },
+      },
+    },
+  ],
+});
+
+/**
+ * S09 §2's success frame — and it was never waiting on C12.
+ *
+ * The deferral said "S04, S09, S13 … waits on C12" and S09 has no plot: its
+ * composition is `rule, rule, steps, notice, rule, table, notice` (S09 T1.1). It
+ * became writable when C11 landed and stayed exempt for a whole component, because
+ * TD3 checks that a mapped path exists and nothing checks that a blocker names the
+ * right component (`HEIGHT_AUDIT.md`).
+ */
+const S09_SMOKE_STEPS: Block = block({
+  kind: "steps",
+  id: "s09-smoke",
+  gapBefore: true,
+  steps: [
+    { label: "1 batch through forward", state: "done", detail: "output shape (4, 10)" },
+    { label: "loss.compute on output + targets", state: "done", detail: "value 2.31" },
+    { label: "metrics.val_accuracy.update", state: "done", detail: "accepted" },
+    { label: "metrics.val_loss.update", state: "done", detail: "accepted" },
+    { label: "@prism.validate", state: "done", detail: "batch accepted" },
+  ],
+});
+
+const S09_USER_TESTS: Block = block({
+  kind: "table",
+  id: "s09-user-tests",
+  gapBefore: true,
+  showHeader: false,
+  columns: [
+    { key: "glyph", label: "", align: "left", priority: 100, minWidth: 1, sortable: false },
+    { key: "name", label: "name", align: "left", priority: 95, minWidth: 30, flex: true, sortable: true, truncateFrom: "start" },
+    { key: "duration", label: "duration", align: "right", priority: 60, minWidth: 6, sortable: true },
+  ],
+  rows: [
+    { id: "t1", cells: { glyph: { text: "", glyph: "ok" }, name: { text: "DigitClassifier::smoke_forward_shape" }, duration: { text: "0.04s" } } },
+    { id: "t2", cells: { glyph: { text: "", glyph: "ok" }, name: { text: "DigitClassifier::no_nan_in_weights" }, duration: { text: "0.02s" } } },
+    { id: "t3", cells: { glyph: { text: "", glyph: "ok" }, name: { text: "DigitClassifier::forward_is_deterministic" }, duration: { text: "0.06s" } } },
+  ],
+});
+
 const S08_RESOLVED: Block = block({
   kind: "keyValue",
   id: "s08-resolved",
@@ -100,7 +324,208 @@ const S08_RESOLVED: Block = block({
   ],
 });
 
+// --- the table-bearing surfaces (HEIGHT_AUDIT's C11 deferrals) -------------
+//
+// Each region is drawn from a `table`, so measuring one before C11 registered
+// measured the `raw` fallback — which is why HEIGHT_AUDIT deferred all five by
+// name rather than leaving them untested and unremarked.
+//
+// The columns are the surfaces' own, priorities included, because the height of a
+// table region depends on which columns survive: a dropped column becomes an
+// expand row, and an expand row is a row.
+
+/**
+ * A surface's declared columns, as `ColumnDef`s — **read from its own column
+ * table**, never restated here.
+ *
+ * The same discipline as the row count. A fixture carrying its own priorities and
+ * minimums would compose to the illustrated height forever while §3 drifted, and
+ * §3 is the half that C11's planner is checked against (A03 CP6). Reading it means
+ * a change to a surface's columns flows into its illustrated height on the next
+ * run.
+ */
+function cols(file: string, table = 0): readonly ColumnDef[] {
+  const declared = surfaceColumns(file)[table] ?? [];
+  if (declared.length === 0) throw new Error(`${file} table ${String(table)} declares no columns`);
+
+  return declared.map((c) => ({
+    key: c.key,
+    // `expand` and `glyph` are one cell wide and headed by nothing — a label there
+    // would truncate to an ellipsis, which is what the illustrations show as blank.
+    label: c.key === "expand" || c.key === "glyph" ? "" : c.key,
+    align: c.align,
+    truncateFrom: c.truncateFrom,
+    priority: c.priority,
+    minWidth: c.minWidth,
+    sortable: c.sortable,
+    ...(c.flex ? { flex: true } : {}),
+    ...(c.key === "expand" ? { role: "expand" as const } : {}),
+  }));
+}
+
+function cellsOfRow(
+  id: string,
+  values: Readonly<Record<string, string>>,
+  glyph?: Glyph,
+): TableRow {
+  const out: Record<string, Cell> = {};
+  for (const [key, text] of Object.entries(values)) out[key] = { text };
+  // The glyph column carries a slot and no text — one cell wide, and C11 draws the
+  // character (C09 §4). The illustrations show it, so the fixtures that regenerate
+  // them have to carry it.
+  if (glyph !== undefined) out["glyph"] = { text: "", glyph };
+  return { id, cells: out };
+}
+
+const S03_TABLE: Block = block({
+  kind: "table",
+  id: "s03-runs",
+  gapBefore: true,
+  columns: cols("docs/surfaces/S03_ps_list.md"),
+  rows: [
+    cellsOfRow("a3f9b21", { uuid: "a3f9b21", kind: "candidate", family: "digit-classifier", status: "running", detail: "ep 17/40", metric: "0.0372", age: "23m", owner: "malachy", mr: "!1248" }, "running"),
+    cellsOfRow("7c2d4e1", { uuid: "7c2d4e1", kind: "experiment", family: "decoder-zoom", status: "succeeded", metric: "0.0089", age: "41m", owner: "malachy", mr: "!1201" }, "ok"),
+    cellsOfRow("2e8a04c", { uuid: "2e8a04c", kind: "experiment", family: "graphsage", status: "failed", detail: "OOM at ep 3", metric: "—", age: "1h 12m", owner: "priya", mr: "!1188" }, "error"),
+    cellsOfRow("f410d99", { uuid: "f410d99", kind: "candidate", family: "flow-predictor", status: "queued", metric: "—", age: "3m", owner: "malachy", mr: "—" }, "queued"),
+  ],
+});
+
+const S05_TABLE: Block = block({
+  kind: "table",
+  id: "s05-services",
+  gapBefore: true,
+  columns: cols("docs/surfaces/S05_serving.md"),
+  rows: ["digit-classifier", "flow-predictor", "volatility-estimator", "orderbook-pressure"].map(
+    (name, i) => cellsOfRow(name, { name, replicas: "3/3", status: "healthy", errors: "0.02%", version: "de29117", p99: "45ms", "req/s": "432", p50: "18ms", age: `${String(i + 2)}d` }),
+  ),
+});
+
+const S06_FAMILIES: Block = block({
+  kind: "table",
+  id: "s06-families",
+  gapBefore: true,
+  columns: cols("docs/surfaces/S06_models.md"),
+  rows: ["digit-classifier", "flow-predictor", "orderbook-pressure", "latency-anomaly-gnn", "fill-rate"].map(
+    (family) => cellsOfRow(family, { family, serving: "de29117", latest: "de29117", versions: "4", updated: "2h ago" }),
+  ),
+});
+
+const S06_VERSIONS: Block = block({
+  kind: "table",
+  id: "s06-versions",
+  gapBefore: true,
+  columns: cols("docs/surfaces/S06_models.md", 1),
+  rows: ["de29117", "b4f0c12", "9e2a55d", "1f0c8b3"].map((version) =>
+    cellsOfRow(version, { version, state: "serving", metric: "AUC 0.912", run: "c4e1f23", mr: "!1244", created: "2h ago" }),
+  ),
+});
+
+const S14_KEYS: Block = block({
+  kind: "table",
+  id: "s14-keys",
+  gapBefore: true,
+  columns: cols("docs/surfaces/S14_config.md"),
+  rows: [
+    ["current_context", "fmx-prod", "config"],
+    ["ui.theme", "dark", "config"],
+    ["ui.show_banner", "true", "default"],
+    ["terminal.colour_depth", "24", "env"],
+    ["terminal.mouse", "true", "default"],
+    ["history.cap", "10000", "default"],
+  ].map(([key, value, source]) =>
+    cellsOfRow(key ?? "", { key: key ?? "", value: value ?? "", source: source ?? "" }),
+  ),
+});
+
+/** The contexts region: two rows, no header — the headerless list C04 §3 names. */
+const S14_CONTEXTS: Block = block({
+  kind: "table",
+  id: "s14-contexts",
+  gapBefore: true,
+  showHeader: false,
+  columns: cols("docs/surfaces/S14_config.md", 1),
+  rows: [
+    cellsOfRow("fmx-prod", { name: "fmx-prod", url: "https://prism.fmx.io/v1", token: "token valid · 30d" }),
+    cellsOfRow("fmx-staging", { name: "fmx-staging", url: "https://staging.prism.fmx.io", token: "token expired" }),
+  ],
+});
+
+const S15_SECRETS: Block = block({
+  kind: "table",
+  id: "s15-secrets",
+  gapBefore: true,
+  columns: cols("docs/surfaces/S15_identity.md"),
+  rows: [
+    cellsOfRow("gitlab-readonly-token", { name: "gitlab-readonly-token", owner: "research-infra", age: "34d" }, "running"),
+    cellsOfRow("minio-research-creds", { name: "minio-research-creds", owner: "research-infra", age: "34d" }, "running"),
+    cellsOfRow("wandb-api-key", { name: "wandb-api-key", owner: "malachy", age: "12d" }, "running"),
+    cellsOfRow("huggingface-token", { name: "huggingface-token", owner: "malachy", age: "8d", note: "not accessible" }, "error"),
+  ],
+});
+
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
+  {
+    file: "docs/surfaces/S04_run_detail.md",
+    fence: 1,
+    label: "S04 §3 — the training region",
+    width: 76,
+    blocks: [
+      block({ kind: "rule", id: "s04-rule", label: "loss · epoch 17 / 40 · 43%" }),
+      S04_LOSS_PLOT,
+      block({
+        kind: "progress",
+        id: "s04-progress",
+        gapBefore: true,
+        label: "",
+        current: 17,
+        total: 40,
+      }),
+      S04_METRICS,
+    ],
+  },
+  {
+    file: "docs/surfaces/S09_test.md",
+    fence: 0,
+    label: "S09 §2 — test passed",
+    width: 78,
+    blocks: [
+      block({
+        kind: "rule",
+        id: "s09-rule",
+        label: "test · fmx_models.jobs.training:job · pytest",
+      }),
+      block({
+        kind: "rule",
+        id: "s09-smoke-rule",
+        gapBefore: true,
+        label: "implicit smoke test · structural · read-only · 1 batch",
+      }),
+      S09_SMOKE_STEPS,
+      block({
+        kind: "notice",
+        id: "s09-smoke-total",
+        gapBefore: true,
+        tone: "ok",
+        glyph: "ok",
+        text: "smoke passed · 1.1s · sinks not invoked · callbacks did not fire",
+      }),
+      block({
+        kind: "rule",
+        id: "s09-user-rule",
+        gapBefore: true,
+        label: "user tests · @prism.test · 3",
+      }),
+      S09_USER_TESTS,
+      block({
+        kind: "notice",
+        id: "s09-total",
+        gapBefore: true,
+        tone: "ok",
+        glyph: "ok",
+        text: "4 / 4 passed · 1 smoke + 3 user · 2.6s                            2.6s",
+      }),
+    ],
+  },
   {
     file: "docs/surfaces/S07_diff.md",
     fence: 0,
@@ -200,6 +625,127 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         id: "s08f-tip",
         gapBefore: true,
         text: "? T1-008 for the full rule                                    exit 1",
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S03_ps_list.md",
+    fence: 0,
+    label: "S03 §2 — the ps list at 100",
+    width: 98,
+    blocks: [
+      block({ kind: "rule", id: "s03-rule", label: "ps · 4 of 11 · --mine · last 24h" }),
+      block({
+        kind: "pills",
+        id: "s03-kinds",
+        gapBefore: true,
+        chips: [{ label: "all ×11" }, { label: "training ×9" }, { label: "evaluation ×2" }],
+      }),
+      block({
+        kind: "pills",
+        id: "s03-statuses",
+        chips: [
+          { label: "● running ×1" },
+          { label: "✓ succeeded ×6" },
+          { label: "✗ failed ×2" },
+          { label: "○ queued ×1" },
+        ],
+      }),
+      S03_TABLE,
+      block({
+        kind: "pills",
+        id: "s03-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "≡ logs" }, { label: "⚡ events" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S05_serving.md",
+    fence: 0,
+    label: "S05 §2 — the serving list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s05-rule", label: "serving · 7 healthy · 1 degraded" }),
+      S05_TABLE,
+      block({
+        kind: "pills",
+        id: "s05-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↻ restart" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S06_models.md",
+    fence: 0,
+    label: "S06 §2 — the family list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s06-rule", label: "models · 6 families · 14 versions" }),
+      S06_FAMILIES,
+      block({
+        kind: "pills",
+        id: "s06-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ versions" }, { label: "␣ expand" }, { label: "↑ promote" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S06_models.md",
+    fence: 1,
+    label: "S06 §3 — the version list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s06v-rule", label: "models · digit-classifier · 4 versions" }),
+      S06_VERSIONS,
+      block({
+        kind: "pills",
+        id: "s06v-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↑ promote" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S14_config.md",
+    fence: 0,
+    label: "S14 §2 — config, two table regions",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s14-rule", label: "config · ~/.prism/config.toml" }),
+      S14_KEYS,
+      block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", gapBefore: true }),
+      S14_CONTEXTS,
+      block({
+        kind: "pills",
+        id: "s14-actions",
+        gapBefore: true,
+        chips: [{ label: "⏎ edit" }, { label: "␣ expand" }, { label: "↕ switch context" }, { label: "⊘ reset" }],
+      }),
+    ],
+  },
+  {
+    file: "docs/surfaces/S15_identity.md",
+    fence: 4,
+    label: "S15 §5 — the secrets list",
+    width: 78,
+    blocks: [
+      block({ kind: "rule", id: "s15-rule", label: "secrets · 4 · names only" }),
+      S15_SECRETS,
+      block({
+        kind: "notice",
+        id: "s15-notice",
+        gapBefore: true,
+        tone: "muted",
+        text: "Values are never shown by the CLI.",
+      }),
+      block({
+        kind: "pills",
+        id: "s15-actions",
+        gapBefore: true,
+        chips: [{ label: "≡ /secrets <target>" }],
       }),
     ],
   },

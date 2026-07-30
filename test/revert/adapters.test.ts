@@ -183,7 +183,10 @@ describe("C07 fail-on-revert", () => {
     if (table?.kind !== "table") throw new Error("expected a table");
     // Flattening would have produced `labels.tier` and `labels.zone` — structure
     // the tool never declared, in a table that looks authoritative.
-    expect(table.columns.map((c) => c.key)).toEqual(["id", "labels"]);
+    expect(table.columns.filter((c) => c.role === undefined).map((c) => c.key)).toEqual([
+      "id",
+      "labels",
+    ]);
   });
 
   it("T6.10 (I7): deferring schema checks to first use → T2.5 fails", () => {

@@ -32,9 +32,30 @@ The property that makes plots easy relative to every other block: **measured hei
 
 ```typescript
 const plotDefinition: BlockDefinition<Plot>;   // registered into C09
+
+/** One row of ramp glyphs. For C11's `Cell.spark` — see below. */
+function sparkline(
+  values: readonly number[],
+  width: number,
+  caps: Pick<TerminalCapabilities, "unicode">,
+): string;
 ```
 
 Internal to C12: the raster grid, the Bresenham walker, the scaling and downsampling functions. None is a block shape.
+
+### `sparkline` exists for C11's cell case
+
+`Cell.spark` puts a series inside a table cell (C04 §3), and a cell is not a block — so C11 cannot reach it through the registry, and rendering it as a `plot` would drag block dispatch into a cell. The export is therefore **a pure function**: values and a width in, one row of glyphs out. Same layer, acyclic, no registry, no `ctx`.
+
+C12's own `form: "sparkline"` renderer calls the same internal, so there is one rasteriser and `b.spark(…)` produces the block form of exactly what a cell shows. Recorded here so nobody later reads this as public surface with no consumer and deletes it (CLAUDE.md: an export nothing consumes is removed — this one has a named consumer, and the consumer is C11).
+
+**It takes capabilities**, because the ramp differs between Unicode and ASCII (§6) and a renderer must never probe for its own (C09 I3). C11 has them on `ctx` and passes them through; nothing here reads an environment.
+
+The return is exactly `width` cells and exactly one row (I13), so a cell containing one is the same height as a cell without — which is what makes C11's column planning indifferent to it (§10, and C12 T4.4 asserts it from this side).
+
+**It windows to the last `width` points, and 8 is not a constant.** A01 A.2 says "the last 8 points", which is the instance where `width` is 8 — the width C11's `spark` column declares as its minimum. A column can be planned wider when residual is distributed, so the function must be correct at any width, and 8 is a floor rather than an assumption. T1.13 covers 1, 8 and 80.
+
+**It normalises over the window it shows.** A cell has no block, so there is nothing to pin a range with; the block form's `yMin`/`yMax` reach the shared internal instead. That is why the public signature has three parameters and not four — a pinned range on a function whose only caller cannot supply one is an argument nobody passes.
 
 ### Height
 
@@ -44,13 +65,15 @@ line, axes: false            → height
 line, axes: true             → height + 2      (axis rule, then x-labels)
 ```
 
-With `axes: false` there is no y-label column and the plot area is the full `width`. With axes it is `width − yLabelWidth − 3`, where 3 covers a space, the `│`, and a space.
+With `axes: false` there is no y-label column and the plot area is the full `width`. With axes it is `width − yLabelWidth − 2`, where 2 covers a space and the `│`.
 
 Exact and data-independent. An empty series occupies its declared height with a centred empty message rather than collapsing — a plot that changes height when data arrives would shift everything below it mid-stream.
 
 **`form: "line"` requires `height`, and omitting it is a construction error** (C04 §3). There is deliberately no default. `height` is optional on the type only because `sparkline` does not take one, and C04's constructor enforces the pairing rather than substituting a number. A defaulted height is the one way this component's central property — height declared, never derived — fails silently: the plot renders, nothing errors, and it is the wrong size on a surface nobody thought about.
 
-Width is `ctx.width`. For an axed line plot the plot area is `width − yLabelWidth − 3`, where `yLabelWidth` is the widest formatted y-label and 3 covers a space, the `│`, and a space.
+Width is `ctx.width`. For an axed line plot the plot area is `width − yLabelWidth − 2`, where `yLabelWidth` is the widest formatted y-label and 2 covers a space and the `│`.
+
+**Two cells, not three, and the data sits flush against the axis.** An earlier version of this section declared three — a space, the `│`, and a space — and S04 §3 and S11 §2 both drew two. The figures are right: a gap between the axis and the plot area is a habit from charts with margins, and in a terminal it renders as a leftmost sample floating off its own axis. One figure disagreeing with the text is a slip; two figures drawn independently and agreeing with each other is the text being wrong (`docs/surfaces/HEIGHT_AUDIT.md`, the fifth verdict).
 
 ---
 
@@ -58,11 +81,31 @@ Width is `ctx.width`. For an axed line plot the plot area is `width − yLabelWi
 
 **Braille.** Each cell is a 2×4 dot matrix mapped to `U+2800 + mask`, with the standard bit assignment — dots 1,2,3,7 in the left column and 4,5,6,8 in the right. Points are plotted into a boolean grid of `width×2` by `height×4`, then folded into characters.
 
+**The coupling between samples and cells is fixed by the glyph.** Braille gives 2 dot columns per cell and 4 dot rows, so an axed plot of `w` cells has `w×2` addressable columns; the ASCII ramp (§6) gives 1 column per cell and 8 subrows. Sample count and width are therefore coupled in one direction only: more samples than dot columns are downsampled, fewer are spread across the full width. **A sparkline is not braille** — it is one ramp glyph per sample at one sample per cell, so eight samples need eight cells and no more resolution is available. That sentence is stated because its absence is what let a five-sample sparkline be drawn inside a twelve-cell table cell three separate times (`HEIGHT_AUDIT.md`).
+
 **Lines.** Successive points are joined with Bresenham. Without it, a series that moves faster than one dot-column per sample renders as disconnected specks rather than a curve.
 
 **Scaling.** `yMin`/`yMax` over all series unless the block pins them. Values map linearly to dot rows, inverted so larger is higher.
 
-**Axes.** Three y-labels — max, midpoint, min — formatted per `yFormat`, right-aligned in the label column. The x-axis is a rule under the plot area; x-labels sit at left, centre and right of it.
+**Axes.** Up to three y-labels — max, midpoint, min — formatted per `yFormat`, right-aligned in the label column, placed at the max, mid and min row indices of the plot area. **They collapse when the height cannot hold three**: at `height: 2` the max and the min, at `height: 1` the max alone. The midpoint goes first because the extremes bound the data and the midpoint is interpolation between them. Without this clause the section contradicted T3.2, which renders `height: 1` with axes.
+
+The x-axis is a rule under the plot area; x-labels sit at left, centre and right of it.
+
+### Downsampling and Bresenham compose — four values per dot column
+
+I5 wants per-column minima and maxima so a spike survives; I14 wants successive points joined so a curve reads as a curve. **Each is correct alone and they do not compose**: keeping only a column's min and max discards the order within it, so there is nothing left to join, and two adjacent columns whose spans do not overlap render as two disconnected bars.
+
+So a column keeps **four** values, not two:
+
+```
+per dot column   fill the vertical span [min, max]          → I5, the spike survives
+between columns  Bresenham from column i's `last`
+                 to column i+1's `first`                    → I14, the curve connects
+```
+
+With at most one sample per column `first = min = max = last`, and the algorithm degenerates to plain Bresenham between points. That degeneration is what makes this right rather than a compromise: fifty points and fifty thousand take one code path, and there is no density branch to get wrong at the boundary.
+
+Recorded as a composition clause on both invariants rather than as a change to either, because neither was wrong — and see A03 §2 for what that says about the audit that did not find it.
 
 ---
 
@@ -101,6 +144,8 @@ strip i   = base + (i === 0 ? remainder : 0)
 
 **Series labels consume no plot rows.** Each label is written into the y-label column beside its strip, not above it. A label occupying a row would make the total exceed `height`, which is the trap this rule exists to avoid.
 
+**And they replace the max/mid/min labels rather than sharing the column with them.** There is one label column and a strip is 2 rows deep at `height: 8, n: 4`, so there is no room for both, and a reader of a stacked plot needs to know which series a strip is before knowing its bounds. Single-series plots keep §3's three labels.
+
 When `n > height` there are not enough rows to give each series one. The plot then renders the **first series plus a legend line naming the omitted ones**, still within `height`, and sets a truncation marker. Silently dropping series would be worse than saying so.
 
 Single-series plots are unaffected. Sparklines are single-series by construction.
@@ -127,7 +172,7 @@ Under `unicode: "ascii"`, braille is unavailable.
 - **I2** — Rasterisation is pure and total. No series input throws.
 - **I3** — No division by zero on a constant or single-point series.
 - **I4** — Non-finite values are filtered before scaling and never reach the grid.
-- **I5** — Downsampling preserves per-column minima and maxima.
+- **I5** — Downsampling preserves per-column minima and maxima. *Composition (§3): a column also keeps its first and last sample, because preserving only the extremes leaves I14 nothing to join.*
 - **I6** — At `colourDepth: 1`, multi-series plots stack; series are never distinguished by colour alone.
 - **I7** — Stacked strips sum to exactly `height`; series labels occupy the y-label column and consume no plot rows.
 - **I8** — When series outnumber available rows, the plot renders the first series plus a legend and marks itself truncated. Series are never dropped silently.
@@ -135,8 +180,9 @@ Under `unicode: "ascii"`, braille is unavailable.
 - **I10** — A plot never emits a character outside its measured region — `height` rows without axes, `height + 2` with, by `width` cells.
 - **I11** — C12 owns no state; every render is a pure function of block, width and context.
 - **I12** — C12 registers through C09's public `register`; it is not privileged.
-- **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise.
 - **I13** — Sparklines are exactly one row, at every width including 1.
+- **I14** — Successive points are joined by Bresenham line-draw rather than plotted as isolated dots, so a curve reads as a curve at braille resolution. A scatter of points at 2×4 subcell density is indistinguishable from noise. *Composition (§3): under downsampling the join runs from a column's last sample to the next column's first, which is what keeps I5's span-fill connected.*
+- **I15** — Y-labels are placed at the max, mid and min rows of the plot area and collapse from the middle outward when the height cannot hold three: two labels at `height: 2`, one at `height: 1`.
 
 ---
 
@@ -153,6 +199,7 @@ Under `unicode: "ascii"`, braille is unavailable.
 9. The ASCII fallback keeps the cell grid identical and only loses subcell resolution (I9).
 10. C12 holds no state and registers through the public mechanism (I11, I12).
 11. Braille rasterisation and Bresenham are ported from the mockup's working implementation (→ A01 A.2).
+12. Y-labels are placed at the max, mid and min rows and collapse from the middle outward rather than overflowing a short plot (I15).
 
 ---
 

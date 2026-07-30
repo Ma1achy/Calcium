@@ -10,9 +10,12 @@ import { describe, expect, it } from "vitest";
 import {
   ACKNOWLEDGED_BACKLOG,
   blockersIn,
+  checkSourceMap,
+  checkSurfaceDeferrals,
   checkTodoExpiry,
   collectTodos,
   COMPONENT_SOURCES,
+  KIND_OF_COMPONENT,
   todoTitles,
 } from "../../tools/enforce/todo-expiry.mjs";
 
@@ -37,6 +40,35 @@ describe("todo expiry", () => {
       seen.sort(),
       violations.map((v) => v.message).join("\n"),
     ).toEqual([...ACKNOWLEDGED_BACKLOG].sort());
+  });
+
+  it("TD3: every path the map names exists", () => {
+    // The rule's own vacuity, closed. `defaultIsImplemented` returns false for a
+    // file that is not there, so a mapped path that never existed reports "not
+    // implemented" forever and every deferral waiting on that component is exempt
+    // — silently, and for the same reason SS26 passed: the check cannot find the
+    // thing it was asked about.
+    //
+    // C07 was the live instance, mapping to `src/data/adapters.ts` while C07 landed
+    // as `adapters/index.ts`.
+    const violations = checkSourceMap();
+    expect(violations.map((v) => `${v.rule} ${v.file}`), violations.map((v) => v.message).join("\n")).toEqual([]);
+  });
+
+  it("TD3 fires: a mapped path that does not exist, and an excuse that has expired", () => {
+    const missing = checkSourceMap({ C99: "src/nowhere/at-all.ts" }, {}, () => false);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.rule).toBe("TD3");
+    expect(missing[0]?.message).toContain("silently exempt");
+
+    // And the other direction, which is what stops the exception list outliving its
+    // reason: a component listed unscaffolded whose file now exists.
+    const arrived = checkSourceMap({ C99: "src/somewhere/real.ts" }, { C99: "not yet" }, () => true);
+    expect(arrived).toHaveLength(1);
+    expect(arrived[0]?.message).toContain("stops being an absence");
+
+    // A genuine absence, excused: no violation either way.
+    expect(checkSourceMap({ C99: "src/later.ts" }, { C99: "not yet" }, () => false)).toEqual([]);
   });
 
   it("TD1 fires: a todo whose blocker is not a recognisable id", () => {
@@ -147,5 +179,91 @@ describe("todo expiry", () => {
     for (const [id, path] of Object.entries(COMPONENT_SOURCES)) {
       expect(path, `${id} must name a path under src/`).toMatch(/^src\/.+\.ts$/);
     }
+  });
+
+  // --- TD4 — the blocker is the right component ----------------------------
+  //
+  // The half A03 §9a had recorded as having no mechanism. Both known instances
+  // are surface deferrals, and both are derivable from things a surface spec
+  // already states: what it composes to, and which section holds its
+  // illustration.
+
+  it("TD4: no surface deferral names the wrong component or a section with no illustration", () => {
+    const violations = checkSurfaceDeferrals(
+      collectTodos("test").filter((e) => !e.file.endsWith("todo-expiry.test.ts")),
+    );
+
+    expect(violations.map((v) => v.message).join("\n\n"), "TD4").toEqual("");
+  });
+
+  it("TD4 fires: S07's deferral, restored", () => {
+    // **The fabricated violation is the real one**, copied from the deferral as
+    // it stood rather than invented (A03 commitment 14a). A fabrication written
+    // fresh is written under the same assumption as the rule; this one is written
+    // under the assumption that produced the defect.
+    const violations = checkSurfaceDeferrals([
+      {
+        file: "test/contract/surfaces.test.ts",
+        title: "S07 §3's patch region composes to its illustrated rows — waits on C25",
+      },
+    ]);
+
+    // Both halves fire, and they are independent findings about one deferral:
+    // §3 has no illustration, and S07's stated composition has no `patch`.
+    expect(violations).toHaveLength(2);
+    expect(violations.every((v) => v.rule === "TD4")).toBe(true);
+    expect(violations[0]?.message).toContain("contains no illustration");
+    expect(violations[1]?.message).toContain("wrong component");
+  });
+
+  it("TD4 fires: S09's deferral, restored", () => {
+    // The first instance, and it fails on half (b) alone — S09 §2 does have an
+    // illustration, which is exactly why half (a) could not have caught it and
+    // why the rule needs both.
+    const violations = checkSurfaceDeferrals([
+      {
+        file: "test/contract/surfaces.test.ts",
+        title: "S04 §3 and S09 §2 compose to their illustrated rows — waits on C11 and C12",
+      },
+    ]);
+
+    const messages = violations.map((v) => v.message).join("\n");
+    expect(messages, "S09 has no plot").toContain("registers `plot`");
+    expect(messages, "and half (a) has nothing to say about it").not.toContain(
+      "S09 §2 until its illustration",
+    );
+  });
+
+  it("TD4 fires: a deferral that names a surface and no section", () => {
+    const violations = checkSurfaceDeferrals([
+      { file: "test/contract/surfaces.test.ts", title: "S12 composes — waits on C22" },
+    ]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("without naming a section");
+  });
+
+  it("TD4's kind map is the three kinds a component registers, and nothing else", () => {
+    // Half (b)'s whole domain. Written out literally rather than derived from the
+    // registry, for C05 T1.7c's reason: a list derived from the thing it checks
+    // agrees with itself and passes on any addition.
+    expect(KIND_OF_COMPONENT).toEqual({ C11: "table", C12: "plot", C25: "patch" });
+  });
+
+  it("TD4 half (b) has no live subject, and that is stated rather than assumed", () => {
+    // **The honest state, asserted.** C25 is the last component that registers a
+    // kind, so once its deferrals are written no surface deferral names C11, C12
+    // or C25 again, and half (b) has nothing in the tree to be wrong about — the
+    // failure mode A03 §2 exists to name. Half (a) applies to every surface
+    // deferral there will ever be; half (b)'s evidence is the two fabrications
+    // above, and this assertion is what makes the claim checkable rather than a
+    // comment. It fails if a live subject appears, which is the day the note
+    // above stops being true.
+    const live = collectTodos("test")
+      .filter((e) => !e.file.endsWith("todo-expiry.test.ts"))
+      .filter((e) => /\bS\d\d\b/.test(e.title))
+      .filter((e) => (blockersIn(e.title) ?? []).some((id) => KIND_OF_COMPONENT[id] !== undefined));
+
+    expect(live.map((e) => e.title), "half (b) is running on fabrications alone").toEqual([]);
   });
 });

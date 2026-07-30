@@ -9,9 +9,9 @@
  * let the glyph carry the meaning.
  */
 
-export { DEFAULT_FLOOR, floorFor, isHex, luminance, ratio, textSurfaces, validateTokens } from "./contrast.js";
+export { DEFAULT_FLOOR, diffPairs, floorFor, isHex, luminance, ratio, textSurfaces, validateTokens } from "./contrast.js";
 export { DARK_FOUR_BIT, LIGHT_FOUR_BIT, MUST_STAY_DISTINCT } from "./four-bit.js";
-export { cacheSize, clearResolutionCache, resolve, resolveTone } from "./resolve.js";
+export { cacheSize, clearResolutionCache, resolve, resolveBackground, resolveTone } from "./resolve.js";
 export { loadTheme, type Overrides, type ThemeStore } from "./store.js";
 export { DARK } from "./tokens-dark.js";
 export { LIGHT } from "./tokens-light.js";

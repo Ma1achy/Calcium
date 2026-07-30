@@ -109,26 +109,28 @@ Artefact SHAs are shown **truncated in the middle** — the leading and trailing
 
 ### Families
 
-| Column | Priority | Min | Flex |
-|---|---|---|---|
-| expand · glyph | 100 | 1 · 1 | — |
-| family | 95 | 18 | yes |
-| serving | 85 | 7 | — |
-| latest | 80 | 7 | — |
-| versions | 60 | 8 | — |
-| updated | 40 | 7 | — |
+| Column | Priority | Min | Align | Flex |
+|---|---|---|---|---|
+| expand · glyph | 100 | 1 · 1 | left | — |
+| family | 95 | 18 | left | yes |
+| serving | 85 | 7 | left | — |
+| latest | 80 | 7 | left | — |
+| versions | 60 | 8 | **right** | — |
+| updated | 40 | 7 | left | — |
 
 ### Versions
 
-| Column | Priority | Min | Flex |
-|---|---|---|---|
-| expand · glyph | 100 | 1 · 1 | — |
-| version | 95 | 7 | — |
-| state | 85 | 9 | — |
-| metric | 70 | 12 | yes |
-| run | 60 | 7 | — |
-| mr | 50 | 6 | — |
-| created | 40 | 7 | — |
+| Column | Priority | Min | Align | Flex |
+|---|---|---|---|---|
+| expand · glyph | 100 | 1 · 1 | left | — |
+| version | 95 | 7 | left | — |
+| state | 85 | 9 | left | — |
+| metric | 70 | 12 | left | yes |
+| run | 60 | 7 | left | — |
+| mr | 50 | 6 | left | — |
+| created | 40 | 7 | left | — |
+
+**`align` is declared on both tables** (C04 §3 requires it, and §2's figure right-aligns `versions`). Only `versions` is a number. `metric` reads `AUC 0.912` — a label and a value in one cell, so it aligns left despite ending in digits, and a renderer inferring alignment from content would get it wrong. That is why C11 does not infer (C11 I13's reasoning, one field over).
 
 | Width | Families drop | Versions drop |
 |---|---|---|

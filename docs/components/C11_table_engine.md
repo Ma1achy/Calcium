@@ -35,6 +35,7 @@ type PlannedColumns = Readonly<{
 }>;
 
 function planColumns(cols: readonly ColumnDef[], width: number): PlannedColumns;
+function focusableRowIds(block: Table): readonly string[];
 
 const tableDefinition: BlockDefinition<Table>;   // registered into C09
 ```
@@ -43,7 +44,15 @@ const tableDefinition: BlockDefinition<Table>;   // registered into C09
 
 An earlier draft placed `ColumnDef` here on the reasoning that it "describes planning rather than content". It does not — it is a field of `Table`, so C04 could not declare `Table` without it, and an L0 → L1 dependency was the consequence. The import above is C11 reaching *down*, which is the direction that holds.
 
-`planColumns` is pure and memoised on `(columns, width)`. It is called on every render and on every resize, and it must be cheap.
+`focusableRowIds` is here rather than in §5 because C16 imports it: focus is rendered by C11 and owned by C16 (I15), so the router needs the ordered list of rows it may move between, and that list is a function of the block alone.
+
+`planColumns` is **pure and not memoised**. It is called on every render and on every resize, and it must be cheap — which is an argument for it being cheap, not for it holding a cache.
+
+Three reasons, and the first two are structural. C11 owns no state (I11), and T2.6 scans `table/` for mutable module state — a memo table is the state that scan exists to find. Measured heights are already cached one layer up, on `(entryId, rev, width)` (C14 I3), which is where the repeated work actually accumulates. And there is no measurement behind the optimisation: T3.16 asserts sub-millisecond planning at 10,000 rows, and a cache added to satisfy a budget that is already met is complexity bought with nothing.
+
+If a cache is ever wanted, its shape is settled and it is not a per-registry closure that grows with every resize: C05's, a `WeakMap` keyed on the **columns object** rather than on its content (C05 §3a). A content key of `(columns, width)` is precisely what C05:173 argues against — two column sets differing only in a field the key ignores would share a plan, a bug that passes every other test in §8.
+
+**This reversal was ruled and unrecorded.** It was settled during C11's planning, the sequence moved to C08, and this section still read "pure and memoised on `(columns, width)`" — verbatim from C11's initial commit — when implementation began. A ruling that lands nowhere is invisible; the remedy is that a spec edit follows a ruling immediately, whether or not the code does.
 
 ---
 
@@ -61,6 +70,10 @@ An earlier draft placed `ColumnDef` here on the reasoning that it "describes pla
    narrower than the terminal rather than stretching columns arbitrarily
 ```
 
+**Step 3's `while` is a bound on the loop, not a filter over it.** Admission **stops** at the first column that does not fit; it does not skip that column and carry on to narrower ones. The two readings survive every reading of this sentence and differ by one cell in practice: at width 80, S03's admitted set reaches 72 cells through `age`, `kind` at 10 would take it to 84 and is refused, and `mr` at 6 needs exactly 80 and fits — so a skipping planner shows `mr` at a width whose drop table says `mr` goes. S03 §3's table at 80 is what pins it, and C11 T4.1 asserts it.
+
+It is also the better rule to be held to. A lower-priority column appearing at a width where a higher-priority one was refused is a drop order nobody chose, and D38's promise is that the order is reviewable.
+
 Step 4 is what stops the degenerate case: at width 20 with a 40-cell column, the table renders one truncated column rather than nothing. `overflowed` records it so a caller can react.
 
 Step 5 matters for usability — dropping the `owner` column must not reorder `uuid` and `status`. Priority governs survival, never position.
@@ -72,6 +85,18 @@ Step 5 matters for usability — dropping the `owner` column must not reorder `u
 **A row becomes expandable when columns drop, whether or not it declared a `detail`.** Otherwise the promise is empty: a row with no detail is not expandable, so at narrow widths its dropped fields would be genuinely unreachable — precisely the outcome D38 exists to prevent. Expandability is therefore derived, not declared: `expandable = detail !== undefined || dropped.length > 0`.
 
 That is the property that makes aggressive dropping safe. Without it, narrowing a terminal would silently destroy information.
+
+### The expand marker is a declared column, filled here
+
+Every surface with an expandable table declares an `expand` column — priority 100, `minWidth` 1 — and records its source as "synthesised by C11" (S03 §3, S05 §3, S06 §5, R01 §5). Its one cell is inside those surfaces' drop arithmetic, so it is an ordinary column for planning purposes and must stay one; a gutter reserved by C11 would move every documented total.
+
+What was missing is how C11 recognises it. It is **`role: "expand"` on `ColumnDef`** (C04 §3), and nothing else:
+
+- A column with `role: "expand"` takes its cell content from C11: the `expand` or `collapse` glyph token (C09 §4) according to `expanded`, and blank when the row is not expandable at this width.
+- A column without the role is data, whatever its key. Matching on `key === "expand"` was the alternative and it fails twice over — a reserved string in an engine that is otherwise generic, and a silent collision the day a far side returns a field called `expand`.
+- `planColumns` does not read `role`. The role governs cell content; priority and width govern layout. That separation is why adding it changed no drop table.
+
+**A table with no `role: "expand"` column shows no marker, even when rows are expandable.** That is the honest consequence and it is left visible rather than patched: C07's fallback declares no such column (C07 §5), so a fallback table whose columns drop is expandable with nothing on screen saying so. The remedy belongs in the shape table that builds those columns, not in a planner guessing where a marker would look right.
 
 ### Priorities are the app's
 
@@ -90,6 +115,8 @@ Sort is view state on the block (C04 §3), so it survives freezing and is record
 - **Height-neutral.** Sorting reorders rows without changing their number or expansion, so measured height is invariant under sort. C14 therefore never needs to remeasure after a sort.
 - **Type-aware.** Numeric columns sort numerically, durations by magnitude, everything else lexically by grapheme. `12m` before `2h`, not after.
 - **Missing values sort last** in both directions. A column of mostly-empty cells should not bury the populated ones under either arrow.
+
+**The indicator is ` ↑` / ` ↓` appended to the active column's header** (A01 Appendix A.4). Its two characters are C09's, not C11's: C09 §4 owns both renderings of every character that enters a frame and the 1:1 width rule that makes ASCII degradation height-preserving, so they are a rôle in its glyph set (`^` and `v`) rather than a literal here. The indicator is appended *inside* the column's planned width, so a header whose label then exceeds that width truncates — geometry is the plan's, and an indicator that widened a column would make the header disagree with the rows beneath it.
 
 ---
 
@@ -127,6 +154,7 @@ Detail is indented by 2 cells, so it measures at `width − 2`. Detail blocks ar
 - **I13** — Column priority is declared by the surface, never inferred by C11. A table engine guessing which column matters would guess differently as data changed, and the drop order would stop being reviewable.
 - **I14** — Missing values sort last in both directions. Not first when ascending and last when descending — last either way, because a null is an absence of rank rather than the bottom of one, and a reader sorting to find the worst case should not find blanks.
 - **I15** — Focus is rendered by C11 and owned by C16. C11 holds no focus state; it draws what it is handed, which is what keeps I11 true for the one piece of state a table most looks like it should own.
+- **I16** — The expand marker is drawn only into a column declaring `role: "expand"`, and `planColumns` never reads `role`. A table declaring no such column shows no marker; C11 neither synthesises a column nor reserves a gutter, because either would change width arithmetic the surfaces already state.
 - **I12** — C11 registers through C09's public `register`; it is not privileged.
 
 ---
@@ -145,6 +173,8 @@ Detail is indented by 2 cells, so it measures at `width − 2`. Detail blocks ar
 10. Focus is rendered here and owned by C16 (I15).
 11. C11 holds no state and registers through the public mechanism (I11, I12).
 12. Golden frames at 80 / 100 / 120 / 160 pin the layouts (D39) (→ A01 §3).
+13. The expand marker fills a column the surface declared, and planning ignores `role` (I16).
+14. `planColumns` is pure, total and holds no cache (I7, I11).
 
 ---
 
@@ -170,6 +200,7 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T1.14**: numeric sort orders `2`, `10`, `100` correctly, not lexically.
 - **T1.15**: duration sort orders `45s`, `12m`, `2h`, `3d` correctly.
 - **T1.16**: missing values sort last ascending *and* descending.
+- **T1.17** (I16): a `role: "expand"` column draws `expand` collapsed, `collapse` expanded, and blank on a row that is not expandable at this width. The same table with the role removed draws that column's cell data and no marker anywhere.
 
 ### Tier 2 — contract / interface
 
@@ -179,15 +210,16 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T2.4** (I2): for every width where a column drops, that column's key appears in every row's expanded detail.
 - **T2.8** (I2, the gap): a table whose rows declare **no** `detail`, rendered at a width where two columns drop → every row is expandable and the dropped values are present. Without this, narrow terminals silently destroy data.
 - **T2.5** (I12): `table` is registered via `registry.register`, and removing that call removes the kind entirely — no built-in fallback path.
-- **T2.6** (I11): a source scan finds no mutable module state in `table/`.
-- **T2.7** (I7): memoisation returns results deeply equal to cold computation for every corpus entry.
+- **T2.9** (I16): the plan for a column set is deeply equal with and without `role: "expand"`, at every width in the corpus — planning cannot see the role.
+- **T2.6** (I11): a source scan finds no mutable module state in `table/` (A03 SS24).
+- **T2.7** (I7, I11): calling `planColumns` twice on the same input returns deeply equal plans that are **not the same object** — the absence of a cache, asserted rather than assumed. A memo added later fails this, which is the point: it is a decision to revisit deliberately, not to reach for.
 
 ### Tier 3 — edge cases
 
 - **T3.1**: zero columns → renders the empty message; does not throw.
 - **T3.2**: one column wider than the terminal → truncated, `overflowed` true, still readable.
 - **T3.3**: all columns sharing one priority → dropped in reverse declared order, deterministically.
-- **T3.4**: a column whose `minWidth` exceeds `maxWidth` → `minWidth` wins; logged.
+- **T3.4**: a column whose `minWidth` exceeds `maxWidth` → `minWidth` wins, silently. An earlier draft said "logged", which nothing at L1 can do: SS33 bans `console.*` across `src/` and C11 is handed no debug sink. A contradictory `ColumnDef` is a surface defect and belongs to whatever validates surfaces, not to a planner that must stay total (I7).
 - **T3.5**: a cell containing CJK text → planned width counts 2 cells per glyph (C09 `cells()`).
 - **T3.6**: a cell containing a ZWJ emoji → counted as one cluster; truncation never splits it.
 - **T3.7**: a cell longer than its planned width → truncated with the capability-correct marker, and measurement is unaffected.
@@ -198,10 +230,13 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T3.12**: `sort` naming a non-existent column → ignored, original order retained, no throw.
 - **T3.13**: `sort` on a non-sortable column → ignored.
 - **T3.14**: a table where every cell in a column is empty → the column still plans, and sorting on it is a stable no-op.
-- **T3.15**: two rows sharing an `id` → rejected by C04's `validateDocument`; merge semantics (C04 I8) would otherwise be ambiguous.
+- **T3.15**: two rows sharing an `id` → rejected by C04's `validateDocument`. Three things address a row by id and all three are ambiguous without it: `merge` upserts by row id (C04 I9), `ctx.focus` names a row by id (I15), and a rendered row is keyed by it. An earlier draft cited C04 I8, which is `applyPatch` purity and says nothing about identity.
+
+  **This check does not exist yet, and C04 I14 is not it.** I14 covers *block* ids, nested children included, and `validateDocument` implements exactly that — table rows are not blocks, so two rows sharing an `id` currently validate clean. Row-id uniqueness is C04's to add, on the same reasoning as I14 and beside it; C11 cannot check it without duplicating a boundary rule one layer up (C09 I6's argument, one directory over). Raised from here because C11 is the first component to depend on it.
 - **T3.18**: no column declares `flex` and the table is narrower than the terminal → residual width is unused; columns are not stretched.
+- **T3.19** (I16): a table with a data column keyed `expand` and no `role` → the cell's own text renders and no marker is drawn. The collision a reserved key would have caused, asserted rather than avoided by convention.
 - **T3.16**: 10,000 rows → planning stays sub-millisecond; measurement is linear.
-- **T3.17**: width changes between measure and render → the memo key differs, so no stale plan is used.
+- **T3.17**: width changes between measure and render → the plan is the new width's. With no cache there is nothing to go stale, and this asserts the property the memo key was there to protect: a second call at a different width plans for that width, and the first plan is not retained anywhere.
 
 ### Tier 4 — integration
 
@@ -234,6 +269,9 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T6.9** (I11): caching sort order in module state → T2.6 fails.
 - **T6.10** (I12): making `table` a privileged built-in → T2.5 fails, and the extension path stops being exercised by the framework itself.
 - **T6.11**: lexical sort on a numeric column → T1.14 fails.
+- **T6.13** (I16): recognising the expand column by `key === "expand"` rather than by `role` → T3.19 fails, and a far side returning a field of that name loses it.
+- **T6.14** (I16): letting `planColumns` widen or reserve for a `role: "expand"` column → T2.9 fails, and every drop table in the S-series is off by the same two cells.
+- **T6.15** (I11): memoising `planColumns` on `(columns, width)` → T2.7 fails, and T2.6's scan finds the cache.
 
 ---
 

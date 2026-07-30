@@ -244,7 +244,10 @@ describe("C04 fail-on-revert", () => {
     }
   });
 
-  it.todo("T6.2 (I7): a measurer ignoring the expanded flag → T3.12 and T4.5 fail — waits on C11 and C14");
+  // C11's own T6.7 now covers the measurer half — a table measurer ignoring
+  // `expanded` fails there, at every width. What is still deferred is this file's
+  // claim, which is about viewport drift.
+  it.todo("T6.2 (I7): a measurer ignoring the expanded flag → T4.5 fails with viewport drift — waits on C14");
   it("T6.7a (§1): importing theme into viewmodel/ → T2.9 fails", () => {
     // The half of T6.7 that C10 landing made writable. A block names a palette
     // slot and never resolves one, so `viewmodel/` importing `theme/` is the

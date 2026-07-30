@@ -44,6 +44,10 @@ export type GlyphSet = Readonly<{
   warning: string;
   bar: string;
 
+  // Sort indicators — the active column's header (C11 §4, A01 A.4).
+  sortAsc: string;
+  sortDesc: string;
+
   // Progress.
   progressFull: string;
   progressEmpty: string;
@@ -68,6 +72,9 @@ const UNICODE: GlyphSet = Object.freeze({
   warning: "▲",
   bar: "▌",
 
+  sortAsc: "↑",
+  sortDesc: "↓",
+
   progressFull: "█",
   progressEmpty: "░",
 });
@@ -90,6 +97,9 @@ const ASCII: GlyphSet = Object.freeze({
   blocked: "/",
   warning: "!",
   bar: "|",
+
+  sortAsc: "^",
+  sortDesc: "v",
 
   progressFull: "#",
   progressEmpty: ".",

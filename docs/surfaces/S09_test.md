@@ -124,7 +124,23 @@ C11 drops columns wholesale, not cells — a column that renders for some rows a
 
 A passing test's duration is idle curiosity; a failing one's is a clue about whether it timed out. That is why the information survives the column being dropped rather than disappearing with it.
 
-Test names truncate **from the left**, keeping the method name — `DigitClassifier::` is the same on every row.
+### The user-tests table's columns
+
+Declared here because the region is a table and stated none — the gap the
+truncation audit found in three surfaces at once (S05 §5, S15 §5, this one).
+
+| Column | Priority | Min | Align | Trunc | Flex | Sortable |
+|---|---|---|---|---|---|---|
+| glyph | 100 | 1 | left | end | — | — |
+| name | 95 | 30 | left | **start** | yes | yes |
+| duration | 60 | 6 | **right** | end | — | yes |
+
+**Test names truncate from the start**, keeping the method name — `DigitClassifier::`
+is the same on every row, so cutting the other end makes every row read as the same
+test. `truncateFrom: "start"` names the end characters are removed from (C04 I32).
+
+`duration` is right-aligned: the figure draws it so, and comparing durations down a
+column is the whole reason it is there.
 
 Tracebacks and assertion blocks never truncate; they wrap.
 

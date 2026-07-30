@@ -110,6 +110,7 @@ type Patch    = Readonly<{ kind: "patch"; id: string;
                            path: string;               // the file, for the header
                            language: string;           // syntax palette, per hunk line
                            hunks: readonly Hunk[];
+                           collapsedAfter?: number;    // elided below the last hunk
                            layout?: "unified" | "split" }> & Gap;   // default: width-derived
 type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@
                            lines: readonly Readonly<{
@@ -136,10 +137,15 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
                            height?: number; axes?: boolean;
                            xLabels?: readonly [string, string, string];
                            yFormat?: "number" | "percent" | "bytes" | "duration";
+                           yMin?: number; yMax?: number;      // pin the range (I33)
                            emptyMessage?: string }> & Gap;
 ```
 
 `Table`, `TableRow`, `Cell` and `ColumnDef` are declared below. **Every block variant is declared here** — C11 and C12 own the table *engine* and the plot *renderer*, not the shapes. `id` is present on every variant because `ViewPatch` addresses blocks by it.
+
+**`yMin` and `yMax` pin the vertical range.** C12 §3 says the range is computed over all series "unless the block pins them" and C12 T1.14 tests exactly that, while the shape had no field to pin it with — intent stated in prose that the schema could not carry, the same class as the missing `align` and the missing truncation side. Absent, the range is the data's; present, values outside it clamp to the edge rather than escaping the grid, which is what makes a pinned axis usable for comparing two plots rather than a way to lose points off the top.
+
+Both are optional and independent: pinning only `yMin` at 0 is the common case, because a loss curve that autoscales its floor exaggerates every wobble near zero.
 
 **`form: "line"` requires `height`.** Omitting it is a construction error, not a default. A plot's height is a layout decision the surface must make, and a magic default produces silently wrong-sized plots that nobody notices are wrong. `height` is optional on the type only because `sparkline` does not take one; the constructor enforces the pairing.
 
@@ -230,6 +236,14 @@ They share a name and nothing else. `diff` is rows of `{field, a, b, comparison}
 
 `patch` is declared here because C04 owns every block shape — settled when `plot` moved out to C12 — but it is **registered by C25**, exactly as `table` is by C11 and `plot` by C12. `collapsedBefore` is view state that affects height, so it lives in the block (commitment 4); expanding a collapsed region patches the document rather than mutating anything external, which is the same mechanism C11 uses for expanded rows and the reason it reaches a frozen entry when an action cannot.
 
+**`collapsedAfter` is `Patch`'s and `collapsedBefore` is `Hunk`'s, and the split is the whole of the decision.** A patch elides unchanged context in three places: before the first hunk, between hunks, and after the last one. `collapsedBefore` covers the first two — every interior region belongs to exactly one hunk, the one it precedes — and the tail is the one region it structurally cannot reach.
+
+Putting the tail on `Hunk` as well would double-count: the region between hunk 1 and hunk 2 is hunk 1's *after* and hunk 2's *before*, so two fields would describe one gap and a producer would have to know which of them to fill. On `Patch` it means "elided below the last hunk" and nothing else, so there is nothing to decide and nothing to reconcile.
+
+**Not a rare case.** A patch with one hunk at line 18 of a two-hundred-line file elides fourteen lines above and a hundred and seventy below, and the larger number is the one that could not be stated. Scratchpad 6 §2's illustration drew `⋯ 31 unchanged lines` as its last row from the start.
+
+This is HEIGHT_AUDIT's **fourth verdict class** — a schema gap, where neither the figure nor the declaration was wrong about what it described. It was first filed as a figure slip on a count of one, and that was a misreading: the count distinguishes the *first* verdict class from the *fifth*, both of which resolve by picking a side. The fourth resolves by changing the shape, because picking either side keeps a defect.
+
 `raw` is the escape hatch and it is load-bearing. Anything unmodellable — a system command's stdout, an unrecognised envelope — becomes `raw` and still renders. **The vocabulary never has to be complete for the tool to work.**
 
 ### Cell
@@ -263,6 +277,8 @@ type ColumnDef = Readonly<{
   maxWidth?: number;
   flex?:     boolean;                 // absorbs residual width
   sortable:  boolean;
+  role?:     "expand";                // C11 fills the cell; not view state (I30)
+  truncateFrom?: "start" | "end";     // default "end" — keeps the start (I32)
 }>;
 
 type TableRow = Readonly<{
@@ -278,6 +294,32 @@ type MergeRow = Omit<TableRow, "expanded">;
 ```
 
 `showHeader: false` gives a headerless list with per-row actions — the shape small lists need, without inventing a block type for it. `detail` being `Block[]` is what lets an expanded run row reveal a plot, a progress bar and a set of actions, composed from the same vocabulary rather than a bespoke detail renderer.
+
+**`role: "expand"` names the column C11 fills.** Every surface with an expandable table already declares an `expand` column of `minWidth` 1 whose content is drawn by C11 rather than supplied as data, and its cell is inside those surfaces' width arithmetic — so it must stay an ordinary column for planning while being extraordinary for content. The role is how a renderer recognises it. Two alternatives were rejected: a reserved `key === "expand"`, which puts a magic string in a generic engine and silently eats a far side's field of that name; and a gutter reserved by C11, which would move every drop total the S-series states. The role is declared by the surface, is not view state, and is not carried by `merge` any differently from the rest of `columns` — `expanded` remains the only view state on a table row (I9, I22). C11 I16 holds the other half: planning never reads it.
+
+**`truncateFrom` names the end characters are removed from, not the end that survives.** `"end"` removes from the end and keeps the start, which is what prose wants and is the default; `"start"` keeps the tail, which is what paths, hierarchical keys and hash-suffixed names want. The naming matters more than it looks: `truncate: "head" | "tail"` and `keep:` both invite the reader to guess which side is being described, and this is a field somebody sets once per column and never revisits — so it is named for the operation, in the direction the operation runs.
+
+Nine places in the S-series state a truncation side in prose. **Four of them are table columns and the rest are not** — `keyValue` values in S04, S08 and S15, `steps` detail in S10, `logs` lines in S11 — so this field expresses less than half the intent that exists.
+
+### `Truncatable` — settled, not yet landed
+
+The remaining five need the same thing said about a *string* rather than about a column, and the shape is settled rather than open:
+
+```typescript
+type Truncatable =
+  | string
+  | Readonly<{ text: string; truncateFrom: "start" | "end" }>;
+```
+
+A bare string means `"end"`. That is deliberately the pattern C24's builder already establishes — where a bare string is a cell with the default tone — so it reads as a familiar shorthand rather than as a second mechanism, and **every existing call site is unchanged**: a field typed `Truncatable` accepts everything a `string` field accepted.
+
+One type rather than five fields, because the crux is the same everywhere it appears: **the producer knows which side and the renderer knows the width**, so the side has to be declared and cannot be pre-applied. An adapter that truncated a path itself would be guessing at a width it does not have.
+
+It lands on `keyValue` values, `steps` detail and `logs` messages. `ColumnDef` keeps its own field rather than typing its cells as `Truncatable`, because a column truncates every cell in it the same way — the declaration belongs to the column, not repeated per row.
+
+**Its own commit, not a rider.** It is a C04 schema change with a C09 consequence in every kind that renders a truncatable string, and folding that into the commit of whichever component happened to need it next is how a schema change stops being reviewable. Until it lands, the five sites are recorded in `HEIGHT_AUDIT.md` with what each one wants.
+
+S06 states a third value — SHAs truncated **in the middle**, keeping both ends, because that is what people compare by eye. It is deliberately absent from the union: a middle truncation spends its marker between two kept halves, so the arithmetic is a different one (two budgets and a centred marker rather than one budget and a trailing one), and C09 I9's marker rule is written for the single-ended case. It arrives with a clause in that rule or not at all.
 
 **`ColumnDef` is declared here, not in C11.** It is part of a block's shape, and commitment 11 says every block shape is declared in C04 — the same split that gives C04 `Plot`'s shape while C12 rasterises it. C11 keeps `PlannedColumns` and `planColumns`, which are genuinely planning rather than content. The alternative considered and rejected was a type-only import from C11: it erases at build and so passes the module-graph check, which is precisely the objection — an L0 → L1 dependency that `make enforce` reports as clean is worse than one it catches.
 
@@ -481,6 +523,10 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I18** — `validateDocument` terminates on any input, including a cyclic one. A path-scoped seen-set refuses a cycle; it is not a depth limit, and it does not reject a legitimately shared subtree.
 - **I20** — `ErrorLike` requires `message` and nothing else. `code`, `stage`, `details` and `remediation` are optional, and a far side's richer envelope is a specialisation rather than a second type — so every failure in the system renders through one path (A01 B5).
 - **I20a** — `meta` carries the invocation record: `argv`, `stderr` and `transport` are present on every document C07 produces. They belong to `meta` because a block is content and the invocation is *about* the document, so any inspector reaches them uniformly without re-running anything (D49).
+- **I33** — `yMin` and `yMax` pin a plot's vertical range, independently and optionally. Out-of-range values clamp to the edge; they are never dropped and never widen the range they were pinned against, because a pinned axis exists so that two plots can be compared and a range that silently grew would defeat that.
+- **I32** — `truncateFrom` names the end characters are removed from, and defaults to `"end"`. A column that does not declare it truncates as prose does, keeping the start — the same behaviour as before the field existed, so adding it changed no rendering that had not asked to change.
+- **I31** — Row ids are unique within a table, checked by `validateDocument` alongside I14's block ids. Three things address a row by id — `merge` upserts by it (I9), C16's focus names it, and a rendered row is keyed by it — so a duplicate is ambiguous in three ways at once. It is a separate invariant from I14 because the namespaces are separate: two tables may each hold a row `r1`, and a row id never collides with a block id. Raised from C11, the first component to depend on it.
+- **I30** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
 - **I21** — `patch` and `diff` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
 
 ---
@@ -503,6 +549,10 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 14. Substitution is 1:1 by column count, so a degraded frame occupies the same cells as an undegraded one (→ C09 I5).
 15. `validateDocument` and `validateBlock` are public, total, and the single enforcement point for I3 (I3, I4).
 16. Schema version is `tui.view/1`; mismatch is refused at the boundary (I2).
+17. A column may declare `role: "expand"`, which is presentation intent rather than view state (I30).
+18. Row ids are unique within their table, checked where block ids are (I31).
+19. A column may declare which end it truncates from; the default keeps the start (I32).
+20. A plot may pin its vertical range; out-of-range values clamp rather than escape (I33).
 17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it (I20a, D49).
 18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts (I13).
 19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump (I12).
@@ -543,6 +593,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.13** (I15, the composition test): `merge` → `merge` → `replace`. The two merges accumulate, new rows land in payload order after the existing ones, and view state survives on touched and untouched rows alike; the `replace` then discards all of it. Both halves asserted, because the second is a design decision and would otherwise read as a bug.
 - **T1.14** (I15): a failing patch in the middle of a sequence leaves the document at its last good state, and the following patch still applies to it.
 - **T1.15** (I14): `validateDocument` rejects a document with two blocks sharing an id, including when one of them is nested inside a `panel`.
+- **T1.16** (I31): `validateDocument` rejects a table with two rows sharing an `id`, and accepts the same ids used in two different tables. Row ids are unique within their table, not across the document — a block id and a row id are different namespaces.
 - **T1.16** (§3): constructing a `plot` with `form: "line"` and no `height` throws; `sparkline` without one does not.
 - **T1.17** (I18): a document whose `panel` contains itself is refused by `validateDocument` with a named error, and the call returns. A shared-but-acyclic subtree appearing twice validates — the seen-set is path-scoped, and a global one would fail this.
 - **T1.18** (I1, §4b): C24's `b` produces blocks frozen exactly once — the constructor is the only freeze point, asserted by spying on it.
@@ -612,6 +663,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.10** (I15): making `applyPatch` return a bare `ViewDocument` again, absorbing the four failures → T1.12 and T1.14 fail, and C23 loses the mechanism its §5 depends on.
 - **T6.11** (I16): typing the `merge` arm as `TableRow[]` → T1.8b fails to compile, which is the point: the guard is the type, not the runtime.
 - **T6.12** (I14): dropping the uniqueness check from `validateDocument` → T1.15 fails, and T1.12's duplicate-id case stops being reachable.
+- **T6.13** (I31): dropping the row-id uniqueness check → T1.16 fails, and `merge` upserts into whichever duplicate it reaches first while focus and the render key point at the other.
 - **T6.13** (I18): swapping the path-scoped seen-set for a global one → T1.17's shared-subtree half fails; removing it entirely hangs T3.15 rather than failing it, which is why T1.17 asserts the call *returns*.
 - **T6.14** (I17): removing the `max(1, …)` floor → T3.6b fails at all three kinds.
 - **T6.15** (§3): giving a `row` group's children the full width → T3.6c fails, and T2.1 fails at every width where a child wraps.

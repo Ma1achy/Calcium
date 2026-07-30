@@ -215,7 +215,7 @@ describe("C05 contract", () => {
     expect(routes, "the fixture must exercise both routes or this proves nothing").toContain("spawn");
   });
 
-  it("T2.6 (I13): C05 imports nothing from terminal/, presentation/ or above", () => {
+  it("T2.6 (I13, MG5): C05 imports nothing from terminal/, presentation/ or above", () => {
     expect(checkModuleGraph(SOURCES)).toEqual([]);
   });
 

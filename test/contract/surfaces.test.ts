@@ -12,6 +12,9 @@
 // A fixture holding its own number agrees with itself forever.
 import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/testing/index.js";
 import { illustratedRows, SURFACE_FRAMES } from "../support/surfaces.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
@@ -19,7 +22,12 @@ import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 describe("the S-series' illustrated heights", () => {
   for (const frame of SURFACE_FRAMES) {
     it(`${frame.label} composes to the rows it draws`, () => {
+      // `table` and `plot` are registered rather than shipped as defaults
+      // (C09 §3), so a registry without them measures the table- and plot-bearing
+      // surfaces as `raw` — which would assert nothing while looking like coverage.
       const registry = createBlockRegistry({});
+      registry.register(tableDefinition as unknown as BlockDefinition);
+      registry.register(plotDefinition as unknown as BlockDefinition);
       const drawn = illustratedRows(frame.file, frame.fence);
       const measured = registry.measureSequence(frame.blocks, frame.width);
       const rendered = renderSequenceToLines(registry, frame.blocks, frame.width, {
@@ -52,8 +60,36 @@ describe("the S-series' illustrated heights", () => {
   // The rest of the S-series, by the component that makes it composable. Each
   // is a table, a plot or a patch region: measuring one today measures the `raw`
   // fallback, which would assert nothing while looking like coverage.
-  it.todo("S03, S05, S06, S14, S15 compose to their illustrated rows — waits on C11");
-  it.todo("S04, S09, S13 compose to their illustrated rows — waits on C11 and C12");
-  it.todo("S07 §3's patch region composes to its illustrated rows — waits on C25");
-  it.todo("S01, S02, S10, S11, S12 compose to their illustrated rows — waits on C22");
+  // S03, S05, S06, S14 and S15 are above, composed and asserted — C11 registered
+  // `table` and their deferral expired with it. **S04 §3 and S09 §2 joined them
+  // when C12 registered `plot`**, and S09 turned out never to have been waiting on
+  // C12 at all: it has no plot, and had been exempt since C11 landed because
+  // nothing checks that a blocker names the right component (HEIGHT_AUDIT).
+  //
+  // S13 moved to C22 rather than being composed here. Its illustration is a whole
+  // screen — an outer panel with a title and a footer around a `group` of five —
+  // which is the shape S01 and S12 already wait on C22 for. Its table and its
+  // sparkline compose today; the frame around them does not.
+  // **S07's deferral is deleted rather than expired, and it was never C25's.**
+  // It read "S07 §3's patch region composes to its illustrated rows — waits on
+  // C25". S07 §2 draws two `diff` blocks and is asserted above; §3 is "Direction
+  // of improvement", a table of four verdicts with no illustration in it; and the
+  // only mention of `patch` in the whole file is the sentence explaining why
+  // `diff` and `patch` are separate kinds. The surface that draws a patch is
+  // S10 §4a, which has no illustration fence of its own and is inside the C22
+  // line below.
+  //
+  // Second wrong blocker in consecutive components, after S09's — and A03 TD4
+  // now fires on both halves of this one: §3 has no illustration, and S07's
+  // stated composition names no `patch`. The check would have failed on the
+  // commit that wrote it.
+  //
+  // **The C22 line names sections, which it did not.** TD4 requires it: an
+  // illustration belongs to a section, so a deferral naming only a surface cannot
+  // be checked against one — which is how S07's survived pointing at a section
+  // that had none. All six are their surface's `§2`, the whole-screen figure that
+  // wants an outer `panel` with a title and a footer.
+  it.todo(
+    "S01 §2, S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated rows — waits on C22",
+  );
 });

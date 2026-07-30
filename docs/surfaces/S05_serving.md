@@ -53,19 +53,21 @@ Error rate is toned independently of health so the number itself carries the sig
 
 Display order is the declared order below; priority governs survival only (C11 I4).
 
-| Column | Priority | Min | Flex | Sortable |
-|---|---|---|---|---|
-| expand | 100 | 1 | — | — |
-| glyph | 100 | 1 | — | — |
-| name | 95 | 16 | yes | yes |
-| replicas | 85 | 7 | — | yes |
-| status | 80 | 10 | — | yes |
-| errors | 70 | 7 | — | yes |
-| version | 65 | 7 | — | yes |
-| p99 | 60 | 6 | — | yes |
-| req/s | 50 | 7 | — | yes |
-| p50 | 40 | 6 | — | yes |
-| age | 30 | 5 | — | yes |
+| Column | Priority | Min | Align | Flex | Sortable |
+|---|---|---|---|---|---|
+| expand | 100 | 1 | left | — | — |
+| glyph | 100 | 1 | left | — | — |
+| name | 95 | 16 | left | yes | yes |
+| replicas | 85 | 7 | left | — | yes |
+| status | 80 | 10 | left | — | yes |
+| errors | 70 | 7 | **right** | — | yes |
+| version | 65 | 7 | left | — | yes |
+| p99 | 60 | 6 | **right** | — | yes |
+| req/s | 50 | 7 | **right** | — | yes |
+| p50 | 40 | 6 | **right** | — | yes |
+| age | 30 | 5 | **right** | — | yes |
+
+**`align` is declared here as it is in S03 §3**, and for the same reason: it is required on `ColumnDef` and the figure in §2 right-aligns five of these columns on a field this table did not state. `replicas` stays left — `3/3` is a ratio rather than a number, and its values are all the same width, so the illustration cannot be read as evidence either way.
 
 | Width | Drops |
 |---|---|
@@ -126,7 +128,29 @@ The replicas line names *why* it is degraded rather than only that it is. `2/3` 
 
 Restarts are `warn`-toned above zero and `error`-toned above five. A pod that has restarted seven times in four minutes is the finding, and a plain number in default tone buries it among the zeroes.
 
-Pod names truncate **from the left**, keeping the hash suffix — the prefix is the deployment name you already know.
+### The pods table's columns
+
+Declared here because the region is a table and stated none — the same gap S15 §5
+had, found by auditing the truncation side.
+
+| Column | Priority | Min | Align | Trunc | Flex | Sortable |
+|---|---|---|---|---|---|---|
+| glyph | 100 | 1 | left | end | — | — |
+| name | 95 | 24 | left | **start** | yes | yes |
+| ready | 85 | 5 | left | end | — | yes |
+| status | 80 | 18 | left | end | — | yes |
+| restarts | 70 | 8 | **right** | end | — | yes |
+| age | 60 | 5 | **right** | end | — | yes |
+| node | 40 | 7 | left | end | — | yes |
+
+**Pod names truncate from the start**, keeping the hash suffix — the prefix is the
+deployment name you already know, and `volatility-estimator-7d8f9b-k2p1` cut the
+other way makes all three rows read alike. `truncateFrom: "start"` names the end
+characters are removed from (C04 I32); it did not exist when this paragraph first
+stated the intent in prose.
+
+`restarts` and `age` are right-aligned, which the figure above draws and this table
+did not state until now.
 
 ---
 

@@ -130,6 +130,27 @@ export type ColumnDef = Readonly<{
   maxWidth?: number;
   flex?: boolean;
   sortable: boolean;
+  /**
+   * The column whose content a renderer supplies rather than the data (I30).
+   *
+   * Surfaces declare an `expand` column of `minWidth` 1 whose cell is the
+   * expand/collapse marker, and its cell is inside their drop arithmetic — so it
+   * must stay an ordinary column for planning while being extraordinary for
+   * content. This is how C11 recognises it (C11 I16). Presentation intent, not
+   * view state: it never changes with what the user does, so `merge` carries it
+   * like the rest of `columns` and I9 is untouched.
+   */
+  role?: "expand";
+  /**
+   * Which end characters are removed from when a cell does not fit (I32).
+   *
+   * `"end"` is the default and keeps the start, which is what prose wants.
+   * `"start"` keeps the tail — a path's filename, a hierarchical key's leaf, a
+   * pod name's hash suffix. Named for the operation rather than for what
+   * survives: `keep:` and `"head" | "tail"` both leave the reader guessing which
+   * side is being described, on a field set once per column and never revisited.
+   */
+  truncateFrom?: "start" | "end";
 }>;
 
 export type TableRow = Readonly<{
@@ -231,6 +252,19 @@ export type Plot = Readonly<{
   axes?: boolean;
   xLabels?: readonly [string, string, string];
   yFormat?: "number" | "percent" | "bytes" | "duration";
+  /**
+   * Pin the vertical range, independently and optionally (I33).
+   *
+   * Absent, the range is the data's. Present, out-of-range values clamp to the
+   * edge — never dropped, and never widening the range they were pinned against,
+   * because a pinned axis exists so two plots can be compared and a range that
+   * silently grew would defeat that.
+   *
+   * `yMin: 0` alone is the common case: a loss curve that autoscales its floor
+   * exaggerates every wobble near zero.
+   */
+  yMin?: number;
+  yMax?: number;
   emptyMessage?: string;
 }> & Gap;
 
@@ -278,6 +312,20 @@ export type Patch = Readonly<{
   path: string;
   language: string;
   hunks: readonly Hunk[];
+  /**
+   * Unchanged lines elided **below the last hunk** (§3).
+   *
+   * On `Patch` rather than on `Hunk`, and the split is the decision. A patch elides
+   * context in three places — before the first hunk, between hunks, after the last —
+   * and `Hunk.collapsedBefore` covers the first two, every interior region belonging
+   * to exactly one hunk. A matching field on `Hunk` would double-count: the gap
+   * between hunk 1 and hunk 2 is 1's *after* and 2's *before*, so a producer would
+   * have to know which of two fields describes one region.
+   *
+   * Not a rare case: one hunk at line 18 of a 200-line file elides 14 lines above
+   * and 170 below.
+   */
+  collapsedAfter?: number;
   layout?: "unified" | "split";
 }> & Gap;
 

@@ -97,11 +97,11 @@ On success:
 ```
 ▌ ── secrets · 4 · names only ──────────────────────────────────────────────────
 ▌
-▌     name                     owner            age
-▌   ● gitlab-readonly-token    research-infra   34d
-▌   ● minio-research-creds     research-infra   34d
-▌   ● wandb-api-key            malachy          12d
-▌   ✗ huggingface-token        malachy          8d      not accessible
+▌    name                               owner               age  note
+▌ ●  gitlab-readonly-token              research-infra      34d
+▌ ●  minio-research-creds               research-infra      34d
+▌ ●  wandb-api-key                      malachy             12d
+▌ ✗  huggingface-token                  malachy              8d  not accessible
 ▌
 ▌   Values are never shown by the CLI.
 ▌
@@ -113,6 +113,24 @@ On success:
 A secret that exists but is not accessible to this identity renders `✗ not accessible` — that is the diagnostic this verb is usually run for, and hiding inaccessible secrets would make a missing binding indistinguishable from a permissions problem.
 
 `/secrets <target>` scopes to what one job declares, which is the form used when a run failed with `SECRET_NOT_ACCESSIBLE`.
+
+### Columns
+
+Checked while `align` was being declared across the S-series, and this surface's gap was larger: **the region is a table and it declared no columns at all.** The figure above was the only statement of what they are, which is the same defect as an unstated `align` with nothing left to disagree with it.
+
+| Column | Priority | Min | Align | Flex |
+|---|---|---|---|---|
+| glyph | 100 | 1 | left | — |
+| name | 95 | 22 | left | yes |
+| owner | 80 | 15 | left | — |
+| age | 60 | 6 | **right** | — |
+| note | 40 | 15 | left | — |
+
+No `expand` column: `/secrets` shows names only, so a row has nothing to reveal — and because nothing drops above 60 cells, nothing becomes reachable-but-unmarked either (C11 I16). Below that, S01's fallback replaces the frame.
+
+`age` is right-aligned, which is the convention S03 §3 and S05 §3 follow and **the figure above does not** — it draws `8d` starting where `34d` does. One of the two is wrong and the convention wins: a column of durations read for the outlier is exactly the case right alignment exists for. The figure is corrected above.
+
+`note` carries `not accessible` and is otherwise empty, which is the one column here whose emptiness is information. It drops last rather than first for that reason, despite being the least-populated column in the table.
 
 ---
 

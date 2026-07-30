@@ -1,6 +1,6 @@
 # Specs
 
-56 documents. This page says which are authoritative for **this** repo, which are
+61 documents. This page says which are authoritative for **this** repo, which are
 context, and what to read in what order.
 
 ---
@@ -11,7 +11,7 @@ context, and what to read in what order.
 |---|---|
 | [`architecture/A02`](architecture/A02_tui_kit_architecture.md) | **The layer rule.** Six layers, imports go down only, L0's two halves never touch. Everything else assumes it |
 | [`architecture/A01`](architecture/A01_architecture_and_boundary.md) | 48 decisions and the boundary contract — argv in, JSON out |
-| [`architecture/A03`](architecture/A03_enforcement_suite.md) | The 88 checks `make enforce` executes, each citing the spec that declared it |
+| [`architecture/A03`](architecture/A03_enforcement_suite.md) | The 93 checks `make enforce` executes, each citing the spec that declared it |
 | [`../CLAUDE.md`](../CLAUDE.md) | The same rules, distilled to the ones violated by accident |
 
 ---
@@ -39,9 +39,16 @@ makes far more sense beside S08's steps and S10's code blocks.
 **`reference-app/` — R01.** Belongs to `docker-tui`. Read it to know what the public
 API has to support.
 
-**`archive/`** — four scratchpads. Superseded, and kept because the *reasoning* behind
+**`archive/`** — six scratchpads. Superseded, and kept because the *reasoning* behind
 several decisions is there and nowhere else. A01 records what was decided; these record
 why the alternatives were rejected. **Where a scratchpad and a spec disagree, the spec wins.**
+
+**`notes/`** — working notes on things not yet specified: resize and a possible
+compositor, image support. **Reference, not work.** A scratchpad is superseded and its
+conclusions have landed somewhere; a note's have not landed anywhere, because there is
+no component to land them in yet. Neither is authoritative, and the distinction matters
+in one direction: reading a scratchpad tells you why a spec says what it says, and
+reading a note tells you what nobody has decided.
 
 ---
 

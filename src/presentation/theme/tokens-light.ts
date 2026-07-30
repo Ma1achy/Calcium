@@ -23,6 +23,11 @@ export const LIGHT: ThemeTokens = Object.freeze({
     bgDeep: "#e8e8e8",
     border: "#d3d3d3",
     borderStrong: "#c8c8c8",
+
+    // §4a — the two text-bearing diff surfaces. Authored against the check
+    // rather than before it, and A01 A.1 records all 48 measured ratios.
+    diffAdd: "#d2ffd2",
+    diffRemove: "#fff0f0",
   }),
 
   palettes: Object.freeze({

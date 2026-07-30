@@ -44,7 +44,12 @@ L3 interaction   interaction/
 L4 shell         shell/
 ```
 
-**Imports go DOWN only.** Never up, never sideways within a layer.
+**Imports go DOWN only.** Never up, and **never cyclically within a layer** —
+A02 §1's wording, which this line used to render as "never sideways". Sideways
+edges inside L1 are required rather than tolerated: C11 and C12 both import C09's
+paint helpers and C10's tones, and C11 imports C12's `sparkline` for a table cell.
+A rule the tree must break is a rule people learn to ignore. The enforceable
+version is acyclicity, and it is what MG1 and MG22 implement.
 
 **L0's two halves never import each other.** `terminal/` knows nothing of view
 models; `data/` knows nothing of terminals. That independence is what allows them
@@ -61,6 +66,10 @@ Each of these produces code that compiles, passes review, and is wrong.
 
 - **Read a clock** outside `shell/session.ts`. It is injected as `() => number`.
 - **Read `process.env`** outside `terminal/capabilities.ts`.
+- **Read the terminal's width** outside `terminal/lifecycle.ts`. It is handed down. Width
+  is the axis that wraps, and a wrapped line scrolls the alternate screen — the one
+  failure that corrupts state the application can no longer see. C01 I12 covers the
+  signal path; nothing covers the frame path, and C01 §5 says so.
 - **Embed a colour.** A block names a palette slot; C10 resolves it.
 - **Write an escape sequence** outside `terminal/escapes.ts`.
 - **Use `.length` for display width.** Use `cells()` — the same implementation the
@@ -78,6 +87,14 @@ Each of these produces code that compiles, passes review, and is wrong.
 - **A fail-on-revert test names the change that makes it fail**, not just the assertion.
   "Removing the idempotency guard → T3.14 fails" is the form.
 - **`make enforce` before opening an MR.** Five seconds. It is A03 executed.
+- **An edit script asserts every replacement matched.** `assert old in s` before every
+  `.replace()`, and a script that reports success having changed nothing is a failure.
+  Twelve invariants across four specs were lost this way — the commitments landed and
+  the invariants silently did not — and later an `SS` rule never reached `SCANS` while
+  `make enforce` stayed green, because the anchor named a rule that is inventoried and
+  unimplemented. Both scripts printed `ok`. This is the fabricated-violation discipline
+  applied to the tool that writes the rules, which is where it was missing: ask whether
+  the change fired, not whether the suite is still green.
 - **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
   initialise, serialise.
 
