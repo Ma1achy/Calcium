@@ -24,6 +24,7 @@ import {
   OWNERS,
   REFERENCE_EXCEPTIONS,
   referenceFiles,
+  scanReferences,
   specFiles,
 } from "../../tools/enforce/commitments.mjs";
 
@@ -439,6 +440,27 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     );
 
     expect(checkReferences(["docs/surfaces/S99_fake.md"], read, {}).violations).toEqual([]);
+  });
+
+  it("scanReferences: offsets survive masking, and the specs read their code", () => {
+    // The two things the renumber depends on and SP3 does not.
+    //
+    // **Offsets.** Code is blanked to spaces rather than removed, so a reference
+    // after a code span still points at the character it points at. A strip that
+    // shortened the line would move every reference after it, and the renumber
+    // rewrites by offset.
+    const line = "The `code` span, then C09 I5.";
+    const [ref] = scanReferences("docs/surfaces/S99_fake.md", line);
+    expect(line.slice(ref?.start, ref?.end)).toBe("I5");
+
+    // **Fenced code in a spec is read.** Ten references live in fenced type
+    // declarations in `docs/components/` — `// pin the range (I33)` — the exact
+    // opposite of the documents, where every id inside code is an illustration.
+    const fenced = ["```ts", "  yMin?: number;   // pin the range (I33)", "```"].join("\n");
+    expect(
+      scanReferences("docs/components/C04_view_model.md", fenced, { owner: "C04", code: true }),
+      "with code:false these would be invisible to the renumber",
+    ).toHaveLength(1);
   });
 
   it("SP3: an exception whose reason has expired fails", () => {

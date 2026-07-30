@@ -59,6 +59,30 @@ export declare const REFERENCE_EXCEPTIONS: Readonly<Record<string, string>>;
 /** Every file SP3 reads. `docs/components/` is SP1's and SP2's. */
 export declare function referenceFiles(): string[];
 
+export type Reference = {
+  /** 1-indexed. */
+  line: number;
+  /** Offsets into that line, valid against the original text. */
+  start: number;
+  end: number;
+  id: string;
+  /** `null` where nothing says which spec owns it. */
+  spec: string | null;
+  /** Whether a spec id sat immediately before it, wrapped lines included. */
+  qualified: boolean;
+};
+
+/**
+ * Every invariant reference in one file. SP3 asks which resolve; the renumber
+ * asks where they are — and a second scanner for the second question would
+ * eventually disagree with the first.
+ */
+export declare function scanReferences(
+  file: string,
+  src: string,
+  options?: Readonly<{ owner?: string | null; code?: boolean }>,
+): Reference[];
+
 /**
  * SP3 — every invariant reference resolves against its owning spec.
  *

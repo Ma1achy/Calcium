@@ -564,7 +564,90 @@ const SEPARATOR = /^[\s*>/]*$/;
  * exists in the wrong spec, which is why a qualified reference is preferred
  * wherever a file's owner is not obvious from its path.
  */
-const STRIP_CODE = [/^\s*```/, /`[^`]*`/g];
+const FENCE = /^\s*```/;
+const SPAN = /`[^`]*`/g;
+
+/**
+ * Code, blanked to spaces rather than removed, so every offset still points at
+ * the character it pointed at. The renumber rewrites by offset and shares this
+ * reader; a strip that shortened the line would move every reference after it.
+ */
+function mask(text) {
+  return text.replace(SPAN, (run) => " ".repeat(run.length));
+}
+
+/**
+ * Every invariant reference in one file, with the spec each resolves to.
+ *
+ * **One reader, used by two callers.** SP3 asks which of these resolve; the
+ * renumber asks where they are. A second scanner for the second question would
+ * disagree with the first eventually, and the disagreement would be a renumber
+ * that moved an id the rule was not looking at — which is precisely how twelve
+ * invariants went missing the last time this was attempted.
+ *
+ * `spec` is `null` where nothing says which spec owns the reference.
+ *
+ * `code` decides whether fenced blocks and code spans are read. It is `false`
+ * for markdown by default, because in every document outside `docs/components/`
+ * an id inside code is a *form* being illustrated and not one occurrence is a
+ * real reference. **Inside the specs it is the other way round**: ten references
+ * live in fenced type declarations — `// pin the range (I33)`, `// required —
+ * see I13` — so the renumber reads them, and anything that widens SP3 to the
+ * specs must too.
+ */
+export function scanReferences(file, src, options = {}) {
+  const owner = options.owner ?? ownerOf(file);
+  const code = options.code ?? !file.endsWith(".md");
+  const out = [];
+
+  let scope = owner;
+  let fenced = false;
+  let adjacent = null;
+  let gap = "";
+
+  for (const [i, raw] of src.split("\n").entries()) {
+    if (!code && FENCE.test(raw)) { fenced = !fenced; continue; }
+    if (fenced) continue;
+
+    const text = code ? raw : mask(raw);
+    if (BREAK.test(text)) { scope = owner; adjacent = null; }
+
+    TOKENS.lastIndex = 0;
+    let m;
+    let cursor = 0;
+    while ((m = TOKENS.exec(text))) {
+      gap += text.slice(cursor, m.index);
+      cursor = m.index + m[0].length;
+
+      if (m[1] !== undefined) {
+        // `C10 I22` — adjacency is explicit qualification and wins over
+        // everything, including an owner. Proximity that is *not* adjacent only
+        // speaks where no owner does.
+        adjacent = m[1];
+        gap = "";
+        if (owner === null) scope = m[1];
+        continue;
+      }
+
+      const qualified = adjacent !== null && SEPARATOR.test(gap) ? adjacent : null;
+      adjacent = null;
+      gap = "";
+
+      out.push({
+        line: i + 1,
+        start: m.index,
+        end: cursor,
+        id: m[2],
+        spec: qualified ?? scope,
+        qualified: qualified !== null,
+      });
+    }
+
+    gap += `${text.slice(cursor)}\n`;
+  }
+
+  return out;
+}
 
 export function checkReferences(
   files,
@@ -587,84 +670,45 @@ export function checkReferences(
     let src;
     try { src = readFile(file); } catch { continue; }
 
-    const owner = ownerOf(file);
     const excused = exceptions[file] !== undefined;
-    const markdown = file.endsWith(".md");
-    const [FENCE, SPAN] = STRIP_CODE;
-    let scope = owner;
     let unresolvable = 0;
-    let fenced = false;
 
-    let adjacent = null;
-    let gap = "";
+    for (const ref of scanReferences(file, src)) {
+      const where = `${file}:${String(ref.line)}`;
 
-    for (const [i, raw] of src.split("\n").entries()) {
-      if (markdown && FENCE.test(raw)) { fenced = !fenced; continue; }
-      if (fenced) continue;
-
-      const text = markdown ? raw.replace(SPAN, "") : raw;
-      if (BREAK.test(text)) { scope = owner; adjacent = null; }
-
-      TOKENS.lastIndex = 0;
-      let m;
-      let cursor = 0;
-      while ((m = TOKENS.exec(text))) {
-        gap += text.slice(cursor, m.index);
-        cursor = m.index + m[0].length;
-
-        if (m[1] !== undefined) {
-          // `C10 I22` — adjacency is explicit qualification and wins over
-          // everything, including an owner. Proximity that is *not* adjacent
-          // only speaks where no owner does.
-          adjacent = m[1];
-          gap = "";
-          if (owner === null) scope = m[1];
-          continue;
-        }
-
-        const qualified = adjacent !== null && SEPARATOR.test(gap) ? adjacent : null;
-        adjacent = null;
-        gap = "";
-        const id = m[2];
-        const where = `${file}:${String(i + 1)}`;
-        const spec = qualified ?? scope;
-
-        if (spec === null) {
-          unresolvable += 1;
-          if (!excused) {
-            violations.push({
-              rule: "SP3",
-              file: where,
-              spec: "A02 §1 · A03 §7a",
-              message:
-                `cites a bare ${id} and nothing before it says which spec owns it. ` +
-                `Write it as \`C09 ${id}\`, add the file to OWNERS or TOPICS, or name ` +
-                `it in REFERENCE_EXCEPTIONS with why. Skipping it is SS26: a check ` +
-                `that cannot find what it was asked about passes exactly like one ` +
-                `that is satisfied.`,
-            });
-          }
-          continue;
-        }
-
-        const own = invariants(spec);
-        if (own !== null && own.has(id)) { resolved += 1; continue; }
-
+      if (ref.spec === null) {
         unresolvable += 1;
-        if (excused) continue;
-        violations.push({
-          rule: "SP3",
-          file: where,
-          spec: "A02 §1 · A03 §7a",
-          message:
-            `cites ${spec} ${id}${qualified === null ? " (bare, by owner)" : ""}, which ` +
-            `${spec} does not declare. A reference that ` +
-            `does not resolve reads as backed and is not — and nothing outside ` +
-            `docs/components/ resolved one of these until SP3.`,
-        });
+        if (!excused) {
+          violations.push({
+            rule: "SP3",
+            file: where,
+            spec: "A02 §1 · A03 §7a",
+            message:
+              `cites a bare ${ref.id} and nothing before it says which spec owns it. ` +
+              `Write it as \`C09 ${ref.id}\`, add the file to OWNERS or TOPICS, or name ` +
+              `it in REFERENCE_EXCEPTIONS with why. Skipping it is SS26: a check ` +
+              `that cannot find what it was asked about passes exactly like one ` +
+              `that is satisfied.`,
+          });
+        }
+        continue;
       }
 
-      gap += `${text.slice(cursor)}\n`;
+      const own = invariants(ref.spec);
+      if (own !== null && own.has(ref.id)) { resolved += 1; continue; }
+
+      unresolvable += 1;
+      if (excused) continue;
+      violations.push({
+        rule: "SP3",
+        file: where,
+        spec: "A02 §1 · A03 §7a",
+        message:
+          `cites ${ref.spec} ${ref.id}${ref.qualified ? "" : " (bare, by owner)"}, which ` +
+          `${ref.spec} does not declare. A reference that does not resolve reads as ` +
+          `backed and is not — and nothing outside docs/components/ resolved one of ` +
+          `these until SP3.`,
+      });
     }
 
     if (excused && unresolvable === 0) {
