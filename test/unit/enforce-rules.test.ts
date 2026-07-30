@@ -263,6 +263,32 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/presentation/plot/definition.ts",
     source: 'import type { PlannedColumns } from "../table/plan.js";',
   },
+  {
+    // The plausible version, and the reason MG10 is not covered by MG1: this
+    // edge goes *downward*, L2 to L1, so the layer walk permits it. What a
+    // reader reaches for is measurement — "evict the tallest" or "stop at the
+    // viewport's worth of rows" both read as more correct than a block count,
+    // and both would make the store depend on a width it cannot honestly obtain.
+    rule: "MG10",
+    file: "src/viewport/transcript/cap.ts",
+    source: 'import { createBlockRegistry } from "../../presentation/blocks/index.js";',
+  },
+  {
+    // The other half of I18, and the one that arrives as a convenience: a `seq`
+    // that is "obviously" better as a timestamp, or an eviction notice that
+    // wants to know how wide the terminal is before it phrases itself.
+    rule: "MG10",
+    file: "src/viewport/transcript/store.ts",
+    source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
+  },
+  {
+    // SS4. Copied from the idiom a store would actually use — `Date.now()` for a
+    // `seq` that someone wanted sortable across sessions — rather than written
+    // to the rule's own assumption, which is SS20's lesson (A03 commitment 14a).
+    rule: "SS4",
+    file: "src/viewport/transcript/store.ts",
+    source: "const seq = Date.now();",
+  },
 ];
 
 const scanIds = SCANS.map((s) => s.id);
@@ -545,8 +571,7 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
    * that is NOT being enforced, and saying so is the point.
    */
   const PENDING_RULES: Record<string, string> = {
-    SS4: "C13 — no transcript/",
-    SS5: "C14 — no viewport/ rule yet",
+    SS5: "folded into SS4's scope — SS4 covers all of src/viewport/, so a second rule with the same pattern and a contained scope could never fire on anything SS4 misses. The SS12-into-SS11 precedent",
     SS6: "C16",
     SS7: "C17",
     SS8: "C19",
@@ -574,7 +599,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // The rest of the MG family, which this check could not see until it read
     // more than `SS` rows. Each waits on the component whose directory it scopes
     // to; none of these exists, so the rule would have nothing to match.
-    MG10: "C13 — no viewport/transcript.ts",
     MG11: "C14",
     MG12: "C15",
     MG13: "C15",

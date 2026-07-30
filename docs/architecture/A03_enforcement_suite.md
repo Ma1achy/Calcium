@@ -127,7 +127,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG7 | C07 imports nothing from `terminal/` or above | C07 T2.6 |
 | MG8 | `tui-kit` imports nothing from `prism-tui` | C08 T2.6, T2.10 |
 | MG9 | No block kind imports the registry | C09 T2.11 |
-| MG10 | C13 imports nothing from `terminal/` or `presentation/` | C13 T2.4 |
+| MG10 | C13 imports nothing from `terminal/` or `presentation/` | C13 I18, T2.4 |
 | MG11 | C14 imports nothing from `terminal/` | C14 T2.5 |
 | MG12 | C15 imports nothing from `terminal/` or C14 | C15 T2.6 |
 | MG13 | C15 imports nothing from C13 | C15 T2.5 |
@@ -140,6 +140,8 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
 | MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I15, T2.17 |
 | MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
+
+**MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
 
 **MG22 is a cycle rule, not a layer rule.** C11 imports C12's `sparkline` for a `Cell.spark` (C12 §2), which is legal: A02 §1 forbids importing *upward* and importing *cyclically*, and both directories are L1, so the layer walk sees nothing either way. What must never exist is the return edge — a plot reaching into the table engine for a column width or a truncation helper, which is exactly the shape a reader would reach for and which would close the cycle. Type-only counts, as MG6 and MG19 both record: a reference is a dependency whether or not it survives the build.
 
@@ -160,8 +162,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in `tui-kit` outside C22 | C22 T2.4 |
 | SS2 | `Math.random` | C08 | C08 T2.3 |
 | SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 T2.2 |
-| SS4 | clock reads | `transcript/` | C13 T2.2 |
-| SS5 | clock reads | `viewport/` | C14 T2.4 |
+| SS4 | clock reads | `src/viewport/` | C13 I9, T2.2 · C14 T2.4 |
+| SS5 | — folded into SS4 | — | C14 T2.4 |
 | SS6 | clock reads | `input/` | C16 T2.3 |
 | SS7 | clock reads | `editor/` | C17 T2.3 |
 | SS8 | clock reads | `completion/` | C19 T2.3 |
@@ -171,6 +173,8 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
 | SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I13, T2.10 |
+
+**SS4 and SS5 were written as two rules over nested scopes, which is one rule and one rule that can never fire.** SS4 named `transcript/` and SS5 named `viewport/`, with the same pattern — so anything SS4 could catch, SS5 caught first, and `transcript/` was a *file* until C13 landed, which is SS3's defect on top. SS4 now scopes to `src/viewport/` and SS5 is folded into it, the SS12-into-SS11 precedent. **It is not redundant with SS1**, which allows `src/shell/session.ts`: the claim these two tests make is that L2 has no clock exception and never acquires one.
 
 **SS1 is the widest and the most valuable.** One injected clock, entering at C22 and nowhere else, is what makes golden frames reproducible and every timing test run on a fake.
 

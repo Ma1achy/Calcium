@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -77,6 +77,38 @@ const FORBIDDEN_EDGES = [
       "C11 imports C12's sparkline, so the L1 edge between them is one-directional " +
       "by construction — a plot reaching back into the table engine closes a cycle " +
       "the layer walk cannot see, because both are L1. Type-only counts",
+  },
+  {
+    // **MG10 is MG6's third kind for a fourth reason, and the sharpest one yet:
+    // both of these edges go *downward*.** C13 is L2; `terminal/` is L0 and
+    // `presentation/` is L1, so MG1 reports an import of either as perfectly
+    // legal, and MG2 sees no cycle because there is none. Every rule in the
+    // suite passes an edge that C13 I18 forbids outright.
+    //
+    // What it guards is not layering but *knowledge*. C13 holds documents and
+    // decides what to evict; the moment it can measure one, it will, because
+    // "evict by height" reads as more correct than "evict by block count" — and
+    // the store would then depend on a width, a theme and a capability set, none
+    // of which it has any way to obtain honestly. The cap is on blocks (I17)
+    // precisely so this component never needs to render to do its job.
+    rule: "MG10",
+    from: "src/viewport/transcript/",
+    to: "src/presentation/",
+    spec: "C13 I18 · C13 T2.4",
+    why:
+      "C13 holds view models and never renders them — measurement is C09's and " +
+      "caching it is C14's. The edge is downward, so the layer walk permits it: " +
+      "this is the rule that does not. Type-only counts",
+  },
+  {
+    rule: "MG10",
+    from: "src/viewport/transcript/",
+    to: "src/terminal/",
+    spec: "C13 I18 · C13 I9 · C13 T2.4",
+    why:
+      "no clock, no width, no escape sequence reaches the transcript — `seq` is " +
+      "logical and the terminal's dimensions arrive as data at C14 if at all. " +
+      "Also downward, and also forbidden. Type-only counts",
   },
 ];
 
