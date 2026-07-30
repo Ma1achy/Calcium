@@ -176,7 +176,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I10** — Summed `takeRows` over a visible range equals `min(viewportHeight, totalRows)`, exactly.
 - **I11** — C14 reads no clock and performs no I/O; the clipboard writer is injected.
 - **I12** — C14 imports nothing from `terminal/`; dimensions arrive as data, and C14 never calls the frame scheduler. L4 orchestrates.
-- **I13** — The eviction marker is an ordinary entry (C13 I13); C14 holds no special case for it.
+- **I13** — The eviction marker is an ordinary entry (C13 I14); C14 holds no special case for it.
 - **I14** — Copy mode restores the prior follow state on exit.
 - **I15** — Cache invalidation is incremental, driven by C13's granular `Change`. An append invalidates nothing already measured; a patch invalidates one entry through its `rev`. Dropping the cache on every change would make the Fenwick tree pointless.
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.

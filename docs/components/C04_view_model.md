@@ -472,6 +472,10 @@ type Measure<B extends Block = Block> =
 
 Container kinds — `panel`, `group`, and a `table`'s expanded detail — measure children they do not know the kind of. `measureChild` is injected by the registry (C09), which passes its own dispatcher. This keeps measurement pure and avoids a module cycle between the registry and the kinds registered into it.
 
+**That same set is exported as `descendants(block)`**, the cycle-safe walk the constructor already performs, because it is knowledge about the vocabulary and C04 owns the vocabulary. C13's block cap needs it (C13 I17) and would otherwise carry a second copy — and a second copy is a walk that misses the next container kind added here, silently, in the component that decides what to evict. The same argument as `cells()`: one implementation, or the two answers drift.
+
+**It yields blocks and never rows.** A table's rows are not blocks; a row's `detail` is. Consumers deciding what to *count* decide that themselves — `descendants` says only what nests.
+
 **`measure(block, w)` must equal the number of terminal rows that rendering `block` at width `w` actually occupies.** C14 virtualises by measured height without rendering; if the two disagree, the viewport drifts, scroll positions land wrong, and content jumps as the user scrolls past it. This is the most load-bearing invariant in the system and the hardest to hold, because it is violated silently.
 
 `measure` is a function of a block and a width, and the gap before a block is a

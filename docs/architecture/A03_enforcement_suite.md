@@ -79,6 +79,10 @@ A mechanism would be n² prose comparison across 25 specs, which is not a check 
 
 That is the closest thing to a detection method there is, and it is worth stating as one rather than leaving it as a coincidence: **the contradiction surfaces when something must satisfy both simultaneously, and nowhere earlier.** A reader looking for the third instance should expect it at the moment of implementation, and should recognise the shape — two true statements, one impossible object — rather than concluding that one of the two is simply wrong. Neither was, either time.
 
+**A third instance, one layer later, and the method is now three for three.** C13's cap, its never-evict rule and `overCap` are three claims about one situation: the cap bounds blocks, the live and streaming entries are exempt from eviction, and the excess is reported for L4 to act on. Each is correct alone. What none of them said is *when* the figure is computed — §4 ran the sweep inside `append` only, so after a `settle` relieved the pressure `overCap` still described the overshoot from before, and L4's warning outlived the condition. It surfaced while walking a sequence by hand against the three rules at once, which is the same moment as the other two: not while reading them, but while making one object satisfy all of them.
+
+**So the expectation is now a step rather than a hope.** Three components, three instances, three found by attempting the work and none found by reading. A component's plan should include the walk — for a renderer, drawing the figure; for a store, stepping a sequence and asserting the whole state after each step — and it should be named as a step, because the two things it reliably catches are caught by nothing else in this document.
+
 The mechanism remains n² prose comparison and remains untractable. What is tractable is the expectation.
 
 **The class extends past rules into the harnesses they run in.** A rule executes inside a fake terminal, a fake clock or a pseudo-terminal, and a harness parameter nobody has exercised is a mechanism that cannot be *seen* to have worked — the same defect from the other side. `runInPty` accepted an `env` record and hard-coded node-pty's `name`, which *is* the child's TERM, so `TERM=dumb` ran under `xterm-256color`; the parameter had never been passed until C02's tier 5 passed it. The standing rule is in `test/support/README.md`: **every helper parameter that shapes the environment under test carries an assertion that fails if the parameter is ignored**, and a parameter with no observable effect is reported rather than skipped, because it may mean the parameter should not exist.
@@ -341,6 +345,21 @@ Every instance came from appending an invariant to the end of a *related group* 
 Resolution is by explicit qualifier (`C10 I22`) first, then by a declared file-to-spec owner map, and a file with references and no owner **fails rather than being skipped** — §2's vacuity class, since a check that cannot find what it was asked about passes exactly like one that is satisfied. In a markdown document an id inside a code span or fenced block is a *form* being illustrated (`(I3, I4)`, `T3.7 (I5): …`) and is not read as a reference; every such occurrence in the corpus is an illustration and none is real.
 
 **Its boundary, stated rather than assumed.** SP3 proves a reference resolves against its owner. It cannot prove the owner is the intended one: a bare id in a misattributed file resolves silently when the number happens to exist in both specs, and the C02 test above was caught only because C02 happens to declare no invariant of that number. Qualified references are immune, and are preferred wherever a file's owner is not obvious from its path.
+
+**And the boundary is reached often enough to be a defect class rather than a caveat. Five known members as of 2026-07-30**, every one of them resolving and every one pointing at the wrong rule:
+
+| Where | Cites | Means |
+|---|---|---|
+| C22 §3, twice | C01 I17 | C01 I5 — `beforeRelease` runs once before the first release |
+| C13 T1.7b, T6.11 | I14 | I13 — `rev` bumps on every applied patch |
+| C13 T2.4 | I13 | I18 — C13 imports nothing from `terminal/` or `presentation/` |
+| C14 I13 | C13 I13 | C13 I14 — the eviction marker is a real entry |
+
+Two people reading carefully found five, which is not a rare event but the ordinary rate.
+
+**No mechanism, and one should not be built.** A citation resolving to the wrong invariant is a semantic error; the only available check is word overlap between the citing text and the invariant's, which is precisely the heuristic the 2026-07-29 pairing audit abandoned — a commitment is the *readable* form of an invariant, so it deliberately shares few words with it, and the noise floor sits above the signal. The three C13 members were found the same way the C22 pair was: by someone reading the spec end to end in order to implement against it.
+
+That is the same detection method as §2's contradiction class, and it has the same consequence. **Both classes are found by doing the work and by nothing else**, which is the argument for the implementation walk being a scheduled step rather than a courtesy — it is the only pass either class has.
 
 **A dangling reference is not inert — it arms itself when the number gets used.** C22 §3 cited `C01 I17` twice, about `beforeRelease` running once before the first release, which is C01 I5 and always was. For months C01 declared no I17 at all, so both citations were dangling and nothing looked. Then the C25 commit added a real I17 — the width rule — and the two silently became *resolving* citations pointing at an unrelated invariant. SP3 would have caught them on any day before that one and on no day after, and what found them in the end was reading the renumber's diff. This is the boundary above with a date attached: the rule proves resolution, and resolution is exactly what the new invariant supplied. Qualifying all eleven hundred is not the remedy — that is a diff of pure noise, and `T3.7 (I5)` in `test/unit/capabilities.test.ts` is unambiguous to a reader. Saying where the rule stops is what keeps it from being read as stronger than it is, which is the failure mode of everything in §2's list.
 
