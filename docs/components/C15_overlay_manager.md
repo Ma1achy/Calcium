@@ -216,7 +216,8 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I14** — `update` changes a layer's content, placement or width and never the stack's shape, its order, or its `dismissable`. A layer whose escapability changes mid-life makes C16's Ctrl-C ladder depend on when it looked.
 - **I15** — `layout()` omits a zero-height overlay and dismisses nothing. Acting on what it computed would cost I5.
 - **I16** — An overlay's width is `min(layer.width ?? region.width, region.width)`, and its content is measured at that width rather than at the region's. `Placed.left` is derived from it.
-- **I17** — An anchored overlay never covers its anchor's own rows, `[row, row + rows − 1]`, on either side of a flip. A single-row anchor is the default and the special case, not the general one.
+- **I17** — An anchored overlay never covers its anchor's own rows, `[row, row + rows − 1]`, **whenever either side has a row to offer**. A single-row anchor is the default and the special case, not the general one. The qualification is T3.8's: a one-row region with a one-row anchor has no room on either side, and an overlay covering its anchor is a better answer than one silently absent.
+- **I18** — The `maxHeightFraction` clamp is floored at one row. `floor(1 × 0.5)` is zero, and a region too short for the fraction must not swallow every overlay it holds.
 
 ---
 
@@ -237,7 +238,8 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 13. A layer changes in place through `update` — content, placement or width, never the stack's shape and never its escapability (I14).
 14. A zero-height overlay is omitted from the layout rather than dismissed by it (I15).
 15. An overlay's width is its owner's to declare, and its content is measured at that width; `left` follows from it (I16, I6).
-16. An anchor is a span rather than a row, and an overlay never covers it (I17).
+16. An anchor is a span rather than a row, and an overlay never covers it while either side has room (I17).
+17. Both clamps have a floor of one row, so a short region never silently swallows a layer (I18).
 
 ---
 
@@ -286,7 +288,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.6** (I7): neither side fits → the larger side is taken and clamped; `truncated` true.
 - **T3.7**: an overlay taller than `maxHeightFraction` of the region → clamped, `truncated` true. A control asserts the same overlay is *un*truncated in a taller region, so a fixture that is always truncated cannot report a pass.
 - **T3.7b** (I7): the fraction clamp is applied before placement and the fit clamp after — asserted by an overlay that would flip differently if the two were swapped. The pair of clamps sharing a word is what makes this worth its own test.
-- **T3.8**: region height 1 → the overlay occupies 1 row, truncated, no negative arithmetic.
+- **T3.8** (I17, I18): region height 1 → the overlay occupies 1 row, truncated, no negative arithmetic. It covers its anchor, which is the one case I17 permits and the reason I17 is qualified rather than absolute: with no room on either side the alternatives are covering the anchor or vanishing, and vanishing is the one that looks like a dropped keystroke.
+- **T3.8b** (I18): an overlay in a region of 1 row with the default fraction → placed, not omitted. `floor(1 × 0.5)` is zero and the floor is what stops that reading the layout.
 - **T3.9** (I16): a layer declaring a width wider than the region → clamped to the region, content measured at the clamped width, `left` 0, nothing overflows horizontally.
 - **T3.10**: an anchor row outside the region → clamped to the nearest edge, not vanished.
 - **T3.11** (I10): `dismiss(id, "anchorEvicted")` → the layer is removed and the change carries that reason; `dismiss(id)` carries `explicit`. C15 is the recorder, so the test is over what it reports, not over what it noticed.
@@ -337,6 +340,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.12** (I16): measuring content at `region.width` rather than at the resolved width → T1.14 fails, and a narrow confirm is drawn shorter than it is.
 - **T6.13** (I6): omitting `left` from `Placed` → T1.15 and T2.2 fail, and C16 cannot hit-test a centred confirm.
 - **T6.14** (I14): widening `LayerUpdate` to include `dismissable` → T1.13 fails, and C16's Ctrl-C ladder starts depending on when it looked.
+- **T6.15** (I17): computing the anchored sides from `row ± 1` rather than from the span → T3.5b fails, and a menu lands on the second line of a two-row prompt while every number in `Placed` agrees with every other.
+- **T6.16** (I18): dropping either clamp's floor of one row → T3.8 and T3.8b fail, and a short terminal loses its overlays entirely rather than showing them badly.
 
 ---
 
