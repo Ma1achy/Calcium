@@ -289,6 +289,12 @@ The welcome art is **77 cells × 8 rows**, three glyphs (`█` U+2588, `▒` U+2
 
 Surfaces — dark `bg #1a1a1a`, `bg-elev #222222`, `bg-deep #141414`, `border #2c2c2c`, `border-hi #3a3a3a`; light `#fafafa`, `#f0f0f0`, `#e8e8e8`, `#d3d3d3`, `#c8c8c8`.
 
+**Four diff surfaces**, added with C25 and the first text-bearing surfaces besides `bg` and `bgElev` (C10 §4a). `diffAdd` and `diffRemove` are the line background of a changed row; `diffAddStrong` and `diffRemoveStrong` are the stronger pair for the precisely changed words within one, which word-level emphasis needs and nothing consumes yet.
+
+Their values and **their measured ratios are recorded here when they are authored**, and they are authored against the check rather than before it: twelve slots — the nine `syntax` slots and `tone.ok`, `tone.error`, `tone.muted` — clear their floor against each of the four, in both variants. 96 ratios, recomputed from the shipped tokens by C10 T2.14a.
+
+Deliberately not authored in advance of the measurement. The palette correction above is the precedent and the reason: the light `number`/`type` collision was **created** by correcting both values to the floor, so only recomputation could have found it. Values chosen from a picture and recorded as if measured is the failure this appendix exists to prevent.
+
 **Discrepancy:** `j22` commits to "Solarized Light". The mockup implements **Atom One Light**. The mockup's is the better-engineered palette and the one to keep; the journey's wording is wrong.
 
 ### A.2 Algorithms

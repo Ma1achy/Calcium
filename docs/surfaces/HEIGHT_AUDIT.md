@@ -40,6 +40,7 @@ Instances, and the first three were the second kind:
 | S03 §3, S05 §3, S06 §5, S15 §5 | `metric`, `age`, `errors`, `p99`, `req/s`, `p50`, `versions` right-aligned | `align`, which `ColumnDef` requires |
 | S01 §2, S03 §2, S13 §2 | A number and a sparkline in one `metric` cell | Nothing — see the fourth verdict below |
 | S04 §3, S11 §2 | A plot area two cells right of its label, data flush to the axis | Nothing — C12 §2 declared three cells and the **figures were right**; see the fifth verdict |
+| C25 §2 (first draft) | A trailing `⋯ 31 unchanged lines` after the last hunk | `Hunk.collapsedBefore` covers the region *before* a hunk; the region after the last one is unrepresentable. Fourth verdict class, second instance — but with **one** figure, so the figure moves |
 
 ### The fourth verdict: neither side is right
 
@@ -96,6 +97,17 @@ other against the text is the text being wrong.
 Worth separating from the first verdict class, because the remedy is opposite and
 the symptom identical. Both look like a figure and a table disagreeing; deciding by
 which artefact is easier to edit gets one of them backwards every time.
+
+**And the two-figures clause earned its keep immediately.** C25's illustration was
+drawn for the first time in the same fold-in, and its first draft carried a trailing
+`⋯ 31 unchanged lines` that `Hunk.collapsedBefore` cannot express — the field covers
+the region before a hunk, so the tail has nowhere to live. That is the fourth verdict
+class by symptom: a figure and a shape disagreeing about something the shape has to
+carry. But it is **one** figure, and one is a slip, so the row went rather than the
+shape. `Patch.collapsedAfter?: number` is recorded as open in C25 §9 with no consumer
+asking for it.
+
+The two classes are separated by a count, and the count is doing real work.
 
 ### The braille figures, measured
 
@@ -325,19 +337,34 @@ blocker is wrong is indistinguishable from one that is pending (A03 §9a).
 
 | Surface | Waits on |
 |---|---|
-| S07 §3 patch region | **C25** |
 | S13 dashboard | **C22** — see below |
+| S01, S02, S10, S11, S12 | **C22** — whole screens |
 
 Composed and asserted: S03, S05, S06, S14, S15 (with C11), and **S04 §3 and S09
 §2 (with C12)**.
 
-**Two corrections to this table, and one of them had been wrong since it was
-written.** S09 was listed as waiting on C11 *and* C12 and has no plot at all — its
-composition is `rule, rule, steps, notice, rule, table, notice` (S09 T1.1) — so it
-became writable when C11 landed and stayed exempt for a whole component. A deferral
-whose blocker is wrong is indistinguishable from one that is pending (A03 §9a), and
-TD3 checks that a mapped path exists rather than that a blocker names the right
-component. That half has no mechanism; this row is the only place it was caught.
+**Three corrections to this table, and two of them were wrong from the day they
+were written.**
+
+**S09 waited on a component it had nothing to do with.** It was listed as waiting on
+C11 *and* C12 and has no plot at all — its composition is `rule, rule, steps, notice,
+rule, table, notice` (S09 T1.1) — so it became writable when C11 landed and stayed
+exempt for a whole component.
+
+**S07 §3's "patch region" does not exist.** The row deferred it to C25. S07 §2 draws
+two `diff` blocks and is already composed and asserted; §3 is "Direction of
+improvement", a table of four verdicts with no illustration in it; and the only
+mention of `patch` anywhere in S07 is the sentence explaining why `diff` and `patch`
+are separate kinds. The surface that draws a patch is **S10 §4a**, which has no
+illustration fence of its own and is already inside the C22 line. So the row is
+**deleted** rather than expired: there was never anything for C25 to make composable.
+
+**And that is the second instance, one component after the first.** When S09's was
+corrected, this file recorded that the half TD3 does not cover has no mechanism.
+It has one now — **A03 TD4**: a surface deferral naming a component whose kind does
+not appear in that surface's own composition fails, which catches both of these from
+two things a surface spec already states. The correction that closes the class rather
+than the instance, on the third defect being the second one found by hand.
 
 **S13 moves to C22**, and not because of C12. Its illustration is a whole screen —
 an outer `panel` with a title and a footer, wrapping a `group` of five inner panels —

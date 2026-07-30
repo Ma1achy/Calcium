@@ -66,6 +66,10 @@ Each of these produces code that compiles, passes review, and is wrong.
 
 - **Read a clock** outside `shell/session.ts`. It is injected as `() => number`.
 - **Read `process.env`** outside `terminal/capabilities.ts`.
+- **Read the terminal's width** outside `terminal/lifecycle.ts`. It is handed down. Width
+  is the axis that wraps, and a wrapped line scrolls the alternate screen — the one
+  failure that corrupts state the application can no longer see. C01 I12 covers the
+  signal path; nothing covers the frame path, and C01 §5 says so.
 - **Embed a colour.** A block names a palette slot; C10 resolves it.
 - **Write an escape sequence** outside `terminal/escapes.ts`.
 - **Use `.length` for display width.** Use `cells()` — the same implementation the

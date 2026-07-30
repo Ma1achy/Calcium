@@ -5,10 +5,10 @@
 | **Type** | Component |
 | **Package** | `tui-kit` |
 | **Layer** | L1 presentation |
-| **Depends on** | C04 (`Patch`, `Hunk`, `Measure`) · C09 (registers into its registry; `cells()`; tokenisation) · C10 (`resolveTone`, `resolve` for the `syntax` palette) |
+| **Depends on** | C04 (`Patch`, `Hunk`, `Measure`) · C09 (registers into its registry; `cells()`; tokenisation) · C10 (`resolveTone`, `resolve` for the `syntax` palette, `resolveBackground` for the diff surfaces) |
 | **Consumed by** | C09's registry · S10's manifest change · any surface showing a textual change |
-| **Source** | Scratchpad 5 §4 · A01 D29 · A02 §2 |
-| **Status** | Draft — one open item in §6 blocks implementation, not the spec |
+| **Source** | Scratchpad 5 §4 · Scratchpad 6 §2, §6, §7 · A01 D29 · A02 §2 |
+| **Status** | Settled. §6's open item is closed — `Style` gains a background channel, and the decision is C10's |
 
 ---
 
@@ -34,22 +34,119 @@ const patchDefinition: BlockDefinition<Patch>;   // registered into C09
 
 Nothing else is exported. The block shape is C04's, the registry is C09's, and a consumer producing a patch uses `b.patch(…)` from C24.
 
+---
+
+### The illustration
+
+C09 §3's sixteen kinds each have one. C25 had a measurement line and no picture, and its field names commit to a git-style unified diff and to nothing else — so the renderer would have been written to a plausible reading of `Hunk` rather than to a drawing. **Five things below are decisions rather than consequences, and two of them are inferable the wrong way from the fields alone.**
+
+```
+── serving/volatility-estimator.yaml ───────────────────────────────────────────
+  ⋯ 14 unchanged lines
+  @@ -18,7 +18,9 @@
+  18  18    spec:
+  19  19      selector:
+  20  20        matchLabels:
+  21          -   app: volatility-estimator
+      21    +   app: volatility-estimator
+      22    +   prism.fmx.io/family: volatility
+  22  23      replicas: 2
+  23  24      template:
+```
+
+**Eleven rows, and the formula gives eleven**: one path header, one hunk header, eight lines, one collapse marker. Drawn without a panel gutter or blank separator rows, because both belong to whoever composes the block — S10 puts it in a panel — and a figure that includes them is a figure whose row count disagrees with §2's arithmetic. That disagreement is what the surface audit spends its time on, and the cheapest place to not create it is here.
+
+**A trailing collapsed region cannot be drawn, and the first draft of this figure drew one.** `⋯ 31 unchanged lines` after the last hunk reads well and `Hunk.collapsedBefore` has nowhere to put it — the field covers the region before a hunk, so the regions before and between hunks are expressible and the one after the last hunk is not. One figure against a declared shape is a slip in the figure (C12's fifth verdict class needs *two* figures agreeing before the declaration is the thing that moves), so the row is gone rather than the shape widened. Recorded as open in §9: it wants `Patch.collapsedAfter?: number`, which is a C04 change with no consumer asking for it — S10 renders a manifest, where the interesting thing is never the tail.
+
+### The row anatomy
+
+Four columns, and every one of them is toned by the line's kind.
+
+```
+   ┌── oldNo ──┬── newNo ──┬─ marker ─┬── text ─────────────────────────────┐
+   │        18 │        18 │          │ spec:                    ← context  │
+   │        21 │           │    -     │   app: volatility-est…   ← removed  │
+   │           │        21 │    +     │   app: volatility-est…   ← added    │
+   └───────────┴───────────┴──────────┴─────────────────────────────────────┘
+       toned       toned      toned      syntax slots, all three kinds
+```
+
+| Line kind | `oldNo` | `newNo` | marker | text | background |
+|---|---|---|---|---|---|
+| `context` | present, `muted` | present, `muted` | blank | syntax slots | none |
+| `remove` | present, `error` | blank | `-`, `error` | **syntax slots** | `diffRemove` |
+| `add` | blank | present, `ok` | `+`, `ok` | **syntax slots** | `diffAdd` |
+
+**All three kinds are syntax-highlighted.** GitHub, VS Code and delta all do it. The one well-known renderer that does not gives its reason as keeping removed lines visually simpler beneath a red deletion background — which is a fact about the strength of *its* background, not about what a diff should look like. With a subtle background, coloured text on it reads fine, so the premise does not transfer. Only the **gutter** varies by kind; the text is code in all three cases and reads as code.
+
+Worth recording because the palette looks like the knob and is not: authoring a strong `diffRemove` does not render coloured text *plain*, it renders it *muddy*. Those are different outcomes and only one is what someone asking for plain removed lines wants. There is no way to deliver it short of a flag, and a flag is refused for now — two code paths and double the goldens for a preference nobody has tested. **The experiment that would overturn this** is worth running rather than arguing: once C25 renders, draw a real hunk both ways at 24-bit against a subtle background. If highlighted-removed genuinely reads worse, the flag is warranted after all.
+
+**The gutter is toned, not neutral chrome.** Numbers and markers take the line's tone, so a removed row reads as one red unit rather than as grey numbers beside red text.
+
+**Every row therefore uses two palettes at once** — a tone in the gutter and `syntax` slots in the text. That is the case C10 I16 was widened for, and in a patch it is the **general** case rather than an exception on some lines.
+
+**Two number columns, not one.** A removed line has an old number and no new one; an added line the reverse. A single column forces a choice on every changed line and loses the correspondence, which is the thing a diff exists to show. This is the first of the two a reader would infer wrongly from `oldNo?`/`newNo?` being optional.
+
+**`-` and `+` in their own column**, after the numbers and before the text. Inside the text they shift every changed line one cell relative to context and destroy the alignment that makes a diff scannable. This is the second. Under ASCII the marker column is 1:1 by construction, both glyphs being ASCII already.
+
+**Collapsed regions are one row, and they say how many.** `⋯ 14 unchanged lines`, not a bare marker: the count is what tells a reader whether expanding is worth it, and the row is what makes measurement exact.
+
+**Tone and syntax compose on the same line**, which is what §6 resolves.
+
+**Expansion is a document patch, not view state.** C11 T4.7's mechanism — expanding rewrites `collapsedBefore` and patches the document, so a frozen block records its own expansion and the operation reaches a frozen entry where an action could not. There is no `expanded` flag on `Hunk`: expansion *is* the rewrite.
+
+### Split layout, ≥ 100 columns
+
+```
+── serving/volatility-estimator.yaml ───────────────────────────────────────────
+  @@ -18,7 +18,9 @@
+  18    spec:                          │  18    spec:
+  19      selector:                    │  19      selector:
+  20        matchLabels:               │  20        matchLabels:
+  21 -       app: volatility-estimator │  21 +       app: volatility-estimator
+                                       │  22 +       prism.fmx.io/family: …
+  22      replicas: 2                  │  23      replicas: 2
+```
+
+A removed line pairs with its corresponding added line on one row; an unmatched added line pairs with a blank on the left, and an unmatched removed line with a blank on the right. That pairing is what makes side-by-side readable — it is the whole reason split exists rather than being unified with wider columns — and it is why split needs the width: two gutters, two number columns, one separator, and the text twice.
+
+### And pairing makes height depend on width, which I2 denied
+
+**Nine rows here against eleven above, from the same block.** One removed line and two added ones become two paired rows instead of three stacked ones. So a patch does not measure the same at 80 and at 160, and the original I2 — "height is independent of width" — was not merely optimistic but incompatible with the layout §3 chooses by width. Each was defensible alone.
+
+**This is the second instance of a defect class A03 §2 records with no mechanism**: two statements individually correct and jointly unsatisfiable, the first being C12's I5 and I14. The commitment/invariant audit pairs a commitment with an invariant; nothing compares invariants with one another, and it would not have found this, because both were true.
+
+The resolution keeps the invariant that carries load and moves the one that was a convenience:
+
+- **I1 is untouched and is the one that matters.** `measure(patch, w)` equals the rendered row count at width `w`. C14 virtualises on measured height without rendering, so I1 coming apart is a viewport that drifts; I2 coming apart is a width sweep that is slightly less cheap.
+- **I2 becomes width-independence *within a layout*.** Height is constant across every width that selects the same layout, and steps exactly once, at the breakpoint, by the number of rows pairing saves. `measure` stays pure and total and takes the width it was always given.
+- **Nothing wraps, and that is a separate claim** which survives intact. It was bundled into I2 and is now its own invariant, because the reason for it is alignment rather than arithmetic — and S10 cites it (`patch` does not wrap, C25 I2) for the alignment reason.
+
+The alternative was to make split not pair — every line on its own row, blank opposite — which preserves the arithmetic and deletes the point of the layout. A split diff that stacks is a unified diff with wasted columns.
+
+---
+
 ### Height
 
-Exact, and independent of width above a floor:
+Exact at every width, and constant within a layout.
 
 ```
-1                                        the file header (path)
-+ Σ over hunks of (
-    1                                    the hunk header, @@ -18,7 +18,9 @@
-  + hunk.lines.length
-  + (hunk.collapsedBefore ? 1 : 0)       the collapse marker, one row
-  )
+unified                                  split
+1        the file header (path)           1        the file header (path)
++ Σ over hunks of (                     + Σ over hunks of (
+    1      the hunk header                   1      the hunk header
+  + hunk.lines.length                      + pairedRows(hunk.lines)
+  + (hunk.collapsedBefore ? 1 : 0)         + (hunk.collapsedBefore ? 1 : 0)
+  )                                        )
 ```
 
-**Nothing wraps.** A diff line that wraps destroys the column alignment that makes a diff readable — the `+`/`-` gutter stops lining up and the eye loses the shape of the change. Long lines truncate, exactly as `logs` do. That is also what makes height width-independent, which makes C09 T2.1's width sweep cheap and makes any width-dependence a bug the sweep catches immediately.
+`pairedRows` walks each maximal run of consecutive changed lines and emits `max(removes, adds)` rows for it, one row per unchanged line otherwise. It reads the same field `lines.length` reads, so it tokenises nothing and allocates nothing — `measure` stays as cheap in split as in unified, which is what keeps C09 I1 affordable.
 
-A collapsed region is **one row**, carrying its own count: `⋯ 12 unchanged lines`. The count comes from `collapsedBefore`, so measurement reads it directly rather than deriving it.
+**Nothing wraps.** A diff line that wraps destroys the column alignment that makes a diff readable — the `+`/`-` gutter stops lining up and the eye loses the shape of the change. Long lines truncate, exactly as `logs` do.
+
+That is a claim about *alignment*, and it is separate from the arithmetic above. Wrapping would make height depend on the width of the content continuously; the layout breakpoint makes it depend on width in exactly one step, at a value the block declares. A sweep across the seven widths sees two values and knows which side of the breakpoint each is on — which is a weaker property than one value, and still strong enough to catch a wrap.
+
+A collapsed region is **one row** in both layouts, carrying its own count: `⋯ 12 unchanged lines`. The count comes from `collapsedBefore`, so measurement reads it directly rather than deriving it.
 
 ---
 
@@ -73,7 +170,7 @@ Within a line, the `syntax` palette highlights the language — so a changed YAM
 
 **C10 had to be widened for this.** Before C25, `syntax` was scoped to `code` blocks by C10 I16, tested by C10 T2.8 and enforced by A03 SS20. That scope is now a closed list of `code` and `patch`, and it stays closed: a third consumer is a spec change, and the friction is the point.
 
-**How the two compose is open — see §6.**
+**How the two compose is settled in §6**: the line kind takes a background, the syntax palette keeps the foreground, and the gutter takes the tone.
 
 ### Layout
 
@@ -84,6 +181,56 @@ Within a line, the `syntax` palette highlights the language — so a changed YAM
 ### ASCII fallback
 
 `unicode: "ascii"` replaces the collapse marker's `⋯` with `...`. **This changes the cell count**, so unlike C09's 1:1 substitution rule the collapse marker's *content budget* changes at measure time instead — the marker is a fixed one row either way, so height is unaffected and C09 I1 holds. This is the "adding a kind whose measurer needs capabilities" case C09 commitment 11 names as a design decision, and it is made here deliberately: the alternative is a three-cell `⋯` that is one cell wide, which would drift every truncation point on the row.
+
+---
+
+## 3a. Three levels, and both thresholds
+
+A patch has three presentations. Two are rendering; the third is a pushed view.
+
+```
+collapsed     hunks plus collapsed context, capped        the default
+expanded      the whole patch inline, however tall        the transcript scrolls it
+fullscreen    all hunks in a pushed view                  when inline is too much
+```
+
+**Not a container you enter and scroll.** The tempting shape is a block you enter, which then scrolls independently, and it should not be built: nested scrolling means the reader has to know which thing the arrow keys are moving, and while they are inside the diff they cannot scroll *past* it to reach what is below. C14 has one scroll position by design. "Enter it and scroll" becomes **"expand it and scroll normally"** — the same outcome, one scroll position, and a finished diff can be paged past.
+
+### Both thresholds are in viewport-heights, not rows
+
+The cost of an over-tall block is paging past it to reach the transcript, and that cost is relative to the screen. Sixty rows is one page on a fifty-row terminal and three on a twenty-four-row one, so a constant would be wrong at both ends.
+
+```
+collapsed form      admit hunks while the running total ≤ 1 × viewport,
+                    cutting at hunk boundaries; then
+                    "and 43 more hunks · ⏎ fullscreen"
+
+inline expansion    offered when expanded rows ≤ maxExpandHeight
+                    (default 2 × viewport, configurable)
+                    above that: fullscreen only
+```
+
+**The collapsed form needs its own cap, which is the easy thing to miss.** A rename across a file produces forty tiny hunks, and collapsed that is still hundreds of rows before anyone expands anything. The cut is at **hunk boundaries**: a hunk is a coherent unit, and dropping one whole is better than showing half of it.
+
+**2× for expansion** — one page to read, one to leave. One screenful refuses a legitimate thirty-line diff; three means paging three times past something already finished with.
+
+Both are computable before either is offered, because `measure` is pure and takes the width. Nothing has to be rendered to know whether it would fit.
+
+### What is a preference, and what is not
+
+`maxExpandHeight` is a multiple of viewport height, default 2 — someone reading diffs all day on a tall monitor wants 4 and someone on a laptop wants 1.5, and there is no right answer to hard-code.
+
+**Two things are not configurable: whether expansion exists, and what happens above the threshold.** The number is a reading preference; the behaviour is the contract. An option that turns off expansion makes a dropped hunk unreachable, which is D38's failure exactly, and an option that changes what happens above the threshold means two paths where one is untested.
+
+## 3b. Fullscreen is all the hunks, not the whole file
+
+A `Patch` carries hunks and a path. It does not carry the file — the unchanged lines are not in the block — so a whole-file view means either the block carries the file content or the view fetches it, and both are data decisions rather than rendering ones.
+
+**Decided: fullscreen is every hunk, uncollapsed, scrollable.** What `less` gives you on a `git diff`. It needs no data the block does not already have, which is what makes it specifiable now and buildable when L2 lands.
+
+A C15 pushed view, the third after S12 and S13, so the conventions come free: `esc` pops, arrows and `PgUp`/`PgDn` scroll, `g`/`G` seek. The diff-specific pair is **`n` and `p`, next and previous hunk** — the one motion a diff has that a list does not.
+
+**Whole-file-with-changes is deferred to the editor, and they are the same component.** Both need the whole file, a scroll model independent of the transcript, and highlighting over a window rather than a fragment. Said explicitly because the alternative is two of them: a read-only file viewer with diff decoration is the smaller first target, it has its consumer in this feature, and it is the same component with editing turned off.
 
 ---
 
@@ -101,8 +248,9 @@ Consequences that matter:
 
 ## 5. Invariants
 
-- **I1** — `measure(patch, w)` equals the rendered row count at width `w`, for every block and every width. C09 I1, specialised.
-- **I2** — Height is independent of width. Nothing wraps; long lines truncate.
+- **I1** — `measure(patch, w)` equals the rendered row count at width `w`, for every block and every width. C09 I1, specialised. **This is the one that carries load**: C14 virtualises on measured height without rendering, so I1 coming apart is a viewport that drifts silently.
+- **I2** — Nothing wraps. Long lines truncate, exactly as `logs` do, because a wrapped diff line destroys the gutter alignment that makes a diff readable. This is a claim about alignment, not about arithmetic (§2).
+- **I2a** — Height is constant across every width that selects the same layout, and changes only at the layout breakpoint, by the number of rows pairing saves. `measure` is pure and total at every width. **The original I2 claimed width-independence outright and was incompatible with §3's split pairing** — the two were individually correct and jointly unsatisfiable, which is a defect class A03 §2 names and does not check.
 - **I3** — `measure` never tokenises and never reads capabilities except for the collapse marker's content budget (§3).
 - **I4** — Every `add` and `remove` line carries its prefix glyph regardless of colour depth. D29 at the source.
 - **I5** — A collapsed region occupies exactly one row and states its own count.
@@ -111,15 +259,29 @@ Consequences that matter:
 - **I8** — C25 declares no block types. `Patch` and `Hunk` are C04's.
 - **I10** — A language C09's tokeniser does not recognise renders as plain text, never as an error. A diff of an unfamiliar file type is still a diff worth reading, and refusing to render it would make the renderer's language table a gate on content.
 - **I11** — Word-level intra-line highlighting is deferred, and the block shape does not foreclose it. `Hunk` carries whole lines; adding spans later is a field, not a redesign.
-- **I9** — Expansion of a collapsed region patches the document (C11 T4.7's mechanism), never mutates external state. C25 itself does not expand anything — it renders whatever `collapsedBefore` says.
+- **I9** — Expansion of a collapsed region patches the document (C11 T4.7's mechanism), never mutates external state. C25 itself does not expand anything — it renders whatever `collapsedBefore` says. There is no `expanded` flag: expansion *is* the rewrite.
+- **I12** — Every row carries the gutter in the line's tone and the text in `syntax` slots, for all three line kinds. Only the gutter varies by kind; the text is code in every case. Two palettes on one row is the general case in a patch, not an exception on some rows (§2).
+- **I13** — The line background is the third signal and never the only one. At 1-bit it resolves to nothing (C10 §4's surface rule), and the marker and the toned gutter both survive — which is what makes losing it lossless under D29.
+- **I14** — The collapsed form admits hunks while the running total is within one viewport, cutting at hunk boundaries and never mid-hunk, and states how many hunks it dropped.
+- **I15** — Inline expansion is offered iff the expanded row count is within `maxExpandHeight`; above it, fullscreen is the only route. Both are computable before either is offered, `measure` being pure.
+- **I16** — `maxExpandHeight` is the only configurable part. Whether expansion exists, and what happens above the threshold, are not — a patch's dropped content is always reachable (D38).
+- **I17** — The fullscreen view is every hunk of *this block*, uncollapsed. It never needs data the block does not carry, which is why whole-file-with-changes is a different component (§3b).
 
 ---
 
-## 6. Open — the composition rule
+## 6. The composition rule — resolved
 
-**This blocks implementation, not the spec.** It must be settled before C25 is scheduled.
+**Option (a): `Style` gains a background channel, and it is C10's decision, taken in C10.** The line kind takes the background, `syntax` keeps the foreground, the gutter takes the tone, and the marker carries the distinction under D29 regardless of any of them.
 
-C10's `Style` is `{colour?, bold?, dim?, inverse?, underline?}` — **no background channel.** So on a changed line, where the line kind wants to say "added" and the syntax palette wants to say "this is a keyword", something has to give:
+It is a **requirement rather than a preference**, which is what changed: §2's row anatomy cannot be expressed without it. The foreground is spoken for by syntax on all three line kinds, and bold and dim are spoken for by the 1-bit tone collapse (C10 §5), so there is no channel left. Option (b) would make added and removed lines the same colour, and option (c) would suppress highlighting on exactly the lines a reader most wants to read.
+
+Two levels are needed, not one: a line background for add and remove, and a **stronger** one for the precisely changed words within a line, which is what word-level emphasis will want (I11). One channel with a single value per line cannot express the second, so the span carries its own.
+
+**Degradation needs no new principle.** C10 §4's surfaces already degrade to nothing at 1-bit and `resolve`'s surface path already implements it, so a diff background is a surface. What makes losing it lossless is I13.
+
+**What does follow is a real new check**: the contrast floor extends to diff backgrounds. They are surfaces, so everything painted on them must clear its floor against them exactly as tones clear it against `bg` and `bgElev` — and because the background covers the whole row, that is the nine `syntax` slots *and* the three gutter tones, in both variants. It gives nobody a choice; it prevents a bad one, by failing at load if a theme ships a background nothing reads on. See C10 §4.
+
+The three options, kept because the reasoning is the reason the decision holds:
 
 | | |
 |---|---|
@@ -129,22 +291,27 @@ C10's `Style` is `{colour?, bold?, dim?, inverse?, underline?}` — **no backgro
 
 Attributes are already spoken for: bold and dim are how 1-bit carries tone (C10 §5), so they cannot also carry line kind.
 
-Adding a background channel to `Style` is a C10 decision and should be taken deliberately, not discovered as a side effect of writing a patch renderer. Recorded here because C25 is where the constraint became visible, and the decision belongs in C10 when it is made.
+**The palette is not the knob, and it looked like it.** Authoring a strong `diffRemove` to get plain removed lines does not work: a strong background does not render coloured text *plain*, it renders it *muddy* — unreadable syntax rather than legible default foreground. Those are different outcomes and only one of them is what the request means. There is no clever way around a flag if the preference turns out to be real, and §2 records the experiment that would establish it.
 
 ---
 
 ## 7. Commitments
 
 1. C25 renders textual diffs; `diff` remains the structured comparison and the two never merge (I8).
-2. Height is exact and width-independent; nothing wraps (I2).
+2. Nothing wraps, because a wrapped diff line destroys the alignment that makes a diff readable (I2). Height is exact at every width and constant within a layout, stepping once at the breakpoint (I1, I2a).
 3. A collapsed region is one row stating its own count (I5).
 4. `+` and `-` carry the distinction; tone reinforces it and never replaces it (I4).
-5. Two layouts, chosen by width — unified when narrow, split when wide. The breakpoint is a §3 value, tuned against golden frames rather than promised (I2).
+5. Two layouts, chosen by width — unified when narrow, split when wide. The breakpoint is a §3 value, tuned against golden frames rather than promised (I2a).
 6. C25 registers through C09's public mechanism and is not privileged (I6).
 7. C25 declares no block types and holds no state (I7, I8).
 8. Tokenisation is C09's; `measure` never tokenises (I3).
 9. An unregistered language renders as plain text, not an error (I10).
 10. Word-level highlighting is deferred and the block shape does not foreclose it (I11).
+11. All three line kinds are syntax-highlighted; only the gutter varies by kind, and every row therefore uses two palettes at once (I12, → C10 I16).
+12. The line background is a third signal and never the only one; at 1-bit it is gone and the diff is still a diff (I13, → A01 D29).
+13. The collapsed form is capped at one viewport and cuts at hunk boundaries, stating how many hunks it dropped (I14).
+14. Inline expansion is offered when the expanded form fits `maxExpandHeight` and fullscreen otherwise; the number is configurable and the behaviour is not (I15, I16).
+15. Fullscreen is every hunk of this block uncollapsed, never the whole file — the whole file is the editor's, and it is one component rather than two (I17).
 
 ---
 
@@ -154,7 +321,8 @@ Six tiers. No state machine, so no transition table (A02 §7).
 
 ### Tier 1 — unit
 
-- **T1.1**: a single-hunk patch measures `1 + 1 + lines.length`.
+- **T1.1**: a single-hunk patch measures `1 + 1 + lines.length` at a unified width.
+- **T1.1a** (I2a): the same patch at a split width measures `1 + 1 + pairedRows`, and `pairedRows` is `max(removes, adds)` per run of consecutive changed lines. Asserted on a hunk with one removed line and two added ones, where the two figures differ — a hunk whose runs are all one-sided would pass either arithmetic.
 - **T1.2**: a three-hunk patch measures the sum across hunks plus one file header.
 - **T1.3** (I5): a hunk with `collapsedBefore: 12` measures one row more than the same hunk without it, and the marker states `12`.
 - **T1.4** (I5): `collapsedBefore: 1` still occupies exactly one row — a collapse of one is not expanded silently.
@@ -166,7 +334,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 ### Tier 2 — contract / interface
 
 - **T2.1** (I1, the headline): for the fixture corpus × widths {40, 60, 80, 100, 120, 160, 200}, `measure` equals the rendered row count.
-- **T2.2** (I2): for every fixture, `measure` returns the same value at all seven widths.
+- **T2.2** (I2a): for every fixture, `measure` returns one value across {40, 60, 80} and one across {100, 120, 160, 200} — two values, not seven, and the step is at the declared breakpoint. A patch that wraps would give more than two.
 - **T2.3** (I6): `patch` is registered via `registry.register`; removing the call removes the kind, and no built-in fallback path supplies it.
 - **T2.4** (I7): `measure` called a hundred times returns the same value; no I/O, no state.
 - **T2.5** (I3): `measure` performs no tokenisation — a spy on C09's tokeniser records zero calls across the corpus.
@@ -179,10 +347,15 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T3.3**: a 10,000-character line → truncates, occupies one row, and height is unchanged.
 - **T3.4**: `language` naming an unregistered language → renders plain, no error, height identical.
 - **T3.5**: `language: ""` → same as unregistered.
-- **T3.6** (I2): the same patch at width 40 and width 200 measures identically.
+- **T3.6** (I2a): the same patch at widths 40 and 80 measures identically, and at 100 and 200 measures identically — the constancy is within a layout, and asserting it across the breakpoint would assert the thing that is false.
+- **T3.6a** (I2, I2a): a patch of only `context` lines measures identically at 40 and at 200. With no changed lines there is nothing to pair, so the step vanishes and the two layouts agree — which is the case that would hide a wrap, and the reason T2.2 uses a corpus rather than one fixture.
 - **T3.7**: a hunk whose `header` is longer than the width → truncates to one row.
 - **T3.8**: `collapsedBefore: 0` → treated as absent; no marker row.
-- **T3.9**: a patch where every line is `add` (a new file) → no `remove` lines, height exact.
+- **T3.9**: a patch where every line is `add` (a new file) → no `remove` lines, height exact, and unified and split agree because every run is one-sided.
+- **T3.10** (I14): forty single-line hunks against a twenty-four-row viewport → the collapsed form stops at a hunk boundary within one viewport and states how many it dropped. No hunk is half-rendered.
+- **T3.11** (I15, I16): a patch whose expanded form exceeds `maxExpandHeight` → inline expansion is not offered and fullscreen is; one whose expanded form fits → expansion is offered. Both decided without rendering either.
+- **T3.12** (I16): `maxExpandHeight` at 1.5 and at 4 → the threshold moves; there is no value at which expansion stops existing.
+- **T3.13** (I12): a `remove` line whose text is a YAML key → the gutter is `error`-toned and the key is `syntax.key`, on the same row. The row that would have been dropped by option (c).
 
 ### Tier 4 — integration
 
@@ -192,6 +365,9 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T4.4** (with C09, ascii): `unicode: "ascii"` → the collapse marker is `...`, height unchanged, no codepoint above U+007F.
 - **T4.5** (with C14): expanding a collapsed region shifts subsequent blocks by exactly the measured delta; no drift over fifty expand/collapse cycles.
 - **T4.6** (with C24): `b.patch({…})` produces a block that validates and renders.
+- **T4.7** (with C10, I13): at `colourDepth: 24` a changed row carries a background; at 4 it carries the curated index; at 1 it carries none, and the marker and the toned gutter are still there. The degradation ladder walked on one row.
+- **T4.8** (with C10, I12): every `syntax` slot and every gutter tone clears its contrast floor against all four diff backgrounds, in both variants. C10's check, asserted from the patch side because C25 is the consumer that made the surfaces text-bearing.
+- **T4.9** (with C10): the background covers the row to the full width, so a short line's padding carries it too. A background that stopped at the text would be ragged, and the row is the unit the reader sees.
 
 ### Tier 5 — e2e
 
@@ -201,7 +377,12 @@ Six tiers. No state machine, so no transition table (A02 §7).
 
 ### Tier 6 — fail-on-revert
 
-- **T6.1** (I2): making long lines wrap → T2.2 fails, and height becomes width-dependent.
+- **T6.1** (I2): making long lines wrap → T2.2 sees more than two heights across the seven widths, and the gutter stops lining up.
+- **T6.1a** (I2a): making split stack rather than pair — every line its own row, blank opposite → T1.1a fails, and split becomes unified with wasted columns. The revert that looks like a simplification, because it restores the width-independence the original I2 claimed.
+- **T6.8** (I12): suppressing syntax on `remove` lines → T3.13 fails. The convention this spec rejected, and the one a reader is most likely to restore from another tool.
+- **T6.9** (I13): carrying the add/remove distinction on the background alone, dropping the marker → T4.2 fails at 1-bit, where the background is gone and nothing is left.
+- **T6.10** (I14): capping the collapsed form by row count rather than at hunk boundaries → T3.10 fails with a half-rendered hunk.
+- **T6.11** (I16): making expansion itself configurable → T3.12 fails, and a dropped hunk becomes unreachable (D38).
 - **T6.2** (I1): counting a collapsed region as its collapsed line count → T1.3 fails.
 - **T6.3** (I6): making `patch` a privileged built-in → T2.3 fails.
 - **T6.4** (I4): rendering the add/remove distinction with tone alone → T4.2 fails at `colourDepth: 1`.
@@ -222,3 +403,15 @@ Six tiers. No state machine, so no transition table (A02 §7).
 | **Word-level highlighting within a changed line** | Deferred. It is where diff viewers earn their keep and also where they get slow — an intra-line diff is a second diff algorithm running per changed line. The block shape does not foreclose it: a `spans` field on a line would be additive |
 | Expanding a collapsed region | C23 dispatches it; expansion patches the document (C11 T4.7's mechanism) |
 | Syntax highlighting of the whole file | `code`, C09 |
+| The fullscreen view's implementation | C15, when L2 lands. §3b specifies it so that it is not designed twice |
+| A whole-file view with diff decoration | The editor, and it is the same component as the fullscreen view with more data (§3b) |
+
+### Open
+
+**A trailing collapsed region cannot be expressed.** `Hunk.collapsedBefore` covers the region before a hunk, so the regions before and between hunks are representable and the one after the last hunk is not. §2 records that the first draft of the illustration drew one. It wants `Patch.collapsedAfter?: number`, which is a C04 shape change and additive — deliberately not taken, because there is no consumer: S10 renders a manifest against what is deployed, where the interesting thing is the change and never the tail. Recorded so that whoever wants it finds the reasoning rather than the field.
+
+**`code.startLine` is not landing here.** Scratchpad 6 §3 designs it — a number rather than a boolean, absent meaning no gutter, the width derived — and its consumer is S08, which is not built. It is additive and optional so nothing breaks, but it changes golden frames for every `code` fixture that opts in, and touching a built component for no consumer is the thing the discipline exists to prevent. `markLine` is weaker again and stays open.
+
+**`hunksFromStructuredPatch` is not landing here.** The `diff` package's `structuredPatch` output maps mechanically onto `Hunk` — split the sigil, derive the header, count from `oldStart`/`newStart` — and the inclination is that the *type conversion* is worth shipping while the *dependency* stays the app's. One function, no dependency, and unresolved: it may belong in `tui-kit/testing`, in the app, or nowhere.
+
+**Lezer is researched and undecided.** Scratchpad 6 §4 measures it against lowlight — 856 KB against 9.5 MB, incremental by design, and a **closed** tag vocabulary of 78 tags, which is the palette-slot argument arrived at independently. Switching would rewrite C09's tokenisation section and its hljs map, change `DEPENDENCIES.md`, and re-record the goldens, and it has no consumer until either the editor or a second language exists. Recorded because the obstacle it answers — a resumable parser for Node — was the thing blocking the editor, and it is answered.
