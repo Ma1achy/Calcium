@@ -21,4 +21,7 @@ export {
   type GlyphSet,
 } from "./glyphs.js";
 export { createBlockRegistry } from "./registry.js";
+// C25 renders code inside a diff line and does not tokenise (C25 §4). The
+// tokeniser and its memo stay C09's; what crosses the seam is the token stream.
+export { sliceTokens, tokenise, tokenisationCount, type Token } from "./kinds/code.js";
 export type { BlockDefinition, BlockRegistry, FocusState, RenderContext } from "./types.js";

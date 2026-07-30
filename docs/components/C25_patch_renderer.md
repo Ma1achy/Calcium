@@ -42,19 +42,21 @@ C09 §3's sixteen kinds each have one. C25 had a measurement line and no picture
 
 ```
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────
-  ⋯ 14 unchanged lines
-  @@ -18,7 +18,9 @@
-  18  18    spec:
-  19  19      selector:
-  20  20        matchLabels:
-  21          -   app: volatility-estimator
-      21    +   app: volatility-estimator
-      22    +   prism.fmx.io/family: volatility
-  22  23      replicas: 2
-  23  24      template:
+⋯ 14 unchanged lines
+@@ -18,6 +18,7 @@
+18 18   spec:
+19 19     selector:
+20 20       matchLabels:
+21    -       app: volatility-estimator
+   21 +       app: volatility-estimator
+   22 +       prism.fmx.io/family: volatility
+22 23     replicas: 2
+23 24     template:
 ```
 
 **Eleven rows, and the formula gives eleven**: one path header, one hunk header, eight lines, one collapse marker. Drawn without a panel gutter or blank separator rows, because both belong to whoever composes the block — S10 puts it in a panel — and a figure that includes them is a figure whose row count disagrees with §2's arithmetic. That disagreement is what the surface audit spends its time on, and the cheapest place to not create it is here.
+
+**Two corrections to this figure, both made by rendering it.** Its first draft indented every row under the header by two cells, which is decoration costing two columns on every line of the one block where the text column is what the reader came for; the rule now runs flush and so does everything below it. And its hunk header read `@@ -18,7 +18,9 @@` against lines that span six and seven — three context, one removed, two added, two context — so a reader deriving the counts from the drawn lines got different numbers from the header drawn above them. `Hunk.header` is a string the block carries verbatim and C25 computes nothing from it, which is precisely why a wrong one survives review: nothing in the renderer disagrees with it.
 
 **A trailing collapsed region cannot be drawn, and the first draft of this figure drew one.** `⋯ 31 unchanged lines` after the last hunk reads well and `Hunk.collapsedBefore` has nowhere to put it — the field covers the region before a hunk, so the regions before and between hunks are expressible and the one after the last hunk is not. One figure against a declared shape is a slip in the figure (C12's fifth verdict class needs *two* figures agreeing before the declaration is the thing that moves), so the row is gone rather than the shape widened. Recorded as open in §9: it wants `Patch.collapsedAfter?: number`, which is a C04 change with no consumer asking for it — S10 renders a manifest, where the interesting thing is never the tail.
 
@@ -99,20 +101,21 @@ Worth recording because the palette looks like the knob and is not: authoring a 
 
 ```
 ── serving/volatility-estimator.yaml ───────────────────────────────────────────
-  @@ -18,7 +18,9 @@
-  18    spec:                          │  18    spec:
-  19      selector:                    │  19      selector:
-  20        matchLabels:               │  20        matchLabels:
-  21 -       app: volatility-estimator │  21 +       app: volatility-estimator
-                                       │  22 +       prism.fmx.io/family: …
-  22      replicas: 2                  │  23      replicas: 2
+@@ -18,6 +18,7 @@
+18   spec:                             │18   spec:
+19     selector:                       │19     selector:
+20       matchLabels:                  │20       matchLabels:
+21 -       app: volatility-estimator   │21 +       app: volatility-estimator
+                                       │22 +       prism.fmx.io/family: volat…
+22     replicas: 2                     │23     replicas: 2
+23     template:                       │24     template:
 ```
 
 A removed line pairs with its corresponding added line on one row; an unmatched added line pairs with a blank on the left, and an unmatched removed line with a blank on the right. That pairing is what makes side-by-side readable — it is the whole reason split exists rather than being unified with wider columns — and it is why split needs the width: two gutters, two number columns, one separator, and the text twice.
 
 ### And pairing makes height depend on width, which I2 denied
 
-**Nine rows here against eleven above, from the same block.** One removed line and two added ones become two paired rows instead of three stacked ones. So a patch does not measure the same at 80 and at 160, and the original I2 — "height is independent of width" — was not merely optimistic but incompatible with the layout §3 chooses by width. Each was defensible alone.
+**Ten rows here against eleven above, from the same block.** One removed line and two added ones become two paired rows instead of three stacked ones. So a patch does not measure the same at 80 and at 160, and the original I2 — "height is independent of width" — was not merely optimistic but incompatible with the layout §3 chooses by width. Each was defensible alone.
 
 **This is the second instance of a defect class A03 §2 records with no mechanism**: two statements individually correct and jointly unsatisfiable, the first being C12's I5 and I14. The commitment/invariant audit pairs a commitment with an invariant; nothing compares invariants with one another, and it would not have found this, because both were true.
 
@@ -261,6 +264,7 @@ Consequences that matter:
 - **I11** — Word-level intra-line highlighting is deferred, and the block shape does not foreclose it. `Hunk` carries whole lines; adding spans later is a field, not a redesign. **Its carrier is decided and is not a background**: C10 §4a measured a stronger background pair and withdrew it, so a changed span takes `underline` over the line's background (→ C10 §4a).
 - **I9** — Expansion of a collapsed region patches the document (C11 T4.7's mechanism), never mutates external state. C25 itself does not expand anything — it renders whatever `collapsedBefore` says. There is no `expanded` flag: expansion *is* the rewrite.
 - **I12** — Every row carries the gutter in the line's tone and the text in `syntax` slots, for all three line kinds. Only the gutter varies by kind; the text is code in every case. Two palettes on one row is the general case in a patch, not an exception on some rows (§2).
+- **I12a** — In split layout the background belongs to a **side**, not to a row. A paired row changed in two directions, so one colour across it asserts the wrong change on one half — and the blank facing an unpaired addition would claim the other side gained the line too. Found by looking at a frame; no assertion in the suite disagreed with it.
 - **I13** — The line background is the third signal and never the only one. At 1-bit it resolves to nothing (C10 §4's surface rule), and the marker and the toned gutter both survive — which is what makes losing it lossless under D29.
 - **I14** — The collapsed form admits hunks while the running total is within one viewport, cutting at hunk boundaries and never mid-hunk, and states how many hunks it dropped.
 - **I15** — Inline expansion is offered iff the expanded row count is within `maxExpandHeight`; above it, fullscreen is the only route. Both are computable before either is offered, `measure` being pure.
@@ -307,7 +311,7 @@ Attributes are already spoken for: bold and dim are how 1-bit carries tone (C10 
 8. Tokenisation is C09's; `measure` never tokenises (I3).
 9. An unregistered language renders as plain text, not an error (I10).
 10. Word-level highlighting is deferred and the block shape does not foreclose it (I11).
-11. All three line kinds are syntax-highlighted; only the gutter varies by kind, and every row therefore uses two palettes at once (I12, → C10 I16).
+11. All three line kinds are syntax-highlighted; only the gutter varies by kind, and every row therefore uses two palettes at once (I12, → C10 I16). In split layout the background is a side's rather than a row's (I12a).
 12. The line background is a third signal and never the only one; at 1-bit it is gone and the diff is still a diff (I13, → A01 D29).
 13. The collapsed form is capped at one viewport and cuts at hunk boundaries, stating how many hunks it dropped (I14).
 14. Inline expansion is offered when the expanded form fits `maxExpandHeight` and fullscreen otherwise; the number is configurable and the behaviour is not (I15, I16).

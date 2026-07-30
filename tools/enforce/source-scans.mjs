@@ -77,18 +77,26 @@ export const SCANS = [
     scope: "src/presentation/theme/", allow: ["src/presentation/theme/four-bit.ts"],
     why: "tokens are 24-bit hex; the curated 4-bit map is the one file that holds indices" },
 
-  // The allow-lists name only what exists. `code.ts` and `patch.ts` arrive with
-  // C09 and C25 and will each have to add their own row — which is the friction
-  // C10 I16 asks for: `syntax` used casually stops meaning anything, and the
-  // list being closed at two is a spec change in four places, not a permission.
+  // **The pattern was correct about a syntax nobody writes**, and that is its own
+  // vacuity class (A03 §2). It required a word character after `syntax.`, and
+  // `code.ts` — its only consumer for two components, and the file the allow-list
+  // exists for — writes ``slot(`syntax.${token.slot}`, …)``. `$` is not `\w`, so
+  // the rule never matched the one idiom in use, its allow-list was never
+  // exercised, and a third consumer writing that form would have passed silently:
+  // the four-place friction C10 I16 asks for, unenforced at the only place it
+  // applies.
   //
-  // Until then these rules police a scope whose legitimate members do not exist,
-  // so the fabricated-violation test carries the whole weight of showing they
-  // can fire. A rule with nothing to be wrong about passes exactly like a
-  // satisfied one.
+  // The interpolated form is now the second alternative. And per A03 commitment
+  // 14a, its fabricated violation is **copied from `code.ts`** rather than written
+  // fresh — a fabrication written to the rule's own assumption reproduces the
+  // assumption, which is exactly how this survived.
+  //
+  // The allow-list names both legitimate members. C10 I16's list is closed at two
+  // and this is the enforceable form of it.
   { id: "SS20", spec: "C10 I16 · C10 T2.8",
-    pattern: /["'`]syntax\.\w|palettes\s*\.\s*syntax/,
-    scope: "src/", allow: ["src/presentation/theme/"],
+    pattern: /["'`]syntax\.(?:\w|\$\{)|palettes\s*\.\s*syntax/,
+    scope: "src/",
+    allow: ["src/presentation/theme/", "src/presentation/blocks/kinds/code.ts", "src/presentation/patch/"],
     why: "`syntax` is consumed by code and patch rendering only; the list is closed at two" },
 
   { id: "SS21", spec: "C10 I16 · C10 T2.8",
@@ -205,10 +213,10 @@ export const SCANS = [
   // field rather than adding a second row with the same id closes the class: C18
   // needs the third scope, and a per-scope row is a shape the next reader has to
   // notice rather than a list they add to.
-  { id: "SS24", spec: "C11 I11 · C11 T2.6 · C12 T2.5 · C18 T2.2",
+  { id: "SS24", spec: "C11 I11 · C11 T2.6 · C12 T2.5 · C25 T2.4 · C18 T2.2",
     pattern: /^(?:export\s+)?(?:let|var)\s/m,
-    scope: ["src/presentation/table/", "src/presentation/plot/"], allow: [],
-    why: "C11 and C12 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
+    scope: ["src/presentation/table/", "src/presentation/plot/", "src/presentation/patch/"], allow: [],
+    why: "C11, C12 and C25 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
 
   { id: "SS26", spec: "C21 T2.2",
     pattern: /process\.stdout\.write/,

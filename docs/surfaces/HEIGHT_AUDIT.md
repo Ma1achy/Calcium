@@ -6,11 +6,15 @@ that found.
 
 **Scope.** The regions drawn from kinds C09 ships — `rule`, `notice`, `keyValue`,
 `steps`, `logs`, `events`, `progress`, `code`, `diff`, `pills`, `tip`, `panel`,
-`group`, `raw`. Regions containing a `table`, a `plot` or a `patch` are deferred:
-those kinds are registered by **C11**, **C12** and **C25**, and until they exist a
-measurement of them measures the `raw` fallback, which proves nothing. Named by
-component, because a deferral whose blocker is wrong is indistinguishable from
-one that is pending (A03 §9a).
+`group`, `raw`. Regions containing a `table`, a `plot` or a `patch` were deferred:
+those kinds are registered by **C11**, **C12** and **C25**, and while any of them
+was unbuilt a measurement of it measured the `raw` fallback, which proves nothing.
+
+**All three exist now**, so no surface is deferred on a kind any more — every
+remaining deferral waits on **C22**, for the frame around a whole screen rather
+than for a block inside it. Named by component, because a deferral whose blocker
+is wrong is indistinguishable from one that is pending (A03 §9a) — and TD4 is
+what checks the naming, after two such deferrals were found by hand.
 
 **Verdicts, not numbers.** A delta recorded as `S08: +4` gets reconciled later by
 adjusting whichever side is easier to edit. Each row below says which side is

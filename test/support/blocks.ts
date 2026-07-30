@@ -13,6 +13,7 @@ import {
   type Block,
   type BlockKind,
   type ColumnDef,
+  type Hunk,
   type Plot,
   type Table,
   type ViewDocument,
@@ -466,4 +467,113 @@ export const PLOT_CORPUS: readonly Block[] = Object.freeze([
   }),
   ONE_PER_KIND.plot,
   ...ADVERSARIAL.filter((b) => b.kind === "plot"),
+]);
+
+// --- C25's corpus ----------------------------------------------------------
+//
+// Shaped around the two things a patch can get wrong that nothing else can: the
+// arithmetic across the layout breakpoint, and a run of changed lines pairing.
+
+type Line = Readonly<{ kind: "add" | "remove" | "context"; text: string; oldNo?: number; newNo?: number }>;
+
+/**
+ * A hunk from a compact spelling: `" ctx"`, `"-old"`, `"+new"`.
+ *
+ * The line numbers are derived rather than written, because a fixture whose numbers
+ * are hand-typed is a fixture that eventually disagrees with its own sigils — and
+ * `oldNo`/`newNo` presence is exactly what T1.8 and the two-column decision rest on.
+ */
+export function hunkOf(
+  spec: readonly string[],
+  options: Readonly<{ oldStart?: number; newStart?: number; collapsedBefore?: number }> = {},
+): Hunk {
+  let oldNo = options.oldStart ?? 18;
+  let newNo = options.newStart ?? 18;
+  const lines: Line[] = [];
+
+  for (const raw of spec) {
+    const sigil = raw.slice(0, 1);
+    const text = raw.slice(1);
+    if (sigil === "-") lines.push({ kind: "remove", text, oldNo: oldNo++ });
+    else if (sigil === "+") lines.push({ kind: "add", text, newNo: newNo++ });
+    else lines.push({ kind: "context", text, oldNo: oldNo++, newNo: newNo++ });
+  }
+
+  // The counts are the old and new spans, not the row count — a header saying
+  // `-18,8 +18,8` on a hunk that loses one line and gains two is a fixture that
+  // lies in the one field a reader checks by hand. Caught by reading the frame.
+  const olds = lines.filter((l) => l.kind !== "add").length; // cells-ok
+  const news = lines.filter((l) => l.kind !== "remove").length; // cells-ok
+  const header = `@@ -${options.oldStart ?? 18},${olds} +${options.newStart ?? 18},${news} @@`;
+  return options.collapsedBefore === undefined
+    ? { header, lines }
+    : { header, lines, collapsedBefore: options.collapsedBefore };
+}
+
+export function patchOf(
+  options: Readonly<{
+    id?: string;
+    path?: string;
+    language?: string;
+    hunks?: readonly Hunk[];
+    layout?: "unified" | "split";
+  }> = {},
+): Block {
+  const base = {
+    kind: "patch" as const,
+    id: options.id ?? "patch-corpus",
+    path: options.path ?? "serving/volatility-estimator.yaml",
+    language: options.language ?? "yaml",
+    hunks: options.hunks ?? [THE_ILLUSTRATION],
+  };
+  return block(options.layout === undefined ? base : { ...base, layout: options.layout });
+}
+
+/**
+ * C25 §2's figure, as data. One removed line and two added ones, which is the run
+ * that pairs to two rows in split against three in unified — the case that made I2
+ * and §3 jointly unsatisfiable, and the only shape that tells the two arithmetics
+ * apart.
+ */
+export const THE_ILLUSTRATION: Hunk = hunkOf(
+  [
+    " spec:",
+    "   selector:",
+    "     matchLabels:",
+    "-      app: volatility-estimator",
+    "+      app: volatility-estimator",
+    "+      prism.fmx.io/family: volatility",
+    "   replicas: 2",
+    "   template:",
+  ],
+  { collapsedBefore: 14 },
+);
+
+export const PATCH_CORPUS: readonly Block[] = Object.freeze([
+  patchOf(),
+  patchOf({ id: "patch-no-hunks", hunks: [] }),
+  patchOf({ id: "patch-forced-unified", layout: "unified" }),
+  patchOf({ id: "patch-forced-split", layout: "split" }),
+  patchOf({ id: "patch-context-only", hunks: [hunkOf([" a: 1", " b: 2", " c: 3"])] }),
+  patchOf({ id: "patch-all-adds", hunks: [hunkOf(["+a: 1", "+b: 2", "+c: 3"])] }),
+  patchOf({ id: "patch-all-removes", hunks: [hunkOf(["-a: 1", "-b: 2", "-c: 3"])] }),
+  patchOf({ id: "patch-collapse-one", hunks: [hunkOf([" a: 1", "+b: 2"], { collapsedBefore: 1 })] }),
+  patchOf({ id: "patch-collapse-zero", hunks: [hunkOf([" a: 1", "+b: 2"], { collapsedBefore: 0 })] }),
+  patchOf({
+    id: "patch-three-hunks",
+    hunks: [
+      hunkOf([" a: 1", "-b: 2", "+b: 3"], { collapsedBefore: 9 }),
+      hunkOf([" c: 4", "+d: 5"], { oldStart: 90, newStart: 91, collapsedBefore: 40 }),
+      hunkOf([" e: 6", "-f: 7"], { oldStart: 998, newStart: 999 }),
+    ],
+  }),
+  patchOf({ id: "patch-long-line", hunks: [hunkOf([`+key: ${"x".repeat(10_000)}`])] }),
+  patchOf({ id: "patch-unknown-language", language: "brainfuck" }),
+  patchOf({ id: "patch-no-language", language: "" }),
+  patchOf({
+    id: "patch-lopsided",
+    hunks: [hunkOf([" a: 1", "-b: 2", "-c: 3", "-d: 4", "+b: 9", " e: 5"])],
+  }),
+  patchOf({ id: "patch-wide-numbers", hunks: [hunkOf([" a: 1", "+b: 2"], { oldStart: 99_998, newStart: 99_999 })] }),
+  ONE_PER_KIND.patch,
 ]);
