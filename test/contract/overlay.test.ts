@@ -5,7 +5,9 @@
 // C12, C13 and C14 each hid a defect in exactly that gap — a rule right at the
 // moment it was written and silent about the path that follows.
 import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
 
+import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { createOverlayManager, place, sortLayers } from "../../src/viewport/overlay/index.js";
 import type { Layer, Region } from "../../src/viewport/overlay/index.js";
 import { REGION, anchored, centred, placeIn, registry, rows, view } from "../support/overlay.js";
@@ -150,6 +152,43 @@ describe("C15 contract — placement is a function", () => {
     // no degenerate cases is not exercising the exemption either.
     expect(checked).toBeGreaterThan(300);
     expect(degenerate).toBeGreaterThan(0);
+  });
+});
+
+describe("C15 contract — the edges that are not there", () => {
+  it("T2.5 (I9), T2.6 (I12): no C13, no C14, no terminal/ — and each fabrication fires", () => {
+    const sources = readdirSync("src/viewport/overlay")
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/viewport/overlay/${f}`);
+
+    // The control: the scan found files. A glob matching nothing reports a
+    // clean graph exactly like a graph that is clean — SS26's lesson, and the
+    // reason `overlays.ts` being a file rather than a directory kept SS4
+    // reporting compliance for the life of the project.
+    expect(sources.length).toBeGreaterThan(0);
+    expect(
+      checkModuleGraph(sources).filter((v) => v.rule === "MG12" || v.rule === "MG13"),
+    ).toEqual([]);
+
+    // **Two of these three edges go sideways** — C13, C14 and C15 are all L2 —
+    // so the layer walk permits them and MG2 sees no cycle, because there is
+    // none. Nothing else in the suite reports either, which is why the
+    // fabrications matter more here than usual.
+    //
+    // The first is not invented: it is the one-line fix the spec pass rejected.
+    // I10 asked C15 to notice an evicted anchor, and subscribing is the only
+    // way to notice — bought with C15's statelessness and `layout()`'s purity.
+    const target = "src/viewport/overlay/manager.ts";
+    for (const [source, rule] of [
+      ['import type { Change } from "../transcript/index.js";', "MG13"],
+      ['import type { ScrollState } from "../viewport/index.js";', "MG12"],
+      ['import type { TerminalSize } from "../../terminal/lifecycle.js";', "MG12"],
+    ] as const) {
+      const fabricated = checkModuleGraph([target], (file) =>
+        file === target ? source : readFileSync(file, "utf8"),
+      ).filter((v) => v.rule === rule);
+      expect(fabricated, source).toHaveLength(1);
+    }
   });
 });
 

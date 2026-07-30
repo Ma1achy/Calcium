@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -118,6 +118,52 @@ const FORBIDDEN_EDGES = [
       "dimensions arrive as data and C14 never calls the frame scheduler — a scroll " +
       "reports a change and L4 commits, matching the C01 and C10 orchestration " +
       "pattern. The edge is downward, so the layer walk permits it. Type-only counts",
+  },
+  {
+    // MG13. The rule this table's header has named as its example since C06,
+    // finally armed — and it is a **sideways** prohibition where MG10 and MG11
+    // are downward ones. C13 and C15 are both L2, so the layer walk permits the
+    // edge and MG2 sees no cycle because there is none to see.
+    //
+    // What it guards is the finding that shaped C15's whole interface. The spec
+    // gave C15 a duty it had no information for — dismiss an overlay whose
+    // anchor row was evicted — and the one-line fix is to subscribe to the
+    // transcript. That buys detection and pays with C15's statelessness,
+    // `layout()`'s purity, and a second component reading a change stream,
+    // which is the class C14 paid for in a blank screen. The reason is recorded
+    // by the caller instead (C15 I10), and this is what stops the fix being
+    // rediscovered.
+    rule: "MG13",
+    from: "src/viewport/overlay/",
+    to: "src/viewport/transcript/",
+    spec: "C15 I9 · C15 I12 · C15 T2.5",
+    why:
+      "C15 holds no entry ids and writes nothing to the transcript — an anchor " +
+      "is a region row, and whoever raised the layer keeps it current through " +
+      "`update`. Sideways, so the layer walk permits it. Type-only counts",
+  },
+  {
+    // MG12, and a separate rule in A03's inventory rather than MG13's second
+    // row. C14 is the other component whose data would let C15 stop being
+    // handed a region, and `layout(region)` taking one as a parameter is the
+    // whole of I12 — a manager that can ask the viewport where it is has
+    // acquired state nothing can assert it pure over.
+    rule: "MG12",
+    from: "src/viewport/overlay/",
+    to: "src/viewport/viewport/",
+    spec: "C15 I12 · C15 T2.6",
+    why:
+      "the region arrives as data at `layout()`. Sideways, so the layer walk " +
+      "permits it. Type-only counts",
+  },
+  {
+    rule: "MG12",
+    from: "src/viewport/overlay/",
+    to: "src/terminal/",
+    spec: "C15 I12 · C15 T2.6",
+    why:
+      "no clock, no width, no escape sequence reaches a layer — C15 composes no " +
+      "frame and reads no dimension it was not given. Downward, and forbidden",
   },
   {
     rule: "MG10",

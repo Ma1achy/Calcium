@@ -143,8 +143,8 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG9 | No block kind imports the registry | C09 T2.11 |
 | MG10 | C13 imports nothing from `terminal/` or `presentation/` | C13 I18, T2.4 |
 | MG11 | C14 imports nothing from `terminal/` | C14 T2.5 |
-| MG12 | C15 imports nothing from `terminal/` or C14 | C15 T2.6 |
-| MG13 | C15 imports nothing from C13 | C15 T2.5 |
+| MG12 | C15 imports nothing from `terminal/` or C14 | C15 I12, T2.6 |
+| MG13 | C15 imports nothing from C13 — the table's first *sideways* prohibition | C15 I9, T2.5 |
 | MG14 | C16 imports nothing from `terminal/` | C16 T2.7 |
 | MG15 | C17 imports nothing from `terminal/` | C17 T2.6 |
 | MG16 | C18 imports nothing from `terminal/` or `presentation/` | C18 T2.4 |
@@ -160,6 +160,10 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 **MG22 is a cycle rule, not a layer rule.** C11 imports C12's `sparkline` for a `Cell.spark` (C12 §2), which is legal: A02 §1 forbids importing *upward* and importing *cyclically*, and both directories are L1, so the layer walk sees nothing either way. What must never exist is the return edge — a plot reaching into the table engine for a column width or a truncation helper, which is exactly the shape a reader would reach for and which would close the cycle. Type-only counts, as MG6 and MG19 both record: a reference is a dependency whether or not it survives the build.
 
 MG2 would catch the cycle once closed; MG22 catches the edge that would close it, one commit earlier. That is the MG13/MG18 precedent and the reason the table holds specific prohibitions alongside the general walk.
+
+**MG13 is that precedent armed, and it is the first *sideways* prohibition in the table.** MG10 and MG11 are downward edges the layer walk permits; C13, C14 and C15 are all L2, so C15 → C13 is not merely permitted, it is invisible to every other rule at once — the walk sees no direction to object to and MG2 sees no cycle, because there is none. MG12 is its neighbour and covers the same component's other two reaches, C14 and `terminal/`.
+
+What MG13 guards is a fix the C15 spec pass rejected, and the fabrication is copied from it rather than invented (commitment 14a). C15's I10 asked the overlay manager to dismiss a layer whose anchor row had been evicted, and the only way to notice an eviction is to subscribe to the store. One import buys the detection and pays with C15's statelessness, `layout()`'s purity, and a second component in the tree reading a change stream as a description of current state — the class §2 records and C14 paid for in a blank screen. The reason is recorded by whoever raised the layer instead, and this rule is what stops the one-line version being rediscovered by someone reading I10 without §5 beside it.
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
 

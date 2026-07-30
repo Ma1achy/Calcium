@@ -313,6 +313,32 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/viewport/viewport/viewport.ts",
     source: 'import { writeFileSync } from "node:fs";',
   },
+  {
+    // MG13, and this fabrication is the one-line fix the C15 spec pass rejected
+    // — copied from it rather than invented, per A03 commitment 14a. I10 asked
+    // C15 to dismiss an overlay whose anchor row had been evicted, and the only
+    // way to notice is to subscribe to the store. It buys detection and pays
+    // with C15's statelessness, `layout()`'s purity, and a second component
+    // reading a change stream as state.
+    rule: "MG13",
+    file: "src/viewport/overlay/manager.ts",
+    source: 'import type { Change } from "../transcript/index.js";',
+  },
+  {
+    // MG12, the other reach: `layout()` takes a region as a parameter, and the
+    // viewport is right there holding one. A manager that can ask where it is
+    // has acquired state nothing can assert it pure over.
+    rule: "MG12",
+    file: "src/viewport/overlay/place.ts",
+    source: 'import type { ScrollState } from "../viewport/index.js";',
+  },
+  {
+    // MG12's downward half, which the layer walk permits: a layer that wants to
+    // know the terminal's width rather than the region's.
+    rule: "MG12",
+    file: "src/viewport/overlay/place.ts",
+    source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
+  },
 ];
 
 const scanIds = SCANS.map((s) => s.id);
@@ -622,8 +648,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // The rest of the MG family, which this check could not see until it read
     // more than `SS` rows. Each waits on the component whose directory it scopes
     // to; none of these exists, so the rule would have nothing to match.
-    MG12: "C15",
-    MG13: "C15",
     MG14: "C16",
     MG15: "C17",
     MG16: "C18",
