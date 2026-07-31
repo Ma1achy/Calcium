@@ -168,6 +168,14 @@ The mockup's algorithm (A01 Appendix A.2), which is the standard one and worth k
 
 This is worth stating because the obvious reading of "`Tab` twice opens the menu" (`j22` R17) is readline's, where it is a **press counter** — and a press counter is state outliving an event, which §4 would then require to be sequence-tagged or it goes stale on the next keystroke. The rule that would have governed it instead showed it should not exist. The version of this spec that asserted the single-match case was asserting something unreachable.
 
+### What acceptance replaces
+
+**`[tokenStart, cursor)`, leaving whatever follows the cursor** — T3.3's rule, and the shell's: completing `--st|xyz` gives `--status` followed by `xyz`.
+
+**Except inside a quoted token, where it replaces the whole span.** T3.3 and T3.15 meet here and give opposite answers, and the spec used to state each in its own sentence without noticing. Leaving the tail preserves the closing quote, so a re-quoted candidate closes a quote that is already closed — T3.15's "the closing quote is not duplicated" is unsatisfiable under T3.3's rule. Splitting the difference by inserting an opening quote and letting the tail close it works only while the candidate needs the same quote character the user typed, which C18's quoter does not promise.
+
+So the whole span goes, replaced by `quote(candidate)`. The argument is not only mechanical: **inside quotes there is no tail in the shell's sense.** The quotes are what make the run one value, and completing half of a quoted value while preserving the other half produces a string nobody meant far more often than it does what they wanted. Outside quotes, whitespace already ended the token, and the tail is a separate thing the user is keeping.
+
 Ghost text is accepted by `Tab` or `→`. Any other key ignores it — it is a suggestion, never a commitment.
 
 ---
@@ -448,7 +456,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 
 - **T3.1**: `Tab` on empty input → all verbs offered.
 - **T3.2**: `Tab` with no candidates → nothing happens; no menu, no error.
-- **T3.3**: `Tab` mid-token with text after the cursor → completes the prefix before the cursor only, leaving the tail.
+- **T3.3**: `Tab` mid-token with text after the cursor → completes the prefix before the cursor only, leaving the tail. Unquoted tokens; T3.15 is the quoted case and the rules differ.
 - **T3.4** (I5): a candidate containing a space → quoted by C18's quoter, and re-tokenising the resulting line yields exactly that candidate as one token. Round-trip, not eyeballed.
 - **T3.5**: a candidate identical to what is typed → the delimiter is still appended, so the press advances the line rather than doing nothing. With the delimiter already present, nothing changes and no menu opens: a one-entry menu showing what the user has finished typing is noise.
 - **T3.6** (I6): one of three sources throws → the other two still contribute; the failure is logged once.
@@ -464,7 +472,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T3.19** (C15 I15): narrowing to zero candidates → C19 dismisses. C15 omits a zero-row layer from the layout and dismisses nothing, so the moment is C19's or it is nobody's.
 - **T3.13**: 5,000 candidates → the menu clamps, reports truncation, and renders within budget.
 - **T3.14**: a candidate containing a control character → stripped before insertion.
-- **T3.15**: completing inside a quoted token → the quote context is respected; the closing quote is not duplicated.
+- **T3.15** (I16): completing inside a quoted token → the **whole token span** is replaced by `quote(candidate)`, so the closing quote is not duplicated and the value stays one token. The unquoted tail rule (T3.3) does not apply inside quotes, and §5 says why.
 - **T3.16**: unbalanced quotes in the input → context is `none`; nothing is offered rather than something wrong.
 - **T3.17**: cursor at position 0 of a non-empty line → verb or executable slot, as if empty.
 - **T3.18**: a dynamic source returning duplicates → deduplicated before display.
