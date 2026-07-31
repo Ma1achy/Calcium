@@ -401,6 +401,7 @@ export const OWNERS = [
   { path: "src/viewport/transcript", spec: "C13" },
   { path: "src/viewport/viewport", spec: "C14" },
   { path: "src/viewport/overlay", spec: "C15" },
+  { path: "src/interaction/router", spec: "C16" },
   { path: "src/testing", spec: "C09" },
 ];
 
@@ -429,6 +430,7 @@ export const TOPICS = {
   manifest: "C05",
   "measurement-conformance": "C09",
   patch: "C25",
+  "router-decode": "C16",
   text: "C09",
   plot: "C12",
   process: "C21",

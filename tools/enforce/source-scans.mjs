@@ -56,10 +56,32 @@ export const SCANS = [
     why: "L2 reads no clock at all — `seq` is logical, so golden frames and fixture-backed sessions are reproducible" },
 
   // --- forbidden literals --------------------------------------------------
+  // SS14 guards the **write** path, and its own citation says so: C01 T2.5 is an
+  // output scan. Nothing may *emit* an escape sequence except one module, because
+  // a terminal left in a mode nobody owns is unrecoverable.
+  //
+  // Recognition is the inverse direction and was never what it guarded. C16's
+  // decoder matches bytes arriving *from* the terminal: it emits nothing, and the
+  // sequences it matches are the terminal's input vocabulary rather than this
+  // application's output. C16 I13 separately forbids importing `terminal/`, so
+  // without this entry the component is unbuildable as specified - two rules each
+  // right and impossible together.
+  //
+  // MG21's precedent runs the other way: `presentation/` may import `escapes.js`
+  // for `sgr` and nothing else. Both are narrow legal edges, stated rather than
+  // assumed.
+  //
+  // **The entry names the decoder's file, and it is not a licence to emit.** A
+  // second table of the same constants was the alternative and is worse - an
+  // input sequence and an output sequence that stop agreeing look correct in both
+  // files, which is MG20's drift with nothing to catch it. If `decode.ts` ever
+  // writes a query or a mode set, that is the write path and this entry would
+  // hide it, so the decoder carries its own test that it reaches no stream
+  // (C16 T2.9). One file allowed, one file to check.
   { id: "SS14", spec: "C01 I1 · C01 T2.5",
     pattern: /\\x1b|\\u001b|\u001b/,
-    scope: "src/", allow: ["src/terminal/escapes.ts"],
-    why: "escape literals live in one module" },
+    scope: "src/", allow: ["src/terminal/escapes.ts", "src/interaction/router/decode.ts"],
+    why: "escape literals live in one module on the write path; recognising arriving bytes is the inverse direction" },
 
   // The digits, not the meaning. SS15 says where the literals may live; MG20
   // (module-graph.mjs) says which component may import each one. An earlier
@@ -201,10 +223,22 @@ export const SCANS = [
     scope: "src/presentation/", allow: ["src/presentation/theme/"],
     why: "display width comes from cells(), never .length" },
 
+  // SS40 is SS23's split repeated one directory over, and the third instance of
+  // A03 §2's directory-scope class.
+  //
+  // C17 indexes by grapheme because the cursor is a *position*. C16's decoder
+  // counts bytes and buffer offsets in a stream, where a code-unit count is the
+  // correct measure and a grapheme index would be wrong — `pending.length` is how
+  // many characters are left to parse, not how wide anything is.
+  //
+  // A shared rule would give the decoder the editor's advice at the moment
+  // someone reaches for the quick fix, which is exactly what SS23's comment above
+  // says about SS40 itself. A directory is a packaging decision, not a semantic
+  // one.
   { id: "SS40", spec: "C17 I2 · C17 T2.4",
     pattern: /\.length\b(?!.*\/\/ *graphemes-ok)|\.charAt\s*\(|\.slice\s*\(/,
-    scope: "src/interaction/", allow: [],
-    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position" },
+    scope: "src/interaction/", allow: ["src/interaction/router/decode.ts"],
+    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. C16's decoder is out of scope and counts bytes, where a unit count is the correct measure" },
 
   // SS3 carried two of the four vacuity failures at once (A03 §2). It was
   // inventoried in A03 from the start and never written here, so it could not
