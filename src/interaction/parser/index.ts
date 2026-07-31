@@ -1,9 +1,20 @@
 /**
- * Tokenise, classify, expand. Pure and total.
+ * C18 — the command parser.
  *
- * C18 — see spec.
- * Implement to the spec's commitments and invariants; cite invariant
- * numbers in tests. If the spec is wrong, change the spec first.
+ * `tokenise` and `quote` are exported for C19, which must not write its own:
+ * two implementations disagree at unbalanced quotes and escaped spaces, and the
+ * symptom is completion offering a candidate that parses differently once
+ * accepted (I11, SS30).
  */
 
-export {};
+export { parse } from "./parse.js";
+export { tokenise, quote } from "./tokenise.js";
+export { slashPolicy, prefixPolicy } from "./policy.js";
+export type {
+  Builtin,
+  CommandPolicy,
+  ParseContext,
+  ParseResult,
+  Part,
+  Token,
+} from "./types.js";

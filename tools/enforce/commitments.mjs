@@ -403,6 +403,7 @@ export const OWNERS = [
   { path: "src/viewport/overlay", spec: "C15" },
   { path: "src/interaction/router", spec: "C16" },
   { path: "src/interaction/editor", spec: "C17" },
+  { path: "src/interaction/parser", spec: "C18" },
   { path: "src/testing", spec: "C09" },
 ];
 
@@ -418,6 +419,7 @@ export const OWNERS = [
 export const TOPICS = {
   "adapter-registry": "C07",
   editor: "C17",
+  parser: "C18",
   adapters: "C07",
   blocks: "C09",
   capabilities: "C02",

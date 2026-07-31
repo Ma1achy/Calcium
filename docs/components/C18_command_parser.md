@@ -48,15 +48,9 @@ type ParseContext = Readonly<{
 
 function parse(input: string, ctx: ParseContext): ParseResult;
 
-type Classification =
-  | Readonly<{ kind: "app" | "local"; tokens: readonly string[] }>
-  | Readonly<{ kind: "builtin"; name: string; tokens: readonly string[] }>
-  | Readonly<{ kind: "shell" }>
-  | Readonly<{ kind: "empty" }>;
-
 interface CommandPolicy {
   readonly prefix: string;                       // "/" by default
-  classify(firstToken: string, tokens: readonly string[]): Classification;
+  verbOf(token: Token): string | null;           // the verb, or null for "not mine"
 }
 
 export const slashPolicy: CommandPolicy;         // the default (D20, D23)
@@ -163,7 +157,11 @@ Anything more contorted than a leading built-in — `ls | cd`, `cd` in the middl
 
 **Rule 4's second clause is D23.** `/usr/bin/ls` has a slash after position 0, so it is a path and goes to the shell. App verbs never contain slashes, so one test separates them permanently.
 
-`CommandPolicy` decides only the **kind**; `parse` does the rest. A policy that also parsed would be a second parser, and F2's intent is a replaceable prefix rule, not a replaceable parser.
+**The policy answers one question: is this token the app's own verb, and what is the verb?** `parse` does everything else. An earlier draft had it return a `Classification` covering `builtin`, `shell` and `empty` — which is the second-parser shape the next sentence warns against, arrived at by the interface rather than by anyone deciding it: a `:` policy would have had to re-implement built-in interception and operator delegation, neither of which has anything to do with a prefix. It also took the first token as a `string`, which cannot express quoting, so §5's unquoted-only rewrite had nowhere to ask.
+
+Returning the verb rather than a boolean is what keeps the prefix in one place. The policy owns both the test and the stripping, so nothing in `parse` needs a corresponding edit — and §5's rewrite predicate is literally `verbOf(token) !== null && !token.quoted`, which is how "one slash rule, not two" is made structural rather than remembered.
+
+F2's intent is a replaceable prefix rule, not a replaceable parser.
 
 The prefix itself is a **pluggable policy** (F2). `/` is this app's choice; another consumer may want `:` or none. `tui-kit` supplies the default and the rule above describes it.
 
@@ -180,10 +178,11 @@ git log --oneline | head -20        →  sh -c "git log --oneline | head -20"
 
 ### The rewrite predicate
 
-**A token is rewritten when it is exactly what rule 4 would classify as a verb, and
-unquoted.** Read without a predicate, "any `/verb` token" rewrites `/usr/bin/ls` in
-`/usr/bin/ls | head` — which contradicts D23 one line after D23 established it. The
-predicate is rule 4's, so there is one slash rule and not two:
+**A token is rewritten when it is exactly what rule 4 would classify as a verb, it is
+unquoted, and it is in command position.** Read without a predicate, "any `/verb`
+token" rewrites `/usr/bin/ls` in `/usr/bin/ls | head` — which contradicts D23 one line
+after D23 established it. The predicate is rule 4's, so there is one slash rule and
+not two:
 
 | Token | Rewritten | Why |
 |---|---|---|
@@ -191,6 +190,24 @@ predicate is rule 4's, so there is one slash rule and not two:
 | `/usr/bin/ls` | no | D23 — a slash after position 0 |
 | `"/ps"`, `'/ps'` | no | quoted; the user meant the path |
 | `/` | no | no verb after the prefix |
+| `/tmp` in `cd /tmp \| ls` | no | not in command position |
+
+**Command position is the third clause, and it was missing.** D23 separates a verb
+from a path by counting slashes, and a single-component absolute path has none to
+count: `/tmp`, `/etc` and `/home` satisfy rule 4's shape exactly. Without this clause
+`cd /tmp | ls` is delegated as `cd widget tmp | ls`, which is not a boundary case —
+it is the commonest line in this document.
+
+A token is in command position if it is the first token, or the first after a
+control operator (`|`, `||`, `&&`, `;`, `&`). It is *not* in command position after a
+redirect, because `>` takes a filename. That is how a shell reads the same line, which
+is the point: C18 is deciding what the shell would call a command, and it may not
+disagree with the shell about a line it is about to hand over.
+
+The clause does nothing to rule 4, where the first token is in command position by
+construction. **`/tmp` alone is still an unknown verb**, and that is D23's stated cost
+rather than a new one: the prefix means the app, and a user who wants the directory
+listed writes `ls /tmp`.
 
 **The rewrite does not consult the manifest.** `/zzzzz | cat` becomes
 `widget zzzzz | cat`, and the binary reports its own unknown verb — the same message
@@ -213,8 +230,13 @@ rewrite never asks about the match because it never asks the manifest.
 ### What is refused, and where
 
 Rule 0 runs on the token list before anything else. A trailing bare `&` is the last
-token and `kind: "operator"`; a job-control word is refused **only as an unquoted
-first token**, so `echo fg` is a line about the word `fg` and delegates.
+token and `kind: "operator"`; a job-control word is refused **as a first token**, so
+`echo fg` is a line about the word `fg` and delegates.
+
+Quoting does not disable the refusal, for the reason interception ignores quoting
+(§4): `'fg'` is the `fg` built-in in bash, so it still wants a job table that still
+does not exist. The two rules are asking one question — does quoting change what the
+shell does with this word — and they must not answer it differently. It is no, twice.
 
 `sleep 5 & echo x` is delegated whole: only a *trailing* `&` is refused, so
 backgrounding mid-line reaches the shell and works there. That is the spec's answer
@@ -343,7 +365,7 @@ Context throughout: the fixture manifest, `binary: "widget"`, `lastUuid: "web:v3
 |---|---|---|
 | `/ps --mine` | 4 | `app` · tool `ps` · argv `["ps","--mine"]` · residual `["--mine"]` · ok |
 | `/help` | 4 | `local` · tool `help` · argv `["help"]` · residual `[]` · ok |
-| `/serving scale web --replicas=3` | 4 | `app` · tool `serving scale` · argv `["serving","scale","web","--replicas=3"]` · residual `["web","--replicas=3"]` · ok |
+| `/serving scale web 3` | 4 | `app` · tool `serving scale` · argv `["serving","scale","web","3"]` · residual `["web","3"]` · ok — longest match, and the residual starts after both verb tokens |
 | `/usr/bin/ls -la` | 5 | `shell` · `/usr/bin/ls -la` — **no rewrite** |
 | `//ps` | 5 | `shell` · `//ps` |
 | `/` | 4 | `error` · no verb after the prefix |
@@ -366,6 +388,7 @@ Context throughout: the fixture manifest, `binary: "widget"`, `lastUuid: "web:v3
 | `cd /tmp \| ls` | 2c | `shell` · verbatim |
 | `ls \| cd` | 3 | `shell` · verbatim |
 | `'cd' /tmp` | 2a | `builtin` · quoting does not disable interception |
+| `'/ps'` | 4 | `app` — quoting disables the *rewrite* (§5), never the classification; bash reads `'/ps'` and `/ps` alike |
 
 ### The rewrite against everything it meets
 
@@ -390,7 +413,7 @@ Context throughout: the fixture manifest, `binary: "widget"`, `lastUuid: "web:v3
 | `/promote $_` | `app` · argv `["promote","web:v3"]` · ok |
 | `/promote "$_"` | `app` · argv `["promote","web:v3"]` · ok |
 | `/promote '$_'` | `app` · argv `["promote","$_"]` · **fail** (pattern) — carried, still `app` |
-| `/serving scale web --replicas=1 --config=$_` | `app` · `--config=web:v3` |
+| `/serving scale web 3 --config=$_` | `app` · `--config=web:v3` |
 | `/promote $_x` | `app` · argv `["promote","$_x"]` · fail — carried |
 | `/promote $_` with `lastUuid: null` | `error` · `no previous result · submit or promote something first` |
 | `/zzz $_` with `lastUuid: null` | `error` · unknown verb — lookup precedes expansion |
@@ -496,17 +519,17 @@ with are different claims.
 - **I9** — A leading built-in followed by `&&` or `;` is split from the remainder rather than delegated whole, so the session's directory and environment actually change.
 - **I10** — Only a trailing bare `&` and the job-control words are refused.
 - **I11** — The tokeniser is shared with C19; there is exactly one implementation.
-- **I12** — The prefix rule is a policy; the default is `/` and it is replaceable (F2).
+- **I12** — The prefix rule is a policy, and the policy decides one thing: whether a token is the app's own verb, and which. Everything else — built-ins, operators, refusals — is `parse`'s and identical under every policy, so a replaceable prefix never becomes a replaceable parser (F2).
 - **I13** — Output from a shell-delegated command reaches the transcript as a `raw` block. C18 does not parse it, because what the user's shell produced is text by construction and pretending otherwise would put a second envelope contract in the one place there is deliberately none.
 - **I14** — An unknown verb is matched against the manifest at a Levenshtein distance of **2** and no further (A01 A.2). Beyond the cutoff the suggestion is dropped for a generic hint, because a wrong suggestion costs more than none — it sends the reader to a verb that exists and does something else.
 - **I15** — C18 imports nothing from `terminal/` or `presentation/` and never commits a frame.
 - **I16** — Tokens carry source offsets, and every delegated string is spliced into the input rather than re-joined from tokens, so the user's quoting survives verbatim.
-- **I17** — A token is rewritten only if it satisfies rule 4's predicate and is unquoted. The rewrite consults no manifest, so a verb that does not exist still reaches the binary and gets the binary's own error.
+- **I17** — A token is rewritten only if it satisfies rule 4's predicate, is unquoted, and is in command position — first, or first after a control operator. A single-component absolute path has no slash for D23 to count, so without the third clause `cd /tmp | ls` is delegated as `cd widget tmp | ls`. The rewrite consults no manifest, so a verb that does not exist still reaches the binary and gets the binary's own error.
 - **I18** — Multiple rewrites are applied last-to-first, because each changes the length every earlier-measured span depends on.
 - **I19** — `residual` on the result is exactly the array `validateInvocation` was given, and `validateInvocation` is called once per parse.
 - **I20** — `$_` expands where the following character is not a word character, matching the shell's own rule for the same sigil, and never inside single quotes.
 - **I21** — Tool lookup precedes `$_` expansion, and a failing validation keeps its `app` or `local` kind rather than becoming an `error`.
-- **I22** — The refusals are evaluated first and on tokens, never on the raw input; a job-control word is refused only as an unquoted first token.
+- **I22** — The refusals are evaluated first and on tokens, never on the raw input; a job-control word is refused as a first token, quoted or not, because quoting does not stop bash treating it as the built-in — the same answer §4's interception gives.
 - **I23** — The distance-2 suggester is C05's; there is exactly one implementation, as there is exactly one tokeniser.
 - **I24** — A leading built-in with an empty remainder is not a split; it delegates whole, so a syntax error leaves the session's directory alone.
 
@@ -529,12 +552,12 @@ with are different claims.
 13. One tokeniser, shared with completion (I11).
 14. The prefix is a pluggable policy (I12).
 15. Delegated strings are spliced from the input, so quoting reaches the shell verbatim (I16).
-16. The rewrite predicate is rule 4's, unquoted, and manifest-free — one slash rule, not two (I17).
+16. The rewrite predicate is rule 4's, unquoted, in command position, and manifest-free — one slash rule, not two, and C18 never disagrees with the shell about which token is a command (I17).
 17. Rewrites apply last-to-first, so the splice boundary and the tool-match boundary can differ safely (I18).
 18. The validated array is carried, so "validation before spawning" is assertable rather than believed (I19).
 19. `$_` follows the shell's own boundary rule, because the same string is delegated unchanged on the other side of the prefix (I20).
 20. Lookup reports before expansion, and a failing validation still says what was parsed (I21).
-21. Refusals run first, on tokens, and job control is a first-token word (I22).
+21. Refusals run first, on tokens, and job control is a first-token word whether or not it is quoted (I22).
 22. One distance-2 suggester, shared with C05 (I23).
 23. An empty remainder is not a split (I24).
 
@@ -564,10 +587,10 @@ Six tiers. No state machine — C18 is pure.
 - **T1.12** (I10): `sleep 5 &` → `error`; `a && b` → `shell`.
 - **T1.13** (I6): `/ps --status=nonsense` → `app` with a failing `validation`, and nothing spawned.
 - **T1.14**: quoting — single, double, escaped spaces, nested → the documented token lists. Eight cases.
-- **T1.15** (I17): the rewrite predicate table of §5, all four rows, in a delegated line.
+- **T1.15** (I17): the rewrite predicate table of §5, all five rows, in a delegated line — `/tmp` as an argument among them.
 - **T1.16** (I18): `/ps | /help` → both rewritten, and the second one's text is intact — the assertion that fails when the splices run first-to-last.
 - **T1.17** (I24): `cd /tmp &&` → `shell`, not a split; the whole input is delegated.
-- **T1.18** (I22): `fg` → `error`; `echo fg` → `shell`.
+- **T1.18** (I22): `fg` → `error`; `echo fg` → `shell`; `'fg'` → `error`, the same answer `'cd'` gets.
 - **T1.19** (I21): `/zzz $_` with `lastUuid: null` → the unknown-verb error, not the `$_` one.
 - **T1.20** (I21): `/ps --status=nonsense` → kind `app` with a failing validation, and `tool` still present.
 
@@ -647,6 +670,7 @@ Six tiers. No state machine — C18 is pure.
 - **T6.11** (I12): hardcoding `/` outside the policy → T2.6 fails.
 - **T6.14** (I16): re-joining tokens instead of splicing → T3.14 fails, and a quoted redirect path loses its quotes on the way to the shell.
 - **T6.15** (I17): rewriting any token that starts with `/` → T1.15 fails, and `/usr/bin/ls | head` becomes `widget usr/bin/ls | head`.
+- **T6.15b** (I17): dropping the command-position clause → T2.11's `cd /tmp | ls` row fails, and the commonest line in this document is delegated as `cd widget tmp | ls`.
 - **T6.16** (I18): splicing first-to-last → T1.16 fails, and the second rewrite lands inside the first one's inserted text.
 - **T6.17** (I19): recomputing validation at the second call site → T2.9's call count fails; the two results can then disagree where it is least visible.
 - **T6.18** (I20): the token-exact reading → T3.12 fails, and `--config=$_` reaches the far side unexpanded.

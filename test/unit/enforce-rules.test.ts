@@ -278,6 +278,24 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import { escapes } from "../../terminal/escapes.js";',
   },
   {
+    // SS30's three subjects, one fabrication each — a rule with three subjects
+    // and one fabrication proves the subject it used, which is SS24's scope
+    // list in a different column.
+    rule: "SS30",
+    file: "src/interaction/completion/context.ts",
+    source: "export function tokenise(line: string): readonly string[] {",
+  },
+  {
+    rule: "SS30",
+    file: "src/interaction/completion/insert.ts",
+    source: "function quote(candidate: string): string {",
+  },
+  {
+    rule: "SS30",
+    file: "src/interaction/parser/suggest.ts",
+    source: "function levenshtein(a: string, b: string): number {",
+  },
+  {
     rule: "MG20",
     file: "src/terminal/frame-scheduler.ts",
     source: 'import { ALT_SCREEN } from "./escapes.js";',
@@ -760,7 +778,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     SS18: "C10 — needs the block-producing module list",
     SS22: { waitsOn: "C19", why: "there is no completion module to hold a literal verb list" },
     SS29: { waitsOn: "C23", why: "the execution pipeline does not exist" },
-    SS30: { waitsOn: "C18", why: "the tokeniser and quoter land with C18; C19 then consumes them" },
 
     // SS31, SS32 and SS38 were here, each saying "implemented in
     // dependencies.mjs, not source-scans.mjs" — which is not a pending rule but

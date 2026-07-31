@@ -274,8 +274,24 @@ export const SCANS = [
   // rules, because that is where someone reads about writing an exception.
   { id: "SS40", spec: "C17 I2 · C17 T2.4",
     pattern: /(?:\.length\b|\.charAt\s*\(|\.slice\s*\()(?![^\n]*\/\/ *graphemes-ok)/,
-    scope: "src/interaction/", allow: ["src/interaction/router/decode.ts"],
-    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. `// graphemes-ok` claims the expression operates on a grapheme array or a non-text value, where index arithmetic is correct — it is a claim about the code, not a way to silence the rule. C16's decoder is out of scope and counts bytes, where a unit count is the correct measure" },
+    // **Two directory exceptions, and they are the same exception twice.** The
+    // rule is C17's: a cursor is a position and `.length` is a unit count, so
+    // the editor indexes by grapheme. C16's decoder and C18's tokeniser are
+    // both *lexers over a string*, where the code unit is the addressing
+    // scheme rather than a mistake about one — decode counts bytes off the
+    // wire, and the parser's spans are code-unit offsets by definition, spliced
+    // back into the same string they were measured in.
+    //
+    // Granted as directories rather than as annotations because the alternative
+    // was twenty-seven `// graphemes-ok` marks in one component, and an
+    // annotation that dense stops reading as a claim and starts reading as
+    // ceremony — which is how it becomes a way to silence the rule. Neither
+    // file measures display width, and MG16 now forbids C18 from importing the
+    // layer that would let it. C18 T3.23 demonstrates the claim on astral
+    // characters rather than asserting it.
+    scope: "src/interaction/",
+    allow: ["src/interaction/router/decode.ts", "src/interaction/parser/"],
+    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. `// graphemes-ok` claims the expression operates on a grapheme array or a non-text value, where index arithmetic is correct — it is a claim about the code, not a way to silence the rule. C16's decoder and C18's tokeniser are out of scope: both are lexers where a unit count is the correct measure" },
 
   // SS3 carried two of the four vacuity failures at once (A03 §2). It was
   // inventoried in A03 from the start and never written here, so it could not
@@ -360,6 +376,45 @@ export const SCANS = [
       "src/interaction/parser/",
     ], allow: [],
     why: "C11, C12 and C25 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
+
+  // C18 I11 and C05 I18, as one rule.
+  //
+  // **Its subject was always "a shared text primitive with one implementation";
+  // the row happened to name two.** Widening to three states what it meant —
+  // and a second row with an identical family is the shape A03 §2 says a reader
+  // has to *notice*, which is what a rule cannot rely on. SS24's `scope` list is
+  // the precedent: widen the field.
+  //
+  // The three:
+  //
+  //   - **Tokeniser.** C19 completes what C18 will parse. Two tokenisers
+  //     disagree at unbalanced quotes and escaped spaces, and the symptom is a
+  //     candidate that parses differently once accepted.
+  //   - **Quoter.** The same, one step later: a candidate quoted by one and
+  //     parsed by the other round-trips to something else.
+  //   - **Edit distance.** Two distance-2 cutoffs agree about the distance and
+  //     diverge about the tie-break, so they differ exactly where a suggestion
+  //     is *wrong* rather than absent — which A01 A.2 says costs more than none.
+  //
+  // The pattern names the declarations rather than the calls, so importing
+  // either owner is fine and writing a second is not.
+  { id: "SS30", spec: "C18 I11 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+    pattern:
+      /^(?:export\s+)?(?:async\s+)?function\s+(?:tokenis[ez]e?|lex|shellSplit|quoteArg|shellQuote|quote|levenshtein|editDistance|distance)\b/m,
+    scope: "src/",
+    // **The third entry is a name collision and not a second implementation**,
+    // and it is granted rather than tolerated. C09's `code.ts` tokenises *source
+    // text into highlight slots* — a different primitive with a different input
+    // and a different output, shared with C25 for exactly the reason this rule
+    // exists. Widening the pattern to exclude it by name would make the rule
+    // depend on a spelling; naming the file says which exception was granted and
+    // by whom, and the scope-column equality keeps A03 saying the same thing.
+    allow: [
+      "src/interaction/parser/tokenise.ts",
+      "src/data/manifest/validate.ts",
+      "src/presentation/blocks/kinds/code.ts",
+    ],
+    why: "one tokeniser, one quoter, one distance-2 suggester — a second agrees today and diverges where it is least visible" },
 
   { id: "SS26", spec: "C21 T2.2",
     pattern: /process\.stdout\.write/,

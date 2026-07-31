@@ -66,11 +66,10 @@ export const COMPONENT_SOURCES = Object.freeze({
   // instance). Repointed on the commit that makes the path real, never before:
   // a path that does not exist reads as "not implemented" forever.
   C17: "src/interaction/editor/editor.ts",
-  // The scaffold, in the directory SS24's scope needs. `defaultIsImplemented`
-  // ignores a bare `export {}`, so this reads as "not implemented" and every
-  // deferral naming C18 stays deferred — which is correct until `parse.ts`
-  // exists, at which point this repoints there and not before (TD3).
-  C18: "src/interaction/parser/index.ts",
+  // The parser, now that it exists — the barrel was the scaffold (TD3, eighth
+  // instance). Repointed on the commit that makes `parse.ts` real, never
+  // before: a path that does not exist reads as "not implemented" forever.
+  C18: "src/interaction/parser/parse.ts",
   C19: "src/interaction/completion.ts",
   C20: "src/interaction/history.ts",
   C21: "src/data/process/runner.ts",   // the runner, not process/types.ts — see above

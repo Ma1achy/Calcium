@@ -275,7 +275,7 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/`, allowing `presentation/theme/` | C09 T2.9 |
-| SS40 | The same, in the editor | `src/interaction/`, allowing `router/decode.ts` | C17 I2, T2.4 |
+| SS40 | The same, in the editor | `src/interaction/`, allowing `router/decode.ts` and `interaction/parser/` | C17 I2, T2.4 |
 | SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `patch/`, `src/interaction/parser/` | C11 T2.6, C12 T2.5, C25 T2.4, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
@@ -283,7 +283,7 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | SS41 | `process.env` or `process.stdin` | `process/` | C21 I14, T2.7 |
 | SS28 | Scheduler calls | `src/interaction/` | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
 | SS29 | Multi-store access | outside local handlers | C23 T2.7 |
-| SS30 | Second tokeniser or quoter | anywhere | C18 T2.3, C19 T2.4 |
+| SS30 | A second implementation of a shared text primitive — tokeniser, quoter, edit distance | `src/`, allowing `interaction/parser/tokenise.ts`, `data/manifest/validate.ts` and `blocks/kinds/code.ts` | C18 T2.3, C18 T2.10, C19 T2.4, C05 T2.9 |
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
 | SS33 | `console.*` | `src/` | C01 I9, A04 §2 |

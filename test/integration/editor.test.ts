@@ -14,6 +14,8 @@ import { createRouter, type RouterDeps } from "../../src/interaction/router/rout
 import type { InputEvent } from "../../src/interaction/router/types.js";
 import { createEditor, type LineEditor } from "../../src/interaction/editor/index.js";
 import { cells } from "../../src/presentation/text.js";
+import { parse } from "../../src/interaction/parser/index.js";
+import { fixture } from "../support/manifest.js";
 
 const G = { first: 2, cont: 2 } as const;
 const enc = new TextEncoder();
@@ -169,8 +171,25 @@ describe("C17 tier 4 — with C09", () => {
   });
 });
 
+it("T4.4 (with C18): the buffer is classified without C18 mutating it", () => {
+  // The seam between the two L3 components that both hold the line the user
+  // typed. C17 owns it; C18 reads it and returns a decision, and `parse` is
+  // pure by I1 — so the editor's state after a classification must be
+  // identical, cursor included.
+  const e = createEditor({ text: "/ps --mine", cursor: 4 });
+  const before = { text: e.text, cursor: e.cursor, rows: e.displayRows(80, G) };
+
+  const result = parse(e.text, {
+    manifest: fixture(),
+    binary: "widget",
+    lastUuid: null,
+  });
+
+  expect(result.kind).toBe("app");
+  expect({ text: e.text, cursor: e.cursor, rows: e.displayRows(80, G) }).toEqual(before);
+});
+
 // Deferred, with the blocker in the greppable form the guard reads.
-it.todo("T4.4: the buffer is classified without C18 mutating it — waits on C18");
 it.todo(
   "T4.5: the cursor position determines the completion context, and accepting a candidate inserts as one undo unit — waits on C19",
 );

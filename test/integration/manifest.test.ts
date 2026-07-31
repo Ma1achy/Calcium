@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { document, validateDocument, type ErrorLike, type ViewDocument } from "../../src/data/viewmodel/index.js";
 import { findTool, validateInvocation } from "../../src/data/manifest/index.js";
 import { fixture } from "../support/manifest.js";
+import { parse } from "../../src/interaction/parser/index.js";
 
 /**
  * The error path, as C23 will drive it: whatever produced the `ErrorLike` —
@@ -75,7 +76,32 @@ describe("C05 integration", () => {
     expect(doc.status).toBe("error");
   });
 
-  it.todo("T4.1: a classified /-prefixed input validates before any transport call — waits on C18");
+  it("T4.1 (with C18, D17): a classified input validates before any transport call", () => {
+    // D17's whole argument, asserted from C05's side: the structure is local,
+    // so a malformed invocation costs nothing rather than 300 ms of interpreter
+    // startup to be told the same thing. The spy is what makes "before" mean
+    // something — an assertion that the result is invalid would pass equally
+    // well if the transport had run first.
+    let invoked = 0;
+    const transport = {
+      invoke: () => {
+        invoked += 1;
+        throw new Error("the transport must not be reached during parsing");
+      },
+    };
+
+    const result = parse("/ps --status=nonsense", {
+      manifest: fixture(),
+      binary: "widget",
+      lastUuid: null,
+    });
+
+    expect(result.kind).toBe("app");
+    if (result.kind !== "app") return;
+    expect(result.validation.ok, "rejected locally").toBe(false);
+    expect(invoked, "and nothing was spawned to find that out").toBe(0);
+    void transport;
+  });
   it.todo("T4.2: completion candidates for --status= come from the manifest's values — waits on C19");
   it.todo("T4.3: adding a flag to the fixture makes it completable with no TypeScript change — waits on C19");
   // T4.4 and T4.5 are written, in test/integration/transport.test.ts: the
