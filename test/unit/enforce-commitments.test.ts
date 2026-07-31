@@ -321,18 +321,64 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     // indistinguishable from a clean tree. So the count of references it actually
     // resolved is asserted, four figures, against a corpus of ~1500.
     const files = referenceFiles();
-    expect(files.length, "src, test, tools and the documents outside components/").toBeGreaterThan(
+    expect(files.length, "src, test, tools and every document including components/").toBeGreaterThan(
       200,
     );
 
     const { violations, resolved } = checkReferences(files);
     expect(resolved, "the resolver must see the corpus, not merely fail to object").toBeGreaterThan(
-      1000,
+      3000,
     );
     expect(
       violations.map((v) => `${v.file} — ${v.message}`),
       "run `make enforce` for the detail",
     ).toEqual([]);
+  });
+
+  it("SP3: the component specs are in the corpus, and are most of it", () => {
+    // The gap this closed, asserted from the direction that found it. SP3's
+    // corpus walked every documentation directory except `docs/components/` —
+    // deliberately, and the rule's own message said so — on the premise that a
+    // component spec's citations were covered elsewhere. They were not: SP1
+    // checks that a commitment cites an invariant and SP2 checks ordering, and
+    // neither resolves a cross-spec citation. So `C13 I99` in a component spec
+    // dangled and passed, while the identical line in a behaviour spec failed.
+    //
+    // Asserting the *share* rather than the presence, because a single component
+    // file slipping into the corpus would satisfy a membership check while the
+    // other twenty-four stayed invisible.
+    const files = referenceFiles();
+    const components = files.filter((f) => f.startsWith("docs/components/"));
+    expect(components.length, "all 25 component specs").toBe(25);
+
+    const { resolved } = checkReferences(components);
+    expect(resolved, "the densest citation corpus in the project").toBeGreaterThan(1500);
+  });
+
+  it("SP3: a bare id in a component spec resolves against that spec", () => {
+    // One file, declaring and citing — which is what a spec is, and what the
+    // resolver has to handle: `specPath("C14")` points back at this same file.
+    const read = () =>
+      "- **I19** — entryAtRow is pure and total.\n\n- **T1.1** (I19): a row resolves to an entry.\n";
+
+    // The self-ownership rule. Without it every spec citing its own invariants —
+    // which is what a spec mostly does — reads as an unowned bare reference, and
+    // the check's first run reports 1052 violations that are all its own doing.
+    // A check whose first run is that wrong gets switched off, not fixed.
+    expect(
+      checkReferences(["docs/components/C14_viewport.md"], read, {}).violations,
+    ).toEqual([]);
+  });
+
+  it("SP3: a dangling citation inside a component spec fails", () => {
+    const read = (f: string) =>
+      f === "docs/components/C16_input_router.md"
+        ? "- **T9.9** (C13 I99): fabricated.\n"
+        : "- **I1** — At most one entry is live.\n";
+
+    const { violations } = checkReferences(["docs/components/C16_input_router.md"], read, {});
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("C13 I99");
   });
 
   it("SP3: every owner-map entry matches something in the tree", () => {

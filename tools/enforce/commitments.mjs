@@ -494,6 +494,7 @@ export function referenceFiles() {
   walk("test", /\.(tsx?|mjs|md)$/);
   walk("tools", /\.mjs$/);
   walk("docs/architecture", /\.md$/);
+  walk("docs/components", /\.md$/);
   walk("docs/surfaces", /\.md$/);
   walk("docs/behaviours", /\.md$/);
   walk("docs/notes", /\.md$/);
@@ -507,7 +508,26 @@ export function referenceFiles() {
   ].sort();
 }
 
+/**
+ * A component spec owns its own invariants, so a bare `I6` inside
+ * `docs/components/C14_viewport.md` means `C14 I6`.
+ *
+ * This is the rule that had never been needed, because `referenceFiles` did not
+ * walk `docs/components/`. Adding the directory without it reports 1052
+ * violations, nearly all of them a spec citing itself the way every spec in the
+ * corpus does — which would read as "the specs are riddled with dangling
+ * references" rather than "the resolver has never seen a self-referential file".
+ * A check whose first run is that wrong gets switched off, not fixed.
+ */
+function selfOwner(file) {
+  const m = /^docs\/components\/(C\d{2})_/.exec(file);
+  return m === null ? null : m[1];
+}
+
 function ownerOf(file) {
+  const self = selfOwner(file);
+  if (self !== null) return self;
+
   let best = null;
   for (const o of OWNERS) {
     if (file.startsWith(o.path) && (best === null || o.path.length > best.path.length)) best = o;
@@ -541,6 +561,7 @@ const TOKENS = /\b(C\d{2})\b|\b(I\d+[a-z]?)\b/g;
  *     > acquired, in reverse order" ↔ I2 (idempotence) + I6 (inverse, reverse).
  */
 const BREAK = /^\s*$|^#{1,6}\s|^---\s*$/;
+
 
 /**
  * What may sit between a spec id and the invariant it qualifies.
@@ -606,6 +627,7 @@ export function scanReferences(file, src, options = {}) {
   const code = options.code ?? !file.endsWith(".md");
   const out = [];
 
+
   let scope = owner;
   let fenced = false;
   let adjacent = null;
@@ -617,6 +639,7 @@ export function scanReferences(file, src, options = {}) {
 
     const text = code ? raw : mask(raw);
     if (BREAK.test(text)) { scope = owner; adjacent = null; }
+
 
     TOKENS.lastIndex = 0;
     let m;
