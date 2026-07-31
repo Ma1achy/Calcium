@@ -192,17 +192,35 @@ not two:
 | `/` | no | no verb after the prefix |
 | `/tmp` in `cd /tmp \| ls` | no | not in command position |
 
+### The rule the third clause is an instance of
+
+> **C18 may not disagree with the shell about which token is a command in a line it
+> is handing over.**
+
+That is the principle, and the clause is what it comes to here. It is worth stating
+as the principle because the next person will meet a case the predicate does not
+cover and it will look safe to widen — the rewrite is only ever adding a binary in
+front of a verb, and the token in question will obviously be one. The test is not
+whether the token looks like a verb. It is whether the shell, reading the same
+string, would call it a command. Where the two answers differ, C18 is corrupting a
+line it does not own.
+
 **Command position is the third clause, and it was missing.** D23 separates a verb
 from a path by counting slashes, and a single-component absolute path has none to
 count: `/tmp`, `/etc` and `/home` satisfy rule 4's shape exactly. Without this clause
-`cd /tmp | ls` is delegated as `cd widget tmp | ls`, which is not a boundary case —
-it is the commonest line in this document.
+`cd /tmp | ls` is delegated as `cd widget tmp | ls`.
+
+**That row is the commonest line in this document, not an edge**, and it is the
+argument for §8a being a table rather than a list of interesting inputs: `cd /tmp` is
+in §4's opening example, in `j22`'s open question and in three test rows, and it
+survived all of them because none of those asked what the *delegated string* was. It
+took a cell where two rules meet — built-in interception against the rewrite — and it
+was found the first time the table was executed rather than read.
 
 A token is in command position if it is the first token, or the first after a
 control operator (`|`, `||`, `&&`, `;`, `&`). It is *not* in command position after a
-redirect, because `>` takes a filename. That is how a shell reads the same line, which
-is the point: C18 is deciding what the shell would call a command, and it may not
-disagree with the shell about a line it is about to hand over.
+redirect, because `>` takes a filename. That is how a shell reads the same line,
+which is the whole of why it is the rule.
 
 The clause does nothing to rule 4, where the first token is in command position by
 construction. **`/tmp` alone is still an unknown verb**, and that is D23's stated cost
@@ -524,7 +542,7 @@ with are different claims.
 - **I14** — An unknown verb is matched against the manifest at a Levenshtein distance of **2** and no further (A01 A.2). Beyond the cutoff the suggestion is dropped for a generic hint, because a wrong suggestion costs more than none — it sends the reader to a verb that exists and does something else.
 - **I15** — C18 imports nothing from `terminal/` or `presentation/` and never commits a frame.
 - **I16** — Tokens carry source offsets, and every delegated string is spliced into the input rather than re-joined from tokens, so the user's quoting survives verbatim.
-- **I17** — A token is rewritten only if it satisfies rule 4's predicate, is unquoted, and is in command position — first, or first after a control operator. A single-component absolute path has no slash for D23 to count, so without the third clause `cd /tmp | ls` is delegated as `cd widget tmp | ls`. The rewrite consults no manifest, so a verb that does not exist still reaches the binary and gets the binary's own error.
+- **I17** — A token is rewritten only if it satisfies rule 4's predicate, is unquoted, and is in command position. The rule the third clause instantiates: **C18 may not disagree with the shell about which token is a command in a line it is handing over.** A single-component absolute path has no slash for D23 to count, so without it `cd /tmp | ls` is delegated as `cd widget tmp | ls`. The rewrite consults no manifest, so a verb that does not exist still reaches the binary and gets the binary's own error.
 - **I18** — Multiple rewrites are applied last-to-first, because each changes the length every earlier-measured span depends on.
 - **I19** — `residual` on the result is exactly the array `validateInvocation` was given, and `validateInvocation` is called once per parse.
 - **I20** — `$_` expands where the following character is not a word character, matching the shell's own rule for the same sigil, and never inside single quotes.
@@ -552,7 +570,7 @@ with are different claims.
 13. One tokeniser, shared with completion (I11).
 14. The prefix is a pluggable policy (I12).
 15. Delegated strings are spliced from the input, so quoting reaches the shell verbatim (I16).
-16. The rewrite predicate is rule 4's, unquoted, in command position, and manifest-free — one slash rule, not two, and C18 never disagrees with the shell about which token is a command (I17).
+16. The rewrite predicate is rule 4's, unquoted, in command position, and manifest-free — one slash rule, not two, and C18 never disagrees with the shell about which token is a command in a line it is handing over (I17).
 17. Rewrites apply last-to-first, so the splice boundary and the tool-match boundary can differ safely (I18).
 18. The validated array is carried, so "validation before spawning" is assertable rather than believed (I19).
 19. `$_` follows the shell's own boundary rule, because the same string is delegated unchanged on the other side of the prefix (I20).

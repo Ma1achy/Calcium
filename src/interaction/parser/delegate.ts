@@ -33,12 +33,18 @@ const CONTROL: readonly string[] = Object.freeze(["|", "||", "&&", ";", "&"]);
 /**
  * Which token indices a shell would read as a command.
  *
+ * **The rule, not the fix: C18 may not disagree with the shell about which
+ * token is a command in a line it is handing over.** The next case that does
+ * not fit this predicate will look safe to admit — the rewrite only ever puts a
+ * binary in front of a verb, and the token will obviously be one. The test is
+ * not whether it looks like a verb; it is whether the shell, reading the same
+ * string, would call it a command. Where the answers differ, this function is
+ * corrupting a line it does not own.
+ *
  * **The clause D23 cannot supply.** D23 separates a verb from a path by
  * counting slashes, and `/tmp` has none to count — so `cd /tmp | ls` was
  * delegated as `cd widget tmp | ls`, which is the commonest line in the spec
- * rather than an edge. C18 is deciding what the shell would call a command, so
- * it reads the line the way the shell does: first token, or first after a
- * control operator.
+ * rather than an edge.
  */
 function commandPositions(tokens: readonly Token[]): ReadonlySet<number> {
   const at = new Set<number>();
