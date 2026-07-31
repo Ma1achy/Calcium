@@ -298,6 +298,25 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import { size } from "../../terminal/lifecycle.js";',
   },
   {
+    // MG18's reachable form is the editor, not the terminal, and it is the
+    // import a reasonable person writes: `previous()` has produced a string and
+    // the buffer is one call away. What it costs is I1 — the store would then
+    // own where the cursor lands and whether the replacement is one undo unit,
+    // both of which are the prompt's answers, and both already given.
+    rule: "MG18",
+    file: "src/interaction/history/store.ts",
+    source: 'import type { LineEditor } from "../editor/index.js";',
+  },
+  {
+    // SS9's literal half, which is the live one. A default that reads
+    // `~/.prism` looks like a courtesy and makes a standalone run append to the
+    // developer's own history — silently, in a file nobody opens until it is
+    // wrong (C20 I12, T6.12).
+    rule: "SS9",
+    file: "src/interaction/history/store.ts",
+    source: 'const stateDir = deps.stateDir ?? "~/.prism";',
+  },
+  {
     // SS30's three subjects, one fabrication each — a rule with three subjects
     // and one fabrication proves the subject it used, which is SS24's scope
     // list in a different column.
@@ -798,7 +817,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
       "anything SS1 misses. The fourth instance of the fold, and the third whose " +
       "blocking component turned out to be the proof it could not fire: C19's " +
       "arrival is what made it visible",
-    SS9: { waitsOn: "C20", why: "the history module does not exist" },
     SS12: "C10 — folded into SS11's scope for now",
     SS18: "C10 — needs the block-producing module list",
     SS29: { waitsOn: "C23", why: "the execution pipeline does not exist" },
@@ -816,12 +834,10 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // difference between a rule not yet built and a rule nobody remembers.
     MG2: "nothing — implementable today, and the general form of MG13/MG18",
 
-    // The rest of the MG family, which this check could not see until it read
-    // more than `SS` rows. Each waits on the component whose directory it scopes
-    // to; none of these exists, so the rule would have nothing to match.
-
-
-    MG18: { waitsOn: "C20", why: "src/interaction/history/ does not exist" },
+    // The rest of the MG family was here, waiting on the components whose
+    // directories they scope to. MG18 was the last of them and it went with
+    // C20: `src/interaction/history/` exists, so the rule has something to
+    // match and the entry became the lie this check exists to catch.
   };
 
   /**

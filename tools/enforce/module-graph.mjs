@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -258,6 +258,25 @@ const FORBIDDEN_EDGES = [
     why:
       "no clock, no width, no escape sequence reaches a layer — C15 composes no " +
       "frame and reads no dimension it was not given. Downward, and forbidden",
+  },
+  {
+    // MG18 — C20 imports nothing from `terminal/` and nothing from C17.
+    //
+    // Pending on C20 since it was inventoried, and built on the commit that
+    // makes `src/interaction/history/` real. The second target is the live one
+    // and it is the whole of I1: `previous()` returns a string because a store
+    // that could call `setText` would have to decide where the cursor lands and
+    // whether the replacement is one undo unit — both the prompt's business, and
+    // both already answered by C17 for the editor's own callers. The import is
+    // sideways within L3 and the layer walk would permit it, which is exactly
+    // why the prohibition is written down rather than left to the walk.
+    rule: "MG18",
+    from: "src/interaction/history/",
+    to: ["src/terminal/", "src/interaction/editor/"],
+    spec: "C20 I1 · C20 I15 · C20 T2.5 · C20 T2.6",
+    why:
+      "C20 returns strings and L4 applies them; the clock, the width and the " +
+      "frame are somebody else's, and the buffer is C17's. Type-only counts",
   },
   {
     rule: "MG10",

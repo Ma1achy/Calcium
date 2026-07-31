@@ -17,6 +17,7 @@ import { cells } from "../../src/presentation/text.js";
 import { parse } from "../../src/interaction/parser/index.js";
 import { fixture } from "../support/manifest.js";
 import { accept, contextAt } from "../../src/interaction/completion/index.js";
+import { openWith } from "../support/history.js";
 
 const G = { first: 2, cont: 2 } as const;
 const enc = new TextEncoder();
@@ -214,10 +215,53 @@ it("T4.5 (C19 I11): the cursor decides the context, and accepting is one undo un
   expect(e.text).toBe("/ps --st");
 });
 
-// Deferred, with the blocker in the greppable form the guard reads.
-it.todo(
-  "T4.6: history navigation calls setText and the typed draft is restored on return, cursor included — waits on C20",
-);
+// T4.6, written on the commit C20 landed. What it asserts is the seam rather
+// than either component: C20 returns a string and **L4 applies it** (C20 I1), so
+// this is the shape of the call the shell will make, standing in for it.
+//
+// The last two assertions are §7a Trace 3, and they are the reason this test is
+// at this tier. C20 I3 resets navigation on a *user* edit and C20 cannot tell
+// one from the setText it just caused — so the rule lives in the caller, and
+// only a tier that holds both components can see it.
+it("T4.6 (with C20, I2, I3): navigation replaces the buffer and the draft returns with its cursor", async () => {
+  const { store } = await openWith();
+  for (const c of ["/ps --status=running", "/logs digit-42"]) store.append(c, 0);
+
+  const e = createEditor();
+  e.insert("/pro");
+  e.move("charLeft");
+  expect([e.text, e.cursor]).toEqual(["/pro", 3]);
+
+  // What L4 does on `↑`: take the buffer, apply what comes back, cursor at end.
+  const up = (): void => {
+    const next = store.previous(e.text);
+    if (next !== null) e.setText(next, [...next].length);
+  };
+  const down = (): void => {
+    const next = store.next();
+    if (next !== null) e.setText(next, [...next].length);
+  };
+
+  up();
+  expect([e.text, e.cursor]).toEqual(["/logs digit-42", 14]);
+  up();
+  expect(e.text).toBe("/ps --status=running");
+
+  down();
+  expect(e.text).toBe("/logs digit-42");
+  down();
+  // The draft, and the cursor is L4's to place — C20 never saw it (I1).
+  expect(e.text).toBe("/pro");
+  expect(store.navigating).toBe(false);
+
+  // And the reset is on a *user* edit, not on the setText navigation caused:
+  // wiring `resetNavigation` to every buffer change makes `↑` work exactly once.
+  up();
+  expect(store.navigating).toBe(true);
+  e.insert("x");
+  store.resetNavigation();
+  expect(store.previous(e.text)).toBe("/logs digit-42");
+});
 it.todo(
   "T4.7: the prompt's rendered height equals displayRows, asserted on the frame rather than the editor — waits on L4",
 );

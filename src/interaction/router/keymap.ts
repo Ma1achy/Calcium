@@ -125,6 +125,25 @@ export const defaultKeymap: readonly Binding[] = [
   // still refuses `Esc` — C15's `pop()` inspects only the top and returns the
   // layer rather than a boolean, which is what lets one row serve both.
   { target: "overlay", key: { name: "escape" }, action: "dismiss" },
+
+  // --- C20's three, and the fourth that is not here ----------------------
+  //
+  // `↑`/`↓` are bound on the prompt only. The `overlay` target already has both
+  // (C19's `menuPrev`/`menuNext`), and two bindings for one `(target, key)` is a
+  // construction error rather than a last-wins — which is the table telling the
+  // truth: while a menu is open the arrows belong to the menu, and C16 derives
+  // the target from the stack (I1) rather than from what each consumer would
+  // prefer.
+  { target: "prompt", key: { name: "up" }, action: "historyPrev" },
+  { target: "prompt", key: { name: "down" }, action: "historyNext" },
+  { target: "prompt", key: { name: "r", ctrl: true }, action: "reverseSearch" },
+  //
+  // A second `⌃r` steps to an older match, and it is an `overlay` row because
+  // by then the search *is* the overlay. `Tab`, `Enter` and `Esc` inside a
+  // search are C19's three rows already in this table, dispatched to whichever
+  // layer is on top — the handler reads `overlays.top`, which is L4's to do and
+  // is why C20 adds no fourth row here.
+  { target: "overlay", key: { name: "r", ctrl: true }, action: "searchOlder" },
 ];
 
 /**

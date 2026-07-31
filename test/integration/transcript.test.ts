@@ -134,5 +134,10 @@ describe("C13 integration", () => {
   // T4.6 is resolved from C16's side, against real instances of both components:
   // `test/integration/router.test.ts`. Kept as a pointer rather than duplicated,
   // because the assertion needs a router to ask and this file has none.
-  it.todo("T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C22 and C20");
+  it.todo(
+    // C20 landed, and its half of this is asserted in test/e2e/history.test.ts:
+    // nothing in `clear()` touches a transcript. What is missing is the command
+    // that drives both, which is the shell's.
+    "T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C22",
+  );
 });

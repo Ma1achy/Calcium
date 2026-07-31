@@ -212,6 +212,15 @@ describe("§6 — the default table (C17 I12)", () => {
       // the key arrives from `poll` once the window closes. A fixed clock cannot
       // express that, which is why the loop below steps one.
       "overlay escape": ["\u001b"],
+
+      // C20's four. The arrows carry both forms for the reason the `right`
+      // row above gives — a rule satisfied by only the normal form is
+      // satisfied on half the terminals — and `\u0012` is Ctrl-R, a byte
+      // rather than a name a terminal has to be persuaded to send.
+      "prompt up": ["\u001b[A", "\u001bOA"],
+      "prompt down": ["\u001b[B", "\u001bOB"],
+      "prompt c+r": ["\u0012"],
+      "overlay c+r": ["\u0012"],
     };
 
     const keymap = createKeymap(defaultKeymap);

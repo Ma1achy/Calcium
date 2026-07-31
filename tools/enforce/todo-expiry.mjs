@@ -79,7 +79,11 @@ export const COMPONENT_SOURCES = Object.freeze({
   // and `types.ts` is declarations, and TD3's rule is that a row names the file
   // that must contain the *behaviour*.
   C19: "src/interaction/completion/engine.ts",
-  C20: "src/interaction/history.ts",
+  // The store, now that it exists — `history.ts` was the scaffold (TD3, tenth
+  // instance). Repointed on the commit that makes `store.ts` real, never
+  // before: a path that does not exist reads as "not implemented" forever, so
+  // every deferral waiting on C20 would be silently exempt.
+  C20: "src/interaction/history/store.ts",
   C21: "src/data/process/runner.ts",   // the runner, not process/types.ts — see above
   C22: "src/shell/session.ts",
   C23: "src/shell/execution.ts",

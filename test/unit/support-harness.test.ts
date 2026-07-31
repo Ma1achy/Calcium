@@ -45,6 +45,13 @@ import {
   result,
 } from "../support/transport.js";
 import { fakeWorld, steppableClock, worldResult } from "../support/world.js";
+import {
+  entry,
+  fakeClock as historyClock,
+  fakeFs,
+  seedFiles,
+} from "../support/history.js";
+import { load } from "../../src/interaction/history/index.js";
 import { doc, psColumns, psTable, tableOf } from "../support/blocks.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
@@ -739,5 +746,62 @@ describe("C14 fixtures respond to what their tests vary", () => {
       measureSequence([expanded], 80),
       "expansion must change the height, or the index test asserts nothing",
     ).toBeGreaterThan(measureSequence([table], 80));
+  });
+});
+
+describe("test/support/history.ts — every option is asserted to take effect", () => {
+  // The rule this directory's README states, and C20's fake is exactly the
+  // shape that likes to fail it: five options, each of which a careless
+  // implementation discards silently, and two of them are the whole of T3.7 and
+  // T3.8. A fake that cannot fail makes those tests read as covering a
+  // read-only home and a full disk while running neither.
+  it("`fail` really refuses, and `none` really restores", async () => {
+    const fs = fakeFs();
+    await expect(fs.appendFile("/f", "a")).resolves.toBeUndefined();
+
+    fs.fail("readOnly");
+    await expect(fs.appendFile("/f", "b")).rejects.toThrow(/EACCES/);
+    await expect(fs.writeFile("/f", "b")).rejects.toThrow(/EACCES/);
+    expect(() => {
+      fs.appendFileSync("/f", "b");
+    }).toThrow(/EACCES/);
+
+    fs.fail("full");
+    await expect(fs.appendFile("/f", "c")).rejects.toThrow(/ENOSPC/);
+
+    fs.fail("none");
+    await fs.appendFile("/f", "d");
+    expect(fs.files.get("/f")).toBe("ad");
+  });
+
+  it("`jitter` really settles writes out of order", async () => {
+    const fs = fakeFs();
+    fs.jitter(true);
+    const order: string[] = [];
+    // Issued first, second, third — and if `jitter` were inert they would
+    // settle in that order, which is the state T3.19 exists to rule out.
+    await Promise.all(
+      ["a", "b", "c"].map(async (name) => {
+        await fs.appendFile(`/${name}`, name);
+        order.push(name);
+      }),
+    );
+    expect(order).not.toEqual(["a", "b", "c"]);
+  });
+
+  it("`seedFiles` produces a file the loader accepts, escaping included", () => {
+    const seeded = seedFiles([entry("/deploy \\\n  --now", 5), entry("/ps", 6)]);
+    const loaded = load(seeded["/state/history"] ?? "", seeded["/state/history.meta"] ?? "");
+
+    expect(loaded.warnings, "a seed the loader warns about is not a fixture").toEqual([]);
+    expect(loaded.entries.map((e) => [e.command, e.ts])).toEqual([
+      ["/deploy \\\n  --now", 5],
+      ["/ps", 6],
+    ]);
+  });
+
+  it("`fakeClock` never repeats, so a stamp names the append that produced it", () => {
+    const clock = historyClock(1_000, 7);
+    expect([clock(), clock(), clock()]).toEqual([1_000, 1_007, 1_014]);
   });
 });

@@ -405,6 +405,7 @@ export const OWNERS = [
   { path: "src/interaction/editor", spec: "C17" },
   { path: "src/interaction/parser", spec: "C18" },
   { path: "src/interaction/completion", spec: "C19" },
+  { path: "src/interaction/history", spec: "C20" },
   { path: "src/testing", spec: "C09" },
 ];
 
@@ -422,6 +423,7 @@ export const TOPICS = {
   editor: "C17",
   parser: "C18",
   completion: "C19",
+  history: "C20",
   adapters: "C07",
   blocks: "C09",
   capabilities: "C02",

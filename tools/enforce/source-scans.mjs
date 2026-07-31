@@ -50,6 +50,25 @@ export const SCANS = [
     scope: "src/viewport/", allow: [],
     why: "C14 performs no I/O — the clipboard writer is injected, and a viewport that shells out cannot be unit-tested" },
 
+  // **SS9, built on the day C20 landed, and built rather than folded.**
+  //
+  // It is the last of the four pending rules A03 §2 tracks and the only one that
+  // survives the question that retired SS5, SS6, SS7 and SS8: could it fire on
+  // anything a broader rule misses? Its clock clause could not — SS1 bans clock
+  // reads across all of `src/` — so the clause is gone rather than carried, and
+  // C20 T2.4's clock half is SS1's coverage declared. What is left is `fs` and
+  // the `~/.prism` literal, and SS1 speaks for neither.
+  //
+  // The literal is the live half. C20 is the first component since C08 to write
+  // anything, and a hardcoded `~/.prism` means a standalone run appends to the
+  // developer's own history — which makes a clean clone neither clean nor
+  // repeatable, and does it silently, in a file nobody looks at until it is
+  // wrong (C20 I12, T6.12).
+  { id: "SS9", spec: "C20 I11 · C20 I12 · C20 T2.4",
+    pattern: /require\(["']fs["']\)|from\s+["']node:fs["']|~\/\.prism/,
+    scope: "src/interaction/history/", allow: [],
+    why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and a hardcoded `~/.prism` makes standalone development append to a real install" },
+
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
     scope: "src/viewport/", allow: [],
@@ -312,6 +331,22 @@ export const SCANS = [
       "src/interaction/parser/",
       "src/interaction/completion/context.ts",
       "src/interaction/completion/sources.ts",
+      // **C20's six, and `layers.ts` is deliberately not among them** — the
+      // discriminator is the sentence above, held to for the second time. Two of
+      // the six are lexers in C18's coordinate system (`redact.ts` splices the
+      // tokeniser's spans back into the string they were measured in;
+      // `codec.ts` scans a line for escapes), and four count arrays — entries,
+      // rows, splices — where an index is a position in a list and not a claim
+      // about text at all. `layers.ts` is the one file that measures display
+      // width, and it uses `cells()`; granting the directory would have handed
+      // the file in the minority the wrong advice at the moment someone reached
+      // for a quick fix.
+      "src/interaction/history/codec.ts",
+      "src/interaction/history/navigate.ts",
+      "src/interaction/history/persist.ts",
+      "src/interaction/history/redact.ts",
+      "src/interaction/history/search.ts",
+      "src/interaction/history/store.ts",
     ],
     why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. `// graphemes-ok` claims the expression operates on a grapheme array or a non-text value, where index arithmetic is correct — it is a claim about the code, not a way to silence the rule. C16's decoder and C18's tokeniser are out of scope: both are lexers where a unit count is the correct measure" },
 
@@ -519,9 +554,26 @@ export const SCANS = [
     scope: "src/interaction/completion/", allow: ["src/interaction/completion/types.ts"],
     why: "every candidate is a projection of the manifest (I4): a literal verb, flag or enum list here is how completion drifts from the far side, and it is correct on the day it is written" },
 
+  // **C20 owns a `flush` that has nothing to do with a frame**, and the
+  // collision is the rule's evidence rather than its intent: this scan reads a
+  // bare identifier, and `flush` is C03's scheduler method *and* the name C20 §4
+  // and C22 §8 both give to putting history on disk. Three files are allowed by
+  // name — the interface, the writer, and the store that delegates to it.
+  //
+  // What the allowance costs is visible and small: those three stop being
+  // scanned for `commit(` and `invalidate(` too. Two other things already cover
+  // that ground for C20 — MG18 forbids any import from `terminal/`, and the
+  // component's whole injected surface is `fs`, `clock` and `stateDir`, so a
+  // scheduler has no route in. Per file rather than per directory, so a file
+  // added to `history/` later is caught and has to be argued onto this list.
   { id: "SS28", spec: "C16 T2.6 · C17 T2.6 · C18 T2.4 · C19 T2.5 · C20 T2.6",
     pattern: /\b(?:commit|flush|invalidate)\s*\(/,
-    scope: "src/interaction/", allow: [],
+    scope: "src/interaction/",
+    allow: [
+      "src/interaction/history/types.ts",
+      "src/interaction/history/persist.ts",
+      "src/interaction/history/store.ts",
+    ],
     why: "L4 orchestrates; interaction never commits a frame" },
 
   // C05's first draft declared its own `Result<T, E>` with `errors` plural where

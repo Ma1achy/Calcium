@@ -23,7 +23,10 @@ describe("C17 tier 5 — at a real prompt", () => {
     "T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it at every position — waits on L4",
   );
   it.todo(
-    "T5.4: an undo/redo sequence interleaved with paste and history navigation returns to the expected text — waits on L4 and C20",
+    // C20 landed; the navigation half of this is asserted in
+    // test/integration/editor.test.ts T4.6. What remains is a real session
+    // driving both, which is the shell's.
+    "T5.4: an undo/redo sequence interleaved with paste and history navigation returns to the expected text — waits on L4",
   );
   it.todo(
     "T5.5: resizing while a wrapped multi-line command is in the buffer → the prompt reflows and the viewport height stays correct — waits on L4",

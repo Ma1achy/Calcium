@@ -8,7 +8,55 @@
 //
 // A tier-5 file asserting something C15 can do alone would look like coverage
 // and be tier 1 in a different directory.
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
+
+import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import type { OverlayManager } from "../../src/viewport/overlay/index.js";
+import { MENU_ID, menuLayer } from "../../src/interaction/completion/index.js";
+import { SEARCH_ID } from "../../src/interaction/history/index.js";
+import { createFocusStore } from "../../src/interaction/router/focus.js";
+import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { createRouter, type RouterDeps } from "../../src/interaction/router/router.js";
+import type { InputEvent } from "../../src/interaction/router/types.js";
+import { registry } from "../support/overlay.js";
+import { openWith } from "../support/history.js";
+
+const escape = (): InputEvent => ({
+  kind: "key",
+  key: { name: "escape", ctrl: false, meta: false, shift: false, sequence: "\u001b" },
+});
+
+/** The shell's half of the router, reduced to what a stack of two layers needs. */
+function routerDeps(overlays: OverlayManager): RouterDeps {
+  return {
+    overlayTop: () => {
+      const top = overlays.top;
+      return top === null ? null : { kind: top.kind, id: top.id, dismissable: top.dismissable };
+    },
+    placed: () =>
+      overlays.layout({ width: 80, height: 24 }).map((p) => ({
+        layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
+        top: p.top,
+        left: p.left,
+        height: p.height,
+        width: p.width,
+      })),
+    popLayer: () => void overlays.pop(),
+    copyMode: () => false,
+    exitCopyMode: () => undefined,
+    liveEntry: () => null,
+    entryAtRow: () => null,
+    busy: () => false,
+    cancel: () => undefined,
+    shellChild: () => false,
+    signalShellChild: () => undefined,
+    region: () => ({ top: 0, height: 24 }),
+    mouseEnabled: () => true,
+    promptHasText: () => false,
+    clearPrompt: () => undefined,
+    raiseExitConfirm: () => undefined,
+  };
+}
 
 describe("C15 e2e — layers under real input", () => {
   // The flip is asserted as geometry in T3.5 and T3.5b. What is left here is
@@ -18,9 +66,59 @@ describe("C15 e2e — layers under real input", () => {
   it.todo(
     "T5.1: a completion menu near the bottom flips above the prompt and shows every candidate. C19 has landed and the placement half is asserted in test/integration/completion.test.ts; what is missing is a real prompt at a real screen position — waits on L4",
   );
-  it.todo(
-    "T5.2: reverse-i-search over a completion menu — both stacked, keys to the search, esc returns to the menu. C19 has landed and the stacking and routing halves are asserted in test/integration/router.test.ts; the search half is not built — waits on C20",
-  );
+  // T5.2, written on the commit C20 landed. C15 §3's "overlays nest freely" is
+  // the sentence under test and reverse-i-search over a completion menu is the
+  // case it was written for — three components' worth of state, and the only
+  // tier where the search is a real search rather than a `rows(3)` stand-in.
+  it("T5.2: reverse-i-search over a completion menu — both stacked, keys to the search, esc returns to the menu", async () => {
+    const overlays = createOverlayManager({ registry });
+    const focus = createFocusStore();
+    const router = createRouter({
+      focus,
+      keymap: createKeymap(defaultKeymap),
+      now: () => 1_000,
+      deps: routerDeps(overlays),
+    });
+
+    overlays.push(menuLayer([{ value: "--status" }, { value: "--since" }], 0, 0, { row: 20, rows: 1 }));
+    expect(router.target).toBe("overlay");
+
+    const { store } = await openWith();
+    for (const c of ["/ps --status=running", "/logs digit-42"]) store.append(c, 0);
+    store.searchOpen("/p");
+    overlays.push(store.searchLayer({ row: 20, rows: 1 }));
+
+    // Both layers, the search on top, and every keystroke going to it.
+    expect(overlays.stack.map((l) => l.id)).toEqual([MENU_ID, SEARCH_ID]);
+    store.searchType("digit");
+    overlays.update(SEARCH_ID, { content: store.searchLayer({ row: 20, rows: 1 }).content });
+    expect(store.searchState?.hit?.command).toBe("/logs digit-42");
+
+    // Both are placed, neither escapes the region, and the search is drawn over
+    // the menu — C15 sorts by kind and then by push order.
+    const placed = overlays.layout({ width: 80, height: 24 });
+    expect(placed.map((p) => p.layer.id)).toEqual([MENU_ID, SEARCH_ID]);
+    for (const p of placed) expect(p.top + p.height).toBeLessThanOrEqual(24);
+
+    // `Esc` — one row in C16's table, dispatched to whatever is on top. The
+    // handler is L4's and is written here as L4 will write it: read the action
+    // from the keymap, and let the layer on top decide what it means. That is
+    // the seam C20 §5 names when it says the bindings are C16's.
+    const keymap = createKeymap(defaultKeymap);
+    router.register("overlay", (e) => {
+      if (e.kind !== "key") return false;
+      const binding = keymap.resolve("overlay", e.key);
+      if (binding?.action !== "dismiss") return false;
+      if (overlays.top?.id === SEARCH_ID) store.searchEnd("cancel");
+      overlays.pop();
+      return true;
+    });
+
+    expect(router.dispatch(escape()), "consumed").toBe(true);
+    expect(overlays.stack.map((l) => l.id)).toEqual([MENU_ID]);
+    expect(router.target, "the menu is still there, and still has the keys").toBe("overlay");
+    expect(store.searchState).toBeNull();
+  });
   // T4.5b asserts the ladder's shape against C15 alone. This is the same claim
   // through a real keystroke, and the rung that must not fire is the one that
   // pops the dashboard out from under the confirm.
