@@ -40,7 +40,9 @@ Cap is **10,000 entries**, FIFO. `entries` never exceeds it. The two files are *
 
 ### Corruption
 
-A malformed file is treated as empty and a warning is logged (`j22`). The session opens normally. Refusing to start because history is unreadable would be a worse failure than losing it — and the sidecar going missing while the commands survive is common enough (a partial copy, an interrupted rotation) that the commands are kept and the metadata reset.
+A malformed file is treated as empty and a warning is logged (`j22`). The session opens normally.
+
+**A partial final line is not malformed, and the distinction is worth the sentence.** Every entry is written with its terminator, so a last line without one is an interrupted append — one entry, mid-flight, at the moment of a crash. Discarding 9,999 good commands to punish it would be the corruption rule doing more damage than the corruption. So: an unterminated final line is dropped with a warning, and *malformed* means an invalid escape or a null byte in the file, which is a file no writer of ours produced. Refusing to start because history is unreadable would be a worse failure than losing it — and the sidecar going missing while the commands survive is common enough (a partial copy, an interrupted rotation) that the commands are kept and the metadata reset.
 
 ---
 
@@ -67,10 +69,12 @@ P2 an assignment NAME=value whose NAME matches SECRET,
    &, a quote, or end of line.                             → redact the value
 E  otherwise the entropy heuristic — length ≥ 20 and ≥ 3.5
    bits per character — with exemptions for a UUID, 7–64
-   hex characters (B5), a semver, a flag name, and a path,
-   where a path starts with /, ./, ../ or ~/, or is
-   relative with no + or = in any segment (B4).            → redact if still over
+   hex characters (B5), a semver, a flag name, and a path:
+   rooted (/, ./, ../, ~/), or containing a / with no
+   segment that trips the bar on its own (B4).             → redact if still over
 ```
+
+**The path exemption is defined by segments, not by punctuation**, and the first wording was "no `+` or `=` in any segment", which `aGVsbG8vd29ybGRzZWNyZXQ5OTk5` walks straight through. A path is a composition of names and a secret is one long high-entropy run, so the test is the one already written: exempt a slash-bearing token when **every segment** falls under the length-and-entropy bar. `/var/folders/T/x9f2kd8s0shx7q1p/prism-run` is exempt because its longest segment is sixteen characters; a base64 blob is not, because one segment is the blob.
 
 Positional redaction is reliable and catches the realistic case — someone pasting `--token=ghp_…`. The entropy net catches an unrecognised shape without destroying the identifiers the tool is built around.
 
@@ -99,7 +103,7 @@ interface HistoryStore {
   clear(): void;
 
   // Reverse search — §7's second machine, one call per column of its table.
-  searchOpen(): void;
+  searchOpen(current: string): void;
   searchType(text: string): void;
   searchBackspace(): void;
   searchOlder(): void;
@@ -140,6 +144,8 @@ type SearchState  = Readonly<{ query: string; hit: SearchHit | null; failed: boo
 **Construction is asynchronous and everything after it is not.** The filesystem is injected and its reads return promises, so the load has to be awaited somewhere; doing it in `openHistory` means every call above answers from memory, synchronously, which is what lets `previous()` return a string rather than a promise on a keystroke path where a promise would be a frame of latency for no reason.
 
 **`failed` is the third state a narrowing keystroke can produce**, and §7a Trace 2 is why the interface has a field for it: without one, the overlay either shows a line that does not contain the query beside it, or throws away a walk the user made on purpose. `searchEnd("accept")` also writes the navigation cursor to the hit's index (§7a Trace 1, I21) — the one place the two machines touch.
+
+**`searchOpen` takes the buffer for the same reason `previous` does.** Trace 1 assumed a draft was already stashed because navigation came first. Searching from idle and accepting has no draft, and then `↓` past the newest returns nothing — the pre-search text is gone, by exactly the route I2 exists to close. So the buffer is stashed at `searchOpen` if navigation has not already stashed one, and the two entry points into the draft are symmetric.
 
 **`searchEnd` takes the action rather than being three methods.** §7's table has three columns that end a search and one behaviour behind them — deactivate, return the match or null — differing only in what L4 then does with the string. Three methods would be three implementations of one thing, and the failure mode is the familiar one: two of them get updated.
 
@@ -350,7 +356,7 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 - **I18** — `drain()` is synchronous and puts every pending append on disk. It is the only thing `beforeRelease` calls, and the only use of `appendFileSync`.
 - **I19** — Redaction runs over C18's tokens where the command parses and a whitespace split where it does not, line by line, and always before escaping.
 - **I20** — A whitespace-only command is not stored; a null byte is stripped before storage.
-- **I21** — `searchEnd("accept")` sets the navigation cursor to the hit's index and preserves the stashed draft. The only place one machine writes the other's state.
+- **I21** — `searchEnd("accept")` sets the navigation cursor to the hit's index and preserves the stashed draft, which `searchOpen` stashes when navigation has not. The only place one machine writes the other's state.
 - **I22** — A search action that finds nothing sets `failed` and retains both the query and the previous hit; the next matching query resumes from that hit, not from the newest.
 - **I23** — `searchEnd` returns the command captured in the hit, never a re-read of `entries[index]`.
 - **I24** — Redaction never destroys a flag name, a numeric value behind a name that merely contains a keyword, or a flag following a valueless secret flag.
@@ -436,7 +442,8 @@ Six tiers. Every cell of both §7 tables is covered.
 
 ### Tier 3 — edge cases
 
-- **T3.1** (I9): a truncated history file → empty history, warning, session opens.
+- **T3.1** (I9): a history file containing an invalid escape → empty history, warning, session opens.
+- **T3.1b** (I9): a history file whose last line has no terminator → that entry is dropped, the rest survive, and a warning is recorded. The partial write, told apart from the corruption.
 - **T3.2** (I9): a sidecar shorter than the command file → commands kept, metadata reset.
 - **T3.3** (I9): a sidecar containing non-numeric fields → treated as corrupt; commands kept.
 - **T3.4**: `next` without a prior `previous` → null.
