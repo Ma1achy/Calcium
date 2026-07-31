@@ -220,6 +220,10 @@ It was found by writing the reachability table below and having no state to put 
 
 **Cancellation outranks everything** because it is the most consequential and most time-sensitive intent. A user hitting Ctrl-C while a promote is running means the promote, not the dashboard they happen to be looking at. Stating the precedence matters — the alternative reading is defensible, and leaving it implicit guarantees the two get implemented differently.
 
+**`\r` and `\n` are two keys, not one.** In raw mode Enter sends `\r` and Ctrl-J sends `\n`, and the decoder mapped both to `enter` — the obvious reading, and the one that makes C17 I12 unsatisfiable: Ctrl-J is one of the two newline bindings that must work on every terminal, and a binding on `{name: "j", ctrl: true}` would have resolved against an event nothing could produce. That is §5's unconstructible-rung class one layer lower, in the decoder rather than the ladder, and it was found while seeding the keymap rather than by running anything.
+
+It also settles what a newline *inside* an unbracketed paste means. The heuristic path (§7) sees the byte as a control that ends a printable run, and under the old mapping every line of a pasted block arrived as `enter` — submitting each line in turn. As `Ctrl-J` it inserts, which is what a pasting user meant and what bracketed paste already did.
+
 Ctrl-D at an empty prompt takes the same confirm path (`j22` #10). With text present it is a no-op, not a delete-forward, because a stray Ctrl-D that eats a character mid-command is worse than one that does nothing.
 
 The 500 ms window uses an **injected clock**, like C03's scheduler — C16 reads no ambient time, so double-tap timing is testable on a fake clock.
@@ -352,6 +356,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I14** — No chord support beyond modifiers. Terminals send no key-up event, so a two-key chord cannot be distinguished from two keystrokes without a timeout, and a timeout would make the same input mean different things at different typing speeds.
 - **I15** — `activeTarget` is pure over its inputs.
 - **I16** — Ctrl-D is dispatched only when the editor buffer is empty, and it opens a confirm rather than exiting. With text present it is consumed and discarded — never treated as EOF, and never as a delete-forward, because a keystroke that sometimes ends the session and sometimes edits the line is one nobody presses twice.
+- **I17** — `\r` and `\n` are **different keys**. `\r` is `enter`; `\n` is `Ctrl-J`, which is what that byte is. Collapsing them is the obvious reading of "the Enter key" and it silently removes one of the two terminal-independent newline bindings C17 I12 requires — a binding that resolves against nothing, which is C16 §5's unconstructible-rung class arriving one layer lower, in the decoder. It also decides what a newline inside an unbracketed paste means: `enter` submits each line of a pasted block, `Ctrl-J` inserts it.
 
 ---
 
@@ -370,6 +375,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I26).
 12. Duplicate bindings fail at construction (I10).
 13. C16 never commits a frame; L4 does (I11).
+14. `\r` and `\n` decode to different keys, so C17's Ctrl-J newline is reachable and a pasted newline inserts rather than submits (I17).
 
 ---
 
@@ -386,6 +392,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.3b2** (I2): a C13 append with no `resetFocus()` call leaves the stored location untouched — the reset is the caller's, and a router that quietly subscribed would pass T1.3b while failing this.
 - **T1.3c** (I3): a click at a transcript row resolves to that row's block, not to the focused target.
 - **T1.3d** (I3): a click inside an overlay's placed region resolves to the overlay even when focus is elsewhere.
+- **T1.3b** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
 - **T1.4**: `CSI 200~` enters buffering.
 - **T1.5** (I12): bytes during buffering emit no key events.
 - **T1.6** (I6): `CSI 201~` emits exactly one `paste` carrying the buffered text.
@@ -480,6 +487,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.11**: expressing bindings as conditionals → T4.9 fails, and help drifts from behaviour.
 - **T6.12** (I2): failing to reset focus on append → T1.3b fails, and the next command is typed into a table.
 - **T6.13** (I3): routing mouse events through focus priority → T1.3c fails, and clicks land on the wrong block.
+- **T6.9b** (I17): collapsing `\r` and `\n` back into one key → T1.3b fails, C17's Ctrl-J binding resolves against an event nothing produces, and every line of an unbracketed paste submits.
 
 ---
 
