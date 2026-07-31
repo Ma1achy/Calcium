@@ -334,7 +334,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.1** (with C01, C21): the `suspend` → `handoff` → `resume` → `invalidate` sequence runs in order; C01's raw-mode guard never fires.
 - **T4.2** (with C10, C03): a theme switch triggers exactly one `invalidate`, issued by C22 and not by C10.
 - **T4.3** (with C14, C03): a scroll issues exactly one `commit("input")`, issued by C22 and not by C14.
-- **T4.4** (with C15, C13): popping a view appends a one-line trace composed by C22; C15 writes nothing.
+- **T4.4** (with C15, C13): popping a view appends nothing — C15 writes nothing and C22 composes nothing. A trace here would freeze the block the pop returns to and clear the selection A01 D7 preserves.
 - **T4.5** (with C20, C17): a history recall calls `setText`; C20 never touches the editor.
 - **T4.6** (with C18, C21): a `cd` built-in updates session `cwd`, and the next spawn lands there.
 - **T4.7** (with C19, C17): ghost text is composited into the prompt without entering the buffer.

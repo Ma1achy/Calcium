@@ -124,7 +124,7 @@ A non-dismissable layer — a confirm awaiting y/N — must be resolved by `dism
 
 **`pop()` returning `null` covers two cases, and its caller has to tell them apart.** C16's Ctrl-C ladder is the consumer: it dismisses a dismissable overlay, no-ops on a non-dismissable one, and *falls through to the next rung* when there is no layer at all (C16 §5, I8). Those are three outcomes and `pop()` reports two, so the ladder reads `top` before calling — `top === null` is the fall-through, `top.dismissable === false` is the no-op. Said here because the obvious code branches on the return value, and the obvious code sends Ctrl-C nowhere while a confirm is open.
 
-Popping emits a change. **C15 does not write to the transcript** — the one-line trace a pushed view leaves behind (A01 D7) is composed by L4, which knows what the view was showing. Keeping C15 out of C13 preserves the layering and stops the overlay manager needing to understand what a dashboard is.
+Popping emits a change. **C15 does not write to the transcript**, and after A01 D7's amendment nothing else does on a pop either — a trace entry would freeze the block the pop returns to and clear the selection D7 preserves. The invariant is unchanged and its justification is now simpler: an overlay manager that could append would need to understand what a dashboard is, and keeping C15 out of C13 is what stops L2 depending on the transcript's contents (I9, MG13).
 
 ---
 
@@ -233,7 +233,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 8. No backdrop dimming — terminals render it as a fault, not as depth (I11).
 9. `layout()` is pure and needs no resize invalidation (I5).
 10. A dismissal records why it happened; C15 records the reason and never detects it (I10).
-11. C15 emits pop events; L4 composes the transcript trace (I9).
+11. C15 emits pop events and writes nothing to the transcript; a pop appends nothing at all (I9, A01 D7).
 12. Push returns a disposable equivalent to dismissal (I13).
 13. A layer changes in place through `update` — content, placement or width, never the stack's shape and never its escapability (I14).
 14. A zero-height overlay is omitted from the layout rather than dismissed by it (I15).
@@ -314,7 +314,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.7** (with C19): the completion menu pushes an anchored overlay and renders its own "N more" from `Placed.truncated`.
 - **T4.7b** (with C19, I14): typing narrows the candidate set through `update`, not through a pop and a push — asserted by the change log, which holds one `push`, N `content` and one `pop` rather than N of each.
 - **T4.9** (with C25): C25 §3b's fullscreen patch is a view whose content is a single block, carried by `Block[]` with no special case; paging through it with `n` and `p` is the owner calling `update`, and `Placed` never gains a scroll offset.
-- **T4.8** (with L4): popping a view emits a change from which L4 composes the transcript trace; C15 writes nothing.
+- **T4.8** (with L4): popping a view emits a `pop` change and the transcript is untouched — same entry count, same live id, before and after. C15 writes nothing and L4 appends nothing (A01 D7).
 
 ### Tier 5 — e2e
 
@@ -322,7 +322,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T5.2**: reverse-i-search raised over a completion menu → both stacked, keys go to the search, `Esc` returns to the menu.
 - **T5.3**: a confirm raised inside the dashboard → drawn over it, `Esc` does nothing, `n` resolves it and returns to the dashboard.
 - **T5.4**: resizing the terminal with three layers open → all reposition correctly, none escapes the region, no blank frames.
-- **T5.5**: `Esc` from the logs view → view pops, a one-line trace appears in the transcript, focus returns to the live block with selection preserved (A01 D7).
+- **T5.5**: `Esc` from the logs view → view pops, the transcript is untouched, and focus returns to the still-live block with selection preserved (A01 D7). The untouched transcript is what makes the preserved selection possible, not an incidental detail beside it.
 
 ### Tier 6 — fail-on-revert
 
@@ -331,7 +331,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.3** (I1): allowing nested views → T3.3 fails and the `Esc` chain becomes ambiguous.
 - **T6.4** (I3): letting `Esc` dismiss a confirm → T1.9 fails; a stray keypress answers a question the user did not read.
 - **T6.5** (I4): rendering an overlay with raw React → T2.3 fails, and the overlay stops being themed or measurable.
-- **T6.6** (I9): writing the pop trace from C15 → T2.5 fails and L2 gains a dependency on the transcript's contents.
+- **T6.6** (I9): writing to the transcript from C15 → T2.5 fails and L2 gains a dependency on the transcript's contents.
 - **T6.7** (I6): an off-by-one in clamping → T2.2 fails across the corpus.
 - **T6.8** (I8): rendering an overflow indicator inside C15 → T4.7 fails, since C15 cannot know what the remainder is.
 - **T6.9** (I5): caching layout results across regions → T2.1 fails after a resize.
@@ -353,7 +353,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 | What the completion menu contains | C19 |
 | Reverse-search behaviour | C20 |
 | The dashboard's panels and refresh | S13 |
-| The transcript trace left by a popped view | L4 |
+| Whether a popped view records anything in the transcript | L4 — and after A01 D7's amendment it records nothing |
 | Scroll state beneath an overlay | C14 |
 | Scrolling a view's own content | Its owner — S12, S13, C25 §3b. C15 places the region's worth and clips nothing |
 | Noticing that a layer's anchor row moved or was evicted | Its owner, through `update` and `dismiss(id, "anchorEvicted")` |

@@ -51,7 +51,7 @@ Push exists only where the thing genuinely needs the whole screen and its own le
 
 Seven steps and three mechanisms. The properties that make it work are all about what *survives*:
 
-**Selection survives a push.** `esc` from the logs view returns to the detail with the same action focused. C16 stores focus as a location and resets it only on append (C16 I13) — a push preserves it, which is what A01 D7 requires and what makes `esc` feel like going back rather than starting over.
+**Selection survives a push.** `esc` from the logs view returns to the detail with the same action focused. C16 stores focus as a location and resets it only on append (C16 I2) — a push preserves it, and the pop appends nothing, which is what A01 D7 requires and what makes `esc` feel like going back rather than starting over.
 
 **The list survives the drill.** It is frozen, not replaced. Scrolling up shows it with the original row still rendered as it was.
 

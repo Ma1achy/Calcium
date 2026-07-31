@@ -471,7 +471,7 @@ to an architecture commitment (A02 1, 2, 20; A03 6, 15; A04 2, 3, 4).
 
 ## Fourth pass — citations that resolve against the wrong invariant
 
-**Five known instances as of 2026-07-30.** Not found by a pass; accumulated by
+**Six known instances as of 2026-07-31.** Not found by a pass; accumulated by
 people reading specs in order to implement against them.
 
 | Where | Cites | Means |
@@ -480,6 +480,22 @@ people reading specs in order to implement against them.
 | C13 T1.7b, T6.11 | I14 | I13 — `rev` bumps on every applied patch |
 | C13 T2.4 | I13 | I18 — C13 imports nothing from `terminal/` or `presentation/` |
 | C14 I13 | C13 I13 | C13 I14 — the eviction marker is a real entry |
+| B03 §3 | C16 I13 | C16 I2 — the stored focus location resets on append |
+
+**Six for six on one detection method.** Every instance was found while *applying*
+a decision, never while reviewing one — the sixth surfaced during C16's spec pass,
+when amending A01 D7 meant reading every document that depended on it. That is the
+argument for the by-hand walk sitting in CLAUDE.md's Always list rather than being
+offered as a courtesy to components that look tricky.
+
+**And a companion class the fourth pass had not named: dependants of a *clause*.**
+D7 carried two promises in one row and four documents cited it, one of which — B03's
+canonical drill path — was downstream of the clause that a ruling proposed to drop.
+SP3 resolves ids, so it can see that `A01 D7` exists; nothing can see that a *half*
+of D7 is load-bearing somewhere else. The practice that closes it is procedural
+rather than mechanical: **when a ruling amends a decision rather than a component,
+grep the decision id before taking the ruling, not after.** Taking it first cost one
+reversal here.
 
 **This is the third pass's third kind of A03 defect, arriving from the other
 side.** That pass found SS37 declaring C09 I4 for behaviour that is C09 I15, and

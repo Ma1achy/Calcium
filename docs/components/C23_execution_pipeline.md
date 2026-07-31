@@ -196,7 +196,7 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 |---|---|
 | Submit | `parse` → route → … → `transcript.append` → `scheduler.commit` |
 | A TTY child | `lifecycle.suspend` → `runner.handoff` → `lifecycle.resume` → `scheduler.invalidate` |
-| Pop a pushed view | `overlays.pop` → compose a one-line trace → `transcript.append` → `commit` |
+| Pop a pushed view | `overlays.pop` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) |
 | History recall | `history.previous` → `editor.setText` → `commit("input")` |
 | Stall detected | inject notice patch → `commit("stream")` |
 | View refresh tick | `fetch()` → patch the layer → `commit("stream")` |
@@ -365,7 +365,7 @@ Fake transport, fake stores.
 - **T4.1** (with C18, C05, C06, C07, C13): a real fixture-backed submission end to end produces a valid document and one entry.
 - **T4.2** (with C06, C07): a streamed verb's patches produce the same final document as adapting its whole output at once (C07 T4.5, from this side).
 - **T4.3** (with C01, C21, C03): the handoff sequence runs in documented order and ends with an invalidate.
-- **T4.4** (with C15, C13): popping a view appends a trace composed here; C15 writes nothing.
+- **T4.4** (with C15, C13): popping a view appends **nothing** — the transcript's entry count and live id are unchanged across the pop, so the block beneath stays live and focusable (A01 D7). C15 writes nothing either.
 - **T4.5** (with C10, C03): a `/theme` local handler switches the theme and C23 invalidates.
 - **T4.6** (with C20, C17): `/history 4` re-runs entry 4 through the full pipeline.
 - **T4.7** (with C16): Ctrl-C during a verb cancels; during a pass-through forwards `SIGINT`.
