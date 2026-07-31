@@ -91,6 +91,8 @@ interface CompletionEngine {
   request(ctx: CompletionContext, seq: number): Promise<CompletionResult>;
   cancel(): void;
   readonly pending: boolean;
+  /** The token of validity. `null` means nothing in flight is still wanted. */
+  readonly active: number | null;
 }
 
 type CompletionResult = Readonly<{
@@ -102,6 +104,18 @@ type CompletionResult = Readonly<{
 ```
 
 **Every request carries a sequence number, and a result whose sequence is not the latest is discarded.** This is the single most important behaviour in the component. Without it, a slow UUID lookup returning after three more keystrokes rewrites the buffer to something the user was not typing — and it happens exactly when the cluster is slow, which is when they are least tolerant of it.
+
+### The sequence is a token of validity, not a counter
+
+**Every piece of state that outlives a single event carries the sequence it belongs to, and is used only while that sequence is `active`.** The in-flight request, the menu's candidate set, the selection — each is tagged, and anything not carrying the current token is stale *by construction* rather than by something having remembered to clear it.
+
+That is why `cancel()` **invalidates** the token — `active = null` — rather than advancing it. Advancing would mint a token nothing holds, which works by accident; invalidating says what happened. The two are indistinguishable until a result arrives after `Esc`, and then only the second one discards it: after a cancel there is no latest sequence for a result to match, which is precisely the case the counter reading gets wrong.
+
+Written as one rule because it was three fixes before it was one — a result surviving `Esc`, a "just completed" bit surviving a keystroke, a spinner stamp surviving a supersession — and three special cases in three sections is how the fourth one gets missed.
+
+**`active: number | null` is the shape, and the null case is the mechanism rather than a redundancy.** It reads like a nullable counter, and the obvious simplification is to drop the null and compare against the newest sequence. That simplification is exactly §8a row 4.
+
+One thing is deliberately *not* tagged this way, and §7 says why: the spinner's elapsed-wait stamp belongs to the source call, not to the token.
 
 `ghost` is synchronous by construction: it consults static sources only — which means manifest-backed slots only — and returns the completion of a unique match, or null.
 
@@ -152,6 +166,12 @@ At 500 ms a spinner appears in the prompt: `❯ /ps --family=⠋`.
 
 **The user can keep typing.** A keystroke during a pending request supersedes it — the old sequence is abandoned and the spinner clears. Nothing is blocked and nothing arrives late to overwrite the buffer.
 
+**The spinner clears because the work ended, not because a clock restarted.** Dynamic sources run only on `Tab` (I3), so a keystroke that supersedes a pending request leaves *nothing* pending behind it. This is worth stating because the reasoning that produces the wrong implementation is plausible: "the request is superseded, so the next one restarts the 500 ms" — there is no next one until the user presses `Tab` again.
+
+**The elapsed-wait stamp is taken per source call, and it is the one thing §4's tagging rule does not reach.** Two `Tab`s in the same context join the same in-flight promise (§3, and §8a row 3), and the user's wait began at the first. A stamp tagged with the sequence resets on the second `Tab` and hides the spinner for a further 500 ms while they are already waiting — the wrong answer in the direction that matters, since the whole point of the spinner is to explain a wait that is already happening.
+
+The distinction is the reason, not the exception: **tagging answers validity, and the stamp measures elapsed wait.** Validity belongs to the token; the wait belongs to the work. Named here rather than left as a quiet deviation, because a rule with an undocumented exception is a rule people stop trusting.
+
 The 500 ms threshold and the 60-second TTL both use an **injected clock**, so every timing test runs on a fake one.
 
 ---
@@ -168,7 +188,7 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 
 ## 9. Invariants
 
-- **I1** — A result whose sequence is not the latest is never applied.
+- **I1** — A result is applied only when its sequence is the `active` token. A result arriving after `cancel()` is never applied, because `cancel()` invalidates the token rather than advancing it — under a plain latest-wins reading that result *is* the latest and lands.
 - **I2** — Completion never blocks input; a pending request leaves the prompt fully responsive.
 - **I3** — Static sources are synchronous; dynamic sources run only on `Tab`. Filesystem-backed slots are dynamic, so `path` and `executable` have no ghost text.
 - **I4** — Every candidate derives from the manifest or a registered source; nothing is hardcoded.
@@ -182,6 +202,7 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 - **I12** — C19 imports nothing from `terminal/` and never commits a frame.
 - **I13** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
 - **I14** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
+- **I15** — Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner's elapsed-wait stamp, which is per source call (§7).
 
 ---
 
@@ -189,7 +210,7 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 
 1. Every candidate comes from the manifest or a registered source; nothing is hand-maintained (I4).
 2. Static sources run per keystroke; dynamic sources only on `Tab`. Filesystem slots are dynamic, so paths have no ghost text and `Tab` is required (I3).
-3. Requests carry sequence numbers and stale results are discarded (I1).
+3. Requests carry sequence numbers and stale results are discarded, including after a cancel (I1).
 4. Typing during a pending request supersedes it and clears the spinner (I13).
 5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected (I9, I10).
 6. A failing source is dropped, not fatal (I6).
@@ -201,6 +222,7 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 12. `/` completes verbs; bare text completes executables and paths (I14).
 13. Dynamic sources are the app's; static ones ship with the framework (I3).
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
+15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner's elapsed-wait stamp is the one named exception, and it is per source call (§7).
 
 ---
 
@@ -248,8 +270,10 @@ Six tiers. Every cell of the §8 table is covered.
 - **T3.6** (I6): one of three sources throws → the other two still contribute; the failure is logged once.
 - **T3.7** (I6): a source exceeding its timeout → dropped; the spinner clears.
 - **T3.8** (I10): two requests within the TTL → one source invocation; after expiry → two.
-- **T3.9**: `Tab` twice while a request is pending → one pending request, not two.
-- **T3.10**: `Esc` while pending → cancelled; a later result is discarded.
+- **T3.9**: `Tab` twice while a request is pending → one pending request, not two. The second `Tab` mints a new token *and* joins the existing in-flight promise: the source is invoked once, asserted with a spy.
+- **T3.9b** (I15, §7): `Tab`, 400 ms, `Tab`, 200 ms → the spinner is showing, because the stamp belongs to the source call and the wait began at the first `Tab`. On a per-sequence stamp it is still hidden.
+- **T3.10** (I1, I15): `Esc` while pending → `active` is null and a later result is discarded. Asserts the mechanism, not only the outcome: the result's sequence is still the highest ever issued, so a latest-wins comparison applies it and this test is what fails.
+- **T3.10b** (I15): after `cancel()`, a subsequent `Tab` mints a fresh token and *its* result applies — cancelling invalidates the current token without poisoning the engine.
 - **T3.11**: `Tab` with the menu open → advances the selection rather than re-requesting.
 - **T3.12**: a keystroke with the menu open → menu dismissed, ghost recomputed.
 - **T3.13**: 5,000 candidates → the menu clamps, reports truncation, and renders within budget.
@@ -281,6 +305,8 @@ Six tiers. Every cell of the §8 table is covered.
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I1): applying results without a sequence check → T1.11 and T5.2 fail; a slow cluster rewrites what the user is typing.
+- **T6.1b** (I1, I15): making `cancel()` advance the sequence instead of invalidating it → T3.10 fails, and a result arriving after `Esc` lands on a prompt the user dismissed. The version that passes T1.11 and fails this one is the counter reading of §4.
+- **T6.13** (I15): tagging the spinner's stamp with the sequence rather than the source call → T3.9b fails, and the spinner hides for a further 500 ms each time an already-waiting user presses `Tab`.
 - **T6.2** (I3): running dynamic sources per keystroke → T2.1 fails and the API is hammered.
 - **T6.3** (I2): awaiting a request on the input path → T2.2 fails and typing stalls.
 - **T6.4** (I4): hardcoding an enum list → T2.6 and T4.1 fail, and completion drifts from the far side.
