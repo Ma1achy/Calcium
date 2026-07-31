@@ -527,6 +527,8 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 
 ### Tier 5 — e2e
 
+**Deferred on L4**, in `test/e2e/completion.test.ts`, with the blocker in the greppable form the expiry guard reads. The properties are not deferred — each is asserted at tiers 1 to 4 against the engine, and what waits is the half only visible from outside: that the spinner is *seen* in the prompt, that the menu flips above a prompt actually near the bottom of a real screen, and that the directory reader is the real one. The file names which lower-tier test carries each half, so the deferral is a list of blockers rather than a gap.
+
 - **T5.1**: typing `/ps --status=` and pressing `Tab` → the five statuses appear, arrow-selectable, `Enter` inserts.
 - **T5.2**: a dynamic UUID source with a 2-second delay → the spinner appears at 500 ms, typing continues freely, and the late result never touches the buffer.
 - **T5.3**: `Tab` near the bottom of the terminal → the menu flips above and shows every candidate.
