@@ -196,7 +196,11 @@ Ghost text is accepted by `Tab` or `→`. Any other key ignores it — it is a s
 
 An anchored overlay through C15, with `Block[]` content like every other layer (C15 I4). It is themed, degrades to ASCII, and measures through the same registry as the transcript.
 
-Two rows of pills when the candidate set is short, a table when entries have `detail`. The overlay flips above the prompt when there is no room below (C15 §4) — the case that matters, since the prompt is near the bottom by definition.
+Two rows of pills when the candidate set is short, a table when entries have `detail`.
+
+**The selection is a glyph on the row, and it has to be**, because C04's `TableRow` has no way to say a row is selected and the two obvious substitutes are each wrong. A `selected` field would put view state beside `expanded` in the type C04 §4 deliberately keeps free of it — and selection here is not the table's, it is the menu's. A `Tone` is worse: a tone is a palette slot with a meaning, and "the cursor is here" is not one of them, so the highlight would arrive as `info` or `accent` and mean something else in every theme. `bullet` is in C04's closed glyph vocabulary, C09 owns both its renderings, and the marker therefore degrades to ASCII with the rest of the menu rather than beside it.
+
+Pills carry `active`, which already exists, so only the table form needed a ruling. The overlay flips above the prompt when there is no room below (C15 §4) — the case that matters, since the prompt is near the bottom by definition.
 
 Truncation is reported by C15 through `Placed.truncated`; **C19 renders the "N more" indicator itself**, because only C19 knows what the remainder is (C15 I8).
 
@@ -503,7 +507,8 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T4.6b** (with C16): C19's seven rows construct into `defaultKeymap` without a `KeymapError`, and every one decodes from a real wire form — C16 T2.13's check applied to the rows this component adds.
 - **T4.6c** (with C16, C15): `Esc` on a non-dismissable confirm raised over the menu is a no-op and the menu beneath it survives; the same row dismisses the menu when it is on top.
 - **T4.7** (with C17): accepting a candidate is one undo unit; a single `undo` reverts the whole insertion.
-- **T4.8** (with C10, C02): the menu renders in both themes and under `unicode: "ascii"` with unchanged geometry.
+- **T4.8** (with C10, C02): the menu renders in both themes and under `unicode: "ascii"` with unchanged geometry — including the selection marker, which is a `bullet` glyph and therefore C09's to substitute 1:1.
+- **T4.8b** (I8): moving the selection changes exactly one row's glyph and no tone; the block tree is otherwise identical. A tone-based highlight fails this, and so does one that rebuilds the table.
 
 ### Tier 5 — e2e
 
