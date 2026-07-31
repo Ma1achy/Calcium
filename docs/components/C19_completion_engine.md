@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` (engine + static sources) + app (dynamic sources) |
 | **Layer** | L3 interaction |
-| **Depends on** | C05 (`Manifest`) · C18 (the shared tokeniser) · C15 (the menu overlay) · C04 (`Block`, for menu content) |
+| **Depends on** | C05 (`Manifest`) · C18 (the shared tokeniser, the quoter, and `Token`) · C15 (the menu overlay) · C04 (`Block`, for menu content) |
 | **Consumed by** | C16 (`Tab`, `→`) · L4 (ghost text compositing) |
 | **Source** | A01 D25 · A01 Appendix A.2 · `j22` §tab completion · A02 §6 hook 4 |
 | **Status** | Draft |
@@ -27,17 +27,19 @@ The cursor's position in the tokenised input decides what is being completed. C1
 ```typescript
 type CompletionContext = Readonly<{
   input:      string;
-  cursor:     number;                 // grapheme index
-  tokens:     readonly string[];
+  cursor:     number;                 // code-unit offset into `input` — see below
+  tokens:     readonly Token[];       // C18's, spans and all
   tokenIndex: number;
   prefix:     string;                 // the part of the current token before the cursor
+  /** What acceptance replaces: `[start, cursor]` of the current token. */
+  replace:    Readonly<{ start: number; end: number }>;
   tool:       ToolDef | null;         // resolved if the line names one
   slot:       Slot;
 }>;
 
 type Slot =
   | Readonly<{ kind: "verb" }>                          // "/" prefix present
-  | Readonly<{ kind: "executable" }>                    // bare first token
+  | Readonly<{ kind: "executable" }>                    // bare word in command position
   | Readonly<{ kind: "flagName" }>                      // "--" prefix
   | Readonly<{ kind: "flagValue"; flag: FlagDef }>
   | Readonly<{ kind: "positional"; arg: ArgDef }>
@@ -46,6 +48,20 @@ type Slot =
 ```
 
 `verb` versus `executable` is D25: a leading `/` completes the manifest, bare text completes `PATH` and the filesystem. Same key, two namespaces, decided by one character.
+
+**`tokens` is C18's `Token[]`, and this is where C18 ruling 4 is tested rather than asserted.** That ruling commits that one shape serves both consumers — the delegated string's splice and this context — and the shape is the span-carrying token. The `readonly string[]` this field first declared cannot answer any of the three questions asked of it:
+
+- **`prefix` is a question about offsets, not about text**, which is C18 §2's own wording. Token text has quotes removed and escapes applied, so `'ab cd'` has a text of `ab cd` and a span of seven characters; no arithmetic over the text recovers what sits before the cursor.
+- **Acceptance needs a range to replace.** That is `replace`, and it is derivable only from `start`.
+- **`quoted` and `parts` carry the quote context** T3.15 completes inside, and **`kind` carries command position**: the word after a `|` is a command, so `ls | gre` is an `executable` slot. A string list cannot see the operator — and "the first token" is not the rule. C18 states the command-position rule as the rule; C19 asks the same token list rather than restating it, which is I5's argument arriving one field further along.
+
+So the string form was not merely weaker. It made T3.3, T3.15 and the `executable` half of I14 unimplementable, in a component whose test list already names all three.
+
+**`cursor` is a code-unit offset into `input`, not a grapheme index**, and the two cannot be mixed. Token spans are code-unit offsets, so every derivation of `prefix` and `replace` is arithmetic in that space; a grapheme index silently mis-slices the first line containing an emoji or a combining mark, and the failure is a candidate inserted over half a character rather than an error.
+
+**C17's cursor *is* a grapheme index (C17 I2), so the conversion is real and it belongs to L4**, at the seam where the editor's buffer becomes a completion context. Putting it here would give C19 two coordinate systems and one of them would eventually be read in the other's arithmetic — which is the defect this ruling closes, reintroduced inside the component instead of across its boundary.
+
+That also settles a scan question rather than leaving it to be discovered: SS40 forbids `.length`, `charAt` and `slice` across `src/interaction/`, allowing `router/decode.ts` and `interaction/parser/`. `completion/` is neither, and span arithmetic is exactly the forbidden shape. The allowance is the same one `parser/` already holds and for the same reason — this is the tokeniser's coordinate system, where a code-unit count is the honest measure — so `interaction/completion/` joins that list rather than the rule being narrowed. A03 §"a directory is a packaging decision" is the precedent, and the row lands with the code (A03 commitment 14b).
 
 ---
 
@@ -200,7 +216,7 @@ It is the shape A03 §2 names: each statement is correct where it stands, and on
 - **I2** — Completion never blocks input; a pending request leaves the prompt fully responsive.
 - **I3** — Static sources are synchronous; dynamic sources run only on `Tab`. Filesystem-backed slots are dynamic, so `path` and `executable` have no ghost text.
 - **I4** — Every candidate derives from the manifest or a registered source; nothing is hardcoded.
-- **I5** — The tokeniser **and the quoter** are C18's; there is one implementation of each. A candidate needing quotes is quoted by the same code that will later parse it.
+- **I5** — The tokeniser **and the quoter** are C18's; there is one implementation of each. A candidate needing quotes is quoted by the same code that will later parse it. `CompletionContext` carries C18's `Token`, spans included — the shape C18 ruling 4 commits serves both consumers — and `cursor` is in that shape's coordinate system.
 - **I6** — A source that throws or times out is dropped from that request; others still contribute.
 - **I7** — Ghost text appears only on a unique static match and is never committed without `Tab` or `→`.
 - **I8** — The menu is a C15 overlay with `Block[]` content; C19 renders no chrome of its own.
@@ -242,6 +258,8 @@ Six tiers. Every cell of the §8 table is covered.
 
 - **T1.1**: each `Slot` is detected from a canonical input and cursor — seven cases.
 - **T1.2** (I14): `/p` → verb slot; `gi` → executable slot.
+- **T1.2b** (I14, I5): `ls | gre` → executable slot, from the operator token rather than from the token index. On a string list the word is at index 2 and reads as a positional.
+- **T1.2c** (I5): an input whose current token contains a multi-byte grapheme → `prefix` and `replace` are computed in the tokeniser's coordinate system and the insertion lands on a cluster boundary. Fails on a grapheme index read as a code-unit offset.
 - **T1.3**: `/ps --st` → flag-name slot with tool `ps` resolved.
 - **T1.4**: `/ps --status=` → flag-value slot carrying that `FlagDef`; ghost recomputes without a request.
 - **T1.4b** (I3): a `path` or `executable` slot → `ghost` returns null without touching the filesystem; `Tab` is required to get candidates.
@@ -263,6 +281,7 @@ Six tiers. Every cell of the §8 table is covered.
 - **T2.2** (I2): with a source that never resolves, a hundred keystrokes are processed with no added latency.
 - **T2.3** (I9): a source scan finds no clock reference in `completion/`.
 - **T2.4** (I5): C19 imports C18's tokeniser and quoter; a second implementation of either fails the check.
+- **T2.4b** (I5): `CompletionContext.tokens` is C18's `Token`, asserted structurally — a context built with bare strings does not typecheck, and `replace.start` equals the current token's `start`.
 - **T2.5** (I12): the module graph shows no import from `terminal/` and no scheduler call.
 - **T2.6** (I4): a source scan finds no literal verb, flag or enum list in `completion/`.
 - **T2.7**: every `Slot` kind has at least one registered source — exhaustive over the union.
@@ -322,6 +341,8 @@ Six tiers. Every cell of the §8 table is covered.
 - **T6.4** (I4): hardcoding an enum list → T2.6 and T4.1 fail, and completion drifts from the far side.
 - **T6.5** (I6): letting a source failure abort the request → T3.6 fails.
 - **T6.6** (I5): a second tokeniser or quoter → T2.4, T3.4 and T4.3 fail.
+- **T6.6b** (I5): flattening `CompletionContext.tokens` back to `readonly string[]` → T2.4b, T1.2b, T3.3 and T3.15 fail, and completion loses the offsets C18 ruling 4 exists to supply.
+- **T6.6c** (I5): passing C17's grapheme cursor through unconverted → T1.2c fails, and a candidate is inserted over half a cluster on the first line holding an emoji.
 - **T6.12** (I3): making path completion static → T1.4b fails, and every keystroke stats the filesystem.
 - **T6.7** (I7): committing ghost text on any keypress → T1.13 fails.
 - **T6.8** (I8): drawing the menu directly instead of through C15 → T2.8 and T4.4 fail, and it stops flipping.
