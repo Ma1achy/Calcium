@@ -98,6 +98,8 @@ Static sources ship in `tui-kit` and read only C05. Dynamic sources are the app'
 
 Dynamic results are cached on `(sourceId, contextKey)` with a 60-second TTL (`j22`). A source that throws or times out is **dropped from the result set for that request** — other sources still contribute, and completion degrades rather than failing.
 
+**The cache holds the in-flight promise, not the resolved value, and the TTL starts at resolution.** §8a trace 3 is why: a second `Tab` in the same context must join the existing call rather than issue a second one (T3.9), and a value cache has nothing to return at that moment because the first call has not come back. The two statements — "a new sequence" and "one pending request, not two" — are compatible only under a promise cache.
+
 ---
 
 ## 4. Requesting
@@ -222,6 +224,130 @@ It is the shape A03 §2 names: each statement is correct where it stands, and on
 
 ---
 
+## 8a. The sequence trace
+
+Resolved by hand before any code, as C16's rung table, C17's edit trace and C18's classification table were, and by the same method: **indexed by rule interaction, not by input coverage.** A row governed by one rule is a restatement of that rule and finds nothing. Every row below is a cell where two correct statements overlap.
+
+**The sequence is written beside every row, and that is the point of the artefact.** A row where it does not move restates a rule; a row where it moves mid-flight is where the discard rule holds or does not. `active` is written next to it, because §4's ruling is that the two are different questions.
+
+Columns: `seq` is the newest sequence minted, `active` the token results are checked against, `flight` the in-flight source calls, `menu` the layer's state. The **whole** state is asserted after every step, not the field the step is about — that is what caught C13's and C14's defects.
+
+### Trace 1 — keystroke during a pending request, menu open
+
+The cell where I13's supersession meets §6's narrow-in-place.
+
+| Step | Event | seq | active | flight | menu |
+|---|---|---|---|---|---|
+| 1 | `Tab` on `/ps --family=` | 4 | 4 | `uuids@4` | — |
+| 2 | keystroke `a` | **5** | **5** | abandoned | — |
+| 3 | `uuids@4` resolves | 5 | 5 | — | — (discarded: 4 ≠ 5) |
+
+Step 2 is the row that matters: the sequence advances *and* the flight is abandoned rather than re-issued, because dynamic sources run only on `Tab` (I3). Nothing is pending afterwards, which is why §7's spinner clears without a clock restarting.
+
+With the menu already open, step 2 gains a fourth outcome and it is F1's:
+
+| Step | Event | seq | active | menu |
+|---|---|---|---|---|
+| 1 | menu open on `{running, ready}` | 7 | 7 | open, 2 rows |
+| 2 | keystroke `u` — extends | **8** | **8** | open, **filtered to `{running}`**, one `content` change |
+| 3 | keystroke `x` — extends, matches nothing | **9** | **9** | dismissed by C19 (C15 I15) |
+
+And backspace, which the prose "narrows on a keystroke" silently fails to cover:
+
+| Step | Event | seq | active | menu |
+|---|---|---|---|---|
+| 1 | menu open on `{running}` | 7 | 7 | open |
+| 2 | backspace — widens | **8** | **8** | dismissed |
+
+Filtering can only narrow. Serving a backspace would mean re-running a dynamic source on a keystroke, against I3, or showing a set that no longer matches the buffer.
+
+### Trace 2 — `Esc` during a pending request
+
+Where I1's latest-wins meets §8's cancel row. **This is the trace that found F2.**
+
+| Step | Event | seq | active | flight |
+|---|---|---|---|---|
+| 1 | `Tab` | 4 | 4 | `uuids@4` |
+| 2 | `Esc` | 4 | **null** | abandoned |
+| 3 | `uuids@4` resolves | 4 | null | — (discarded: active is null) |
+
+**The sequence does not move, and that is the whole finding.** Under "a result whose sequence is not the latest is never applied", step 3's result *is* the latest — 4 is still the newest sequence ever minted — so a latest-wins comparison applies it, onto a prompt the user has just dismissed. Only invalidation discards it. §4 states the rule; T3.10 and T6.1b are this trace.
+
+Step 4, so the invalidation is not mistaken for a poisoning:
+
+| 4 | `Tab` again | **5** | **5** | `uuids@5` |
+
+### Trace 3 — `Tab` twice while pending
+
+Where §8's "new seq" meets T3.9's "one pending request, not two".
+
+| Step | Event | seq | active | flight | source calls |
+|---|---|---|---|---|---|
+| 1 | `Tab` | 4 | 4 | `uuids@4` | 1 |
+| 2 | `Tab`, same context | **5** | **5** | `uuids@4` **joined** | **1** |
+| 3 | resolves | 5 | 5 | — | 1 → applied under 5 |
+
+The two statements are compatible only if the cache holds the **in-flight promise** keyed on `(sourceId, contextKey)` and starts the TTL at resolution. A value cache consulted after the fact has no entry yet at step 2 and issues a second call.
+
+Step 3 also settles which token a joined result carries: the promise was created under 4 and the result is applied under 5, because the *context* is what the result answers and the context is unchanged. A result tagged with its creating sequence would be discarded here, and the user would press `Tab` twice and get nothing.
+
+### Trace 4 — the spinner across a supersession
+
+Where §7's 500 ms meets I13's "the spinner clears". **This is where §4's rule is deliberately not applied.**
+
+| Step | Event | t (ms) | seq | active | stamp | spinner |
+|---|---|---|---|---|---|---|
+| 1 | `Tab` | 0 | 4 | 4 | 0 (call) | — |
+| 2 | `Tab`, same context | 400 | **5** | **5** | **0** | — |
+| 3 | clock | 520 | 5 | 5 | 0 | **showing** |
+
+If the stamp were tagged with the sequence it would reset to 400 at step 2, and step 3 would show nothing — hiding the spinner for a further 500 ms from a user who has already been waiting half a second and pressed `Tab` again *because* nothing happened. The wait belongs to the work, not to the token.
+
+The supersession case, for contrast:
+
+| Step | Event | t | seq | active | flight | spinner |
+|---|---|---|---|---|---|---|
+| 1 | `Tab` | 0 | 4 | 4 | `uuids@4` | — |
+| 2 | keystroke | 400 | **5** | **5** | abandoned | — |
+| 3 | clock | 520 | 5 | 5 | — | — |
+
+Nothing shows because nothing is pending, not because a timer was reset.
+
+### Trace 5 — `Tab` on a static-only slot
+
+Where I3 meets I1: does a sequence move when no async work exists?
+
+| Step | Event | seq | active | flight |
+|---|---|---|---|---|
+| 1 | `Tab` on a dynamic slot | 4 | 4 | `uuids@4` |
+| 2 | cursor moves to a static-only slot, `Tab` | **5** | **5** | — |
+| 3 | `uuids@4` resolves | 5 | 5 | — (discarded) |
+
+**`Tab` always mints, even with nothing to await.** Minting is free and step 3 is what it buys: a slot with no dynamic source is exactly the case where a reader concludes there is nothing to sequence, and it is the case where the abandoned request has the most changed buffer to land on.
+
+### Trace 6 — `Tab` twice, ambiguous
+
+The reachable form of `j22` R17 (§5), and the trace that shows no counter is involved.
+
+| Step | Event | buffer | seq | menu |
+|---|---|---|---|---|
+| 1 | typed | `/ps --st` | 3 | — |
+| 2 | `Tab` — rule 4 | `/ps --stat` | **4** | — |
+| 3 | `Tab` — rule 5 now applies | `/ps --stat` | **5** | **open, 2 rows** |
+
+Step 3 opens the menu because step 2 exhausted the common prefix, not because the engine remembers step 2 happened. Nothing carries across the two presses, which is why there is nothing here for §4 to tag.
+
+The single-match case, which the previous draft asserted:
+
+| Step | Event | buffer | slot |
+|---|---|---|---|
+| 1 | typed | `/ps --mi` | flagName |
+| 2 | `Tab` — rule 3 | `/ps --mine ` | **positional** |
+
+The second `Tab` completes the next slot. There is no state under which it re-opens the first one.
+
+---
+
 ## 9. Invariants
 
 - **I1** — A result is applied only when its sequence is the `active` token. A result arriving after `cancel()` is never applied, because `cancel()` invalidates the token rather than advancing it — under a plain latest-wins reading that result *is* the latest and lands.
@@ -265,7 +391,7 @@ It is the shape A03 §2 names: each statement is correct where it stands, and on
 
 ## 11. Tests
 
-Six tiers. Every cell of the §8 table is covered.
+Six tiers. Every cell of the §8 table and every row of §8a is covered.
 
 ### Tier 1 — unit
 
@@ -299,6 +425,7 @@ Six tiers. Every cell of the §8 table is covered.
 - **T2.5** (I12): the module graph shows no import from `terminal/` and no scheduler call.
 - **T2.6** (I4): a source scan finds no literal verb, flag or enum list in `completion/`.
 - **T2.7**: every `Slot` kind has at least one registered source — exhaustive over the union.
+- **T2.9** (§8a): the sequence trace replayed row for row, asserting the **whole** state after each step — `seq`, `active`, the in-flight set, the menu and the buffer — rather than the field the step is about.
 - **T2.8** (I8): the menu's content is `Block[]`; a compile-level test rejects React.
 
 ### Tier 3 — edge cases
