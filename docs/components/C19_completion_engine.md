@@ -106,6 +106,10 @@ So C19 imports no `fs`. The seam is the whole of its filesystem knowledge.
 
 Dynamic results are cached on `(sourceId, contextKey)` with a 60-second TTL (`j22`). A source that throws or times out is **dropped from the result set for that request** — other sources still contribute, and completion degrades rather than failing.
 
+**`contextKey` is the slot's identity, not the prefix**, and the difference decides whether the cache is worth having. A slot is identified by its kind, the resolved tool, and the flag or argument it belongs to — everything a source's answer depends on except what the user has typed so far. Keyed on the prefix instead, `--family=a` and `--family=ab` are different entries, every keystroke after a `Tab` is a fresh fetch, and the 60-second TTL never hits anything. The far side would be hammered for suggestions nobody asked for, which is the outcome the static/dynamic split exists to prevent, arriving through the cache instead of through the keystroke path.
+
+So **a dynamic source answers for the slot and the engine filters by prefix.** That is also what makes §6's narrowing possible: the menu filters the set it holds, and it can only do that if the set is the slot's rather than one prefix's. Static sources may filter internally — they are re-run per keystroke and an in-memory filter costs nothing — but the engine filters again regardless, so neither kind can be wrong about it.
+
 **The cache holds the in-flight promise, not the resolved value, and the TTL starts at resolution.** §8a trace 3 is why: a second `Tab` in the same context must join the existing call rather than issue a second one (T3.9), and a value cache has nothing to return at that moment because the first call has not come back. The two statements — "a new sequence" and "one pending request, not two" — are compatible only under a promise cache.
 
 ---
@@ -472,6 +476,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T3.6** (I6): one of three sources throws → the other two still contribute; the failure is logged once.
 - **T3.7** (I6): a source exceeding its timeout → dropped; the spinner clears.
 - **T3.8** (I10): two requests within the TTL → one source invocation; after expiry → two.
+- **T3.8b** (I10): `Tab`, then three more characters, then `Tab` → still one source invocation, because `contextKey` is the slot's identity rather than the prefix. Keyed on the prefix this is four, and the TTL never hits.
 - **T3.9**: `Tab` twice while a request is pending → one pending request, not two. The second `Tab` mints a new token *and* joins the existing in-flight promise: the source is invoked once, asserted with a spy.
 - **T3.9b** (I15, §7): `Tab`, 400 ms, `Tab`, 200 ms → the spinner is showing, because the stamp belongs to the source call and the wait began at the first `Tab`. On a per-sequence stamp it is still hidden.
 - **T3.10** (I1, I15): `Esc` while pending → `active` is null and a later result is discarded. Asserts the mechanism, not only the outcome: the result's sequence is still the highest ever issued, so a latest-wins comparison applies it and this test is what fails.
