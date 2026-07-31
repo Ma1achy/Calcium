@@ -88,9 +88,13 @@ type StoredFocus =
   | Readonly<{ at: "liveBlock"; rowId: string | null }>;
 ```
 
-It is a focus *location*, not a bit — when focus is in the live block, which row holds it is part of the same fact and has no separate owner. C09's `FocusState` is derived from this plus C13's `liveId`. `↓` from the prompt moves focus into the live block's rows; `Esc` returns it. C16 owns it, and **it resets to `{at: "prompt"}` whenever C13 appends** — running a command always returns focus to where the next one is typed.
+It is a focus *location*, not a bit — when focus is in the live block, which row holds it is part of the same fact and has no separate owner. C09's `FocusState` is derived from this plus C13's `liveId`. `↓` from the prompt moves focus into the live block's rows; `Esc` returns it. C16 owns it, and **it resets to `{at: "prompt"}` on every C13 append** — running a command always returns focus to where the next one is typed.
 
-**Pushing a view does not clear it.** A01 D7 requires that popping a pushed view returns to a still-live block *with selection preserved*, so the stored location survives the whole push/pop cycle and only an append resets it.
+**L4 makes that reset as a call, and C16 does not subscribe to C13.** The information path is named here because leaving it implicit is how the same duty gets implemented twice or not at all. A subscription is constructible — `TranscriptView` exposes `subscribe` and C16 already takes the view — and it is the wrong mechanism, for a reason that is about the data rather than about layering: `Change` carries a single `append` kind, so a subscriber cannot tell a command outcome from a notice append (§2's bracketed-paste notice is one). The sentence above says *running a command* returns focus to the prompt, and only the caller knows it ran a command. So `resetFocus()` is on the interface and C23 §4's submit row calls it.
+
+It also keeps C16 off a delta stream. C14 is the component that paid for being the second consumer of one, in a blank screen that every assertion passed.
+
+**Pushing a view does not clear it, and popping does not either.** A01 D7 requires that popping a pushed view returns to a still-live block *with selection preserved*, and the pop appends nothing (C23 §4), so the stored location survives the whole push/pop cycle. Only an append resets it.
 
 Everything else is derived from something visible. The precise claim is therefore: focus is derived from visible state plus exactly one stored location, whose owner and reset condition are both named. A second piece of stored focus would be a design change, not an implementation detail.
 
@@ -104,6 +108,7 @@ Handlers register against a target and return whether they consumed the event.
 interface InputRouter {
   register(target: FocusTarget, handler: (e: InputEvent) => boolean): Disposable;
   dispatch(e: InputEvent): boolean;
+  resetFocus(): void;                 // L4 calls this on append (§3, I2)
   readonly target: FocusTarget;
 }
 ```
@@ -216,7 +221,7 @@ Two small machines, both with an injected clock.
 ## 8. Invariants
 
 - **I1** — Focus is derived on every dispatch from C15, C14 and C13, plus exactly one stored **location** (`StoredFocus`) owned by C16.
-- **I2** — That bit resets to `prompt` on every C13 append.
+- **I2** — That **location** resets to `{at: "prompt"}` on every C13 append, and the reset arrives as a `resetFocus()` call from L4 rather than through a subscription. C16 subscribes to no change stream: `Change` has one `append` kind, so a subscriber could not tell a command outcome from a notice, and the rule is about running a command. "Bit" was this invariant's original word and §3 is the correction — which row holds focus is part of the same fact.
 - **I3** — Mouse events route by position, never by focus target, and are dropped when the capability is absent.
 - **I4** — Exactly one handler consumes an event; there is no bubbling past the first consumer.
 - **I5** — Unconsumed events are dropped, never inserted into a lower target.
@@ -237,7 +242,7 @@ Two small machines, both with an injected clock.
 ## 9. Commitments
 
 1. C01 sets raw mode; C16 decodes the bytes (I13).
-2. Focus is derived from what is on screen, plus one stored location — including which row — that resets only on append (I1, I2).
+2. Focus is derived from what is on screen, plus one stored location — including which row — that resets only on append, and only because L4 says so (I1, I2).
 3. Mouse events route by position through C15 then C14; keys route by focus (I3).
 4. A paste is one event, whatever its size; the no-bracketed-paste fallback is a documented heuristic (I6, I12).
 5. No chord support beyond modifiers — terminals send no key-up (I14).
@@ -261,7 +266,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.1**: byte sequences decode to the documented keys — plain, ctrl, meta, arrows, function keys, `Esc`. Twenty cases.
 - **T1.2**: a lone `Esc` byte is distinguished from an escape sequence prefix by the documented disambiguation window.
 - **T1.3** (I15): `activeTarget` returns the documented target for each of the six conditions.
-- **T1.3b** (I2): moving focus to `liveBlock`, then appending an entry → focus is back at `prompt`.
+- **T1.3b** (I2): moving focus to `liveBlock`, then `resetFocus()` → focus is back at `prompt`, and the stored `rowId` is gone with it.
+- **T1.3b2** (I2): a C13 append with no `resetFocus()` call leaves the stored location untouched — the reset is the caller's, and a router that quietly subscribed would pass T1.3b while failing this.
 - **T1.3c** (I3): a click at a transcript row resolves to that row's block, not to the focused target.
 - **T1.3d** (I3): a click inside an overlay's placed region resolves to the overlay even when focus is elsewhere.
 - **T1.4**: `CSI 200~` enters buffering.

@@ -194,7 +194,7 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 
 | Trigger | Sequence |
 |---|---|
-| Submit | `parse` → route → … → `transcript.append` → `scheduler.commit` |
+| Submit | `parse` → route → … → `transcript.append` → `router.resetFocus` → `scheduler.commit` |
 | A TTY child | `lifecycle.suspend` → `runner.handoff` → `lifecycle.resume` → `scheduler.invalidate` |
 | Pop a pushed view | `overlays.pop` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) |
 | History recall | `history.previous` → `editor.setText` → `commit("input")` |
@@ -368,7 +368,8 @@ Fake transport, fake stores.
 - **T4.4** (with C15, C13): popping a view appends **nothing** — the transcript's entry count and live id are unchanged across the pop, so the block beneath stays live and focusable (A01 D7). C15 writes nothing either.
 - **T4.5** (with C10, C03): a `/theme` local handler switches the theme and C23 invalidates.
 - **T4.6** (with C20, C17): `/history 4` re-runs entry 4 through the full pipeline.
-- **T4.7** (with C16): Ctrl-C during a verb cancels; during a pass-through forwards `SIGINT`.
+- **T4.7** (with C16): Ctrl-C during a verb cancels; during a piped shell child forwards `SIGINT`.
+- **T4.7b** (with C16, C13): a submission made while focus is in the live block calls `router.resetFocus` after `transcript.append` and before `commit` — asserted on the call order, since a reset issued before the append would be undone by nothing and a reset issued after the commit paints one frame with focus in a frozen block.
 - **T4.8** (with C22): `cd` updates session state and the next spawn lands there.
 - **T4.9** (with C14): appending while the viewport is detached does not move it (C14 I4, from this side).
 
