@@ -97,6 +97,34 @@ export const defaultKeymap: readonly Binding[] = [
   { target: "prompt", key: { name: "enter", shift: true }, action: "insertNewline" },
   { target: "prompt", key: { name: "enter", meta: true }, action: "insertNewline" },
   { target: "prompt", key: { name: "j", ctrl: true }, action: "insertNewline" },
+
+  // --- C19 §6's seven ----------------------------------------------------
+  //
+  // **Declared here rather than imported from `completion/`**, and the first
+  // attempt did import them. C16 is *consumed by* C19, so a row living in C19
+  // and pulled in here makes the two directories mutually referential — the
+  // file graph stays acyclic and passes, and the component graph does not. The
+  // spec's own wording is the right one: these bindings are C16's. C19 declares
+  // what it needs bound and this file is where bindings live.
+  { target: "prompt", key: { name: "tab" }, action: "complete" },
+  //
+  // **One action, not two, and this table is what forces it.** Accepting the
+  // ghost cannot be a row beside moving the cursor forward: two bindings for
+  // one `(target, key)` is a construction error below, so the fallback lives in
+  // the handler. The two-row design is the natural one and it fails at startup
+  // rather than at the keystroke — loud, but still the seam rewritten.
+  { target: "prompt", key: { name: "right" }, action: "acceptGhostOrForward" },
+
+  { target: "overlay", key: { name: "tab" }, action: "menuNext" },
+  { target: "overlay", key: { name: "down" }, action: "menuNext" },
+  { target: "overlay", key: { name: "up" }, action: "menuPrev" },
+  { target: "overlay", key: { name: "enter" }, action: "menuAccept" },
+  //
+  // Generic rather than C19's alone, landing now because C19 is the first
+  // dismissable overlay to arrive. It respects `dismissable`, so a confirm
+  // still refuses `Esc` — C15's `pop()` inspects only the top and returns the
+  // layer rather than a boolean, which is what lets one row serve both.
+  { target: "overlay", key: { name: "escape" }, action: "dismiss" },
 ];
 
 /**

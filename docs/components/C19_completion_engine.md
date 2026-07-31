@@ -218,6 +218,8 @@ Arrow keys move the selection, `Enter` accepts, `Esc` dismisses. Those bindings 
 
 **`→` is one action, not two, and the keymap is what forces it.** C16 raises a `KeymapError` on a duplicate `(target, key)` rather than shadowing, so "accept the ghost" cannot be a second row beside "move the cursor forward" — the fallback lives in the handler. Worth stating because the natural design is two rows, and it fails at construction rather than at the keystroke, which is a startup crash rather than a bug but is still a rewrite of the seam.
 
+**The rows are declared in C16's table, not exported from C19.** The first implementation put them in `completion/` and imported them into `keymap.ts`, which leaves the file graph acyclic — so every check passes — and makes the two directories mutually referential at the component level, where C16 is *consumed by* C19 and nothing goes back the other way. The wording above is the right one and the code follows it: C19 says what it needs bound, and bindings live where bindings live.
+
 **`overlay`/`escape` is generic rather than C19's alone**, and it lands here because C19 is the first dismissable overlay to arrive. It must respect `dismissable`, so a confirm still refuses `Esc` (C16 T4.2) — C15's `pop()` already inspects only the top and returns the layer rather than a boolean, which is what makes one row correct for both cases.
 
 `Esc` reaching this row is distinct from Ctrl-C reaching rung 3 of C16's ladder: the ladder pops the same layer, so the two agree, and neither is implemented in terms of the other.

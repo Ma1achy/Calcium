@@ -289,8 +289,30 @@ export const SCANS = [
     // file measures display width, and MG16 now forbids C18 from importing the
     // layer that would let it. C18 T3.23 demonstrates the claim on astral
     // characters rather than asserting it.
+    //
+    // **C19's entries are files, and the near-miss is worth recording.** C19 §2
+    // first claimed `completion/` as a third directory, on the reasoning that it
+    // works in the tokeniser's coordinate system — true of `context.ts` and
+    // `sources.ts`, which slice C18's code-unit offsets and strip ASCII markers
+    // in that same space, and false of `menu.ts`, which measures candidate
+    // columns and must use `cells()`. The discriminator is the sentence above:
+    // no allowed file measures display width. Granting the directory would have
+    // given the one file in the minority the wrong advice at exactly the moment
+    // someone reached for a quick fix, which is the defect A03 §2 has now
+    // recorded three times.
+    //
+    // **Per file rather than per directory, and the direction is what makes it
+    // safe.** An allow-list denies by default, so a file added to `completion/`
+    // later is caught and has to be argued onto this list rather than inheriting
+    // an allowance nobody re-examined. That is the opposite of SS26's failure,
+    // where a narrow *scope* silently stopped seeing new files.
     scope: "src/interaction/",
-    allow: ["src/interaction/router/decode.ts", "src/interaction/parser/"],
+    allow: [
+      "src/interaction/router/decode.ts",
+      "src/interaction/parser/",
+      "src/interaction/completion/context.ts",
+      "src/interaction/completion/sources.ts",
+    ],
     why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. `// graphemes-ok` claims the expression operates on a grapheme array or a non-text value, where index arithmetic is correct — it is a claim about the code, not a way to silence the rule. C16's decoder and C18's tokeniser are out of scope: both are lexers where a unit count is the correct measure" },
 
   // SS3 carried two of the four vacuity failures at once (A03 §2). It was

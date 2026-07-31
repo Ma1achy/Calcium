@@ -404,6 +404,7 @@ export const OWNERS = [
   { path: "src/interaction/router", spec: "C16" },
   { path: "src/interaction/editor", spec: "C17" },
   { path: "src/interaction/parser", spec: "C18" },
+  { path: "src/interaction/completion", spec: "C19" },
   { path: "src/testing", spec: "C09" },
 ];
 
@@ -420,6 +421,7 @@ export const TOPICS = {
   "adapter-registry": "C07",
   editor: "C17",
   parser: "C18",
+  completion: "C19",
   adapters: "C07",
   blocks: "C09",
   capabilities: "C02",
