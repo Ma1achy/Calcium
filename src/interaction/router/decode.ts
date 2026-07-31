@@ -145,7 +145,7 @@ function namedControl(ch: string): InputEvent | null {
       return key("tab", ch);
     case "":
       return key("backspace", ch);
-    case "":
+    case "\u001b":
       return key("escape", ch);
     case " ":
       return key("space", ch);
@@ -220,7 +220,7 @@ export function createDecoder(options: DecoderOptions): Decoder {
   function decodeAt(i: number, out: InputEvent[]): number {
     const ch = pending[i] as string;
 
-    if (ch !== "") {
+    if (ch !== "\u001b") {
       if (paste.mode === "buffering") {
         paste = Object.freeze({ mode: "buffering", text: paste.text + ch, since: paste.since });
         return 1;
@@ -252,7 +252,7 @@ export function createDecoder(options: DecoderOptions): Decoder {
       if (now() - escSince < ESC_DISAMBIGUATION_MS) return 0;
       escSince = null;
       flushHeuristic(out);
-      return out.push(key("escape", "")), 1;
+      return out.push(key("escape", "\u001b")), 1;
     }
     escSince = null;
 
@@ -263,13 +263,13 @@ export function createDecoder(options: DecoderOptions): Decoder {
       const name = CSI_LETTER_KEYS[rest[1] as string];
       if (name === undefined) return 3; // malformed SS3: discard, decode on (T3.13)
       flushHeuristic(out);
-      return out.push(key(name, ` O${rest[1] as string}`)), 3;
+      return out.push(key(name, `\u001b O${rest[1] as string}`)), 3;
     }
 
     // ESC + printable is Meta (T1.1). Ink 7 no longer sets meta on a bare
     // Escape, which is why that case is decided above by the window and not here.
     flushHeuristic(out);
-    return out.push(key(rest[0] as string, `${rest[0] as string}`, { meta: true })), 2;
+    return out.push(key(rest[0] as string, `\u001b${rest[0] as string}`, { meta: true })), 2;
   }
 
   function decodeCsi(i: number, rest: string, out: InputEvent[]): number {

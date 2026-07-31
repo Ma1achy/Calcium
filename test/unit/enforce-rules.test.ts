@@ -79,6 +79,14 @@ const FABRICATED: readonly Fabrication[] = [
     source: "const end = buffer.length;",
   },
   {
+    // Copied from the real call site, per the standing rule: C16's keymap built a
+    // slot with one function and split it with another, and the separator was a
+    // literal NUL. Ten tests passed because both halves agreed.
+    rule: "SS43",
+    file: "src/interaction/router/keymap.ts",
+    source: 'const key = `${target}\u0000${name}`;'.replace("\\u0000", "\u0000"),
+  },
+  {
     // The code-unit half, which `.length` alone does not cover.
     rule: "SS40",
     file: "src/interaction/editor.ts",

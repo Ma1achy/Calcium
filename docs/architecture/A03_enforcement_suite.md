@@ -61,6 +61,12 @@ This is not belt-and-braces. Every check here reports success the same way wheth
 
 A vacuous rule reports success it has not earned; an undeclared branch reports a decision nobody took. Both were found by attempting the work rather than by reviewing it, and neither is visible to a reader checking statements one at a time. Where a component resolves an event through an ordered ladder, the table of rungs against constructing states (C16 §5) is what makes both kinds legible: an unreachable rung has an empty column, and a missing rung has a constructible state with no row.
 
+- **Code self-consistent enough to hide its own defect.** C16's keymap built a lookup slot with one function and took it apart with another. The separator both used was a literal NUL rather than the space it reads as — and because *both* halves used it, every one of ten tests passed. A test exercising both sides of a round trip cannot see a separator both sides get wrong; it is the arithmetically-self-consistent viewport one layer down, in a string.
+
+  **What found it was a scan looking for something else.** SS40's stated concern is `.length` in the editor, and it fired on the string surgery beside the NUL. That is an argument for scans being cheap and broad rather than precisely aimed: a rule targeted exactly at its own subject would have walked past a NUL masquerading as a space, and the cost of the broad version is a comment explaining an exception.
+
+  SS43 is the rule the class earned, and its first run found **three more instances in shipped code** — a memo key in C09, a dedup key in C05, and five `sequence` literals in C16's own decoder. All four read as spaces. Three were deliberate and defensible, which is the point: the rule is not "NUL is wrong" but "an invisible character is invisible", and the remedy is an escape rather than an allowance.
+
 - **A test over an ordered structure that checks its members one at a time.** C16 T1.3 asserts each of the six focus conditions resolves to its documented target — six correct assertions that pass under *any* permutation of the priority they exist to protect. It is not vacuity: every assertion fires, and the subject responds. It is a suite that is individually right and jointly silent about the one property the structure has, which no amount of adding more per-member cases repairs.
 
   **This project had already solved it once and did not carry it across.** CP6 compares each surface's *stated* column drop order against `planColumns`' actual output rather than checking each column's priority in isolation, precisely because a per-member check cannot see a sequence — and it caught two defects three readings had missed. C16's priority list is the same shape one component over.
@@ -275,6 +281,7 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |
 | SS33 | `console.*` | `src/` | C01 I9, A04 §2 |
+| SS43 | A literal C0 control character (tab and newline excepted) | `src/` | C16 T2.10 |
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |

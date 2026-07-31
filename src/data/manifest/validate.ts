@@ -414,7 +414,7 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
       }
 
       for (const other of flag.conflicts ?? []) {
-        const pair = [flag.name, other].sort().join(" ");
+        const pair = [flag.name, other].sort().join("\u0000");
         if (counts.has(other) && !reportedConflicts.has(pair)) {
           reportedConflicts.add(pair);
           errors.push(

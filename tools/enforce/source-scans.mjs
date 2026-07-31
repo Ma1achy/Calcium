@@ -83,6 +83,27 @@ export const SCANS = [
     scope: "src/", allow: ["src/terminal/escapes.ts", "src/interaction/router/decode.ts"],
     why: "escape literals live in one module on the write path; recognising arriving bytes is the inverse direction" },
 
+  // A C0 control character written literally into source. An escape, or not at
+  // all.
+  //
+  // Two instances, and they are the two halves a rule wants. `decode.ts` holds a
+  // deliberate one inside a control-stripping character class — correct, and
+  // unreadable, which is why it is an escape now rather than an allow entry.
+  // `keymap.ts` held an accidental one as a *separator*: `slot` joined on NUL and
+  // `describe` split on NUL, both agreed, and ten tests passed.
+  //
+  // That second one is why the pattern is broad rather than aimed. It was found
+  // by SS40 firing on the string surgery beside it, and SS40's stated concern is
+  // `.length` in the editor. A scan targeted precisely at its own subject would
+  // have walked past a NUL masquerading as a space.
+  //
+  // Tabs and newlines are excluded because they are whitespace people write on
+  // purpose; everything else in C0 is invisible in every editor and diff.
+  { id: "SS43", spec: "C16 T2.10",
+    pattern: /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/,
+    scope: "src/", allow: [],
+    why: "a control character in source is invisible: write it as an escape, or a separator that reads as a space turns out to be a NUL" },
+
   // The digits, not the meaning. SS15 says where the literals may live; MG20
   // (module-graph.mjs) says which component may import each one. An earlier
   // version of this rule said "outside C01", which contradicted SS14 and C01 I1
