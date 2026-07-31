@@ -462,7 +462,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 
 - **T2.1** (I3): a spy proves dynamic sources are not invoked on keystrokes, only on `Tab`.
 - **T2.2** (I2): with a source that never resolves, a hundred keystrokes are processed with no added latency.
-- **T2.3** (I9): a source scan finds no clock reference in `completion/`.
+- **T2.3** (I9): a source scan finds no clock reference in `completion/` — SS1's, which covers all of `src/` with one named exception. A03 inventoried this as SS8 scoped to `completion/`, and it is folded rather than built: a rule whose scope is contained by a broader rule with the same pattern can never fire on anything the broader one misses. The fourth instance of that fold, and the third whose blocking component turned out to be the proof it could never fire.
 - **T2.3b** (I17): a source scan finds no `fs` or `node:fs` import in `completion/`; the `path` source is driven entirely by a fake reader in every tier below 5.
 - **T2.4** (I5): C19 imports C18's tokeniser and quoter; a second implementation of either fails the check.
 - **T2.4b** (I5): `CompletionContext.tokens` is C18's `Token`, asserted structurally — a context built with bare strings does not typecheck, and `replace.start` equals the current token's `start`.
