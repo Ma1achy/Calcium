@@ -15,7 +15,7 @@
 import { createFallbackAdapter } from "../data/adapters/index.js";
 import { slashPolicy } from "../interaction/parser/index.js";
 import { makeDefaultChrome } from "./chrome.js";
-import { ConfigError, type TuiConfig } from "./types.js";
+import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 
 /**
  * Below this the layout engine cannot produce a sane answer, so the size gate
@@ -49,14 +49,16 @@ const REQUIRED = ["name", "binary", "manifest", "theme"] as const;
 export type ResolvedConfig = ReturnType<typeof resolveConfig>;
 
 /**
- * The real clock arrives as an argument rather than as a `??` default here, and
- * that is A03 SS1 shaping the code rather than merely checking it: the scan's
- * allow-list is the single file `src/shell/session.ts`, so `Date.now` may be
- * named there and nowhere else in `src/`.
+ * **Every ambient value arrives as an argument**, never as a `??` default here,
+ * and that is A03 SS1 shaping the code rather than merely checking it: the
+ * scan's allow-list is the single file `src/shell/session.ts`, so `Date.now`
+ * may be named there and nowhere else in `src/`. `process.cwd()` and the real
+ * `node:fs` follow it for consistency rather than for a scan — the value of
+ * "one place performs the ambient reads" is that there is one place to look.
  *
  * Widening the allow-list to two files would have been the smaller diff and the
- * worse one — the value of "one place reads the clock" is exactly that the list
- * has one entry, and the second is always easier to argue for than the first.
+ * worse one: the point is that the list has one entry, and the second is always
+ * easier to argue for than the first.
  */
 export function validateConfig(config: TuiConfig): void {
   // `in` rather than a truthiness check: `name: ""` is a supplied field and a
@@ -66,7 +68,16 @@ export function validateConfig(config: TuiConfig): void {
   }
 }
 
-export function resolveConfig(config: TuiConfig, systemClock: () => number) {
+export type Ambient = Readonly<{
+  /** `Date.now`, from the one file SS1 allows to name it. */
+  clock: () => number;
+  /** `process.cwd()`, for the same reason: one file performs the read. */
+  cwd: string;
+  /** The real filesystem — `node:fs` at the boundary, which is C22 (A04 §2). */
+  fs: FileSystem;
+}>;
+
+export function resolveConfig(config: TuiConfig, ambient: Ambient) {
   validateConfig(config);
 
   const retain = config.debug?.retainPayloads;
@@ -88,8 +99,10 @@ export function resolveConfig(config: TuiConfig, systemClock: () => number) {
     // Absent, nothing is retained. Present without a count, 50 (§2).
     retainPayloads: config.debug === undefined ? 0 : (retain ?? DEFAULT_RETAIN_PAYLOADS),
 
-    clock: config.clock ?? systemClock,
-    fs: config.fs,
+    env: config.env ?? {},
+    cwd: config.cwd ?? ambient.cwd,
+    clock: config.clock ?? ambient.clock,
+    fs: config.fs ?? ambient.fs,
     stateDir: config.stateDir ?? DEFAULT_STATE_DIR,
     openUrl: config.openUrl,
     stdout: config.stdout ?? process.stdout,

@@ -414,6 +414,11 @@ export const OWNERS = [
   // the direction that matters, since C22 is the one still growing files.
   { path: "src/shell", spec: "C22" },
   { path: "src/shell/execution", spec: "C23" },
+  // A mutation run is about one component and says so in its filename. Prefix
+  // rows rather than a `tools/mutate` row, because a run's bare `I1` means its
+  // own component's I1 and there is no single owner for the directory.
+  { path: "tools/mutate/runs/c01", spec: "C01" },
+  { path: "tools/mutate/runs/c22", spec: "C22" },
   { path: "src/testing", spec: "C09" },
 ];
 
@@ -457,6 +462,7 @@ export const TOPICS = {
   sequence: "C06",
   session: "C22",
   "session-config": "C22",
+  "session-construct": "C22",
   "session-state": "C22",
   "session-chrome": "C22",
   sgr: "C01",

@@ -23,8 +23,8 @@ const results = runPass({
   // Its kill is not in doubt: T3.18b asserts the returned pair.
   control: {
     file: "src/terminal/lifecycle.ts",
-    from: "    return Object.freeze({ columns: stdout.columns, rows: stdout.rows });",
-    to: "    return Object.freeze({ columns: -1, rows: -1 });",
+    from: "  return Object.freeze({ columns: stream.columns, rows: stream.rows });",
+    to: "  return Object.freeze({ columns: -1, rows: -1 });",
     why: "T3.18b asserts size() returns the terminal's dimensions",
   },
   mutations: [
@@ -38,15 +38,15 @@ const results = runPass({
     {
       name: "size() reads each dimension twice",
       file: "src/terminal/lifecycle.ts",
-      from: "    return Object.freeze({ columns: stdout.columns, rows: stdout.rows });",
-      to: "    return Object.freeze({ columns: stdout.columns && stdout.columns, rows: stdout.rows });",
+      from: "  return Object.freeze({ columns: stream.columns, rows: stream.rows });",
+      to: "  return Object.freeze({ columns: stream.columns && stream.columns, rows: stream.rows });",
       expect: "T3.18b",
     },
     {
       name: "size() does not freeze",
       file: "src/terminal/lifecycle.ts",
-      from: "    return Object.freeze({ columns: stdout.columns, rows: stdout.rows });",
-      to: "    return { columns: stdout.columns, rows: stdout.rows };",
+      from: "  return Object.freeze({ columns: stream.columns, rows: stream.rows });",
+      to: "  return { columns: stream.columns, rows: stream.rows };",
       expect: "T3.18b",
     },
     {

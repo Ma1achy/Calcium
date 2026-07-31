@@ -136,6 +136,24 @@ const EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   SIGHUP: 129,
 });
 
+/**
+ * I12a, and the reason it is a free function as well as a method.
+ *
+ * **I13 is a rule about a file, not about an object.** C22 needs the terminal's
+ * dimensions at construction step 5, for the viewport, and the lifecycle is
+ * step 7 — and it cannot move earlier, because `beforeRelease` closes over the
+ * history store and the runner (C22 I1) and C01 takes it at construction. A
+ * method alone would have forced one of the two invariants to give.
+ *
+ * So the read lives here, in the one file allowed to perform it, and is
+ * reachable without an instance. `size()` delegates to it: one implementation,
+ * so the signal path, the frame path and the construction path cannot come to
+ * disagree about what a snapshot is.
+ */
+export function terminalSize(stream: Readonly<{ columns: number; rows: number }>): TerminalSize {
+  return Object.freeze({ columns: stream.columns, rows: stream.rows });
+}
+
 export function createTerminalLifecycle(opts: TerminalLifecycleOptions): TerminalLifecycle {
   const { stdout, stdin, capabilities, onFatal } = opts;
   const debug = opts.debug ?? ((): void => {});
@@ -315,13 +333,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     process.exit(EXIT_CODES[signal]);
   }
 
-  /**
-   * I12a. Both reads and the freeze in one place, so the signal path and the
-   * frame path cannot come to disagree about what a snapshot is.
-   */
-  function snapshotSize(): TerminalSize {
-    return Object.freeze({ columns: stdout.columns, rows: stdout.rows });
-  }
+  const snapshotSize = (): TerminalSize => terminalSize(stdout);
 
   function onWinch(): void {
     // T3.18 — while suspended the dimensions belong to the child.

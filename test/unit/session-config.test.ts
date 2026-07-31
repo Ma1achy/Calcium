@@ -16,7 +16,7 @@ import {
   resolveConfig,
   validateConfig,
 } from "../../src/shell/config.js";
-import { ConfigError, type TuiConfig } from "../../src/shell/types.js";
+import { ConfigError, type FileSystem, type TuiConfig } from "../../src/shell/types.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 
 const MANIFEST = { version: "1", tools: [] } as unknown as TuiConfig["manifest"];
@@ -28,7 +28,12 @@ const minimal = (): TuiConfig => ({
   theme: defaultTheme,
 });
 
-const CLOCK = (): number => 1_700_000_000_000;
+/** The three ambient values, faked. `session.ts` supplies the real ones. */
+const AMBIENT = Object.freeze({
+  clock: (): number => 1_700_000_000_000,
+  cwd: "/ambient",
+  fs: {} as unknown as FileSystem,
+});
 
 describe("C22 §2 — config", () => {
   it("T2.7 (I7a): each missing required field is named, one at a time", () => {
@@ -84,7 +89,7 @@ describe("C22 §2 — config", () => {
   });
 
   it("T1.5 (I17): only the four required fields → every default applied", () => {
-    const r = resolveConfig(minimal(), CLOCK);
+    const r = resolveConfig(minimal(), AMBIENT);
 
     expect(r.adapters).toEqual({});
     expect(r.fallbackAdapter).toBeDefined();
@@ -99,32 +104,54 @@ describe("C22 §2 — config", () => {
 
   it("T1.5b (I10): the injected clock wins, and the system clock is the fallback", () => {
     const injected = (): number => 42;
-    expect(resolveConfig({ ...minimal(), clock: injected }, CLOCK).clock()).toBe(42);
-    expect(resolveConfig(minimal(), CLOCK).clock()).toBe(1_700_000_000_000);
+    expect(resolveConfig({ ...minimal(), clock: injected }, AMBIENT).clock()).toBe(42);
+    expect(resolveConfig(minimal(), AMBIENT).clock()).toBe(1_700_000_000_000);
+  });
+
+  it("T1.5f (I10): the injected filesystem and cwd win over the ambient ones", () => {
+    // The clock's siblings. `fs` and `cwd` enter the graph here and nowhere
+    // else, and a test covering only the clock leaves two of the three ambient
+    // values free to be read directly with nothing objecting.
+    const injected = { readFile: () => Promise.resolve("injected") } as unknown as FileSystem;
+    expect(resolveConfig({ ...minimal(), fs: injected }, AMBIENT).fs).toBe(injected);
+    expect(resolveConfig(minimal(), AMBIENT).fs).toBe(AMBIENT.fs);
+
+    expect(resolveConfig({ ...minimal(), cwd: "/given" }, AMBIENT).cwd).toBe("/given");
+    expect(resolveConfig(minimal(), AMBIENT).cwd).toBe("/ambient");
+  });
+
+  it("T1.5g (I20): env defaults to an empty record and is never read ambiently", () => {
+    // `{}` degrades the shell to ASCII, which is the safe direction — and the
+    // assertion is that the default is empty rather than absent, so C02 gets a
+    // record it can answer from rather than `undefined`.
+    expect(resolveConfig(minimal(), AMBIENT).env).toEqual({});
+    expect(resolveConfig({ ...minimal(), env: { TERM: "xterm" } }, AMBIENT).env).toEqual({
+      TERM: "xterm",
+    });
   });
 
   it("T1.5c (C13 §5a): retention is off, then 50, then the given count", () => {
     // Three states from two fields, and the middle one is the one a `??` chain
     // gets wrong: `debug: {}` means on-with-the-default, not off.
-    expect(resolveConfig(minimal(), CLOCK).retainPayloads).toBe(0);
-    expect(resolveConfig({ ...minimal(), debug: {} }, CLOCK).retainPayloads).toBe(
+    expect(resolveConfig(minimal(), AMBIENT).retainPayloads).toBe(0);
+    expect(resolveConfig({ ...minimal(), debug: {} }, AMBIENT).retainPayloads).toBe(
       DEFAULT_RETAIN_PAYLOADS,
     );
     expect(
-      resolveConfig({ ...minimal(), debug: { retainPayloads: 7 } }, CLOCK).retainPayloads,
+      resolveConfig({ ...minimal(), debug: { retainPayloads: 7 } }, AMBIENT).retainPayloads,
     ).toBe(7);
   });
 
   it("T1.5d (I20): stateDir defaults and no environment is read", () => {
-    expect(resolveConfig(minimal(), CLOCK).stateDir).toBe("~/.prism");
-    expect(resolveConfig({ ...minimal(), stateDir: "/tmp/x" }, CLOCK).stateDir).toBe("/tmp/x");
+    expect(resolveConfig(minimal(), AMBIENT).stateDir).toBe("~/.prism");
+    expect(resolveConfig({ ...minimal(), stateDir: "/tmp/x" }, AMBIENT).stateDir).toBe("/tmp/x");
   });
 
   it("T1.5e (I11): cluster and version default to empty and come from config", () => {
     // The two fields with no writer. They enter here or nowhere, which is what
     // makes "set at construction and never written after" constructible.
-    expect(resolveConfig(minimal(), CLOCK).cluster).toBe("");
-    const r = resolveConfig({ ...minimal(), cluster: "fmx-prod", version: "1.0.0" }, CLOCK);
+    expect(resolveConfig(minimal(), AMBIENT).cluster).toBe("");
+    const r = resolveConfig({ ...minimal(), cluster: "fmx-prod", version: "1.0.0" }, AMBIENT);
     expect([r.cluster, r.version]).toEqual(["fmx-prod", "1.0.0"]);
   });
 

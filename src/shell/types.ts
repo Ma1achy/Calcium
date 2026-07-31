@@ -90,9 +90,11 @@ export interface FileSystem {
 /**
  * What C22 needs from C23, and nothing more (§3a, step 10).
  *
- * `seal` is here because I3 counts five registries and the fifth is C23's: the
- * app's local handlers arrive through config and C23 is what holds them, so the
- * seal cannot happen at step 4 with the other four.
+ * `seal` is here because C23's is the fourth of I3's seals: the app's local
+ * handlers arrive through config and C23 is what holds them, so it cannot be
+ * sealed at step 4 with C05's, C07's and C09's. (C19's registry is the fourth
+ * one *built* and has no seal at all — `register` returns a `Disposable`, by
+ * design. Four built, four sealed, and they are not the same four.)
  */
 export interface Pipeline {
   submit(line: string): void;
@@ -125,6 +127,17 @@ export type TuiConfig = Readonly<{
   /** Off by default; 50 when enabled without a count (C13 §5a). */
   debug?: Readonly<{ retainPayloads?: number }>;
 
+  /**
+   * The process environment, supplied by the app (I20).
+   *
+   * C02 and C21 each take one and **no file under `src/` reads `process.env`** —
+   * not even C02, which is allow-listed for it and does not use the allowance.
+   * Omitted, it defaults to `{}`, and the shell degrades to ASCII with no
+   * colour: the safe direction, and the alternative is a fifth required field.
+   */
+  env?: Readonly<NodeJS.ProcessEnv>;
+  /** The session's starting directory. Defaults to the process's. */
+  cwd?: string;
   clock?: () => number;
   fs?: FileSystem;
   /** Default `~/.prism`. The **app** resolves `PRISM_TUI_STATE_DIR` (I20). */

@@ -40,6 +40,7 @@ type TuiConfig = Readonly<{
 
   debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
 
+  env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` degrades to ASCII (I20)
   clock?:    () => number;
   fs?:       FileSystem;
   stateDir?: string;                       // default ~/.prism; the app resolves PRISM_TUI_STATE_DIR (I20)
@@ -82,6 +83,10 @@ Four required fields. Every optional one has a working default: the fallback ada
 
 `stateDir` defaults to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
 
+**`env` is the environment record, and the app supplies it** (I20). C02 takes one (`detectCapabilities(env, overrides)`) and C21 takes one (`ProcessRunnerDeps.env`, for `$SHELL`), and **no file under `src/` reads `process.env`** — not even C02, which is allow-listed for it and does not use the allowance. So the record enters through config, from the app's entry point, along with `stateDir` and `transport`.
+
+It is optional and defaults to `{}`, which costs something worth naming: an app that omits it gets a capability record for a terminal that declares nothing, so the shell degrades to ASCII and no colour. That is the right default — it is the safe direction, and the alternative is a fifth required field, which I17 forbids for a reason R01 §1 tests. It is not the right *silence*, so C02's warnings surface on the restored primary screen (C02 §2) and an empty record is one of them.
+
 **`PRISM_TUI_STATE_DIR` is resolved by the app's entry point, not here** (I20). An earlier draft of this section had C22 read it, which contradicts A03 SS10 — the scan bans `process.env` across all of `src/` with a one-file allow-list, C02's, because an exception list is the thing that grows. C06 I18 settled the same question for `PRISM_TUI_TRANSPORT` and the reasoning transfers whole: a variable named for one consumer has no business inside a framework that claims to serve others, and `tui-kit` ships no binary to read it from. `prism-tui` reads its own variable and passes the resolved path through `TuiConfig.stateDir`, exactly as it passes a constructed router through `TuiConfig.transport`.
 
 This is a structural interaction rather than an oversight, which is why it survived review: §2 is about what C22 owns and SS10 is about what `src/` may read, both correct on their own, and the sentence sat in the one cell where they meet.
@@ -105,8 +110,7 @@ Three things depend on that split, and none of them is served by constructing ea
  2  detect capabilities                     C02
  3  build registries: blocks, adapters,
     manifest, completion sources            C09, C07, C05, C19  — manifest first
- 4  seal the four construction-time
-    registries                              C05, C07, C09, C19 obligations
+ 4  seal the three that have a seal          C05, C07, C09 obligations
  5  construct stores: transcript, viewport,
     overlays, history, editor, theme         C13, C14, C15, C20, C17, C10
  6  construct the process runner             C21
@@ -151,7 +155,11 @@ Registration is therefore its own step. I3 is unharmed: it says sealed *before i
 
 **The incidental pair is written out on purpose.** One row, saying that 1 → 2 carries no weight, is what stops the list being tidied into "the three that matter" — after which the next reader has no way to tell a pair nobody checked from a pair that was checked and found free. The same move as recording a pending enforcement rule rather than deleting it.
 
-**A fifth registry exists and is C23's.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and seals them. It is sealed at step 10 by C23 rather than at step 4, because the app's handlers arrive through config and C23 is what holds them. Commitment 4 says four and I3 says *every* registry; both are now true and neither counts the same set, which is why the step list says "the four construction-time registries" and this paragraph says where the fifth is.
+**Four registries are built and three of them seal.** C19's is the exception, and it is not an oversight in C19: `register` returns a `Disposable`, because a dynamic completion source is meant to come and go within a session (C19 §2). There is nothing to seal, and adding a seal would contradict the interface.
+
+The step list said "seal all four registries" against a line naming three components, `C05, C07, C09` — the two halves of one entry disagreeing, with the count in the half a reader skims. What made it visible was writing the code: `completion.seal()` does not compile.
+
+**And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
 
 ---
 
@@ -352,7 +360,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
 - **I1** — Stores and the process runner are constructed before the lifecycle, so `beforeRelease` can reach them.
 - **I2** — The lifecycle is constructed before any acquire.
-- **I3** — Every registry is sealed before input is accepted: the four built at construction, and C23's local registry, which is sealed at step 10 because the app's handlers arrive with it.
+- **I3** — Every registry that has a seal is sealed before input is accepted: C05's, C07's and C09's at step 4, and C23's local registry at step 10, because the app's handlers arrive with the pipeline. C19's completion sources are the fourth registry built and the one with no seal — `register` returns a `Disposable` by design (C19 §2), so a dynamic source may come and go within a session.
 - **I4** — **`beforeRelease` is the function all five callers share**, and it is what makes cleanup once-only. `/exit`, Ctrl-D confirm and double Ctrl-C additionally run `stop`'s four steps in order, idempotently; `signal` and `fault` are C01's, which releases, writes diagnostics and exits with 128 + signal or 1 — C01 exposes no signal hook, so `stop` cannot run there. An earlier wording said *one function, five callers* without saying which function, and the two readings are both defensible, which is how it survived.
 - **I4a** — `session.stopping` is not set on the signal and fault paths, and nothing may make either of them asynchronous. `process.exit` inside the handler is what stops a submission interleaving; the flag is unnecessary only for as long as that is true.
 - **I5** — Cleanup runs inside `beforeRelease` and nowhere else; it can therefore never run twice.
@@ -372,7 +380,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I17** — `createTui` requires exactly four fields; every other has a working default. The count is the ergonomic claim R01 §1 tests — a working TUI built from the README without asking a question — and a fifth required field is a spec change rather than a convenience.
 - **I18** — Banner and identity fetches are non-blocking: input is accepted before either completes, and neither can delay the first frame. A shell that will not take a keystroke until a network call returns is a shell that hangs on a bad DNS entry.
 - **I19** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
-- **I20** — `tui-kit` reads no environment variable. `PRISM_TUI_STATE_DIR` is resolved by the app's entry point and arrives as `TuiConfig.stateDir`, exactly as `PRISM_TUI_TRANSPORT` arrives as `TuiConfig.transport` (C06 I18). A03 SS10's allow-list stays at one file.
+- **I20** — `tui-kit` reads no environment, variable or record. `PRISM_TUI_STATE_DIR` arrives as `TuiConfig.stateDir`, `PRISM_TUI_TRANSPORT` as `TuiConfig.transport` (C06 I18), and the process environment itself as `TuiConfig.env`, which C22 hands to C02 and C21. A03 SS10's allow-list names one file and that file does not use it — no module under `src/` touches `process.env`.
 - **I21** — `beforeRelease` is synchronous and returns `undefined`, never a thenable. `killAll()`'s promise is deliberately not awaited: its signals are delivered synchronously and only the reaping is deferred, and awaiting it would make the handler `async`, which C01 I5 forbids because a signal handler cannot await.
 
 ---
@@ -384,7 +392,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
 3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
 3b. `createTui` validates and returns; steps 2 to 11 run inside `start()` (I7a).
-4. Five registries seal before input is accepted — four at construction, and C23's local registry with the pipeline (I3).
+4. Four registries seal before input is accepted — C05's, C07's and C09's at construction, and C23's with the pipeline. C19's is the one with no seal, by its own design (I3).
 5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate (I8).
 6. The too-small render is layout-engine-free (I9).
 7. Banner fetches are non-blocking and input is accepted before they finish (I18).
@@ -409,7 +417,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.1**: `start` with valid config → running; every component constructed once.
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
-- **T1.4** (I3): all five registries report `sealed` before the input router accepts anything — the four construction-time ones and C23's local registry, which is the one a test counting four would miss.
+- **T1.4** (I3): all four seals are closed before the input router accepts anything — C05's, C07's and C09's, and C23's local registry, which is the one a test counting only the construction-time ones would miss. C19's engine has no `seal`, and the test asserts that too: a count is the wrong assertion when one member of the set does not belong to it.
 - **T1.4b** (I3, commitment 3a): the submit handler is registered after the pipeline exists, and the pipeline holds the router. Asserted on the event log: no handler registration precedes step 10. The construction cycle §3a found fails here rather than at the first Enter.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
 - **T1.6** (I10): a fake clock and filesystem reach every component that takes one — asserted per component.
