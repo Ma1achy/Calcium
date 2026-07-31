@@ -383,6 +383,44 @@ describe("C01 signals", () => {
     expect(seen[0]).toEqual({ columns: 80, rows: 24 });
   });
 
+  it("T3.18b (I12a): size() reads each dimension once and freezes the pair", () => {
+    // §5's deferred accessor, now that C22 is the caller and SS42 is the rule
+    // requiring its use. Same property as T3.17 on the other route: a frame
+    // composed against two widths wraps, and a wrap scrolls the alternate
+    // screen — the one failure the application cannot see.
+    const live = { columns: 80, rows: 24 };
+    const stdout = fakeStdout(live);
+    const { lifecycle } = harness({ stdout });
+    lifecycle.acquire();
+
+    const before = { ...stdout.reads };
+    const size = lifecycle.size();
+
+    expect(stdout.reads.columns - before.columns).toBe(1);
+    expect(stdout.reads.rows - before.rows).toBe(1);
+    expect(Object.isFrozen(size)).toBe(true);
+    expect(size).toEqual({ columns: 80, rows: 24 });
+
+    // A fresh snapshot per call, not a cached one: the terminal changes and the
+    // next call says so. A single-call test passes against a value captured at
+    // construction, which is the accessor that would silently freeze the
+    // viewport's width at whatever it was when the shell opened.
+    live.columns = 120;
+    expect(lifecycle.size()).toEqual({ columns: 120, rows: 24 });
+  });
+
+  it("T3.18c (I12a): size() answers while constructed, before any acquire", () => {
+    // The one dimension route not gated on state. C22 takes the viewport's
+    // width and height at construction step 5, and the lifecycle is step 7 —
+    // so an accessor that threw here would leave C22 with no legal way to
+    // satisfy both C14 §2 and SS42.
+    const stdout = fakeStdout();
+    const { lifecycle } = harness({ stdout });
+
+    expect(lifecycle.acquired).toBe(false);
+    expect(lifecycle.size()).toEqual({ columns: 80, rows: 24 });
+  });
+
   it("T3.18: SIGWINCH while suspended notifies nobody", () => {
     const { lifecycle } = harness();
     lifecycle.acquire();

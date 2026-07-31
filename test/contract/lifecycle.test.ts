@@ -46,7 +46,17 @@ describe("C01 contract", () => {
   it("T2.1: every member of TerminalLifecycle is present; the flags are getters", () => {
     const lifecycle = build();
 
-    for (const member of ["acquire", "release", "suspend", "resume", "onResize", "onResume"]) {
+    for (const member of [
+      "acquire",
+      "release",
+      "suspend",
+      "resume",
+      "onResize",
+      "onResume",
+      // A method, not a getter (I12a) — so it belongs in this list rather than
+      // beside `writer` below, and `typeof === "function"` is what says so.
+      "size",
+    ]) {
       expect(typeof (lifecycle as unknown as Record<string, unknown>)[member], member).toBe(
         "function",
       );

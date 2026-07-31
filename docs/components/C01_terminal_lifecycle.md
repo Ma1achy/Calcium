@@ -34,6 +34,7 @@ interface TerminalLifecycle {
   resume(): void;
   onResize(cb: (size: TerminalSize) => void): Disposable;
   onResume(cb: () => void): Disposable;   // fired after a SIGCONT re-acquisition
+  size(): TerminalSize;                   // one frozen snapshot per call — I12a, §5
   readonly writer: NodeJS.WriteStream;    // the privileged handle — see I9
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -129,6 +130,7 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 - **I10** — A capability absent from the record is never acquired. No mouse in the record means no mouse sequence, ever.
 - **I11** — `released` is a terminal state. Every operation on a released instance throws except `release()` itself, which is a no-op (I2).
 - **I12** — `SIGWINCH` produces one coherent `{columns, rows}` snapshot per event (D31). Subscribers never see a mismatched pair. **Per signal, and not per frame** — `writer` is a live handle, so its `columns` is read by whoever holds it at the moment they read it, and nothing here guarantees a frame was composed against one width. §5 states the boundary; the frame path's snapshot belongs with whoever writes it.
+- **I12a** — `size()` reads `columns` and `rows` once, freezes them together and returns them. It is the only route to a dimension outside a `SIGWINCH`, and it is a method rather than a getter so that a caller wanting one snapshot writes one call — a getter reads like a property and invites two reads in one expression, which is the mismatched pair I12 exists to prevent. Unlike `onResize` it answers while `constructed`: C22 needs the size at construction step 5, before anything is acquired.
 - **I13** — `columns` and `rows` are read in this file and nowhere else in `src/`. Enforced by A03 SS42, and it is the fourth member of the same family as the clock, `process.env` and the escape literals: one place reads it, everything else is handed the value. Width is the axis that wraps, and a wrap scrolls the alternate screen.
 - **I14** — Failure to acquire the alternate screen is fatal and aborts before first paint. It is the only fatal case in the system (A02 §7).
 - **I15** — `SIGCONT` re-acquires terminal state and reports through `onResume`. It sets no flag: C01 states a fact about the terminal and L4 decides what it means, because a `contaminated` flag under two owners is the failure C01 exists to prevent, applied to itself (D53).
@@ -219,7 +221,13 @@ Eight trappable handlers, registered by the constructor and named individually b
 
 Stated here rather than left to be inferred from the absence of an accessor, because the shape invites the wrong reading: I12 is a strong guarantee, `onResize` is the only route to a dimension, and the natural conclusion is that the width is handled. It is handled on the signal path only. `writer` is a `Proxy` over the real stdout whose `get` forwards to the target, so `columns` is not a value C01 hands out — it is a read performed by the consumer, at whatever moment the consumer performs it.
 
-**Not fixed here, deliberately.** An accessor with one caller and no rule requiring its use is worse than a documented gap: it looks like the problem is solved. What lands now is the boundary written down, and A03's rule that the width is read in this file and nowhere else — so a *second* live reader cannot appear quietly while the first is the one legitimate one.
+**Not fixed when this was written, deliberately.** An accessor with one caller and no rule requiring its use is worse than a documented gap: it looks like the problem is solved. What landed then was the boundary written down, and A03's rule that the width is read in this file and nowhere else — so a *second* live reader cannot appear quietly while the first is the one legitimate one.
+
+**Fixed now, because both conditions arrived together.** `size()` returns a frozen `TerminalSize` read once per call (I12a). C22 is the caller the paragraph above was waiting for, and it needs it twice over: the viewport takes `width` and `height` at construction (C14 §2), and the frame path needs one snapshot per frame. SS42 is the rule requiring its use — every other file in `src/` is already forbidden `.columns`, so the accessor is not an option beside a live read, it is the only legal route.
+
+**C22 is where the gap actually bit.** Two correct statements — *the viewport takes width and height* and *only this file reads them* — and the cell where they meet is C22's construction step 5, with no way to satisfy both. That is the structural shape C22 §3a is indexed for, and it was missed there because the table walks C22's own steps and this constraint lives in another component's invariant.
+
+`size()` is deliberately a method and not a getter: a getter reads like a property and invites being called twice in one expression, which is the two-widths failure this exists to prevent. A call site that wants one snapshot writes one call and passes the value down, as C22 §6 does with `now`.
 
 ### Suspend and resume
 
@@ -259,6 +267,7 @@ Nested suspend is refused — `suspend()` while already suspended throws. There 
 17. `released` is terminal — a new instance is constructed per session; the transition table in §5 is exhaustive and every cell is tested (I11).
 18. Exit codes are 128 + signal, per signal: 130, 143, 129 (I17).
 19. The terminal's dimensions are read in one file, and I12's snapshot covers the signal path only. §5 states where the guarantee stops rather than leaving it inferred from the absence of an accessor, because the per-frame snapshot is the frame path's to make and a partial fix here would look like a whole one (I12, I13).
+19a. `size()` is that accessor, added when both of §5's conditions arrived — a caller that cannot work without it, and a rule requiring its use. It answers while `constructed`, because C22 takes the viewport's dimensions before anything is acquired (I12a).
 
 ---
 
@@ -335,6 +344,8 @@ Where the real defects live.
 - **T3.16** (I8, C15): `SIGTERM` while suspended → handlers disposed, stdout restored, zero terminal bytes emitted, exit **143**. The child is untouched.
 - **T3.17** (I12): `SIGWINCH` fires → `columns` and `rows` are each read exactly once, and every subscriber receives the same frozen object. "Never sees a mismatched pair" is not directly observable; read-once-and-freeze is, and it is what makes the claim true. Asserted with a stream whose `columns` getter mutates `rows`.
 - **T3.18**: `SIGWINCH` arrives while suspended → no subscriber is notified; the dimensions belong to the child.
+- **T3.18b** (I12a): `size()` reads `columns` and `rows` exactly once per call and returns them frozen together — asserted with T3.17's stream, whose `columns` getter mutates `rows`, so a second read inside one call produces a pair that cannot have coexisted. A stable fake would pass whether the accessor read once or twice, which is the setup where both readings agree.
+- **T3.18c** (I12a): `size()` answers while `constructed`, before any acquire, because C22 takes the viewport's dimensions at construction step 5. It is the one dimension route that is not gated on state.
 - **T3.19**: `SIGWINCH` fires three times in one tick → three notifications, not one. C01 does not coalesce, and neither does C03: `resize` is immediate there and cannot be given a window (C03 §3, C03 I2). Nothing in the system debounces it (D31).
 - **T3.20**: `acquire()` while suspended → throws a named error. `resume()` is the intended call and the ambiguity is not tolerated.
 - **T3.21**: `acquire()` after `release()` → throws. `released` is terminal; the handlers are gone and a revived instance would hold state nothing releases.
@@ -397,6 +408,7 @@ Tests whose only job is to fail loudly if a specific invariant is quietly undone
 - **T6.11** (I11): making `released` re-acquirable → T3.21 fails. A revived instance holds terminal state with no handler registered to release it — precisely the window I3 exists to close.
 - **T6.12** (I1): emitting a mode-setting sequence from C03, or a `2026` marker from C01 → T2.8 fails. The transactional exception stays exactly one sequence wide.
 - **T6.13** (I9): giving Ink `process.stdout` rather than `lifecycle.writer` → T1.7 fails, because the renderer's writes become indistinguishable from foreign ones and land in the debug sink. This is the regression that makes single-owner stdout a claim rather than a property.
+- **T6.15** (I12a): making `size` a getter rather than a method → nothing fails, and that is the finding. **Structural guard** (A02 17a): the protection is the call syntax, which makes `size()` read as work and `size` read as a field, so `{ w: size.columns, h: size.rows }` is the natural thing to write against a getter and two reads is what it does. T3.18b catches the two reads *inside* the accessor; nothing can catch two reads by a caller except the shape that makes one call the obvious spelling.
 - **T6.14** (I13): reading `stdout.columns` in a second module — the plausible version being a renderer that wants the width without being handed it → T2.10 fails, naming the file. The regression is not that the read is wrong on its own; it is that two readers at two moments in one frame is how a frame comes to be composed against two widths.
 
 ---

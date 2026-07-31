@@ -36,7 +36,7 @@ The first four are **build gates**: they fail the build, not a test run, because
 
 This is not belt-and-braces. Every check here reports success the same way whether the tree is clean or the rule is broken, and a broken rule is indistinguishable from compliance at exactly the moment it matters.
 
-**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Fourteen have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
+**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Fifteen have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
 
 - **A pattern that cannot match a real subject.** MG20 compared a resolved specifier against `src/terminal/escapes` while every NodeNext specifier ends `.js`. It matched nothing and reported compliance.
 - **A scope that matches no files.** SS26 scopes to `src/data/process/`; the tree has `src/data/process.ts`, a file. `startsWith` never matches, so the rule has never once been evaluated.
@@ -66,6 +66,12 @@ A vacuous rule reports success it has not earned; an undeclared branch reports a
   **What found it was a scan looking for something else.** SS40's stated concern is `.length` in the editor, and it fired on the string surgery beside the NUL. That is an argument for scans being cheap and broad rather than precisely aimed: a rule targeted exactly at its own subject would have walked past a NUL masquerading as a space, and the cost of the broad version is a comment explaining an exception.
 
   SS43 is the rule the class earned, and its first run found **three more instances in shipped code** — a memo key in C09, a dedup key in C05, and five `sequence` literals in C16's own decoder. All four read as spaces. Three were deliberate and defensible, which is the point: the rule is not "NUL is wrong" but "an invisible character is invisible", and the remedy is an escape rather than an allowance.
+
+- **A harness that cannot see a kill, reporting thoroughness.** The mutation pass is the only thing that asks whether a test can fail, so a mutation runner that cannot detect a failing suite deletes that check and leaves a report that reads like a rigorous one. C22's runner read `/Tests\s+\d+ failed/` against vitest output carrying ANSI codes between "Tests" and "1 failed": **eight live mutants reported as survivors**, which is nine lines of "no failure" — indistinguishable from the finding a mutation pass exists to produce.
+
+  **It is the edit-script defect in the instrument built to apply the remedy**, and it fails in the direction that reads as diligence. An edit script that prints `ok` having changed nothing at least looks like nothing happened; a mutation report full of survivors looks like work. Neither is caught by review, because both outputs are the shape the reader expects.
+
+  So the control pair lives **inside** the harness (`tools/mutate/mutate.mjs`) rather than in each component's run: before any row is reported, the clean tree must pass and a caller-supplied mutation whose kill is not in doubt must be seen to be killed. The caller supplies that mutation and says why it cannot survive, because a generic sentinel is the harness marking its own homework. `test/unit/mutate-harness.test.ts` fabricates a blind runner and asserts it refuses, and its ANSI fixture is the real output rather than an invented one — the first version tested its regex against a string it wrote itself, with no codes in it, so the fixture and the regex agreed and the tree did not.
 
 - **A test over an ordered structure that checks its members one at a time.** C16 T1.3 asserts each of the six focus conditions resolves to its documented target — six correct assertions that pass under *any* permutation of the priority they exist to protect. It is not vacuity: every assertion fires, and the subject responds. It is a suite that is individually right and jointly silent about the one property the structure has, which no amount of adding more per-member cases repairs.
 

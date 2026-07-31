@@ -145,6 +145,14 @@ describe("C01 fail-on-revert", () => {
     expect(members.has("contaminated")).toBe(false);
     // resume() does not repaint either: it emits acquisition sequences and
     // nothing else. C03 owns the flag, the L4 shell calls invalidate().
+    //
+    // **The exhaustive set is the point, and `size` had to be argued past it.**
+    // A `has("contaminated")` check alone would let any other member appear
+    // unremarked, which is how a lifecycle grows a second responsibility. The
+    // set failing on an addition is the mechanism working: `size` is C01 §5's
+    // deferred accessor, added on the commit where both of its conditions
+    // arrived — a caller that cannot work without it (C22's viewport, at
+    // construction step 5) and a rule requiring its use (SS42).
     expect(members).toEqual(
       new Set([
         "acquire",
@@ -153,6 +161,7 @@ describe("C01 fail-on-revert", () => {
         "resume",
         "onResize",
         "onResume",
+        "size",
         "writer",
         "acquired",
         "suspended",

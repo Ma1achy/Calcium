@@ -22,6 +22,21 @@ export interface TerminalLifecycle {
   resume(): void;
   onResize(cb: (size: TerminalSize) => void): Disposable;
   onResume(cb: () => void): Disposable;
+  /**
+   * One frozen snapshot per call (I12a) — the only route to a dimension outside
+   * a `SIGWINCH`, and the reason SS42 can keep its single-file scope while the
+   * frame path needs a width.
+   *
+   * **A method, not a getter.** A getter reads like a property, and
+   * `{ w: size.columns, h: size.rows }` is then the natural spelling — two
+   * reads, which is the mismatched pair I12 exists to prevent. `size()` makes
+   * one call the obvious thing to write and the value the obvious thing to pass
+   * down.
+   *
+   * Answers while `constructed`, unlike everything else here: C22 takes the
+   * viewport's dimensions at construction step 5, before anything is acquired.
+   */
+  size(): TerminalSize;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -300,16 +315,21 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     process.exit(EXIT_CODES[signal]);
   }
 
+  /**
+   * I12a. Both reads and the freeze in one place, so the signal path and the
+   * frame path cannot come to disagree about what a snapshot is.
+   */
+  function snapshotSize(): TerminalSize {
+    return Object.freeze({ columns: stdout.columns, rows: stdout.rows });
+  }
+
   function onWinch(): void {
     // T3.18 — while suspended the dimensions belong to the child.
     if (state !== "acquired") return;
 
     // I12 — read each once, freeze, hand the same object to every subscriber.
     // Two reads per subscriber is where a mismatched pair would come from.
-    const size: TerminalSize = Object.freeze({
-      columns: stdout.columns,
-      rows: stdout.rows,
-    });
+    const size = snapshotSize();
     for (const cb of resizeSubscribers) cb(size);
   }
 
@@ -453,6 +473,11 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     resume,
     onResize: (cb) => subscribe(resizeSubscribers, cb),
     onResume: (cb) => subscribe(resumeSubscribers, cb),
+    // Not gated on state, and that is the one difference from everything above
+    // it: C22 needs the viewport's dimensions at construction step 5, before
+    // any acquire. There is nothing to be wrong about — reading the size of a
+    // terminal nobody has entered is still the size of the terminal.
+    size: snapshotSize,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).
