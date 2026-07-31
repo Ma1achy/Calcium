@@ -62,6 +62,7 @@ interface FileSystem {
   readFile(path: string): Promise<string>;
   writeFile(path: string, data: string): Promise<void>;
   appendFile(path: string, data: string): Promise<void>;
+  appendFileSync(path: string, data: string): void;   // the exit path only — C20 §2, I18
   mkdir(path: string): Promise<void>;
   exists(path: string): Promise<boolean>;
 }
@@ -80,6 +81,8 @@ Four required fields. Every optional one has a working default: the fallback ada
 `debug.retainPayloads` turns on C13's raw-payload retention (C13 §5a) so `/debug` can show what an adapter was actually given. Absent, nothing is retained. Present without a count, the default is 50 — a number rather than "all" because doubling memory against a 100,000-block cap is how a debug mode becomes one nobody turns on.
 
 `stateDir` resolves from `PRISM_TUI_STATE_DIR`, defaulting to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
+
+**`FileSystem` structurally satisfies C20's `HistoryFs`, and that is the direction the dependency runs.** C20 declares the narrow seam it needs — four methods, no `mkdir`, no `exists` — because an L3 component reaching up to L4 for a type is the edge A02 Seam 4 exists to prevent; this interface is a superset, so the injected `fs` is passed straight down with no adapter. `appendFileSync` is the one synchronous member and it exists for C20 I18: `beforeRelease` is synchronous (C01 I5), and without it the append in flight at exit — the command just submitted — is lost.
 
 `openUrl` is injected for the same reason as `clock` and `fs`: it is a side effect, and a component that shells out to `xdg-open` cannot be unit-tested. C23 scheme-checks before calling it (C23 §3a).
 
