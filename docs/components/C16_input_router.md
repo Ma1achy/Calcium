@@ -41,7 +41,9 @@ type InputEvent =
 
 **A paste is one event, not N key events.** Bracketed paste wraps content in `CSI 200~` … `CSI 201~`; C16 buffers between the markers and emits a single `paste`. Ten thousand characters arriving as ten thousand key events would each trigger a completion recompute and a frame commit, which is a hang rather than a slowdown.
 
-Where `bracketedPaste` is unavailable (C02 §4), C16 falls back to a timing heuristic: more than 8 characters within 30 ms with no intervening escape is treated as a paste, and a notice is committed on first use so the user knows the behaviour is approximate.
+Where `bracketedPaste` is unavailable (C02 §4), C16 falls back to a timing heuristic: more than 8 characters within 30 ms with no intervening escape is treated as a paste, and a notice is committed on first use so the user knows the behaviour is approximate. The machine is enumerated in §7 and its one qualification to I6 is stated there.
+
+**One consumer consequence, because only C17 sees it and nobody would look for it.** C17 I5 makes each `paste` event exactly one undo unit, and on this path a large paste is several events — so **undo after a hundred-thousand-character paste returns it in chunks rather than all at once.** Both invariants hold; it is their composition that surprises. Acceptable on a degraded path the notice already flags as approximate, and written down here rather than discovered by someone testing undo on a terminal without bracketed paste.
 
 **Ink 7 changed two key semantics** worth knowing before wiring this: backspace
 arrives as `key.backspace` rather than `key.delete`, and a plain `Escape` no
@@ -311,7 +313,9 @@ The window is measured **from the first buffered character, not from the last**,
 
 And **every printable is therefore delayed by up to 30 ms on this path**. That is unavoidable: a decision that depends on what arrives next cannot be made before it arrives, and nothing can un-send a key already dispatched. It is a second reason the §2 notice exists, and it is the honest reading of "the behaviour is approximate".
 
-> **Open, and named rather than decided.** I6 says a paste emits one event regardless of length. On the bracketed path that holds by construction. On this path a paste large enough to span more than 30 ms of arrival emits one event per window, so I6 holds for the sizes a terminal delivers in one or two chunks and not obviously beyond them. T3.1's 100,000 characters is the case that would settle it. Whether I6 is qualified for the heuristic path or the window extends while bytes keep arriving is a decision this spec has not taken.
+**I6 is qualified for this path, and the window does not extend.** A paste spanning more than one window emits one event per window. Extending the window while bytes kept arriving would restore the single event and reintroduce precisely what the fixed window was forced to solve — a close condition depending on what arrives next, which nine characters at 22 ms already showed cannot terminate. Separating that case from a real paste would need a second threshold, which is a second heuristic layered on the one the notice already apologises for.
+
+The guarantee I6 was written for survives: bounded work, not a single event. Twenty-five events for a hundred thousand characters is not the hang that ten thousand key events would be.
 
 ---
 
@@ -322,7 +326,7 @@ And **every printable is therefore delayed by up to 30 ms on this path**. That i
 - **I3** — Mouse events route by position, never by focus target, and are dropped when the capability is absent.
 - **I4** — Exactly one handler consumes an event; there is no bubbling past the first consumer.
 - **I5** — Unconsumed events are dropped, never inserted into a lower target.
-- **I6** — A paste emits one `paste` event regardless of length.
+- **I6** — A paste emits one `paste` event regardless of length on the bracketed path. On the heuristic path it emits one event per window: **the guarantee is bounded work, not a single event.** The purpose survives the qualification — I6 exists because ten thousand characters as ten thousand key events would each trigger a completion recompute and a frame commit, a hang rather than a slowdown, and one event per 30 ms window makes T3.1's 100,000 characters roughly twenty-five. It is the literal wording that does not hold. A window that extended while bytes kept arriving would restore the single event and could not terminate, which is the same close-condition problem the fixed window was forced to solve (§7).
 - **I7** — Cancellation of an in-flight verb outranks every other Ctrl-C meaning.
 - **I8** — **While a non-dismissable layer is on top, no event acts on anything beneath it.** It is never dismissed, no lower focus target is reached, and the `global` fallback does not run (§4 step 3). The invariant was originally about Ctrl-C alone, and Ctrl-C was only the first key traced past a confirm — forbidding the dismissal left every lower rung and every global shortcut reachable, so an unanswered confirm sat over a screen that had changed theme, scrolled, or entered copy mode. Not dismissing the confirm is small comfort when the thing under it moved.
 - **I9** — C16 reads no ambient clock; timing is injected.
@@ -396,7 +400,8 @@ Six tiers. Every cell of both §7 tables is covered.
 
 ### Tier 3 — edge cases
 
-- **T3.1**: a paste of 100,000 characters → one event, delivered within budget, no per-character work.
+- **T3.1** (I6): a paste of 100,000 characters on the **bracketed** path → one event, delivered within budget, no per-character work.
+- **T3.1b** (I6): the same paste on the **heuristic** path → one event per window rather than one event, and the assertion is the bound, not the count: the event count is far below the character count and no per-character dispatch occurs. Asserting `=== 1` here would encode the wording I6 no longer makes; asserting a bound encodes the guarantee it does.
 - **T3.2**: a paste containing `CSI 201~`-like bytes in its payload → terminated only by a true end marker.
 - **T3.3**: a paste containing control characters → stripped before the event is emitted (C09 I18 at the input boundary).
 - **T3.4**: an unterminated paste — start marker, then the stream stalls → after a 1 s timeout the buffer is flushed as a paste rather than swallowing input forever.

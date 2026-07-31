@@ -112,6 +112,8 @@ Required, not optional: C16 commits that a paste is undoable as one edit (C16 T4
 
 A paste is always its own unit, however long — `insert(text, { atomic: true })` is how C16 delivers one, and `atomic` simply forces a fresh undo unit that the next keystroke will not merge into.
 
+**One undo unit per `paste` *event*, which is not always one unit per user paste.** Where the terminal lacks bracketed paste, C16 falls back to a timing heuristic and a large paste arrives as one event per 30 ms window (C16 I6, §7), so undoing it returns it in chunks. I5 holds and C16 I6 holds; the composition is what surprises, and it is recorded in both specs because the person who notices it will be testing undo rather than reading about decoding.
+
 **The undo stack is bounded at 200 units.** Beyond that the **oldest** are discarded; discarding the newest would make the most recent edit unrecoverable, which is the one people actually try to undo.
 
 `redo` is cleared by any new edit.
