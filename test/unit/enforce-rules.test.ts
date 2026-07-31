@@ -363,6 +363,28 @@ const FABRICATED: readonly Fabrication[] = [
     source: "const width = stdout.columns;",
   },
   {
+    // **Copied from a real call site**, which A03 §2 makes the standing rule for
+    // any scan targeting a code idiom: a fabrication written fresh uses the same
+    // idiom the rule was written against, and SS20 is the instance that proved
+    // it — correct about a syntax nobody writes while the idiom in use walked
+    // past.
+    //
+    // This is C06's `createTransport` as it would look if the framework
+    // resolved its own mode, which is the plausible version: the value is right
+    // there in the environment and passing it through config is one more hop.
+    rule: "SS44",
+    file: "src/data/transport/factory.ts",
+    source: 'const mode = process.env["PRISM_TUI_TRANSPORT"] ?? "subprocess";',
+  },
+  {
+    // The C22 half, and the one that actually shipped in a draft: `stateDir`
+    // resolving its own variable, which reads as C22 owning the default rather
+    // than as the framework reading the environment.
+    rule: "SS44",
+    file: "src/shell/config.ts",
+    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? "~/.prism",',
+  },
+  {
     // The edge a reader would reach for: a plot inside an expanded table row
     // wants a width, and `planColumns` has one. Written as a type-only import
     // deliberately — that is the form that erases at build and passes every other

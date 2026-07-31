@@ -25,7 +25,7 @@ The constraint that governs every decision here: **the frame must never render m
 
 ## 2. The screen
 
-At 100 × 30, mid-session, with the live block navigable:
+At 80 × 14, mid-session, with the live block navigable:
 
 ```
 ▲ prism  v1.0.0   fmx-prod · malachy@fmx.io              ● live         14:23:07
@@ -46,6 +46,14 @@ At 100 × 30, mid-session, with the live block navigable:
 ────────────────────────────────────────────────────────────────────────────────
 ↑↓ rows   ⏎ drill in   ␣ expand   f filter   s sort   ⌃↑ prev   esc prompt
 ```
+
+**The fence is a diagram of the four regions, and its box-drawing marks their boundaries rather than depicting rows.** The three horizontal rules are not rendered: the frame is header, viewport, prompt, footer and nothing between them, which is exactly §3's arithmetic. Counting them gives a fifteen-row frame from a fourteen-row terminal, and a frame one row over scrolls the alternate screen.
+
+Stated because the picture invites the other reading and C22 took it — the deferral asserting this figure could not be written for two commits while §2 and §3 disagreed, and nothing said which was the artefact. Three reasons the rules are not real:
+
+- **The fixed overhead is already at its limit.** At the 60 × 16 minimum, header + footer + a one-row prompt leaves thirteen rows of viewport. Three rules take it to ten — nearly a quarter of the smallest supported frame spent on separators, permanently, because only the viewport flexes.
+- **The boundaries already carry information.** `▌` marks live against frozen, `❯` marks the prompt, and the transcript's own `rule` blocks separate commands *with a label*: `── ps · 4 of 11 · --mine ──`. A bare line above the prompt would be the only chrome in the system that costs a row and says nothing. C09's `rule` kind exists precisely because a separator carrying text earns its row.
+- **The caption was the stale half.** It said 100 × 30 against a figure eighty cells wide, so one of the two was already wrong before the rules were counted.
 
 The `▌` gutter marks the live block (D6). The footer has switched to row keys because focus is in that block.
 

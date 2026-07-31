@@ -16,7 +16,23 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/testing/index.js";
-import { illustratedRows, SURFACE_FRAMES } from "../support/surfaces.js";
+import { frameLines, frameRows, illustratedRows, SURFACE_FRAMES } from "../support/surfaces.js";
+import { compose, heightsSum } from "../../src/shell/frame.js";
+import { paint } from "../../src/shell/paint.js";
+import { displayCells } from "../../src/presentation/text.js";
+import type { SessionSnapshot } from "../../src/shell/types.js";
+
+const S01_SESSION: SessionSnapshot = Object.freeze({
+  cwd: "/work",
+  env: Object.freeze({}),
+  lastUuid: null,
+  identity: null,
+  cluster: "fmx-prod",
+  health: "live",
+  version: "1.0.0",
+  retained: null,
+  stopping: false,
+});
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 
 describe("the S-series' illustrated heights", () => {
@@ -97,9 +113,63 @@ describe("the S-series' illustrated heights", () => {
   // a dashboard. A single row waiting on C22 would have come due five-sixths
   // unwritable, which is the failure this triage exists to prevent and is
   // indistinguishable from a row that expired correctly.
-  it.todo(
-    "S01 §2 composes to its illustrated rows — waits on C22 — needs the paint path, not the graph: `compose` returns the frame's parts and nothing yet turns them into rows",
-  );
+  it("S01 §2's regions are the ones §3 computes", () => {
+    // **The figure is a diagram; its three horizontal rules are not rendered**
+    // (S01 §2). `frameRows` strips them, and what is left is the frame §3
+    // describes: header, viewport, prompt, footer.
+    //
+    // **The assertion is the decomposition, not the row count.** A first draft
+    // composed at the figure's own dimensions and asserted the paint returned
+    // that many rows — which is `rows === rows`, since `paint` always returns
+    // exactly `size.rows`. It passed and said nothing: the inert-subject class,
+    // in the test written to close it.
+    //
+    // What can disagree is where the boundaries fall. The figure marks its own:
+    // row 0 is the header, the `❯` row is the prompt, the last row is the
+    // footer, and everything between the header and the prompt is the viewport.
+    // If §3 said the header were two rows, the arithmetic would compute ten
+    // viewport rows against a figure that draws eleven.
+    const file = "docs/surfaces/S01_the_frame.md";
+    const lines = frameLines(file, 0);
+    const rows = frameRows(file, 0);
+    const width = Math.max(...lines.map(displayCells));
+
+    const promptRow = lines.findIndex((l) => l.startsWith("❯"));
+    expect(promptRow, "the figure marks its prompt").toBeGreaterThan(0);
+
+    const drawnViewport = promptRow - 1;
+    const drawnFooter = lines.length - promptRow - 1;
+
+    const frame = compose({
+      chrome: { header: () => [], footer: () => [] },
+      session: () => S01_SESSION,
+      now: () => 1_700_000_000_000,
+      size: () => ({ columns: width, rows }),
+      promptRows: () => 1,
+    });
+
+    expect(
+      frame.region.height,
+      `§3 computes ${String(frame.region.height)} viewport rows; §2 draws ${String(drawnViewport)}`,
+    ).toBe(drawnViewport);
+    expect(frame.promptRows, "one prompt row in the figure").toBe(1);
+    expect(drawnFooter, "one footer row, and nothing between it and the prompt").toBe(1);
+    expect(heightsSum(frame), "and the four sum to the frame").toBe(true);
+
+    // The paint then fills that shape at the figure's width — the axis that
+    // wraps, and the one §3 says nothing about.
+    const painted = paint(frame, {
+      registry: createBlockRegistry({ defaults: true }),
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      transcriptRows: () => [],
+      promptRows: () => [""],
+    });
+    for (const [i, line] of painted.entries()) {
+      expect(displayCells(line), `row ${String(i)}`).toBe(width);
+    }
+  });
+
   it.todo(
     "S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated rows — waits on C23 — every one of the five is a document some verb produced",
   );

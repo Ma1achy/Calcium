@@ -639,6 +639,21 @@ export const SCANS = [
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 
+  // The third member of the injected-ambient family, after the clock and the
+  // environment record. `tui-kit` ships no binary, so a variable named for one
+  // consumer has no business inside a framework that claims to serve others —
+  // `prism-tui` reads its own and passes the value through `TuiConfig`.
+  //
+  // **Broad by name rather than by variable.** C06 I18 forbade
+  // `PRISM_TUI_TRANSPORT` and C22 I20 added `PRISM_TUI_STATE_DIR`; a rule per
+  // variable is a list that grows one incident at a time, and the third one
+  // would be added after it shipped. The prefix is the thing that means "the
+  // app's", so the prefix is what the rule matches.
+  { id: "SS44", spec: "C06 I18 · C22 I20 · C22 T2.9",
+    pattern: /PRISM_TUI_[A-Z_]+/,
+    scope: "src/", allow: [],
+    why: "the app's entry point resolves its own variables; the framework reads none" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

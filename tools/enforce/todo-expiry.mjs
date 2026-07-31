@@ -343,37 +343,13 @@ export function backlogKey(violation) {
  * from nothing and every entry costs a sentence.
  */
 export const ACKNOWLEDGED_BACKLOG = Object.freeze([
-  // **Two deferrals wait on C22's paint path, which is inside C22 and unbuilt.**
+  // Empty, and it has been non-empty exactly once. C22's paint path put two
+  // deferrals here — S01 §2's illustrated rows and C03 T5.4's edge drag — and
+  // both are gone: T5.4 moved to C24, which is what a PTY needs to drive a
+  // session, and S01 §2 became writable when the figure was ruled a diagram.
   //
-  //   - `test/contract/surfaces.test.ts` — S01 §2's illustrated rows.
-  //   - `test/e2e/frame-scheduler.test.ts` T5.4 — edge-drag with no blank frame.
-  //
-  // `compose()` returns the frame's parts; nothing yet turns them into rows, so
-  // neither test has anything to assert against. Every other C22 deferral that
-  // came due on this commit was written (C01 T4.5 and T4.6, C14 T4.7 and T4.8)
-  // or moved to the component it was really waiting for (C13 T4.7 → C23).
-  //
-  // **The entry is coarser than the finding, and that is a known weakness.**
-  // A row is `"<rule> <file>"`, so this one silently covers a *third* deferral
-  // naming C22 in either file. The remedy is to keep it short-lived rather than
-  // to build per-test granularity for two rows: it goes when the paint path
-  // lands, and TD0 compares by equality, so a resolved entry left here fails
-  // just as loudly as a new expiry.
-  // The count is load-bearing: a third deferral in either file changes the key
-  // and fails TD0, rather than inheriting an exemption argued for two.
-  // **One deferral, and it waits on a contradiction rather than on code.**
-  //
-  // `test/contract/surfaces.test.ts` — S01 §2's illustrated rows. The paint
-  // path exists now, so the original reason is gone; what is left is that the
-  // figure and the arithmetic disagree and no assertion can satisfy both. The
-  // caption says 100 x 30 and the fence is 17 rows of 80, and the fence draws
-  // three horizontal rules that §3's arithmetic — header 1, footer 1, prompt,
-  // viewport — does not account for. Resolving it moves C22's `HEADER_ROWS`,
-  // so it is a ruling rather than a repair.
-  //
-  // The count is what makes this safe to leave: it was `(2)` while C03 T5.4
-  // also waited, and dropping to `(1)` failed TD0 rather than passing quietly.
-  "TD2 src/shell/session.ts (1)",
+  // The count in the key is what kept the entry honest while it existed: it
+  // read `(2)`, and dropping to `(1)` failed TD0 rather than passing quietly.
 ]);
 
 /**

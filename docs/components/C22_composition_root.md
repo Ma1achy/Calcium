@@ -439,10 +439,12 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T2.3** (I7): history is flushed on all five paths, including a thrown exception.
 - **T2.4** (I10): a source scan finds no ambient clock or `fs` reference anywhere in `tui-kit` outside C22.
 - **T2.5**: every hook in A02 §6 has a default except `theme`, and each default is exercised.
-- **T2.6** (I12): `SpawnOptions.cwd` is a function; a compile-level test rejects a string.
+- **T2.6** (I12, TL6): `SpawnOptions.cwd` is a function; a `@ts-expect-error` rejects a string, and the function form is exercised beside it so the rule is not "nothing compiles". A captured string is correct at capture and wrong for every verb after the first `cd` — and the failure is silent, because the verb runs, just somewhere else.
+- **T2.6b** (→ C01 I14): the lifecycle cannot be constructed without `onFatal` (TL7). A failed alternate screen is the only fatal case in the system, so it is the one failure that cannot have undefined handling; optional in the type, every consumer omits it and finds out when nothing can be rendered.
 - **T2.7** (I7a): config validation rejects each missing required field with a named error, from `createTui` itself and before `start()` is ever called — so a bad config fails at the call site and nothing is constructed.
 - **T2.8** (I21, C01 I5): `beforeRelease()` returns `undefined` — not a thenable, checked as `typeof result?.then !== "function"` rather than by awaiting, since awaiting a non-thenable passes. This is the mechanism behind the floating `killAll()`: nothing in this tree flags a floating promise and nothing flags the `await` that would "fix" it, and the resulting `async` handler fails only when a signal arrives during shutdown.
-- **T2.9** (I20): a source scan finds no `process.env` and no `PRISM_TUI_STATE_DIR` anywhere in `src/`, C02's one allow-listed file excepted. The C06 T2.9 shape, for the second variable.
+- **T2.9** (I20, SS44): the source scan finds no `PRISM_TUI_*` anywhere in `src/` — **the rule imported from the enforcement tool, not restated** (C01 T2.10's shape). SS44 matches the prefix rather than the variable, because a rule per variable is a list that grows one incident at a time and the third would be written after it shipped.
+- **T2.9b** (I20): SS10's allow-list has one entry and C02 does not spend it, so the honest count of environment readers under `src/` is zero. Asserted rather than folded into SS10 by narrowing its scope: an allow-list denies by default, and a file added to `terminal/` later should argue its way on rather than inherit an allowance nobody re-examined.
 
 ### Tier 3 — edge cases
 
@@ -514,7 +516,7 @@ PTY harness.
 - **T6.11** (I14): auto-login on expiry → T3.12 fails and a browser opens unasked.
 - **T6.12** (A02 Seam 4): letting C10, C14 or C15 cause their own cross-layer effect → T4.2, T4.3 or T4.4 fails.
 - **T6.14** (I21): adding `await` to the `killAll()` call in `beforeRelease` → T2.8 fails on the returned thenable. The revert is the plausible one — a reader who sees a floating promise and tidies it — and nothing else in the tree objects: typescript-eslint was rejected during C02, so there is no `no-floating-promises` rule to flag the promise or the fix. Without T2.8 the edit is green until a signal arrives mid-shutdown.
-- **T6.15** (I20): resolving `PRISM_TUI_STATE_DIR` inside `src/` → T2.9 and A03 SS10 fail, and SS10's allow-list gains its second entry.
+- **T6.15** (I20): resolving `PRISM_TUI_STATE_DIR` inside `src/` → T2.9 fails on SS44, which is fabricated against both the C06 form and the C22 one — the second copied from the draft that actually shipped it.
 - **T6.16** (I11): dropping `cluster` or `version` from §5's table → T1.11 loses a field silently, because a field with no row and a field with no writer are the same absence to a reader. The count in commitment 8 is what fails.
 - **T6.17** (I21, C20 I18): calling `flush()` rather than `drain()` in `beforeRelease` → T1.7 and T2.3 fail, and the command the user has just typed is the one entry lost, because Node does not wait for a pending promise at exit.
 - **T6.18** (I3, commitment 3a): registering the submit handler at step 9, beside the others → T1.4b fails. **Structural guard as well** (A02 17a): the handler would close over a pipeline that is `undefined` at registration, so the shape that prevents it is the ordering itself, and T1.4b is what makes the ordering visible rather than a comment.

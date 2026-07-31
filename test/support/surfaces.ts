@@ -44,6 +44,45 @@ export function illustratedRows(file: string, fence: number): number {
   return found.replace(/\n$/, "").split("\n").length;
 }
 
+/**
+ * The rows a figure's *frame* has, with the diagram's boundary marks removed.
+ *
+ * **Two conventions, both unstated until C22 hit one.** S01 §2 separates its
+ * regions with bare horizontal rules; S12 and S13 draw a full box with the
+ * title in the top rail. Neither is rendered — `tui-kit` draws no frame around
+ * anything, and S01 §3's arithmetic is header, viewport, prompt, footer with
+ * nothing between them.
+ *
+ * Counting the marks costs two rows the terminal does not have, and for the
+ * boxed figures two cells on every row. That is a wrap, and a wrap scrolls the
+ * alternate screen.
+ *
+ * Mechanical rather than remembered, because remembering is what failed: S01's
+ * deferral sat unwritable for two commits while §2 and §3 disagreed and nothing
+ * said which was the artefact.
+ */
+export function frameRows(file: string, fence: number): number {
+  return frameLines(file, fence).length;
+}
+
+/** A bare separator: box-drawing and whitespace, nothing else. */
+const BARE_RULE = /^\s*[─━]{3,}\s*$/;
+/** The top or bottom of a box, wherever its title sits. */
+const BOX_EDGE = /^\s*[┌└╭╰]/;
+/** A side rail, and the two cells it costs. */
+const RAIL = /^(\s*)│(.*)│\s*$/;
+
+export function frameLines(file: string, fence: number): readonly string[] {
+  const found = fences(file)[fence];
+  if (found === undefined) throw new Error(`${file} has no fenced block ${fence}`);
+
+  return found
+    .replace(/\n$/, "")
+    .split("\n")
+    .filter((l) => !BARE_RULE.test(l) && !BOX_EDGE.test(l))
+    .map((l) => RAIL.exec(l)?.[2] ?? l);
+}
+
 // --- the S-series' column and drop tables (A03 CP6) ------------------------
 //
 // Read from the markdown for the same reason the row counts are. A fixture

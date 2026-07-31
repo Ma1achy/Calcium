@@ -261,10 +261,13 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
 | SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I13, T2.10 |
+| SS44 | `PRISM_TUI_*` | `src/` | C06 I18, C22 I20, C22 T2.9 |
 
 **SS4 and SS5 were written as two rules over nested scopes, which is one rule and one rule that can never fire.** SS4 named `transcript/` and SS5 named `viewport/`, with the same pattern — so anything SS4 could catch, SS5 caught first, and `transcript/` was a *file* until C13 landed, which is SS3's defect on top. SS4 now scopes to `src/viewport/` and SS5 is folded into it, the SS12-into-SS11 precedent. **It is not redundant with SS1**, which allows `src/shell/session.ts`: the claim these two tests make is that L2 has no clock exception and never acquires one.
 
 **SS1 is the widest and the most valuable.** One injected clock, entering at C22 and nowhere else, is what makes golden frames reproducible and every timing test run on a fake.
+
+**SS44 closes the family by name rather than by variable.** C06 I18 forbade `PRISM_TUI_TRANSPORT` and C22 I20 added `PRISM_TUI_STATE_DIR`; a rule per variable is a list that grows one incident at a time, and the third would be written after it shipped. The prefix is what means "the app's", so the prefix is what the rule matches — and `tui-kit` ships no binary to read one from.
 
 **SS42 is the fourth member of that family and the last ambient value that had no owner.** The clock enters at C22, `process.env` at C02, escape literals live in `escapes.ts` — and the terminal's dimensions were read wherever anyone wanted them, which today is one place by luck rather than by rule.
 
