@@ -1,4 +1,9 @@
-// C19 tier 2 — contract. §8a's traces, replayed row for row.
+// C19 tier 2 — contract. §8a's traces and §8b's table, replayed row for row.
+//
+// Two artefacts because C19 has two kinds of rule interaction. A sequence trace
+// finds the ones mediated by an event; a classification table finds the ones
+// that hold at rest. C19 shipped with only the first, and the second found four
+// defects on its first run.
 //
 // **The whole state is asserted after every step**, not the field the step is
 // about. That is the shape that caught C13's and C14's defects: an invariant
@@ -18,6 +23,59 @@ import { createKeymap } from "../../src/interaction/router/keymap.js";
 import { at, deferredSource, fakeClock, snapshot } from "../support/completion.js";
 
 const FLAG_SLOT = "/ps --status=‸";
+
+describe("C19 §8b — the classification table", () => {
+  // The structural half of the walk, which C19 shipped without. §8a is a
+  // sequence trace and finds interactions mediated by an *event*; these rules
+  // hold at rest, with no event between them, so no number of keystroke rows
+  // reaches them. Four of the ten were defects when this first ran.
+  //
+  // The whole context is asserted per row, not the field the row is about.
+  const ROWS: readonly Readonly<{
+    why: string;
+    line: string;
+    slot: string;
+    prefix: string;
+    tool: string | null;
+    arg: string | null;
+  }>[] = [
+    { why: "quoting x the flag-value sub-token",
+      line: '/ps --status="ru\u2038"', slot: "flagValue", prefix: "ru", tool: "ps", arg: null },
+    { why: "operators x tool resolution — no flag after a pipe ever completed",
+      line: "ls | /ps --st\u2038", slot: "flagName", prefix: "--st", tool: "ps", arg: null },
+    { why: "multi-word verbs x positional index — `scale` is the verb, not an argument",
+      line: "/serving scale \u2038", slot: "positional", prefix: "", tool: "serving scale", arg: "service" },
+    { why: "space-form flag values x positional index — `canary` belongs to `--to`",
+      line: "/serving scale --to canary \u2038", slot: "positional", prefix: "", tool: "serving scale", arg: "service" },
+    { why: "bool flags x row 4's skip — the negative control, nothing is swallowed",
+      line: "/serving scale --side-by-side \u2038", slot: "positional", prefix: "", tool: "serving scale", arg: "service" },
+    { why: "the positional index advancing normally",
+      line: "/serving scale web \u2038", slot: "positional", prefix: "", tool: "serving scale", arg: "replicas" },
+    { why: "quoting x command position — agrees with C18's verbOf, which also ignores `quoted`",
+      line: '"/ps"\u2038', slot: "verb", prefix: "/ps", tool: null, arg: null },
+    { why: "unbalanced quotes x everything — one character from row 1",
+      line: '/ps --status="ru\u2038', slot: "none", prefix: "", tool: null, arg: null },
+    { why: "a path-typed arg x the positional rule",
+      line: "/tail \u2038", slot: "path", prefix: "", tool: "tail", arg: null },
+    { why: "no resolved tool x arguments",
+      line: "git commit \u2038", slot: "path", prefix: "", tool: null, arg: null },
+  ];
+
+  it("T2.10 (§8b): every row, whole result", () => {
+    for (const row of ROWS) {
+      const ctx = at(row.line);
+      expect(
+        {
+          slot: ctx.slot.kind,
+          prefix: ctx.prefix,
+          tool: ctx.tool?.name ?? null,
+          arg: ctx.slot.kind === "positional" ? ctx.slot.arg.name : null,
+        },
+        `${row.line} — ${row.why}`,
+      ).toEqual({ slot: row.slot, prefix: row.prefix, tool: row.tool, arg: row.arg });
+    }
+  });
+});
 
 describe("C19 §8a trace 2 — Esc during a pending request (I1, I15)", () => {
   it("T3.10: the sequence does not move, and only invalidation discards the result", async () => {
@@ -91,7 +149,7 @@ describe("C19 §8a trace 3 — Tab twice while pending", () => {
     expect(b.candidates.map((c) => c.value)).toEqual(["running"]);
   });
 
-  it("T3.9b (§7): the spinner's stamp is per source call, not per sequence", async () => {
+  it("T3.9b (§7): the spinner reads the earliest call still in flight", async () => {
     const clock = fakeClock();
     const engine = createEngine({ now: clock.now });
     const d = deferredSource();
@@ -107,8 +165,10 @@ describe("C19 §8a trace 3 — Tab twice while pending", () => {
     await Promise.resolve();
     clock.advance(200); // 600ms since the wait began, 200 since the second Tab
 
-    // A sequence-tagged stamp resets here and hides the spinner for another
-    // 500ms from a user who has been waiting for six-tenths of a second.
+    // A single overwritten `pendingSince` resets here and hides the spinner for
+    // another 500ms from a user who has waited six-tenths of a second and pressed
+    // Tab again *because* nothing happened. The question is how long anything has
+    // been outstanding, not how long this request has.
     expect(engine.spinning).toBe(true);
     expect(SPINNER_MS).toBe(500);
   });

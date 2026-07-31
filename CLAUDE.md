@@ -124,15 +124,26 @@ Each of these produces code that compiles, passes review, and is wrong.
   meet, C19's sequence trace the events where a request is in flight and something else
   happens.
 
-  **And C19 found the method's limit, which is worth knowing before choosing the next
-  artefact's index.** A trace indexed by *events* cannot see two **structural** rules
-  meeting — rules that both hold at rest, with no event between them. C19's
-  `--flag=value` defect is the case: "the engine filters by prefix" met "a flag value is
-  half of a token", the menu came back empty, and no assertion about a source would have
-  shown it. What caught it was a test asserting the *whole result* rather than the field
-  it was written for. So choose the index deliberately, then ask what it cannot express;
-  where the answer is "two rules that both hold at rest", the cover is whole-state
-  assertions rather than a second trace. A row governed by one rule is a restatement of that rule and finds nothing;
+  **Rule interactions come in two kinds, and the two artefact shapes catch different
+  ones.** This is the second half of the principle, and C19 is what forced it.
+
+  - A **sequence trace** finds *event-mediated* interactions: two rules that meet
+    because something happened in between. C16's rung table, C17's edit trace and
+    C19's §8a are all this shape.
+  - A **classification table** finds *structural* interactions: two rules that both
+    hold at rest, with no event between them. C18's §8a is this shape.
+
+  **C19 needed both and had one.** Its `--flag=value` defect is a structural
+  interaction — "the engine filters by prefix" meets "a flag value is half of a token"
+  — and a trace indexed by events cannot reach it however many rows it has. The menu
+  came back empty and no assertion about a source would have shown why. C18's table
+  would have caught it, and C18's table was already in the repo.
+
+  So the artefact's *shape* is a decision, not a consequence of the component looking
+  like a state machine. Ask which kinds of interaction the component has before
+  choosing: a component with state and structure needs a trace **and** a table, and
+  taking the trace alone because the state machine is the obvious thing is how the
+  structural half goes unexamined. A row governed by one rule is a restatement of that rule and finds nothing;
   every one of the eleven pre-code defects across those three components lived in a
   cell where two correct statements overlap. That is also why they were invisible to
   review — a reader checks statements one at a time by construction, so a suite indexed
@@ -151,16 +162,20 @@ Each of these produces code that compiles, passes review, and is wrong.
   assertions respectively. A mutation that fails nothing is a finding about the
   tests, not a licence.
 
-  **And sometimes about the spec.** C19's §7 said the spinner's stamp is taken "per
-  source call, not per sequence" — and swapping the two fails nothing, because a source
-  call begins synchronously inside `request`. The sentence named a distinction that does
-  not exist, so a reader could satisfy it exactly and still hold the single overwritten
-  stamp it was written to forbid. This is A03 §2's vacuity class arriving in prose: a
-  sentence that cannot be violated reads identically to one that is obeyed, and review
-  cannot tell them apart because both read as correct. When a mutation fails nothing,
-  ask which artefact it indicts before rewriting the test — and prefer wordings that
-  name the observable mechanism ("the earliest call still in flight") over ones that
-  name where a value is computed.
+  **And sometimes about the spec — this is A03 §2's vacuity class arriving in prose.**
+  A03 §2 is written about rules: a rule with nothing to be wrong about passes exactly
+  like a rule that is satisfied. The same thing happens to a sentence. C19's §7 said
+  the spinner's stamp is taken "per source call, not per sequence", and swapping the
+  two fails nothing, because a source call begins synchronously inside `request`. The
+  sentence named a distinction that does not exist, so it forbade nothing while reading
+  as though it forbade the defect — and a reader could satisfy it exactly while holding
+  the single overwritten stamp it was written against.
+
+  Review cannot tell the two apart, because both read as correct. **The mutation pass
+  is the only thing that asks a sentence whether it can be violated.** So when a
+  mutation fails nothing, ask which artefact it indicts before rewriting the test, and
+  prefer wordings that name the observable mechanism ("the earliest call still in
+  flight") over ones that name where a value is computed.
 
   The figure that argues for the whole discipline is C16's: **seven defects from the
   by-hand walks before any code, four more from mutation during it, three

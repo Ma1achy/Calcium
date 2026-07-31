@@ -402,6 +402,40 @@ The second `Tab` completes the next slot. There is no state under which it re-op
 
 ---
 
+## 8b. The classification table
+
+§8a is a **sequence trace**, and a sequence trace finds interactions that are *mediated by an event*: two rules that meet because something happened in between. It found six things and could not have found a seventh, because C19's other rules interact **structurally** — they hold at rest, with no event between them, and no number of rows indexed by keystrokes reaches them.
+
+**C19 needed both artefact shapes and shipped with one.** This table is the missing half, and it is C18 §8a's shape applied to the context derivation: the whole result asserted per row, indexed by the cells where two structural rules overlap. It was run against landed code rather than before it, which is the wrong order and is why it found four defects instead of preventing them.
+
+Columns are the whole result, not the field the row is about.
+
+| # | The two rules | Input (`‸` is the cursor) | slot | prefix | tool | arg |
+|---|---|---|---|---|---|---|
+| 1 | quoting × the flag-value sub-token | `/ps --status="ru‸"` | `flagValue` | `ru` | `ps` | — |
+| 2 | operators × tool resolution | `ls \| /ps --st‸` | `flagName` | `--st` | `ps` | — |
+| 3 | multi-word verbs × positional index | `/serving scale ‸` | `positional` | `` | `serving scale` | `service` |
+| 4 | space-form flag values × positional index | `/serving scale --to canary ‸` | `positional` | `` | `serving scale` | `service` |
+| 5 | bool flags × row 4's skip | `/serving scale --side-by-side ‸` | `positional` | `` | `serving scale` | `service` |
+| 6 | positional index, advancing | `/serving scale web ‸` | `positional` | `` | `serving scale` | `replicas` |
+| 7 | quoting × command position | `"/ps"‸` | `verb` | `/ps` | — | — |
+| 8 | unbalanced quotes × everything | `/ps --status="ru‸` | `none` | `` | — | — |
+| 9 | a `path`-typed arg × the positional rule | `/tail ‸` | `path` | `` | `tail` | — |
+| 10 | no resolved tool × arguments | `git commit ‸` | `path` | `` | — | — |
+
+**Rows 1 to 4 were defects**, each an empty menu or a wrong argument with nothing to indicate why.
+
+- **Row 1.** `unquotedPrefix` retried with a closing quote only when the token's *first* character was one, so a quote opening partway through — which is exactly `--status="ru` — fell through to the empty string. An empty prefix is no slot and no candidates. The `=` is now found in the **source** rather than in the unquoted text, which removes the special case that caused it.
+- **Row 2.** `findTool` was given every word on the line, so `ls | /ps --st` asked for `["ls", "ps"]` and resolved nothing: **no flag after a pipe ever completed.** Every question here is about the current command, and the segment now begins at the last operator.
+- **Row 3.** A tool name may be several words (C05 §2), so counting positionals from index 1 made `scale` the first argument and every argument resolved one slot late. `findTool` already returns `consumed` and the answer was being discarded.
+- **Row 4.** C05's gate accepts `--flag value` as well as `--flag=value`, so the word after a value-taking flag belongs to that flag. Counted as a positional it shifts everything after it, and on a one-argument tool the slot becomes `none` — the menu stops appearing entirely. Row 5 is the negative control: a bool takes no value, so nothing is skipped.
+
+**Row 7 is a row that agrees, and it is in the table for that reason.** A quoted `"/ps"` classifies as a verb here, and C18's `verbOf` also ignores `quoted` — so the two components agree and I5's failure mode cannot occur. Whether *either* should treat a quoted token as a verb is C18's question and is left open rather than answered unilaterally here; what this row asserts is that they cannot disagree.
+
+**Row 8's `tool` is empty and row 1's is `ps`**, on inputs differing by one character. That is the tokeniser deciding, which is the point: unbalanced quotes are an error to C18, so completion offers nothing rather than something wrong.
+
+---
+
 ## 9. Invariants
 
 - **I1** — A result is applied only when its sequence is the `active` token. A result arriving after `cancel()` is never applied, because `cancel()` invalidates the token rather than advancing it — under a plain latest-wins reading that result *is* the latest and lands.
@@ -483,6 +517,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T2.6** (I4): a source scan finds no literal verb, flag or enum list in `completion/`.
 - **T2.7**: every `Slot` kind has at least one registered source — exhaustive over the union.
 - **T2.9** (§8a): the sequence trace replayed row for row, asserting the **whole** state after each step — `seq`, `active`, the in-flight set, the menu and the buffer — rather than the field the step is about.
+- **T2.10** (§8b): the classification table replayed row for row, asserting the whole context — slot, prefix, tool, argument — rather than the field the row is about. Four of its ten rows were defects when it was first run.
 - **T2.8** (I8): the menu's content is `Block[]`; a compile-level test rejects React.
 
 ### Tier 3 — edge cases
