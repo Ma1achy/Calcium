@@ -89,6 +89,8 @@ A vacuous rule reports success it has not earned; an undeclared branch reports a
 
   **SS8 is now folded, on the day C19 landed, and it went exactly as this paragraph predicted.** Its scope was `completion/` and its pattern was clock reads, which SS1 already forbids across all of `src/` with one named exception — so it could never fire on anything SS1 missed, and the component supposedly blocking it was again the one that proved it. C19 T2.3 declares SS1's coverage of `completion/` rather than a rule of its own. **SS9 is the last of the four**, and it is not the same case: its scope adds `fs` and a `~/.prism` literal, neither of which SS1 covers, so C20 builds it rather than folding it.
 
+  **Built, on the day C20 landed — and half of it was folded after all.** The rule as inventoried read "clock, `fs`, `~/.prism` literal", and the clock clause is the same dead entry the other three were: SS1 bans clock reads across all of `src/`, so a `history/`-scoped clause could not fire on anything SS1 misses. It is gone rather than carried, and C20 T2.4's clock half declares SS1's coverage. What was built is the half SS1 does not speak for. **The lesson the four of them add up to is that a pending rule is a claim about scope, not about a component**, and the honest thing to check when the blocker arrives is not "can I write this now" but "would it ever have fired".
+
   **The half a machine can see is now checked, and it found two on its first run.** A reason false at birth cannot expire and needs the fold; a reason that *becomes* false has a moment, and nothing was watching that moment. So a pending entry is now one of two shapes: a bare string, which is a fold or a condition no arrival satisfies, or `{ waitsOn, why }`, which is a claim — and "the component named by `waitsOn` is built" is a question `defaultIsImplemented` already answers. **MG14 had waited on C16 through C16's landing and C17's**, unenforced, reporting exactly like a satisfied rule; SS6 had waited on C16 for a fold it should have taken at the same moment. Both were found by writing the check, neither by reading the list.
 
 - **A scope column that drifted from the scope.** 14b's inventory equality compares rule **ids**, so a row may name a directory the rule does not scan and omit one it does — in both directions, indefinitely. SS24 said `table/`, `plot/`, `parser/` while the code said `table/`, `plot/`, `patch/`: one scope inventoried and unimplemented, one implemented and uninventoried, and every set comparison in the suite satisfied by the id alone. The equality now runs over the scope column too, **and over allow-lists**, which is the worse half — a granted exemption that no document records is indistinguishable from a rule that has no exemptions. Nine rows were wrong on the first run, SS28's five-subdirectory list against a code scope of `src/interaction/` among them, and every one was the row rather than the code.
@@ -235,7 +237,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS6 | — folded into SS1 | — | C16 T2.3 |
 | SS7 | — folded into SS1 | — | C17 T2.3 |
 | SS8 | — folded into SS1 | — | C19 T2.3 |
-| SS9 | clock, `fs`, `~/.prism` literal | `history/` | C20 T2.4 |
+| SS9 | `fs`, `~/.prism` literal — the clock clause dropped, being SS1's | `history/` | C20 T2.4 |
 | SS10 | `process.env` reads of the seven terminal variables | outside C02 | C02 T2.5 |
 | SS11 | `process.env` | `src/presentation/` | C09 T2.7 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
@@ -283,13 +285,13 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/`, allowing `presentation/theme/` | C09 T2.9 |
-| SS40 | The same, in the editor | `src/interaction/`, allowing `router/decode.ts`, `interaction/parser/`, and `completion/context.ts` and `completion/sources.ts` by name | C17 I2, T2.4 |
+| SS40 | The same, in the editor | `src/interaction/`, allowing `router/decode.ts`, `interaction/parser/`, `completion/context.ts` and `completion/sources.ts` by name, and six of C20's seven — `history/codec.ts`, `history/navigate.ts`, `history/persist.ts`, `history/redact.ts`, `history/search.ts`, `history/store.ts` — with the seventh, the layer builder, left in scope, being the one that measures display width | C17 I2, T2.4 |
 | SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `patch/`, `src/interaction/parser/` | C11 T2.6, C12 T2.5, C25 T2.4, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
 | SS27 | Timer or escalation logic, including a `SIGTERM` literal | `process/` | C21 I8, I11, T2.4 |
 | SS41 | `process.env` or `process.stdin` | `process/` | C21 I14, T2.7 |
-| SS28 | Scheduler calls | `src/interaction/` | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
+| SS28 | Scheduler calls | `src/interaction/`, allowing `history/types.ts`, `history/persist.ts` and `history/store.ts`, whose `flush` is C20's write to disk and not C03's frame | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
 | SS29 | Multi-store access | outside local handlers | C23 T2.7 |
 | SS30 | A second implementation of a shared text primitive — tokeniser, quoter, edit distance | `src/`, allowing `interaction/parser/tokenise.ts`, `data/manifest/validate.ts` and `blocks/kinds/code.ts` | C18 T2.3, C18 T2.10, C19 T2.4, C05 T2.9 |
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |

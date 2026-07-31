@@ -42,6 +42,8 @@ Cap is **10,000 entries**, FIFO. `entries` never exceeds it. The two files are *
 
 A malformed file is treated as empty and a warning is logged (`j22`). The session opens normally.
 
+**A damaged file is repaired at open (I28).** A load that warned — corrupt, truncated, or with an unusable sidecar — is followed by a rewrite of both files from what survived. Without it the damage is permanent in the way that matters: the session opens, warns and works, and *every session after it* opens on the same broken file and loses everything again, because appending to a file already declared unreadable changes nothing about it. At open rather than at the first write, because the exit path has no synchronous rewrite (I18) and would otherwise append a session's commands to a file the next load discards.
+
 **A partial final line is not malformed, and the distinction is worth the sentence.** Every entry is written with its terminator, so a last line without one is an interrupted append — one entry, mid-flight, at the moment of a crash. Discarding 9,999 good commands to punish it would be the corruption rule doing more damage than the corruption. So: an unterminated final line is dropped with a warning, and *malformed* means an invalid escape or a null byte in the file, which is a file no writer of ours produced. Refusing to start because history is unreadable would be a worse failure than losing it — and the sidecar going missing while the commands survive is common enough (a partial copy, an interrupted rotation) that the commands are kept and the metadata reset.
 
 ---
@@ -68,19 +70,29 @@ P2 an assignment NAME=value whose NAME matches SECRET,
    ?private_token=… (B3). The value ends at whitespace,
    &, a quote, or end of line.                             → redact the value
 E  otherwise the entropy heuristic — length ≥ 20 and ≥ 3.5
-   bits per character — with exemptions for a UUID, 7–64
-   hex characters (B5), a semver, a flag name, and a path:
-   rooted (/, ./, ../, ~/), or containing a / with no
-   segment that trips the bar on its own (B4).             → redact if still over
+   bits per character — applied to each half of an
+   assignment and to the whole of anything else (B7), with
+   exemptions for a UUID, 7–64 hex characters (B5), a
+   semver, a flag name, a URL (B8), and a path: rooted
+   (/, ./, ../, ~/), or containing a / with no segment
+   that carries + or = and none that trips the bar on
+   its own (B4).                                           → redact if still over
+
+   All three run again *inside* a quoted compound, over its
+   pieces split on whitespace with quotes trimmed (B9).
 ```
 
-**The path exemption is defined by segments, not by punctuation**, and the first wording was "no `+` or `=` in any segment", which `aGVsbG8vd29ybGRzZWNyZXQ5OTk5` walks straight through. A path is a composition of names and a secret is one long high-entropy run, so the test is the one already written: exempt a slash-bearing token when **every segment** falls under the length-and-entropy bar. `/var/folders/T/x9f2kd8s0shx7q1p/prism-run` is exempt because its longest segment is sixteen characters; a base64 blob is not, because one segment is the blob.
+**The path exemption is defined by segments, and by punctuation, and it needed both.** The first wording was "no `+` or `=` in any segment", which an unpadded blob walks straight through; the second was the segment bar alone, which a padded one walks through the other way, because a `/` splits it into two halves that are each under the bar. A path is a composition of names and a secret is one long high-entropy run — so a slash-bearing token is a path when **every segment** is under the bar *and* carries neither `+` nor `=`. `/var/folders/T/x9f2kd8s0shx7q1p/prism-run` is exempt because its longest segment is sixteen characters and its punctuation is slashes; base64 is not, either way round.
 
 Positional redaction is reliable and catches the realistic case — someone pasting `--token=ghp_…`. The entropy net catches an unrecognised shape without destroying the identifiers the tool is built around.
+
+**The net measures atoms, and an assignment is two of them (B7).** `--run=<uuid>` is forty-two characters of mixed case and `--family=digit-classifier` is twenty-five, so a net applied to whole tokens redacts a UUID, a semver and an ordinary flag — three of the five shapes I5 exists to protect, destroyed by the rule written to protect them. Applied to the value alone it walks past `ijx3IdkOu1RvEsOaQI5tMwrFcSjvWw==`, because base64 padding parses as a thirty-character *name* and a value of `=`. So both halves, and the whole token where it is not an assignment.
 
 **"Flag" and "token" are C18's, where the command parses.** The rules above are positional, and a position is a token — so redaction tokenises with C18's `tokenise`, which already knows what a quote does. Where the command does not parse, it falls back to a whitespace split: a paste is not obliged to be valid input, and a secret inside an unparseable line is still a secret. Writing a second tokeniser here would be C18 ruling 4 contradicted one component over.
 
 **Every line is scanned, and redaction runs before escaping (I18).** C17 §4 shipped three newline bindings, so a submitted command can carry a newline and `GITLAB_PASSWORD=hunter2` can sit on its third line. Redaction takes the logical command, line by line; escaping is what happens to the result on its way to disk. The other order scans `\\n`-joined text in which the environment rule's line anchor no longer has a line to anchor to.
+
+**A quoted compound is opened, not skipped and not spliced whole (B9).** `sh -c "GITLAB_PASSWORD=hunter2 deploy"` is one token whose text is a whole command: splicing by its span takes `deploy` and the closing quote along with the secret, and the net redacts the command wholesale. Skipping it leaves `curl -H 'PRIVATE-TOKEN: ghp_…'` intact — a secret that is neither an assignment nor a flag value, so nothing but the net will catch it and the net was outside the quotes. All three rules therefore run again over the compound's pieces, split on whitespace with surrounding quote characters trimmed so a splice cannot eat one.
 
 Redaction happens **before persistence, not before display**. The in-memory entry for the current session keeps its value so `↑` still works within the session; only what reaches disk is redacted.
 
@@ -330,7 +342,15 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 - **B5 — the hex exemption's range destroys SHA-256.** 7–40 is Git's; a 64-character digest is as much an identifier as a commit is, and this tool prints them. 7–64.
 - **B6 — P is unconditional on length and E is not.** `--password hunter2` is seven low-entropy characters and is still a password. Recorded because the natural implementation applies one length bar to everything.
 
-**Four of these six destroy a legitimate command and two leak a secret**, and every one lives in a cell where two correct statements overlap: a flag rule meeting a name that contains a keyword, a next-token rule meeting a flag, a token rule meeting a quoted string, an exemption meeting an alphabet. None is visible to a reader checking the three rules one at a time, which is how all three read as correct in §3.
+### And three more the corpus added, which the table could not
+
+§7b was written before the code and indexed by rule interaction, which is what made its six findings findable. Three more arrived when the rules met a real corpus rather than a chosen one, and each is the same shape one step further in — a rule that is right about the case it was written for and wrong about the atom it is applied to.
+
+- **B7 — the net measures the halves of an assignment.** Applied to whole tokens it redacts `--run=<uuid>`, `--version=1.24.0-rc.3` and `--family=digit-classifier`; applied to values alone it walks past `ijx3IdkOu1RvEsOaQI5tMwrFcSjvWw==`, whose blob is the *name* and whose value is `=`. Each of the two obvious readings misses what the other catches, which is why neither showed up as wrong on its own.
+- **B8 — a URL is exempt.** A query string makes an address long and high-entropy, so the net redacts the whole of `https://host/api?…` the moment it carries two parameters. P2 already reaches the part of a URL that holds a secret.
+- **B9 — a quoted compound is opened.** Skipping it was the fix for the splice damage in B3's row, and it left `curl -H 'PRIVATE-TOKEN: ghp_…'` intact: a secret in no rule's shape, catchable only by the net, with the net outside the quotes. T5.4 is where that surfaced — a session-level assertion that *no fragment* reaches disk, which is a different question from any row of a table.
+
+**Four of the first six destroy a legitimate command and two leak a secret**, and every one lives in a cell where two correct statements overlap: a flag rule meeting a name that contains a keyword, a next-token rule meeting a flag, a token rule meeting a quoted string, an exemption meeting an alphabet. None is visible to a reader checking the three rules one at a time, which is how all three read as correct in §3.
 
 ---
 
@@ -360,9 +380,11 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 - **I22** — A search action that finds nothing sets `failed` and retains both the query and the previous hit; the next matching query resumes from that hit, not from the newest.
 - **I23** — `searchEnd` returns the command captured in the hit, never a re-read of `entries[index]`.
 - **I24** — Redaction never destroys a flag name, a numeric value behind a name that merely contains a keyword, or a flag following a valueless secret flag.
-- **I25** — The assignment rule reaches inside quoted token text and URL query values, not only bare tokens.
+- **I25** — Every rule reaches inside a quoted compound and into URL query values, not only bare tokens: the compound is scanned by its pieces.
 - **I26** — The path exemption does not exempt a base64 blob.
 - **I27** — `drain()` writes from the last confirmed write, and the duplicate this may produce is collapsed on load by I4.
+- **I28** — A load that warned is repaired at open: both files are rewritten from what survived, so damage is not inherited by the next session.
+- **I29** — The entropy net measures each half of an assignment and the whole of anything else. Neither half alone is sufficient, and each miss is a shape the other catches.
 
 ---
 
@@ -394,6 +416,8 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 24. The assignment rule reaches inside quoted text and URL query values (I25).
 25. The path exemption does not exempt base64 (I26).
 26. The exit drain writes from the last confirmed write; I4 collapses the overlap on load (I27).
+27. A damaged file is repaired at open, so no session inherits it (I28).
+28. The entropy net measures both halves of an assignment and every piece of a quoted compound (I29, I25).
 
 ---
 
@@ -426,7 +450,7 @@ Six tiers. Every cell of both §7 tables is covered.
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I5, the important one): a corpus of realistic commands — UUIDs, 7- and 40-character SHAs, semvers, absolute and relative paths, flag names — survives redaction intact.
+- **T2.1** (I5, I29, the important one): a corpus of realistic commands — UUIDs, 7- and 40-character SHAs, semvers, absolute and relative paths, flag names — survives redaction intact.
 - **T2.2** (I5): `--token=ghp_16C7e42F292c6912E7710c838347Ae178B4a`, `GITLAB_PASSWORD=hunter2`, `--api-key foo` → redacted in all three positions.
 - **T2.3** (I6): a redacted-on-disk entry is still complete in `entries` for the current session.
 - **T2.4** (I11, I12): a source scan finds no clock, no direct `fs`, and no `~/.prism` literal in `history/`.
@@ -487,7 +511,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T5.3**: `⌃r`, narrowing, `⌃r` again, `Enter` → the older match executes.
 - **T5.4**: a session where a token is pasted → the on-disk file contains `[REDACTED]` and no fragment of the secret.
 - **T5.5**: a multi-line command submitted, session restarted, recalled with `↑` → identical, newlines intact.
-- **T5.6**: a session started with a deliberately corrupted history file → opens, warns once, works.
+- **T5.6** (I9, I28): a session started with a deliberately corrupted history file → opens, warns once, works, **and the session after it opens clean**. The second half is the one that matters: without the repair the damage is inherited for ever.
 - **T5.7** (I18): a command submitted and the session ended through `beforeRelease` without awaiting anything → the command is on disk. The case the asynchronous signature quietly breaks.
 
 ### Tier 6 — fail-on-revert
@@ -513,6 +537,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.19** (I24): dropping the boundary from the flag-name match → T2.12 fails on `--tokens=3`, and a count is redacted.
 - **T6.20** (I25): scanning tokens only → T2.12 fails on `sh -c "GITLAB_PASSWORD=…"`, and the commonest delegated-shell secret persists in full.
 - **T6.21** (I26): exempting anything containing a slash → T2.12 fails on the base64 row, and the entropy net stops catching what it exists for.
+- **T6.24** (I29): measuring the whole token, or only the value → T2.1 fails on `--run=<uuid>` under the first reading and T2.12 fails on the padded blob under the second. Both readings look complete on their own.
+- **T6.25** (I25): treating a quoted compound as opaque → T5.4 fails, and a `PRIVATE-TOKEN:` header reaches disk in full.
+- **T6.26** (I28): seeding the writer without the damaged flag → T5.6's second session fails, and a corrupt file is inherited by every session that follows.
 - **T6.22** (I3): resetting navigation on C20's own `setText` → T4.8 fails, `↑` works once and `↓` never does.
 - **T6.23** (I27): draining from the last issued write rather than the last confirmed one → T5.7 fails, and the command lost is the one just typed.
 
