@@ -42,7 +42,7 @@ type TuiConfig = Readonly<{
 
   clock?:    () => number;
   fs?:       FileSystem;
-  stateDir?: string;                       // PRISM_TUI_STATE_DIR, default ~/.prism
+  stateDir?: string;                       // default ~/.prism; the app resolves PRISM_TUI_STATE_DIR (I20)
   openUrl?: (url: URL) => Promise<void>;   // default: the OS handler, http/https only
   stdout?: NodeJS.WriteStream;
   stdin?:  NodeJS.ReadStream;
@@ -80,7 +80,11 @@ Four required fields. Every optional one has a working default: the fallback ada
 
 `debug.retainPayloads` turns on C13's raw-payload retention (C13 §5a) so `/debug` can show what an adapter was actually given. Absent, nothing is retained. Present without a count, the default is 50 — a number rather than "all" because doubling memory against a 100,000-block cap is how a debug mode becomes one nobody turns on.
 
-`stateDir` resolves from `PRISM_TUI_STATE_DIR`, defaulting to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
+`stateDir` defaults to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
+
+**`PRISM_TUI_STATE_DIR` is resolved by the app's entry point, not here** (I20). An earlier draft of this section had C22 read it, which contradicts A03 SS10 — the scan bans `process.env` across all of `src/` with a one-file allow-list, C02's, because an exception list is the thing that grows. C06 I18 settled the same question for `PRISM_TUI_TRANSPORT` and the reasoning transfers whole: a variable named for one consumer has no business inside a framework that claims to serve others, and `tui-kit` ships no binary to read it from. `prism-tui` reads its own variable and passes the resolved path through `TuiConfig.stateDir`, exactly as it passes a constructed router through `TuiConfig.transport`.
+
+This is a structural interaction rather than an oversight, which is why it survived review: §2 is about what C22 owns and SS10 is about what `src/` may read, both correct on their own, and the sentence sat in the one cell where they meet.
 
 **`FileSystem` structurally satisfies C20's `HistoryFs`, and that is the direction the dependency runs.** C20 declares the narrow seam it needs — four methods, no `mkdir`, no `exists` — because an L3 component reaching up to L4 for a type is the edge A02 Seam 4 exists to prevent; this interface is a superset, so the injected `fs` is passed straight down with no adapter. `appendFileSync` is the one synchronous member and it exists for C20 I18: `beforeRelease` is synchronous (C01 I5), and without it the append in flight at exit — the command just submitted — is lost.
 
@@ -135,7 +139,7 @@ Three orderings are load-bearing and the rest are incidental:
 
 **Gate 1 has one exception.** A verb whose manifest entry declares `oneShot: true` — `/dashboard --once` is the only one in v1 — writes a single frame to stdout and exits, with no alternate screen and no session. Piping is its entire purpose, so refusing it for not being a TTY would refuse the use case. The exception is declared in the manifest rather than special-cased by name, so a second such verb needs no change here.
 
-Gates 1, 2 and 4 are `t01`'s. **Gate 4 does not block construction** — the graph is built, the fallback is drawn, and a resize continues from step 5 with session state intact. The too-small render is C22's, deliberately layout-engine-free (C02 §Size), because it must work in a terminal too small for the layout engine to produce a sane answer.
+Gates 1, 2 and 4 are `t01`'s. **Gate 4 does not block construction** — the graph is built, the fallback is drawn, and a resize continues from step 5 with session state intact. The too-small render is C22's, deliberately layout-engine-free, because it must work in a terminal too small for the layout engine to produce a sane answer. The 60 × 16 threshold is C22's number and not C02's: C02 §8 assigns it to L4 explicitly, on the grounds that a minimum size is an app policy rather than a terminal capability. An earlier draft cited it as `C02 §Size`, a section C02 has never had — a dangling reference, and A03 §9a records what happens to those when a renumber gives them something to resolve against.
 
 Step 7 is non-blocking, so the banner completes visibly over the first second rather than delaying the prompt. Input is accepted at 8, not after 7 — a dev can type while the banner is still filling in.
 
@@ -166,6 +170,11 @@ type SessionSnapshot = Readonly<{
 | `identity`, `health` | C22's refresh loop | Chrome, and the notices in §7 |
 | `retained` | C23, on an auth failure; cleared on a successful retry | C23's retry handler |
 | `stopping` | C22, at `stop()` | C23, to refuse late submissions |
+| `cluster`, `version` | **nobody — set at construction, never written after** | Chrome (S01 §2) |
+
+**Nine fields, seven of them mutable.** An earlier draft counted six and named neither `cluster` nor `version` in this table, which left I11 — exactly one writer per field — with nothing to say about two of the nine. That is A03 §2's vacuity class in a state table: a field absent from an ownership table reads exactly like a field nobody writes, and only one of those is a claim.
+
+`cluster` and `version` are the ones nobody writes, and they are declared so rather than dropped from the type. Both come from config, both are read by chrome — S01 §2 reads `session.cluster` and commits that cluster never elides — and both are constant for the life of a session: a second cluster is a second session (§13), and the version cannot change under a running process. So the row is `nobody`, and T1.11 asserts it as an absence of writes rather than skipping the two fields it cannot name a writer for.
 
 `cwd` is exposed to C21 as a **function**, not a value (C21 I11), so a `cd` between two verbs actually moves the second one.
 
@@ -211,9 +220,19 @@ An unreachable cluster sets `health: "offline"` and nothing else. Verbs fail wit
 with `beforeRelease` — supplied by C22 at construction — doing:
 
 ```
-a  killAll()                        C21 — SIGKILL, no grace
-b  flush history                    C20
+a  killAll()                        C21 — SIGKILL, no grace, not awaited
+b  history.drain()                  C20 — the synchronous append
 ```
+
+### `beforeRelease` is synchronous, and the floating promise is deliberate
+
+C01 I5 requires it synchronous and non-throwing, because a signal handler cannot await. Both calls are chosen to hold under that constraint, and each is a case where the synchronous-looking thing is the wrong one:
+
+**`killAll()` returns a `Promise` and is called without `await`.** It delivers every `SIGKILL` in a synchronous loop and then awaits only the *reaping* (C21 §killAll). So by the time it returns its promise, every live child has already been signalled — which is the part that must happen before the terminal is released — and what is abandoned is the wait for exit statuses nothing here reads. **The assertion is therefore the observable one: every handle in `runner.live` was signalled before the first release byte.** Asserting that a promise settled would assert the part that does not matter and would require the await that breaks I5.
+
+**And the promise is defended, because "fixing" it breaks I5 invisibly.** There is no `no-floating-promises` rule in this tree — typescript-eslint was rejected during C02 at 87 packages — so nothing flags the promise and nothing flags the fix either. The next reader adds `await`, `beforeRelease` becomes `async`, and the failure appears only when a signal arrives during shutdown: the path least likely to be exercised and most likely to matter. A comment at the site is a habit; what carries it is **T2.8, which asserts `beforeRelease()` returns `undefined` and not a thenable**, and T6.14, which names the edit.
+
+**`drain()`, not `flush()`.** C20 ships both, and `flush()` is `async` (C20 §2, I18): the append still in flight at exit is the command the user has just typed, and Node does not wait for a pending promise at process end. `drain()` is the synchronous member `FileSystem.appendFileSync` exists for. Calling `flush()` here would satisfy the reading of step b and lose exactly the entry the step is written to save.
 
 **Cleanup runs through `beforeRelease` and nowhere else.** An earlier draft had C22 call `killAll` and flush directly on the explicit paths and treated `beforeRelease` as a no-op afterwards — but C01 I5 runs it once before the *first* release, which had not yet happened, so both ran twice. A double history flush duplicates entries. One path, five callers, no special case.
 
@@ -249,7 +268,7 @@ History flushes on **every** path including faults. Losing a session's history t
 - **I8** — A failed size gate does not abort construction; session state survives until a resize.
 - **I9** — The too-small render uses no layout engine.
 - **I10** — Clock and filesystem enter the graph only here.
-- **I11** — Session state has exactly one writer per field.
+- **I11** — Session state has exactly one writer per field, and the two fields with no writer say so. `cluster` and `version` are set at construction and never written after; a field absent from §5's table would read identically to a field nobody writes, and only one of those is a claim.
 - **I12** — `cwd` reaches C21 as a function, never a captured value.
 - **I13** — Chrome is app-supplied; `tui-kit` owns only the frame's structure.
 - **I14** — C22 never auto-logins.
@@ -258,23 +277,26 @@ History flushes on **every** path including faults. Losing a session's history t
 - **I17** — `createTui` requires exactly four fields; every other has a working default. The count is the ergonomic claim R01 §1 tests — a working TUI built from the README without asking a question — and a fifth required field is a spec change rather than a convenience.
 - **I18** — Banner and identity fetches are non-blocking: input is accepted before either completes, and neither can delay the first frame. A shell that will not take a keystroke until a network call returns is a shell that hangs on a bad DNS entry.
 - **I19** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
+- **I20** — `tui-kit` reads no environment variable. `PRISM_TUI_STATE_DIR` is resolved by the app's entry point and arrives as `TuiConfig.stateDir`, exactly as `PRISM_TUI_TRANSPORT` arrives as `TuiConfig.transport` (C06 I18). A03 SS10's allow-list stays at one file.
+- **I21** — `beforeRelease` is synchronous and returns `undefined`, never a thenable. `killAll()`'s promise is deliberately not awaited: its signals are delivered synchronously and only the reaping is deferred, and awaiting it would make the handler `async`, which C01 I5 forbids because a signal handler cannot await.
 
 ---
 
 ## 11. Commitments
 
 1. Four required config fields; every other has a working default (I17).
-2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` resolves from `PRISM_TUI_STATE_DIR` (I10).
+2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.prism` and the **app's entry point** resolves `PRISM_TUI_STATE_DIR` (I10, I20).
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2).
 4. All four registries seal before input is accepted (I3).
 5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate (I8).
 6. The too-small render is layout-engine-free (I9).
 7. Banner fetches are non-blocking and input is accepted before they finish (I18).
-8. Session state is six fields with one writer each; nothing else lives here (I11).
+8. Session state is nine fields — seven with one writer each, and `cluster` and `version` set at construction with none. Nothing else lives here (I11).
 9. `cwd` is exposed as a function so `cd` moves subsequent verbs (I12).
 10. Chrome is app-supplied; the prompt gutter is C22's to pass, not C17's to assume (I13).
 11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I19).
 12. Shutdown is one function, five callers, four ordered steps, with cleanup solely inside `beforeRelease` (I4, I5).
+12a. `beforeRelease` is synchronous and returns no thenable; `killAll()`'s promise is not awaited and `drain()` is used rather than `flush()` (I21, C01 I5, C20 I18).
 13. Release precedes diagnostics; history flushes on every path (I6, I7).
 14. An offline cluster degrades rather than ends the session (I15).
 15. `stopped` is terminal (I16).
@@ -293,11 +315,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4** (I3): all four registries report `sealed` before the input router accepts anything.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
 - **T1.6** (I10): a fake clock and filesystem reach every component that takes one — asserted per component.
-- **T1.7** (I5): on every exit path, `killAll` and the history flush each run **exactly once** — the double-flush regression, tested directly.
-- **T1.8**: `stop("exit")` from running → the five steps in order, exit code 0.
+- **T1.7** (I5): on every exit path, `killAll` and `drain` each run **exactly once** — the double-flush regression, tested directly.
+- **T1.8**: `stop("exit")` from running → §8's **four** steps in order, exit code 0. An earlier draft of this line said five, against a §8 and an I4 that both say four; the count is asserted against the list rather than restated, so the two cannot drift again.
 - **T1.9**: `stop` from created → stopped without acquiring anything.
 - **T1.10** (I4): `stop` twice → the second is a no-op; no double release, no double flush.
-- **T1.11** (I11): each session field is written only by its documented writer — a spy per field.
+- **T1.11** (I11): each session field is written only by its documented writer — a spy per field, all nine. `cluster` and `version` are asserted as **never written after construction**, which is the half a table with seven rows could not state.
 
 ### Tier 2 — contract / interface
 
@@ -308,6 +330,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T2.5**: every hook in A02 §6 has a default except `theme`, and each default is exercised.
 - **T2.6** (I12): `SpawnOptions.cwd` is a function; a compile-level test rejects a string.
 - **T2.7**: config validation rejects each missing required field with a named error, before construction.
+- **T2.8** (I21, C01 I5): `beforeRelease()` returns `undefined` — not a thenable, checked as `typeof result?.then !== "function"` rather than by awaiting, since awaiting a non-thenable passes. This is the mechanism behind the floating `killAll()`: nothing in this tree flags a floating promise and nothing flags the `await` that would "fix" it, and the resulting `async` handler fails only when a signal arrives during shutdown.
+- **T2.9** (I20): a source scan finds no `process.env` and no `PRISM_TUI_STATE_DIR` anywhere in `src/`, C02's one allow-listed file excepted. The C06 T2.9 shape, for the second variable.
 
 ### Tier 3 — edge cases
 
@@ -315,7 +339,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.19**: `stop` sets `session.stopping` before releasing, so a submission racing shutdown is refused.
 - **T3.2**: `start` twice → no-op, nothing constructed twice.
 - **T3.3**: `stop` during construction → nothing acquired, no cleanup attempted.
-- **T3.4**: `stop` while a handed-off child is running → the child is killed inside `beforeRelease`, then the terminal is released.
+- **T3.4**: `stop` while a handed-off child is running → `beforeRelease` signals every handle in `runner.live` and **the handed-off child is not among them**, then the terminal is released.
+
+  **The original line asserted the opposite and was unsatisfiable.** It read "the child is killed inside `beforeRelease`", and C21 deliberately does not track a handed-off child in `live` (`runner.ts`, the comment under `handoff`): that child runs in *this* process group, so signalling the group would kill the session along with it. The child receives the signal from the OS, on the same delivery that reached this process — which is why the row still ends with the terminal released and no orphan, and why the assertion is about what `beforeRelease` reaches rather than about the child's fate.
+
+  Written as a consequence rather than an oversight, because the two read identically once the test is green: an assertion nobody can satisfy and an assertion nobody has written yet both show up as a missing test.
 - **T3.5**: non-TTY stdout → help printed, exit 0, no escape sequence emitted.
 - **T3.5b**: non-TTY stdout with a `oneShot` verb → one frame to stdout, exit 0, no alternate screen, no session constructed.
 - **T3.6**: missing config → `config init` dispatched; the shell opens afterwards.
@@ -372,6 +400,10 @@ PTY harness.
 - **T6.10** (I12): passing `cwd` as a string → T2.6 and T4.6 fail.
 - **T6.11** (I14): auto-login on expiry → T3.12 fails and a browser opens unasked.
 - **T6.12** (A02 Seam 4): letting C10, C14 or C15 cause their own cross-layer effect → T4.2, T4.3 or T4.4 fails.
+- **T6.14** (I21): adding `await` to the `killAll()` call in `beforeRelease` → T2.8 fails on the returned thenable. The revert is the plausible one — a reader who sees a floating promise and tidies it — and nothing else in the tree objects: typescript-eslint was rejected during C02, so there is no `no-floating-promises` rule to flag the promise or the fix. Without T2.8 the edit is green until a signal arrives mid-shutdown.
+- **T6.15** (I20): resolving `PRISM_TUI_STATE_DIR` inside `src/` → T2.9 and A03 SS10 fail, and SS10's allow-list gains its second entry.
+- **T6.16** (I11): dropping `cluster` or `version` from §5's table → T1.11 loses a field silently, because a field with no row and a field with no writer are the same absence to a reader. The count in commitment 8 is what fails.
+- **T6.17** (I21, C20 I18): calling `flush()` rather than `drain()` in `beforeRelease` → T1.7 and T2.3 fail, and the command the user has just typed is the one entry lost, because Node does not wait for a pending promise at exit.
 
 ---
 

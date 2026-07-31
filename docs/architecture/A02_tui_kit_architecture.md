@@ -158,15 +158,25 @@ Array order **is** the priority. Focus is derived on every dispatch from what is
 
 No component reaches sideways or upward to cause an effect in another. Where an effect must cross, **L4 sequences it**:
 
-| Effect | Sequence |
-|---|---|
-| Child process needing a TTY | `lifecycle.suspend()` → `runner.handoff()` → `lifecycle.resume()` → `scheduler.invalidate()` |
-| Theme switch | `theme.setVariant()` → `scheduler.invalidate()` |
-| Scroll | `viewport.scroll()` → `scheduler.commit("input")` |
-| History recall | `history.previous()` → `editor.setText()` |
-| Command submit | `parser.parse()` → `transport` → `adapters` → `transcript.append()` → `scheduler.commit()` |
+| Effect | Sequence | Owner |
+|---|---|---|
+| Child process needing a TTY | `lifecycle.suspend()` → `runner.handoff()` → `lifecycle.resume()` → `scheduler.invalidate()` | C23 |
+| Theme switch | `theme.setVariant()` → `scheduler.invalidate()` | C23 |
+| Scroll | `viewport.scroll()` → `scheduler.commit("input")` | C22 |
+| History recall | `history.previous()` → `editor.setText()` → **not** `history.resetNavigation()` (C20 I3) | C23 |
+| Command submit | `parser.parse()` → `transport` → `adapters` → `transcript.append()` → `scheduler.commit()` → `router.resetFocus()` | C23 |
+| Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — never pop-and-repush (C19, C15 §2) | C23 |
+| History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` | C23 |
+| Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) | C23 |
+| Resume from `SIGCONT` | C01's `onResume` → `scheduler.invalidate()` — the same call an orchestrated `resume()` makes, because C01 sets no contamination flag (C01 §Signals) | C22 |
+| Terminal too small | size gate → C22's layout-engine-free fallback → `onResize` → resume the normal frame, state intact (C22 §4) | C22 |
+| Shutdown | `session.stopping = true` → `lifecycle.release()` (which runs `beforeRelease`) → diagnostics → exit (C22 §8) | C22 |
 
 This is the rule that keeps L0's two halves unaware of each other and keeps L1 and L2 unaware of the terminal. It has caught four attempted violations during specification — contamination, invalidation, scroll commits and handoff — and it is the first thing to check when a component wants a dependency that feels awkward.
+
+**The owner column, and six rows that were missing.** The table listed five sequences when it was written, and every seam added since C15 landed went into the component spec that needed it and not into this table: `resetFocus()` on append (C16 I2), C19's menu push and `update`, C20's search layer and its three-way `searchEnd`, C20's suppressed `resetNavigation`, C25's fullscreen view, and C22's own three. Each is a real cross-layer effect and each was already specified somewhere; what was missing is the one place that says *all* of them are L4's, which is the only form in which the rule is checkable.
+
+The owner column exists because "L4" now means two components. A row owned by C23 is not C22's to implement, and without the column the difference is a judgement each reader makes again.
 
 ### Seam 5 — the five extension hooks
 
@@ -215,7 +225,9 @@ Order is load-bearing; three steps are not reorderable.
 
 ### Shutdown
 
-One function, five callers — `/exit`, Ctrl-D confirm, double Ctrl-C, signal, fault. Flush history → release terminal → print diagnostics if any → exit with the caller's code. Release precedes printing so faults land in the real scrollback.
+One function, five callers — `/exit`, Ctrl-D confirm, double Ctrl-C, signal, fault. Set `stopping` → release the terminal → print diagnostics if any → exit with the caller's code. Release precedes printing so faults land in the real scrollback.
+
+**Killing children and flushing history are inside `beforeRelease`, not steps of their own.** This line used to read "flush history → release terminal", which is the shape C22's earlier draft had and the reason it double-flushed: C01 runs `beforeRelease` once before the first release, so a flush written as a separate step runs beside it rather than instead of it, and a duplicated history entry is the result. C22 §8 is authoritative and this is the summary of it.
 
 ---
 
@@ -382,5 +394,5 @@ Those entries **say which category they are in and name the structure that carri
 17. Six test tiers, not seven. Behaviour cross-cuts scope and is carried by the existing tiers.
 17a. A fail-on-revert entry with no failing test names itself as a structural guard and names the structure, rather than reading as an unfinished one.
 18. Every stateful component enumerates its transition table; invalid transitions are tier-3 tests.
-19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one.
+19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one. Seam 4's table names **every** such sequence and which of the two L4 components owns it — a seam specified only in the component that needs it is not checkable as a rule.
 20. **Every commitment cites an invariant, several, or another spec's.** §1's two rules for whose claim a commitment is are mechanical, not advisory: A03 SP1 fails the build on a commitment with no marker, on a citation naming an invariant its spec does not declare, and on a cross-reference that does not resolve. Self-referential deliberately — this is the document that states the rule, so it is the document that commits to it.
