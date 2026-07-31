@@ -171,16 +171,24 @@ describe("C20 §5 — reverse search", () => {
     expect(store.searchEnd("accept")).toBe("/logs digit-42");
   });
 
-  it("T1.19 (I23): the hit's captured command is returned after entries change", async () => {
-    const { store } = await openWith(three);
+  it("T1.19 (I23): the hit's captured command is returned after the indices shift", async () => {
+    // **At the cap, so the appends genuinely renumber.** The first version of
+    // this test appended to an uncapped store, where an append only ever adds
+    // at the end and `entries[1]` still names the same command — so the two
+    // readings agreed and the mutation that re-reads by index survived the
+    // whole suite. The mutation pass is what said so; nothing in a green run
+    // did.
+    const { store } = await openWith(three, { cap: 3 });
 
     store.searchOpen("");
     store.searchType("logs");
-    // Index 1 will name something else by the time `searchEnd` runs; the hit
-    // carries the string, so the answer cannot drift with the list.
+    expect(store.searchState?.hit?.index).toBe(1);
+
     store.append("/deploy", 0);
     store.append("/build", 0);
-
+    // Index 1 now names `/deploy`; the hit carries the string, so the answer
+    // cannot drift with the list.
+    expect(store.entries[1]?.command).toBe("/deploy");
     expect(store.searchEnd("submit")).toBe("/logs digit-42");
   });
 });

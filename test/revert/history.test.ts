@@ -128,11 +128,17 @@ describe("T6.3, T6.4, T6.17, T6.18, T6.22 (I2, I3, I21, I22): the two machines",
 
   it("re-reading `entries[index]` returns a command the user never chose", async () => {
     // The mutation: `searchEnd` returning `entries[hit.index].command`.
-    const { store } = await openWith(three);
+    //
+    // **At the cap**, because that is the only thing that renumbers: an append
+    // to an uncapped store adds at the end and every index still names what it
+    // named. Written the easy way this test passes under the mutation, which is
+    // how it was written and what the mutation pass caught.
+    const { store } = await openWith(three, { cap: 3 });
     store.searchOpen("");
     store.searchType("logs");
     store.append("/one", 0);
     store.append("/two", 0);
+    expect(store.entries[1]?.command).toBe("/one");
     expect(store.searchEnd("submit")).toBe("/logs digit-42");
   });
 });

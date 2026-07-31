@@ -286,6 +286,8 @@ It is **not constructible today**: within a session an append follows a submit, 
 
 **Ruling: remove the class instead of defending against it.** `searchEnd` returns `hit.command` — the string captured when the hit was found — and never re-reads `entries[hit.index]`. `rerun(index)` stays index-addressed because its index comes from the user and is range-checked (T3.14). One line, and the row cannot come back when L4 grows a path that does append.
 
+**The test for it has to construct the shift, and the first one did not.** Appending to an uncapped store only ever adds at the end, so every index still names what it named and both readings agree — the test passed, read as covering the class, and the mutation that re-reads by index survived the whole suite. At the cap the appends renumber. Nothing in a green run said so; the mutation pass did, which is the second time on this component that a passing test turned out to be asserting nothing.
+
 ### Trace 5 — `clear()` under each machine
 
 Also unreachable, for two reasons worth recording: `/history clear` is itself a submitted command, and the submit resets navigation before the confirm is raised; and the confirm is non-dismissable, so C16 skips global shortcuts beneath it (C16 §5) and `⌃r` cannot fire while it is open.
