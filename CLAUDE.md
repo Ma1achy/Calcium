@@ -122,6 +122,22 @@ Each of these produces code that compiles, passes review, and is wrong.
   than the one it holds. And a fixture must be shown to respond to the thing under test
   before it is asserted against — `test/support/README.md` carries that rule and the two
   instances that produced it.
+- **Mutate before trusting a green suite.** A test file is not verified by passing;
+  it is verified by breaking the thing it covers and watching it fail. Every module
+  in C16 was mutated on landing — the priority order swapped, the arming machine
+  moved into a handler, the paste window turned into a gap timer, `/help` given its
+  own copy of the table — and **four defects came out of it**, none visible from a
+  green run. Two of them were in tests that had just passed sixteen and ten
+  assertions respectively. A mutation that fails nothing is a finding about the
+  tests, not a licence.
+
+  The figure that argues for the whole discipline is C16's: **seven defects from the
+  by-hand walks before any code, four more from mutation during it, three
+  enforcement rules changed shape under the pressure, and one new rule that found
+  three further instances in shipped code on its first run.** Eight spec commits
+  before a line of implementation looked disproportionate at the time, and every one
+  of those seven pre-code defects would otherwise have been a rewrite.
+
 - **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
   initialise, serialise.
 
