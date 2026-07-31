@@ -38,10 +38,18 @@ export interface CompletionEngine {
   /**
    * Has a request been waiting long enough to show a spinner (§7)?
    *
-   * Derived rather than stored, from the earliest **source call** still in
-   * flight — not from the sequence. Two `Tab`s in one context join the same
-   * call and the wait began at the first, so a sequence-tagged stamp would
-   * reset and hide the spinner for another 500 ms from someone already waiting.
+   * **The earliest call still in flight**, which is the whole mechanism. The
+   * question is "how long has anything been outstanding", not "how long has the
+   * current request been outstanding": two `Tab`s in one context join the same
+   * promise and the wait began at the first.
+   *
+   * Written as *earliest in flight* rather than "per source call", because that
+   * second phrasing names a distinction that does not exist — a call begins
+   * synchronously inside `request`, so both stampings carry the same number and
+   * a mutation swapping them fails nothing. The defect it was meant to forbid
+   * is a single `pendingSince` each request overwrites, and T6.13 is that: the
+   * *latest* stamp instead of the earliest.
+   *
    * Tagging answers validity; this measures elapsed wait, and the wait belongs
    * to the work.
    */

@@ -250,9 +250,15 @@ At 500 ms a spinner appears in the prompt: `❯ /ps --family=⠋`.
 
 **The spinner clears because the work ended, not because a clock restarted.** Dynamic sources run only on `Tab` (I3), so a keystroke that supersedes a pending request leaves *nothing* pending behind it. This is worth stating because the reasoning that produces the wrong implementation is plausible: "the request is superseded, so the next one restarts the 500 ms" — there is no next one until the user presses `Tab` again.
 
-**The elapsed-wait stamp is taken per source call, and it is the one thing §4's tagging rule does not reach.** Two `Tab`s in the same context join the same in-flight promise (§3, and §8a row 3), and the user's wait began at the first. A stamp tagged with the sequence resets on the second `Tab` and hides the spinner for a further 500 ms while they are already waiting — the wrong answer in the direction that matters, since the whole point of the spinner is to explain a wait that is already happening.
+**The spinner shows when the *earliest* source call still in flight is older than the threshold**, and that is the one thing §4's tagging rule does not reach. Two `Tab`s in the same context join the same in-flight promise (§3, and §8a row 3), and the user's wait began at the first — so what is asked is "how long has anything been outstanding", not "how long has the current request been outstanding".
+
+**Stated as "earliest in flight" rather than "per source call", because the second wording names a distinction that does not exist.** A source call begins synchronously inside `request`, so a stamp taken per request and a stamp taken per call carry the same number, and a mutation swapping one for the other fails nothing. Someone implementing to that wording could satisfy it and still hold a single `pendingSince` that each request overwrites — which is the actual defect, and it survives the sentence that was supposed to forbid it.
+
+The wrong answer is in the direction that matters: a single overwritten stamp resets on the second `Tab` and hides the spinner for a further 500 ms while the user is already waiting, having pressed `Tab` again precisely *because* nothing happened.
 
 The distinction is the reason, not the exception: **tagging answers validity, and the stamp measures elapsed wait.** Validity belongs to the token; the wait belongs to the work. Named here rather than left as a quiet deviation, because a rule with an undocumented exception is a rule people stop trusting.
+
+T6.13 is the mutation that expresses it — the spinner reading the *latest* stamp rather than the earliest, which is what one overwritten `pendingSince` amounts to.
 
 The 500 ms threshold and the 60-second TTL both use an **injected clock**, so every timing test runs on a fake one.
 
@@ -412,7 +418,7 @@ The second `Tab` completes the next slot. There is no state under which it re-op
 - **I12** — C19 imports nothing from `terminal/` and never commits a frame.
 - **I13** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
 - **I14** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
-- **I15** — Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner's elapsed-wait stamp, which is per source call (§7).
+- **I15** — Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner, which asks how long the earliest call still in flight has been outstanding (§7).
 - **I16** — A unique match is inserted whole followed by its own `delimiter`; a common prefix is inserted without one. The delimiter is declared by the candidate, because only its source knows whether the value is a directory, a flag taking a value, or a finished word.
 - **I17** — C19 reads no filesystem. The `path` and `executable` sources take an injected directory reader, so every test runs without one.
 
@@ -434,7 +440,7 @@ The second `Tab` completes the next slot. There is no state under which it re-op
 12. `/` completes verbs; bare text completes executables and paths (I14).
 13. Static sources ship with the framework, and so do the two generic dynamic ones — `path` and `executable`, over an injected directory reader. Only **domain-backed** dynamic sources are the app's, because a filesystem is not a domain (I3, I17).
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
-15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner's elapsed-wait stamp is the one named exception, and it is per source call (§7).
+15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner is the one named exception: it asks how long the earliest call still in flight has been outstanding (§7).
 
 ---
 
