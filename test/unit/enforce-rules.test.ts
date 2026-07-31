@@ -93,6 +93,14 @@ const FABRICATED: readonly Fabrication[] = [
     source: "const ch = buffer.charAt(cursor);",
   },
   {
+    // The third branch, which had no fabricated violation and no escape hatch.
+    // Slicing the buffer by code unit is how an emoji gets cut in half, and it
+    // is the operation someone reaches for first.
+    rule: "SS40",
+    file: "src/interaction/editor/editor.ts",
+    source: "const head = this.text.slice(0, cursor);",
+  },
+  {
     // The shape an adapter author reaches for when a document wants a
     // timestamp column the far side did not send. It compiles, it reads
     // sensibly, and it makes the adapter untestable against a fixture.
@@ -402,6 +410,48 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+  });
+
+  it("SS40's annotation is honoured on all three branches, and is a claim", () => {
+    // The lookahead sat on the `.length` alternative alone, so `.charAt(` and
+    // `.slice(` had no escape hatch — and C17 needs one, because slicing a
+    // *grapheme array* is the operation the rule is asking for rather than the
+    // one it forbids. A rule with no way to say "this is correct here" is a
+    // rule people route around by renaming the variable.
+    //
+    // Asserted per branch rather than once: the widening is a change to a
+    // regex, and a regex edit that silently covered two of three would leave
+    // exactly the branch nobody tested unannotated. `make enforce` would print
+    // `ok` either way.
+    const annotated = {
+      "src/interaction/editor/graphemes.ts": [
+        "const n = clusters.length; // graphemes-ok",
+        "const head = clusters.slice(0, at); // graphemes-ok",
+        "const first = row.charAt(0); // graphemes-ok",
+      ].join("\n"),
+    };
+
+    const clean = checkSourceScans(Object.keys(annotated), (f) => annotated[f] ?? "");
+
+    expect(
+      clean.filter((v) => v.rule === "SS40"),
+      "an annotated grapheme-array operation is the remedy, not a violation",
+    ).toHaveLength(0);
+
+    // And the annotation is a claim about the expression, not a licence for the
+    // line: the same three without it are three violations, one per branch.
+    const bare = {
+      "src/interaction/editor/graphemes.ts": [
+        "const n = clusters.length;",
+        "const head = clusters.slice(0, at);",
+        "const first = row.charAt(0);",
+      ].join("\n"),
+    };
+
+    expect(
+      checkSourceScans(Object.keys(bare), (f) => bare[f] ?? "").filter((v) => v.rule === "SS40"),
+      "each branch fires on its own",
+    ).toHaveLength(3);
   });
 
   it("MG21 permits escapes.js, and permits a type-only capability import", () => {

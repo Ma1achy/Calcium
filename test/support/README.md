@@ -128,6 +128,33 @@ move the content" and "there was no content that could have moved."
 
 ---
 
+## An exception annotation is a claim, not a suppression
+
+`// cells-ok` and `// graphemes-ok` exempt a line from SS23 and SS40. Neither
+means "the scan complained here". Each is an assertion about the expression it
+sits on, and it is read as one by the next person to touch the line:
+
+| Mark | What it claims |
+|---|---|
+| `// cells-ok` | this `.length` is not a display width — a count of rows, palette levels, children, errors |
+| `// graphemes-ok` | this operates on a **grapheme array** or a non-text value, where index arithmetic is correct |
+
+The distinction is most of what the annotation is worth. SS23's comment records
+why sixteen `cells-ok` marks on colour arithmetic were refused in favour of one
+allow-list entry: putting a claim about display width on lines that have nothing
+to do with display width teaches the mark to mean "the scan complained", and
+after that it silences a real violation without anyone noticing. SS40 is one
+careless review from the same place, and it is the newer of the two.
+
+So: if the honest comment would be "I know, but", the line is a violation and
+the fix is the remedy the rule's `why` names — `cells()` for a width, a grapheme
+index for a position. If the expression genuinely counts something else, the
+mark states which, and a reviewer can check it.
+
+This lives beside the fixture rules because both answer the same question —
+what a test or a mark is allowed to assert about itself — and because SS40's
+annotation is what an author reaches for while writing C17.
+
 ## Two decisions made here that later components inherit
 
 Both were forced by one component and will silently shape every test written

@@ -256,10 +256,26 @@ export const SCANS = [
   // someone reaches for the quick fix, which is exactly what SS23's comment above
   // says about SS40 itself. A directory is a packaging decision, not a semantic
   // one.
+  // **The annotation covers all three branches, and it did not.** The lookahead
+  // sat on the `.length` alternative alone, so `.charAt(` and `.slice(` had no
+  // escape hatch at all — and C17 needs one: slicing a *grapheme array* is the
+  // correct operation at the buffer, the kill buffer and the 200-unit undo
+  // bound, and index arithmetic over clusters is what this rule is asking for
+  // rather than what it forbids. A rule with no way to say "this is the right
+  // operation" is a rule people route around by renaming the variable.
+  //
+  // **`// graphemes-ok` is a claim, not a suppression.** It asserts that the
+  // expression operates on a grapheme array or a non-text value, where index
+  // arithmetic is correct. It does not mean "the scan complained here". The
+  // distinction is the whole value of the annotation: SS23's comment already
+  // records why sixteen `cells-ok` marks on colour arithmetic would have taught
+  // the mark to mean the wrong thing, and the same failure is one careless
+  // review away here. `test/support/README.md` carries it beside the fixture
+  // rules, because that is where someone reads about writing an exception.
   { id: "SS40", spec: "C17 I2 · C17 T2.4",
-    pattern: /\.length\b(?!.*\/\/ *graphemes-ok)|\.charAt\s*\(|\.slice\s*\(/,
+    pattern: /(?:\.length\b|\.charAt\s*\(|\.slice\s*\()(?![^\n]*\/\/ *graphemes-ok)/,
     scope: "src/interaction/", allow: ["src/interaction/router/decode.ts"],
-    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. C16's decoder is out of scope and counts bytes, where a unit count is the correct measure" },
+    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. `// graphemes-ok` claims the expression operates on a grapheme array or a non-text value, where index arithmetic is correct — it is a claim about the code, not a way to silence the rule. C16's decoder is out of scope and counts bytes, where a unit count is the correct measure" },
 
   // SS3 carried two of the four vacuity failures at once (A03 §2). It was
   // inventoried in A03 from the start and never written here, so it could not
