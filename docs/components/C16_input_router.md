@@ -157,6 +157,7 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 | A non-dismissable overlay is on top | No-op — a confirm is not cancellable by Ctrl-C |
 | Copy mode | Exit copy mode |
 | A pushed view | Pop it |
+| Focus in the live block | Return focus to the prompt, keeping the input; a second Ctrl-C then takes the prompt rungs |
 | Prompt with text | Clear the input |
 | Prompt empty | Arm the exit confirm; a second within 500 ms raises it |
 
@@ -175,6 +176,12 @@ Note that the reorder above widened this hazard rather than narrowing it: the th
 The `shell` route is a different thing and is reachable. It goes through `spawnShell` rather than `C06.invoke`, so `busy` is false and rung 1 does not catch it, which is what leaves a real gap for this rung to fill.
 
 **Making `spawnShell` set `busy` instead was rejected.** It would put a foreground shell command under C06's concurrency guard, and C23 I5 already owns that condition at a different scope — C23's guard is authoritative and C06's is the backstop. Two guards over one condition is how they drift.
+
+**The live-block rung is new, and it is a change rather than a description.** The table had no row for focus being in the live block, so it fell through to the prompt rungs — meaning Ctrl-C while navigating a table *cleared the prompt behind it*, a side effect on a surface the user is not looking at. That is I5's principle broken by omission: an event that finds no rung for the target that owns it should not act on a lower one.
+
+Under the ladder's own rule, "stop the most immediate thing", the most immediate thing while focus is in a table is being in the table. So the rung returns focus to the prompt and keeps whatever was typed, which makes Ctrl-C the coarse partner of `Esc` (§3) rather than a duplicate of it, and a second Ctrl-C then behaves exactly as it would have from the prompt. Nothing is lost and nothing invisible changes.
+
+It was found by writing the reachability table below and having no state to put in one of the rows — the same table that caught the reorder and rung 2. **"Correct by accident" is one reorder away from wrong**, and a rung that works by falling through is invisible to a reader who resolves the ladder by reading it top to bottom, which is the only thing a ladder is for.
 
 **Cancellation outranks everything** because it is the most consequential and most time-sensitive intent. A user hitting Ctrl-C while a promote is running means the promote, not the dashboard they happen to be looking at. Stating the precedence matters — the alternative reading is defensible, and leaving it implicit guarantees the two get implemented differently.
 
@@ -198,20 +205,27 @@ constructible case.
 | 4 | Non-dismissable overlay | a confirm on top — **over anything**, including copy mode and a view | T1.12, T1.12b |
 | 5 | Copy mode | `copyMode` true, no layer on the stack | T4.3 |
 | 6 | Pushed view | a view on the stack, no overlay above it | T5.3 |
-| 7 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
-| 8 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
+| 7 | Focus in the live block | `StoredFocus.at === "liveBlock"`, no layer, not copy mode | T1.14 |
+| 8 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
+| 9 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
 
-Two rows earned their place by being hard to fill. Rung 2's column said
-"pass-through child" and could not be written at all. Rung 4's said "a confirm on
-top" until the question "on top of *what*" was asked, which is what exposed the
-order defect — rungs 3 and 4 have to dominate 5 and 6, not merely precede 3's old
-neighbours.
+Three rows earned their place by being hard to fill, and each was a different
+defect.
 
-**One rung is missing and this is where it shows.** No row covers Ctrl-C while
-`StoredFocus.at === "liveBlock"`. It falls through to rungs 7 and 8, which is
-probably right — Ctrl-C returning the user to where they type is consistent with
-I2 — and it is stated nowhere, so the fall-through is an accident that happens to
-be correct. Left as a question rather than answered here.
+Rung 2's column said "pass-through child" and could not be written at all —
+unreachable behaviour.
+
+Rung 4's said "a confirm on top" until the question "on top of *what*" was asked,
+which is what exposed the order defect: rungs 3 and 4 have to dominate 5 and 6, not
+merely precede 3's old neighbours.
+
+Rung 7 had no row. Its state — focus in the live block, nothing layered above —
+is perfectly constructible and every rung above it declined, so the ladder answered
+with rung 8 and cleared a prompt the user could not see. **A missing rung is not a
+gap in the table; it is a wrong answer given confidently**, because a ladder always
+returns something. That is why re-running this table after adding a rung is part of
+the rule rather than a courtesy: rung 7's arrival renumbered two rows, and a row
+whose number moved is a citation somewhere that did not.
 
 ---
 
@@ -325,6 +339,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.12** (I8): Ctrl-C with a non-dismissable overlay on top → no-op.
 - **T1.12b** (I8): Ctrl-C with a confirm raised over copy mode → no-op, and copy mode is **still active**. The pair, not the first of it: moving only the dismissable rung above copy mode passes T1.12 and fails this.
 - **T1.13**: Ctrl-D at an empty prompt arms the same confirm; with text present it is a no-op.
+- **T1.14** (I5): Ctrl-C with focus in the live block and text in the prompt → focus returns to `{at: "prompt"}` and **the buffer is unchanged**. The buffer assertion is the one that matters: without the rung this passes the focus half by accident and clears the input, which is a side effect on a surface the user is not looking at.
+- **T1.14b**: a second Ctrl-C after T1.14 → clears the input, exactly as rung 8 would have from the prompt. The rung defers the prompt behaviour rather than replacing it.
 
 ### Tier 2 — contract / interface
 
@@ -388,6 +404,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.5** (I4): broadcasting to every handler → T1.7 fails and actions fire twice.
 - **T6.6** (I5): falling through to the prompt on an unconsumed key → T1.8 fails and typing in the dashboard edits the hidden prompt.
+- **T6.6b** (I5): deleting the live-block rung so Ctrl-C falls through to the prompt rungs → T1.14 fails, and Ctrl-C while navigating a table clears an input the user cannot see. The same defect as T6.6, arriving through an omission rather than through a broadcast.
 - **T6.7** (I9): using a real timer for the double-tap → T2.3 fails and the test flakes.
 - **T6.8** (I10): last-wins on duplicate bindings → T2.4 fails.
 - **T6.9** (I11): committing a frame from C16 → T2.6 and T4.4 fail.
