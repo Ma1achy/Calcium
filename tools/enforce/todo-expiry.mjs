@@ -113,7 +113,7 @@ const TODO_TITLE = /\bit\.todo\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'
  * from day one, which would make the rule fail everywhere immediately and get it
  * deleted within the hour.
  */
-function defaultIsImplemented(path) {
+export function defaultIsImplemented(path) {
   if (!existsSync(path)) return false;
   const src = readFileSync(path, "utf8");
   const body = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");

@@ -31,6 +31,7 @@ import {
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
+import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
 
 /** A file that must fail `rule`, at a path inside its scope. */
 type Fabrication = { rule: string; file: string; source: string };
@@ -251,6 +252,30 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "MG15",
     file: "src/interaction/editor/layout.ts",
     source: 'import type { TerminalLifecycle } from "../../terminal/lifecycle.js";',
+  },
+  {
+    // MG14's, and it is the import someone would actually write: `decode.ts`
+    // matches CSI sequences, and `escapes.ts` is where the CSI vocabulary
+    // lives. SS14 already allows `decode.ts` its own escape literals, which is
+    // the exemption that exists precisely so C16 does not reach for C01's.
+    rule: "MG14",
+    file: "src/interaction/router/decode.ts",
+    source: 'import { CURSOR } from "../../terminal/escapes.js";',
+  },
+  {
+    // MG16's, and it fabricates the `presentation/` half rather than the
+    // `terminal/` one — the second target is the one that would be written, and
+    // a single fabrication against a two-target rule proves only the target it
+    // used. `errorBlock` is the shape someone reaches for to make an
+    // unknown-verb message render nicely.
+    rule: "MG16",
+    file: "src/interaction/parser/index.ts",
+    source: 'import { blocks } from "../../presentation/blocks/index.js";',
+  },
+  {
+    rule: "MG16",
+    file: "src/interaction/parser/index.ts",
+    source: 'import { escapes } from "../../terminal/escapes.js";',
   },
   {
     rule: "MG20",
@@ -688,9 +713,40 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
    * the component that will make them implementable. An entry here is a rule
    * that is NOT being enforced, and saying so is the point.
    */
-  const PENDING_RULES: Record<string, string> = {
+  /**
+   * A pending entry is one of two things, and conflating them is what let MG14
+   * sit unenforced for two components.
+   *
+   * A **string** is a reason that will never come true on its own — a fold, or
+   * a condition no component's arrival satisfies. Nothing can expire it; A03 §2
+   * says the fold is the only exit and something has to take it deliberately.
+   *
+   * A **`waitsOn`** names a component, and it is a claim the suite can check:
+   * when that component lands, the rule is implementable and the entry is a
+   * lie. That is the other half of A03 §2's class — a reason false when it was
+   * written versus a reason that has since become false — and only the second
+   * half can be caught mechanically. It is, below.
+   */
+  type Pending = string | Readonly<{ waitsOn: string; why: string }>;
+
+  const PENDING_RULES: Record<string, Pending> = {
     SS5: "folded into SS4's scope — SS4 covers all of src/viewport/, so a second rule with the same pattern and a contained scope could never fire on anything SS4 misses. The SS12-into-SS11 precedent",
-    SS6: "C16",
+    // **Folded, and it is the fourth instance of the class and the first the
+    // suite caught rather than a person.** SS6 forbids clock reads in `input/`;
+    // SS1 forbids them across all of `src/` with one named exception, so SS6
+    // could never fire on anything SS1 misses — the SS5-into-SS4,
+    // SS12-into-SS11 and SS7-into-SS1 precedent. Its reason was false when it
+    // was written and additionally named a directory that never existed: C16
+    // implements into `router/`.
+    //
+    // What is new is how it surfaced. It sat pending on C16, C16 landed, and
+    // nothing looked — until `waitsOn` made "the blocker has arrived" a thing
+    // the suite can ask.
+    SS6:
+      "folded into SS1's scope — SS1 bans clock reads across all of src/ with " +
+      "one named exception, so a rule scoped to `input/` could never fire on " +
+      "anything SS1 misses. Fourth instance of the pending-entry-false-at-birth " +
+      "class, and the first found by the `waitsOn` check rather than by hand",
     SS7:
       "folded into SS1's scope — SS1 bans clock reads across all of src/ with one " +
       "named exception, so a rule scoped to `editor/` could never fire on anything " +
@@ -698,13 +754,13 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
       "instance of A03 §2's pending-entry-false-at-birth class: C17's arrival is " +
       "what made it visible, because the component said to be blocking it is the " +
       "one that proves it could not fire",
-    SS8: "C19",
-    SS9: "C20",
+    SS8: { waitsOn: "C19", why: "the completion module does not exist" },
+    SS9: { waitsOn: "C20", why: "the history module does not exist" },
     SS12: "C10 — folded into SS11's scope for now",
     SS18: "C10 — needs the block-producing module list",
-    SS22: "C19",
-    SS29: "C23",
-    SS30: "C18, C19",
+    SS22: { waitsOn: "C19", why: "there is no completion module to hold a literal verb list" },
+    SS29: { waitsOn: "C23", why: "the execution pipeline does not exist" },
+    SS30: { waitsOn: "C18", why: "the tokeniser and quoter land with C18; C19 then consumes them" },
 
     // SS31, SS32 and SS38 were here, each saying "implemented in
     // dependencies.mjs, not source-scans.mjs" — which is not a pending rule but
@@ -722,10 +778,10 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // The rest of the MG family, which this check could not see until it read
     // more than `SS` rows. Each waits on the component whose directory it scopes
     // to; none of these exists, so the rule would have nothing to match.
-    MG14: "C16",
-    MG16: "C18",
-    MG17: "C19",
-    MG18: "C20",
+
+
+    MG17: { waitsOn: "C19", why: "src/interaction/completion/ does not exist" },
+    MG18: { waitsOn: "C20", why: "src/interaction/history/ does not exist" },
   };
 
   /**
@@ -842,6 +898,31 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     },
   );
 
+  it("no pending rule waits on a component that has already landed", () => {
+    // **The half of A03 §2's pending class that a machine can see.** A reason
+    // false at birth cannot expire and needs the fold; a reason that *becomes*
+    // false has a moment, and this is it. Nothing was looking at that moment:
+    // MG14 waited on C16, C16 landed, C17 landed after it, and the rule sat
+    // unenforced through both while reporting exactly like a satisfied one.
+    //
+    // On its first run it found MG14 and SS6 — one rule to build and one to
+    // fold, both stranded by the same commit two components back.
+    const landed: string[] = [];
+    for (const [id, entry] of Object.entries(PENDING_RULES)) {
+      if (typeof entry === "string") continue;
+      const path = COMPONENT_SOURCES[entry.waitsOn];
+      if (path !== undefined && defaultIsImplemented(path)) {
+        landed.push(`${id} waits on ${entry.waitsOn}, which is built (${path})`);
+      }
+    }
+
+    expect(
+      landed,
+      `${landed.join("; ")} — implement the rule, or fold it and say what it folds into. ` +
+        `A pending entry whose blocker has arrived is indistinguishable from an enforced rule.`,
+    ).toEqual([]);
+  });
+
   it("nothing listed pending has quietly been implemented", () => {
     // The other direction, for the same reason the scope list checks its own
     // exemptions: a pending entry that outlives its reason is a rule everyone
@@ -866,6 +947,80 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     );
 
     expect(phantom, `${phantom.join(", ")} is listed pending but A03 has no row`).toEqual([]);
+  });
+
+  /**
+   * The same equality, one column over — and the hole it closes was found by
+   * being told to look for it.
+   *
+   * 14b compares rule **ids**. A row can therefore name a scope the code does
+   * not have and omit one it does, forever, in both directions and silently:
+   * SS24's row said `table/`, `plot/`, `parser/` while the code said `table/`,
+   * `plot/`, `patch/` — one scope inventoried and unimplemented, one
+   * implemented and uninventoried, and every set comparison in this file
+   * satisfied by the id alone.
+   *
+   * **Both directions matter, and they fail differently.** A path in the row
+   * that the code does not have is a rule the reader believes covers ground it
+   * does not. A path in the code that the row does not have is worse when it is
+   * an *allow* entry: a granted exemption that no document records, which is
+   * indistinguishable from a rule that has no exemptions at all.
+   *
+   * On its first run it fired on eight rows besides SS24. Every one was the row
+   * being out of date rather than the code being wrong, which is the direction
+   * this was expected to find and is not the direction it was written for.
+   *
+   * The reading rules, because the column is prose and not a data structure:
+   *
+   *   - A backticked token containing `/` or ending `.ts` is a path.
+   *   - A component id resolves through `COMPONENT_SOURCES` — SS1's "outside
+   *     C22" names `src/shell/session.ts` as surely as writing the path would.
+   *   - "anywhere" or "outside" in the cell names the whole tree, so a `src/`
+   *     scope is accounted for.
+   *
+   * Matching is by suffix, so a row may write `plot/` where the code writes
+   * `src/presentation/plot/`. A row is free to be shorter; it is not free to be
+   * about a different directory.
+   */
+  it("every SS row's scope column names the paths the rule actually scans and allows", () => {
+    const doc = readFileSync("docs/architecture/A03_enforcement_suite.md", "utf8");
+    const cells = new Map<string, string>();
+    for (const line of doc.split("\n")) {
+      const row = /^\|\s*(SS\d+)\s*\|[^|]*\|([^|]*)\|/.exec(line);
+      if (row?.[1] !== undefined && row[2] !== undefined) cells.set(row[1], row[2].trim());
+    }
+
+    const sources: Record<string, string> = COMPONENT_SOURCES;
+    const problems: string[] = [];
+
+    for (const scan of SCANS) {
+      const cell = cells.get(scan.id);
+      if (cell === undefined) continue; // 14b already reports a rule with no row
+
+      const scopes = Array.isArray(scan.scope) ? scan.scope : [scan.scope];
+      const code = [...scopes, ...scan.allow];
+
+      const quoted = [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
+      const prose = quoted.filter((t) => t.includes("/") || t.endsWith(".ts"));
+      const named = [
+        ...prose,
+        ...[...cell.matchAll(/\bC\d\d\b/g)].map((m) => sources[m[0]] ?? ""),
+        ...(/anywhere|outside/.test(cell) ? ["src/"] : []),
+      ].filter((p) => p !== "");
+
+      for (const p of prose) {
+        if (!code.some((c) => c.endsWith(p))) {
+          problems.push(`${scan.id}: the row names ${p}, which the rule neither scans nor allows`);
+        }
+      }
+      for (const c of code) {
+        if (!named.some((p) => c.endsWith(p))) {
+          problems.push(`${scan.id}: the rule reaches ${c}, which the row does not name`);
+        }
+      }
+    }
+
+    expect(problems, problems.join("\n")).toEqual([]);
   });
 
   it("every implemented rule is inventoried in A03", () => {

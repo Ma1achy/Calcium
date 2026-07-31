@@ -85,6 +85,10 @@ A vacuous rule reports success it has not earned; an undeclared branch reports a
 
   **And the fold is the only exit, which is the third instance of this now closed.** SS5 was folded into SS4 and SS12 into SS11, both for the same reason: a rule whose scope is contained by a broader rule with the same pattern can never fire on anything the broader one misses. SS7 is the third — its scope is `editor/` and SS1 bans clock reads across all of `src/` with one named exception — and C17's arrival was the moment to see it, because the component that was supposedly blocking it is the one that proves it could never fire. **A pending rule whose reason was false when it was written cannot expire on its own; something has to retire it deliberately, and the fold is what that looks like.** SS8 and SS9 wait on C19 and C20 and are the same entry twice more; each is folded or built when its component lands, and neither is left to expire by itself.
 
+  **The half a machine can see is now checked, and it found two on its first run.** A reason false at birth cannot expire and needs the fold; a reason that *becomes* false has a moment, and nothing was watching that moment. So a pending entry is now one of two shapes: a bare string, which is a fold or a condition no arrival satisfies, or `{ waitsOn, why }`, which is a claim — and "the component named by `waitsOn` is built" is a question `defaultIsImplemented` already answers. **MG14 had waited on C16 through C16's landing and C17's**, unenforced, reporting exactly like a satisfied rule; SS6 had waited on C16 for a fold it should have taken at the same moment. Both were found by writing the check, neither by reading the list.
+
+- **A scope column that drifted from the scope.** 14b's inventory equality compares rule **ids**, so a row may name a directory the rule does not scan and omit one it does — in both directions, indefinitely. SS24 said `table/`, `plot/`, `parser/` while the code said `table/`, `plot/`, `patch/`: one scope inventoried and unimplemented, one implemented and uninventoried, and every set comparison in the suite satisfied by the id alone. The equality now runs over the scope column too, **and over allow-lists**, which is the worse half — a granted exemption that no document records is indistinguishable from a rule that has no exemptions. Nine rows were wrong on the first run, SS28's five-subdirectory list against a code scope of `src/interaction/` among them, and every one was the row rather than the code.
+
 - **A check that existed as a habit rather than a mechanism.** The other side of SS3: not a rule written down and never built, but one performed reliably and never written down. Invariant ordering was verified by ad-hoc script while the specs were written, caught every time, and never became a rule — so when the habit stopped, twenty of twenty-five specs drifted out of order and nothing went red, because nothing was missing and no citation dangled. **It is the hardest of these to notice, because there is no artefact to inspect.** The other eight are a rule that is present and broken; this is a rule that was never an artefact at all, and the only evidence it existed is that the corpus was clean while someone was watching. What made it findable was reading C04's invariant list end to end for an unrelated reason. SP2 is the mechanism it should have been.
 
 Generalising it turned up three things the narrow pattern had been hiding, and none of them was a violated rule:
@@ -220,16 +224,16 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
 | SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in `tui-kit` outside C22 | C22 T2.4 |
-| SS2 | `Math.random` | C08 | C08 T2.3 |
+| SS2 | `Math.random` | anywhere in `src/`; C08 is where it would be reached for | C08 T2.3 |
 | SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 T2.2 |
 | SS4 | clock reads | `src/viewport/` | C13 I9, T2.2 · C14 T2.4 |
 | SS5 | — folded into SS4 | — | C14 T2.4 |
-| SS6 | clock reads | `input/` | C16 T2.3 |
+| SS6 | — folded into SS1 | — | C16 T2.3 |
 | SS7 | — folded into SS1 | — | C17 T2.3 |
 | SS8 | clock reads | `completion/` | C19 T2.3 |
 | SS9 | clock, `fs`, `~/.prism` literal | `history/` | C20 T2.4 |
 | SS10 | `process.env` reads of the seven terminal variables | outside C02 | C02 T2.5 |
-| SS11 | `process.env` | `blocks/` | C09 T2.7 |
+| SS11 | `process.env` | `src/presentation/` | C09 T2.7 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
 | SS13 | `fs`, clipboard shell-out | `viewport/` | C14 T2.4 |
 | SS42 | `.columns` / `.rows` on a stream handle | outside `terminal/lifecycle.ts` | C01 I13, T2.10 |
@@ -250,14 +254,14 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
-| SS14 | `\x1b`, `\u001b` | outside `terminal/escapes.ts` | C01 I1, T2.5 |
+| SS14 | `\x1b`, `\u001b` | outside `terminal/escapes.ts`, allowing `interaction/router/decode.ts` | C01 I1, T2.5 |
 | SS15 | Mode numbers `1049 25 2004 1002 1006 2026` | outside `terminal/escapes.ts` | C01 I1, T2.8 |
 | SS16 | Hex, ANSI code, colour name | `viewmodel/` | C04 T2.7 |
 | SS17 | Hex, ANSI, named colour | `blocks/` | C09 T2.8 |
 | SS18 | Hex literal | any block-producing module | C10 T2.9 |
 | SS19 | ANSI index or terminal-specific value | `presentation/theme/`, allowing `four-bit.ts` | C10 I13, T2.5 |
-| SS20 | `syntax` palette reference | outside `code` and `patch` rendering | C10 T2.8 |
-| SS21 | `spectrum` palette reference | outside declared art | C10 T2.8 |
+| SS20 | `syntax` palette reference | outside `presentation/theme/`, `blocks/kinds/code.ts` and `presentation/patch/` | C10 T2.8 |
+| SS21 | `spectrum` palette reference | outside `presentation/theme/`, where the art is declared | C10 T2.8 |
 | SS22 | Literal verb, flag or enum list | `completion/` | C19 T2.6 |
 
 **SS22 is the anti-drift check.** A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review.
@@ -270,14 +274,14 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
-| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/` | C09 T2.9 |
-| SS40 | The same, in the editor | `src/interaction/` | C17 I2, T2.4 |
-| SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `parser/` | C11 T2.6, C12 T2.5, C18 T2.2 |
+| SS23 | `.length`, `charAt`, `slice` on display text | `src/presentation/`, allowing `presentation/theme/` | C09 T2.9 |
+| SS40 | The same, in the editor | `src/interaction/`, allowing `router/decode.ts` | C17 I2, T2.4 |
+| SS24 | Mutable module state | `src/presentation/table/`, `plot/`, `patch/`, `src/interaction/parser/` | C11 T2.6, C12 T2.5, C25 T2.4, C18 T2.2 |
 | SS25 | Exit-code mapping or `ErrorLike` construction | `transport/` | C06 T2.3 |
 | SS26 | Writes to real `process.stdout` | `process/` | C21 T2.2 · **pending, see below** |
 | SS27 | Timer or escalation logic, including a `SIGTERM` literal | `process/` | C21 I8, I11, T2.4 |
 | SS41 | `process.env` or `process.stdin` | `process/` | C21 I14, T2.7 |
-| SS28 | Scheduler calls | `input/`, `editor/`, `parser/`, `completion/`, `history/` | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
+| SS28 | Scheduler calls | `src/interaction/` | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
 | SS29 | Multi-store access | outside local handlers | C23 T2.7 |
 | SS30 | Second tokeniser or quoter | anywhere | C18 T2.3, C19 T2.4 |
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |

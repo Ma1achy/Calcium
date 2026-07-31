@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG15", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -168,6 +168,49 @@ const FORBIDDEN_EDGES = [
       "C17 holds no geometry and emits nothing: width and gutter are parameters, " +
       "and the prompt is drawn by L4. Downward, so the layer walk permits it. " +
       "Type-only counts",
+  },
+  {
+    // MG14 — C16 imports nothing from `terminal/`.
+    //
+    // **Two components late, and that is the finding rather than the rule.** It
+    // was listed pending on C16 from the day it was written, C16 landed, and
+    // nothing looked: a pending entry whose blocker has arrived reports exactly
+    // like a rule that is enforced. The check that now catches it is the same
+    // shape as A03 §2's other vacuity checks and is a sibling of the fold —
+    // one exit for a reason that was false at birth, one for a reason that has
+    // since come true.
+    //
+    // The reachable form is the decoder. C16 reads bytes and names keys, and
+    // both halves of that job have a `terminal/` module that looks relevant:
+    // `capabilities` knows whether the terminal sends `modifyOtherKeys`, and
+    // `escapes` holds the CSI vocabulary decode is matching against. The second
+    // is the one that would be written — SS14 already allows `decode.ts` its
+    // own `\x1b` literals, which is the exemption that exists precisely because
+    // C16 must not reach for C01's.
+    rule: "MG14",
+    from: "src/interaction/router/",
+    to: "src/terminal/",
+    spec: "C16 T2.7",
+    why:
+      "C16 decodes bytes it is handed and names keys; capability answers arrive " +
+      "as `DecodeCapabilities`, not by asking C02. Downward, so the layer walk " +
+      "permits it. Type-only counts",
+  },
+  {
+    // MG16 — C18 imports nothing from `terminal/` *or* `presentation/`, which
+    // is the only rule in this family with two forbidden targets. The second is
+    // the live one: C18 produces errors, and an `ErrorLike` is C04's while the
+    // rendering of one is C07's and C09's. A parser that reached for a block
+    // builder to make its unknown-verb message pretty would put presentation
+    // inside a pure function and give the same failure two renderings.
+    rule: "MG16",
+    from: "src/interaction/parser/",
+    to: ["src/terminal/", "src/presentation/"],
+    spec: "C18 I15 · C18 T2.4",
+    why:
+      "C18 is pure and total, and it classifies rather than renders: an " +
+      "`ErrorLike` is C04's shape and what it looks like is C07's and C09's " +
+      "question. Downward, so the layer walk permits it. Type-only counts",
   },
   {
     // MG12, and a separate rule in A03's inventory rather than MG13's second
@@ -378,9 +421,14 @@ function checkForbiddenEdges(files, readFile) {
     const f = file.replaceAll("\\", "/");
     for (const edge of FORBIDDEN_EDGES) {
       if (!f.startsWith(edge.from)) continue;
+      // `to` is a list because MG16 forbids two targets, and SS24's history is
+      // the argument for a list over a second row: two rows with one id are one
+      // member of every set comparison, so the second is invisible to the
+      // fabrication check and can be vacuous without anything saying so.
+      const targets = Array.isArray(edge.to) ? edge.to : [edge.to];
       for (const spec of importsOf(file, readFile, true)) {
         const target = resolve(file, spec);
-        if (target === null || !target.startsWith(edge.to)) continue;
+        if (target === null || !targets.some((t) => target.startsWith(t))) continue;
         violations.push({
           rule: edge.rule, file,
           message: `imports ${spec} — ${edge.why}`,

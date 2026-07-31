@@ -23,6 +23,9 @@ export declare function blockersIn(title: string): readonly string[] | null;
 
 export declare function todoTitles(source: string): string[];
 
+/** Exists, and holds more than the scaffold's `export {}`. */
+export declare function defaultIsImplemented(path: string): boolean;
+
 export declare function checkTodoExpiry(
   entries: readonly TodoEntry[],
   sources?: Readonly<Record<string, string>>,

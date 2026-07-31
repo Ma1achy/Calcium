@@ -345,9 +345,20 @@ export const SCANS = [
   // field rather than adding a second row with the same id closes the class: C18
   // needs the third scope, and a per-scope row is a shape the next reader has to
   // notice rather than a list they add to.
+  //
+  // **And the list then diverged from A03's row in both directions**: the code
+  // grew `patch/` for C25 and the row never heard, while the row named `parser/`
+  // and the code never did. 14b's inventory equality compares rule *ids*, so it
+  // saw neither. The scope-column equality in `test/unit/enforce-rules.test.ts`
+  // is 14b's equality one column over, and it fired on eight other rows.
   { id: "SS24", spec: "C11 I11 · C11 T2.6 · C12 T2.5 · C25 T2.4 · C18 T2.2",
     pattern: /^(?:export\s+)?(?:let|var)\s/m,
-    scope: ["src/presentation/table/", "src/presentation/plot/", "src/presentation/patch/"], allow: [],
+    scope: [
+      "src/presentation/table/",
+      "src/presentation/plot/",
+      "src/presentation/patch/",
+      "src/interaction/parser/",
+    ], allow: [],
     why: "C11, C12 and C25 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
 
   { id: "SS26", spec: "C21 T2.2",
