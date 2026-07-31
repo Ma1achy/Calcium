@@ -88,6 +88,7 @@ function parseManifest(raw: unknown): Result<Manifest, readonly ManifestError[]>
 function findTool(m: Manifest, tokens: readonly string[]): ToolMatch | null;
 function visibleTools(m: Manifest): readonly ToolDef[];
 function validateInvocation(tool: ToolDef, argv: readonly string[]): ValidationResult;
+function suggestName(name: string, candidates: readonly string[]): string | undefined;
 
 interface ManifestStore {
   load(m: Manifest): void;
@@ -215,6 +216,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I15** — C05 imports nothing from `terminal/`, `presentation/` or above.
 - **I16** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
 - **I17** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
+- **I18** — There is exactly one distance-2 suggester in the tree, and it is C05's. A01 A.2's cutoff is a policy about *when a suggestion is worth making*, and two implementations agree about the distance and diverge about the tie-break — which is where a suggestion is wrong rather than absent, and a wrong suggestion is the thing the cutoff exists to prevent.
 
 ---
 
@@ -234,6 +236,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 12. `ArgType` carries no app-domain concepts; `pattern` is the extension point (I5).
 13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I16).
 14. Conflicts are directional in the check and deduplicated in the report (I17).
+15. The distance-2 suggester is exported, so C18's unknown verbs and C05's unknown flags are one implementation (I18).
 
 ---
 
@@ -274,6 +277,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T2.5** (I12): every tool resolves to exactly one execution route; no tool is both local and spawnable.
 - **T2.6** (I15): the module graph shows no import from `terminal/` or above.
 - **T2.7**: `parseManifest` accepts its own serialised output — round-trip identity.
+- **T2.9** (I18): the exported `suggestName` is the one the flag path uses — an unknown flag's suggestion and the same call made directly agree, including the tie-break where two candidates sit at the same distance. Identity of behaviour asserted on the case where two implementations would differ, not on the case where they would agree.
 - **T2.8** (I8): `findTool` over the same manifest twice returns deeply equal results, **and** a second manifest object with identical content does not observe the first's results. `findTool` caches its match index (§3a) and this is the first cache in the tree, so purity is asserted rather than argued. The second half is the load-bearing one: a cache keyed on content rather than object identity passes every other test in this suite and breaks the moment two manifests differ only in a field the key ignores. Asserted by comparing results — the test does not know the cache exists.
 
 ### Tier 3 — edge cases
