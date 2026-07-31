@@ -156,10 +156,7 @@ describe("C21 with C06", () => {
   }, 60_000);
 
   it.todo(
-    // C18 produces both results now; the routing is L4's. The blocker clause
-    // reads to end of line, so the explanation goes *before* it — naming C18
-    // after "waits on" would parse as still waiting for it.
-    "T4.4: a shell ParseResult routes to spawnShell and an app result to spawn — waits on L4, which owns the routing",
+    "T4.4: a shell ParseResult routes to spawnShell and an app result to spawn — waits on L4, which owns the routing. C18 produces both results now",
   );
   it.todo(
     "T4.5 (with C01, L4): the documented suspend → handoff → resume sequence runs in order, and T3.8's guard never fires on the correct path — waits on L4",

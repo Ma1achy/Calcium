@@ -98,9 +98,29 @@ export const LAYER_SOURCES = Object.freeze({
  *     "moving the registry into C04 … waits on C09 and C10" as waiting on C04,
  *     which is the component the test belongs to, not one it waits for.
  *
- * So: everything from "waits on" to the end is the blocker clause, and within
- * it, identifiers only. Prose before it is the description; prose after it is
- * for the reader.
+ * So: identifiers only, and only inside the blocker clause. Prose before it is
+ * the description.
+ *
+ * **The third failure was prose *after* it, and it is why the clause now ends.**
+ * Reading to end of line meant a sentence explaining a correction parsed as part
+ * of the claim: restating two deferrals as "waits on L4, which owns the routing;
+ * C18 produces both results now" left them waiting on C18 — the component the
+ * sentence exists to say they no longer wait for. Three incidents, and the
+ * standing remedy was to put the explanation *before* the clause, which is a
+ * habit rather than a mechanism.
+ *
+ * The clause ends at a sentence delimiter: an **em dash**, a **period**, or a
+ * **closing paren**. That is how these titles are already written, and it keeps
+ * the multi-blocker form — `waits on L4 and C20` has no delimiter in it, so it
+ * survives whole, which the obvious fix (take the first identifier) does not.
+ *
+ * **A closing paren counts only when it is unmatched within the clause**, and
+ * the corpus is what forces the qualification. `waits on a real render tree
+ * (C09) and a terminal emulator` is the shape the first failure produced, and a
+ * naive paren rule would cut it at `(C09` — harmless there, and not harmless in
+ * `waits on L4 (the shell) and C20`, where it would drop a blocker silently.
+ * Dropping a blocker is the exact defect this rule exists to prevent, so the
+ * paren terminates only a clause that was itself parenthetical.
  */
 const IDENTIFIER = /\b(C\d{2}|L\d)\b/g;
 const WAITS_ON = /waits on/i;
@@ -137,11 +157,33 @@ export function todoTitles(source) {
  * — the typo case (`waits on CO9`, letter O), which must be a violation rather
  * than a silent exemption. An empty array means the title declares no wait.
  */
+/**
+ * Where the blocker clause ends: an em dash, a period, or an unmatched `)`.
+ *
+ * A period only counts at a word boundary — followed by a space or the end —
+ * so a version or a filename inside a clause does not truncate it.
+ */
+export function blockerClause(text) {
+  let depth = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") {
+      if (depth === 0) return text.slice(0, i);
+      depth -= 1;
+    } else if (ch === "\u2014") return text.slice(0, i);
+    else if (ch === "." && (i + 1 === text.length || text[i + 1] === " ")) {
+      return text.slice(0, i);
+    }
+  }
+  return text;
+}
+
 export function blockersIn(title) {
   const start = title.search(WAITS_ON);
   if (start === -1) return [];
 
-  const clause = title.slice(start);
+  const clause = blockerClause(title.slice(start));
   const ids = new Set();
   IDENTIFIER.lastIndex = 0;
   let m;

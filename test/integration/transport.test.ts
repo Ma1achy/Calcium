@@ -254,7 +254,5 @@ describe("C06 with C05", () => {
     expect(remainder).toContain("</html>");
   });
   it.todo("T4.5b (with L4): the concurrency refusal surfaces as a notice naming the running verb — waits on L4");
-  it.todo(// C18 classifies the built-in now; applying it is L4's. Named before the
-    // blocker clause, which reads to end of line.
-    "T4.6 (with L4): a cd built-in followed by a verb → the verb spawns in the new directory — waits on L4, which applies it");
+  it.todo("T4.6 (with L4): a cd built-in followed by a verb → the verb spawns in the new directory — waits on L4, which applies it. C18 classifies it now");
 });

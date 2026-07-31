@@ -21,6 +21,9 @@ export declare const ACKNOWLEDGED_BACKLOG: readonly string[];
 /** Component and layer ids in a title's blocker clause. `null` when it names none. */
 export declare function blockersIn(title: string): readonly string[] | null;
 
+/** The clause, cut at an em dash, a period, or an unmatched closing paren. */
+export declare function blockerClause(text: string): string;
+
 export declare function todoTitles(source: string): string[];
 
 /** Exists, and holds more than the scaffold's `export {}`. */

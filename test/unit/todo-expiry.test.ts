@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ACKNOWLEDGED_BACKLOG,
+  blockerClause,
   blockersIn,
   checkSourceMap,
   checkSurfaceDeferrals,
@@ -161,6 +162,66 @@ describe("todo expiry", () => {
     // Declares a wait, names nothing — the typo case, distinguished from the
     // no-wait case by null rather than by an empty array.
     expect(blockersIn("T9.9: e — waits on the thing that does not exist yet")).toBeNull();
+  });
+
+  it("the blocker clause ends at a sentence delimiter — one fabrication per form", () => {
+    // **Three incidents, and this is the mechanism replacing the workaround.**
+    // The clause read to end of line, so a sentence explaining a correction
+    // parsed as part of the claim, and the standing remedy was to write the
+    // explanation *before* the clause. A habit, in a project whose method is
+    // that habits become mechanisms.
+    //
+    // A fabrication per form, because a single one proves the form it used and
+    // the earlier parses each failed on a form nobody had written down.
+
+    // 1. Single blocker, then prose naming the component it no longer waits on.
+    //    This is the live incident: the restatement mentions C18 in order to
+    //    say the test does not wait for it.
+    expect(
+      blockersIn("T4.4: routing — waits on L4, which owns it. C18 produces both results now"),
+      "the sentence after the period is for the reader",
+    ).toEqual(["L4"]);
+
+    // 2. Multi-blocker, which the obvious fix — take the first identifier —
+    //    breaks. C17's tier 5 needs it and there is no delimiter inside it.
+    expect(blockersIn("T5.4: an undo sequence — waits on L4 and C20")).toEqual(["L4", "C20"]);
+
+    // 3. A parenthetical clause, terminated by its own closing paren.
+    expect(
+      blockersIn("T5.1: typing at a prompt (waits on L4) once the shell composes"),
+    ).toEqual(["L4"]);
+
+    // 4. And the qualification the corpus forced: a paren *opened inside* the
+    //    clause does not end it. Cutting at the first `)` would be harmless in
+    //    the first of these and would silently drop C20 in the second — which
+    //    is the exact defect this rule exists to prevent.
+    expect(
+      blockersIn("T5.3: c — waits on a real render tree (C09) and a terminal emulator"),
+    ).toEqual(["C09"]);
+    expect(blockersIn("T5.5: f — waits on L4 (the shell) and C20")).toEqual(["L4", "C20"]);
+
+    // 5. An em dash after the clause, which is how most of these are written.
+    expect(
+      blockersIn("T5.2: paste — waits on L4 — the frame is what shows it"),
+    ).toEqual(["L4"]);
+
+    // 6. A period that is not a sentence end does not truncate.
+    expect(blockersIn("T4.9: a — waits on C22 and src/shell/session.ts existing")).toEqual([
+      "C22",
+    ]);
+  });
+
+  it("the delimiter rule fires: the same title, read both ways", () => {
+    // The control. Under the old parse this title yielded ["L4", "C18"], which
+    // is what kept two deferrals waiting on a component that had landed — so
+    // the fabrication is the *real* title, and the assertion is that it no
+    // longer reads that way.
+    const restated = "T4.4: routing — waits on L4, which owns it. C18 produces both results now";
+
+    expect(blockerClause(restated.slice(restated.indexOf("waits on")))).toBe(
+      "waits on L4, which owns it",
+    );
+    expect(blockersIn(restated)).not.toContain("C18");
   });
 
   it("extracts titles from every quoting style", () => {

@@ -518,6 +518,8 @@ The second is worse than the first and was found by looking once rather than by 
 
 **Scoped to surface deferrals, deliberately.** The general form — does this blocker own this work — needs to know which component owns which behaviour, and that is this document's `Declared` column rather than anything derivable. The narrow form needs only two things a surface spec already states: what it composes to, and what it says it is waiting for. TD1 checks the blocker is *known*, TD3 that its path *exists*, and TD4 that it is the *right* component. Three directions, and TD4 is the one that had no mechanism.
 
+**The clause the blocker is read from now ends at a sentence delimiter, and that is the third incident of one shape.** Twice the parse was too wide on the left — matching the words after "waits on", then matching identifiers across the whole title — and the third time it was too wide on the right: reading to end of line meant a sentence *explaining* a correction parsed as part of the claim, so restating a deferral as "waits on L4 … C18 produces both results now" left it waiting on C18. The standing remedy was to write the explanation before the clause, which is a habit; an em dash, a period or an unmatched closing paren is a mechanism, and it keeps the multi-blocker form `waits on L4 and C20` that taking the first identifier would have broken.
+
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
 
 ---
