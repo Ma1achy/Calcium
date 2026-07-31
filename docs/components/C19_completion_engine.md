@@ -73,6 +73,8 @@ type Candidate = Readonly<{
   display?: string;                   // shown if it differs from the inserted text
   detail?: string;                    // right-aligned hint in the menu
   tone?:   Tone;
+  /** What follows it when accepted whole. Default `" "`; `""` means nothing. */
+  delimiter?: string;
 }>;
 
 interface CompletionSource {
@@ -144,15 +146,25 @@ The mockup's algorithm (A01 Appendix A.2), which is the standard one and worth k
 ```
 1  compute candidates
 2  none                        → nothing happens; no menu, no bell
-3  one                         → insert it whole
+3  one                         → insert it whole, followed by its delimiter
 4  many, common prefix longer
-   than what is typed          → insert the common prefix, no menu
+   than what is typed          → insert the common prefix, no delimiter, no menu
 5  many, no further prefix     → open the menu
 ```
 
-**An accepted flag value is inserted as `--flag=value`.** C05's gate accepts both that and `--flag value` (C05 §3), so completion is choosing a form rather than obeying one — and `=` is the form that cannot be misread as a flag followed by a positional. It is also the form that works when the value begins with `-`, which the space-separated form does not. One form taught, both accepted; the pair of sentences lives in both specs so they cannot drift.
+**Rule 3 appends the delimiter and rule 4 does not, and the difference is load-bearing.** The token is finished in one case and unfinished in the other — and that is the whole of why a second `Tab` behaves usefully, as below.
 
-`Tab` twice opens the menu even on a single match (bash convention, `j22` R17). Some people always want to see what they matched, and the second press costs nothing.
+**The delimiter belongs to the candidate, not to the engine.** A directory wants `/`, a flag that takes a value wants `=`, everything else wants a space. Only the source can know which: the engine cannot tell a directory from a file, and only C05 says whether a flag takes a value. A single engine-level rule would have to guess, and each guess is wrong for one of the three.
+
+**An accepted flag value is inserted as `--flag=value`**, which arrives as a consequence of the above rather than as a separate rule: the flag-name candidate for a value-taking flag carries `=`. C05's gate accepts both that and `--flag value` (C05 §3), so completion is choosing a form rather than obeying one — and `=` is the form that cannot be misread as a flag followed by a positional. It is also the form that works when the value begins with `-`, which the space-separated form does not. One form taught, both accepted; the pair of sentences lives in both specs so they cannot drift.
+
+### `Tab` twice, and the state it does not need
+
+**On a single match the second `Tab` cannot open the same menu, because the first insertion moved the cursor into a different slot.** Rule 3 appended a delimiter, so the token is complete and what follows the cursor is a new, empty one — the second `Tab` completes the *next* thing, which is what the user wants and what happens without anyone arranging it.
+
+**The reachable case is the ambiguous one, and it needs no counter.** `--st` over `{status, statistics}` takes rule 4: the common prefix `stat` is inserted with no delimiter, which moves the state from rule 4 to rule 5, so pressing `Tab` again opens the menu. That is the bash behaviour people actually experience, and it falls out of the algorithm rather than out of remembering that the last key was also `Tab`.
+
+This is worth stating because the obvious reading of "`Tab` twice opens the menu" (`j22` R17) is readline's, where it is a **press counter** — and a press counter is state outliving an event, which §4 would then require to be sequence-tagged or it goes stale on the next keystroke. The rule that would have governed it instead showed it should not exist. The version of this spec that asserted the single-match case was asserting something unreachable.
 
 Ghost text is accepted by `Tab` or `→`. Any other key ignores it — it is a suggestion, never a commitment.
 
@@ -227,6 +239,7 @@ It is the shape A03 §2 names: each statement is correct where it stands, and on
 - **I13** — A keystroke arriving during a pending request supersedes it: the sequence advances, the spinner clears, and the older result is discarded on arrival (I1). No state from the superseded request survives into the next one.
 - **I14** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
 - **I15** — Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner's elapsed-wait stamp, which is per source call (§7).
+- **I16** — A unique match is inserted whole followed by its own `delimiter`; a common prefix is inserted without one. The delimiter is declared by the candidate, because only its source knows whether the value is a directory, a flag taking a value, or a finished word.
 
 ---
 
@@ -238,7 +251,7 @@ It is the shape A03 §2 names: each statement is correct where it stands, and on
 4. Typing during a pending request supersedes it and clears the spinner (I13).
 5. The spinner appears at 500 ms; the TTL is 60 seconds; both clocks are injected (I9, I10).
 6. A failing source is dropped, not fatal (I6).
-7. Acceptance advances to the longest common prefix and stops; the menu-on-second-`Tab` behaviour is §4's, not contract (I5).
+7. Acceptance advances to the longest common prefix and stops there; a unique match is inserted whole with its delimiter, and the delimiter is the candidate's (I16). The menu-on-second-`Tab` behaviour is §5's, and it is a consequence of that pair rather than a stored press count.
 8. Ghost text is a suggestion, accepted only by `Tab` or `→` (I7).
 9. The menu is a C15 overlay; C19 supplies blocks and the overflow indicator (I8).
 10. The tokeniser and the quoter are both shared with C18 (I5).
@@ -273,7 +286,8 @@ Six tiers. Every cell of the §8 table is covered.
 - **T1.12**: a keystroke during a pending request → new sequence, old superseded.
 - **T1.13** (I7): ghost text appears on a unique match; a printable key ignores it.
 - **T1.14**: `Esc` with the menu open → dismissed, buffer unchanged.
-- **T1.15**: `Tab` twice on a single match → menu opens anyway.
+- **T1.15**: `Tab` twice on an **ambiguous** match → the first inserts the common prefix with no delimiter, the second opens the menu. The reachable form of `j22` R17; the single-match form it used to assert cannot occur, because rule 3's delimiter moves the cursor into the next slot.
+- **T1.15b**: `Tab` on a single match → the candidate and its delimiter, and the slot after the cursor is the next one. A directory candidate ends `/`, a value-taking flag ends `=`, a bool flag ends with a space.
 
 ### Tier 2 — contract / interface
 
@@ -293,7 +307,7 @@ Six tiers. Every cell of the §8 table is covered.
 - **T3.2**: `Tab` with no candidates → nothing happens; no menu, no error.
 - **T3.3**: `Tab` mid-token with text after the cursor → completes the prefix before the cursor only, leaving the tail.
 - **T3.4** (I5): a candidate containing a space → quoted by C18's quoter, and re-tokenising the resulting line yields exactly that candidate as one token. Round-trip, not eyeballed.
-- **T3.5**: a candidate identical to what is typed → no insertion, menu on the second `Tab`.
+- **T3.5**: a candidate identical to what is typed → the delimiter is still appended, so the press advances the line rather than doing nothing. With the delimiter already present, nothing changes and no menu opens: a one-entry menu showing what the user has finished typing is noise.
 - **T3.6** (I6): one of three sources throws → the other two still contribute; the failure is logged once.
 - **T3.7** (I6): a source exceeding its timeout → dropped; the spinner clears.
 - **T3.8** (I10): two requests within the TTL → one source invocation; after expiry → two.
@@ -348,6 +362,8 @@ Six tiers. Every cell of the §8 table is covered.
 - **T6.8** (I8): drawing the menu directly instead of through C15 → T2.8 and T4.4 fail, and it stops flipping.
 - **T6.9** (I9): a real timer for the spinner → T2.3 fails and the tests flake.
 - **T6.10** (I11): inserting a candidate character by character → T4.7 fails.
+- **T6.14** (I16): appending the delimiter after a common prefix as well as after a unique match → T1.15 fails, and the second `Tab` never reaches the menu because the token it would have widened has been closed.
+- **T6.15** (I16): moving the delimiter into the engine as one rule → T1.15b fails on two of its three cases, since nothing outside the source knows a directory from a file.
 - **T6.11** (I14): offering verbs for bare text → T1.2 fails.
 
 ---
