@@ -118,10 +118,21 @@ Each of these produces code that compiles, passes review, and is wrong.
   the first ruling. Every one would have been a rewrite if found after the build, which
   is the argument for this being scheduled rather than diligent.
   **Index the artefact by rule interaction, not by input coverage.** This is the method
-  behind all three walks and it is now three for three: C16's rung table takes the rows
+  behind all three walks and it is now four for four: C16's rung table takes the rows
   where two rungs could both apply, C17's edit trace the sequences where two coalescing
   clauses meet, C18's classification table the inputs where two classification rules
-  meet. A row governed by one rule is a restatement of that rule and finds nothing;
+  meet, C19's sequence trace the events where a request is in flight and something else
+  happens.
+
+  **And C19 found the method's limit, which is worth knowing before choosing the next
+  artefact's index.** A trace indexed by *events* cannot see two **structural** rules
+  meeting — rules that both hold at rest, with no event between them. C19's
+  `--flag=value` defect is the case: "the engine filters by prefix" met "a flag value is
+  half of a token", the menu came back empty, and no assertion about a source would have
+  shown it. What caught it was a test asserting the *whole result* rather than the field
+  it was written for. So choose the index deliberately, then ask what it cannot express;
+  where the answer is "two rules that both hold at rest", the cover is whole-state
+  assertions rather than a second trace. A row governed by one rule is a restatement of that rule and finds nothing;
   every one of the eleven pre-code defects across those three components lived in a
   cell where two correct statements overlap. That is also why they were invisible to
   review — a reader checks statements one at a time by construction, so a suite indexed
@@ -139,6 +150,17 @@ Each of these produces code that compiles, passes review, and is wrong.
   green run. Two of them were in tests that had just passed sixteen and ten
   assertions respectively. A mutation that fails nothing is a finding about the
   tests, not a licence.
+
+  **And sometimes about the spec.** C19's §7 said the spinner's stamp is taken "per
+  source call, not per sequence" — and swapping the two fails nothing, because a source
+  call begins synchronously inside `request`. The sentence named a distinction that does
+  not exist, so a reader could satisfy it exactly and still hold the single overwritten
+  stamp it was written to forbid. This is A03 §2's vacuity class arriving in prose: a
+  sentence that cannot be violated reads identically to one that is obeyed, and review
+  cannot tell them apart because both read as correct. When a mutation fails nothing,
+  ask which artefact it indicts before rewriting the test — and prefer wordings that
+  name the observable mechanism ("the earliest call still in flight") over ones that
+  name where a value is computed.
 
   The figure that argues for the whole discipline is C16's: **seven defects from the
   by-hand walks before any code, four more from mutation during it, three
