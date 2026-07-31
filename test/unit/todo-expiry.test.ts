@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ACKNOWLEDGED_BACKLOG,
+  backlogKey,
   blockerClause,
   blockersIn,
   checkSourceMap,
@@ -33,7 +34,7 @@ describe("todo expiry", () => {
     const violations = checkTodoExpiry(
       collectTodos("test").filter((e) => !e.file.endsWith("todo-expiry.test.ts")),
     );
-    const seen = violations.map((v) => `${v.rule} ${v.file}`);
+    const seen = violations.map(backlogKey);
 
     // Equality, not superset. A new expiry fails because it is not in the list;
     // a resolved one fails because it still is. An exemption list that only
@@ -42,6 +43,41 @@ describe("todo expiry", () => {
       seen.sort(),
       violations.map((v) => v.message).join("\n"),
     ).toEqual([...ACKNOWLEDGED_BACKLOG].sort());
+  });
+
+  it("TD0's key sees a third deferral join two that were acknowledged", () => {
+    // **The case the old key could not see.** A row was `"<rule> <file>"`, so
+    // every deferral in one file collapsed into one string: two acknowledged
+    // and three produced the same key, and a third would have inherited an
+    // exemption argued for two. An exemption list that cannot see itself grow
+    // is the thing this list exists to prevent.
+    //
+    // Fabricated rather than waiting for it, because the failure mode is
+    // silence: nothing would have reported the third.
+    const twoInOneFile = [
+      { file: "test/a.test.ts", title: "T9.1: a — waits on C99" },
+      { file: "test/b.test.ts", title: "T9.2: b — waits on C99" },
+    ];
+    const map = { C99: "src/shell/session.ts" };
+    const built = () => true;
+
+    const two = checkTodoExpiry(twoInOneFile, map, built).map(backlogKey);
+    expect(two, "the count is in the key").toEqual(["TD2 src/shell/session.ts (2)"]);
+
+    const three = checkTodoExpiry(
+      [...twoInOneFile, { file: "test/c.test.ts", title: "T9.3: c — waits on C99" }],
+      map,
+      built,
+    ).map(backlogKey);
+
+    expect(three).toEqual(["TD2 src/shell/session.ts (3)"]);
+    expect(three, "so an equality against the acknowledged two fails").not.toEqual(two);
+  });
+
+  it("a rule with no count keeps the plain key", () => {
+    // TD1, TD3 and TD4 report per file and have no count, so their keys are
+    // unchanged — the count is TD2's identity, not a new format for everyone.
+    expect(backlogKey({ rule: "TD1", file: "test/x.test.ts" })).toBe("TD1 test/x.test.ts");
   });
 
   it("TD3: every path the map names exists", () => {

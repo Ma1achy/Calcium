@@ -277,6 +277,8 @@ export function checkTodoExpiry(
     violations.push({
       rule: "TD2",
       file: path,
+      // **The count is part of the identity, not decoration** — see `backlogKey`.
+      count: files.length,
       message:
         `${id} is implemented (${path} exists); ${files.length} test${files.length === 1 ? "" : "s"} ` +
         `still wait on it — write them, or restate what they are actually waiting for`,
@@ -285,6 +287,33 @@ export function checkTodoExpiry(
   }
 
   return violations;
+}
+
+/**
+ * How an acknowledged violation is identified, for TD0's equality.
+ *
+ * **The count is in the key, and that is the whole of this function.** A row was
+ * `"<rule> <file>"`, which groups every deferral in one file into one string —
+ * so two acknowledged deferrals in `session.ts` and *three* produce the same
+ * key, and a third silently inherits an exemption argued for two. The list that
+ * exists to stop exemptions growing could not see one grow.
+ *
+ * Found by asking what the key cannot distinguish rather than by a failure,
+ * which is the only way this kind is found: an over-broad key reports
+ * compliance for exactly the case it was written to catch (A03 §2).
+ *
+ * The alternative was a key per test id, which means TD2 emitting one violation
+ * per deferral instead of one per component. That loses the grouped message —
+ * "6 tests still wait on it" is the useful line — for the same discrimination,
+ * so the count is the cheaper half of the same guarantee.
+ *
+ * Exported so TD0 and its fabrication use one implementation. A test carrying
+ * its own copy of the key format agrees with itself under any change to it.
+ */
+export function backlogKey(violation) {
+  return violation.count === undefined
+    ? `${violation.rule} ${violation.file}`
+    : `${violation.rule} ${violation.file} (${String(violation.count)})`;
 }
 
 /**
@@ -330,7 +359,9 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
   // to build per-test granularity for two rows: it goes when the paint path
   // lands, and TD0 compares by equality, so a resolved entry left here fails
   // just as loudly as a new expiry.
-  "TD2 src/shell/session.ts",
+  // The count is load-bearing: a third deferral in either file changes the key
+  // and fails TD0, rather than inheriting an exemption argued for two.
+  "TD2 src/shell/session.ts (2)",
 ]);
 
 /**

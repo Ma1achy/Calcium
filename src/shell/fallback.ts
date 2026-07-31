@@ -83,8 +83,19 @@ export function fallbackLines(size: TerminalSize): readonly string[] {
  * Draw, through whichever sink the caller owns.
  *
  * `\r\n` rather than `\n`: at launch the terminal is not in raw mode yet and at
- * mid-session it is, and only the pair is correct in both.
+ * mid-session it is, and only the pair is correct in both. A bare `\n` in raw
+ * mode moves down without returning, so line two starts under the end of line
+ * one — which is the staircase, and it is the fallback's whole job to be
+ * readable when nothing else is.
+ *
+ * **Nothing at all when there are no rows.** A terminal reporting zero rows is
+ * degenerate but reachable — a detached pane, a resize caught mid-flight — and
+ * writing a lone `\r\n` into it scrolls the one thing that cannot afford to
+ * scroll. `write` is not called, rather than called with an empty string: a
+ * sink that logs its calls should see none.
  */
 export function drawFallback(size: TerminalSize, write: Sink): void {
-  write(`${fallbackLines(size).join("\r\n")}\r\n`);
+  const lines = fallbackLines(size);
+  if (lines.length === 0) return;
+  write(`${lines.join("\r\n")}\r\n`);
 }

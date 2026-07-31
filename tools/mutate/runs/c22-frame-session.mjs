@@ -92,6 +92,44 @@ const results = runPass({
       expect: "T3.8d",
     },
     {
+      // **The inert-subject sweep, kept.** These three all survived once: the
+      // assertion was `toContain("\\r\\n")` against a three-line render, where
+      // the join, the terminator and a spare all satisfy it.
+      name: "fallback: drop the trailing CRLF",
+      file: "src/shell/fallback.ts",
+      from: '  write(`${lines.join("\\r\\n")}\\r\\n`);',
+      to: '  write(lines.join("\\r\\n"));',
+      expect: "T3.15c",
+    },
+    {
+      name: "fallback: join with LF, which staircases in raw mode",
+      file: "src/shell/fallback.ts",
+      from: '  write(`${lines.join("\\r\\n")}\\r\\n`);',
+      to: '  write(`${lines.join("\\n")}\\r\\n`);',
+      expect: "T3.15c",
+    },
+    {
+      name: "fallback: write a lone newline into a zero-row terminal",
+      file: "src/shell/fallback.ts",
+      from: "  if (lines.length === 0) return;",
+      to: "  if (false) return;",
+      expect: "T3.15c",
+    },
+    {
+      name: "fallback: emit an SGR",
+      file: "src/shell/fallback.ts",
+      from: "    fitCells(`Terminal too small`, size.columns),",
+      to: "    fitCells(`\\u001b[31mTerminal too small\\u001b[39m`, size.columns),",
+      expect: "T3.8b",
+    },
+    {
+      name: "fallback: report the minimum as the actual size",
+      file: "src/shell/fallback.ts",
+      from: "    fitCells(`${String(size.columns)}x${String(size.rows)}`, size.columns),",
+      to: "    fitCells(`${String(MIN_COLUMNS)}x${String(MIN_ROWS)}`, size.columns),",
+      expect: "T3.15b",
+    },
+    {
       name: "fallback: gate on both bounds rather than either",
       file: "src/shell/fallback.ts",
       from: "  return size.columns < MIN_COLUMNS || size.rows < MIN_ROWS;",

@@ -36,7 +36,7 @@ The first four are **build gates**: they fail the build, not a test run, because
 
 This is not belt-and-braces. Every check here reports success the same way whether the tree is clean or the rule is broken, and a broken rule is indistinguishable from compliance at exactly the moment it matters.
 
-**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Fifteen have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
+**The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Sixteen have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
 
 - **A pattern that cannot match a real subject.** MG20 compared a resolved specifier against `src/terminal/escapes` while every NodeNext specifier ends `.js`. It matched nothing and reported compliance.
 - **A scope that matches no files.** SS26 scopes to `src/data/process/`; the tree has `src/data/process.ts`, a file. `startsWith` never matches, so the rule has never once been evaluated.
@@ -66,6 +66,18 @@ A vacuous rule reports success it has not earned; an undeclared branch reports a
   **What found it was a scan looking for something else.** SS40's stated concern is `.length` in the editor, and it fired on the string surgery beside the NUL. That is an argument for scans being cheap and broad rather than precisely aimed: a rule targeted exactly at its own subject would have walked past a NUL masquerading as a space, and the cost of the broad version is a comment explaining an exception.
 
   SS43 is the rule the class earned, and its first run found **three more instances in shipped code** — a memo key in C09, a dedup key in C05, and five `sequence` literals in C16's own decoder. All four read as spaces. Three were deliberate and defensible, which is the point: the rule is not "NUL is wrong" but "an invisible character is invisible", and the remedy is an escape rather than an allowance.
+
+- **A subject too uniform to tell the code from the defect.** Fifth instance, and the first counted as a class rather than as five separate fixture repairs. Every one is the same shape: an assertion whose *subject* cannot exhibit the difference, so the assertion is about the code and the fixture is about nothing.
+
+  - C22's fallback measured with `cells()`, and every string it renders is ASCII by design — it runs where the capability record may say nothing is supported — so `.length` agrees on all of them and the swap survived every assertion about the rendered output.
+  - The same file terminated lines with `\r\n`, asserted as `toContain("\r\n")` against a three-line render. The join, the trailing terminator and a spare newline all satisfy that, so **three** distinct mutations survived one assertion.
+  - C22's `T1.14` asserted `lifecycle.size()`, which reads the terminal directly and is therefore true whatever the viewport was handed; a hardcoded `80 x 24` survived.
+  - C16's keymap round trip used one separator on both sides, so a NUL masquerading as a space passed ten tests.
+  - C14's viewport fixture used `raw` blocks, whose measurer ignores width, so a width-sensitive claim was asserted against content that measures the same at every width.
+
+  **The remedy is always the same and it is never "add more assertions".** It is to find the input on which the two readings differ and assert *there* — a wide character, a one-row terminal, two widths, a real separator. Where the component's own vocabulary cannot produce that input, the unit that can is extracted and tested directly: `fitCells` is exported for exactly this, and the export is justified by the discrimination rather than by a caller.
+
+  **Narrow corpora are where this breeds**, which is the tell worth carrying. A component that deliberately restricts what it handles — ASCII only, one block kind, a fixed set of strings — has a subject that agrees with itself, and a suite over that subject reports coverage it does not have. So: after any mutation survives in such a component, sweep the rest of the file rather than repairing the one row. C22's fallback returned three more on that sweep, and one of them was a real defect — a lone newline written into a terminal reporting zero rows.
 
 - **A harness that cannot see a kill, reporting thoroughness.** The mutation pass is the only thing that asks whether a test can fail, so a mutation runner that cannot detect a failing suite deletes that check and leaves a report that reads like a rigorous one. C22's runner read `/Tests\s+\d+ failed/` against vitest output carrying ANSI codes between "Tests" and "1 failed": **eight live mutants reported as survivors**, which is nine lines of "no failure" — indistinguishable from the finding a mutation pass exists to produce.
 

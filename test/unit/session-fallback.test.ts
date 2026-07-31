@@ -61,7 +61,7 @@ describe("C22 §4 — the size gate", () => {
     expect(fitCells("abc", 10), "and it leaves short text alone").toBe("abc");
   });
 
-  it("T3.8c2: no rendered line exceeds the width it was given", () => {
+  it("T3.8c2: widths, across the range a fallback actually meets", () => {
     // `.length` and `cells()` diverge on exactly the characters a narrow
     // terminal makes visible, and a line one cell over wraps — which scrolls
     // whatever screen this landed on.
@@ -88,8 +88,33 @@ describe("C22 §4 — the size gate", () => {
     drawFallback({ columns: 44, rows: 12 }, (s) => written.push(s));
 
     expect(written).toHaveLength(1);
-    expect(written[0], "CRLF, correct in raw mode and out of it").toContain("\r\n");
     expect(written[0]).toContain("44x12");
     expect(written[0], "and it says what is needed").toContain(`${String(MIN_COLUMNS)}x${String(MIN_ROWS)}`);
   });
+
+  it("T3.15c: the exact bytes, at the sizes where the terminators separate", () => {
+    // **Three survivors made this exact.** The assertion was
+    // `toContain("\r\n")` against a three-line render, where the join, the
+    // trailing terminator and a stray extra all satisfy it — so dropping the
+    // terminator, joining with a bare `\n`, and emitting a spare newline each
+    // failed nothing. The fourth or fifth instance of one class: a subject too
+    // uniform to tell the code from the defect.
+    //
+    // One row is what separates them. There is no join at one row, so the only
+    // `\r\n` in the output is the terminator, and every one of the three
+    // mutations changes the string.
+    const at = (columns: number, rows: number): string[] => {
+      const out: string[] = [];
+      drawFallback({ columns, rows }, (s) => out.push(s));
+      return out;
+    };
+
+    expect(at(40, 1)).toEqual(["Terminal too small\r\n"]);
+    expect(at(40, 2)).toEqual(["Terminal too small\r\n40x2\r\n"]);
+
+    // And zero rows writes nothing rather than a lone newline: a terminal with
+    // no rows is the one that cannot afford to scroll.
+    expect(at(40, 0), "not called at all, not called with an empty string").toEqual([]);
+  });
+
 });

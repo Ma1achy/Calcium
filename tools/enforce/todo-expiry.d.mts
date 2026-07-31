@@ -17,6 +17,9 @@ export type TodoEntry = {
 export declare const COMPONENT_SOURCES: Readonly<Record<string, string>>;
 export declare const LAYER_SOURCES: Readonly<Record<string, string>>;
 export declare const ACKNOWLEDGED_BACKLOG: readonly string[];
+export declare function backlogKey(
+  violation: Readonly<{ rule: string; file: string; count?: number }>,
+): string;
 
 /** Component and layer ids in a title's blocker clause. `null` when it names none. */
 export declare function blockersIn(title: string): readonly string[] | null;
