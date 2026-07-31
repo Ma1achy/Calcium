@@ -96,30 +96,62 @@ This is a structural interaction rather than an oversight, which is why it survi
 
 ## 3. Construction order
 
+**`createTui` runs step 1 and nothing else.** Validation is eager — it needs nothing constructed, and a bad config should fail at the call site rather than on `start()` — so `createTui` throws for a missing required field (T2.7) and otherwise returns an instance in the `created` state. **Steps 2 to 11 run inside `start()`.**
+
+Three things depend on that split, and none of them is served by constructing eagerly: §9's `created` state has to be a state where something exists and nothing is built; `stop` from `created` must find no lifecycle and nothing acquired (T1.9); and `TuiConfig.manifest` may be a path, so step 3 reads a file and a constructor cannot await.
+
 ```
  1  validate config                      → invalid: throw before anything is acquired
  2  detect capabilities                     C02
  3  build registries: blocks, adapters,
-    completion sources, manifest            C09, C07, C19, C05
- 4  seal all four registries                C05, C07, C09 obligations
+    manifest, completion sources            C09, C07, C05, C19  — manifest first
+ 4  seal the four construction-time
+    registries                              C05, C07, C09, C19 obligations
  5  construct stores: transcript, viewport,
     overlays, history, editor, theme         C13, C14, C15, C20, C17, C10
  6  construct the process runner             C21
  7  construct the lifecycle, passing
     onFatal and beforeRelease                C01 — installs signal handlers
  8  construct the frame scheduler             C03
- 9  construct the input router and
-    register every handler                    C16
-10  construct the execution pipeline          C23
+ 9  construct the input router                C16
+10  construct the execution pipeline          C23 — seals the local registry
+11  register every handler                    C16, and 10's submit
 ```
 
-Three orderings are load-bearing and the rest are incidental:
+Three orderings are load-bearing and the rest are incidental. §3a walks every pair.
 
 **5 and 6 before 7.** The lifecycle's `beforeRelease` closes over the history store and the process runner. C01's signal handlers exit the process after releasing (C01 §Signals), so cleanup that has not been wired by then never runs at all.
 
 **7 before any acquire.** C01 registers its handlers at construction, which is what closes the window where terminal state is held with nothing to release it (C01 I3).
 
-**4 before 9.** A registry sealed after input is accepted could serve a different answer to the same question at two points in one session — the drift C05, C07 and C09 each seal against.
+**4 before 11.** A registry sealed after input is accepted could serve a different answer to the same question at two points in one session — the drift C05, C07 and C09 each seal against.
+
+### 3a. The pairs, walked
+
+**Indexed by pairs of steps whose ordering rules could both apply, not one row per step.** A row governed by a single rule restates that rule and finds nothing; every defect below lived in a cell where two correct statements overlap. This is the structural half of the artefact — no event passes between two construction steps, so a sequence trace cannot reach any of it — and §8a is the event-mediated half.
+
+| Pair | What the later step closes over | If they swap | Kind |
+|---|---|---|---|
+| 1 → 2 | nothing | Nothing breaks: C02 acquires nothing and emits nothing, so an invalid config is still rejected before any state exists | **incidental** |
+| 2 → 3 | the capability record | Block definitions are built against a default record, and a Unicode terminal gets a table in ASCII beside a sparkline that is not — C02 §1's whole reason for existing | **constitutive** |
+| 3 → 3 | the manifest, by the completion sources | The default completion sources are manifest-derived (§2), so building them first yields sources over an empty tool list that never refill | **constitutive** |
+| 3 → 4 | the built registries | Sealing an unbuilt registry seals nothing | **constitutive** |
+| 2 → 5 | the capability record | C10, C14 and C17 each take it; same failure as 2 → 3 | **constitutive** |
+| 4 → 11 | the sealed registries | **I3.** A registry answering differently at two points in one session | **load-bearing** |
+| 5, 6 → 7 | the history store and the runner, via `beforeRelease` | **I1.** Cleanup is wired after the handlers that would call it, so it never runs on a signal path — and nothing fails, because the explicit paths still work | **load-bearing** |
+| 7 → 8 | `lifecycle.acquired` and `writer` | C03 takes both (`FrameSchedulerOptions`); there is no scheduler to construct | **constitutive** |
+| 7 → acquire | the registered handlers | **I2.** C01's crash window reopens | **load-bearing** |
+| 9 → 10 | the router, by the pipeline | C23's submit row ends `router.resetFocus()` (A02 Seam 4, C16 I2) | **constitutive** |
+| 10 → 11 | the pipeline, by the submit handler | **The cycle, and the defect this table found.** See below | **load-bearing in effect** |
+| 5 → 11 | C15, by `raiseExitConfirm` | The Ctrl-C and Ctrl-D rungs have nothing to raise; C16's ladder answers and nothing appears | **constitutive** |
+
+**The 9 / 10 / 11 split is a correction.** The step list read "9 construct the input router and register every handler · 10 construct the execution pipeline", and both halves are correct read alone. Together they require the prompt's submit handler — registered at 9 — to close over a pipeline that does not exist until 10, while the pipeline closes over the router for `resetFocus`. A construction cycle, invisible to a reader checking either statement on its own, and it would have surfaced during the build as a `undefined is not a function` on the first Enter.
+
+Registration is therefore its own step. I3 is unharmed: it says sealed *before input is accepted*, which is startup step 8, not before the router exists.
+
+**The incidental pair is written out on purpose.** One row, saying that 1 → 2 carries no weight, is what stops the list being tidied into "the three that matter" — after which the next reader has no way to tell a pair nobody checked from a pair that was checked and found free. The same move as recording a pending enforcement rule rather than deleting it.
+
+**A fifth registry exists and is C23's.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and seals them. It is sealed at step 10 by C23 rather than at step 4, because the app's handlers arrive through config and C23 is what holds them. Commitment 4 says four and I3 says *every* registry; both are now true and neither counts the same set, which is why the step list says "the four construction-time registries" and this paragraph says where the fifth is.
 
 ---
 
@@ -240,6 +272,49 @@ C01 I5 requires it synchronous and non-throwing, because a signal handler cannot
 
 History flushes on **every** path including faults. Losing a session's history to a crash is a small loss that feels large.
 
+### 8a. The shutdown trace
+
+Five callers × six points construction can have reached. **This is the event-mediated half** — every cell is two rules meeting because something happened in between — and it found the two things below that §3a's table structurally cannot see.
+
+**Two of the five callers never run `stop()`, and the function all five share is `beforeRelease`.**
+
+`signal` and `fault` are entirely C01's: `signalExit` and `fault` call `releaseInternal` — which runs `beforeRelease` once, guarded by C01's own `beforeReleaseRan` — write diagnostics, and `process.exit` with 128 + signal or 1. C01 exposes no signal hook; `onFatal` is for a failed acquire and returns `never`. So on those two paths §8's step 1 does not happen, step 3 is C01's write to stderr and step 4 is C01's exit code.
+
+An earlier I4 said *shutdown is one function with five callers* and T2.1 asserted it **by identity**, which cannot pass: three callers share `stop` and five share `beforeRelease`. Both readings of "one function" are defensible in isolation, which is exactly why the sentence survived — and the test written against the wrong one would have been the first thing to fail during the build, after the seam was already shaped around it.
+
+**`session.stopping` is therefore never set on the signal and fault paths, and that is safe for one reason only:** `process.exit` runs synchronously inside the handler, so no submission can interleave between the release and the exit. It is written down because the obvious improvement — making a signal path do anything asynchronous — removes the reason without touching the flag.
+
+| Caller | ↓ reached | nothing | after 5–6 | after 7 | after acquire | first paint | running |
+|---|---|---|---|---|---|---|---|
+| `/exit` (C23) | | n/a — needs a prompt | n/a | n/a | n/a | n/a | four steps |
+| Ctrl-D confirm (C16) | | n/a | n/a | n/a | n/a | n/a | four steps |
+| double Ctrl-C (C16) | | n/a | n/a | n/a | n/a | n/a | four steps |
+| signal (C01) | | no handlers yet — the process dies with the default disposition, terminal untouched | same | `beforeRelease`, no bytes released, exit 128+n | full release, exit 128+n | same | same |
+| fault (C22 → `stop`, or C01) | | `stop` from `created`: nothing acquired, no lifecycle, no cleanup (T1.9) | **the named cell** — see below | `beforeRelease` runs, release emits nothing, stack to stderr | full release, then the stack | `beforeRelease` runs, terminal restored, stack on the primary screen (T3.16) | four steps |
+
+**The named cell — a fault after the stores, before the lifecycle.** Nothing is acquired and no cleanup is needed, and **the code knows it without a flag** because there is no lifecycle to release: the variable is undefined precisely because construction has not reached step 7. The absence is structural, not recorded.
+
+This is also where I7 has to be read carefully. Cleanup lives only inside `beforeRelease` (I5), `beforeRelease` only runs through the lifecycle, so a fault before step 7 flushes nothing — and I7 says history flushes on *every* path. Both hold, and the reason is an ordering fact rather than an exception: **nothing can be appended to history before input is accepted**, which is startup step 8, four steps after the lifecycle exists. A flush before step 7 would have nothing to write. If anything ever appends earlier — a startup notice, a restored session — that is the day I7 and I5 genuinely conflict, and this paragraph is what makes it visible then rather than a silent empty file.
+
+**Three further cells, each resolved by something that already exists:**
+
+- **`stop()` twice, from two callers.** C01's `beforeReleaseRan` guard makes cleanup once-only and `releaseInternal` returns early when released, so C22's own idempotency (T1.10) covers the four steps and C01 covers the cleanup. Two guards, two different things, neither duplicating the other.
+- **`stop()` while a handoff is in flight.** `beforeRelease` reaches `runner.live`, and a handed-off child is deliberately not in it (T3.4). C21's own comment is the authority.
+- **`SIGWINCH` after release.** C01's `onWinch` returns unless the state is `acquired`, so a resize racing shutdown is inert. **C22 adds no guard of its own** — a second one would be two owners for one condition, which is the thing A02 §4 exists to prevent.
+
+### 8b. The size gate, at rest
+
+A third table, small, and structural rather than event-mediated: the gate's state is not reached by a sequence but held.
+
+| Gate | Acquired | Where the fallback is drawn | Sink |
+|---|---|---|---|
+| passes at launch | yes | nowhere | — |
+| fails at launch | **no** | the primary screen | raw `stdout`, before step 5 |
+| fails mid-session | yes | inside the alternate screen | the scheduler, through `lifecycle.writer` |
+| fails, then `stop()` | no | left where it is on the primary screen | — |
+
+**The fallback has two sinks and §4 describes one.** "Layout-engine-free" is one rule and "the gate defers rather than aborts" is another; the cell where they meet is that a too-small terminal at launch never enters the alternate screen at all, so the fallback goes to the real screen — while the same fallback mid-session must go through the scheduler or it will be overwritten by the next frame. One renderer, two callers, and the renderer must take its writer rather than reach for one.
+
 ---
 
 ## 9. State machine
@@ -260,13 +335,15 @@ History flushes on **every** path including faults. Losing a session's history t
 
 - **I1** — Stores and the process runner are constructed before the lifecycle, so `beforeRelease` can reach them.
 - **I2** — The lifecycle is constructed before any acquire.
-- **I3** — Every registry is sealed before input is accepted.
-- **I4** — Shutdown is one function with five callers, idempotent, and runs its four steps in order.
+- **I3** — Every registry is sealed before input is accepted: the four built at construction, and C23's local registry, which is sealed at step 10 because the app's handlers arrive with it.
+- **I4** — **`beforeRelease` is the function all five callers share**, and it is what makes cleanup once-only. `/exit`, Ctrl-D confirm and double Ctrl-C additionally run `stop`'s four steps in order, idempotently; `signal` and `fault` are C01's, which releases, writes diagnostics and exits with 128 + signal or 1 — C01 exposes no signal hook, so `stop` cannot run there. An earlier wording said *one function, five callers* without saying which function, and the two readings are both defensible, which is how it survived.
+- **I4a** — `session.stopping` is not set on the signal and fault paths, and nothing may make either of them asynchronous. `process.exit` inside the handler is what stops a submission interleaving; the flag is unnecessary only for as long as that is true.
 - **I5** — Cleanup runs inside `beforeRelease` and nowhere else; it can therefore never run twice.
 - **I6** — Release precedes diagnostics on every path.
-- **I7** — History flushes on every path, faults included.
+- **I7** — History flushes on every path, faults included. A fault before the lifecycle exists flushes nothing and does not violate this: nothing can be appended before input is accepted, which is four steps later. The day anything appends earlier, I7 and I5 conflict for real (§8a).
+- **I7a** — `createTui` runs step 1 — validation — and returns; steps 2 to 11 run inside `start()`. §9's `created` state, T1.9's "nothing acquired" and a manifest given as a path all require it, and validation is the one step that can be eager because it needs nothing constructed.
 - **I8** — A failed size gate does not abort construction; session state survives until a resize.
-- **I9** — The too-small render uses no layout engine.
+- **I9** — The too-small render uses no layout engine, and it takes its writer rather than reaching for one: at launch it draws to the primary screen because the terminal is never acquired, and mid-session it draws through the scheduler or the next frame overwrites it (§8b).
 - **I10** — Clock and filesystem enter the graph only here.
 - **I11** — Session state has exactly one writer per field, and the two fields with no writer say so. `cluster` and `version` are set at construction and never written after; a field absent from §5's table would read identically to a field nobody writes, and only one of those is a claim.
 - **I12** — `cwd` reaches C21 as a function, never a captured value.
@@ -286,8 +363,10 @@ History flushes on **every** path including faults. Losing a session's history t
 
 1. Four required config fields; every other has a working default (I17).
 2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.prism` and the **app's entry point** resolves `PRISM_TUI_STATE_DIR` (I10, I20).
-3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2).
-4. All four registries seal before input is accepted (I3).
+3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
+3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
+3b. `createTui` validates and returns; steps 2 to 11 run inside `start()` (I7a).
+4. Five registries seal before input is accepted — four at construction, and C23's local registry with the pipeline (I3).
 5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate (I8).
 6. The too-small render is layout-engine-free (I9).
 7. Banner fetches are non-blocking and input is accepted before they finish (I18).
@@ -295,7 +374,7 @@ History flushes on **every** path including faults. Losing a session's history t
 9. `cwd` is exposed as a function so `cd` moves subsequent verbs (I12).
 10. Chrome is app-supplied; the prompt gutter is C22's to pass, not C17's to assume (I13).
 11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I19).
-12. Shutdown is one function, five callers, four ordered steps, with cleanup solely inside `beforeRelease` (I4, I5).
+12. Cleanup is `beforeRelease` and all five callers reach it; the three explicit callers additionally run `stop`'s four ordered steps, and the signal and fault paths are C01's, which cannot be given more (I4, I4a, I5).
 12a. `beforeRelease` is synchronous and returns no thenable; `killAll()`'s promise is not awaited and `drain()` is used rather than `flush()` (I21, C01 I5, C20 I18).
 13. Release precedes diagnostics; history flushes on every path (I6, I7).
 14. An offline cluster degrades rather than ends the session (I15).
@@ -312,7 +391,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.1**: `start` with valid config → running; every component constructed once.
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
-- **T1.4** (I3): all four registries report `sealed` before the input router accepts anything.
+- **T1.4** (I3): all five registries report `sealed` before the input router accepts anything — the four construction-time ones and C23's local registry, which is the one a test counting four would miss.
+- **T1.4b** (I3, commitment 3a): the submit handler is registered after the pipeline exists, and the pipeline holds the router. Asserted on the event log: no handler registration precedes step 10. The construction cycle §3a found fails here rather than at the first Enter.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
 - **T1.6** (I10): a fake clock and filesystem reach every component that takes one — asserted per component.
 - **T1.7** (I5): on every exit path, `killAll` and `drain` each run **exactly once** — the double-flush regression, tested directly.
@@ -323,13 +403,14 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I4): for each of the five callers, the same shutdown function runs — asserted by identity, not by behaviour.
+- **T2.1** (I4): for each of the five callers, the same **`beforeRelease`** runs — asserted by identity, not by behaviour. And the half the original line could not have covered: for the three explicit callers, the same `stop` runs, also by identity. Two assertions because there are two shared functions and five callers do not share the same one; asserting `stop` across all five is unsatisfiable, since C01 exposes no signal hook (§8a).
+- **T2.1b** (I4a): the signal and fault handlers are synchronous end to end — no `await` between the release and the exit, asserted on the source rather than by timing, because the failure is a submission interleaving and a test cannot make one land in the gap reliably.
 - **T2.2** (I6): on all five paths, the last release byte precedes the first diagnostic byte.
 - **T2.3** (I7): history is flushed on all five paths, including a thrown exception.
 - **T2.4** (I10): a source scan finds no ambient clock or `fs` reference anywhere in `tui-kit` outside C22.
 - **T2.5**: every hook in A02 §6 has a default except `theme`, and each default is exercised.
 - **T2.6** (I12): `SpawnOptions.cwd` is a function; a compile-level test rejects a string.
-- **T2.7**: config validation rejects each missing required field with a named error, before construction.
+- **T2.7** (I7a): config validation rejects each missing required field with a named error, from `createTui` itself and before `start()` is ever called — so a bad config fails at the call site and nothing is constructed.
 - **T2.8** (I21, C01 I5): `beforeRelease()` returns `undefined` — not a thenable, checked as `typeof result?.then !== "function"` rather than by awaiting, since awaiting a non-thenable passes. This is the mechanism behind the floating `killAll()`: nothing in this tree flags a floating promise and nothing flags the `await` that would "fix" it, and the resulting `async` handler fails only when a signal arrives during shutdown.
 - **T2.9** (I20): a source scan finds no `process.env` and no `PRISM_TUI_STATE_DIR` anywhere in `src/`, C02's one allow-listed file excepted. The C06 T2.9 shape, for the second variable.
 
@@ -355,7 +436,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.12** (I14): an expired token → a notice with an inline re-login offer; no browser opens.
 - **T3.13**: `retry` after a successful re-login → the retained command re-runs unchanged.
 - **T3.14** (I15): cluster unreachable at startup → `health: "offline"`, session opens, a system command still runs.
-- **T3.15**: a fault during construction, after stores but before the lifecycle → nothing acquired, no cleanup needed, error surfaced.
+- **T3.15** (I7, §8a): a fault during construction, after stores but before the lifecycle → nothing acquired, no cleanup attempted, error surfaced. The assertion is that the code reaches this **without a flag** — a spy shows no `beforeRelease` was constructed to call, rather than a boolean saying not to.
+- **T3.15b** (I9, §8b): a failed size gate at launch draws the fallback to the **primary screen** and no alternate-screen sequence is emitted; the same fallback mid-session draws through the scheduler. One renderer, two writers, asserted on both.
 - **T3.16**: a fault during the first paint → `beforeRelease` runs, terminal restored, stack on the primary screen.
 - **T3.17**: `SIGKILL` — documented as unrecoverable; the test asserts the documentation exists rather than the behaviour.
 - **T3.18**: a `beforeRelease` that throws → logged, release still completes (C01 I5 from this side).
@@ -404,6 +486,11 @@ PTY harness.
 - **T6.15** (I20): resolving `PRISM_TUI_STATE_DIR` inside `src/` → T2.9 and A03 SS10 fail, and SS10's allow-list gains its second entry.
 - **T6.16** (I11): dropping `cluster` or `version` from §5's table → T1.11 loses a field silently, because a field with no row and a field with no writer are the same absence to a reader. The count in commitment 8 is what fails.
 - **T6.17** (I21, C20 I18): calling `flush()` rather than `drain()` in `beforeRelease` → T1.7 and T2.3 fail, and the command the user has just typed is the one entry lost, because Node does not wait for a pending promise at exit.
+- **T6.18** (I3, commitment 3a): registering the submit handler at step 9, beside the others → T1.4b fails. **Structural guard as well** (A02 17a): the handler would close over a pipeline that is `undefined` at registration, so the shape that prevents it is the ordering itself, and T1.4b is what makes the ordering visible rather than a comment.
+- **T6.19** (I4): asserting `stop` by identity across all five callers → T2.1 fails on the signal path, where C01 owns the release and offers no hook. The revert is the *original spec wording*, which is why the entry exists: the test written against it is unsatisfiable, and a green suite would have meant the seam was reshaped to fit an assertion rather than the other way round.
+- **T6.20** (I4a): making the signal or fault path asynchronous — an `await` anywhere between release and exit → T2.1b fails. Nothing else objects, and `session.stopping` is not set on those paths, so a submission could interleave where today none can.
+- **T6.21** (I9): giving the fallback renderer its own writer instead of taking one → T3.15b fails, and the launch-time fallback either writes into an alternate screen that was never entered or the mid-session one is overwritten by the next frame.
+- **T6.22** (I7a): constructing steps 2–11 in `createTui` → T1.9 fails, because `stop` from `created` now has a lifecycle to release; and a manifest given as a path cannot be read at all, since a constructor cannot await.
 
 ---
 
