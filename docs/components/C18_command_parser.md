@@ -27,13 +27,17 @@ The classification is what the `/` prefix bought (D20). With bare verbs, the par
 ```typescript
 type ParseResult =
   | Readonly<{ kind: "app";     tool: ToolDef; argv: readonly string[];
-               validation: ValidationResult }>
+               residual: readonly string[]; validation: ValidationResult }>
   | Readonly<{ kind: "local";   tool: ToolDef; argv: readonly string[];
-               validation: ValidationResult }>
-  | Readonly<{ kind: "builtin"; name: "cd" | "export" | "pwd"; args: readonly string[] }>
+               residual: readonly string[]; validation: ValidationResult }>
+  | Readonly<{ kind: "builtin"; name: Builtin; args: readonly string[] }>
+  | Readonly<{ kind: "builtinThenShell"; name: Builtin;
+               args: readonly string[]; rest: string }>
   | Readonly<{ kind: "shell";   command: string }>
   | Readonly<{ kind: "empty" }>
   | Readonly<{ kind: "error";   error: ErrorLike }>;
+
+type Builtin = "cd" | "export" | "pwd";
 
 type ParseContext = Readonly<{
   manifest: Manifest;
@@ -56,7 +60,39 @@ interface CommandPolicy {
 }
 
 export const slashPolicy: CommandPolicy;         // the default (D20, D23)
+
+type Token = Readonly<{
+  text:   string;                     // quotes removed, escapes applied
+  start:  number;                     // offset into the input
+  end:    number;                     // exclusive
+  quoted: boolean;                    // any part of it was inside quotes
+  kind:   "word" | "operator";
+}>;
+
+function tokenise(input: string): Result<readonly Token[], ErrorLike>;
+function quote(text: string): string;
 ```
+
+**`argv` is what gets spawned; `residual` is what was validated.** D24 spawns
+`["<verb tokens…>", …args]`, so `/ps --mine` gives `argv ["ps","--mine"]` while
+`validateInvocation` is handed C05's `ToolMatch.residual` — `["--mine"]`. One field
+could not carry both, and with only `argv` the array validation ran against is not on
+the result: commitment 9 is then believed rather than checked, because a test can see
+that a `ValidationResult` is present and not that it corresponds to anything. Two
+fields because they are two different things, and the redundancy is what makes the
+correspondence assertable (T2.9).
+
+**Tokens carry offsets, and this is not a convenience.** Two consumers need them and
+neither can be served by token text:
+
+- `builtinThenShell.rest` and every delegated `command` must be the user's own
+  string, quoting intact (T3.14). Re-joining tokens loses exactly the quoting that
+  delegation exists to preserve, so the `/verb` rewrite is a **splice into the input**
+  rather than a re-join (§5).
+- C19's `CompletionContext` carries `tokenIndex` and `prefix`, "the part of the
+  current token before the cursor" — a question about offsets, not about text.
+
+One shape serves both, which is what I11 is for.
 
 ---
 
@@ -66,11 +102,23 @@ Standard shell quoting: single quotes are literal, double quotes allow `$_`, bac
 
 Unterminated quotes are an error, not a silent close.
 
+**Operators are tokens, not a pattern over the input.** `|`, `||`, `>`, `>>`, `<`,
+`&&`, `;` and `&` are emitted as `kind: "operator"`; everything else is a word. A
+regex over the raw string would classify `echo "a & b"` as backgrounding and
+`echo "a | b"` as a pipe (T3.8), and it would read the slash in a quoted `"/usr/bin"`
+as D23's. Every rule in §4 and §5 asks the token list, never the string.
+
+A digit-prefixed redirect (`2>`) tokenises as the word `2` followed by the operator
+`>`. That is enough: the line contains an operator, so it delegates whole, and C18
+never needs to know what an fd is.
+
 ---
 
 ## 4. Classification
 
 ```
+0  a refusal (§5) — trailing bare "&", or a job-control
+   word as the first token                           → error
 1  empty or whitespace only                          → empty
 2  first token is a built-in
      2a  no shell operator follows                   → builtin
@@ -91,6 +139,26 @@ Checking built-ins after operators would break the same case in the other direct
              args: readonly string[]; rest: string }>
 ```
 
+**The split needs a non-empty remainder.** `cd /tmp &&` has nothing after the
+operator, and T3.7 already rules that case — `&&` at the start or end of input is
+delegated, and the shell reports its own syntax error. Rule 2b's wording did not say
+so, and a split on an empty remainder would apply the `cd` and then report nothing,
+which is the one outcome bash does not produce: the line is a syntax error, so the
+directory must not change either. Empty remainder falls through to rule 3.
+
+**`rest` is delegated, and delegation means the rewrite.** `cd /tmp && /ps` must run
+the app, so `rest` goes through §5's `/verb` rewrite exactly as a whole-line
+delegation does. Written down because the variant's declaration says only "the
+remainder", and a `rest` handed over verbatim would run `/ps` as a path.
+
+**Interception ignores quoting; the rewrite honours it.** `'cd' /tmp` is the `cd`
+built-in in bash, so it is one here — the built-in test is on token text. The `/verb`
+rewrite is the opposite (§5), and the asymmetry has a reason rather than being an
+oversight: quoting does not change what bash does with `cd`, and it does not change
+what bash does with `/ps` either. The rewrite is C18 *altering* what the user typed,
+so a quoted token is the user saying "leave this alone" and bash agrees with them.
+Interception changes nothing about the text.
+
 Anything more contorted than a leading built-in — `ls | cd`, `cd` in the middle of a pipeline — is meaningless and goes to the shell, which reports its own error.
 
 **Rule 4's second clause is D23.** `/usr/bin/ls` has a slash after position 0, so it is a path and goes to the shell. App verbs never contain slashes, so one test separates them permanently.
@@ -109,6 +177,49 @@ The prefix itself is a **pluggable policy** (F2). `/` is this app's choice; anot
 /ps --json | jq '.data[0].uuid'     →  sh -c "prism ps --json | jq '.data[0].uuid'"
 git log --oneline | head -20        →  sh -c "git log --oneline | head -20"
 ```
+
+### The rewrite predicate
+
+**A token is rewritten when it is exactly what rule 4 would classify as a verb, and
+unquoted.** Read without a predicate, "any `/verb` token" rewrites `/usr/bin/ls` in
+`/usr/bin/ls | head` — which contradicts D23 one line after D23 established it. The
+predicate is rule 4's, so there is one slash rule and not two:
+
+| Token | Rewritten | Why |
+|---|---|---|
+| `/ps` | `widget ps` | rule 4's shape |
+| `/usr/bin/ls` | no | D23 — a slash after position 0 |
+| `"/ps"`, `'/ps'` | no | quoted; the user meant the path |
+| `/` | no | no verb after the prefix |
+
+**The rewrite does not consult the manifest.** `/zzzzz | cat` becomes
+`widget zzzzz | cat`, and the binary reports its own unknown verb — the same message
+the user would get in bash. Consulting the manifest here would put a lookup in the
+shell path purely to decide a rewrite, and it would make `/zzzzz` alone (a suggestion
+at distance ≤ 2) and `/zzzzz | cat` (a missing file) fail in two unrelated ways for
+one typo. Classification stays a question about characters.
+
+**Every qualifying token is rewritten, not only the first** (T3.13), including a
+`local` verb: in a pipeline there is no in-process path, so `/help | less` becomes
+`widget help | less`. And **the splices are applied last-to-first**, because each one
+changes the length of the string every later span was measured against.
+
+**The splice covers one token, and the tool match may be longer.** `/serving scale web`
+splices `[0,8)` — `/serving` → `widget serving` — and `scale web` follows unchanged,
+giving `widget serving scale web`. The splice boundary and `findTool`'s longest-match
+boundary are different lengths, which is exactly where an off-by-one hides; the
+rewrite never asks about the match because it never asks the manifest.
+
+### What is refused, and where
+
+Rule 0 runs on the token list before anything else. A trailing bare `&` is the last
+token and `kind: "operator"`; a job-control word is refused **only as an unquoted
+first token**, so `echo fg` is a line about the word `fg` and delegates.
+
+`sleep 5 & echo x` is delegated whole: only a *trailing* `&` is refused, so
+backgrounding mid-line reaches the shell and works there. That is the spec's answer
+rather than an omission — the refusal exists because a background job has nowhere to
+report to, and a job the user backgrounded inside a compound line is the shell's.
 
 This is a **correction to `j22`**, which refused brace expansion and globbing on the grounds that the Prism shell "is not bash". That reasoning assumed we would implement pipes and redirects ourselves. Delegating instead means globbing, brace expansion, variable expansion, quoting and operator precedence are all exactly right, because they are the user's actual shell doing them. Reimplementing a subset would be more work and would be wrong in ways users discover one at a time.
 
@@ -137,6 +248,35 @@ A `/`-prefixed first token with no further slash is looked up with `findTool`, l
 | Found, `local: false` | `app` — goes to the transport |
 | Not found | `error`, with an edit-distance suggestion at distance ≤ 2 |
 
+The suggester is **C05's**, exported rather than rewritten. C05 already runs a
+distance-2 cutoff for unknown flags, and two implementations of one cutoff agree
+about the distance and diverge about the tie-break — so the divergence lands exactly
+where a suggestion is *wrong* rather than absent, which A01 A.2 says costs more than
+none. Same argument as the shared tokeniser, one primitive over.
+
+**An app command's arguments are not glob-expanded**, because no shell is in the loop
+(D18): `/tail *.log` reaches the transport as the literal `*.log`, while `ls *.log`
+delegates and globs. That is the documented consequence of the argv-array rule rather
+than an inconsistency, and it is written here because the two lines look alike and
+behave differently.
+
+**`/` alone is its own error, not an unknown verb with an empty name.** Rule 4 fires —
+the prefix is at position 0 and there is no *further* slash — and the verb is the
+empty string. Handed to the suggester that would list every verb within distance 2 of
+`""`, which is every one- and two-character verb in the manifest. T3.1 says "not an
+empty tool name" and this is what that means in the result: a distinct error saying
+there is no verb after the prefix.
+
+**A failing validation stays `app` or `local`.** The kind describes what the input
+*is*, not whether it will succeed; L4 renders the errors and still shows what was
+parsed, which is why §6 carries the result rather than throwing it. Converting to
+`error` would lose the tool, and with it the help L4 wants to show beside the failure.
+
+**Lookup precedes expansion.** `/zzz $_` with no last UUID is an unknown-verb error,
+not a `$_`-unset one — the verb is the thing the user got wrong, `$_` never appears in
+a verb token, and the cheaper, more useful message wins. Recorded because the two
+errors are produced by different sections and nothing said which runs first.
+
 Validation runs here, **before anything is spawned** (D17). A malformed invocation costs nothing rather than 300 ms of interpreter startup to be told the same thing. The result is carried on the `ParseResult` rather than thrown, so L4 can render the errors and still show what was parsed.
 
 ---
@@ -144,6 +284,28 @@ Validation runs here, **before anything is spawned** (D17). A malformed invocati
 ## 7. `$_` expansion
 
 Resolved at parse time from `ctx.lastUuid`, in unquoted and double-quoted tokens, never in single-quoted ones.
+
+**It expands where the next character is not a word character, and nowhere else.**
+That is bash's own rule for `$_`, and adopting it rather than inventing one is the
+whole argument: the same characters are delegated *unchanged* when the line is
+addressed to the shell (below), so a `$_` that expanded differently on this side of
+the prefix would make one string mean two things depending on a character D20 chose
+for an unrelated reason.
+
+| Form | Expands | Why |
+|---|---|---|
+| `$_` | yes | the whole token |
+| `--target=$_` | yes | `$_` ends the token |
+| `"a $_ b"` | yes | double-quoted, followed by a space |
+| `web:$_` | yes | the boundary is the character after, not the token edge |
+| `$_x` | no | `$_x` names the variable `_x`, which is not this |
+| `'$_'` | no | single-quoted |
+
+**This changes T3.12, which asserted the token-exact reading.** Under that reading
+`--target=$_` and `--config=$_` do not expand — the two forms a user is likeliest to
+type after a result — and the test's `x$_` half is what forced it. Writing the
+classification table is what surfaced the pair: the invariant admitted two readings
+that agree on every row anyone had written down and differ on the common one.
 
 **Expansion applies to `app` and `local` commands only, never to shell-delegated input.** `$_` is a real variable in bash and zsh — the last argument of the previous command — and rewriting it inside a line the user is addressing to their own shell would silently break `echo $_`. In shell context `$_` belongs to the shell.
 
@@ -158,6 +320,166 @@ Expansion happens **after** tokenising, so a UUID containing a space could not s
 `cd`, `export` and `pwd` are intercepted before shell delegation, because `sh -c "cd /tmp"` changes a subshell's directory and exits. The session's own cwd and environment must change, so L4 applies them and C18 only classifies.
 
 `cd` with no argument goes home; `cd -` returns to the previous directory. Session-scoped, not persisted — matching bash, and matching `j22`'s open question, which resolved the same way.
+
+---
+
+## 8a. The classification table
+
+Resolved by hand before any code, as C16's rung table and C17's edit trace were, and
+kept here for the same reason: it is the contract in the form someone can check an
+implementation against.
+
+**It is indexed by rule interaction, not by input coverage.** A row governed by one
+rule is a restatement of that rule and finds nothing; every defect these walks have
+produced has lived in a cell where two correct statements overlap, which is also why
+they survive review — a reader checks statements one at a time by construction.
+
+Context throughout: the fixture manifest, `binary: "widget"`, `lastUuid: "web:v3"`.
+`ok`/`fail` is the carried `validation`.
+
+### The prefix against D23's slash
+
+| Input | Rule | Result |
+|---|---|---|
+| `/ps --mine` | 4 | `app` · tool `ps` · argv `["ps","--mine"]` · residual `["--mine"]` · ok |
+| `/help` | 4 | `local` · tool `help` · argv `["help"]` · residual `[]` · ok |
+| `/serving scale web --replicas=3` | 4 | `app` · tool `serving scale` · argv `["serving","scale","web","--replicas=3"]` · residual `["web","--replicas=3"]` · ok |
+| `/usr/bin/ls -la` | 5 | `shell` · `/usr/bin/ls -la` — **no rewrite** |
+| `//ps` | 5 | `shell` · `//ps` |
+| `/` | 4 | `error` · no verb after the prefix |
+| `/pss` | 4 | `error` · `unknown verb: /pss — did you mean /ps?` |
+| `/zzzzz` | 4 | `error` · `unknown verb: /zzzzz — /help for verbs` |
+| `/debug dump` | 4 | `local` · resolves although `hidden` (C05 I11) |
+
+### Built-in interception against operator delegation
+
+| Input | Rule | Result |
+|---|---|---|
+| `cd /tmp` | 2a | `builtin` · `cd` · args `["/tmp"]` |
+| `cd` | 2a | `builtin` · `cd` · args `[]` |
+| `cd -` | 2a | `builtin` · `cd` · args `["-"]` |
+| `export A=1` | 2a | `builtin` · `export` · args `["A=1"]` |
+| `cd /tmp && make` | 2b | `builtinThenShell` · `cd` · args `["/tmp"]` · rest `make` |
+| `cd /tmp ; ls` | 2b | same shape · rest `ls` |
+| `cd /tmp && /ps` | 2b | `builtinThenShell` · args `["/tmp"]` · rest **`widget ps`** |
+| `cd /tmp &&` | 3 | `shell` · `cd /tmp &&` — empty remainder, the shell reports the syntax error |
+| `cd /tmp \| ls` | 2c | `shell` · verbatim |
+| `ls \| cd` | 3 | `shell` · verbatim |
+| `'cd' /tmp` | 2a | `builtin` · quoting does not disable interception |
+
+### The rewrite against everything it meets
+
+| Input | Rule | Delegated command |
+|---|---|---|
+| `/ps --json \| jq '.data[0].uuid'` | 3 | `widget ps --json \| jq '.data[0].uuid'` |
+| `/serving scale web \| cat` | 3 | `widget serving scale web \| cat` |
+| `/ps \| /help` | 3 | `widget ps \| widget help` |
+| `/zzzzz \| cat` | 3 | `widget zzzzz \| cat` — no manifest lookup |
+| `echo "/ps"` | 5 | `echo "/ps"` |
+| `echo '/ps'` | 5 | `echo '/ps'` |
+| `/usr/bin/ls \| head` | 3 | `/usr/bin/ls \| head` |
+| `cat > "my file.txt"` | 3 | `cat > "my file.txt"` |
+| `ls *.md` | 5 | `ls *.md` — no operator; rule 5, and the shell globs |
+| `/tail *.log` | 4 | `app` · argv `["tail","*.log"]` — **not** globbed (D18) |
+
+### `$_`, both halves of I7
+
+| Input | Result |
+|---|---|
+| `echo $_` | `shell` · `echo $_` — unexpanded |
+| `/promote $_` | `app` · argv `["promote","web:v3"]` · ok |
+| `/promote "$_"` | `app` · argv `["promote","web:v3"]` · ok |
+| `/promote '$_'` | `app` · argv `["promote","$_"]` · **fail** (pattern) — carried, still `app` |
+| `/serving scale web --replicas=1 --config=$_` | `app` · `--config=web:v3` |
+| `/promote $_x` | `app` · argv `["promote","$_x"]` · fail — carried |
+| `/promote $_` with `lastUuid: null` | `error` · `no previous result · submit or promote something first` |
+| `/zzz $_` with `lastUuid: null` | `error` · unknown verb — lookup precedes expansion |
+
+### Refusals against the tokeniser
+
+| Input | Rule | Result |
+|---|---|---|
+| `sleep 5 &` | 0 | `error` |
+| `a && b` | 3 | `shell` |
+| `echo "a & b"` | 5 | `shell` — the `&` is inside a word token |
+| `sleep 5 & echo x` | 3 | `shell` — only a *trailing* `&` is refused |
+| `fg` | 0 | `error` |
+| `echo fg` | 5 | `shell` — first token only |
+| `&& b` | 3 | `shell` — the shell reports the syntax error |
+
+### Totality against the error path
+
+| Input | Result |
+|---|---|
+| `` (empty), `   `, `\t` | `empty` |
+| `'unterminated` | `error` — not a silent close |
+| `"unterminated` | `error` |
+| `abc\` | `error` |
+| `/ps` + trailing spaces | identical to `/ps` |
+| `/ps --status=nonsense` | `app` · fail (enum) — carried |
+| `/ps --since -1h` | `app` · fail (missing value, C05's remediation) — carried |
+| input with a NUL | stripped; the remainder parses |
+
+### What it found
+
+Thirteen, and four are contradictions rather than gaps — two statements each correct
+where it stands, which is the class this artefact exists for.
+
+1. **`builtinThenShell` was not in §2's union.** T1.9b requires the variant; T2.5
+   claims to be exhaustive over the union — so T2.5 passed by being exhaustive over a
+   union missing the variant its sibling demands. *Contradiction.*
+2. **The rewrite predicate was unstated**, and "any `/verb` token" rewrites
+   `/usr/bin/ls` in a delegated line — contradicting D23 one section after D23.
+   *Contradiction.*
+3. **T3.12 forced the token-exact `$_` reading**, under which `--target=$_` does not
+   expand. The two readings agree on every row anyone had written and differ on the
+   commonest form. *Contradiction.*
+4. **Rule 2b splits on an empty remainder**, which T3.7 already ruled the other way.
+   *Contradiction.*
+5. `rest` never said it goes through the rewrite; without it `cd /tmp && /ps` runs a
+   path.
+6. The rewrite's relationship to the manifest was unstated — one typo would have
+   failed two unrelated ways.
+7. `/` alone needed its own error; the suggester on `""` returns every short verb.
+8. Nothing said whether lookup or expansion reports first.
+9. Nothing said a failing validation keeps its kind.
+10. Nothing said where the refusals sit in the order, or that job-control words are
+    refused as a first token only.
+11. Quoting disables the rewrite and not the interception, and the asymmetry needed
+    its reason written down.
+12. Multiple rewrites must splice last-to-first; each changes the length every later
+    span was measured against.
+13. An app command's arguments are not globbed — a documented consequence of D18 that
+    two adjacent rows make look like an inconsistency.
+
+## 8b. The delegation figure
+
+The analogue of C17's "read the frame, not only the numbers". A splice can be
+arithmetically perfect about offsets and still hand the shell something it parses
+differently, and the only way to see that is to write the string out and then run it.
+
+`binary: "/opt/my tools/widget"` — a path with a space, because that is the case the
+quoter exists for.
+
+| Input | Spans replaced | Handed to `spawnShell` |
+|---|---|---|
+| `/ps --json \| jq .` | `[0,3)` | `'/opt/my tools/widget' ps --json \| jq .` |
+| `/serving scale web \| cat` | `[0,8)` | `'/opt/my tools/widget' serving scale web \| cat` |
+| `/ps \| /help` | `[6,11)` then `[0,3)` | `'/opt/my tools/widget' ps \| '/opt/my tools/widget' help` |
+| `cat > "my file.txt"` | none | `cat > "my file.txt"` |
+| `cd /tmp && /ps` | `[11,14)` of the rest | rest: `'/opt/my tools/widget' ps` |
+| `echo "/ps"` | none | `echo "/ps"` |
+
+Read the third row: the spans are listed in the order they are applied, and applying
+`[0,3)` first would leave `[6,11)` pointing into the middle of the inserted path.
+
+**The verb is not quoted and the binary always is.** A verb that reached rule 4's
+predicate is a run of non-slash, non-whitespace, unquoted characters, and quoting it
+would change `widget ps` into `widget 'ps'` for no gain. The binary is app-supplied
+and may be anything, so it goes through `quote` unconditionally rather than when it
+looks like it needs it — T4.8 runs the first two rows through the real `spawnShell`
+and compares output, because a string that looks right and a string the shell agrees
+with are different claims.
 
 ---
 
@@ -178,6 +500,15 @@ Expansion happens **after** tokenising, so a UUID containing a space could not s
 - **I13** — Output from a shell-delegated command reaches the transcript as a `raw` block. C18 does not parse it, because what the user's shell produced is text by construction and pretending otherwise would put a second envelope contract in the one place there is deliberately none.
 - **I14** — An unknown verb is matched against the manifest at a Levenshtein distance of **2** and no further (A01 A.2). Beyond the cutoff the suggestion is dropped for a generic hint, because a wrong suggestion costs more than none — it sends the reader to a verb that exists and does something else.
 - **I15** — C18 imports nothing from `terminal/` or `presentation/` and never commits a frame.
+- **I16** — Tokens carry source offsets, and every delegated string is spliced into the input rather than re-joined from tokens, so the user's quoting survives verbatim.
+- **I17** — A token is rewritten only if it satisfies rule 4's predicate and is unquoted. The rewrite consults no manifest, so a verb that does not exist still reaches the binary and gets the binary's own error.
+- **I18** — Multiple rewrites are applied last-to-first, because each changes the length every earlier-measured span depends on.
+- **I19** — `residual` on the result is exactly the array `validateInvocation` was given, and `validateInvocation` is called once per parse.
+- **I20** — `$_` expands where the following character is not a word character, matching the shell's own rule for the same sigil, and never inside single quotes.
+- **I21** — Tool lookup precedes `$_` expansion, and a failing validation keeps its `app` or `local` kind rather than becoming an `error`.
+- **I22** — The refusals are evaluated first and on tokens, never on the raw input; a job-control word is refused only as an unquoted first token.
+- **I23** — The distance-2 suggester is C05's; there is exactly one implementation, as there is exactly one tokeniser.
+- **I24** — A leading built-in with an empty remainder is not a split; it delegates whole, so a syntax error leaves the session's directory alone.
 
 ---
 
@@ -197,6 +528,15 @@ Expansion happens **after** tokenising, so a UUID containing a space could not s
 12. `$_` is never expanded in shell-delegated input, where it belongs to the shell (I7).
 13. One tokeniser, shared with completion (I11).
 14. The prefix is a pluggable policy (I12).
+15. Delegated strings are spliced from the input, so quoting reaches the shell verbatim (I16).
+16. The rewrite predicate is rule 4's, unquoted, and manifest-free — one slash rule, not two (I17).
+17. Rewrites apply last-to-first, so the splice boundary and the tool-match boundary can differ safely (I18).
+18. The validated array is carried, so "validation before spawning" is assertable rather than believed (I19).
+19. `$_` follows the shell's own boundary rule, because the same string is delegated unchanged on the other side of the prefix (I20).
+20. Lookup reports before expansion, and a failing validation still says what was parsed (I21).
+21. Refusals run first, on tokens, and job control is a first-token word (I22).
+22. One distance-2 suggester, shared with C05 (I23).
+23. An empty remainder is not a split (I24).
 
 ---
 
@@ -224,6 +564,12 @@ Six tiers. No state machine — C18 is pure.
 - **T1.12** (I10): `sleep 5 &` → `error`; `a && b` → `shell`.
 - **T1.13** (I6): `/ps --status=nonsense` → `app` with a failing `validation`, and nothing spawned.
 - **T1.14**: quoting — single, double, escaped spaces, nested → the documented token lists. Eight cases.
+- **T1.15** (I17): the rewrite predicate table of §5, all four rows, in a delegated line.
+- **T1.16** (I18): `/ps | /help` → both rewritten, and the second one's text is intact — the assertion that fails when the splices run first-to-last.
+- **T1.17** (I24): `cd /tmp &&` → `shell`, not a split; the whole input is delegated.
+- **T1.18** (I22): `fg` → `error`; `echo fg` → `shell`.
+- **T1.19** (I21): `/zzz $_` with `lastUuid: null` → the unknown-verb error, not the `$_` one.
+- **T1.20** (I21): `/ps --status=nonsense` → kind `app` with a failing validation, and `tool` still present.
 
 ### Tier 2 — contract / interface
 
@@ -234,6 +580,10 @@ Six tiers. No state machine — C18 is pure.
 - **T2.5**: every `ParseResult` variant is produced by at least one corpus input — exhaustive over the union.
 - **T2.6** (I12): swapping the policy to a `:` prefix reclassifies the corpus consistently, with no other behaviour change.
 - **T2.7** (I6): a spy proves the transport is never touched during parsing.
+- **T2.8** (I16): for every corpus input, `input.slice(t.start, t.end)` reconstructs each token's source, and the concatenation of the spans plus the gaps is the input — the tokeniser cannot lose a character it did not report.
+- **T2.9** (I19): for every `app` and `local` result, the carried `validation` equals `validateInvocation(tool, result.residual)`, and a counting spy proves it was called once.
+- **T2.10** (I23): C18 imports C05's suggester; a second edit-distance implementation fails SS30.
+- **T2.11** (§8a): the classification table replayed row for row, asserting the **whole** result — kind, tool, argv, residual, validation and the rule that fired.
 
 ### Tier 3 — edge cases
 
@@ -248,13 +598,17 @@ Six tiers. No state machine — C18 is pure.
 - **T3.9**: `&` inside `&&` → not refused.
 - **T3.10** (I8): a `$_` value containing a space → stays one token, because expansion follows tokenising.
 - **T3.11**: `$_` appearing twice → both expand to the same value.
-- **T3.12**: `$_x` and `x$_` → only exact `$_` expands; adjacency does not.
+- **T3.12** (I20): `$_x` → literal, because `$_x` names a different variable; `--config=$_` and `web:$_` → expanded. **Restated** — it asserted the token-exact reading, under which the two commonest forms silently do not expand (§7).
 - **T3.13**: a pipe with an app command on both sides → delegated whole; both rewritten.
 - **T3.14**: a redirect to a path containing spaces, quoted → delegated verbatim, quoting preserved.
 - **T3.15**: `cd` with no argument → home; `cd -` → previous.
 - **T3.16**: a 1 MB single-line input → parses within budget.
 - **T3.17**: input containing a null byte → stripped, remainder parses.
 - **T3.18**: a tool marked `hidden` → still parses and runs; it is only absent from help and completion (C05 I11).
+- **T3.19** (§6): `/` alone → an error saying there is no verb after the prefix, carrying no suggestion — distinguishable from an unknown-verb error, not merely non-empty.
+- **T3.20** (§4): `'cd' /tmp` → `builtin`; quoting does not disable interception, and `echo "/ps"` in the same test does not get rewritten, so the asymmetry is one assertion.
+- **T3.21** (D18): `/tail *.log` → argv carries the literal `*.log`; `ls *.log` delegates.
+- **T3.22** (I17): `/zzzzz | cat` → delegated as `widget zzzzz | cat`; no manifest lookup occurs, proved by a spy on `findTool`.
 
 ### Tier 4 — integration
 
@@ -265,6 +619,7 @@ Six tiers. No state machine — C18 is pure.
 - **T4.5** (with L4): a `builtin` `cd` changes the session cwd, and the next `app` command spawns there (C06 T3.22 from this side).
 - **T4.6** (with C07): a delegated command's output renders as a `raw` block, not through an adapter.
 - **T4.7** (with L4): `$_` is populated from the previous result's UUID and cleared when a command returns none.
+- **T4.8** (with C21, I16): §8b's figure run for real. The string `parse` produced goes to `spawnShell` and the shell's output is compared — a pipe, a glob, a quoted redirect path with spaces, and a binary that is a path with a space. A splice can be arithmetically perfect and still be parsed differently by `sh`, and only running it says which.
 
 ### Tier 5 — e2e
 
@@ -290,6 +645,14 @@ Six tiers. No state machine — C18 is pure.
 - **T6.9** (I11): a second tokeniser in the completion module → T2.3 fails.
 - **T6.10** (I1): a throw on unbalanced quotes → T2.1 fails.
 - **T6.11** (I12): hardcoding `/` outside the policy → T2.6 fails.
+- **T6.14** (I16): re-joining tokens instead of splicing → T3.14 fails, and a quoted redirect path loses its quotes on the way to the shell.
+- **T6.15** (I17): rewriting any token that starts with `/` → T1.15 fails, and `/usr/bin/ls | head` becomes `widget usr/bin/ls | head`.
+- **T6.16** (I18): splicing first-to-last → T1.16 fails, and the second rewrite lands inside the first one's inserted text.
+- **T6.17** (I19): recomputing validation at the second call site → T2.9's call count fails; the two results can then disagree where it is least visible.
+- **T6.18** (I20): the token-exact reading → T3.12 fails, and `--config=$_` reaches the far side unexpanded.
+- **T6.19** (I22): checking the refusals on the raw input → T3.8 fails, and `echo "a & b"` is refused as a background job.
+- **T6.20** (I24): splitting on an empty remainder → T1.17 fails, and `cd /tmp &&` changes the directory on a line the shell rejects.
+- **T6.21** (I23): a second distance-2 implementation in `parser/` → T2.10 and SS30 fail.
 
 ---
 
