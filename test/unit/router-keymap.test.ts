@@ -190,9 +190,28 @@ describe("§6 — the default table (C17 I12)", () => {
     const BYTES: Record<string, readonly string[]> = {
       // Both forms, because a terminal sends one or the other and a rule
       // satisfied by either is satisfied on half the terminals.
-      "prompt s+enter": ["[13;2u", "[27;2;13~"],
-      "prompt m+enter": ["\r"],
+      "prompt s+enter": ["\u001b[13;2u", "\u001b[27;2;13~"],
+      "prompt m+enter": ["\u001b\r"],
       "prompt c+j": ["\n"],
+
+      // C19 §6's seven. Written with `\u001b` rather than a raw byte: the two
+      // rows above carry literal escapes and read as `[13;2u` on every screen
+      // they are shown on, which is SS43's argument arriving in a directory the
+      // rule does not scan.
+      "prompt tab": ["\t"],
+      // Both forms: `\u001bOC` is what a terminal in application cursor mode
+      // sends, and a rule satisfied by only the normal form is satisfied on half
+      // the terminals — which is exactly how Shift-Enter came to be unreachable.
+      "prompt right": ["\u001b[C", "\u001bOC"],
+      "overlay tab": ["\t"],
+      "overlay down": ["\u001b[B", "\u001bOB"],
+      "overlay up": ["\u001b[A", "\u001bOA"],
+      "overlay enter": ["\r"],
+      // **A lone `Esc` is the one form that needs time.** The same byte begins
+      // every sequence above, so it is held for the disambiguation window and
+      // the key arrives from `poll` once the window closes. A fixed clock cannot
+      // express that, which is why the loop below steps one.
+      "overlay escape": ["\u001b"],
     };
 
     const keymap = createKeymap(defaultKeymap);
@@ -209,11 +228,18 @@ describe("§6 — the default table (C17 I12)", () => {
       expect(sequences, `${slot} has no wire form — nobody can press it`).toBeDefined();
 
       for (const seq of sequences ?? []) {
+        // A steppable clock rather than a constant, because a lone `Esc` is
+        // decidable only once the disambiguation window closes — the byte that
+        // means "escape" is the byte that begins every other sequence here.
+        // Everything else answers on `push` and is unaffected by the advance.
+        let t = 1_000;
         const decoder = createDecoder({
           capabilities: { bracketedPaste: true, mouse: true },
-          now: () => 1_000,
+          now: () => t,
         });
-        const events = decoder.push(enc.encode(seq));
+        const pushed = decoder.push(enc.encode(seq));
+        t += 1_000;
+        const events = [...pushed, ...decoder.poll()];
         const keys = events.filter((e) => e.kind === "key");
 
         expect(keys, `${slot}: ${JSON.stringify(seq)} decodes to one key`).toHaveLength(1);

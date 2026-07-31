@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -195,6 +195,30 @@ const FORBIDDEN_EDGES = [
       "C16 decodes bytes it is handed and names keys; capability answers arrive " +
       "as `DecodeCapabilities`, not by asking C02. Downward, so the layer walk " +
       "permits it. Type-only counts",
+  },
+  {
+    // MG17 — C19 imports nothing from `terminal/`.
+    //
+    // Listed pending on C19 from the day it was written, and built on the
+    // commit that makes the directory real rather than left to be noticed —
+    // MG14 was two components late, and a pending entry whose blocker has
+    // arrived reports exactly like an enforced rule.
+    //
+    // The reachable form is the menu. C19 decides how wide the menu wants to
+    // be, and "how wide" is one short step from "how wide is the terminal" —
+    // which is `lifecycle`'s, handed down, and the one axis whose misuse wraps
+    // a line and scrolls the alternate screen. C15 I16 is the seam that keeps
+    // it honest: C19 declares a width and C15 owns the region, and neither can
+    // supply the other's half. A `terminal/` import here is what collapses that
+    // pair back into one component guessing.
+    rule: "MG17",
+    from: "src/interaction/completion/",
+    to: "src/terminal/",
+    spec: "C19 I12 · C19 T2.5",
+    why:
+      "C19 supplies candidates, blocks and a requested width; the region, the " +
+      "frame and the terminal's own dimensions are C15's and L4's. Downward, " +
+      "so the layer walk permits it. Type-only counts",
   },
   {
     // MG16 — C18 imports nothing from `terminal/` *or* `presentation/`, which

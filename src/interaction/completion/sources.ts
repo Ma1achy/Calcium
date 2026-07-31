@@ -101,10 +101,11 @@ export function flagValueSource(): CompletionSource {
     dynamic: false,
     complete(ctx) {
       if (ctx.slot.kind !== "flagValue") return [];
+      // `ctx.prefix` is already the value, not the whole `--flag=value` token
+      // (§2): the context makes the value its own sub-token, so this source and
+      // the engine's filter agree about what a candidate is matched against.
       const values = ctx.slot.flag.values ?? [];
-      const eq = ctx.prefix.indexOf("=");
-      const typed = eq === -1 ? ctx.prefix : ctx.prefix.slice(eq + 1);
-      return values.filter((v) => starts(v, typed)).map((v) => ({ value: v, delimiter: " " }));
+      return values.filter((v) => starts(v, ctx.prefix)).map((v) => ({ value: v, delimiter: " " }));
     },
   };
 }

@@ -266,9 +266,13 @@ What SS42 buys is that a **second** live reader cannot appear quietly beside the
 | SS19 | ANSI index or terminal-specific value | `presentation/theme/`, allowing `four-bit.ts` | C10 I13, T2.5 |
 | SS20 | `syntax` palette reference | outside `presentation/theme/`, `blocks/kinds/code.ts` and `presentation/patch/` | C10 T2.8 |
 | SS21 | `spectrum` palette reference | outside `presentation/theme/`, where the art is declared | C10 T2.8 |
-| SS22 | Literal verb, flag or enum list | `completion/` | C19 T2.6 |
+| SS22 | Literal verb, flag or enum list | `src/interaction/completion/`, allowing `completion/types.ts` | C19 I4, T2.6, T4.1 |
 
-**SS22 is the anti-drift check.** A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review.
+**SS22 is the anti-drift check**, and it became real on the day `completion/` did. A hardcoded enum in completion is how the manifest stops being the source of truth, and it looks harmless in review — the list is *correct* on the day it is written, which is why nothing else in the suite would notice it. C19 T4.1 keeps passing against a literal list, because the fixture manifest still holds the same values.
+
+Two shapes, because there are two ways to write one: a `"--flagname"` literal is a flag by itself, and three or more lowercase word strings in an array literal is a verb or enum list. `"--"` alone is not matched — the prefix test in `context.ts` is a question about syntax, not a flag name — and a one-entry `slots:` list is a source declaring which slot it serves. Both near-misses are asserted in `test/revert/completion.test.ts`, because a rule widened until it is ignored is worse than no rule.
+
+`types.ts` is allowed by name: `SLOT_KINDS` is C19's own closed union, enumerated so T2.7 can be exhaustive over it, and it is not manifest data.
 
 **SS19 scopes to the directory with one named exception, not to the token files.** C10 I13 forbids an ANSI index in token data, while C10 §3 requires a curated 4-bit map per theme — so exactly one file in `theme/` must contain indices, and it is named in the allow-list. Scoping the rule to `tokens-*.ts` instead would read as tighter and be looser: it stops seeing a new token file the day someone adds one, which is SS26's failure arriving through a different door. An allow-list of one exception is auditable; a glob that might not match anything is not.
 

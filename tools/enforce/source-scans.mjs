@@ -497,6 +497,28 @@ export const SCANS = [
     scope: "src/", allow: [],
     why: "C01 owns stdout; a stray write is captured to the debug log, but it should not exist" },
 
+  // **SS22, the anti-drift check.** Inventoried from the start and unbuildable
+  // until `completion/` existed, which is C19's landing — the same "a rule
+  // waiting on the component that creates its scope" this file opens with.
+  //
+  // The whole value of C05 is that a flag added on the far side becomes
+  // completable with no TypeScript change (C19 T4.1). A hardcoded enum in
+  // completion is how that stops being true, and it looks entirely harmless in
+  // review: the list is *correct* on the day it is written.
+  //
+  // Two shapes, because there are two ways to write one. A `"--flagname"`
+  // literal is a flag by itself; three or more lowercase word strings in an
+  // array literal is a verb or enum list. `"--"` alone is not matched — the
+  // prefix test in `context.ts` is a question about syntax, not a flag name.
+  //
+  // `types.ts` is allowed by name: `SLOT_KINDS` is C19's own closed union,
+  // enumerated so T2.7 can be exhaustive over it, and it is not manifest data.
+  // The alternative is a rule that cannot see a list added to any other file.
+  { id: "SS22", spec: "C19 I4 · C19 T2.6 · C19 T4.1",
+    pattern: /"--[a-z][\w-]*"|\[\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"/,
+    scope: "src/interaction/completion/", allow: ["src/interaction/completion/types.ts"],
+    why: "every candidate is a projection of the manifest (I4): a literal verb, flag or enum list here is how completion drifts from the far side, and it is correct on the day it is written" },
+
   { id: "SS28", spec: "C16 T2.6 · C17 T2.6 · C18 T2.4 · C19 T2.5 · C20 T2.6",
     pattern: /\b(?:commit|flush|invalidate)\s*\(/,
     scope: "src/interaction/", allow: [],

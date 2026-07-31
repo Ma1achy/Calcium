@@ -57,6 +57,12 @@ type Slot =
 
 So the string form was not merely weaker. It made T3.3, T3.15 and the `executable` half of I14 unimplementable, in a component whose test list already names all three.
 
+**`--flag=value` is two things in one token, and `prefix` is the second one.** A flag-value candidate is the *value*, so matching it against `--status=ru` matches nothing: every candidate the source returned is filtered away and the menu is empty for a reason no assertion about the source would show. Acceptance fails from the other end — replacing the whole token rewrites the flag name it was not completing.
+
+So for a `flagValue` slot the value is its own sub-token: `prefix` is what follows the `=`, and `replace` starts there. Everything then agrees — the source matches on the prefix, the engine filters on the prefix, and acceptance replaces the value alone.
+
+**§8a did not find this and could not have.** It is a cell where "the engine filters by prefix" meets "a flag value is half of a token", and both statements are correct; the trace is indexed by *events*, and this is an interaction between two structural rules with no event between them. What found it was T3.9 — a test about something else entirely, asserting the whole result rather than the field it was written for.
+
 **`cursor` is a code-unit offset into `input`, not a grapheme index**, and the two cannot be mixed. Token spans are code-unit offsets, so every derivation of `prefix` and `replace` is arithmetic in that space; a grapheme index silently mis-slices the first line containing an emoji or a combining mark, and the failure is a candidate inserted over half a character rather than an error.
 
 **C17's cursor *is* a grapheme index (C17 I2), so the conversion is real and it belongs to L4**, at the seam where the editor's buffer becomes a completion context. Putting it here would give C19 two coordinate systems and one of them would eventually be read in the other's arithmetic — which is the defect this ruling closes, reintroduced inside the component instead of across its boundary.
@@ -444,6 +450,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T1.2c** (I5): an input whose current token contains a multi-byte grapheme → `prefix` and `replace` are computed in the tokeniser's coordinate system and the insertion lands on a cluster boundary. Fails on a grapheme index read as a code-unit offset.
 - **T1.3**: `/ps --st` → flag-name slot with tool `ps` resolved.
 - **T1.4**: `/ps --status=` → flag-value slot carrying that `FlagDef`; ghost recomputes without a request.
+- **T1.4c** (§2): `/ps --status=ru` → `prefix` is `ru` and `replace` starts after the `=`. On the whole-token reading the engine filters every candidate away and accepting one rewrites the flag name.
 - **T1.4b** (I3): a `path` or `executable` slot → `ghost` returns null without touching the filesystem; `Tab` is required to get candidates.
 - **T1.5** (I4): flag-name candidates equal the manifest's flags for that tool, exactly.
 - **T1.6** (I4): enum candidates equal the flag's `values`, exactly.

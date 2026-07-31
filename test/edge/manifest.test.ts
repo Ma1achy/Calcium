@@ -10,6 +10,7 @@ import {
   type ToolDef,
 } from "../../src/data/manifest/index.js";
 import { fixture, largeManifest, raw, toolNamed } from "../support/manifest.js";
+import { contextAt, verbSource } from "../../src/interaction/completion/index.js";
 
 function parsedOrThrow(source: unknown) {
   const result = parseManifest(source);
@@ -159,7 +160,31 @@ describe("C05 parse edges", () => {
     expect(validateInvocation(match!.tool, ["--größe=3"]).ok).toBe(true);
   });
 
-  it.todo("T3.17b: completion matches unicode names on grapheme boundaries — waits on C19");
+  it("T3.17b: completion matches unicode names on grapheme boundaries", () => {
+    // The prefix is matched in the tokeniser's coordinate system, so a match
+    // must still land on a cluster boundary. `ü` here is a combining sequence,
+    // which is where a naive code-unit prefix test cuts a character in half.
+    const source = raw();
+    const tools = source["tools"] as Record<string, unknown>[];
+    tools.push({
+      name: "au\u0308sfu\u0308hren",
+      local: false,
+      summary: "run, with combining marks",
+      args: [],
+      flags: [],
+    });
+    const m = parsedOrThrow(source);
+
+    const offered = verbSource(() => m).complete(
+      contextAt("/au\u0308s", 6, m),
+    ) as readonly { value: string }[];
+    expect(offered.map((c) => c.value)).toContain("/au\u0308sfu\u0308hren");
+
+    // And the negative control: a prefix cut mid-cluster matches nothing rather
+    // than matching by accident.
+    const cut = verbSource(() => m).complete(contextAt("/aus", 4, m)) as readonly { value: string }[];
+    expect(cut.map((c) => c.value)).not.toContain("/au\u0308sfu\u0308hren");
+  });
 });
 
 describe("C05 validation edges", () => {

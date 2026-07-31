@@ -16,6 +16,7 @@ import { createEditor, type LineEditor } from "../../src/interaction/editor/inde
 import { cells } from "../../src/presentation/text.js";
 import { parse } from "../../src/interaction/parser/index.js";
 import { fixture } from "../support/manifest.js";
+import { accept, contextAt } from "../../src/interaction/completion/index.js";
 
 const G = { first: 2, cont: 2 } as const;
 const enc = new TextEncoder();
@@ -189,10 +190,31 @@ it("T4.4 (with C18): the buffer is classified without C18 mutating it", () => {
   expect({ text: e.text, cursor: e.cursor, rows: e.displayRows(80, G) }).toEqual(before);
 });
 
+it("T4.5 (C19 I11): the cursor decides the context, and accepting is one undo unit", () => {
+  const e = createEditor();
+  e.insert("/ps --st");
+
+  // The context is built from the editor's buffer at the editor's cursor. C17
+  // indexes by grapheme and C19 by code unit, so the conversion happens here,
+  // at the seam — which is exactly where the spec puts it.
+  const ctx = contextAt(e.text, e.text.length, fixture());
+  expect(ctx.slot.kind).toBe("flagName");
+  expect(ctx.prefix).toBe("--st");
+
+  const depth = e.undoDepth;
+  const { start, end, text } = accept(ctx, { value: "--status", delimiter: "=" }, true);
+
+  // One edit, not a delete plus an insert and not one insert per character:
+  // `atomic` is what makes a single `undo` revert the whole acceptance.
+  e.setText(e.text.slice(0, start) + text + e.text.slice(end), start + text.length);
+  expect(e.text).toBe("/ps --status=");
+  expect(e.undoDepth).toBe(depth + 1);
+
+  expect(e.undo()).toBe(true);
+  expect(e.text).toBe("/ps --st");
+});
+
 // Deferred, with the blocker in the greppable form the guard reads.
-it.todo(
-  "T4.5: the cursor position determines the completion context, and accepting a candidate inserts as one undo unit — waits on C19",
-);
 it.todo(
   "T4.6: history navigation calls setText and the typed draft is restored on return, cursor included — waits on C20",
 );

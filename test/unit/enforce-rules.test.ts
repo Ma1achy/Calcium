@@ -68,6 +68,16 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/viewport/transcript.ts",
     source: 'const style = resolve("spectrum.3", theme, caps);',
   },
+  {
+    // The anti-drift rule, and the fabrication is deliberately the *plausible*
+    // form rather than an obviously wrong one: a list that is correct on the day
+    // it is written, in a source file, next to code that uses it. That is what
+    // it looks like in review, and nothing else in the suite would notice it —
+    // T4.1 keeps passing because the fixture manifest still has those values.
+    rule: "SS22",
+    file: "src/interaction/completion/sources.ts",
+    source: 'const STATUSES = ["running", "failed", "queued"];',
+  },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
   {
     // SS40's own violation, and the reason it is not SS23 widened. The same
@@ -276,6 +286,16 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "MG16",
     file: "src/interaction/parser/index.ts",
     source: 'import { escapes } from "../../terminal/escapes.js";',
+  },
+  {
+    // MG17's reachable form, and it is the menu rather than anything exotic.
+    // C19 declares how wide the menu wants to be, and "how wide" is one step
+    // from "how wide is the terminal" — which is `lifecycle`'s, handed down,
+    // and the one axis whose misuse wraps a line and scrolls the alternate
+    // screen. C15 I16 keeps the pair honest; this import collapses it.
+    rule: "MG17",
+    file: "src/interaction/completion/menu.ts",
+    source: 'import { size } from "../../terminal/lifecycle.js";',
   },
   {
     // SS30's three subjects, one fabrication each — a rule with three subjects
@@ -772,11 +792,15 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
       "instance of A03 §2's pending-entry-false-at-birth class: C17's arrival is " +
       "what made it visible, because the component said to be blocking it is the " +
       "one that proves it could not fire",
-    SS8: { waitsOn: "C19", why: "the completion module does not exist" },
+    SS8:
+      "folded into SS1's scope — SS1 bans clock reads across all of src/ with one " +
+      "named exception, so a rule scoped to `completion/` could never fire on " +
+      "anything SS1 misses. The fourth instance of the fold, and the third whose " +
+      "blocking component turned out to be the proof it could not fire: C19's " +
+      "arrival is what made it visible",
     SS9: { waitsOn: "C20", why: "the history module does not exist" },
     SS12: "C10 — folded into SS11's scope for now",
     SS18: "C10 — needs the block-producing module list",
-    SS22: { waitsOn: "C19", why: "there is no completion module to hold a literal verb list" },
     SS29: { waitsOn: "C23", why: "the execution pipeline does not exist" },
 
     // SS31, SS32 and SS38 were here, each saying "implemented in
@@ -797,7 +821,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // to; none of these exists, so the rule would have nothing to match.
 
 
-    MG17: { waitsOn: "C19", why: "src/interaction/completion/ does not exist" },
     MG18: { waitsOn: "C20", why: "src/interaction/history/ does not exist" },
   };
 

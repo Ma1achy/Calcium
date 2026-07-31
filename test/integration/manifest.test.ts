@@ -8,7 +8,20 @@
 import { describe, expect, it } from "vitest";
 import { document, validateDocument, type ErrorLike, type ViewDocument } from "../../src/data/viewmodel/index.js";
 import { findTool, validateInvocation } from "../../src/data/manifest/index.js";
-import { fixture } from "../support/manifest.js";
+import { fixture, raw, toolNamed } from "../support/manifest.js";
+import {
+  contextAt,
+  flagNameSource,
+  flagValueSource,
+} from "../../src/interaction/completion/index.js";
+import { parseManifest, type Manifest } from "../../src/data/manifest/index.js";
+
+/** The fixture as a `Manifest`, or the parse error as a failure here. */
+const parsedOrThrow = (source: Record<string, unknown>): Manifest => {
+  const r = parseManifest(source);
+  if (!r.ok) throw new Error(`fixture does not parse: ${JSON.stringify(r.error)}`);
+  return r.value;
+};
 import { parse } from "../../src/interaction/parser/index.js";
 
 /**
@@ -102,8 +115,32 @@ describe("C05 integration", () => {
     expect(invoked, "and nothing was spawned to find that out").toBe(0);
     void transport;
   });
-  it.todo("T4.2: completion candidates for --status= come from the manifest's values — waits on C19");
-  it.todo("T4.3: adding a flag to the fixture makes it completable with no TypeScript change — waits on C19");
+  it("T4.2: completion candidates for --status= come from the manifest's values", async () => {
+    // C05's whole claim, asserted from the consuming side: the values are the
+    // manifest's, not a list completion keeps.
+    const flag = toolNamed("ps").flags.find((f) => f.name === "status");
+    const got = flagValueSource().complete(contextAt("/ps --status=", 13, fixture()));
+    expect((got as readonly { value: string }[]).map((c) => c.value)).toEqual(flag?.values);
+  });
+
+  it("T4.3: adding a flag to the fixture makes it completable with no TypeScript change", () => {
+    // The anti-drift test from C05's side. No code below changes; only data.
+    const source = raw();
+    const tools = source["tools"] as Record<string, unknown>[];
+    const ps = tools.find((t) => t["name"] === "ps");
+    if (ps === undefined) throw new Error("the fixture no longer has a `ps`");
+
+    const before = flagNameSource().complete(contextAt("/ps --zo", 8, parsedOrThrow(raw())));
+    expect((before as readonly unknown[]).length, "the fixture must not already have it").toBe(0);
+
+    (ps["flags"] as Record<string, unknown>[]).push({
+      name: "zone",
+      type: "string",
+      summary: "which zone",
+    });
+    const after = flagNameSource().complete(contextAt("/ps --zo", 8, parsedOrThrow(source)));
+    expect((after as readonly { value: string }[]).map((c) => c.value)).toEqual(["--zone"]);
+  });
   // T4.4 and T4.5 are written, in test/integration/transport.test.ts: the
   // routing decision is C06's to be driven by and C05's to supply, and it reads
   // better beside the transport than beside the loader. Named here so the pair

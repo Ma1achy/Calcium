@@ -125,6 +125,34 @@ export function contextAt(
   const tool =
     manifest === null ? null : (findTool(manifest, words.map((t) => stripSlash(t.text)))?.tool ?? null);
 
+  const slot = slotAt({ prefix, command, manifest, tokens, index, tool });
+
+  // **`--flag=value` is two things in one token, and `prefix` must be the
+  // second.** A candidate for a flag-value slot is the *value*, so matching it
+  // against `--status=ru` matches nothing — every candidate is filtered away
+  // and the menu is empty however many the source returned. Acceptance has the
+  // same problem from the other end: replacing the whole token would rewrite
+  // the flag name it is not completing.
+  //
+  // So the value is its own sub-token. Found by T3.9 rather than by the §8a
+  // walk, because it is a cell where "the engine filters by prefix" meets "a
+  // flag value is half of a token" — and neither statement is wrong.
+  if (slot.kind === "flagValue" && !(token?.quoted ?? false)) {
+    const eq = prefix.indexOf("=");
+    if (eq !== -1) {
+      return Object.freeze({
+        input,
+        cursor,
+        tokens,
+        tokenIndex: index,
+        prefix: prefix.slice(eq + 1),
+        replace: Object.freeze({ start: start + eq + 1, end }),
+        tool,
+        slot,
+      });
+    }
+  }
+
   return Object.freeze({
     input,
     cursor,
@@ -133,7 +161,7 @@ export function contextAt(
     prefix,
     replace: Object.freeze({ start, end }),
     tool,
-    slot: slotAt({ prefix, command, manifest, tokens, index, tool }),
+    slot,
   });
 }
 

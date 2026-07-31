@@ -16,10 +16,10 @@ describe("C15 e2e — layers under real input", () => {
   // every candidate visible — which needs C19 to produce the candidates and the
   // shell to own the prompt they sit above.
   it.todo(
-    "T5.1: a completion menu near the bottom flips above the prompt and shows every candidate — waits on C19 and L4",
+    "T5.1: a completion menu near the bottom flips above the prompt and shows every candidate. C19 has landed and the placement half is asserted in test/integration/completion.test.ts; what is missing is a real prompt at a real screen position — waits on L4",
   );
   it.todo(
-    "T5.2: reverse-i-search over a completion menu — both stacked, keys to the search, esc returns to the menu. The stacking and routing halves are asserted in test/integration/router.test.ts — waits on C19 and C20",
+    "T5.2: reverse-i-search over a completion menu — both stacked, keys to the search, esc returns to the menu. C19 has landed and the stacking and routing halves are asserted in test/integration/router.test.ts; the search half is not built — waits on C20",
   );
   // T4.5b asserts the ladder's shape against C15 alone. This is the same claim
   // through a real keystroke, and the rung that must not fire is the one that

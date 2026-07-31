@@ -70,7 +70,15 @@ export const COMPONENT_SOURCES = Object.freeze({
   // instance). Repointed on the commit that makes `parse.ts` real, never
   // before: a path that does not exist reads as "not implemented" forever.
   C18: "src/interaction/parser/parse.ts",
-  C19: "src/interaction/completion.ts",
+  // The engine, now that it exists — `completion.ts` was the scaffold (TD3,
+  // ninth instance). Repointed on the commit that makes `engine.ts` real, never
+  // before: a path that does not exist reads as "not implemented" forever, so
+  // every deferral waiting on C19 would be silently exempt.
+  //
+  // The engine rather than the barrel or `types.ts`: the barrel is re-exports
+  // and `types.ts` is declarations, and TD3's rule is that a row names the file
+  // that must contain the *behaviour*.
+  C19: "src/interaction/completion/engine.ts",
   C20: "src/interaction/history.ts",
   C21: "src/data/process/runner.ts",   // the runner, not process/types.ts — see above
   C22: "src/shell/session.ts",
