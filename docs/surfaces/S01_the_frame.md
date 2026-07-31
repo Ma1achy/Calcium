@@ -66,6 +66,8 @@ with `gutter = { first: 2, cont: 2 }` (D24a, C22 §6).
 
 **The prompt is capped at half the terminal.** Pasting two hundred lines is a real thing people do (C17 T5.2), and an uncapped prompt would consume the entire frame and leave the viewport at zero. Beyond the cap the prompt **windows around the cursor**, computed from C17's `cursorCell`, with `⋯` markers on whichever edges are elided. C17 needs no scroll model for this — buffer plus cursor position is enough.
 
+**The prompt draws the rows C17 measured, rather than wrapping the buffer again.** `editor.layout(width, gutter)` returns the display rows and this surface pads each by the gutter it passed in — the first by `first`, the rest by `cont` (C17 I18, §7b). A second wrap here would be C09 I1's divergence in the one place it moves the whole frame: the two would agree on ordinary commands and part company at a wrap boundary, a double-width glyph, or a line that exactly fills its row, which is where a prompt one row off comes from.
+
 Every derived height is clamped at zero or greater, and the sum is asserted equal to `rows` before any output is written.
 
 ---
@@ -170,6 +172,7 @@ Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` 
 10. The gutter marker is chrome and enters no measurement.
 11. The too-small fallback uses no layout engine, no registry, no theme, and no Unicode.
 12. Session state survives the too-small state; it is a render mode, not an error.
+13. The prompt draws the rows `editor.layout` returned rather than wrapping the buffer a second time.
 
 ---
 
@@ -201,6 +204,7 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T2.5** (C6): swapping the chrome hook changes the header and footer and nothing else.
 - **T2.6** (C11): the fallback render calls neither the block registry nor the theme — asserted by spies.
 - **T2.7**: every `SessionSnapshot` field consumed by the header has a documented format and elision point.
+- **T2.8** (C13): the rows the prompt draws are the ones `layout` returned, asserted as identity rather than equality — a second wrap here cannot be written without the two coming apart (C17 I18).
 
 ### Tier 3 — edge cases
 
@@ -249,6 +253,7 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T6.11** (C7): dropping `⏎ run` from the footer, or dropping hints in a different order → T1.8b fails.
 - **T6.5** (C9): adding a second context axis to the footer → T1.10's exhaustive check fails.
 - **T6.6** (C10): rendering the gutter inside a block → T2.3 fails and every live block measures one cell wider.
+- **T6.7** (C13): wrapping the buffer here instead of drawing `layout`'s rows → T2.8 fails, and the prompt is one row off at a wrap boundary, a double-width glyph, or a line that exactly fills its row.
 - **T6.7** (C11): using the block registry for the fallback → T2.6 fails, and the fallback breaks in exactly the terminals it exists for.
 - **T6.8** (C11): using `×` in the fallback → T3.11's ASCII case fails on a non-UTF-8 terminal.
 - **T6.9** (C12): discarding state on the too-small transition → T3.13 fails.

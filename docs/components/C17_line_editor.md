@@ -40,6 +40,7 @@ interface LineEditor {
   undo(): boolean;
   redo(): boolean;
 
+  layout(width: number, gutter: Gutter): readonly string[];   // the display rows, without the gutter
   displayRows(width: number, gutter: Gutter): number;
   cursorCell(width: number, gutter: Gutter): Readonly<{ row: number; col: number }>;
 }
@@ -59,6 +60,8 @@ type Motion =
 **The cursor is a grapheme index.** A ZWJ emoji sequence is one position, a combining mark does not get its own, and a CJK character is one position occupying two columns. `cursorCell(width)` converts to a display position for the prompt to place the terminal cursor; the two are different numbers and conflating them is the defect this separation prevents.
 
 `displayRows` is a **measurement contract** in the same sense as C09's: it must equal the rows the prompt actually occupies, because the frame's viewport height is `rows − header − prompt − footer` (t01 §The frame). If they disagree, the viewport is the wrong size and everything above it is misplaced.
+
+**There is one walk, and L4 draws what it returns.** `layout` produces the display rows; `displayRows` is their count and `cursorCell` is derived from the same walk. It is exported for the reason C09 has one `cells()`: the alternative is C17 measuring the prompt and L4 wrapping it again, two implementations that agree today and diverge at the boundary cases this component exists for. That divergence would arrive when C22 is built, months after the decision, as a prompt one row off — so the contract is structural rather than asserted twice. The rows carry no gutter: C17 holds no geometry and does not know what the prompt glyph looks like (I10), so L4 pads each row by the gutter it passed in.
 
 **The gutter is a parameter, not an assumption.** The first line carries the prompt glyph (`❯ `, two cells) and every wrapped or subsequent line carries a matching indent, so the usable width differs per line. A `displayRows(width)` that ignored this would under-count on exactly the long commands where the count matters. C17 does not know what the prompt looks like — L4 passes the measurements in, which also keeps the editor reusable behind a different prompt.
 
@@ -221,6 +224,92 @@ statement is correct where it stands.
 
 ---
 
+## 7b. The prompt geometry figure
+
+The second artefact, and the one that reads the **frame** rather than the numbers: an
+arithmetically self-consistent layout can still be describing a different buffer than
+the one it holds.
+
+### The ordinary case
+
+Drawn in full, because the edges below decide the rules and this is what someone
+checks an implementation against. A figure of only edges tests the rules and not the
+reading — which is how S03's column figure came to be impossible under its own
+columns.
+
+Width 80, gutter `{first: 2, cont: 2}`, two logical lines:
+
+```
+L1  /run train --dataset=imagenet --epochs=90 --batch-size=256 --lr=0.1 --wd=1e-4 --seed=1234
+L2  --resume
+```
+
+`L1` is 89 cells, `L2` is 8, and the buffer is 98 graphemes including the `\n`.
+
+```
+       0         1         2         3         4         5         6         7         8
+       0....^....0....^....0....^....0....^....0....^....0....^....0....^....0....^....0
+row 0  ❯ /run train --dataset=imagenet --epochs=90 --batch-size=256 --lr=0.1 --wd=1e-4␠
+row 1    --seed=1234
+row 2    --re▮sume
+```
+
+`displayRows(80, {2,2})` is **3**. Row 0 carries 78 cells after the glyph and ends on
+the space at index 77; `--seed=1234` does not fit and moves whole.
+
+| `cursor` | `cursorCell` | Where |
+|---|---|---|
+| 0 | `{row: 0, col: 2}` | the first position, after the glyph |
+| 42 | `{row: 0, col: 44}` | start of `--batch-size=256` |
+| 78 | `{row: 1, col: 2}` | the wrap boundary — the *following* row |
+| 89 | `{row: 1, col: 13}` | end of `L1`, before the `\n` |
+| 90 | `{row: 2, col: 2}` | first position of `L2` |
+| 94 | `{row: 2, col: 6}` | drawn above |
+| 98 | `{row: 2, col: 10}` | end of buffer |
+
+`col` includes the gutter, because it is where the terminal cursor goes.
+
+### The rules it settled
+
+- **`usable = max(1, width − gutter)`, and `first` applies to the buffer's first
+  display row only.** Every later row takes `cont`, whether it is a wrap or a new
+  logical line — which is what §2's "every wrapped **or subsequent** line" says.
+- **Rows come from walking clusters, never from division.** A cluster that does not
+  fit moves whole and leaves the cell behind it blank, so a row's cells and its
+  content only agree if both halves walk.
+- **A display row exists for every position the cursor can occupy.** A logical line
+  whose last cluster exactly fills a row therefore emits a trailing empty row. This
+  is the same rule as T3.8's trailing `\n` rather than a second one, and it applies
+  per logical line: `abcdefgh\nx` at width 10 is **three** rows, not two.
+- **At a wrap boundary the cursor belongs to the following row**, which has a cell to
+  point at only because of the rule above. The two are one rule; taken separately
+  they are an off-by-one in opposite directions.
+- **A cluster wider than `usable` takes a row of its own and overflows it.** A block
+  may substitute or drop a glyph it cannot draw; an editor may not alter what the
+  user typed.
+
+### What it found
+
+1. **The row count is a position count, not `ceil(cells / usable)`.** A line that
+   exactly fills its rows has one more cursor position than `ceil` has rows, and the
+   cursor at the end of it lands on a row that was never reserved. The two formulas
+   agree everywhere else, so a random corpus meets it about once in `usable` strings
+   — and T2.1b, which was aimed at the gutter, is the test that catches it.
+2. **`gutter.first` for each logical line was the other available reading**, and it
+   is wrong by exactly one gutter's width on every line of a pasted block after the
+   first. Confirmed against §2's wording rather than chosen.
+3. **T3.6 was unanswerable as written.** "Width 1 → one row per grapheme cell" does
+   not say whether a two-cell cluster is one row or two. It is one row, overflowed,
+   because the alternative is deleting the user's text. The limit is real and stated:
+   at `usable ≤ 1` the terminal draws two cells where the count says one, and nothing
+   in the tree floors the terminal width — S01 caps the prompt's height and no
+   document floors its width.
+4. **The prompt's height is stable under typing at the end of a full row**, which is
+   a consequence of the position rule rather than a separate requirement. Reserving
+   the row one grapheme early is what stops the frame reflowing mid-keystroke.
+
+---
+
 ## 8. Invariants
 
 - **I1** — The cursor is always at a grapheme boundary, in `[0, graphemeCount]`.
@@ -240,6 +329,9 @@ statement is correct where it stands.
 - **I15** — Coalescing is per `insert` **call** and per boundary event, never per character. A call's graphemes are never split across units; a call whose last grapheme is whitespace closes the unit after merging; a change of character class is not a boundary. All three halves are load-bearing and they fail differently: per-character splitting breaks a yanked phrase into a unit per space, whitespace opening its own unit makes `git commit` three units, and a class change as a boundary makes `-m` two.
 - **I16** — A run of consecutive kills is **one** undo unit, matching the one kill-buffer entry it produces; and the kill buffer is not undo state, so `undo` never restores it. One invariant because they are one question — whether the kill buffer and the undo stack describe the same text — answered in opposite directions for the two halves.
 - **I17** — Word motion skips whitespace in the direction of travel, then consumes one maximal run of a single non-whitespace class. `wordRight` therefore stops at run **ends** and `wordLeft` at run **starts**; the two sequences coincide only where runs abut and are not reverses of each other.
+- **I18** — `layout`, `displayRows` and `cursorCell` are one walk: `displayRows` is `layout().length` and `cursorCell` indexes the rows `layout` returned. L4 draws those rows rather than wrapping the buffer a second time, which is what makes I3 structural instead of a claim two implementations happen to satisfy.
+- **I19** — A display row exists for every position the cursor can occupy, so the count is a position count and not `ceil(cells / usable)`: a logical line whose last cluster exactly fills a row emits a trailing empty row, per line. T3.8's trailing `\n` is this rule rather than a second one, and `cursorCell` at a wrap boundary reports the following row — the two halves are an off-by-one in opposite directions if either is dropped.
+- **I20** — Rows are produced by walking clusters. A cluster that does not fit moves whole and leaves the cell behind it blank; a cluster wider than `usable` takes a row of its own and **overflows** it. C09 I9 may drop or substitute a glyph a block cannot draw and C17 may not: a block renders someone's data, an editor holds what the user typed.
 
 ---
 
@@ -261,6 +353,9 @@ statement is correct where it stands.
 14. Coalescing groups by `insert` call and boundary event rather than by character or character class, so a yanked phrase is one unit and `git commit -m` is three rather than six (I15).
 15. A kill run is one undo unit and the kill buffer is not undo state, so the two never describe different amounts of text (I16).
 16. Word motion skips whitespace then consumes one run, so `wordRight` and `wordLeft` stop at different indices across a gap — a property of the motion, not a defect to be corrected (I17).
+17. `layout` is exported and L4 draws the rows it returns, so the measurement contract is one walk rather than two implementations that agree today (I18).
+18. The row count counts cursor positions rather than cells, so a line that exactly fills its rows reserves the row its end sits on (I19).
+19. A cluster that cannot fit moves whole and one wider than the row overflows rather than being dropped: an editor never alters what the user typed (I20).
 
 ---
 
@@ -305,6 +400,8 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T2.6** (I14): the module graph shows no import from `terminal/` and no scheduler call.
 - **T2.7**: every `Motion` in the union has an implementation — exhaustive over the type.
 - **T2.8**: undo then redo returns a buffer deeply equal to the original, for every corpus entry.
+- **T2.9a** (§7b, I18, I19): the ordinary case is replayed as drawn — `layout(80, {2,2})` returns the three rows verbatim, `displayRows` is 3, and `cursorCell` matches all seven rows of the table. The figure is the fixture; a test that recomputed it would be asserting the implementation against itself.
+- **T2.9b** (I18): `displayRows` is `layout().length` and `cursorCell.row` indexes it, for the whole corpus at every width — asserted as identities, so a second walk cannot be introduced without failing.
 - **T2.9** (§7a): the trace is replayed as one test — all twenty-one steps against one editor, asserting the **whole** state after each, `text`, `cursor`, kill buffer, run flag and both stack depths. Asserted as a sequence rather than as twenty-one cases, because every invariant here constrains an operation and the two defects §7a found last are contradictions between operations.
 
 ### Tier 3 — edge cases
@@ -314,9 +411,10 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T3.3**: motions on an empty buffer → all no-ops, cursor stays 0.
 - **T3.4**: `wordRight` at the end, `wordLeft` at the start → no-ops.
 - **T3.5**: a buffer of only whitespace → word motions traverse it without looping.
-- **T3.6**: `displayRows` at width 1 → one row per grapheme cell; no division by zero.
-- **T3.7**: a double-width glyph straddling the wrap boundary → wraps whole, and `displayRows` accounts for the wasted cell.
-- **T3.8**: a buffer ending in `\n` → the trailing empty line counts as a row.
+- **T3.6** (I20): `displayRows` at width 1 → one row per grapheme, a two-cell cluster included; no division by zero and no dropped text. §7b records that the terminal draws two cells where the count says one at `usable ≤ 1`, and that nothing floors the width.
+- **T3.7** (I20): a double-width glyph straddling the wrap boundary → wraps whole, and `displayRows` accounts for the wasted cell. At width 9 with `{2,2}`, `ab日本語` is `ab日本` and `語`.
+- **T3.8** (I19): a buffer ending in `\n` → the trailing empty line counts as a row.
+- **T3.8b** (I19): a logical line whose last cluster exactly fills its row → the trailing row is emitted, and `abcdefgh\nx` at width 10 with `{2,2}` is **three** rows. `ceil` gives two and leaves the cursor at index 8 with no row.
 - **T3.9**: `yank` with an empty kill buffer → no-op.
 - **T3.10**: `undo` on a clean editor → false.
 - **T3.11**: `redo` with nothing to redo → false.
@@ -363,6 +461,9 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T6.14** (I15): coalescing per character rather than per call → T1.20 fails, and a yanked phrase undoes a word at a time.
 - **T6.15** (I16): giving each kill in a run its own undo unit → T1.21 fails, and one undo returns half of what the kill buffer holds.
 - **T6.16** (I17): skipping the whitespace skip → T1.7 and T1.11 fail together, and `killTo("wordLeft")` at a word boundary deletes one space.
+- **T6.17** (I18): `displayRows` computing its own count rather than `layout().length` → T2.9b fails, and the prompt L4 draws stops being the prompt C17 measured.
+- **T6.18** (I19): `ceil(cells / usable)` in place of the position count → T3.8b fails, and the cursor at the end of a full command has no row to sit on.
+- **T6.19** (I20): dropping a cluster wider than the row, as C09's wrap does → T3.6 fails and the editor deletes what the user typed.
 
 ---
 
