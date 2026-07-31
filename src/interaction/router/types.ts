@@ -44,6 +44,25 @@ export type InputEvent =
   | Readonly<{ kind: "mouse"; row: number; col: number; button: string; press: boolean }>;
 
 /**
+ * A binding, declaratively (C16 §6).
+ *
+ * Data because Phase 1B adds user-defined bindings, and because `/help` renders
+ * from this table — a keymap expressed as conditionals cannot be overridden,
+ * listed, or shown.
+ */
+export type Binding = Readonly<{
+  target: FocusTarget;
+  key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }>;
+  action: string;
+}>;
+
+/** What an adapter attaches to a block; C16 merges it into `liveBlock` while live. */
+export type BlockKeymap = readonly Readonly<{
+  key: Binding["key"];
+  action: string;
+}>[];
+
+/**
  * What the decoder needs to know about the terminal, as data.
  *
  * A subset of C02's record rather than the record itself: the decoder branches
