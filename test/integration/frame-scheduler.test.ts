@@ -4,6 +4,8 @@
 // objects: a real capability record, a real lifecycle, and C01's own `writer`
 // as the injected `write`. The rest name their blocker in a greppable form.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildSession } from "../support/session.js";
+import { displayCells } from "../../src/presentation/text.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
@@ -189,6 +191,47 @@ describe("C03 integration", () => {
   it.todo(
     "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C23 — A02 §4 gives transcript writes to the execution pipeline, so C22 has nothing to append with",
   );
+  it("T4.9 (with C22): a resize mid-frame cannot produce a two-width frame", async () => {
+    // **The test `docs/notes/resize-and-compositor.md` specifies**, at the scope
+    // where the property lives. Compose at 100, let the terminal become 80
+    // before the next write, and assert that what was written is internally
+    // consistent — a too-long line is a wrong frame, but the wrap it causes
+    // scrolls the alternate screen, and that is unrecoverable.
+    //
+    // The subject that can tell the two apart is a size that changes between
+    // the compose and the read. If anything downstream re-read it, some rows
+    // would be 100 cells and some 80.
+    // **A real session, not `buildGraph`.** That harness stubs `render` with a
+    // counter, so nothing it builds ever paints — a test about what reaches the
+    // terminal would be measuring the harness.
+    // **Per frame, not per width, and the first draft of this test had it
+    // wrong.** A frame written *after* the resize is correctly at 80 — C03
+    // treats `resize` as an immediate commit, so the repaint composes at the
+    // new size. The property is not "every frame is 100"; it is that no single
+    // frame mixes two widths, which is what wraps.
+    const { stdout, resize } = await buildSession({}, { columns: 100, rows: 30 });
+
+    const before = stdout.chunks.length;
+    resize({ columns: 80, rows: 30 });
+
+    // Every frame written since, examined on its own.
+    const frames = stdout.chunks
+      .slice(before)
+      .filter((c) => c.startsWith("\u001b[H"))
+      .map((c) => c.replace("\u001b[H", "").split("\r\n"));
+
+    // **The subject, before the claim.** A set of one is satisfied by a set of
+    // none, so a frame that was never written would pass — the inert-subject
+    // class this suite has now met five times.
+    expect(frames.length, "a frame was actually written").toBeGreaterThan(0);
+
+    for (const [i, rows] of frames.entries()) {
+      const widths = new Set(rows.map(displayCells));
+      expect(rows, `frame ${String(i)}: 30 rows`).toHaveLength(30);
+      expect(widths.size, `frame ${String(i)}: composed at ${[...widths].join(", ")}`).toBe(1);
+    }
+  });
+
   it("T4.5 (with C17): a keystroke's frame is drawn before the next keystroke is processed", () => {
     // Against a real editor, which is what the deferral was waiting for. The
     // property is about *ordering*, not about the buffer, so the assertion is

@@ -41,6 +41,7 @@ const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 export { stripControl } from "../data/text.js";
 
 import { stripControl } from "../data/text.js";
+import { sgrPattern } from "../terminal/escapes.js";
 
 /** A tab stop, in cells. Fixed rather than configurable — see `expandTabs`. */
 export const TAB_STOP = 8;
@@ -89,6 +90,79 @@ export function cells(text: string): number {
     total += clusterCells(segment);
   }
   return total;
+}
+
+/**
+ * Display width of a string that already carries SGR, and the safe truncation
+ * that goes with it.
+ *
+ * **`cells()` is wrong for a rendered line, and wrong in a way that looks
+ * right.** `stripControl` drops the ESC byte because it is a control character
+ * and keeps `[38;5;241m`, which is ordinary printable text — so a themed row
+ * measures eleven cells too wide per colour change. C22's frame padded every
+ * chrome row to 80 *counted with the escapes*, which made the visible row about
+ * 38 cells and left the previous frame showing across the rest of it.
+ *
+ * Truncating with `cells()` is worse than measuring with it: the cut lands
+ * inside an escape, `[38;5` reaches the terminal as literal text, and the SGR
+ * is never terminated — so the colour bleeds down every row below.
+ *
+ * Here rather than in C22 because this is where display width is decided, and
+ * two answers to "how wide is this line" is C09 I1's divergence in the one
+ * place that moves the whole frame.
+ */
+export function displayCells(text: string): number {
+  return cells(text.replace(sgrPattern(), ""));
+}
+
+/**
+ * Pad or truncate to exactly `width` display cells, preserving escapes.
+ *
+ * Escapes are copied through and cost nothing; a grapheme that would straddle
+ * the boundary is dropped and the gap padded, rather than halved. A truncated
+ * line is closed with `SGR_RESET` **only if it was cut**, so an unstyled line
+ * gains no bytes and a cut one cannot bleed.
+ */
+export function fitStyled(text: string, width: number, reset: string): string {
+  if (displayCells(text) === width) return text;
+
+  const sgr = sgrPattern();
+  let out = "";
+  let used = 0;
+  let cut = false;
+  let styled = false;
+  let i = 0;
+
+  // `i` is a code-unit index into the string, not a measure of it — the walk
+  // needs a position and `cells()` answers a different question. Every width
+  // decision below goes through `cells`.
+  while (i < text.length) {   // cells-ok: a cursor, not a width
+    sgr.lastIndex = i;
+    const m = sgr.exec(text);
+    if (m !== null && m.index === i) {
+      out += m[0];
+      styled = true;
+      i = sgr.lastIndex;
+      continue;
+    }
+
+    const ch = [...text.slice(i)][0] ?? "";
+    if (ch === "") break;
+    const w = cells(ch);
+    if (used + w > width) {
+      cut = true;
+      break;
+    }
+    out += ch;
+    used += w;
+    i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+  }
+
+  // Only a cut that carried style needs closing. An unstyled truncation gaining
+  // a reset would put four bytes on every plain row of every frame, and a
+  // golden-frame test would then be asserting the reset rather than the row.
+  if (cut && styled) out += reset;
+  return out + " ".repeat(Math.max(0, width - used));
 }
 
 /**

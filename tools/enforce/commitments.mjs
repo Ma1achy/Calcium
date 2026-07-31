@@ -464,6 +464,7 @@ export const TOPICS = {
   "session-config": "C22",
   "session-construct": "C22",
   "session-fallback": "C22",
+  "session-paint": "C22",
   "session-frame": "C22",
   "session-identity": "C22",
   "session-state": "C22",

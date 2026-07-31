@@ -17,8 +17,12 @@ import { appendFileSync } from "node:fs";
 import { access, appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
+import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
 import { drawFallback, tooSmall } from "./fallback.js";
 import { compose, type Composed } from "./frame.js";
+import { paint, FrameError, type PaintDeps } from "./paint.js";
+import { renderSequenceToLines } from "../testing/index.js";
+import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
@@ -203,8 +207,49 @@ class Session implements TuiInstance {
     return Promise.resolve(code);
   }
 
+  /**
+   * One frame: compose, paint, write.
+   *
+   * **The size is read once, by `compose`, and `paint` reads no stream at all.**
+   * A resize arriving between the two is the next frame's problem, which is
+   * correct — C03 sets `contaminated` eagerly at commit time, so the next frame
+   * is a full repaint. A frame composed at two widths is coherent at neither
+   * (`docs/notes/resize-and-compositor.md`).
+   *
+   * A frame that cannot be composed coherently draws the fallback rather than
+   * a short frame: `paint` refuses, and one row too few leaves the previous
+   * frame showing through while one too many scrolls the alternate screen.
+   */
   #render(): void {
-    void this.#composed();
+    const graph = this.#graph;
+    if (graph === null || !graph.lifecycle.acquired) return;
+
+    const frame = this.#composed();
+    let lines: readonly string[];
+    try {
+      lines = paint(frame, this.#paintDeps(graph, frame.size.columns));
+    } catch (err) {
+      if (!(err instanceof FrameError)) throw err;
+      drawFallback(frame.size, (s) => void graph.lifecycle.writer.write(s));
+      return;
+    }
+
+    graph.lifecycle.writer.write(`${HOME}${lines.join("\r\n")}`);
+  }
+
+  #paintDeps(graph: Graph, width: number): PaintDeps {
+    return {
+      registry: graph.blocks,
+      theme: graph.theme.current,
+      capabilities: graph.capabilities,
+      // C14 selected these at this width; the paint pads them and never
+      // re-measures (C09 I1 — one implementation, or the two answers drift).
+      // **Both take the frame's width from the frame**, not from a fresh
+      // `size()`. A closure that re-read it is exactly the two-width frame the
+      // note names, arriving through the one seam that looks harmless.
+      transcriptRows: () => visibleRows(graph, width),
+      promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
+    };
   }
 
   #frameQueries(): FrameQueries {
@@ -232,6 +277,28 @@ class Session implements TuiInstance {
       promptRows: () => 1,
     });
   }
+}
+
+/**
+ * The visible transcript, as rows, at the frame's width.
+ *
+ * C14 chose the range and the `skipRows`/`takeRows` slice; this renders exactly
+ * that slice through C09 and never re-measures. Re-measuring here is C09 I1's
+ * divergence in the place that moves the whole frame — the two would agree on
+ * ordinary output and part company at a wrap boundary.
+ */
+function visibleRows(graph: Graph, width: number): readonly string[] {
+  const out: string[] = [];
+  for (const ve of graph.viewport.visible().entries) {
+    const entry = graph.transcript.entries.find((e) => e.id === ve.id);
+    if (entry === undefined) continue;
+    const lines = renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
+      theme: graph.theme.current,
+      capabilities: graph.capabilities,
+    });
+    out.push(...lines.slice(ve.skipRows, ve.skipRows + ve.takeRows));
+  }
+  return out;
 }
 
 /** What `session` reads before the graph exists — §9's `created` state. */

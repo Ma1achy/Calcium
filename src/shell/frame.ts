@@ -36,8 +36,10 @@ export type Composed = Readonly<{
   region: Readonly<{ top: number; height: number }>;
   /** How big a layer may be — C15's `Region`, `{ width, height }`. */
   overlayRegion: Readonly<{ width: number; height: number }>;
-  /** Rows the prompt occupies, from C17's single walk (C17 §2). */
+  /** Rows the prompt occupies, capped at half the terminal (S01 §3). */
   promptRows: number;
+  /** Rows it wanted before the cap; above `promptRows` the prompt windows. */
+  promptWanted: number;
 }>;
 
 export type ComposeDeps = Readonly<{
@@ -64,7 +66,12 @@ export function compose(deps: ComposeDeps): Composed {
   const session = deps.session();
   const ctx = { session, now, columns: size.columns };
 
-  const promptRows = Math.max(1, deps.promptRows(size.columns, PROMPT_GUTTER));
+  // **The prompt is capped at half the terminal** (S01 §3). Pasting two hundred
+  // lines is a real thing people do (C17 T5.2), and an uncapped prompt consumes
+  // the whole frame and leaves the viewport at zero — the transcript vanishes
+  // while you are typing, which is the moment you most want it.
+  const wanted = Math.max(1, deps.promptRows(size.columns, PROMPT_GUTTER));
+  const promptRows = Math.max(1, Math.min(wanted, Math.floor(size.rows / 2)));
 
   // Clamped at zero: a terminal too short for chrome plus a prompt gets a
   // transcript of no rows rather than a negative height that would read as an
@@ -81,7 +88,27 @@ export function compose(deps: ComposeDeps): Composed {
     region: Object.freeze({ top: HEADER_ROWS, height }),
     overlayRegion: Object.freeze({ width: size.columns, height: size.rows }),
     promptRows,
+    /** What the prompt asked for, before the cap. Beyond it, S01 §3 windows. */
+    promptWanted: wanted,
   });
+}
+
+/**
+ * S01 §3's sum, checked **before any output is written**.
+ *
+ * The four regions must total exactly `rows`. One too many and the frame
+ * scrolls the alternate screen — the failure that corrupts state the
+ * application can no longer see or correct — and one too few leaves a row of
+ * the previous frame showing through.
+ *
+ * Returned rather than thrown: a frame that cannot be composed coherently is
+ * still better than a crash mid-session, and the caller draws the fallback.
+ * The clamps above mean this cannot fail today, which is exactly why it is
+ * asserted — a clamp is a fact about the current arithmetic, and this is a
+ * claim about the frame.
+ */
+export function heightsSum(f: Composed): boolean {
+  return HEADER_ROWS + f.region.height + f.promptRows + FOOTER_ROWS === f.size.rows;
 }
 
 /** The prompt's rendered first-row prefix. C17 holds no geometry (C17 I10). */

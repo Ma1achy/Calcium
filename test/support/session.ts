@@ -11,7 +11,8 @@
 import { resolveConfig, type Ambient } from "../../src/shell/config.js";
 import { constructGraph, type FrameQueries, type Graph } from "../../src/shell/construct.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
-import type { FileSystem, TuiConfig } from "../../src/shell/types.js";
+import { createTui } from "../../src/shell/session.js";
+import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
 import { fakeStdout, type FakeStdout } from "./fake-terminal.js";
 
 export const MANIFEST = {
@@ -58,6 +59,52 @@ export type Harness = Readonly<{
   stdout: FakeStdout;
   rendered: number;
 }>;
+
+/**
+ * A real `Session`, with every ambient value injected.
+ *
+ * **Distinct from `buildGraph`, and the difference matters.** `buildGraph`
+ * stubs `render` with a counter, so nothing it returns ever paints — which is
+ * right for asserting construction order and wrong for asserting a frame. Any
+ * test about what reaches the terminal has to go through `createTui`, or it
+ * measures the harness.
+ */
+export async function buildSession(
+  overrides: Partial<TuiConfig> = {},
+  size = { columns: 100, rows: 30 },
+): Promise<{
+  tui: TuiInstance;
+  stdout: FakeStdout;
+  resize: (next: { columns: number; rows: number }) => void;
+}> {
+  const stdout = fakeStdout(size);
+  const tui = createTui({
+    name: "prism",
+    binary: "prism",
+    manifest: MANIFEST,
+    theme: defaultTheme,
+    stateDir: "/state",
+    env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
+    cwd: "/work",
+    clock: () => 1_700_000_000_000,
+    fs: fakeFs(),
+    stdout: stdout as unknown as NodeJS.WriteStream,
+    stdin: { isRaw: false } as unknown as NodeJS.ReadStream,
+    ...overrides,
+  });
+
+  await tui.start();
+
+  return {
+    tui,
+    stdout,
+    resize: (next) => {
+      size.columns = next.columns;
+      size.rows = next.rows;
+      process.emit("SIGWINCH");
+    },
+  };
+}
 
 export async function buildGraph(
   overrides: Partial<TuiConfig> = {},

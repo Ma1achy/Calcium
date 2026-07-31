@@ -361,7 +361,19 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
   // just as loudly as a new expiry.
   // The count is load-bearing: a third deferral in either file changes the key
   // and fails TD0, rather than inheriting an exemption argued for two.
-  "TD2 src/shell/session.ts (2)",
+  // **One deferral, and it waits on a contradiction rather than on code.**
+  //
+  // `test/contract/surfaces.test.ts` — S01 §2's illustrated rows. The paint
+  // path exists now, so the original reason is gone; what is left is that the
+  // figure and the arithmetic disagree and no assertion can satisfy both. The
+  // caption says 100 x 30 and the fence is 17 rows of 80, and the fence draws
+  // three horizontal rules that §3's arithmetic — header 1, footer 1, prompt,
+  // viewport — does not account for. Resolving it moves C22's `HEADER_ROWS`,
+  // so it is a ruling rather than a repair.
+  //
+  // The count is what makes this safe to leave: it was `(2)` while C03 T5.4
+  // also waited, and dropping to `(1)` failed TD0 rather than passing quietly.
+  "TD2 src/shell/session.ts (1)",
 ]);
 
 /**
