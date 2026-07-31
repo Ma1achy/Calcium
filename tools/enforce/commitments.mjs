@@ -433,6 +433,7 @@ export const TOPICS = {
   "router-decode": "C16",
   "router-focus": "C16",
   "router-keymap": "C16",
+  "router-dispatch": "C16",
   text: "C09",
   plot: "C12",
   process: "C21",
