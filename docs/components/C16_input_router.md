@@ -151,7 +151,7 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 | Context | Behaviour |
 |---|---|
 | **A verb is in flight** | Cancel it (C06's escalation ladder). **Takes precedence over everything** |
-| A system pass-through child is running | Forward `SIGINT` to the child |
+| A piped shell child is running | Forward `SIGINT` to the child |
 | A dismissable overlay is on top | Dismiss it |
 | A non-dismissable overlay is on top | No-op — a confirm is not cancellable by Ctrl-C |
 | Copy mode | Exit copy mode |
@@ -169,11 +169,48 @@ The collapsed form, `if (pop()) handled`, does not merely send Ctrl-C nowhere. A
 
 Note that the reorder above widened this hazard rather than narrowing it: the three layer rungs used to be consecutive, and copy mode now sits between the confirm's no-op and the view's pop. The fall-through has one more wrong thing to do, which is an argument for reading `top` rather than an argument against the order.
 
+**Rung 2 is the piped shell child, and it used to name the pass-through child, which cannot reach here.** A pass-through child runs through A02 Seam 4's `lifecycle.suspend()` → `runner.handoff()`, and C21 I6 makes `handoff` *refuse* while raw mode is still set. With raw mode suspended C16 receives no stdin at all: the terminal delivers `SIGINT` to the foreground process group directly, and the rung had no constructible case for the children it named.
+
+The `shell` route is a different thing and is reachable. It goes through `spawnShell` rather than `C06.invoke`, so `busy` is false and rung 1 does not catch it, which is what leaves a real gap for this rung to fill.
+
+**Making `spawnShell` set `busy` instead was rejected.** It would put a foreground shell command under C06's concurrency guard, and C23 I5 already owns that condition at a different scope — C23's guard is authoritative and C06's is the backstop. Two guards over one condition is how they drift.
+
 **Cancellation outranks everything** because it is the most consequential and most time-sensitive intent. A user hitting Ctrl-C while a promote is running means the promote, not the dashboard they happen to be looking at. Stating the precedence matters — the alternative reading is defensible, and leaving it implicit guarantees the two get implemented differently.
 
 Ctrl-D at an empty prompt takes the same confirm path (`j22` #10). With text present it is a no-op, not a delete-forward, because a stray Ctrl-D that eats a character mid-command is worse than one that does nothing.
 
 The 500 ms window uses an **injected clock**, like C03's scheduler — C16 reads no ambient time, so double-tap timing is testable on a fake clock.
+
+### Every rung, and the state that constructs it
+
+Kept rather than merely run. The two corrections above — the reorder and rung 2 —
+both came out of filling this in on paper, before any code existed to test. A rung
+whose state column cannot be written is a finding about the ladder, not a test to
+delete, and nothing else in the spec would catch a ninth rung added later with no
+constructible case.
+
+| # | Rung | Constructed by | Test |
+|---|---|---|---|
+| 1 | In-flight verb | `C06.busy`, any focus target | T1.11 |
+| 2 | Piped shell child | a `shell` route running; `busy` false | T3.11 |
+| 3 | Dismissable overlay | completion menu or reverse search on top | T1.1x |
+| 4 | Non-dismissable overlay | a confirm on top — **over anything**, including copy mode and a view | T1.12, T1.12b |
+| 5 | Copy mode | `copyMode` true, no layer on the stack | T4.3 |
+| 6 | Pushed view | a view on the stack, no overlay above it | T5.3 |
+| 7 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
+| 8 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
+
+Two rows earned their place by being hard to fill. Rung 2's column said
+"pass-through child" and could not be written at all. Rung 4's said "a confirm on
+top" until the question "on top of *what*" was asked, which is what exposed the
+order defect — rungs 3 and 4 have to dominate 5 and 6, not merely precede 3's old
+neighbours.
+
+**One rung is missing and this is where it shows.** No row covers Ctrl-C while
+`StoredFocus.at === "liveBlock"`. It falls through to rungs 7 and 8, which is
+probably right — Ctrl-C returning the user to where they type is consistent with
+I2 — and it is stated nowhere, so the fall-through is an accident that happens to
+be correct. Left as a question rather than answered here.
 
 ---
 
@@ -311,7 +348,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T3.8**: any key between two Ctrl-Cs → disarms.
 - **T3.9**: 501 ms between two Ctrl-Cs → disarms; the second arms afresh.
 - **T3.10**: three Ctrl-Cs in rapid succession → one confirm, not two.
-- **T3.11**: Ctrl-C during a pass-through child → `SIGINT` forwarded, no local handler runs.
+- **T3.11**: Ctrl-C during a piped `shell` child → `SIGINT` forwarded, no local handler runs.
+- **T3.11b**: during a *pass-through* child C16 receives no input at all — a spy on `dispatch` records nothing between `lifecycle.suspend()` and `resume()`, which is why that case is not a rung. Asserts the absence the §5 table now records.
 - **T3.12** (I3): a mouse event with mouse disabled → dropped before decoding, never surfaced as keys.
 - **T3.12b** (I3): a wheel event with an overlay under the pointer → goes to the overlay; with none → goes to C14.
 - **T3.13**: a malformed escape sequence → discarded; the next valid key decodes normally.
