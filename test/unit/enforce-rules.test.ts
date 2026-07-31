@@ -631,7 +631,13 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
   const PENDING_RULES: Record<string, string> = {
     SS5: "folded into SS4's scope — SS4 covers all of src/viewport/, so a second rule with the same pattern and a contained scope could never fire on anything SS4 misses. The SS12-into-SS11 precedent",
     SS6: "C16",
-    SS7: "C17",
+    SS7:
+      "folded into SS1's scope — SS1 bans clock reads across all of src/ with one " +
+      "named exception, so a rule scoped to `editor/` could never fire on anything " +
+      "SS1 misses. The SS5-into-SS4 and SS12-into-SS11 precedent, and the third " +
+      "instance of A03 §2's pending-entry-false-at-birth class: C17's arrival is " +
+      "what made it visible, because the component said to be blocking it is the " +
+      "one that proves it could not fire",
     SS8: "C19",
     SS9: "C20",
     SS12: "C10 — folded into SS11's scope for now",

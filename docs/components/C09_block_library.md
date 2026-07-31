@@ -42,6 +42,8 @@ type RenderContext = Readonly<{
 }>;
 
 function cells(text: string): number;          // grapheme-aware display width
+function graphemes(text: string): readonly string[];   // the cluster stream, for C17
+function clusterWidth(cluster: string): number;        // one cluster's cells
 function truncate(
   text: string,
   width: number,
@@ -284,6 +286,8 @@ Only the languages actually needed are registered — `createLowlight({ yaml, js
 | Control characters | Stripped before measuring |
 
 Iterating code units is the defect this exists to prevent. `cells()` is grapheme-aware, shared by every kind, and tested independently, because a per-kind width calculation would be wrong in a different way in each.
+
+**The cluster stream is exported for C17, and this is the `cells()` argument one layer down.** The editor's cursor is a grapheme index, so it needs where a cluster *ends* rather than how wide a string is — a different question with the same answer underneath. Constructing a second `Intl.Segmenter` in the editor would be two answers to "where does a cluster end", agreeing today and diverging on whichever ZWJ sequence the two Unicode versions disagree about; it is also a per-call cost on a module that already builds exactly one segmenter for the whole tree, deliberately (§5). `clusterWidth` comes with it because C17's layout walks clusters and asks each its width, which is what `cells()` does internally and cannot expose by returning a total.
 
 Truncation is also grapheme-aware: a cut never lands inside a cluster, and a double-width glyph that would straddle the boundary is dropped rather than half-drawn.
 

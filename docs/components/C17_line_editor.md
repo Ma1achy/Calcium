@@ -394,7 +394,7 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T2.1** (I3, the headline): for a corpus of buffers — empty, single line, multi-line, wrapping, CJK, emoji — `displayRows(w, gutter)` equals the rendered prompt height at widths 20 to 200, for gutters `{first: 2, cont: 2}` and `{first: 0, cont: 0}`.
 - **T2.1b** (I3): a command wrapping exactly at the gutter boundary → the row count matches; the off-by-one that a gutter-blind implementation produces is caught here.
 - **T2.2** (I1): across a thousand random operation sequences, the cursor is always at a valid grapheme boundary in range.
-- **T2.3** (I6): a source scan finds no clock reference in `editor/`.
+- **T2.3** (I6): a source scan finds no clock reference in `editor/` — SS1's, which covers all of `src/` with one named exception. A03 inventoried SS7 for this scope and it is folded into SS1 rather than built: it could never have fired on anything SS1 misses, which is A03 §2's pending-entry class and the reason a test cites the rule that covers it rather than the rule that was promised.
 - **T2.4** (I2): a source scan finds no `.length`, `charAt` or `slice` on buffer text outside the grapheme layer.
 - **T2.5** (I10): the interface exposes no render method and stores no width.
 - **T2.6** (I14): the module graph shows no import from `terminal/` and no scheduler call.

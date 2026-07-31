@@ -83,6 +83,8 @@ A vacuous rule reports success it has not earned; an undeclared branch reports a
 
 - **A pending entry whose reason was false at birth.** The inverse of a deferral that outlives its reason, and it needs saying because the remedy is opposite. `PENDING_RULES.SS6 = "C16"` recorded a clock-read rule waiting on the input router — so 14b's equality was satisfied and always would be. But SS6's scope is `input/`, a directory that has never existed and that C16 does not create, and SS1 already bans clock reads across all of `src/`; building SS6 on C16's arrival would recreate the SS4/SS5 defect exactly. **No event can retire it, because the event it names was never the blocker.** SS7, SS8 and SS9's clock clause are the same entry three more times. A pending record needs a reason that some future thing can make true, and "waiting on C16" is not one when the scope names a directory C16 will not produce — so a pending entry is written against a *file or directory that will exist*, never against a component name alone.
 
+  **And the fold is the only exit, which is the third instance of this now closed.** SS5 was folded into SS4 and SS12 into SS11, both for the same reason: a rule whose scope is contained by a broader rule with the same pattern can never fire on anything the broader one misses. SS7 is the third — its scope is `editor/` and SS1 bans clock reads across all of `src/` with one named exception — and C17's arrival was the moment to see it, because the component that was supposedly blocking it is the one that proves it could never fire. **A pending rule whose reason was false when it was written cannot expire on its own; something has to retire it deliberately, and the fold is what that looks like.** SS8 and SS9 wait on C19 and C20 and are the same entry twice more; each is folded or built when its component lands, and neither is left to expire by itself.
+
 - **A check that existed as a habit rather than a mechanism.** The other side of SS3: not a rule written down and never built, but one performed reliably and never written down. Invariant ordering was verified by ad-hoc script while the specs were written, caught every time, and never became a rule — so when the habit stopped, twenty of twenty-five specs drifted out of order and nothing went red, because nothing was missing and no citation dangled. **It is the hardest of these to notice, because there is no artefact to inspect.** The other eight are a rule that is present and broken; this is a rule that was never an artefact at all, and the only evidence it existed is that the corpus was clean while someone was watching. What made it findable was reading C04's invariant list end to end for an unrelated reason. SP2 is the mechanism it should have been.
 
 Generalising it turned up three things the narrow pattern had been hiding, and none of them was a violated rule:
@@ -223,7 +225,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS4 | clock reads | `src/viewport/` | C13 I9, T2.2 · C14 T2.4 |
 | SS5 | — folded into SS4 | — | C14 T2.4 |
 | SS6 | clock reads | `input/` | C16 T2.3 |
-| SS7 | clock reads | `editor/` | C17 T2.3 |
+| SS7 | — folded into SS1 | — | C17 T2.3 |
 | SS8 | clock reads | `completion/` | C19 T2.3 |
 | SS9 | clock, `fs`, `~/.prism` literal | `history/` | C20 T2.4 |
 | SS10 | `process.env` reads of the seven terminal variables | outside C02 | C02 T2.5 |
