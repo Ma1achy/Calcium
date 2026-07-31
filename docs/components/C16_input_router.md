@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` |
 | **Layer** | L3 interaction |
-| **Depends on** | C15 (stack top) · C14 (copy mode, scroll ops, hit-testing) · C13 (live entry) · C02 (`bracketedPaste`) · C06 (`busy`, `cancel` — the highest-precedence Ctrl-C branch) |
+| **Depends on** | C15 (`top`, `layout` for hit-testing) · C14 (scroll ops, `entryAtRow`; copy mode as an injected `exitCopyMode` while C14 §6 is unbuilt) · C13 (live entry) · C02 (`bracketedPaste`, `mouse`) · C06 (`busy`, `cancel` — the highest-precedence Ctrl-C branch) |
 | **Consumed by** | C17 editor · C19 completion · C20 history · L4 |
 | **Source** | A01 D3, D6 · A02 §2 focus priority · `j22` #10 |
 | **Status** | Draft |
@@ -126,8 +126,9 @@ A click is positional. Sending it through focus priority would deliver a click o
 
 ```
 1  a layer covers the point (C15 layout)   → that layer
-2  the point is in the viewport region     → C14 maps row → entry → block,
-                                              and C11 resolves a row action
+2  the point is in the viewport region     → C14's entryAtRow maps row → entry
+                                              and row offset (C14 I19), and
+                                              C11 resolves a row action
 3  header or footer                        → global
 4  otherwise                               → dropped
 ```

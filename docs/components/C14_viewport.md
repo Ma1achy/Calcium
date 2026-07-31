@@ -63,6 +63,22 @@ type VisibleRange = Readonly<{
 
 C14 exposes these as operations; the keys that invoke them are C16's.
 
+### A region row resolves to an entry here
+
+```typescript
+entryAtRow(row: number): Readonly<{ id: EntryId; rowOffset: number }> | null;
+```
+
+A mouse click arrives as a position and has to become a target. C16 §4 routes mouse events by position rather than by focus, and the middle step — a region row becoming the entry drawn there — is scroll arithmetic, which §2 and §11 both place here.
+
+It was specified nowhere until C16's spec pass, while C16's dependency line already claimed to consume it. The alternative was C16 walking `visible()` and accumulating `takeRows` itself, which works and puts the viewport's arithmetic in the router: two components computing where a row is, agreeing until one of them learns about `gapBefore` or the live gutter and the other does not.
+
+**It returns `rowOffset` as well as `id`**, for the same reason `Anchor` carries one (I6). An entry alone answers "which block was clicked" and not "which row of it", and the row is what C11 needs to resolve a row action. Returning the id alone would push the second lookup back to the caller, which is where this started.
+
+`null` for a row outside the viewport's occupied rows — a short transcript leaves rows below the last entry, and a click there is not a click on the last entry.
+
+**Pure, and no cursor of its own.** `entryAtRow` reads the index and the current scroll, and stores nothing. Copy mode's row cursor is §6's; this is a query.
+
 ---
 
 ## 3. Follow-tail
@@ -166,6 +182,10 @@ Dragging an edge continuously must produce continuously correct frames, never a 
 
 ## 6. Copy mode
 
+> **Unbuilt as of 2026-07-31, and this note exists because nothing else recorded that.** C14 landed with §6 specified and no implementation: `Viewport` carries no `enterCopy`/`exitCopy`, no clipboard injection, and **T1.13, T1.14, T1.15, T3.14 and T5.6 are absent from the suite rather than deferred**. Absent is not deferred — a deferral is tracked and expires (`tools/enforce/todo-expiry.mjs`), while an absent test is indistinguishable from a component that had nothing to say. The five now exist as deferrals against the file that will hold this section, so they fail the moment it is written.
+>
+> Until then, C16 takes `copyMode` as a boolean input and `exitCopyMode` as an injected call. That is a seam standing in for something **unbuilt**, which is legitimate, as distinct from a seam standing in for something unspecified — the distinction that put `entryAtRow` in §2 rather than in C16's constructor.
+
 Mouse is on by default (D34), which takes the terminal's own text selection — the way people copy a UUID today. Copy mode is therefore not optional (A01 S30).
 
 - Entry is by a key binding C16 owns. Copy mode is its own **focus target**, sitting above `pushedView` and below `overlay` in A02's priority order — it takes every key, including inside the dashboard, but a confirm raised over it still wins.
@@ -211,6 +231,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
 - **I17** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
 - **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
+- **I19** — `entryAtRow` is pure and total: it reads the index and the current scroll, stores nothing, and returns `null` for any row the transcript does not occupy. It is the **only** place a region row becomes an entry — C16 routes mouse events by position and does not recompute the mapping, because two components computing where a row is will agree until one of them learns about a height change and the other does not.
 
 ---
 
@@ -233,6 +254,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
 16. `VisibleRange` marks the live entry; the frame draws the live gutter, and no measurement includes it (I18).
 17. An entry's height is `measureSequence`, so `gapBefore` is counted — never `Σ measure`, which is short by one row per gap (I1, C09 I17).
+18. A region row resolves to an entry and a row within it here, once, and C16 does not recompute the mapping (I19).
 
 ---
 
@@ -275,10 +297,14 @@ Fake heights, no rendering.
 - **T2.5** (I12): the module graph shows no import from `terminal/`.
 - **T2.6** (I1): a spy on the block registry proves `render` is never called during a visibility query.
 - **T2.7**: every `Change` variant from C13 has a documented cache effect — exhaustive over the union.
+- **T2.11** (I19): over the same fuzz corpus as T2.1, `entryAtRow` agrees with `visible()` for every occupied row — the entry it names is the one whose `skipRows`/`takeRows` span covers that row, and the `rowOffset` it returns lands inside that entry's height. Asserted against `visible()` rather than against a hand-rolled walk, or the test reimplements the thing it checks and the two agree by construction.
+- **T2.12** (I19): `entryAtRow` performs no mutation — a thousand calls leave `scroll`, `anchor` and `stats` identical.
 
 ### Tier 3 — edge cases
 
 - **T3.1**: empty transcript → empty range, `topRow` 0, no throw.
+- **T3.1b** (I19): `entryAtRow` on an empty transcript, on a negative row, and on a row below the last entry in a short transcript → `null` in all three, never the last entry. A click on blank space beneath the transcript is not a click on the thing above it.
+- **T3.1c** (I19): a row inside an entry that begins above the viewport's top edge → the entry is named and `rowOffset` accounts for the `skipRows` already scrolled past, rather than counting from the viewport's first row.
 - **T3.2**: scroll to bottom while already following → no-op.
 - **T3.3**: `viewportHeight` of 0 → empty range, no division by zero.
 - **T3.4**: `viewportHeight` of 1 → exactly one row visible.
