@@ -287,6 +287,12 @@ Iterating code units is the defect this exists to prevent. `cells()` is grapheme
 
 Truncation is also grapheme-aware: a cut never lands inside a cluster, and a double-width glyph that would straddle the boundary is dropped rather than half-drawn.
 
+**Wrapping is not truncation, and it had been treating an unplaceable cluster as though it were.** A cluster that does not fit the remaining width moves whole to the next row; a cluster wider than the *whole* line cannot be placed at all, and the wrap dropped it — at a usable width of 1, every CJK glyph and every emoji simply left the output. Both halves called the same function, so `measure` and `render` agreed and I1 held: the frame was arithmetically consistent and describing content it did not hold, which is the failure I1 cannot see.
+
+It is substituted by a one-cell `?` (I19). Three answers were available and two are worse: placing it anyway overflows the row into one nobody counted, which is the alternate-screen scroll C09 exists to prevent, and a blank loses the fact that anything was there. `?` is one cell in every capability mode, which matters because `measure` receives no capabilities and so cannot choose a marker the way `truncate` does.
+
+**How narrow this has to be, measured rather than assumed.** A cluster is at most 2 cells, so the substitution needs a usable width of exactly 1. Three of the four ways to reach it are degenerate — a 2-column terminal, a `notice` with a glyph at width 3, `panel` nesting at 2 columns a level. The fourth is not: a `row` group hands each child `floor((w − (n−1)) / n)`, floored to 1, which is 1 whenever `w ≤ 2n − 1` — sixty children at 120 columns, twenty at 40. **The boundary is child count, not terminal width.** No in-tree adapter builds a row group today, so it is latent rather than live; it is reachable through C24's public `group(direction, children)` at an ordinary terminal size as soon as an app builds one from a data list, which is R01 R4.4's reuse claim. Recorded with the figures so nobody restores the drop on the grounds that it only fires at width 1.
+
 ---
 
 ## 6. Registry state machine
@@ -320,6 +326,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I16** — Ink's layout width agrees with `cells()`. C09 hands Ink pre-broken lines, so Ink's own idea of how wide a string is must match the measurer's or a line it considers too long wraps and adds a row nothing counted. Asserted (T2.16), never assumed — a silent disagreement here breaks I1 for every kind at once.
 - **I17** — `gapBefore` is applied by the sequence, never by the block (C04 §3a, C04 I19). `measure` never counts it; `measureSequence` and every container do.
 - **I18** — Control characters are stripped from every text field before measurement and render, by C09 and not by its callers. A far side's output cannot inject escape sequences into the frame: `\x1b[2J` cannot clear the screen, a cursor-position query cannot get its answer typed into the prompt, and a stray `\r` cannot make a measured row and a rendered row disagree. Stripping happens once, at the last point before both, so measurement and render cannot see different text.
+- **I19** — Wrapping never deletes a cluster. A cluster wider than the line it must fit into is **substituted** by a one-cell `?`, never dropped: a row that silently loses a glyph is a frame that is arithmetically consistent and describing different content than it holds. Substitution rather than overflow, because a row wider than it was measured wraps into a row nobody counted — the one failure I1 exists to prevent. C17 I20 answers the same question the other way and says why: a block renders someone's data, an editor holds what the user typed.
 
 ---
 
@@ -340,6 +347,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 13. Ink paints pre-broken lines. Its layout width must agree with `cells()`, and the agreement is asserted (T2.16), never assumed (I16).
 14. No renderer emits a colour. Every style comes from `resolve` against a declared palette slot, so degradation, theme switching and the 1-bit collapse happen in one place instead of once per kind (I4). Enforced by SS17 and, for the Ink-prop route, SS37.
 15. **Control characters are stripped from every text field before measurement and render** (I18). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
+16. **Wrapping substitutes a cluster it cannot place rather than dropping it** (I19). It dropped, and both halves called the same function, so `measure` and `render` agreed and nothing failed — a frame arithmetically consistent and describing content it did not hold. The reach is a fact about child count rather than terminal width (§5).
 
 ---
 
@@ -443,6 +451,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.15** (§3): setting an Ink colour prop instead of emitting SGR → T2.17 fails, and every golden frame renders monochrome while production renders truecolour.
 - **T6.17** (I17): counting `gapBefore` inside `measure` instead of at the sequence → a block measures differently in a document than in a panel, and T2.18 fails.
 - **T6.16** (§3): letting Ink wrap or truncate rather than pre-breaking through `cells()` → T2.1 fails at the wrapping widths, and T3.4's ASCII marker becomes `…` again.
+- **T6.17** (I19): dropping a cluster wider than the line, as both wrappers did → T3.9d and T3.9e fail, and CJK leaves the output at a usable width of 1 with every measurement still agreeing.
 
 ---
 

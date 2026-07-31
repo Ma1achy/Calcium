@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   cells,
   expandTabs,
+  hardWrapCells,
   stripControl,
   truncate,
   wrapCells,
@@ -157,5 +158,24 @@ describe("wrapCells (§3)", () => {
     const rows = wrapCells("abc", 0);
 
     expect(rows).toEqual(["a", "b", "c"]);
+  });
+
+  it("T3.9d (I19): a cluster wider than the line is substituted, never dropped", () => {
+    // It was dropped, silently, for the whole life of both wrappers — and both
+    // `measure` and `render` call this, so they agreed and I1 held. The frame
+    // was arithmetically consistent and describing content it did not hold.
+    expect(wrapCells("日本語", 1)).toEqual(["?", "?", "?"]);
+    expect(wrapCells("a日b", 1)).toEqual(["a", "?", "b"]);
+    expect(hardWrapCells("日本語", 1)).toEqual(["?", "?", "?"]);
+  });
+
+  it("T3.9e (I19): the substitution keeps the row count equal to the glyph count", () => {
+    // The property the drop broke: three glyphs are three rows at width 1,
+    // whatever they are. A measurer counting rows and a renderer emitting them
+    // both go through here, so this is the whole of I1 at this width.
+    for (const text of ["abc", "日本語", "a日c", "🎉🎉🎉"]) {
+      expect(wrapCells(text, 1), text).toHaveLength(3);
+      expect(hardWrapCells(text, 1), text).toHaveLength(3);
+    }
   });
 });

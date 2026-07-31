@@ -255,9 +255,9 @@ export function hardWrapCells(text: string, width: number): readonly string[] {
   let line = "";
   let used = 0;
 
-  for (const { segment } of GRAPHEMES.segment(text)) {
+  for (const raw of GRAPHEMES.segment(text)) {
+    const segment = placeable(raw.segment, limit);
     const w = clusterCells(segment);
-    if (w > limit) continue;
     if (used + w > limit && line !== "") {
       out.push(line);
       line = "";
@@ -293,15 +293,9 @@ export function wrapCells(text: string, width: number): readonly string[] {
 
     let line = "";
     let used = 0;
-    for (const { segment } of GRAPHEMES.segment(paragraph)) {
+    for (const raw of GRAPHEMES.segment(paragraph)) {
+      const segment = placeable(raw.segment, limit);
       const w = clusterCells(segment);
-
-      // A cluster wider than the whole line can never be placed. At width 1 a
-      // CJK glyph is exactly that, and drawing it anyway puts two cells in a
-      // one-cell row — which the terminal wraps into a row nobody counted.
-      // Dropping it is the only option that keeps the geometry honest, and both
-      // halves drop it, because both call this.
-      if (w > limit) continue;
 
       if (used + w > limit && line !== "") {
         const at = breakPoint(line);
@@ -321,6 +315,39 @@ export function wrapCells(text: string, width: number): readonly string[] {
   }
 
   return out;
+}
+
+/**
+ * A cluster that cannot fit the line at all, substituted rather than dropped (I19).
+ *
+ * A cluster is at most two cells, so this fires only at a usable width of 1 —
+ * and it fired silently for the whole life of both wrappers. Every CJK glyph
+ * and every emoji simply left the output there. **Both halves called the same
+ * function, so `measure` and `render` agreed and I1 held**: the frame was
+ * arithmetically consistent and describing content it did not hold, which is
+ * exactly what I1 cannot see.
+ *
+ * Three answers were available and two are worse. Placing it anyway overflows
+ * the row into one nobody counted — the alternate-screen scroll C09 exists to
+ * prevent. A blank keeps the geometry and loses the fact that anything was
+ * there. So a one-cell `?`, which is one cell in every capability mode: this
+ * runs inside `measure`, which receives no capabilities and so cannot pick a
+ * marker the way `truncate` does.
+ *
+ * **How narrow this has to be is a fact about child count, not terminal width.**
+ * A `row` group hands each child `floor((w - (n-1)) / n)`, floored to 1 by
+ * `normaliseWidth`, which is 1 whenever `w <= 2n - 1` — sixty children at 120
+ * columns. No in-tree adapter builds one, so it is latent rather than live, and
+ * it is reachable from C24's public `group()` at an ordinary size (C09 §5).
+ *
+ * C17 I20 answers the same question the other way: an editor overflows rather
+ * than substitutes, because a block renders someone's data and an editor holds
+ * what the user typed.
+ */
+const UNPLACEABLE = "?";
+
+function placeable(segment: string, limit: number): string {
+  return clusterCells(segment) > limit ? UNPLACEABLE : segment;
 }
 
 /**
