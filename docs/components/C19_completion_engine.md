@@ -61,7 +61,9 @@ So the string form was not merely weaker. It made T3.3, T3.15 and the `executabl
 
 **C17's cursor *is* a grapheme index (C17 I2), so the conversion is real and it belongs to L4**, at the seam where the editor's buffer becomes a completion context. Putting it here would give C19 two coordinate systems and one of them would eventually be read in the other's arithmetic — which is the defect this ruling closes, reintroduced inside the component instead of across its boundary.
 
-That also settles a scan question rather than leaving it to be discovered: SS40 forbids `.length`, `charAt` and `slice` across `src/interaction/`, allowing `router/decode.ts` and `interaction/parser/`. `completion/` is neither, and span arithmetic is exactly the forbidden shape. The allowance is the same one `parser/` already holds and for the same reason — this is the tokeniser's coordinate system, where a code-unit count is the honest measure — so `interaction/completion/` joins that list rather than the rule being narrowed. A03 §"a directory is a packaging decision" is the precedent, and the row lands with the code (A03 commitment 14b).
+That also settles a scan question rather than leaving it to be discovered: SS40 forbids `.length`, `charAt` and `slice` across `src/interaction/`, allowing `router/decode.ts` and `interaction/parser/`. Span arithmetic is exactly the forbidden shape, and it is the correct shape here for the reason those two are allowed — this is the tokeniser's coordinate system, where a code-unit count is the honest measure.
+
+**The allowance is `completion/context.ts`, not `completion/`**, and the first draft of this paragraph said the directory. SS40's own note gives the discriminator: *neither allowed file measures display width*. `context.ts` does not; `menu.ts` does, and there a `.length` is exactly the mistake the rule was written for — a candidate's column width is `cells()`, never a unit count. Allowing the directory would hand the one file in the minority the wrong advice at the moment someone reaches for a quick fix, which is A03 §"a directory is a packaging decision" describing the defect it has now recorded three times. The row lands with the code (A03 commitment 14b).
 
 ---
 
@@ -92,7 +94,13 @@ interface CompletionSource {
 
 That split is what keeps typing cheap. Verb names, sub-verbs, flag names and enum values all come from the manifest and cost a filter over an in-memory array, so ghost text can update live. UUIDs, family names and deployment names require the far side, and recomputing them per keystroke would hammer the API for suggestions nobody asked for.
 
-Static sources ship in `tui-kit` and read only C05. Dynamic sources are the app's (A02 §6, hook 4).
+Static sources ship in `tui-kit` and read only C05. **Domain-backed** dynamic sources are the app's (A02 §6, hook 4).
+
+**The framework also ships two dynamic sources of its own, and the earlier wording denied it.** "Dynamic sources are the app's" met "path and executable completion are dynamic" and T2.7's requirement that every `Slot` kind have a registered source, and the three cannot all hold: the framework owns the `path` and `executable` slots, so if it ships nothing dynamic those two slots have no source and T5.4 completes nothing. The division is not static-versus-dynamic but **generic versus domain** — a filesystem is not a domain, and a UUID is.
+
+**Both take an injected directory reader**, for the reason the clock is injected: an ambient read makes every test need a real one, and the failure mode is a suite that passes on the author's machine. It is `readDir(path): Promise<readonly DirEntry[]>`, supplied at C22 with the real implementation, and it is what lets the `/` delimiter of a directory candidate (I16) be decided by the source rather than guessed.
+
+So C19 imports no `fs`. The seam is the whole of its filesystem knowledge.
 
 ### Caching
 
@@ -390,6 +398,7 @@ The second `Tab` completes the next slot. There is no state under which it re-op
 - **I14** — A leading `/` completes the manifest; bare text completes `PATH` and the filesystem, never both.
 - **I15** — Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner's elapsed-wait stamp, which is per source call (§7).
 - **I16** — A unique match is inserted whole followed by its own `delimiter`; a common prefix is inserted without one. The delimiter is declared by the candidate, because only its source knows whether the value is a directory, a flag taking a value, or a finished word.
+- **I17** — C19 reads no filesystem. The `path` and `executable` sources take an injected directory reader, so every test runs without one.
 
 ---
 
@@ -407,7 +416,7 @@ The second `Tab` completes the next slot. There is no state under which it re-op
 10. The tokeniser and the quoter are both shared with C18 (I5).
 11. Accepting produces one undo unit (I11).
 12. `/` completes verbs; bare text completes executables and paths (I14).
-13. Dynamic sources are the app's; static ones ship with the framework (I3).
+13. Static sources ship with the framework, and so do the two generic dynamic ones — `path` and `executable`, over an injected directory reader. Only **domain-backed** dynamic sources are the app's, because a filesystem is not a domain (I3, I17).
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
 15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner's elapsed-wait stamp is the one named exception, and it is per source call (§7).
 
@@ -444,6 +453,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T2.1** (I3): a spy proves dynamic sources are not invoked on keystrokes, only on `Tab`.
 - **T2.2** (I2): with a source that never resolves, a hundred keystrokes are processed with no added latency.
 - **T2.3** (I9): a source scan finds no clock reference in `completion/`.
+- **T2.3b** (I17): a source scan finds no `fs` or `node:fs` import in `completion/`; the `path` source is driven entirely by a fake reader in every tier below 5.
 - **T2.4** (I5): C19 imports C18's tokeniser and quoter; a second implementation of either fails the check.
 - **T2.4b** (I5): `CompletionContext.tokens` is C18's `Token`, asserted structurally — a context built with bare strings does not typecheck, and `replace.start` equals the current token's `start`.
 - **T2.5** (I12): the module graph shows no import from `terminal/` and no scheduler call.
