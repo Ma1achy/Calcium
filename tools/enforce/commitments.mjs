@@ -406,6 +406,14 @@ export const OWNERS = [
   { path: "src/interaction/parser", spec: "C18" },
   { path: "src/interaction/completion", spec: "C19" },
   { path: "src/interaction/history", spec: "C20" },
+  // L4 is the one directory holding two components, so it is the one place the
+  // directory rule needs an exception rather than a second directory: C22 is
+  // the composition root and everything under `src/shell/` is its, except the
+  // execution pipeline. Longest prefix wins, so the second row governs
+  // `execution.ts` and the first governs every file added beside it — which is
+  // the direction that matters, since C22 is the one still growing files.
+  { path: "src/shell", spec: "C22" },
+  { path: "src/shell/execution", spec: "C23" },
   { path: "src/testing", spec: "C09" },
 ];
 
@@ -447,6 +455,10 @@ export const TOPICS = {
   plot: "C12",
   process: "C21",
   sequence: "C06",
+  session: "C22",
+  "session-config": "C22",
+  "session-state": "C22",
+  "session-chrome": "C22",
   sgr: "C01",
   "support-harness": "C09",
   table: "C11",

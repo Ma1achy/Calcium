@@ -48,7 +48,7 @@ type TuiConfig = Readonly<{
   stdin?:  NodeJS.ReadStream;
 }>;
 
-type ChromeFn = (s: SessionSnapshot) => readonly Block[];
+type ChromeFn = (ctx: ChromeContext) => readonly Block[];   // §6
 
 type StopReason = "exit" | "eof" | "interrupt" | "signal" | "fault";
 
@@ -216,7 +216,24 @@ Nothing else lives here. The candidates I expected — verb concurrency, exit ar
 
 ## 6. Chrome
 
-The header and footer are **app-supplied functions from a session snapshot to blocks** (hook 5, F5). `tui-kit` owns the frame's structure — one row each, fixed position, never scrolling — and the app decides what goes in them.
+The header and footer are **app-supplied functions from a chrome context to blocks** (hook 5, F5). `tui-kit` owns the frame's structure — one row each, fixed position, never scrolling — and the app decides what goes in them.
+
+```typescript
+type ChromeFn = (ctx: ChromeContext) => readonly Block[];
+
+type ChromeContext = Readonly<{
+  session: SessionSnapshot;
+  now:     number;      // C22's injected clock, sampled once per frame
+  columns: number;      // handed down from C01, never read
+}>;
+```
+
+**It took a snapshot alone, and could not render what it is specified to render.** Two more of the same class as §3a's and §8a's, both structural, and both found by writing the default:
+
+- **The clock.** S01 §4 sources the header's clock from "Injected clock", the snapshot carries no time, and A03 SS1 forbids reading one. A `now` field on the snapshot would be the wrong repair — it ticks per frame while every other field changes on an event, so I11's one-writer-per-field would be satisfied by a writer that fires sixty times a second. Time is a property of the frame, not of the session.
+- **The width.** S01 §4's whole elision table is width-driven — version drops below 90, identity at 100 then 70, clock at 80 — and a function given only the session cannot know any of it. C22 hands `columns` down, as everything above L0 is handed it (C01 I13).
+
+`now` is sampled **once per frame** and the same value goes to header and footer, for C01 I12's reason one layer up: a header and a footer that read the clock separately can straddle a second boundary and disagree.
 
 The default chrome renders name, binary and clock. Prism's renders cluster, identity, health and clock (`t01` §The header).
 
@@ -347,7 +364,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I10** — Clock and filesystem enter the graph only here.
 - **I11** — Session state has exactly one writer per field, and the two fields with no writer say so. `cluster` and `version` are set at construction and never written after; a field absent from §5's table would read identically to a field nobody writes, and only one of those is a claim.
 - **I12** — `cwd` reaches C21 as a function, never a captured value.
-- **I13** — Chrome is app-supplied; `tui-kit` owns only the frame's structure.
+- **I13** — Chrome is app-supplied; `tui-kit` owns only the frame's structure. It receives the session, the frame's `now` and `columns` — a snapshot alone cannot render the clock S01 §4 specifies or apply its width elisions, and neither belongs on the snapshot: one ticks per frame and the other is C01's to hand down.
+- **I13a** — `now` is sampled once per frame and both chrome functions receive the same value. Two independent reads can straddle a second boundary and print a header and a footer that disagree — C01 I12's rule, one layer up.
 - **I14** — C22 never auto-logins.
 - **I15** — An offline cluster degrades the session; system commands keep working.
 - **I16** — `stopped` is terminal.
@@ -372,7 +390,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 7. Banner fetches are non-blocking and input is accepted before they finish (I18).
 8. Session state is nine fields — seven with one writer each, and `cluster` and `version` set at construction with none. Nothing else lives here (I11).
 9. `cwd` is exposed as a function so `cd` moves subsequent verbs (I12).
-10. Chrome is app-supplied; the prompt gutter is C22's to pass, not C17's to assume (I13).
+10. Chrome is app-supplied and takes session, `now` and `columns`; the prompt gutter is C22's to pass, not C17's to assume (I13, I13a).
 11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I19).
 12. Cleanup is `beforeRelease` and all five callers reach it; the three explicit callers additionally run `stop`'s four ordered steps, and the signal and fault paths are C01's, which cannot be given more (I4, I4a, I5).
 12a. `beforeRelease` is synchronous and returns no thenable; `killAll()`'s promise is not awaited and `drain()` is used rather than `flush()` (I21, C01 I5, C20 I18).
@@ -453,6 +471,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.7** (with C19, C17): ghost text is composited into the prompt without entering the buffer.
 - **T4.8** (with C16, C06): Ctrl-C during a pass-through forwards `SIGINT`; during a verb it cancels.
 - **T4.9** (with C17): the gutter C22 passes matches the prompt it renders, so `displayRows` equals the rendered height.
+- **T4.11** (I13a): header and footer receive the same `now` within one frame, asserted with a clock that advances on every read — a fake returning a fresh value per call, so two reads cannot agree by accident. A monotonic fake would pass whether the value were sampled once or twice, which is the setup where both readings agree (A03 §2).
 - **T4.10** (with C13, C20): `/clear` empties the transcript and leaves history intact.
 
 ### Tier 5 — e2e
@@ -491,6 +510,8 @@ PTY harness.
 - **T6.20** (I4a): making the signal or fault path asynchronous — an `await` anywhere between release and exit → T2.1b fails. Nothing else objects, and `session.stopping` is not set on those paths, so a submission could interleave where today none can.
 - **T6.21** (I9): giving the fallback renderer its own writer instead of taking one → T3.15b fails, and the launch-time fallback either writes into an alternate screen that was never entered or the mid-session one is overwritten by the next frame.
 - **T6.22** (I7a): constructing steps 2–11 in `createTui` → T1.9 fails, because `stop` from `created` now has a lifecycle to release; and a manifest given as a path cannot be read at all, since a constructor cannot await.
+- **T6.23** (I13a): reading the clock once per chrome function instead of once per frame → T4.11 fails. **Structural guard as well** (A02 17a): `ChromeContext` carries `now` as a value, so a second read has nothing to read from — the shape is what prevents it, and T4.11 is what stops the shape being widened back to a function.
+- **T6.24** (I13): putting `now` on `SessionSnapshot` → T1.11 fails, because a field written on every frame has no writer §5's table can name.
 
 ---
 
