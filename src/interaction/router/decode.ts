@@ -138,9 +138,17 @@ function stripControls(text: string): string {
 /** The single-byte keys that are not letters. */
 function namedControl(ch: string): InputEvent | null {
   switch (ch) {
+    // `\r` and `\n` are different keys (I17). Enter sends `\r` in raw mode and
+    // Ctrl-J sends `\n`, so collapsing them removes one of the two
+    // terminal-independent newline bindings C17 I12 requires — a binding that
+    // resolves against an event nothing can produce, which is §5's
+    // unconstructible-rung class one layer lower. It also decides what a
+    // newline inside an unbracketed paste means: `enter` submits every line of
+    // a pasted block, `Ctrl-J` inserts it.
     case "\r":
-    case "\n":
       return key("enter", ch);
+    case "\n":
+      return key("j", ch, { ctrl: true });
     case "\t":
       return key("tab", ch);
     case "":

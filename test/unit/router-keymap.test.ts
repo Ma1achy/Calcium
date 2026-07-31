@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { createKeymap, KeymapError } from "../../src/interaction/router/keymap.js";
+import { createKeymap, KeymapError, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import type { Binding, Key } from "../../src/interaction/router/types.js";
 
 const k = (name: string, mods: Partial<Key> = {}): Key => ({
@@ -139,5 +139,50 @@ describe("C16 §6 — /help renders from the table dispatch uses", () => {
     expect(map.entries().some((e) => e.action === "sort"), "help cannot outlive dispatch").toBe(
       false,
     );
+  });
+});
+
+describe("§6 — the default table (C17 I12)", () => {
+  it("T2.11 (C17 I12): three newline bindings, two of them terminal-independent", () => {
+    // Asserted against `defaultKeymap` rather than a table the test writes.
+    // A fixture keymap here would assert nothing about what ships: the point of
+    // I12 is that the rows exist in the table `/help` renders and dispatch
+    // resolves, and a test that builds its own has checked its own arithmetic.
+    const newline = defaultKeymap.filter((b) => b.action === "insertNewline");
+
+    expect(newline, "three bindings — C17 §4").toHaveLength(3);
+
+    // Both halves of I12, and they count different things. Shift-Enter is the
+    // one many terminals cannot distinguish, so it cannot be one of the two
+    // that always work; an assertion on the count alone passes with it removed,
+    // and one on the reliable pair alone passes with it the only row.
+    const independent = newline.filter((b) => b.key.shift !== true);
+    expect(independent, "at least two that no terminal can fail to send").toHaveLength(2);
+    expect(
+      independent.map((b) => `${b.key.ctrl === true ? "ctrl-" : "meta-"}${b.key.name}`).sort(),
+      "Alt-Enter and Ctrl-J",
+    ).toEqual(["ctrl-j", "meta-enter"]);
+    expect(
+      newline.some((b) => b.key.shift === true && b.key.name === "enter"),
+      "and Shift-Enter, for the terminals that do distinguish it",
+    ).toBe(true);
+  });
+
+  it("T2.12: every default binding resolves to the object the table holds", () => {
+    // The anti-drift property, on the rows that ship. `/help` traverses the same
+    // objects dispatch returns (module note), so identity is what makes "a
+    // binding help shows is a binding dispatch would resolve" checkable.
+    const keymap = createKeymap(defaultKeymap);
+
+    for (const b of defaultKeymap) {
+      const resolved = keymap.resolve(b.target, {
+        name: b.key.name,
+        ctrl: b.key.ctrl ?? false,
+        meta: b.key.meta ?? false,
+        shift: b.key.shift ?? false,
+        sequence: b.key.name,
+      });
+      expect(resolved, `${b.target}:${b.key.name} resolves`).toBe(b);
+    }
   });
 });

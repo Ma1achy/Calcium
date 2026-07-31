@@ -68,6 +68,38 @@ export interface Keymap {
 }
 
 /**
+ * The default table (§6), seeded rather than filled.
+ *
+ * **Three rows, and the emptiness of the rest is honest.** C17's newline
+ * bindings are the only prompt keys any landed spec names: C17 §4 states all
+ * three and I12 requires that at least two work on a terminal that cannot
+ * distinguish Shift-Enter. Nothing in the tree names Ctrl-K, Ctrl-W, Ctrl-A or
+ * any other editing key, so writing them here would be inventing a contract in
+ * the file that is supposed to *hold* one — and `/help` renders from this table,
+ * which would publish the invention as documentation.
+ *
+ * C18, C19 and C20 add their rows when they land. A collision is a construction
+ * error rather than last-wins (I10), so a later addition that shadows one of
+ * these is loud rather than silent, which is what makes seeding safe.
+ *
+ * **Shift-Enter is in the table even though most terminals cannot send it**, and
+ * that is I12's point rather than an oversight: the three include one binding
+ * that depends on the terminal, and the two that do not are what make multi-line
+ * input available everywhere. A table with only the reliable two would satisfy
+ * half the invariant and lose the good behaviour on terminals that do implement
+ * `modifyOtherKeys`.
+ *
+ * Ctrl-J is reachable only because `\n` and `\r` decode to different keys
+ * (I17). It arrived here as a row resolving against an event nothing could
+ * produce, which is what found that.
+ */
+export const defaultKeymap: readonly Binding[] = [
+  { target: "prompt", key: { name: "enter", shift: true }, action: "insertNewline" },
+  { target: "prompt", key: { name: "enter", meta: true }, action: "insertNewline" },
+  { target: "prompt", key: { name: "j", ctrl: true }, action: "insertNewline" },
+];
+
+/**
  * Construction-time duplicate detection (I10, T2.4).
  *
  * **This is not the same check as `mergeBlock`'s, and the two are deliberately

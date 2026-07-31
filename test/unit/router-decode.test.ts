@@ -41,6 +41,25 @@ const names = (events: readonly InputEvent[]): string[] =>
   events.map((e) => (e.kind === "key" ? e.key.name : e.kind));
 
 describe("C16 §2 — key decoding", () => {
+  it("T1.3b (I17): `\\r` is enter and `\\n` is Ctrl-J — asserted as a pair", () => {
+    // They were the same event, and only `\r` was ever asserted. A binding on
+    // Ctrl-J — one of the two terminal-independent newline bindings C17 I12
+    // requires — resolved against something nothing could produce, and the
+    // table still read as satisfied because the row was there.
+    //
+    // The pair is one test deliberately: either half alone passes under the
+    // collapse, since `enter` for both satisfies the first and `Ctrl-J` for
+    // both satisfies the second.
+    const { d } = decoder();
+
+    expect(feed(d, "\r")).toEqual([
+      { kind: "key", key: { name: "enter", ctrl: false, meta: false, shift: false, sequence: "\r" } },
+    ]);
+    expect(feed(d, "\n")).toEqual([
+      { kind: "key", key: { name: "j", ctrl: true, meta: false, shift: false, sequence: "\n" } },
+    ]);
+  });
+
   it("T1.1: byte sequences decode to the documented keys", () => {
     const { d } = decoder();
     const cases: ReadonlyArray<readonly [string, Partial<Record<string, unknown>>]> = [

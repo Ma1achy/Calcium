@@ -423,7 +423,7 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // regex, and a regex edit that silently covered two of three would leave
     // exactly the branch nobody tested unannotated. `make enforce` would print
     // `ok` either way.
-    const annotated = {
+    const annotated: Record<string, string> = {
       "src/interaction/editor/graphemes.ts": [
         "const n = clusters.length; // graphemes-ok",
         "const head = clusters.slice(0, at); // graphemes-ok",
@@ -440,7 +440,7 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
 
     // And the annotation is a claim about the expression, not a licence for the
     // line: the same three without it are three violations, one per branch.
-    const bare = {
+    const bare: Record<string, string> = {
       "src/interaction/editor/graphemes.ts": [
         "const n = clusters.length;",
         "const head = clusters.slice(0, at);",
