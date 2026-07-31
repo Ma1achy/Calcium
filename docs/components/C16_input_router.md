@@ -51,6 +51,21 @@ longer sets `key.meta`. The second matters for §2's escape-sequence
 disambiguation — a lone `Esc` and an escape-sequence prefix are told apart by the
 documented window, not by a modifier flag.
 
+**The window is 50 ms**, and until C16 was implemented this section called it "the
+documented window" while documenting no number — every other constant here is
+written down, so the omission was an oversight rather than latitude.
+
+It is a compromise, not a measurement. Below roughly 25 ms a slow link splits a
+real sequence and `Esc` fires spuriously in the middle of an arrow key; above
+roughly 100 ms a deliberate `Esc` feels sticky. 50 sits centrally in that range and
+is where terminal libraries have converged — `vim`'s `ttimeoutlen` default is the
+same number.
+
+**It is capability-independent and deliberately not tunable.** A user reaching for
+a knob here is working around a link slow enough that the terminal is already
+unusable, and the knob's effect would be to make that failure intermittent instead
+of consistent. One constant, one behaviour, one bug report.
+
 Terminals send no key-up events and repeat held keys as fresh presses, so there is no chord support beyond modifiers. Saying so prevents someone designing a keymap that cannot work.
 
 ---
