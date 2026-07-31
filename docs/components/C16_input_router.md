@@ -96,6 +96,10 @@ It also keeps C16 off a delta stream. C14 is the component that paid for being t
 
 **Pushing a view does not clear it, and popping does not either.** A01 D7 requires that popping a pushed view returns to a still-live block *with selection preserved*, and the pop appends nothing (C23 §4), so the stored location survives the whole push/pop cycle. Only an append resets it.
 
+**One row of the dispatch trace argues this better than the paragraphs above it.** `↓` is bound on two targets — it moves the completion menu's highlight, and it moves focus from the prompt into the live block's rows. Press it with a menu open and it goes to the menu; dismiss the menu and press it again and focus enters the table. Nothing tracked the change, nothing was notified, and no handler asked which mode the session was in: the menu's presence on C15's stack *is* the fact, and `activeTarget` reads it on the way past.
+
+A stored focus gets this right until the one path that forgets to update it — and the symptom is not a crash but `↓` scrolling a table the user cannot see while they stare at a menu.
+
 Everything else is derived from something visible. The precise claim is therefore: focus is derived from visible state plus exactly one stored location, whose owner and reset condition are both named. A second piece of stored focus would be a design change, not an implementation detail.
 
 ---
@@ -114,11 +118,19 @@ interface InputRouter {
 ```
 
 ```
-1  in-flight verb + Ctrl-C          → cancel, consume        (§5)
-2  handlers for activeTarget()      → first consumer wins
-3  handlers for "global"            → shortcuts
-4  otherwise                        → dropped
+0  the exit-arming machine observes    → always, before anything (§7)
+1  in-flight verb + Ctrl-C            → cancel, consume         (§5)
+2  handlers for activeTarget()        → first consumer wins
+3  handlers for "global"              → shortcuts, unless a
+                                        non-dismissable layer is on top
+4  otherwise                          → dropped
 ```
+
+**Step 3 is skipped when the top layer is non-dismissable, and this is a rule rather than six special cases.** A layer that must be answered is modal, and a global shortcut firing beneath one acts on a surface the user cannot see — the same defect as a missing rung, one layer up.
+
+It is deliberately *not* "skipped whenever an overlay is on top". A completion menu is dismissable, and switching theme or scrolling beneath one costs nothing and surprises nobody. `dismissable: false` is the property that means must-be-answered, which is why C15 refuses to let it change mid-life (C15 §2): a modality gate that depended on *when* it looked would be the same defect this closes.
+
+**I8 is an instance of this, not a rule of its own.** It was written about Ctrl-C, and Ctrl-C was simply the first key anyone traced past a confirm; every other global binding walked through the same door until this step existed.
 
 ### Mouse events route by position, not focus
 
@@ -160,6 +172,12 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 | Focus in the live block | Return focus to the prompt, keeping the input; a second Ctrl-C then takes the prompt rungs |
 | Prompt with text | Clear the input |
 | Prompt empty | Arm the exit confirm; a second within 500 ms raises it |
+
+> **This table documents derived behaviour. It is not a specification, and it is not implemented as a list.** Rungs 3 to 7 are handlers registered on `overlay`, `copyMode`, `pushedView` and `liveBlock`, so the order below **is** `activeTarget`'s order (§3) and the two cannot disagree. Rungs 1 and 2 are the exceptions and stay pre-dispatch, because a verb in flight and a shell child are not focus targets and so have no target to register on.
+>
+> Said this loudly because the alternative already happened. The order defect corrected below existed *only* because the ladder was written as an independent table, and a second priority list beside the first will drift from it again — through the same door, on the next edit that touches one and not the other. If this table ever disagrees with §3, §3 is right and this is stale.
+>
+> **One consequence: the rung reachability table below becomes derivable.** A rung with no constructible state is now a *target* with no constructible state, which `activeTarget`'s own tests already cover. That is a check moving from hand-maintained to structural, which is the trade this component keeps making.
 
 **Both overlay rungs sit above copy mode, and the order is not this spec's to choose.** A02 §2 and C14 §6 both put `overlay` above `copyMode` — "a confirm raised over copy mode still wins" — and an earlier draft of this table had copy mode above both. A ladder that disagrees with focus priority is two answers to "what does this key mean now", and the one that loses is whichever the reader did not consult.
 
@@ -262,10 +280,14 @@ Two small machines, both with an injected clock.
 
 **Exit arming**
 
-| From ↓ / event → | Ctrl-C at empty prompt | any other key | 500 ms elapse |
+| From ↓ / event → | Ctrl-C at empty prompt | any other **input** | 500 ms elapse |
 |---|---|---|---|
 | **idle** | → armed (T1.9) | idle | — |
 | **armed** | → confirm raised (T1.10) | → idle (T3.8) | → idle (T3.9) |
+
+**"Any other input", not "any other key", and the widening is not pedantry.** A paste is input and a click is input, and the original wording answered for neither. Ctrl-C, a five-thousand-character paste, Ctrl-C — under the narrow reading the second raises the exit confirm, which is the wrong answer to a sequence nobody would read as a double-tap.
+
+**The machine observes every event before dispatch, and disarms even when a handler consumes the event** (§4 step 0). This is the sharper half. The natural implementation registers the disarm as a handler, which is wrong in a way that surfaces only when a *consumed* key fails to disarm — a two-keystroke window that no test hits by accident, and whose symptom is an exit confirm appearing after the user typed something in between. Arming state is a property of the session, not of whoever happened to want that keystroke.
 
 **Paste buffering** (bracketed paste available)
 
@@ -285,7 +307,7 @@ Two small machines, both with an injected clock.
 - **I5** — Unconsumed events are dropped, never inserted into a lower target.
 - **I6** — A paste emits one `paste` event regardless of length.
 - **I7** — Cancellation of an in-flight verb outranks every other Ctrl-C meaning.
-- **I8** — Ctrl-C never dismisses a non-dismissable overlay, **and never acts on anything beneath one**. The second clause is the load-bearing half and the original wording lacked it: forbidding only the dismissal leaves every lower rung reachable, so Ctrl-C on an unanswered confirm exits the copy mode or pops the view behind it and changes a screen the user is not looking at. Not dismissing the confirm is small comfort when the thing under it moved.
+- **I8** — **While a non-dismissable layer is on top, no event acts on anything beneath it.** It is never dismissed, no lower focus target is reached, and the `global` fallback does not run (§4 step 3). The invariant was originally about Ctrl-C alone, and Ctrl-C was only the first key traced past a confirm — forbidding the dismissal left every lower rung and every global shortcut reachable, so an unanswered confirm sat over a screen that had changed theme, scrolled, or entered copy mode. Not dismissing the confirm is small comfort when the thing under it moved.
 - **I9** — C16 reads no ambient clock; timing is injected.
 - **I10** — The keymap is data; duplicate `(target, key)` bindings fail at construction.
 - **I11** — C16 never calls the frame scheduler. L4 commits.
@@ -306,7 +328,7 @@ Two small machines, both with an injected clock.
 5. No chord support beyond modifiers — terminals send no key-up (I14).
 6. Exactly one handler consumes an event; unconsumed events are dropped (I4, I5).
 7. Ctrl-C cancels an in-flight verb ahead of every other meaning (I7).
-8. Ctrl-C never dismisses a confirm, and never reaches past one to the screen beneath (I8).
+8. Nothing reaches past a non-dismissable layer — not Ctrl-C, not a lower target, not a global shortcut (I8).
 9. Ctrl-D at an empty prompt confirms exit; with text it does nothing (I16).
 10. Double-tap timing is 500 ms on an injected clock (I9).
 11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I26).
@@ -338,6 +360,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.11** (I7): Ctrl-C with a verb in flight → cancel is invoked and no other handler runs.
 - **T1.12** (I8): Ctrl-C with a non-dismissable overlay on top → no-op.
 - **T1.12b** (I8): Ctrl-C with a confirm raised over copy mode → no-op, and copy mode is **still active**. The pair, not the first of it: moving only the dismissable rung above copy mode passes T1.12 and fails this.
+- **T1.12c** (I8): a key bound on `global` — a theme switch — pressed while a non-dismissable layer is on top → the global handler is **not** called. With a *dismissable* layer on top the same key does reach it, which is what makes this a test of `dismissable` rather than of "an overlay exists".
 - **T1.13**: Ctrl-D at an empty prompt arms the same confirm; with text present it is a no-op.
 - **T1.14** (I5): Ctrl-C with focus in the live block and text in the prompt → focus returns to `{at: "prompt"}` and **the buffer is unchanged**. The buffer assertion is the one that matters: without the rung this passes the focus half by accident and clears the input, which is a side effect on a surface the user is not looking at.
 - **T1.14b**: a second Ctrl-C after T1.14 → clears the input, exactly as rung 8 would have from the prompt. The rung defers the prompt behaviour rather than replacing it.
@@ -363,6 +386,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T3.6**: a second start marker while buffering → ignored, not nested.
 - **T3.7**: the timing heuristic with `bracketedPaste: false` — 12 characters in 20 ms → one paste; 3 characters in 200 ms → three keys.
 - **T3.8**: any key between two Ctrl-Cs → disarms.
+- **T3.8b**: a **paste** between two Ctrl-Cs disarms; a **mouse click** between two Ctrl-Cs disarms. The two event kinds the original "any other key" did not answer for.
+- **T3.8c**: a key between two Ctrl-Cs that a handler **consumes** still disarms — a spy confirms the handler ran and returned true, and the second Ctrl-C arms afresh rather than raising the confirm. The test that separates a machine observing before dispatch from one living in a handler; the latter passes T3.8 and fails this.
 - **T3.9**: 501 ms between two Ctrl-Cs → disarms; the second arms afresh.
 - **T3.10**: three Ctrl-Cs in rapid succession → one confirm, not two.
 - **T3.11**: Ctrl-C during a piped `shell` child → `SIGINT` forwarded, no local handler runs.
@@ -402,6 +427,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.3** (I7): letting an overlay consume Ctrl-C ahead of an in-flight verb → T1.11 fails.
 - **T6.4** (I8): allowing Ctrl-C to dismiss a confirm → T1.12 fails.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
+- **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.
+- **T6.4d** (I4, §5): reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails *today*, and the ladder is free to drift from `activeTarget` on the next edit that touches one and not the other. Named because it is the change that produced the original order defect, and because a fail-on-revert test that cannot be written is worth saying so about: the guard is structural, and T2.5's exhaustiveness over `FocusTarget` is what carries it.
+- **T6.13b** (§7): registering the disarm as a handler rather than observing before dispatch → T3.8c fails, and an exit confirm appears after the user typed something in between.
 - **T6.5** (I4): broadcasting to every handler → T1.7 fails and actions fire twice.
 - **T6.6** (I5): falling through to the prompt on an unconsumed key → T1.8 fails and typing in the dashboard edits the hidden prompt.
 - **T6.6b** (I5): deleting the live-block rung so Ctrl-C falls through to the prompt rungs → T1.14 fails, and Ctrl-C while navigating a table clears an input the user cannot see. The same defect as T6.6, arriving through an omission rather than through a broadcast.
