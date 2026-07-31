@@ -367,6 +367,7 @@ test rather than as its steps: the sequence is what the invariants do not constr
 ### Tier 1 — unit
 
 - **T1.1** (I1): inserting into an empty buffer places the cursor after the inserted graphemes.
+- **T1.1b** (I2): inserting *into* a buffer of wide clusters splits at a cluster boundary — mid-CJK and between two family emoji. Added by the mutation pass: replacing the grapheme split with a code-unit slice killed only the fuzz test, because every other insertion happened at position 0 or at the end, where the two indices coincide.
 - **T1.2** (I2): `charRight` across a ZWJ emoji moves one position, not four.
 - **T1.3** (I2): `charRight` across a combining mark moves past base plus mark as one.
 - **T1.4** (I2): `deleteBackward` on an emoji removes the whole cluster.
@@ -430,12 +431,16 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T4.1** (with C16): printable keys insert; a `paste` event inserts atomically as one undo unit.
 - **T4.2** (with C16): `Alt-Enter` and `Ctrl-J` both insert a newline on a terminal that cannot distinguish `Shift-Enter`.
 - **T4.3** (with C09): `displayRows` and `cursorCell` use the same `cells()` as every block, so the prompt and transcript agree on width.
+- **T4.2b** (with C16): a bare `Enter` inserts nothing. The half that fails if `\r` is ever mapped to Ctrl-J to make T4.2 pass, which is the shortest route to a green T4.2 and would make Enter stop submitting.
+- **T4.3b** (with C09): the gutter is added to `cells()` rather than folded into it — the row carries no gutter and the column includes it.
 - **T4.4** (with C18): the buffer is classified without C18 mutating it.
 - **T4.5** (with C19): the cursor position determines the completion context; accepting a candidate inserts as one undo unit.
 - **T4.6** (with C20): history navigation calls `setText`; the typed draft is restored on return, cursor included.
 - **T4.7** (with L4): the prompt's rendered height equals `displayRows`, so the viewport height is correct — asserted on the frame, not the editor.
 
 ### Tier 5 — e2e
+
+All five need a running shell and are deferred on L4, in the form `todo-expiry` reads, so they expire on the commit that makes `src/shell/session.ts` real. The properties are not deferred with them: T5.2's paste-is-one-command and T5.3's cursor-lands-where-the-user-sees-it are asserted at tiers 1 to 4 against the editor, and what waits is the half only visible from outside — that the frame agrees.
 
 - **T5.1**: typing, correcting with word motions, and submitting a long flagged command.
 - **T5.2**: pasting a 200-line block → the prompt grows, the viewport shrinks correspondingly, and submission sends one command.
