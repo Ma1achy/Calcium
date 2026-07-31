@@ -38,6 +38,7 @@ import { createEngine } from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
 import { createKeymap, defaultKeymap } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
+import type { InputEvent } from "../interaction/router/types.js";
 import { openHistory } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { createFrameScheduler } from "../terminal/frame-scheduler.js";
@@ -64,6 +65,7 @@ export const STEPS = Object.freeze([
   "runner",
   "lifecycle",
   "scheduler",
+  "resize",
   "router",
   "pipeline",
   "register",
@@ -298,6 +300,26 @@ export async function constructGraph(
     }),
   );
 
+  // --- 8a. the two cross-layer effects C22 owns (A02 Seam 4) ----------------
+  //
+  // Both are pushes *from* C22 rather than reaches *by* the component, which is
+  // the whole of Seam 4: C14 never calls the scheduler and never learns its own
+  // width, and C01 never knows a viewport exists.
+  //
+  // **The anchor is captured before the cache is dropped** — C14's `resize`
+  // does that internally (C14 I8), which is why this hands over one snapshot
+  // and does not compute anything from it.
+  at("resize", () => {
+    lifecycle.onResize((size) => {
+      stores.viewport.resize({ width: size.columns, height: size.rows });
+      scheduler.commit("resize");
+    });
+    // `SIGCONT` re-acquires and says so through `onResume`; C01 sets no
+    // contamination flag (C01 §Signals), so the invalidate is C22's to issue —
+    // exactly as it is after an orchestrated `resume()`.
+    lifecycle.onResume(() => void scheduler.invalidate());
+  });
+
   // --- 9. the input router --------------------------------------------------
   const router = at("router", () =>
     createRouter({
@@ -333,6 +355,16 @@ export async function constructGraph(
       pipeline?.submit(stores.editor.text);
       return true;
     });
+
+    // Scroll is Seam 4's C22 row: C14 moves and **C22 commits** (C14 I12). A
+    // viewport that committed its own frame would be L2 reaching into L0.
+    router.register("global", (e) => {
+      const move = scrollAmount(e);
+      if (move === null) return false;
+      move(stores.viewport);
+      scheduler.commit("input");
+      return true;
+    });
   });
 
   return Object.freeze({
@@ -351,6 +383,32 @@ export async function constructGraph(
     session,
     log: Object.freeze([...log]),
   });
+}
+
+/**
+ * The scroll bindings, as a lookup from event to motion.
+ *
+ * A table rather than a chain of `if`s for C01's transition-table reason: five
+ * rows are checkable against C14's interface by reading, and a chain gets one
+ * of them wrong. `null` means "not a scroll", which is what lets the handler
+ * decline without consuming (C16 I5).
+ */
+type Scroller = ReturnType<typeof createViewport>;
+
+const WHEEL_ROWS = 3;
+
+function scrollAmount(e: InputEvent): ((v: Scroller) => void) | null {
+  if (e.kind === "key" && !e.key.ctrl && !e.key.meta) {
+    if (e.key.name === "pageup") return (v) => void v.pageUp();
+    if (e.key.name === "pagedown") return (v) => void v.pageDown();
+    if (e.key.name === "home") return (v) => void v.scrollToTop();
+    if (e.key.name === "end") return (v) => void v.scrollToBottom();
+  }
+  if (e.kind === "mouse" && e.press) {
+    if (e.button === "wheelUp") return (v) => void v.scrollBy(-WHEEL_ROWS);
+    if (e.button === "wheelDown") return (v) => void v.scrollBy(WHEEL_ROWS);
+  }
+  return null;
 }
 
 /**

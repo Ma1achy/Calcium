@@ -2,8 +2,249 @@
  * Composition root. The only place a clock or fs enters.
  *
  * C22 — see spec.
- * Implement to the spec's commitments and invariants; cite invariant
- * numbers in tests. If the spec is wrong, change the spec first.
+ *
+ * **This file is A03 SS1's entire allow-list**, which is why the three ambient
+ * reads are gathered at the top and passed down as an `Ambient` record rather
+ * than reached for at their point of use. `config.ts` takes the clock as an
+ * argument for exactly that reason: widening the list to two files is the
+ * smaller diff and the worse one.
+ *
+ * The two things it must get exactly right are ordering (§3, and `construct.ts`)
+ * and shutdown (§8, below).
  */
 
-export {};
+import { appendFileSync } from "node:fs";
+import { access, appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
+import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
+import { drawFallback, tooSmall } from "./fallback.js";
+import { compose, type Composed } from "./frame.js";
+import { createIdentityLoop } from "./identity.js";
+import {
+  SessionStateError,
+  type FileSystem,
+  type SessionSnapshot,
+  type SessionState,
+  type StopReason,
+  type TuiConfig,
+  type TuiInstance,
+} from "./types.js";
+
+/**
+ * §8 step 4 — the caller's code, per caller.
+ *
+ * `interrupt` is 130 and `signal` 143 because C01 §Signals is 128 + signal per
+ * signal, not one code for all three: a fixed 130 tells a supervisor the user
+ * pressed Ctrl-C when the supervisor is what killed the process, which is the
+ * one question an exit code exists to answer.
+ */
+const EXIT_CODES: Readonly<Record<StopReason, number>> = Object.freeze({
+  exit: 0,
+  eof: 0,
+  interrupt: 130,
+  signal: 143,
+  fault: 1,
+});
+
+/**
+ * The real filesystem. `node:fs` at the boundary, and C22 is the boundary
+ * (A04 §2) — no scan forbids it here and every layer below is forbidden it.
+ */
+const nodeFileSystem: FileSystem = {
+  readFile: (path) => readFile(path, "utf8"),
+  writeFile: (path, data) => writeFile(path, data, "utf8"),
+  appendFile: (path, data) => appendFile(path, data, "utf8"),
+  appendFileSync: (path, data) => appendFileSync(path, data, "utf8"),
+  mkdir: async (path) => void (await mkdir(path, { recursive: true })),
+  exists: (path) =>
+    access(path).then(
+      () => true,
+      () => false,
+    ),
+};
+
+/** The three ambient reads, in the one file allowed to perform them. */
+function ambient(): Ambient {
+  return { clock: () => Date.now(), cwd: process.cwd(), fs: nodeFileSystem };
+}
+
+export function createTui(config: TuiConfig): TuiInstance {
+  // **Step 1, and nothing else** (I7a). Validation needs nothing constructed
+  // and a bad config should fail at the call site; steps 2 to 11 run inside
+  // `start()`, because step 3 may read a manifest from a path and a constructor
+  // cannot await.
+  return new Session(resolveConfig(config, ambient()));
+}
+
+class Session implements TuiInstance {
+  #state: SessionState = "created";
+  #graph: Graph | null = null;
+  #identity: ReturnType<typeof createIdentityLoop> | null = null;
+  /** §8's idempotency. `stop` twice is a no-op, not a second release (T1.10). */
+  #stopping: Promise<number> | null = null;
+
+  constructor(private readonly config: ResolvedConfig) {}
+
+  get session(): SessionSnapshot {
+    return this.#graph?.session.snapshot ?? emptySnapshot(this.config);
+  }
+
+  async start(): Promise<void> {
+    // §9's two illegal cells. `stopped` is terminal, matching C01's released
+    // state — a second session constructs a new instance (I16).
+    if (this.#state === "stopped") throw new SessionStateError("start", this.#state);
+    if (this.#state === "running") return; // T3.2 — nothing constructed twice.
+
+    this.#graph = await constructGraph(this.config, {
+      stop: (reason) => this.stop(reason),
+      render: () => this.#render(),
+      repaint: () => this.#render(),
+      frame: this.#frameQueries(),
+      onFatal: (err) => {
+        // C01's only fatal case, and it has already unwound what it held
+        // (C01 §3). Nothing runs after this.
+        throw err;
+      },
+    });
+
+    this.#state = "running";
+
+    // **Gate 4 defers rather than aborts** (I8). The graph is built, the
+    // fallback is drawn on the *primary* screen — nothing was acquired, so
+    // there is no alternate screen to draw into — and a resize continues from
+    // startup step 5 with session state intact.
+    const size = this.#graph.lifecycle.size();
+    if (tooSmall(size)) {
+      drawFallback(size, (s) => void this.config.stdout.write(s));
+      this.#graph.lifecycle.onResize((next) => {
+        if (!tooSmall(next)) this.#open();
+      });
+      return;
+    }
+
+    this.#open();
+  }
+
+  /** Startup steps 5 to 8, reached at launch or after a resize (I8). */
+  #open(): void {
+    const graph = this.#graph;
+    if (graph === null || graph.lifecycle.acquired) return;
+
+    graph.lifecycle.acquire();
+    graph.scheduler.commit("input");
+
+    // Step 7, non-blocking: input is accepted whatever this does, and neither
+    // it nor the first frame waits on a fetch (I18). `start()` never awaits it.
+    //
+    // The fetcher is a stub until the app supplies one — C22 §7 owns the
+    // cadence and the state, and the auth flow itself is the far side's (§13).
+    this.#identity = createIdentityLoop({
+      fetch: () => Promise.resolve(null),
+      writes: graph.session.refresh,
+      now: this.config.clock,
+      notify: () => undefined,
+      schedule: (fn, ms) => {
+        const t = setTimeout(fn, ms);
+        return { [Symbol.dispose]: () => void clearTimeout(t) };
+      },
+    });
+    this.#identity.start();
+  }
+
+  /**
+   * §8 — four steps, and **three of the five callers** (I4).
+   *
+   * `signal` and `fault` do not arrive here. They are C01's: `signalExit` and
+   * `fault` release, write diagnostics and `process.exit` inside the handler,
+   * and C01 exposes no signal hook. **The function all five share is
+   * `beforeRelease`**, wired at construction step 7, which is what makes
+   * cleanup once-only on every path rather than on the three that reach this.
+   *
+   * `session.stopping` is therefore unset on those two, and that is safe for
+   * one reason only: `process.exit` runs synchronously inside the handler, so
+   * no submission can interleave (I4a). Nothing here may become the thing that
+   * makes either path asynchronous.
+   */
+  stop(reason: StopReason): Promise<number> {
+    this.#stopping ??= this.#runStop(reason);
+    return this.#stopping;
+  }
+
+  #runStop(reason: StopReason): Promise<number> {
+    const code = EXIT_CODES[reason];
+    const graph = this.#graph;
+
+    // T1.9, T3.15 — nothing acquired, no cleanup, and **no flag says so**:
+    // there is no lifecycle to release, because construction never reached
+    // step 7. The absence is structural rather than recorded (§8a).
+    if (graph === null) {
+      this.#state = "stopped";
+      return Promise.resolve(code);
+    }
+
+    // 1 — C23 refuses further submissions. Before the release, so a submission
+    // racing shutdown loses the race (T3.19).
+    graph.session.beginStopping();
+    this.#identity?.stop();
+
+    // 2 — release, which runs `beforeRelease` (the cleanup) and then restores
+    // the terminal. C01's own guard makes the cleanup once-only.
+    graph.lifecycle.release();
+
+    // 3 — diagnostics, **only now**, on the restored primary screen. A stack
+    // printed onto the alternate screen is discarded when the screen is
+    // released, so the dev sees a flash and an empty shell (I6). C02's warnings
+    // wait here for the same reason (C02 §2).
+    for (const line of graph.capabilityWarnings) this.config.stdout.write(`${line}\n`);
+
+    // 4 — the caller's code, returned rather than exited: the caller owns the
+    // process, and a library that calls `process.exit` cannot be embedded.
+    this.#state = "stopped";
+    return Promise.resolve(code);
+  }
+
+  #render(): void {
+    void this.#composed();
+  }
+
+  #frameQueries(): FrameQueries {
+    return {
+      copyMode: () => false,
+      exitCopyMode: () => undefined,
+      entryAtRow: () => null,
+      region: () => this.#composed().region,
+      overlayRegion: () => this.#composed().overlayRegion,
+      mouseEnabled: () => this.#graph?.capabilities.mouse ?? false,
+      // Ctrl-C and Ctrl-D raise a confirm; answering it is what stops. Until
+      // C15's confirm layer is composed here, the rung stops directly, which is
+      // the behaviour minus the question.
+      raiseExitConfirm: () => void this.stop("eof"),
+    };
+  }
+
+  #composed(): Composed {
+    const graph = this.#graph;
+    return compose({
+      chrome: this.config.chrome,
+      session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
+      now: this.config.clock,
+      size: () => graph?.lifecycle.size() ?? { columns: 80, rows: 24 },
+      promptRows: () => 1,
+    });
+  }
+}
+
+/** What `session` reads before the graph exists — §9's `created` state. */
+function emptySnapshot(config: ResolvedConfig): SessionSnapshot {
+  return Object.freeze({
+    cwd: config.cwd,
+    env: Object.freeze({}),
+    lastUuid: null,
+    identity: null,
+    cluster: config.cluster,
+    health: "live" as const,
+    version: config.version,
+    retained: null,
+    stopping: false,
+  });
+}

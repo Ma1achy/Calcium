@@ -138,6 +138,6 @@ describe("C13 integration", () => {
     // C20 landed, and its half of this is asserted in test/e2e/history.test.ts:
     // nothing in `clear()` touches a transcript. What is missing is the command
     // that drives both, which is the shell's.
-    "T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C22",
+    "T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C23 — `/clear` is a local handler and C23 holds the registry (C23 §2)",
   );
 });

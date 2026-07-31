@@ -4,7 +4,11 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const SUITE = "test/unit/session-construct.test.ts";
+const SUITE = [
+  "test/unit/session-construct.test.ts",
+  "test/integration/lifecycle.test.ts",
+  "test/integration/viewport.test.ts",
+].join(" ");
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -27,6 +31,28 @@ const results = runPass({
     why: "T1.1 compares the log against STEPS, so reordering STEPS cannot pass",
   },
   mutations: [
+    {
+      // Seam 4's C22 rows: the shell pushes, the component never reaches.
+      name: "wire the resize after the router instead of at 8a",
+      file: "src/shell/construct.ts",
+      from: '  at("resize", () => {\n    lifecycle.onResize',
+      to: '  at("router", () => undefined);\n  at("resize", () => {\n    lifecycle.onResize',
+      expect: "T1.1",
+    },
+    {
+      name: "let C14 hear the resize itself instead of being handed it",
+      file: "src/shell/construct.ts",
+      from: "      stores.viewport.resize({ width: size.columns, height: size.rows });",
+      to: "      // the viewport is left to find out on its own",
+      expect: "T4.6",
+    },
+    {
+      name: "commit the scroll from nowhere — C14 moves and nothing paints",
+      file: "src/shell/construct.ts",
+      from: "      move(stores.viewport);\n      scheduler.commit(\"input\");",
+      to: "      move(stores.viewport);",
+      expect: "T4.8",
+    },
     {
       // **The mutation the 9/10/11 split exists for.** Registration moves back
       // in with the router, as the spec had it, and the submit handler closes

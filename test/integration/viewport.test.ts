@@ -4,7 +4,8 @@
 // C14 decides visibility from measured heights without rendering (I1); if measure
 // and render disagree by one row anywhere, the viewport is wrong in a way that
 // looks like content jumping as you scroll past it, three components from the cause.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { buildGraph } from "../support/session.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence, renderEntry, rowsDoc, wrappingDoc } from "../support/viewport.js";
@@ -117,10 +118,43 @@ describe("C14 integration", () => {
     expect(wide).toBe(measureSequence(store.entries[0]?.doc.blocks ?? [], 200));
   });
 
-  it.todo(
-    "T4.7 (with C01): a SIGWINCH snapshot drives one resize and the anchor is captured before the cache is dropped — waits on C22 — the same wiring T4.6 asserts from C01's side",
-  );
-  it.todo(
-    "T4.8 (with C03): a scroll causes the shell to issue one commit('input'), and a spy asserts C14 never calls the scheduler — waits on C22 — C22 registers the scroll handler and A02 Seam 4 now names it C22's row",
-  );
+  it("T4.7 (with C01, C22): a SIGWINCH drives one resize, through the shell", async () => {
+    // **The push is C22's and the reach is nobody's** (A02 Seam 4). C14 never
+    // learns its own width and C01 never knows a viewport exists; the shell
+    // hands one snapshot over, which is also what makes the anchor-before-cache
+    // ordering C14's own business (C14 I8) rather than a sequence spread across
+    // two components.
+    const { graph, resize } = await buildGraph({}, { columns: 100, rows: 30 });
+    for (let i = 0; i < 8; i += 1) graph.transcript.append(wrappingDoc(`e${i}`));
+    graph.lifecycle.acquire();
+
+    const wide = graph.viewport.scroll.totalRows;
+    resize({ columns: 40, rows: 30 });
+
+    expect(
+      graph.viewport.scroll.totalRows,
+      "narrower means more rows, so the resize reached the viewport",
+    ).toBeGreaterThan(wide);
+  });
+
+  it("T4.8 (with C03, C22): a scroll issues one commit, and C14 issues none", async () => {
+    // C14 moves, C22 commits (C14 I12). A viewport that committed its own frame
+    // would be L2 reaching into L0, which is the edge Seam 4 exists to prevent
+    // — and the spy is what makes "never" checkable rather than asserted.
+    const { graph } = await buildGraph({}, { columns: 100, rows: 8 });
+    for (let i = 0; i < 20; i += 1) graph.transcript.append(rowsDoc(3, `e${i}`));
+    graph.lifecycle.acquire();
+
+    const commit = vi.spyOn(graph.scheduler, "commit");
+    const before = graph.viewport.scroll.topRow;
+
+    const consumed = graph.router.dispatch({
+      kind: "key",
+      key: { name: "pageup", ctrl: false, meta: false, shift: false, sequence: "\u001b[5~" },
+    });
+
+    expect(consumed, "the shell's handler took it").toBe(true);
+    expect(graph.viewport.scroll.topRow, "and the viewport moved").not.toBe(before);
+    expect(commit.mock.calls, "exactly one, and it is an input commit").toEqual([["input"]]);
+  });
 });

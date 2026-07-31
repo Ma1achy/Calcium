@@ -117,6 +117,8 @@ Three things depend on that split, and none of them is served by constructing ea
  7  construct the lifecycle, passing
     onFatal and beforeRelease                C01 — installs signal handlers
  8  construct the frame scheduler             C03
+8a  wire the cross-layer effects C22 owns:
+    resize → viewport, resume → invalidate   A02 Seam 4
  9  construct the input router                C16
 10  construct the execution pipeline          C23 — seals the local registry
 11  register every handler                    C16, and 10's submit
@@ -148,6 +150,8 @@ Three orderings are load-bearing and the rest are incidental. §3a walks every p
 | 9 → 10 | the router, by the pipeline | C23's submit row ends `router.resetFocus()` (A02 Seam 4, C16 I2) | **constitutive** |
 | 10 → 11 | the pipeline, by the submit handler | **The cycle, and the defect this table found.** See below | **load-bearing in effect** |
 | 5 → 11 | C15, by `raiseExitConfirm` | The Ctrl-C and Ctrl-D rungs have nothing to raise; C16's ladder answers and nothing appears | **constitutive** |
+| 5, 8 → 8a | the viewport and the scheduler, by the resize subscription | Nothing, in effect: it is placed at the earliest point both halves exist, and the cost of placing it later is a resize arriving during construction and being dropped | **incidental** |
+| 8 → 11 | the scheduler, by the scroll handler | C14 moves and nothing paints — the frame is one scroll behind until an unrelated commit catches it up | **constitutive** |
 
 **The 9 / 10 / 11 split is a correction.** The step list read "9 construct the input router and register every handler · 10 construct the execution pipeline", and both halves are correct read alone. Together they require the prompt's submit handler — registered at 9 — to close over a pipeline that does not exist until 10, while the pipeline closes over the router for `resetFocus`. A construction cycle, invisible to a reader checking either statement on its own, and it would have surfaced during the build as a `undefined is not a function` on the first Enter.
 
@@ -429,7 +433,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 
 ### Tier 2 — contract / interface
 
-- **T2.1** (I4): for each of the five callers, the same **`beforeRelease`** runs — asserted by identity, not by behaviour. And the half the original line could not have covered: for the three explicit callers, the same `stop` runs, also by identity. Two assertions because there are two shared functions and five callers do not share the same one; asserting `stop` across all five is unsatisfiable, since C01 exposes no signal hook (§8a).
+- **T2.1** (I4, I5): **every exit path runs the same cleanup, exactly once** — `killAll` and `drain` each observed once, per path, whatever function got there. The property rather than the mechanism, because the mechanism differs: three callers reach `stop` and two are C01's, so no single function is shared by all five and an identity assertion has nothing to be about. The original line asserted `stop` by identity across all five and could not have passed, C01 exposing no signal hook (§8a). Identity is still asserted where it holds — the three explicit callers share one `stop` — but it is the weaker claim, and writing the property first is what stops the seam being reshaped to fit an assertion.
 - **T2.1b** (I4a): the signal and fault handlers are synchronous end to end — no `await` between the release and the exit, asserted on the source rather than by timing, because the failure is a submission interleaving and a test cannot make one land in the gap reliably.
 - **T2.2** (I6): on all five paths, the last release byte precedes the first diagnostic byte.
 - **T2.3** (I7): history is flushed on all five paths, including a thrown exception.

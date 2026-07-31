@@ -313,7 +313,25 @@ export function checkTodoExpiry(
  * accumulates. That is the whole mechanism: the list may exist, but it starts
  * from nothing and every entry costs a sentence.
  */
-export const ACKNOWLEDGED_BACKLOG = Object.freeze([]);
+export const ACKNOWLEDGED_BACKLOG = Object.freeze([
+  // **Two deferrals wait on C22's paint path, which is inside C22 and unbuilt.**
+  //
+  //   - `test/contract/surfaces.test.ts` — S01 §2's illustrated rows.
+  //   - `test/e2e/frame-scheduler.test.ts` T5.4 — edge-drag with no blank frame.
+  //
+  // `compose()` returns the frame's parts; nothing yet turns them into rows, so
+  // neither test has anything to assert against. Every other C22 deferral that
+  // came due on this commit was written (C01 T4.5 and T4.6, C14 T4.7 and T4.8)
+  // or moved to the component it was really waiting for (C13 T4.7 → C23).
+  //
+  // **The entry is coarser than the finding, and that is a known weakness.**
+  // A row is `"<rule> <file>"`, so this one silently covers a *third* deferral
+  // naming C22 in either file. The remedy is to keep it short-lived rather than
+  // to build per-test granularity for two rows: it goes when the paint path
+  // lands, and TD0 compares by equality, so a resolved entry left here fails
+  // just as loudly as a new expiry.
+  "TD2 src/shell/session.ts",
+]);
 
 /**
  * Components with no scaffold in the tree at all, each with its reason.

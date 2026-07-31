@@ -98,7 +98,7 @@ describe("the S-series' illustrated heights", () => {
   // unwritable, which is the failure this triage exists to prevent and is
   // indistinguishable from a row that expired correctly.
   it.todo(
-    "S01 §2 composes to its illustrated rows — waits on C22 — the frame is chrome and a prompt, which a constructed graph draws before anything runs",
+    "S01 §2 composes to its illustrated rows — waits on C22 — needs the paint path, not the graph: `compose` returns the frame's parts and nothing yet turns them into rows",
   );
   it.todo(
     "S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated rows — waits on C23 — every one of the five is a document some verb produced",

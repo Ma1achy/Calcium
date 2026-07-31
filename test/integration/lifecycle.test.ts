@@ -7,6 +7,8 @@
 // grep is the manual half; `tools/enforce/todo-expiry.mjs` is the half that
 // fails on its own.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildGraph } from "../support/session.js";
+import { rowsDoc } from "../support/viewport.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
@@ -161,12 +163,44 @@ describe("C01 integration", () => {
   it.todo(
     "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on L4",
   );
-  it.todo(
-    "T4.5: startup ordering — the composition root's steps 6, 7, 8 execute in that order, asserted by an event log — waits on C22 — the ordering is C22's own and needs nothing to have run",
-  );
-  it.todo(
-    "T4.6: a SIGWINCH snapshot propagates to the viewport, which clamps scroll against it — waits on C22 — C22 wires onResize to the viewport at construction",
-  );
+  it("T4.5 (with C22): handlers, then acquire, then paint — asserted as a sequence", async () => {
+    // A02 §3's 6 → 7 → 8, which is C22 §3's step 7 → acquire → first commit.
+    // **Asserted as an order, not as three facts**: each step happening is true
+    // under any permutation, and the invariant is about the sequence (A03 §2's
+    // ordered-structure class).
+    //
+    // 6 before 7 closes the window where terminal state is held with nothing
+    // registered to release it; 6 before 8 means a crash during first paint
+    // still restores.
+    const { graph, stdout, renders } = await buildGraph();
+
+    // 6 — the lifecycle exists, so its handlers are registered (C01 I3) …
+    expect(graph.log).toContain("lifecycle");
+    // … and 7 has not happened: nothing acquired, no byte, no frame.
+    expect([graph.lifecycle.acquired, stdout.output, renders()]).toEqual([false, "", 0]);
+
+    graph.lifecycle.acquire();
+    expect(stdout.output, "7 — the alternate screen").toContain(MODES.altScreenOn);
+
+    graph.scheduler.commit("input");
+    expect(renders(), "8 — and only now a frame").toBeGreaterThan(0);
+  });
+
+  it("T4.6 (with C22, C14): a SIGWINCH snapshot reaches the viewport", async () => {
+    // C01 states a fact and the shell decides what it means (A01 D53). The
+    // snapshot is coherent per signal (I12) and **C22 is what carries it across
+    // the layer** — C14 never reads a dimension and C01 never knows a viewport
+    // exists.
+    const { graph, resize } = await buildGraph({}, { columns: 100, rows: 30 });
+    for (let i = 0; i < 6; i += 1) graph.transcript.append(rowsDoc(4, `e${i}`));
+    graph.lifecycle.acquire();
+
+    const tall = graph.viewport.visible().entries.length;
+    resize({ columns: 100, rows: 10 });
+
+    // Height clamps what is on screen; the observable is that fewer entries fit.
+    expect(graph.viewport.visible().entries.length).toBeLessThan(tall);
+  });
   it("T4.7 (with C03): SIGCONT fires onResume, the shell invalidates, the next commit repaints", () => {
     const { scheduler, lifecycle, render, repaint } = wireScheduler();
     lifecycle.acquire();
