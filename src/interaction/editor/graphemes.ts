@@ -46,7 +46,13 @@ export function stripForBuffer(text: string): string {
       continue;
     }
     if (cp < 0x20 || (cp >= 0x7f && cp <= 0x9f)) continue;
-    out += ch;
+    // An unpaired surrogate, which is what a truncated UTF-8 read produces
+    // mid-cluster. Replaced rather than kept (T3.16): it is not text, it makes
+    // `text` invalid for anything downstream that re-encodes it, and a buffer
+    // holding one is a command that cannot be sent. Replaced rather than
+    // dropped, because a position silently vanishing from a paste is the same
+    // class as C09's wrap deleting a glyph.
+    out += cp >= 0xd800 && cp <= 0xdfff ? "\uFFFD" : ch;
   }
   return out;
 }

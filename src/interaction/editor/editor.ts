@@ -51,6 +51,14 @@ export interface LineEditor {
 
   /** The kill buffer, for tests and for C16's diagnostics. Not undo state (I16). */
   readonly killBuffer: string;
+  /**
+   * Stack depths, for diagnostics and for §7a's trace (C16's `lastStages`
+   * precedent). The trace's table has an undo column and a redo column, and a
+   * replay that asserts only text and cursor passes over a wrong grouping —
+   * which is exactly what happened before T1.19 was written.
+   */
+  readonly undoDepth: number;
+  readonly redoDepth: number;
 }
 
 class Editor implements LineEditor {
@@ -69,6 +77,14 @@ class Editor implements LineEditor {
 
   get killBuffer(): string {
     return this.#kill;
+  }
+
+  get undoDepth(): number {
+    return this.#history.undoDepth;
+  }
+
+  get redoDepth(): number {
+    return this.#history.redoDepth;
   }
 
   get lines(): readonly string[] {
@@ -102,11 +118,14 @@ class Editor implements LineEditor {
 
     const trailing = [...clean].pop() ?? "";
     const closes = classify(trailing) === "space";
+    // Before `edit`, not after: `edit` reads the kill-run flag to decide
+    // whether this joins the run's unit, so ending the run afterwards would let
+    // a keystroke merge into the kill it interrupted.
+    this.#history.endKill();
     this.#history.edit(
       this.#snapshot(),
       opts?.atomic === true ? "atomic" : closes ? "insertClosing" : "insert",
     );
-    this.#history.endKill();
 
     const { head, tail } = splitAt(this.#text, this.#cursor);
     this.#text = head + clean + tail;
@@ -115,16 +134,16 @@ class Editor implements LineEditor {
 
   deleteBackward(): void {
     if (this.#cursor <= 0) return;
-    this.#history.edit(this.#snapshot(), "structural");
     this.#history.endKill();
+    this.#history.edit(this.#snapshot(), "structural");
     this.#text = removeBetween(this.#text, this.#cursor - 1, this.#cursor);
     this.#cursor -= 1;
   }
 
   deleteForward(): void {
     if (this.#cursor >= count(this.#text)) return;
-    this.#history.edit(this.#snapshot(), "structural");
     this.#history.endKill();
+    this.#history.edit(this.#snapshot(), "structural");
     this.#text = removeBetween(this.#text, this.#cursor, this.#cursor + 1);
   }
 
@@ -211,9 +230,15 @@ class Editor implements LineEditor {
     this.insert(this.#kill, { atomic: true });
   }
 
+  /** Construction, not an edit: no unit is recorded (see `createEditor`). */
+  seed(text: string, cursor?: number): void {
+    this.#text = stripForBuffer(text);
+    this.#cursor = clamp(cursor ?? count(this.#text), count(this.#text));
+  }
+
   setText(text: string, cursor?: number): void {
-    this.#history.edit(this.#snapshot(), "structural");
     this.#history.endKill();
+    this.#history.edit(this.#snapshot(), "structural");
     this.#text = stripForBuffer(text);
     this.#cursor = clamp(cursor ?? count(this.#text), count(this.#text));
   }
@@ -255,7 +280,12 @@ class Editor implements LineEditor {
 
 export function createEditor(initial?: Readonly<{ text?: string; cursor?: number }>): LineEditor {
   const editor = new Editor();
-  if (initial?.text !== undefined) editor.setText(initial.text, initial.cursor);
+  // **Seeded, not edited.** `setText` would record an undo unit, so a fresh
+  // editor holding a history entry that restores the empty buffer — undoable
+  // before the user has typed anything, which is not the `clean` row of §7's
+  // table. T3.9 caught it: `yank` on an empty kill buffer correctly did
+  // nothing and `undo` still returned true.
+  if (initial?.text !== undefined) editor.seed(initial.text, initial.cursor);
   return editor;
 }
 

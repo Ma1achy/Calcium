@@ -417,6 +417,7 @@ export const OWNERS = [
  */
 export const TOPICS = {
   "adapter-registry": "C07",
+  editor: "C17",
   adapters: "C07",
   blocks: "C09",
   capabilities: "C02",

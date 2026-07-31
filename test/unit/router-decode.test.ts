@@ -60,6 +60,20 @@ describe("C16 §2 — key decoding", () => {
     ]);
   });
 
+  it("T1.3c (I17): a modified key carries the unmodified key's name", () => {
+    // `Alt-Enter` arrived as {name: "\r", meta: true} — the byte, not the name
+    // the keymap uses — so C17 I12's other terminal-independent newline binding
+    // also resolved against an event nothing produced. Both halves of I12 were
+    // broken in the decoder, in two different branches, and the keymap read as
+    // complete either way.
+    const { d } = decoder();
+    const events = feed(d, "\u001b\r");
+
+    expect(events).toEqual([
+      { kind: "key", key: { name: "enter", ctrl: false, meta: true, shift: false, sequence: "\u001b\r" } },
+    ]);
+  });
+
   it("T1.1: byte sequences decode to the documented keys", () => {
     const { d } = decoder();
     const cases: ReadonlyArray<readonly [string, Partial<Record<string, unknown>>]> = [

@@ -76,13 +76,29 @@ export class History {
     // the merge has just made unreachable.
     this.#redo = [];
 
-    if (boundary === "insert" && this.#open) return;
+    // Both insert kinds merge into an open unit; they differ only in what they
+    // leave behind. `insertClosing` merging and *then* closing is what makes
+    // the space join the word it terminates — pushing a unit for it instead
+    // makes `git commit -m` five units rather than three, which is the shape
+    // T1.19 caught: the trace asserted text and cursor and said nothing about
+    // stack depth, so the sequence replayed correctly over a wrong grouping.
+    if ((boundary === "insert" || boundary === "insertClosing") && this.#open) {
+      this.#open = boundary === "insert";
+      return;
+    }
 
     // A kill run is one unit (I16). The second and later kills of a run merge
     // into the unit the first opened, matching the one kill-buffer entry they
     // produce — undoing a two-kill run returns both words rather than half of
     // what the kill buffer holds.
-    if (boundary === "structural" && this.#killing && this.#open) return;
+    //
+    // **Not `&& this.#open`**, which was the first version and is wrong: a
+    // structural boundary closes the unit, so `#open` is already false when the
+    // second kill arrives and every kill in a run would have pushed. `#killing`
+    // is the whole condition, and it is only true because a kill already pushed
+    // — which is why every other operation calls `endKill()` *before* `edit()`
+    // rather than after, or a deletion mid-run would merge into the kill's unit.
+    if (boundary === "structural" && this.#killing) return;
 
     this.#push(before);
     this.#open = boundary === "insert";

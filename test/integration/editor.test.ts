@@ -1,0 +1,182 @@
+// C17 tier 4 — integration. Against a real C16 decoder, a real router with the
+// shipped keymap, and C09's real `cells()`.
+//
+// **The keymap is `defaultKeymap`, not one written here.** A test that builds
+// its own three newline rows has asserted its own arithmetic; the property is
+// that the table dispatch resolves and `/help` renders is the table that makes
+// multi-line input work (C16 §6, C17 I12).
+import { describe, expect, it } from "vitest";
+
+import { createDecoder } from "../../src/interaction/router/decode.js";
+import { createFocusStore } from "../../src/interaction/router/focus.js";
+import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { createRouter, type RouterDeps } from "../../src/interaction/router/router.js";
+import type { InputEvent } from "../../src/interaction/router/types.js";
+import { createEditor, type LineEditor } from "../../src/interaction/editor/index.js";
+import { cells } from "../../src/presentation/text.js";
+
+const G = { first: 2, cont: 2 } as const;
+const enc = new TextEncoder();
+
+/** A terminal that cannot distinguish Shift-Enter — the majority case (§4). */
+function plainTerminal(): ReturnType<typeof createDecoder> {
+  let t = 0;
+  return createDecoder({
+    capabilities: { bracketedPaste: true, mouse: false },
+    now: () => (t += 1000),
+  });
+}
+
+/**
+ * The wiring L4 will do: the router dispatches, a prompt handler applies the
+ * resolved action to the editor. Nothing here is a fake except the deps C17
+ * has no opinion about.
+ */
+function wire(editor: LineEditor): {
+  dispatch: (e: InputEvent) => boolean;
+} {
+  const keymap = createKeymap(defaultKeymap);
+  const focus = createFocusStore();
+  const deps: RouterDeps = {
+    overlayTop: () => null,
+    placed: () => [],
+    popLayer: () => {},
+    copyMode: () => false,
+    exitCopyMode: () => {},
+    liveEntry: () => null,
+    entryAtRow: () => null,
+    busy: () => false,
+    cancel: () => {},
+    shellChild: () => false,
+    signalShellChild: () => {},
+    region: () => ({ top: 0, height: 10 }),
+    mouseEnabled: () => false,
+    promptHasText: () => editor.text !== "",
+    clearPrompt: () => editor.clear(),
+    raiseExitConfirm: () => {},
+  };
+  const router = createRouter({ focus, keymap, now: () => 0, deps });
+
+  router.register("prompt", (e) => {
+    if (e.kind === "paste") {
+      // C16 T4.6 / C17 I5 — one event, one atomic edit.
+      editor.insert(e.text, { atomic: true });
+      return true;
+    }
+    if (e.kind !== "key") return false;
+
+    const binding = keymap.resolve("prompt", e.key);
+    if (binding?.action === "insertNewline") {
+      editor.insert("\n");
+      return true;
+    }
+    // A printable key. `space` is named rather than literal (C16 §2), which is
+    // the kind of thing L4's handler has to know and C17 deliberately does not.
+    if (!e.key.ctrl && !e.key.meta && e.key.name === "space") {
+      editor.insert(" ");
+      return true;
+    }
+    if (!e.key.ctrl && !e.key.meta && [...e.key.name].length === 1) {
+      editor.insert(e.key.name);
+      return true;
+    }
+    return false;
+  });
+
+  return { dispatch: (e) => router.dispatch(e) };
+}
+
+describe("C17 tier 4 — with C16", () => {
+  it("T4.1 (with C16): printable keys insert; a paste is one atomic undo unit", () => {
+    const editor = createEditor();
+    const { dispatch } = wire(editor);
+    const decoder = plainTerminal();
+
+    for (const event of decoder.push(enc.encode("ls "))) dispatch(event);
+    for (const event of decoder.push(enc.encode("[200~one\ntwo[201~"))) {
+      dispatch(event);
+    }
+
+    expect(editor.text).toBe("ls one\ntwo");
+    expect(editor.undo(), "the paste undoes as one").toBe(true);
+    expect(editor.text).toBe("ls ");
+  });
+
+  it("T4.2 (with C16): Alt-Enter and Ctrl-J both insert a newline", () => {
+    // On a terminal that cannot tell Shift-Enter from Enter, which is most of
+    // them (§4). Driven from *bytes* rather than from fabricated key events,
+    // because the defect this covers was in the decoder: `\n` decoded to
+    // `enter`, so the Ctrl-J row resolved against an event nothing produced.
+    const editor = createEditor();
+    const { dispatch } = wire(editor);
+    const decoder = plainTerminal();
+
+    for (const event of decoder.push(enc.encode("a"))) dispatch(event);
+    for (const event of decoder.push(enc.encode("\r"))) dispatch(event); // Alt-Enter
+    for (const event of decoder.push(enc.encode("b"))) dispatch(event);
+    for (const event of decoder.push(enc.encode("\n"))) dispatch(event); // Ctrl-J
+    for (const event of decoder.push(enc.encode("c"))) dispatch(event);
+
+    expect(editor.lines, "two terminal-independent newlines").toEqual(["a", "b", "c"]);
+    expect(editor.displayRows(80, G)).toBe(3);
+  });
+
+  it("T4.2b (with C16): a bare Enter is not a newline", () => {
+    // The other half, and the one that fails if `\r` is ever mapped to Ctrl-J
+    // to make the first half pass. Enter reaches no newline binding, so the
+    // prompt handler treats it as unbound and the buffer is unchanged.
+    const editor = createEditor();
+    const { dispatch } = wire(editor);
+    const decoder = plainTerminal();
+
+    for (const event of decoder.push(enc.encode("ls\r"))) dispatch(event);
+
+    expect(editor.text, "Enter submits; it does not insert").toBe("ls");
+  });
+});
+
+describe("C17 tier 4 — with C09", () => {
+  it("T4.3 (with C09): the editor and every block resolve width through one cells()", () => {
+    // The same implementation, not a second one that agrees today. Asserted
+    // over C09's adversarial corpus, at a width where each string wraps.
+    const corpus = [
+      "日本語です",
+      "👨‍👩‍👧 family",
+      "école",
+      "⚠️ warn",
+      "🇬🇧 flag",
+      "ábc",
+    ];
+
+    for (const text of corpus) {
+      const e = createEditor({ text });
+      const rows = e.layout(200, { first: 0, cont: 0 });
+
+      expect(rows, `${text} fits one row at 200`).toHaveLength(1);
+      // The editor's own idea of where the cursor ends up is a column, and it
+      // is `cells()` of the whole row. A second width implementation in the
+      // editor would differ here on exactly this corpus.
+      expect(e.cursorCell(200, { first: 0, cont: 0 }).col).toBe(cells(text));
+    }
+  });
+
+  it("T4.3b (with C09): the gutter is added to cells(), not folded into it", () => {
+    const e = createEditor({ text: "日本" });
+
+    expect(cells("日本")).toBe(4);
+    expect(e.cursorCell(80, G).col, "gutter plus width").toBe(6);
+    expect(e.layout(80, G)[0], "and the row itself carries no gutter").toBe("日本");
+  });
+});
+
+// Deferred, with the blocker in the greppable form the guard reads.
+it.todo("T4.4: the buffer is classified without C18 mutating it — waits on C18");
+it.todo(
+  "T4.5: the cursor position determines the completion context, and accepting a candidate inserts as one undo unit — waits on C19",
+);
+it.todo(
+  "T4.6: history navigation calls setText and the typed draft is restored on return, cursor included — waits on C20",
+);
+it.todo(
+  "T4.7: the prompt's rendered height equals displayRows, asserted on the frame rather than the editor — waits on L4",
+);

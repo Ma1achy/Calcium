@@ -276,8 +276,19 @@ export function createDecoder(options: DecoderOptions): Decoder {
 
     // ESC + printable is Meta (T1.1). Ink 7 no longer sets meta on a bare
     // Escape, which is why that case is decided above by the window and not here.
+    //
+    // **The character is named the same way it would be unprefixed** (I17). It
+    // was passed through raw, so `Alt-Enter` arrived as `{name: "\r", meta}`
+    // while the keymap — and every reader — calls that key `enter`. C17 I12
+    // names Alt-Enter as one of the two newline bindings that work everywhere,
+    // and it resolved against an event nothing could produce: the same defect
+    // as `\n` decoding to `enter`, one path over, and both were found by
+    // pressing the bindings rather than by reading the decoder.
     flushHeuristic(out);
-    return out.push(key(rest[0] as string, `\u001b${rest[0] as string}`, { meta: true })), 2;
+    const metaChar = rest[0] as string;
+    const named = namedControl(metaChar);
+    const name = named !== null && named.kind === "key" ? named.key.name : metaChar;
+    return out.push(key(name, `\u001b${metaChar}`, { meta: true })), 2;
   }
 
   function decodeCsi(i: number, rest: string, out: InputEvent[]): number {
