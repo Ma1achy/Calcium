@@ -84,6 +84,14 @@ describe("C18 tier 3 — the edges", () => {
     expect(args("/tail web:$_")).toEqual(["web:web:v3"]);
     expect(args(`/tail "a $_ b"`)).toEqual(["a web:v3 b"]);
     expect(args("/tail '$_'"), "single-quoted").toEqual(["$_"]);
+
+    // **A mixed token, and the mutation pass is what asked for it.** The
+    // exemption lives in two places — `needsExpansion` skips a wholly-literal
+    // token, and `expand` skips literal *parts* — and every case above is
+    // wholly one or the other, so the second half was never run. Breaking it
+    // failed nothing.
+    expect(args(`/tail '$_'$_`), "one literal run and one live one").toEqual(["$_web:v3"]);
+    expect(args(`/tail "$_"'$_'`)).toEqual(["web:v3$_"]);
   });
 
   it("T3.13: a pipe with an app command on both sides rewrites both", () => {

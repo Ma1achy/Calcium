@@ -575,7 +575,7 @@ Six tiers. No state machine — C18 is pure.
 - **T1.4** (I3): `/usr/bin/ls -la` → `shell`, not an unknown-verb error.
 - **T1.5**: `git status` → `shell`.
 - **T1.6**: `/serving scale web --replicas=3` → longest match on `serving scale`, residual `["web","--replicas=3"]`.
-- **T1.7**: `/pss` → `error` suggesting `/ps`; `/zzzzz` → `error` with no suggestion.
+- **T1.7** (I14): `/pss` → `error` suggesting `/ps`; `/zzzzz` → `error` with no suggestion; and the **boundary** — `/psxy` is two edits and suggests, `/psxyz` is three and does not. Without the boundary row nothing distinguishes a cutoff of 2 from one of 4, because every declining case in the list declines under all of them.
 - **T1.8** (I5): `/ps --json | jq .` → `shell` with command `prism ps --json | jq .`.
 - **T1.9**: `cd /tmp`, `pwd`, `export A=1` → `builtin`.
 - **T1.9b** (I9): `cd /tmp && make` → `builtinThenShell` with `rest` of `make`; the args are `["/tmp"]`, not the whole line.

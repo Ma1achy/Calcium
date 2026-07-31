@@ -158,6 +158,20 @@ describe("C18 §4, §5 — the rules", () => {
     expect(far.kind).toBe("error");
     if (far.kind !== "error") return;
     expect(far.error.message).not.toContain("did you mean");
+
+    // **The boundary, which nothing asserted.** `/zzzzz` is five edits from
+    // anything, so it declines under a cutoff of 2, 3 or 4 alike — raising the
+    // cap broke no test. `psxyz` is exactly three from `ps`: the first input
+    // whose answer changes when the number does.
+    const beyond = parse("/psxyz", ctx());
+    expect(beyond.kind).toBe("error");
+    if (beyond.kind !== "error") return;
+    expect(beyond.error.message, "distance 3 is beyond the cutoff").not.toContain("did you mean");
+
+    const inside = parse("/psxy", ctx());
+    expect(inside.kind).toBe("error");
+    if (inside.kind !== "error") return;
+    expect(inside.error.message, "distance 2 is inside it").toContain("did you mean");
   });
 });
 

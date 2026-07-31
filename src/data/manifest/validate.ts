@@ -149,7 +149,11 @@ export function suggestName(
   candidates: readonly string[],
 ): string | undefined {
   let best: string | undefined;
-  let bestDistance = 3; // ≤ 2 counts
+  // **This is the cutoff, and `distance`'s cap is not.** The cap prunes the
+  // matrix; raising it changes nothing observable, which a mutation pass
+  // demonstrated by surviving. The number that decides is here, and A01 A.2's
+  // "distance 2" means `d < 3`.
+  let bestDistance = 3;
   for (const candidate of candidates) {
     const d = distance(name, candidate, 2);
     if (d < bestDistance) {
