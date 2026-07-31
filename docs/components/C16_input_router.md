@@ -296,6 +296,23 @@ Two small machines, both with an injected clock.
 | **normal** | → buffering (T1.4) | dispatch as keys | ignored (T3.5) |
 | **buffering** | ignored (T3.6) | buffered, not dispatched (T1.5) | → normal, emit one paste (T1.6) |
 
+**Paste heuristic** (`bracketedPaste: false`). A02 §7's completeness rule applies: a heuristic that accumulates keystrokes against a window owns a state machine, and §2 described it in prose without enumerating it.
+
+| From ↓ / input → | printable byte | escape byte | 30 ms window elapses |
+|---|---|---|---|
+| **idle** | → accumulating; buffered, window opens (T1.15) | decoded as a key; stays idle (T3.7b) | — |
+| **accumulating** | buffered; window unchanged (T3.7) | → idle: **buffer flushed as individual keys**, then the escape decodes normally (T3.7c) | → idle: more than 8 buffered emits one `paste`; 8 or fewer emit that many keys (T3.7) |
+
+**The escape cell is what prose left open.** §2 says "with no intervening escape" and does not say what becomes of the characters already accumulated. They are flushed as keys — an escape means the run was typing, and typed characters are keys. Discarding them would eat input, and emitting them as a paste would contradict the condition that just failed. The bracketed-paste table above answers its equivalent cell explicitly (T3.6); this one did not.
+
+**Two properties this table makes visible, both consequences rather than choices.**
+
+The window is measured **from the first buffered character, not from the last**, and that is what makes the heuristic discriminate: nine characters spread over 200 ms fall into separate windows of one or two and emit nine keys, while a paste's characters arrive inside a single window and emit one event. A gap-based timer instead of a fixed window fails exactly that case — 200 ms of typing has ~22 ms gaps, which is under the threshold, so the run would never close and nine keystrokes would become a paste.
+
+And **every printable is therefore delayed by up to 30 ms on this path**. That is unavoidable: a decision that depends on what arrives next cannot be made before it arrives, and nothing can un-send a key already dispatched. It is a second reason the §2 notice exists, and it is the honest reading of "the behaviour is approximate".
+
+> **Open, and named rather than decided.** I6 says a paste emits one event regardless of length. On the bracketed path that holds by construction. On this path a paste large enough to span more than 30 ms of arrival emits one event per window, so I6 holds for the sizes a terminal delivers in one or two chunks and not obviously beyond them. T3.1's 100,000 characters is the case that would settle it. Whether I6 is qualified for the heuristic path or the window extends while bytes keep arriving is a decision this spec has not taken.
+
 ---
 
 ## 8. Invariants
@@ -362,6 +379,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.12b** (I8): Ctrl-C with a confirm raised over copy mode → no-op, and copy mode is **still active**. The pair, not the first of it: moving only the dismissable rung above copy mode passes T1.12 and fails this.
 - **T1.12c** (I8): a key bound on `global` — a theme switch — pressed while a non-dismissable layer is on top → the global handler is **not** called. With a *dismissable* layer on top the same key does reach it, which is what makes this a test of `dismissable` rather than of "an overlay exists".
 - **T1.13**: Ctrl-D at an empty prompt arms the same confirm; with text present it is a no-op.
+- **T1.15**: a printable byte with `bracketedPaste: false` opens the window and is buffered rather than dispatched — the `idle → accumulating` cell.
 - **T1.14** (I5): Ctrl-C with focus in the live block and text in the prompt → focus returns to `{at: "prompt"}` and **the buffer is unchanged**. The buffer assertion is the one that matters: without the rung this passes the focus half by accident and clears the input, which is a side effect on a surface the user is not looking at.
 - **T1.14b**: a second Ctrl-C after T1.14 → clears the input, exactly as rung 8 would have from the prompt. The rung defers the prompt behaviour rather than replacing it.
 
@@ -384,7 +402,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T3.4**: an unterminated paste — start marker, then the stream stalls → after a 1 s timeout the buffer is flushed as a paste rather than swallowing input forever.
 - **T3.5**: an end marker with no start → ignored.
 - **T3.6**: a second start marker while buffering → ignored, not nested.
-- **T3.7**: the timing heuristic with `bracketedPaste: false` — 12 characters in 20 ms → one paste; 3 characters in 200 ms → three keys.
+- **T3.7**: the timing heuristic with `bracketedPaste: false` — 12 characters in 20 ms → one paste; **9 characters in 200 ms → nine keys**, asserted in the same test. The negative case is the positive control: a fixture that only ever sends a fast burst proves the timer exists and not that it discriminates, which is `test/support/README.md`'s rule in the place it is easiest to miss. Nine rather than three, because the count must exceed the threshold — three characters would emit keys under a heuristic that had no threshold at all.
+- **T3.7b**: an escape byte from idle → decoded as a key; no buffering begins.
+- **T3.7c**: an escape byte mid-run — six printables, then `Esc` → the six emit as six keys and the escape decodes normally. Neither discarded nor emitted as a paste. The cell §2's prose left open.
 - **T3.8**: any key between two Ctrl-Cs → disarms.
 - **T3.8b**: a **paste** between two Ctrl-Cs disarms; a **mouse click** between two Ctrl-Cs disarms. The two event kinds the original "any other key" did not answer for.
 - **T3.8c**: a key between two Ctrl-Cs that a handler **consumes** still disarms — a spy confirms the handler ran and returned true, and the second Ctrl-C arms afresh rather than raising the confirm. The test that separates a machine observing before dispatch from one living in a handler; the latter passes T3.8 and fails this.
@@ -428,7 +448,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.4** (I8): allowing Ctrl-C to dismiss a confirm → T1.12 fails.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.
-- **T6.4d** (I4, §5): reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails *today*, and the ladder is free to drift from `activeTarget` on the next edit that touches one and not the other. Named because it is the change that produced the original order defect, and because a fail-on-revert test that cannot be written is worth saying so about: the guard is structural, and T2.5's exhaustiveness over `FocusTarget` is what carries it.
+- **T6.4d** (I4, §5) — **structural guard, no failing test.** Reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails today, and the ladder is free to drift from `activeTarget` on the next edit touching one and not the other. Every other entry in this tier reads *change X → test Y fails*; this one names a change no assertion catches, and says so deliberately. Inventing an assertion that looked like a guard would be worse than pointing at the real one, which is **T2.5's exhaustiveness over `FocusTarget`**: while the rungs are handlers, a target with no binding is a compile-level gap, and the ladder cannot hold an order of its own to disagree with. Read this row as a signpost to that, not as an unfinished test (A02 §7).
 - **T6.13b** (§7): registering the disarm as a handler rather than observing before dispatch → T3.8c fails, and an exit confirm appears after the user typed something in between.
 - **T6.5** (I4): broadcasting to every handler → T1.7 fails and actions fire twice.
 - **T6.6** (I5): falling through to the prompt on an unconsumed key → T1.8 fails and typing in the dashboard edits the hidden prompt.

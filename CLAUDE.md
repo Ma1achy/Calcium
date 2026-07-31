@@ -108,6 +108,15 @@ Each of these produces code that compiles, passes review, and is wrong.
   producing a blank screen that every assertion passed. **A citation resolving against
   the wrong invariant**, which no mechanism can catch — `docs/COMMITMENT_INVARIANT_AUDIT.md`
   §Fourth pass says why one should not be built.
+  **C16 is the measured case: seven defects from two artefacts on one component, six of
+  them invisible to a reader checking statements one at a time, and all seven found
+  before any code existed.** The Ctrl-C rung table found three — a rung no state could
+  construct, an order contradicting A02 §2, and a missing rung that made the ladder
+  answer wrongly and silently. The dispatch trace found three — the `global` fallback
+  ignoring modality, the ladder being a second priority list at all, and an arming
+  machine that answered for one event kind of three. The seventh fell out of applying
+  the first ruling. Every one would have been a rewrite if found after the build, which
+  is the argument for this being scheduled rather than diligent.
   Where the component composes a frame, **read the frame, not only the numbers**: an
   arithmetically self-consistent viewport can still be describing a different document
   than the one it holds. And a fixture must be shown to respond to the thing under test

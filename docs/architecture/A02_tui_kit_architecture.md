@@ -353,6 +353,10 @@ Six tiers per component: unit, contract, edge, integration, e2e, fail-on-revert.
 
 The rule earns its place by finding gaps: applied to C01 it surfaced four untested transitions and forced an undecided question — whether a released instance can be re-acquired.
 
+**A fail-on-revert entry whose revert nothing catches is a signpost, not a gap.** The tier's usual form is *change X → test Y fails*, and some guards are structural rather than asserted: the change is possible, it breaks no test, and what prevents it is a shape in the code — an exhaustive union, a handler registration, a type that will not construct. C16 T6.4d is the first written this way, where reimplementing a ladder as an independent list would pass everything and merely be free to drift again.
+
+Those entries **say which category they are in and name the structure that carries them**, because read cold they are indistinguishable from a test nobody finished. The alternative is worse: inventing an assertion that looks like a guard puts a green tick where the protection is not, which is A03 §2's family arriving in the one tier written to prevent it.
+
 **The reference app is the acceptance signal for the framework**, not Prism.
 
 ---
@@ -376,6 +380,7 @@ The rule earns its place by finding gaps: applied to C01 it surfaced four untest
 15. A failed terminal acquire is the only fatal case, because it is the only failure with no place to render itself.
 16. Performance budgets in §7 are measured in M-T3, not asserted.
 17. Six test tiers, not seven. Behaviour cross-cuts scope and is carried by the existing tiers.
+17a. A fail-on-revert entry with no failing test names itself as a structural guard and names the structure, rather than reading as an unfinished one.
 18. Every stateful component enumerates its transition table; invalid transitions are tier-3 tests.
 19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one.
 20. **Every commitment cites an invariant, several, or another spec's.** §1's two rules for whose claim a commitment is are mechanical, not advisory: A03 SP1 fails the build on a commitment with no marker, on a citation naming an invariant its spec does not declare, and on a cross-reference that does not resolve. Self-referential deliberately — this is the document that states the rule, so it is the document that commits to it.
