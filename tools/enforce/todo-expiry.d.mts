@@ -9,9 +9,19 @@ export type Violation = {
   spec: string;
 };
 
-export type TodoEntry = {
-  file: string;
+export type TodoCall = {
   title: string;
+  /**
+   * Title assembled with `+` — TD5. Only the first fragment could be read.
+   *
+   * Optional so a fabricated entry may omit it and mean "not concatenated";
+   * `todoCalls` always sets it explicitly.
+   */
+  concatenated?: boolean;
+};
+
+export type TodoEntry = TodoCall & {
+  file: string;
 };
 
 export declare const COMPONENT_SOURCES: Readonly<Record<string, string>>;
@@ -27,7 +37,8 @@ export declare function blockersIn(title: string): readonly string[] | null;
 /** The clause, cut at an em dash, a period, or an unmatched closing paren. */
 export declare function blockerClause(text: string): string;
 
-export declare function todoTitles(source: string): string[];
+/** Every `it`/`test`/`describe` `.todo`/`.skip` call, past comments (A03 §9a). */
+export declare function todoCalls(source: string): TodoCall[];
 
 /** Exists, and holds more than the scaffold's `export {}`. */
 export declare function defaultIsImplemented(path: string): boolean;

@@ -151,7 +151,85 @@ export const LAYER_SOURCES = Object.freeze({
  */
 const IDENTIFIER = /\b(C\d{2}|L\d)\b/g;
 const WAITS_ON = /waits on/i;
-const TODO_TITLE = /\bit\.todo\s*\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`([^`]*)`)/gs;
+
+/**
+ * The **locator**, and it is the half of this parser that had never been tested.
+ *
+ * A03 §9a records three incidents, and all three are about the *clause* — what is
+ * read after "waits on", too wide on the left twice and too wide on the right
+ * once. This is the fourth, in the other half: reaching the title at all. The old
+ * form was one regex requiring a quote immediately after `it.todo(`, modulo
+ * whitespace, and it silently found nothing whenever anything else sat there.
+ *
+ * Five real deferrals were invisible to every TD rule because of it, and the
+ * shape is what makes it worth a scanner rather than a longer regex: a comment
+ * appears between `it.todo(` and its title exactly when someone has **re-triaged**
+ * that deferral and written down why. The rule stopped seeing precisely the
+ * deferrals that had been read most carefully. Both `/clear`'s and `/help`'s.
+ *
+ * Four forms it now reaches, each with a fabrication in the suite:
+ *
+ *   - a line comment, a block comment, or a trailing comment on the call line;
+ *   - `describe.todo` and `test.todo`, which have no instances today and are
+ *     legal vitest — `describe.todo` defers a whole block from one line, which is
+ *     the worst version of invisible;
+ *   - `it.skip` whose title declares a wait. **Ruled a deferral**: a skip that
+ *     says what it waits for is a deferral wearing a different verb, and
+ *     todo-means-unwritten / skip-means-written-and-not-run is a distinction the
+ *     blocker clause already makes moot. A skip with no clause names no blocker
+ *     and falls out through `blockersIn`'s empty array, which is the existing
+ *     behaviour for everything without one — so this adds a verb, not a path;
+ *   - a title built by `+` concatenation, which is **rejected rather than read**
+ *     (TD5). This is the one the obvious verification misses: a concatenated
+ *     title *is* located, so a count against `grep -c` passes, while `blockersIn`
+ *     sees only the first fragment and files it as declaring no wait. Exempt, and
+ *     counted as compliant. Joining the operands was the alternative and it is
+ *     the worse one — a clause split across the join would reassemble into
+ *     something no one wrote, and a rejection is visible where a truncation is not.
+ */
+const TODO_CALL = /\b(?:it|test|describe)\s*\.\s*(?:todo|skip)\s*\(/g;
+
+/** Whitespace and comments, from `i`. The reason the locator is a scanner. */
+function skipTrivia(source, i) {
+  for (;;) {
+    while (i < source.length && /\s/.test(source[i])) i += 1;
+    if (source.startsWith("//", i)) {
+      const nl = source.indexOf("\n", i);
+      i = nl === -1 ? source.length : nl + 1;
+    } else if (source.startsWith("/*", i)) {
+      const end = source.indexOf("*/", i + 2);
+      i = end === -1 ? source.length : end + 2;
+    } else {
+      return i;
+    }
+  }
+}
+
+/**
+ * One string literal at `i`, or `null` if that is not what is there.
+ *
+ * `null` covers `it.todo(someVariable)` and `it.skip(fn)` — a call with no
+ * literal title is not a deferral this rule can read, and it names no blocker, so
+ * it is not one this rule has anything to say about.
+ */
+function readStringLiteral(source, i) {
+  const quote = source[i];
+  if (quote !== '"' && quote !== "'" && quote !== "`") return null;
+
+  let out = "";
+  for (let j = i + 1; j < source.length; j += 1) {
+    const ch = source[j];
+    if (ch === "\\") {
+      out += source[j + 1] ?? "";
+      j += 1;
+    } else if (ch === quote) {
+      return { text: out, end: j + 1 };
+    } else {
+      out += ch;
+    }
+  }
+  return null;
+}
 
 /**
  * A source file counts as implemented when it exists AND carries more than the
@@ -166,14 +244,28 @@ export function defaultIsImplemented(path) {
   return body.replace(/export\s*\{\s*\}\s*;?/g, "").trim().length > 0;
 }
 
-/** Extract every `it.todo` title from a source string. */
-export function todoTitles(source) {
+/**
+ * Every deferral call in a source string, as `{ title, concatenated }`.
+ *
+ * Objects rather than strings, and that is the point of the change: a title the
+ * locator cannot read whole has to be *reportable*, and a string array has
+ * nowhere to say so. The old signature could only drop or truncate, and it did
+ * both.
+ */
+export function todoCalls(source) {
   const out = [];
-  TODO_TITLE.lastIndex = 0;
+  TODO_CALL.lastIndex = 0;
   let m;
-  while ((m = TODO_TITLE.exec(source))) {
-    out.push(m[1] ?? m[2] ?? m[3] ?? "");
+
+  while ((m = TODO_CALL.exec(source))) {
+    const literal = readStringLiteral(source, skipTrivia(source, m.index + m[0].length));
+    if (literal === null) continue;
+
+    // A `+` after the literal means the title is assembled. TD5, not a read.
+    const next = source[skipTrivia(source, literal.end)];
+    out.push({ title: literal.text, concatenated: next === "+" });
   }
+
   return out;
 }
 
@@ -234,7 +326,26 @@ export function checkTodoExpiry(
   const violations = [];
   const expired = new Map();
 
-  for (const { file, title } of entries) {
+  for (const { file, title, concatenated } of entries) {
+    // TD5 — a title the locator cannot read whole, before anything is read from
+    // it. Checked first because every downstream answer would be about a
+    // fragment, and a fragment's answers all look like legitimate ones: the
+    // first operand rarely contains "waits on", so `blockersIn` returns `[]` and
+    // the deferral files as declaring no wait at all. Exempt, and indistinguishable
+    // from a test that never claimed to be waiting.
+    if (concatenated === true) {
+      violations.push({
+        rule: "TD5",
+        file,
+        message:
+          `todo title is assembled by concatenation, so only its first fragment can be read — ` +
+          `a blocker clause split across the join is exempt and reads as compliant. ` +
+          `Write the title as one literal. Fragment: ${JSON.stringify(title.slice(0, 90))}`,
+        spec: "A03 §9a",
+      });
+      continue;
+    }
+
     const blockers = blockersIn(title);
 
     if (blockers === null) {
@@ -623,7 +734,7 @@ export function collectTodos(dir = "test", readFile = (f) => readFileSync(f, "ut
       const p = `${d}/${name}`;
       if (statSync(p).isDirectory()) walk(p);
       else if (/\.tsx?$/.test(name)) {
-        for (const title of todoTitles(readFile(p))) entries.push({ file: p, title });
+        for (const call of todoCalls(readFile(p))) entries.push({ file: p, ...call });
       }
     }
   };

@@ -551,6 +551,27 @@ The second is worse than the first and was found by looking once rather than by 
 
 **The clause the blocker is read from now ends at a sentence delimiter, and that is the third incident of one shape.** Twice the parse was too wide on the left — matching the words after "waits on", then matching identifiers across the whole title — and the third time it was too wide on the right: reading to end of line meant a sentence *explaining* a correction parsed as part of the claim, so restating a deferral as "waits on L4 … C18 produces both results now" left it waiting on C18. The standing remedy was to write the explanation before the clause, which is a habit; an em dash, a period or an unmatched closing paren is a mechanism, and it keeps the multi-blocker form `waits on L4 and C20` that taking the first identifier would have broken.
 
+### TD5 — the locator, and the half of the parse nobody had tested
+
+The paragraph above records three incidents and calls them one shape. They are one shape, and they are all in the same **half**: what is read *after* "waits on". Twice too wide on the left, once too wide on the right. Every fix tightened the clause.
+
+The fourth incident is in the other half — reaching the title at all — and it had never been tested in any direction. The locator was a single regex requiring a quote immediately after `it.todo(`, modulo whitespace, and it silently found nothing whenever anything else sat there. **Five deferrals were invisible to every TD rule**, which means TD0's equality, TD1's typo check, TD2's expiry and TD4's surface check all reported compliance about a corpus with holes in it.
+
+The shape is the finding, not the regex. A comment appears between `it.todo(` and its title exactly when someone has **re-triaged that deferral and written down why** — so the rule stopped seeing precisely the deferrals that had been read most carefully. Both of C22's triage notes that ended up in that form were about local handlers: `/clear`'s and `/help`'s.
+
+Four forms now reached, each with a fabrication:
+
+| Form | Was |
+|---|---|
+| A line comment, a block comment, or a trailing comment on the call line | invisible — the five |
+| `describe.todo`, `test.todo` | invisible; no instances today, and `describe.todo` defers a whole block from one line |
+| `it.skip` whose title declares a wait | invisible. **Ruled a deferral** — a skip that says what it waits for is a deferral wearing a different verb, and todo-means-unwritten / skip-means-written-and-not-run is a distinction the blocker clause already makes moot. A skip with no clause names no blocker and falls out as everything without one does, so this adds a verb rather than a code path |
+| A title built by `+` concatenation | **located and truncated**, which is worse |
+
+The last is TD5 proper, and it is the one that survives the obvious verification. A concatenated title *is* found, so a count against `grep -c` agrees — while only the first fragment is read. That fragment rarely contains "waits on", so the deferral files as declaring no wait at all: exempt, and indistinguishable from a test that never claimed to be waiting. So the rule **rejects** a concatenated title rather than reading it. Joining the operands was the alternative and it is the worse one: a clause split across the join reassembles into something nobody wrote, and a rejection is visible where a truncation is not.
+
+**The verification is two assertions, and the second is the point.** A count catches every locator miss and is blind to TD5. So the suite also asserts that nothing collected is a fragment — the half with no live subject in the tree today, which the mutation pass surfaced and which is stated there rather than left to look covered.
+
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
 
 ---
