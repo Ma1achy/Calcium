@@ -152,16 +152,22 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 |---|---|
 | **A verb is in flight** | Cancel it (C06's escalation ladder). **Takes precedence over everything** |
 | A system pass-through child is running | Forward `SIGINT` to the child |
-| Copy mode | Exit copy mode |
 | A dismissable overlay is on top | Dismiss it |
 | A non-dismissable overlay is on top | No-op — a confirm is not cancellable by Ctrl-C |
+| Copy mode | Exit copy mode |
 | A pushed view | Pop it |
 | Prompt with text | Clear the input |
 | Prompt empty | Arm the exit confirm; a second within 500 ms raises it |
 
+**Both overlay rungs sit above copy mode, and the order is not this spec's to choose.** A02 §2 and C14 §6 both put `overlay` above `copyMode` — "a confirm raised over copy mode still wins" — and an earlier draft of this table had copy mode above both. A ladder that disagrees with focus priority is two answers to "what does this key mean now", and the one that loses is whichever the reader did not consult.
+
+The defect it produced is the one C15's fourth drawn frame already found, one rung lower: Ctrl-C on an unanswered confirm raised over copy mode **exited copy mode behind it**, leaving the confirm over a screen that had changed. **Moving only the dismissable rung does not fix it** — a non-dismissable confirm would then fall through to copy mode and do the same thing. The two rungs move together or neither does, which is why they are adjacent here and why a test asserts the pair rather than the first of them.
+
 **Three of those rungs are one question C15 answers in two parts.** `pop()` returns `null` both when the top layer refuses to be popped and when there is no layer at all, and this ladder needs those apart: one is a no-op and the other falls through to the prompt. So it reads `top` — `null` is the fall-through, `dismissable: false` is the no-op — and calls `pop()` only in the branch that should pop (C15 §3).
 
-The collapsed form, `if (pop()) handled`, does not merely send Ctrl-C nowhere. The three rungs are consecutive, so a `null` from a non-dismissable confirm falls through to the next one and **pops the pushed view beneath it** — Ctrl-C on an unanswered confirm closes the dashboard behind it and leaves the confirm sitting over a screen that changed. Found by drawing the frame for C15's fourth walk case, which is also where the requirement that the frame be byte-identical came from.
+The collapsed form, `if (pop()) handled`, does not merely send Ctrl-C nowhere. A `null` from a non-dismissable confirm falls through to whatever rung comes next, and every rung below it acts on something *underneath* the confirm: it exits copy mode, or it **pops the pushed view beneath it** — Ctrl-C on an unanswered confirm closes the dashboard behind it and leaves the confirm sitting over a screen that changed. Found by drawing the frame for C15's fourth walk case, which is also where the requirement that the frame be byte-identical came from.
+
+Note that the reorder above widened this hazard rather than narrowing it: the three layer rungs used to be consecutive, and copy mode now sits between the confirm's no-op and the view's pop. The fall-through has one more wrong thing to do, which is an argument for reading `top` rather than an argument against the order.
 
 **Cancellation outranks everything** because it is the most consequential and most time-sensitive intent. A user hitting Ctrl-C while a promote is running means the promote, not the dashboard they happen to be looking at. Stating the precedence matters — the alternative reading is defensible, and leaving it implicit guarantees the two get implemented differently.
 
@@ -227,7 +233,7 @@ Two small machines, both with an injected clock.
 - **I5** — Unconsumed events are dropped, never inserted into a lower target.
 - **I6** — A paste emits one `paste` event regardless of length.
 - **I7** — Cancellation of an in-flight verb outranks every other Ctrl-C meaning.
-- **I8** — Ctrl-C never dismisses a non-dismissable overlay.
+- **I8** — Ctrl-C never dismisses a non-dismissable overlay, **and never acts on anything beneath one**. The second clause is the load-bearing half and the original wording lacked it: forbidding only the dismissal leaves every lower rung reachable, so Ctrl-C on an unanswered confirm exits the copy mode or pops the view behind it and changes a screen the user is not looking at. Not dismissing the confirm is small comfort when the thing under it moved.
 - **I9** — C16 reads no ambient clock; timing is injected.
 - **I10** — The keymap is data; duplicate `(target, key)` bindings fail at construction.
 - **I11** — C16 never calls the frame scheduler. L4 commits.
@@ -248,7 +254,7 @@ Two small machines, both with an injected clock.
 5. No chord support beyond modifiers — terminals send no key-up (I14).
 6. Exactly one handler consumes an event; unconsumed events are dropped (I4, I5).
 7. Ctrl-C cancels an in-flight verb ahead of every other meaning (I7).
-8. Ctrl-C never dismisses a confirm (I8).
+8. Ctrl-C never dismisses a confirm, and never reaches past one to the screen beneath (I8).
 9. Ctrl-D at an empty prompt confirms exit; with text it does nothing (I16).
 10. Double-tap timing is 500 ms on an injected clock (I9).
 11. The keymap is declarative data, so a binding is added in one place (I10). `/help` renders from it, and that rendering is C23's (→ C23 I26).
@@ -279,6 +285,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.10**: a second Ctrl-C within 500 ms → confirm raised.
 - **T1.11** (I7): Ctrl-C with a verb in flight → cancel is invoked and no other handler runs.
 - **T1.12** (I8): Ctrl-C with a non-dismissable overlay on top → no-op.
+- **T1.12b** (I8): Ctrl-C with a confirm raised over copy mode → no-op, and copy mode is **still active**. The pair, not the first of it: moving only the dismissable rung above copy mode passes T1.12 and fails this.
 - **T1.13**: Ctrl-D at an empty prompt arms the same confirm; with text present it is a no-op.
 
 ### Tier 2 — contract / interface
@@ -339,6 +346,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.2** (I6): dispatching paste bytes as key events → T3.1 fails and a large paste hangs the session.
 - **T6.3** (I7): letting an overlay consume Ctrl-C ahead of an in-flight verb → T1.11 fails.
 - **T6.4** (I8): allowing Ctrl-C to dismiss a confirm → T1.12 fails.
+- **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.5** (I4): broadcasting to every handler → T1.7 fails and actions fire twice.
 - **T6.6** (I5): falling through to the prompt on an unconsumed key → T1.8 fails and typing in the dashboard edits the hidden prompt.
 - **T6.7** (I9): using a real timer for the double-tap → T2.3 fails and the test flakes.
