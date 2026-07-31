@@ -117,6 +117,15 @@ Each of these produces code that compiles, passes review, and is wrong.
   machine that answered for one event kind of three. The seventh fell out of applying
   the first ruling. Every one would have been a rewrite if found after the build, which
   is the argument for this being scheduled rather than diligent.
+  **Index the artefact by rule interaction, not by input coverage.** This is the method
+  behind all three walks and it is now three for three: C16's rung table takes the rows
+  where two rungs could both apply, C17's edit trace the sequences where two coalescing
+  clauses meet, C18's classification table the inputs where two classification rules
+  meet. A row governed by one rule is a restatement of that rule and finds nothing;
+  every one of the eleven pre-code defects across those three components lived in a
+  cell where two correct statements overlap. That is also why they were invisible to
+  review — a reader checks statements one at a time by construction, so a suite indexed
+  by inputs tests each rule against itself and agrees.
   Where the component composes a frame, **read the frame, not only the numbers**: an
   arithmetically self-consistent viewport can still be describing a different document
   than the one it holds. And a fixture must be shown to respond to the thing under test
