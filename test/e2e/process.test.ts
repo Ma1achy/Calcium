@@ -112,6 +112,12 @@ describe("C21 e2e", () => {
   // where the expired deferral was, and the claim runs through the transport;
   // one sixty-second test rather than two.
   it.todo(
-    "T5.5: quitting the session with three children running reaps all of them before the terminal is released — waits on C22",
+    // **C22 T5.4 asserts the same claim from the session's side**, and whoever
+    // writes this should narrow rather than duplicate — C01's tier-5 precedent,
+    // where two tests claiming one coverage is how one of them stops being
+    // maintained. What is left over for C21 is the reaping itself: that
+    // `runner.live` is empty and no orphan survives, which C22's test does not
+    // look at.
+    "T5.5: quitting the session with three children running reaps all of them before the terminal is released — waits on C23 — the claim is C22's, but three running children is a state only the pipeline can construct",
   );
 });

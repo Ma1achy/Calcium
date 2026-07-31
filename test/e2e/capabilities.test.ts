@@ -155,6 +155,6 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
   // fixture I wrote navigates a structure I built, with nothing moving focus
   // between them — weaker than the title, and it would read as covered.
   it.todo(
-    "T5.4b: inside tmux, keyboard navigation of a table works end to end. The router landed and is not the blocker — end to end needs a composed shell to drive it — waits on C22",
+    "T5.4b: inside tmux, keyboard navigation of a table works end to end. The router landed and is not the blocker — end to end needs a composed shell to drive it — waits on C23 — the table to navigate is a verb's output, so a constructed graph is not enough",
   );
 });

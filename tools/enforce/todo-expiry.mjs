@@ -94,9 +94,24 @@ export const COMPONENT_SOURCES = Object.freeze({
 /**
  * Layers are legitimate blockers too — "waits on L4" means the shell, which is
  * not one component. Mapped to the file whose existence means that layer runs.
+ *
+ * **L4 points at C23's file, not C22's, and the difference is thirty-five
+ * deferrals.** Both components live in `src/shell/`, so the row looks
+ * interchangeable and is not: "the L4 shell runs" means it can *execute a
+ * command*, and until C23 exists a constructed graph cannot. Pointed at
+ * `session.ts`, the commit that made C22 real expired all thirty-five `L4`
+ * deferrals at once — thirty of them tier-5 PTY tests that launch a session and
+ * run something — and the cheap repair would have been to list them as an
+ * acknowledged backlog, which is the exemption-list-that-only-grows this rule
+ * exists to prevent.
+ *
+ * `execution.ts` exists today as a scaffold holding `export {}`, so
+ * `defaultIsImplemented` returns false for the right reason rather than by
+ * absence, and TD3 passes. It self-expires on the commit that gives C23
+ * behaviour, which is the same commit that makes those thirty-five writable.
  */
 export const LAYER_SOURCES = Object.freeze({
-  L4: "src/shell/session.ts",
+  L4: "src/shell/execution.ts",
 });
 
 /**

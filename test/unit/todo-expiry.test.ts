@@ -17,6 +17,7 @@ import {
   collectTodos,
   COMPONENT_SOURCES,
   KIND_OF_COMPONENT,
+  LAYER_SOURCES,
   todoTitles,
 } from "../../tools/enforce/todo-expiry.mjs";
 
@@ -235,6 +236,43 @@ describe("todo expiry", () => {
 
     expect(titles).toHaveLength(3);
     expect(titles.some((t) => t.includes("C12")), "a real `it` is not a deferral").toBe(false);
+  });
+
+  it("two blocker ids share a path only where they genuinely arrive together", () => {
+    // **The C22 instance, closed as a class.** `L4` and `C22` both pointed at
+    // `src/shell/session.ts`, which is one file and two different waits: "the L4
+    // shell runs" means it can execute a command, and thirty-five of the
+    // thirty-five `L4` deferrals are tier-5 tests that launch a session and run
+    // something. Landing C22 would have expired all of them on a component that
+    // cannot run one, and the cheap repair is `ACKNOWLEDGED_BACKLOG` — the
+    // exemption list that only grows, which is what TD0 asserts equality to
+    // prevent.
+    //
+    // A collision is not wrong in itself. `L4` and `C23` share a path *because*
+    // the shell running and the pipeline existing are the same event. What is
+    // wrong is an undeclared one, so the permitted set is written out and
+    // compared by equality: a new collision fails because it is not here, and a
+    // resolved one fails because it still is.
+    const permitted = [["C23", "L4", "the L4 shell runs when it can execute a command, which is C23"]];
+
+    const all: Record<string, string> = { ...COMPONENT_SOURCES, ...LAYER_SOURCES };
+    const byPath = new Map<string, string[]>();
+    for (const [id, path] of Object.entries(all)) {
+      byPath.set(path, [...(byPath.get(path) ?? []), id]);
+    }
+    const collisions = [...byPath.values()]
+      .filter((ids) => ids.length > 1)
+      .map((ids) => [...ids].sort().join("+"))
+      .sort();
+
+    expect(collisions).toEqual(permitted.map(([a, b]) => `${a}+${b}`).sort());
+
+    // And the specific regression, stated rather than left to the set above:
+    // whatever else moves, these two must not become one moment again.
+    expect(
+      LAYER_SOURCES.L4,
+      "L4 and C22 mapping to one file collapses two different waits into one",
+    ).not.toBe(COMPONENT_SOURCES.C22);
   });
 
   it("every component in the map points at a path the repo actually uses", () => {

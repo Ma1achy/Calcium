@@ -162,10 +162,10 @@ describe("C01 integration", () => {
     "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on L4",
   );
   it.todo(
-    "T4.5: startup ordering — the composition root's steps 6, 7, 8 execute in that order, asserted by an event log — waits on C22",
+    "T4.5: startup ordering — the composition root's steps 6, 7, 8 execute in that order, asserted by an event log — waits on C22 — the ordering is C22's own and needs nothing to have run",
   );
   it.todo(
-    "T4.6: a SIGWINCH snapshot propagates to the viewport, which clamps scroll against it — waits on C22",
+    "T4.6: a SIGWINCH snapshot propagates to the viewport, which clamps scroll against it — waits on C22 — C22 wires onResize to the viewport at construction",
   );
   it("T4.7 (with C03): SIGCONT fires onResume, the shell invalidates, the next commit repaints", () => {
     const { scheduler, lifecycle, render, repaint } = wireScheduler();

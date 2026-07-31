@@ -97,7 +97,7 @@ describe("C03 e2e", () => {
     "T5.3: a full-screen repaint on a synchronised-update terminal shows no intermediate state, sampled mid-write — unwritable with current infrastructure, and not deferred on a component. Synchronised update (DECSET 2026) is the mechanism; observing it needs a terminal emulator that honours the markers and can be sampled mid-frame. A PTY is a kernel device and emulates nothing, so the bytes are all it can show. No planned component delivers this: M-T6's compositor is the nearest thing and is gated on a measured baseline (A01 §7). C09 was named here as the blocker and was never it — a render tree makes the frame, not the observation.",
   );
   it.todo(
-    "T5.4: dragging the terminal edge continuously — every frame correct, none blank, no corruption — waits on C22 and a real render tree",
+    "T5.4: dragging the terminal edge continuously — every frame correct, none blank, no corruption — waits on C22 and a real render tree — corruption shows against chrome alone, so nothing needs to have run",
   );
   it.todo(
     "T5.5: suspending to a child and returning — the first frame after resume is a full repaint, verified by byte volume — waits on L4",

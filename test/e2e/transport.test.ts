@@ -9,7 +9,7 @@ import { runInPty } from "../support/pty.js";
 const FIXTURE = "node test/support/fixture.mjs";
 
 describe("C06 e2e", () => {
-  it.todo("T5.1: a real binary emitting a large document → parsed and rendered within budget — waits on C22");
+  it.todo("T5.1: a real binary emitting a large document → parsed and rendered within budget — waits on C23 — needs a session that executes a command");
   it(
     "T5.2 (C21 T5.4): a real streaming far side at 1,000 lines/s for sixty seconds drops nothing and grows nothing",
     async () => {
@@ -45,7 +45,7 @@ describe("C06 e2e", () => {
   );
 
   it.todo("T5.3: Ctrl-C during a real long-running verb → the child dies within the ladder's bounds and partial output survives — waits on L4");
-  it.todo("T5.4: killing the far side externally mid-invocation → end with signal, guard released, session survives — waits on C22");
-  it.todo("T5.5: one session running one verb on fixtures and another on a real binary, interleaved — waits on C22");
-  it.todo("T5.6: the whole suite with the fixture transport and no far side installed — the standalone-build guarantee — waits on C22");
+  it.todo("T5.4: killing the far side externally mid-invocation → end with signal, guard released, session survives — waits on C23 — there is no invocation to be mid-way through until the pipeline exists");
+  it.todo("T5.5: one session running one verb on fixtures and another on a real binary, interleaved — waits on C23 — needs a session that executes a command");
+  it.todo("T5.6: the whole suite with the fixture transport and no far side installed — the standalone-build guarantee — waits on C23 — the suite it names is the one that runs verbs");
 });

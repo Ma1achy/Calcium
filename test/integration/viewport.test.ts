@@ -118,9 +118,9 @@ describe("C14 integration", () => {
   });
 
   it.todo(
-    "T4.7 (with C01): a SIGWINCH snapshot drives one resize and the anchor is captured before the cache is dropped — waits on C22",
+    "T4.7 (with C01): a SIGWINCH snapshot drives one resize and the anchor is captured before the cache is dropped — waits on C22 — the same wiring T4.6 asserts from C01's side",
   );
   it.todo(
-    "T4.8 (with C03, L4): a scroll causes L4 to issue one commit('input'), and a spy asserts C14 never calls the scheduler — waits on C22",
+    "T4.8 (with C03): a scroll causes the shell to issue one commit('input'), and a spy asserts C14 never calls the scheduler — waits on C22 — C22 registers the scroll handler and A02 Seam 4 now names it C22's row",
   );
 });

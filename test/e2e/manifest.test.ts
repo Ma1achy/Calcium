@@ -29,12 +29,12 @@ describe("C05 e2e", () => {
     expect(visibleTools(m).length).toBe(m.tools.length - 1); // one hidden tool
   });
 
-  it.todo("T5.1: a session completes, validates and rejects for every tool, with no far side — waits on C22");
-  it.todo("T5.2: replacing the fixture with a manifest fetched from a real binary changes the surface — waits on C22");
+  it.todo("T5.1: a session completes, validates and rejects for every tool, with no far side — waits on C23 — rejection is an invocation outcome, so it needs the pipeline that invokes");
+  it.todo("T5.2: replacing the fixture with a manifest fetched from a real binary changes the surface — waits on C23 — C22 fetches the manifest, but the surface it changes is `/help`, which is a local handler");
   // **This deferral was exempt from the day it was written** and TD3 is what
   // surfaced it: C07 was mapped to `src/data/adapters.ts`, a path that has never
   // existed, so "waits on C07" could never expire. C07 landed long ago; the
   // blocker is C22, which owns the session this asserts end to end.
-  it.todo("T5.3: a tool with no adapter renders through the fallback adapter — waits on C22");
-  it.todo("T5.4: a manifest omitting a previously-present tool reports it unavailable — waits on C22");
+  it.todo("T5.3: a tool with no adapter renders through the fallback adapter — waits on C23 — adaptation happens on the app route, which is C23's");
+  it.todo("T5.4: a manifest omitting a previously-present tool reports it unavailable — waits on C23 — the report is an invocation outcome");
 });

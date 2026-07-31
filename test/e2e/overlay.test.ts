@@ -123,7 +123,7 @@ describe("C15 e2e — layers under real input", () => {
   // through a real keystroke, and the rung that must not fire is the one that
   // pops the dashboard out from under the confirm.
   it.todo(
-    "T5.3: a confirm inside the dashboard — drawn over it, esc does nothing, n resolves it and returns. The routing half is asserted in test/integration/router.test.ts T4.2; composing the session is what remains — waits on C22",
+    "T5.3: a confirm inside the dashboard — drawn over it, esc does nothing, n resolves it and returns. The routing half is asserted in test/integration/router.test.ts T4.2; composing the session is what remains — waits on C23 — the dashboard the confirm sits inside is a pushed view produced by running a verb",
   );
   // C01 already delivers the SIGWINCH snapshot this needs; what is missing is
   // the thing that composes a frame from it, so the blocker is L4 alone. Naming

@@ -84,12 +84,23 @@ describe("the S-series' illustrated heights", () => {
   // stated composition names no `patch`. The check would have failed on the
   // commit that wrote it.
   //
-  // **The C22 line names sections, which it did not.** TD4 requires it: an
+  // **The line names sections, which it did not.** TD4 requires it: an
   // illustration belongs to a section, so a deferral naming only a surface cannot
   // be checked against one — which is how S07's survived pointing at a section
   // that had none. All six are their surface's `§2`, the whole-screen figure that
   // wants an outer `panel` with a title and a footer.
+  //
+  // **Split, because one row over six surfaces names the wrong component
+  // whichever one it names.** S01 §2 is the frame itself — chrome, prompt,
+  // gutter — and C22 composes it with nothing having run. The other five are
+  // execution output: a welcome banner, gitops output, a local run, a log view,
+  // a dashboard. A single row waiting on C22 would have come due five-sixths
+  // unwritable, which is the failure this triage exists to prevent and is
+  // indistinguishable from a row that expired correctly.
   it.todo(
-    "S01 §2, S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated rows — waits on C22",
+    "S01 §2 composes to its illustrated rows — waits on C22 — the frame is chrome and a prompt, which a constructed graph draws before anything runs",
+  );
+  it.todo(
+    "S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated rows — waits on C23 — every one of the five is a document some verb produced",
   );
 });

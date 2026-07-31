@@ -187,7 +187,7 @@ describe("C03 integration", () => {
   // here rather than in the title — a title reading "waits on C22. Neither C13
   // nor C14 …" names three blockers, two of which exist, and the rule fires.
   it.todo(
-    "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C22",
+    "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C23 — A02 §4 gives transcript writes to the execution pipeline, so C22 has nothing to append with",
   );
   it("T4.5 (with C17): a keystroke's frame is drawn before the next keystroke is processed", () => {
     // Against a real editor, which is what the deferral was waiting for. The
