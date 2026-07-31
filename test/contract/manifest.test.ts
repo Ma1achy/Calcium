@@ -8,6 +8,7 @@ import {
   ARG_TYPES,
   findTool,
   parseManifest,
+  suggestName,
   validateInvocation,
   type ArgType,
   type Manifest,
@@ -258,6 +259,30 @@ describe("C05 contract", () => {
     // And the reverse direction: the original still answers as it did, so the
     // second manifest did not overwrite a shared entry.
     expect(findTool(m, ["serving"])?.tool.name).toBe("serving");
+  });
+
+  it("T2.9 (I18): the exported suggester is the one the flag path uses, tie-break included", () => {
+    // **Asserted on the tie, because that is the only case two implementations
+    // would disagree about.** Any distance-2 suggester agrees that `--open-mrr`
+    // means `--open-mr`; what varies is which of two equidistant candidates
+    // wins, and a test written against a manifest with no ties in it passes for
+    // both answers. C05's answer is declaration order — first at the minimum.
+    const tool = toolNamed("ps");
+    const names = tool.flags.map((f) => f.name);
+
+    // `limit` and `label` both sit at distance 2 from `labit`, and `limit` is
+    // declared first. The direct call and the validator must agree on that, not
+    // merely both return something.
+    expect(suggestName("labit", names)).toBe("limit");
+
+    const result = validateInvocation(tool, ["--labit=1"]);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const unknown = result.errors.find((e) => e.code === "unknown_flag");
+    expect(unknown?.details?.["suggestion"]).toBe(suggestName("labit", names));
+
+    // And the cutoff, from the other side: nothing within 2 of this.
+    expect(suggestName("zzzzzzz", names)).toBeUndefined();
   });
 
   it("T2.6b (SS35): one Result in the tree, and the rule that keeps it that way fires", () => {
