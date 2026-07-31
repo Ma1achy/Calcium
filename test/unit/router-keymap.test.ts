@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createKeymap, KeymapError, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { createDecoder } from "../../src/interaction/router/decode.js";
 import type { Binding, Key } from "../../src/interaction/router/types.js";
 
 const k = (name: string, mods: Partial<Key> = {}): Key => ({
@@ -166,6 +167,61 @@ describe("§6 — the default table (C17 I12)", () => {
       newline.some((b) => b.key.shift === true && b.key.name === "enter"),
       "and Shift-Enter, for the terminals that do distinguish it",
     ).toBe(true);
+  });
+
+  it("T2.13 (I17): every default binding is a key the decoder can actually produce", () => {
+    // **T2.12 constructs the Key from the binding, which is the shape that
+    // hides this entirely**: a row saying `{name: "\r"}` resolves perfectly
+    // against a Key built from `{name: "\r"}`. I17 is the other direction — a
+    // key the keymap can name must be a key the *decoder* produces — and the
+    // only way to ask it is to send the bytes a terminal sends and see what
+    // comes out.
+    //
+    // It has now found three. `\n` decoded to `enter`, so Ctrl-J's row
+    // resolved against an event nothing could send. The meta branch passed its
+    // character through raw, so Alt-Enter arrived as `{name: "\r", meta}`.
+    // And Shift-Enter's two wire forms — `CSI 13;2u` and xterm's
+    // `CSI 27;2;13~` — were both discarded as well-formed-but-unknown, which
+    // made the row unreachable in every terminal that sends it.
+    //
+    // **A binding with no byte sequence here fails**, and that is the check
+    // rather than an inconvenience: a row nobody can name the wire form of is a
+    // row nobody can press.
+    const BYTES: Record<string, readonly string[]> = {
+      // Both forms, because a terminal sends one or the other and a rule
+      // satisfied by either is satisfied on half the terminals.
+      "prompt s+enter": ["[13;2u", "[27;2;13~"],
+      "prompt m+enter": ["\r"],
+      "prompt c+j": ["\n"],
+    };
+
+    const keymap = createKeymap(defaultKeymap);
+    const enc = new TextEncoder();
+
+    for (const b of defaultKeymap) {
+      const mods =
+        (b.key.ctrl === true ? "c" : "") +
+        (b.key.meta === true ? "m" : "") +
+        (b.key.shift === true ? "s" : "");
+      const slot = `${b.target} ${mods === "" ? "" : `${mods}+`}${b.key.name}`;
+      const sequences = BYTES[slot];
+
+      expect(sequences, `${slot} has no wire form — nobody can press it`).toBeDefined();
+
+      for (const seq of sequences ?? []) {
+        const decoder = createDecoder({
+          capabilities: { bracketedPaste: true, mouse: true },
+          now: () => 1_000,
+        });
+        const events = decoder.push(enc.encode(seq));
+        const keys = events.filter((e) => e.kind === "key");
+
+        expect(keys, `${slot}: ${JSON.stringify(seq)} decodes to one key`).toHaveLength(1);
+        const decoded = keys[0];
+        if (decoded?.kind !== "key") continue;
+        expect(keymap.resolve(b.target, decoded.key), `${slot}: ${JSON.stringify(seq)}`).toBe(b);
+      }
+    }
   });
 
   it("T2.12: every default binding resolves to the object the table holds", () => {

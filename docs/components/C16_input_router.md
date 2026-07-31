@@ -358,6 +358,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I16** — Ctrl-D is dispatched only when the editor buffer is empty, and it opens a confirm rather than exiting. With text present it is consumed and discarded — never treated as EOF, and never as a delete-forward, because a keystroke that sometimes ends the session and sometimes edits the line is one nobody presses twice.
 - **I17** — `\r` and `\n` are **different keys**. `\r` is `enter`; `\n` is `Ctrl-J`, which is what that byte is. Collapsing them is the obvious reading of "the Enter key" and it silently removes one of the two terminal-independent newline bindings C17 I12 requires — a binding that resolves against nothing, which is C16 §5's unconstructible-rung class arriving one layer lower, in the decoder. It also decides what a newline inside an unbracketed paste means: `enter` submits each line of a pasted block, `Ctrl-J` inserts it. **And a modified key carries the same `name` as the unmodified one**: `Alt-Enter` is `{name: "enter", meta: true}`, not `{name: "\r", meta: true}`. That is the same defect one path over — the ESC-prefixed branch passed its character through raw — and it removed the *other* of C17 I12's two terminal-independent bindings, so both of them resolved against events nothing could produce while the keymap read as complete. Found by pressing the bindings through a real decoder in C17's tier 4, not by reading either file. The general rule the two share: **a key the keymap can name must be a key the decoder produces**, and the only way to know is to press it.
 
+  **Made mechanical, it immediately found a third.** T2.13 walks every row of `defaultKeymap` through a real decoder, and a row with no wire form fails. Shift-Enter has two — `CSI 13;2u` and xterm's `modifyOtherKeys` form `CSI 27;2;13~` — and the decoder discarded both as well-formed-but-unknown, because `u` is not in the letter table and `27` is not in the tilde table. The third of C17 I12's three bindings was unreachable in every terminal that sends it, and the two that a reader would check by hand had already been fixed. `27` is a marker rather than a keycode, so the tilde branch tests it before the table; the codepoint is named through the same `namedControl` the unprefixed byte uses, because a second naming path is exactly how the meta branch came to call Enter `\r`.
+
 ---
 
 ## 9. Commitments
@@ -376,6 +378,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 12. Duplicate bindings fail at construction (I10).
 13. C16 never commits a frame; L4 does (I11).
 14. `\r` and `\n` decode to different keys and a modified key keeps the unmodified name, so both of C17's terminal-independent newline bindings resolve against events the decoder actually produces (I17).
+15. Every row of `defaultKeymap` is walked through a real decoder, and a row with no wire form fails — the rule made mechanical, which found the third instance (I17).
 
 ---
 
@@ -394,6 +397,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.3d** (I3): a click inside an overlay's placed region resolves to the overlay even when focus is elsewhere.
 - **T1.3b** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
 - **T1.3c** (I17): `ESC \r` decodes to `{name: "enter", meta: true}` — the name the keymap uses, not the byte.
+- **T1.3d** (I17): `CSI 13;2u` and `CSI 27;2;13~` both decode to `{name: "enter", shift: true}`. Both forms, because a terminal sends one or the other and a rule satisfied by either is satisfied on half the terminals.
 - **T1.4**: `CSI 200~` enters buffering.
 - **T1.5** (I12): bytes during buffering emit no key events.
 - **T1.6** (I6): `CSI 201~` emits exactly one `paste` carrying the buffered text.
@@ -490,6 +494,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.13** (I3): routing mouse events through focus priority → T1.3c fails, and clicks land on the wrong block.
 - **T6.9b** (I17): collapsing `\r` and `\n` back into one key → T1.3b fails, C17's Ctrl-J binding resolves against an event nothing produces, and every line of an unbracketed paste submits.
 - **T6.9c** (I17): passing the meta path's character through unnamed → T1.3c and C17 T4.2 fail, and Alt-Enter inserts nothing on every terminal.
+- **T6.9d** (I17): dropping the CSI-u and `modifyOtherKeys` branches → T1.3d and T2.13 fail, and Shift-Enter is unreachable on every terminal that sends it.
 
 ---
 

@@ -162,6 +162,21 @@ function namedControl(ch: string): InputEvent | null {
   }
 }
 
+/**
+ * A codepoint parameter, named the way the same key is named unprefixed.
+ *
+ * Reuses `namedControl` rather than carrying a second table: I17's whole
+ * subject is that one key has one name, and a second naming path is how the
+ * meta branch came to call Enter `\r` while the keymap called it `enter`.
+ */
+function otherKeyName(param: string | undefined): string | null {
+  const code = Number(param);
+  if (!Number.isInteger(code) || code < 1 || code > 0x10ffff) return null;
+  const ch = String.fromCodePoint(code);
+  const named = namedControl(ch);
+  return named !== null && named.kind === "key" ? named.key.name : ch;
+}
+
 type PasteState =
   | Readonly<{ mode: "normal" }>
   | Readonly<{ mode: "buffering"; text: string; since: number }>;
@@ -317,7 +332,32 @@ export function createDecoder(options: DecoderOptions): Decoder {
     const params = body.split(";");
     const mods = modifiersOf(params[1]);
 
+    // The two forms a terminal uses to report a key it cannot express as a
+    // bare byte — which is every modified Enter, Tab and Space, and therefore
+    // both of the shapes `defaultKeymap`'s Shift-Enter row can arrive in.
+    //
+    // **Third of the class, and found the same way as the first two.** C16 I17
+    // says a key the keymap can name must be a key the decoder produces, and
+    // the check that walks `defaultKeymap` through a real decoder is what
+    // reported it: `CSI 13;2u` fell through to `CSI_LETTER_KEYS["u"]` and
+    // `CSI 27;2;13~` to `CSI_TILDE_KEYS["27"]`, both undefined, both discarded
+    // as well-formed-but-unknown. Shift-Enter was unreachable in every terminal
+    // that sends it, which is every terminal that has it.
+    if (final === "u") {
+      const name = otherKeyName(params[0]);
+      if (name === null) return consumed;
+      return out.push(key(name, sequence, mods)), consumed;
+    }
+
     if (final === "~") {
+      // xterm's `modifyOtherKeys`: the key is the *third* parameter and 27 is
+      // the marker, not a keycode — so this is checked before the tilde table,
+      // which has no 27 and would discard it.
+      if (params[0] === "27") {
+        const name = otherKeyName(params[2]);
+        if (name === null) return consumed;
+        return out.push(key(name, sequence, mods)), consumed;
+      }
       const name = CSI_TILDE_KEYS[params[0] ?? ""];
       if (name === undefined) return consumed; // unknown but well-formed: discard
       return out.push(key(name, sequence, mods)), consumed;

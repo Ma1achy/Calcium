@@ -60,6 +60,31 @@ describe("C16 §2 — key decoding", () => {
     ]);
   });
 
+  it("T1.3d (I17): Shift-Enter decodes, in both forms a terminal sends it", () => {
+    // The third instance, and the one the mechanical check found rather than a
+    // person. `u` is not in the letter table and `27` is not in the tilde
+    // table, so both sequences were discarded as well-formed-but-unknown —
+    // which reads identically to a key the terminal did not send.
+    //
+    // **Both forms in one test**, because a terminal sends one or the other:
+    // supporting either alone leaves the binding unreachable on half of them,
+    // and a test asserting either alone passes in that state.
+    const { d } = decoder();
+
+    expect(feed(d, "[13;2u")).toEqual([
+      { kind: "key", key: { name: "enter", ctrl: false, meta: false, shift: true, sequence: "[13;2u" } },
+    ]);
+    expect(feed(d, "[27;2;13~")).toEqual([
+      { kind: "key", key: { name: "enter", ctrl: false, meta: false, shift: true, sequence: "[27;2;13~" } },
+    ]);
+
+    // And an ordinary letter through the same branch, so the fix is a codepoint
+    // path rather than an Enter special case.
+    expect(feed(d, "[97;5u")).toEqual([
+      { kind: "key", key: { name: "a", ctrl: true, meta: false, shift: false, sequence: "[97;5u" } },
+    ]);
+  });
+
   it("T1.3c (I17): a modified key carries the unmodified key's name", () => {
     // `Alt-Enter` arrived as {name: "\r", meta: true} — the byte, not the name
     // the keymap uses — so C17 I12's other terminal-independent newline binding
