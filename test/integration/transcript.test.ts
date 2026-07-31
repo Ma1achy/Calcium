@@ -131,8 +131,8 @@ describe("C13 integration", () => {
     expect(viewport.visible().entries).toEqual(before.entries);
     expect(viewport.scroll.topRow).toBe(12);
   });
-  it.todo(
-    "T4.6 (with C16): only the live entry appears in the focusable set; frozen entries never do, streaming or not — waits on C16",
-  );
+  // T4.6 is resolved from C16's side, against real instances of both components:
+  // `test/integration/router.test.ts`. Kept as a pointer rather than duplicated,
+  // because the assertion needs a router to ask and this file has none.
   it.todo("T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C22 and C20");
 });

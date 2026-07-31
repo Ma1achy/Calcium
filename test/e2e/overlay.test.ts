@@ -19,13 +19,13 @@ describe("C15 e2e — layers under real input", () => {
     "T5.1: a completion menu near the bottom flips above the prompt and shows every candidate — waits on C19 and L4",
   );
   it.todo(
-    "T5.2: reverse-i-search over a completion menu — both stacked, keys to the search, esc returns to the menu — waits on C19, C20 and C16",
+    "T5.2: reverse-i-search over a completion menu — both stacked, keys to the search, esc returns to the menu. The stacking and routing halves are asserted in test/integration/router.test.ts — waits on C19 and C20",
   );
   // T4.5b asserts the ladder's shape against C15 alone. This is the same claim
   // through a real keystroke, and the rung that must not fire is the one that
   // pops the dashboard out from under the confirm.
   it.todo(
-    "T5.3: a confirm inside the dashboard — drawn over it, esc does nothing, n resolves it and returns — waits on C16 and L4",
+    "T5.3: a confirm inside the dashboard — drawn over it, esc does nothing, n resolves it and returns. The routing half is asserted in test/integration/router.test.ts T4.2; composing the session is what remains — waits on C22",
   );
   // C01 already delivers the SIGWINCH snapshot this needs; what is missing is
   // the thing that composes a frame from it, so the blocker is L4 alone. Naming

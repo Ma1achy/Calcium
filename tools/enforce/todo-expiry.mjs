@@ -56,12 +56,12 @@ export const COMPONENT_SOURCES = Object.freeze({
   C13: "src/viewport/transcript/store.ts",   // the store, not the barrel — and `transcript.ts` was the scaffold (TD3, fourth instance)
   C14: "src/viewport/viewport/viewport.ts",   // the viewport, not the barrel — `viewport.ts` was the scaffold (TD3, fifth instance)
   C15: "src/viewport/overlay/manager.ts",   // the manager, not the barrel — and `overlays.ts` was the scaffold (TD3, sixth instance)
-  // Still the scaffold, deliberately, while `router/decode.ts` exists. The four
-  // deferrals waiting on C16 are about focus and dispatch, and `defaultIsImplemented`
-  // ignores a bare `export {}` — so the scaffold is exactly the right signal until
-  // the dispatcher lands. Repointing this at a not-yet-written path was tried and
-  // TD3 caught it: a path that does not exist reads as "not implemented" forever.
-  C16: "src/interaction/router.ts",
+  // The dispatcher, now that it exists. It pointed at the scaffold while only
+  // `decode.ts` was built, which was the right signal then — `defaultIsImplemented`
+  // ignores a bare `export {}`. Repointing it at the unwritten path *ahead* of
+  // time was tried and TD3 caught it: a path that does not exist reads as "not
+  // implemented" forever, silently exempting every deferral waiting on it.
+  C16: "src/interaction/router/router.ts",
   C17: "src/interaction/editor.ts",
   C18: "src/interaction/parser.ts",
   C19: "src/interaction/completion.ts",
