@@ -16,6 +16,28 @@ export type Key = Readonly<{
   sequence: string;
 }>;
 
+/**
+ * A02 Seam 3. Array order in `focus.ts`'s `FOCUS_ORDER` is the priority; this is
+ * the union that order is exhaustive over.
+ */
+export type FocusTarget =
+  | "overlay"
+  | "copyMode"
+  | "pushedView"
+  | "prompt"
+  | "liveBlock"
+  | "global";
+
+/**
+ * The one stored piece of focus state (C16 §3, I1).
+ *
+ * A *location*, not a bit — which row holds focus inside the live block is part
+ * of the same fact and has no separate owner.
+ */
+export type StoredFocus =
+  | Readonly<{ at: "prompt" }>
+  | Readonly<{ at: "liveBlock"; rowId: string | null }>;
+
 export type InputEvent =
   | Readonly<{ kind: "key"; key: Key }>
   | Readonly<{ kind: "paste"; text: string }>
