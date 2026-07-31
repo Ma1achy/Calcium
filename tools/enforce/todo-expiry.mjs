@@ -62,7 +62,10 @@ export const COMPONENT_SOURCES = Object.freeze({
   // time was tried and TD3 caught it: a path that does not exist reads as "not
   // implemented" forever, silently exempting every deferral waiting on it.
   C16: "src/interaction/router/router.ts",
-  C17: "src/interaction/editor.ts",
+  // The editor, now that it exists — `editor.ts` was the scaffold (TD3, seventh
+  // instance). Repointed on the commit that makes the path real, never before:
+  // a path that does not exist reads as "not implemented" forever.
+  C17: "src/interaction/editor/editor.ts",
   C18: "src/interaction/parser.ts",
   C19: "src/interaction/completion.ts",
   C20: "src/interaction/history.ts",

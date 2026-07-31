@@ -92,6 +92,38 @@ export function cells(text: string): number {
 }
 
 /**
+ * The cluster stream, for C17 (C09 §2, §5).
+ *
+ * The `cells()` argument one layer down. The editor's cursor is a grapheme
+ * index, so it needs where a cluster *ends* rather than how wide a string is —
+ * a different question with the same answer underneath, and a second
+ * `Intl.Segmenter` in `interaction/` would be two answers to it: agreeing
+ * today, parting on whichever ZWJ sequence two Unicode versions disagree
+ * about, and paying the construction cost this module exists to pay once.
+ *
+ * **Nothing is stripped here.** `cells()` strips because a control character
+ * has no width; C17 strips on insert (I9) and its buffer keeps `\n` as
+ * structure, so stripping again would delete the line breaks the layout walks.
+ */
+export function graphemes(text: string): readonly string[] {
+  const out: string[] = [];
+  for (const { segment } of GRAPHEMES.segment(text)) out.push(segment);
+  return out;
+}
+
+/**
+ * One cluster's width in cells.
+ *
+ * What `cells()` computes internally and cannot expose by returning a total.
+ * C17's layout walks clusters and asks each its width, which is the same walk
+ * `wrapCells` does — one implementation, so the prompt and every block break at
+ * the same place.
+ */
+export function clusterWidth(cluster: string): number {
+  return clusterCells(cluster);
+}
+
+/**
  * The width of one grapheme cluster.
  *
  * The base code point carries the width, with two exceptions that matter in

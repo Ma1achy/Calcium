@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG15", "MG19", "MG20", "MG21", "MG22"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -141,6 +141,33 @@ const FORBIDDEN_EDGES = [
       "C15 holds no entry ids and writes nothing to the transcript — an anchor " +
       "is a region row, and whoever raised the layer keeps it current through " +
       "`update`. Sideways, so the layer walk permits it. Type-only counts",
+  },
+  {
+    // MG15 — C17 imports nothing from `terminal/`.
+    //
+    // A **downward** prohibition, so MG1's layer walk permits the edge and only
+    // this sees it: L3 sits above L0, and importing `escapes.js` or
+    // `lifecycle.js` from the editor would be a legal edge by every other rule
+    // in this table. MG21 is the precedent running the other way — presentation
+    // may import `escapes.js` for `sgr`, stated rather than assumed — and the
+    // editor has no such exception because it emits nothing.
+    //
+    // The reachable version of the mistake is width. C17 takes `width` and
+    // `gutter` as parameters (I10) and the shortcut is one import away: reading
+    // `stdout.columns`, or asking C01, rather than being handed the number.
+    // CLAUDE.md's Never list names that one specifically — width is the axis
+    // that wraps, and a wrapped line scrolls the alternate screen — and an
+    // editor holding geometry is also one nothing can measure at a width other
+    // than the terminal's, which is what T2.1's corpus at widths 20 to 200
+    // depends on.
+    rule: "MG15",
+    from: "src/interaction/editor/",
+    to: "src/terminal/",
+    spec: "C17 I10 · C17 I14 · C17 T2.6",
+    why:
+      "C17 holds no geometry and emits nothing: width and gutter are parameters, " +
+      "and the prompt is drawn by L4. Downward, so the layer walk permits it. " +
+      "Type-only counts",
   },
   {
     // MG12, and a separate rule in A03's inventory rather than MG13's second

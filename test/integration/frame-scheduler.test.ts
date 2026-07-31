@@ -10,6 +10,7 @@ import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import type { FrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import { fakeStdin, fakeStdout, MODES } from "../support/fake-terminal.js";
 import { fakeClock } from "../support/fake-scheduler.js";
+import { createEditor } from "../../src/interaction/editor/index.js";
 
 const live: TerminalLifecycle[] = [];
 
@@ -188,10 +189,69 @@ describe("C03 integration", () => {
   it.todo(
     "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C22",
   );
-  it.todo(
-    "T4.5: a keystroke issues commit(input) and the frame is drawn before the next keystroke is processed — waits on C17",
-  );
-  it.todo(
-    "T4.6: typing while a stream commits at 16 ms intervals — every keystroke frame immediate, none behind a stream frame — waits on C17. T3.23 asserts the same property deterministically and does not wait on it",
-  );
+  it("T4.5 (with C17): a keystroke's frame is drawn before the next keystroke is processed", () => {
+    // Against a real editor, which is what the deferral was waiting for. The
+    // property is about *ordering*, not about the buffer, so the assertion is
+    // that the frame for keystroke n exists before keystroke n+1 reaches the
+    // editor — a scheduler that coalesced input would leave the user typing
+    // ahead of the screen, which is the one latency nobody tolerates.
+    const { scheduler, lifecycle, render } = wire();
+    lifecycle.acquire();
+
+    const editor = createEditor();
+    const drawn: string[] = [];
+    render.mockImplementation(() => drawn.push(editor.text));
+
+    for (const ch of [..."git push"]) {
+      const before = render.mock.calls.length;
+      editor.insert(ch);
+      scheduler.commit("input");
+      expect(
+        render.mock.calls.length,
+        `"${ch}" drew no frame before the next keystroke`,
+      ).toBe(before + 1);
+    }
+
+    // And each frame saw the buffer as it was at that keystroke, in order. The
+    // count alone passes for a scheduler that draws eight identical frames.
+    expect(drawn).toEqual(["g", "gi", "git", "git ", "git p", "git pu", "git pus", "git push"]);
+    expect(editor.text).toBe("git push");
+  });
+
+  it("T4.6 (with C17): a keystroke never queues behind a stream frame", () => {
+    // The interleaving the deferral names: a stream committing on its 33 ms
+    // window while someone types. `input` is immediate and `stream` is not
+    // (§3), so every keystroke draws on the spot and the stream's pending frame
+    // is what waits — not the other way round.
+    const { scheduler, lifecycle, clock, render } = wire();
+    lifecycle.acquire();
+
+    const editor = createEditor();
+    const reasons: string[] = [];
+    render.mockImplementation(() => reasons.push(editor.text === "" ? "stream" : "input"));
+
+    scheduler.commit("stream");
+    expect(render, "a stream frame waits for its window").not.toHaveBeenCalled();
+
+    // Typed inside the stream's window. Each draws immediately, and the stream's
+    // frame has still not been drawn.
+    for (const ch of [..."ls"]) {
+      editor.insert(ch);
+      scheduler.commit("input");
+    }
+    expect(reasons, "two keystrokes, two immediate frames").toEqual(["input", "input"]);
+
+    // And the stream's pending frame is **absorbed** rather than drawn late.
+    // I4's reason — the pending frame would draw the same state — so the
+    // keystroke's frame carries the stream's content and the timer is
+    // cancelled. Written this way because the first draft asserted a third
+    // frame after the window and there is none: typing during a stream costs
+    // the stream nothing and delays nobody.
+    clock.advance(50);
+    expect(
+      render.mock.calls.length,
+      "the keystroke's frame carried the stream's content; no late frame follows",
+    ).toBe(2);
+    expect(scheduler.pending).toBe(false);
+  });
 });

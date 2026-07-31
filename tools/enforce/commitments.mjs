@@ -402,6 +402,7 @@ export const OWNERS = [
   { path: "src/viewport/viewport", spec: "C14" },
   { path: "src/viewport/overlay", spec: "C15" },
   { path: "src/interaction/router", spec: "C16" },
+  { path: "src/interaction/editor", spec: "C17" },
   { path: "src/testing", spec: "C09" },
 ];
 

@@ -411,7 +411,7 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T3.3**: motions on an empty buffer → all no-ops, cursor stays 0.
 - **T3.4**: `wordRight` at the end, `wordLeft` at the start → no-ops.
 - **T3.5**: a buffer of only whitespace → word motions traverse it without looping.
-- **T3.6** (I20): `displayRows` at width 1 → one row per grapheme, a two-cell cluster included; no division by zero and no dropped text. §7b records that the terminal draws two cells where the count says one at `usable ≤ 1`, and that nothing floors the width.
+- **T3.6** (I19, I20): `displayRows` at width 1 → one row per grapheme, a two-cell cluster included, **plus I19's trailing row**: `日本語` at width 1 with a zero gutter is **four** rows, because the count is positions and the last cluster fills its row exactly. No division by zero and no dropped text. Three was the number before the walk was run, and it is the same off-by-one as T3.8b wearing a different coat. §7b records that the terminal draws two cells where the count says one at `usable ≤ 1`, and that nothing floors the width.
 - **T3.7** (I20): a double-width glyph straddling the wrap boundary → wraps whole, and `displayRows` accounts for the wasted cell. At width 9 with `{2,2}`, `ab日本語` is `ab日本` and `語`.
 - **T3.8** (I19): a buffer ending in `\n` → the trailing empty line counts as a row.
 - **T3.8b** (I19): a logical line whose last cluster exactly fills its row → the trailing row is emitted, and `abcdefgh\nx` at width 10 with `{2,2}` is **three** rows. `ceil` gives two and leaves the cursor at index 8 with no row.

@@ -188,7 +188,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG12 | C15 imports nothing from `terminal/` or C14 | C15 I12, T2.6 |
 | MG13 | C15 imports nothing from C13 — the table's first *sideways* prohibition | C15 I9, T2.5 |
 | MG14 | C16 imports nothing from `terminal/` | C16 T2.7 |
-| MG15 | C17 imports nothing from `terminal/` | C17 T2.6 |
+| MG15 | C17 imports nothing from `terminal/` — the reachable form is reading a width rather than being handed one | C17 I10 · C17 T2.6 |
 | MG16 | C18 imports nothing from `terminal/` or `presentation/` | C18 T2.4 |
 | MG17 | C19 imports nothing from `terminal/` | C19 T2.5 |
 | MG18 | C20 imports nothing from `terminal/`; no C17 import | C20 T2.5, T2.6 |

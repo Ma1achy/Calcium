@@ -243,6 +243,16 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import type { TerminalLifecycle } from "../../terminal/lifecycle.js";',
   },
   {
+    // MG15's, in the form someone would actually write it. Asking C01 for the
+    // width reads as *more* correct than reading `stdout.columns` — it is the
+    // component that owns the number — and it is the import that turns the
+    // editor into something nothing can measure at a width other than the
+    // terminal's, which is what T2.1's corpus at widths 20 to 200 needs.
+    rule: "MG15",
+    file: "src/interaction/editor/layout.ts",
+    source: 'import type { TerminalLifecycle } from "../../terminal/lifecycle.js";',
+  },
+  {
     rule: "MG20",
     file: "src/terminal/frame-scheduler.ts",
     source: 'import { ALT_SCREEN } from "./escapes.js";',
@@ -713,7 +723,6 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // more than `SS` rows. Each waits on the component whose directory it scopes
     // to; none of these exists, so the rule would have nothing to match.
     MG14: "C16",
-    MG15: "C17",
     MG16: "C18",
     MG17: "C19",
     MG18: "C20",
