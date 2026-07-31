@@ -180,7 +180,23 @@ Two rows of pills when the candidate set is short, a table when entries have `de
 
 Truncation is reported by C15 through `Placed.truncated`; **C19 renders the "N more" indicator itself**, because only C19 knows what the remainder is (C15 I8).
 
-Arrow keys move the selection, `Enter` accepts, `Esc` dismisses. Those bindings are C16's, dispatched to the `overlay` target.
+Arrow keys move the selection, `Enter` accepts, `Esc` dismisses. Those bindings are C16's, dispatched to the `overlay` target — C16's `defaultKeymap` says in as many words that C18, C19 and C20 add their rows when they land, so these are C19's to write:
+
+| Target | Key | Action |
+|---|---|---|
+| `prompt` | `tab` | `complete` |
+| `prompt` | `right` | `acceptGhostOrForward` |
+| `overlay` | `tab` | `menuNext` |
+| `overlay` | `down` | `menuNext` |
+| `overlay` | `up` | `menuPrev` |
+| `overlay` | `enter` | `menuAccept` |
+| `overlay` | `escape` | `dismiss` |
+
+**`→` is one action, not two, and the keymap is what forces it.** C16 raises a `KeymapError` on a duplicate `(target, key)` rather than shadowing, so "accept the ghost" cannot be a second row beside "move the cursor forward" — the fallback lives in the handler. Worth stating because the natural design is two rows, and it fails at construction rather than at the keystroke, which is a startup crash rather than a bug but is still a rewrite of the seam.
+
+**`overlay`/`escape` is generic rather than C19's alone**, and it lands here because C19 is the first dismissable overlay to arrive. It must respect `dismissable`, so a confirm still refuses `Esc` (C16 T4.2) — C15's `pop()` already inspects only the top and returns the layer rather than a boolean, which is what makes one row correct for both cases.
+
+`Esc` reaching this row is distinct from Ctrl-C reaching rung 3 of C16's ladder: the ladder pops the same layer, so the two agree, and neither is implemented in terms of the other.
 
 **The menu is pushed once and changed in place.** Narrowing on a keystroke and re-highlighting on an arrow are `update(id, { content })`, not a dismissal and a fresh push — C16 derives focus on every dispatch (C16 I1), so a pop and a push per character churns focus inside the thing being typed into. The change log over a completion is one `push`, N `content` and one `pop` (C15 T4.7b).
 
@@ -461,6 +477,8 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T4.4** (with C15): the menu opens as an anchored overlay and **flips above the prompt** when there is no room below.
 - **T4.5** (with C15): C19 renders the "N more" indicator from `Placed.truncated`.
 - **T4.6** (with C16): `Tab` reaches completion only when the prompt has focus; with the menu open, arrows route to the overlay.
+- **T4.6b** (with C16): C19's seven rows construct into `defaultKeymap` without a `KeymapError`, and every one decodes from a real wire form — C16 T2.13's check applied to the rows this component adds.
+- **T4.6c** (with C16, C15): `Esc` on a non-dismissable confirm raised over the menu is a no-op and the menu beneath it survives; the same row dismisses the menu when it is on top.
 - **T4.7** (with C17): accepting a candidate is one undo unit; a single `undo` reverts the whole insertion.
 - **T4.8** (with C10, C02): the menu renders in both themes and under `unicode: "ascii"` with unchanged geometry.
 
