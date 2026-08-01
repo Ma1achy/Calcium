@@ -78,6 +78,8 @@ with `gutter = { first: 2, cont: 2 }` (D24a, C22 §6).
 
 **The prompt draws the rows C17 measured, rather than wrapping the buffer again.** `editor.layout(width, gutter)` returns the display rows and this surface pads each by the gutter it passed in — the first by `first`, the rest by `cont` (C17 I18, §7b). A second wrap here would be C09 I1's divergence in the one place it moves the whole frame: the two would agree on ordinary commands and part company at a wrap boundary, a double-width glyph, or a line that exactly fills its row, which is where a prompt one row off comes from.
 
+**The rows painted are the rows the frame was composed from, and the two are compared before output.** The prompt's height enters the frame twice — once as a number, when the regions are computed, and once as rows, when the prompt is drawn. The sum check cannot see those two disagree: it checks the composed frame against itself, and header + viewport + prompt + footer stays equal to `rows` whatever number the prompt was composed with. A frame composed against a one-row prompt and painted from three is internally coherent and describes a different prompt than the one the editor holds — and what reaches the screen is the degeneracy above, a lone `⋯`. So `promptWanted` is compared with the rows handed to the paint, and a frame that fails the comparison draws the fallback exactly as a frame whose heights do not sum does.
+
 Every derived height is clamped at zero or greater, and the sum is asserted equal to `rows` before any output is written.
 
 ---
@@ -184,6 +186,7 @@ Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` 
 12. Session state survives the too-small state; it is a render mode, not an error.
 13. The prompt draws the rows `editor.layout` returned rather than wrapping the buffer a second time.
 14. The elision marker needs a row to sit beside; at a prompt cap of one the last row is shown and no marker is.
+15. The prompt height the frame is composed with and the row count it is painted from are compared before output; a frame where they disagree draws the fallback.
 
 ---
 
@@ -199,7 +202,7 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T1.4**: at `rows = 16` with a 40-row prompt → prompt capped at 8, viewport 6, footer and header 1 each.
 - **T1.5**: the windowed prompt shows the rows around `cursorCell.row`, with `⋯` on each elided edge.
 - **T1.5b** (C14): a three-row prompt at a cap of one → the last row is rendered and no `⋯` appears.
-- **T1.5c** (C4, C13): a session whose editor holds a wrapped buffer → the frame's `promptRows` is what `layout` returned, and the painted prompt contains the typed text. The height the frame is composed with and the rows it is painted from are two records of one number, and this is the only test that compares them.
+- **T1.5c** (C15): a frame composed for a one-row prompt and painted from three rows → refused before output, and the fallback is drawn rather than a prompt windowed to nothing. The state cannot be reached from a session until input is accepted (C22 §4 step 8), so the divergence is closed by a comparison rather than by a test of the wiring.
 - **T1.6**: each health state renders its documented glyph and tone — four cases.
 - **T1.7**: `expiring` with a live cluster → `expiring` wins.
 - **T1.8**: header elision at 100, 90, 89, 80, 79, 70 and 69 columns → the documented fields are present at the boundary and absent one cell below it.
@@ -271,7 +274,7 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T6.8** (C11): using `×` in the fallback → T3.11's ASCII case fails on a non-UTF-8 terminal.
 - **T6.9** (C12): discarding state on the too-small transition → T3.13 fails.
 - **T6.10** (T4.7): committing the clock as `"input"` → keystroke latency regresses under an idle clock.
-- **T6.12** (C4): composing the frame with a constant prompt height while painting the editor's rows → T1.5c fails, and a wrapped prompt paints as a single `⋯` with the command invisible.
+- **T6.12** (C15): removing the comparison → T1.5c admits a frame composed for one prompt row and painted from three, which is what the session shipped: a wrapped prompt drawn as a single `⋯`, invisible to the sum check because that check compares the frame with itself.
 - **T6.13** (C14): restoring the marker at a cap of one → T1.5b fails, and the prompt shows the marker and nothing else.
 
 ---
