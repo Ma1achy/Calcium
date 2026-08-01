@@ -202,8 +202,36 @@ action read as fired from a frozen entry.
 
 Neither is a subtle failure once seen, and both cost a diagnosis each. A stub
 that exists to satisfy a type is a stub that will be called eventually, and
-`as never` is the shape that makes the call site look checked. Either give the
-fake a working implementation, or make the harness assert it is unused.
+`as never` is the shape that makes the call site look checked.
+
+### The default is the real constructor
+
+**Build a double from the component's own constructor unless there is a reason
+you cannot.** Not "write a fake and prove it responds" — that is the fallback,
+for the cases where a real collaborator would reach a network, a clock or a
+disk. Where the constructor is pure and dependency-free, the object literal is
+never the cheaper option; it is the one that fails silently later.
+
+Six doubles in one session satisfied a type and could not do the thing they
+stood in for:
+
+| Double | What it could not do |
+|---|---|
+| `fakeStdin`'s `on` | returned the stream and discarded the callback, so it could never deliver a byte |
+| `{ isRaw: false } as ReadStream` × 4 | had no `on` at all; ten tests failed the moment C01 called it |
+| `{ setText, text }` editor × 2 | had no `clear`, which C23's submit path gained (C23 I28) |
+
+None was bad luck. **The common factor is that all six were written to satisfy a
+signature rather than to stand in for a component** — and a signature is exactly
+what a later edit widens. `createEditor()` was available the whole time and takes
+no arguments; the literal was easier to type and inert.
+
+Inverting the default is cheaper as well as safer: a real double gains new
+methods when its component does, so the failure mode becomes a compile error or
+a loud call rather than a stub that quietly answers wrongly.
+
+Where a real one genuinely will not do, the original rule stands: give the fake a
+working implementation, or make the harness assert it is unused.
 
 ## A tier-4 fake is a tier-4 defect
 
