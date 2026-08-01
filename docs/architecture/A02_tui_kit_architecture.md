@@ -175,6 +175,7 @@ No component reaches sideways or upward to cause an effect in another. Where an 
 | Pop a pushed view | `overlays.pop()` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) | C23 |
 | Stall detected | inject a notice patch → `commit("stream")` (C23 §3b, I25) | C23 |
 | View refresh tick | `fetch()` → patch the layer → `commit("stream")` (C23 §3b) | C23 |
+| Identity notice | C22's identity loop signals → compose → `transcript.append` with `origin: "refresh"` → `commit` (C22 §7, C23 §3b) | C23 |
 | `cd` / `export` | apply to `session` → `commit` | C23 |
 
 This is the rule that keeps L0's two halves unaware of each other and keeps L1 and L2 unaware of the terminal. It has caught four attempted violations during specification — contamination, invalidation, scroll commits and handoff — and it is the first thing to check when a component wants a dependency that feels awkward.

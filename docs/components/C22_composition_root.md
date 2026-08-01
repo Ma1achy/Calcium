@@ -222,13 +222,19 @@ be compared against — half a table checked against half a convention. The `Whe
 column is what makes that honest rather than a fourth copy: the sequences are
 specified in §3, §4 and §8 as they always were, and this table indexes them.
 
-**One row is unresolved and named rather than quietly listed.** §7's *token under
-one day* transition says a notice is committed to the transcript, and C23 §1 says
-C23 is the only component that appends documents. Either the identity loop reaches
-the transcript — which Seam 4 forbids — or the notice is C23's on a trigger C22
-raises, in which case it is a C23 row and needs an `origin` (C23 §3a) that §3b's
-two mechanisms do not currently produce. C23 §8b resolves it; it is recorded here
-so the question has a home until then.
+**The identity notice is C23's, on a signal from here, and it is not in the table
+above for that reason.** §7's transitions say a notice reaches the transcript, and
+C23 §1 says C23 is the only component that appends. Both are correct where they
+stand, so it was a ruling rather than a defect: **C22 signals, C23 appends** —
+the identity loop produces a *fact* and not an entry, which is every other Seam 4
+row's shape. Letting the loop reach the transcript would have made C22 an appender
+and undone the single-appender rule for one notice.
+
+Landing it closed a hole worth more than the row. C23 §3b had two mechanisms and
+both *patch*; `meta.origin` is a field on an appended document, so `origin:
+"refresh"` had no producer and read as reserved while being unreachable. The
+identity notice is the third mechanism and the only one that appends, which is the
+cell that value was reserved for.
 
 ---
 
@@ -322,7 +328,7 @@ The prompt is `❯ ` and its gutter is `{ first: 2, cont: 2 }`, passed to C17's 
 
 Identity is fetched at startup and refreshed on a five-minute cadence against the injected clock. **That loop covers identity only** — any live part in the banner or elsewhere is driven by C23 §3b, so there is one refresh mechanism rather than two (C24 §5). Two transitions commit a notice to the transcript rather than only changing the header:
 
-**Token under one day** — `Token expires in 14h — run /login to refresh`.
+**Token under one day** — `Token expires in 14h — run /login to refresh`. **C22 signals and C23 appends it** (C23 §3b), with `origin: "refresh"`; the loop produces the fact and never reaches the transcript.
 
 **Token expired** — the next verb fails with the auth envelope. **C23 detects it during adaptation and appends the notice**, because it is an execution outcome and C23 owns the transcript. C22 owns only the state: it holds the failed command in `session.retained` and sets `health`. `retry` re-runs the retained command through C23's normal path.
 

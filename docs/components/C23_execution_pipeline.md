@@ -154,7 +154,7 @@ C23 is the only component that appends documents, so it is the only one that can
 |---|---|
 | `user` | A typed submission from the prompt |
 | `action` | An `exec` action dispatched from a block (§3a) |
-| `refresh` | A time-driven tick — stall notice or part refresh (§3b) |
+| `refresh` | An identity transition signalled by C22, appended here (§3b). **The only path that sets it** — the stall notice and a part refresh both *patch*, and a patch carries no `meta` |
 | `agent` | Reserved. Nothing produces it in v1 |
 
 `origin` is not a debugging field. It is what makes a transcript legible once more than one thing is putting entries into it, and a provenance field that can be absent is one nobody trusts.
@@ -165,7 +165,8 @@ C23 is the only component that appends documents, so it is the only one that can
 
 Adapters are pure and read no clock (C07 I1); C15's layout is pure (C15 I5). **Anything periodic is therefore C23's, using C22's injected clock.**
 
-Two cases, one mechanism.
+Three cases. **Two patch an existing host and one appends**, and that distinction
+is what §3b was missing rather than a detail of it.
 
 **Stall detection.** A streaming entry that has received no patch for **120 s** gets a synthetic notice patch — `no output for 2m` in muted tone — replaced on the next real patch and removed if output resumes. It is not an error: a build pulling a large base layer is silent for minutes, and the honest reading of a motionless block is usually "working". Saying how long it has been quiet is better than implying a fault or saying nothing.
 
@@ -184,7 +185,28 @@ C23 drives each on the injected clock and applies the result as a patch to the l
 
 A refresh that throws is contained to its own declared part: the rest of the view is untouched, and backoff doubles from the interval to a 5-minute cap. Recovery resets it. This is A02 §7's one backoff rule, and C23 is its only implementation — no part rolls its own.
 
-Both mechanisms stop when the entry settles or the view pops.
+**Identity notice.** C22's identity loop (C22 §7) reaches a transition worth
+saying out loud — a token inside one day of expiry, or one that has expired — and
+**signals C23, which appends the notice.** C22 produces the fact; C23 sequences
+the entry, which is every other Seam 4 row's shape and keeps C23 the only
+component that appends (§1). The alternative reading, letting the identity loop
+reach the transcript itself, makes C22 an appender and undoes the single-appender
+rule for one notice: a large concession for a small case.
+
+**This is the sole producer of `origin: "refresh"`** (§3a), and until it was
+written that value had none. Both mechanisms above *patch* — the stall notice
+patches its streaming entry, a part refresh patches its layer — and `meta.origin`
+is a field on an appended document. So the origin table named two mechanisms
+neither of which could set it: a value that reads as reserved and was
+unreachable, which is A03 §2's vacuity class in a field rather than in a rule.
+
+**It is the one case with no host to stop with.** The first two stop when the
+entry settles or the view pops; an identity notice is a standalone entry that
+scrolls like any other, and nothing ends it because nothing is holding it. That
+asymmetry is the reason it is a third case and not a third instance of the
+second.
+
+The first two mechanisms stop when the entry settles or the view pops.
 
 ---
 
@@ -204,6 +226,7 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 | Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — **never pop-and-repush** (C19, C15 §2) |
 | History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` |
 | Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) |
+| Identity notice | C22's identity loop signals → compose the notice → `transcript.append` with `origin: "refresh"` → `commit` |
 | `cd` / `export` | apply to `session` → `commit` |
 
 Every one of these crosses a layer boundary that the components deliberately do not cross themselves. Four were caught as attempted violations during specification; this table is where they resolved.
@@ -274,13 +297,13 @@ Per submission.
 - **I16** — C23 is the sole supplier of `onAction`.
 - **I17** — `open` actions go through the injected opener with an `http`/`https` scheme check, never through a shell.
 - **I18** — Actions originating from a frozen entry are refused.
-- **I19** — Stall detection and part refresh are C23's, on C22's injected clock. No adapter, view, layer or entry reads a clock.
+- **I19** — Stall detection, part refresh and the identity notice are C23's — the first two on C22's injected clock, the third on C22's signal. No adapter, view, layer or entry reads a clock, and no component but C23 appends.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
 - **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
 - **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I25) and applied by the sequence (C09 I17). The rule has teeth in one direction only: C23 may not *add* rhythm.
-- **I25** — A stream producing nothing for 120 s appends a muted stall notice, and never an error. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
+- **I25** — A stream producing nothing for 120 s is **patched** with a muted stall notice, and never an error. A patch rather than an append, so it replaces cleanly on the next real patch and never becomes a second entry — and so it carries no `meta.origin`, which is why it is not I22's business. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
 - **I26** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
 
 ---
@@ -305,7 +328,7 @@ Per submission.
 16. C23 supplies `onAction`; `exec` re-enters the normal submission path (I16).
 17. `open` is scheme-checked and never shelled (I17).
 18. Actions from frozen entries are refused (I18).
-19. Anything periodic is C23's, on the injected clock; nothing below L4 reads time (I19).
+19. Anything periodic is C23's, on the injected clock, and so is the identity notice C22 signals; nothing below L4 reads time and nothing but C23 appends (I19).
 20. A stream silent for 120 s gets a muted stall notice, never an error (I25).
 21. View refreshes are staggered by offset and fail in isolation (I20, I21).
 22. C23 sets `meta.origin` on every append; provenance is never absent (I22).
