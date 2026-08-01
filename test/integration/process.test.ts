@@ -14,6 +14,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { pipelineHarness, settled } from "../support/execution.js";
+import { buildGraph } from "../support/session.js";
+import { MODES } from "../support/fake-terminal.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import { createSubprocessTransport } from "../../src/data/transport/index.js";
 import { fakeClock } from "../support/fake-scheduler.js";
@@ -238,7 +240,48 @@ describe("C21 with C06", () => {
     expect(entry?.doc.status, "the failure is reported rather than swallowed").toBe("error");
     expect(JSON.stringify(entry?.doc)).toMatch(/raw mode/);
   });
-  it.todo("T4.7 (with L4): session exit calls killAll before the terminal is released — waits on L4");
+  it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
+    // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
+    // child still running when the alternate screen is released writes onto the
+    // restored primary one, over whatever the user is looking at.
+    //
+    // `killAll` is not called from `stop` — it runs inside `beforeRelease`
+    // (C22 §8 step a), which C01 invokes once before the *first* release. That
+    // parenthesis in Seam 4's row is the step, and reading the row without
+    // reading `shutdown.ts` reads as a missing one.
+    const { graph, stdout } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    // A real child, through the graph's own runner. `beforeRelease` looks
+    // `killAll` up on the runner at call time, so recording over it is seen —
+    // and the child is real, so `live` emptying is a fact about processes
+    // rather than about a counter.
+    const child = graph.runner.spawnShell("sleep 30", { cwd: () => process.cwd() });
+    expect(graph.runner.live, "a child is running").toHaveLength(1);
+
+    let killedAt = -1;
+    const killAll = graph.runner.killAll.bind(graph.runner);
+    Object.defineProperty(graph.runner, "killAll", {
+      configurable: true,
+      value: () => {
+        killedAt = stdout.output.length;
+        return killAll();
+      },
+    });
+
+    expect(stdout.output.indexOf(MODES.altScreenOff), "the screen is still held").toBe(-1);
+    graph.lifecycle.release();
+
+    expect(killedAt, "killAll ran at all").toBeGreaterThanOrEqual(0);
+    expect(
+      killedAt,
+      "signalled before the first release byte — a child outliving the alternate " +
+        "screen writes over whatever the user is looking at",
+    ).toBeLessThanOrEqual(stdout.output.indexOf(MODES.altScreenOff));
+
+    await child.exited;
+    expect(graph.runner.live, "and nothing survives it").toHaveLength(0);
+  });
 });
 
 describe("C21 against the fake it replaced", () => {
