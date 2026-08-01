@@ -143,10 +143,14 @@ Invalidation:
 |---|---|
 | `append` | Measure one entry; push onto the index |
 | `patch` | `rev` changed → remeasure that entry, **overwrite its slot**, update the index by the delta |
-| `settle` | Nothing; settling does not change content |
+| `settle` | **Remeasure that entry, exactly as `patch` does.** A bare `settle(id)` changes nothing and its cached height is returned unchanged, so sharing the arm costs a lookup; `settle(id, doc)` replaces the document and moves `rev`, which is a content change by any reading |
 | `evict` | Delete those ids; advance the front offset, and rebuild if it now exceeds the live count |
 | `clear` | Drop everything |
 | Width change | Drop everything, rebuild the index |
+
+**The `settle` row said "Nothing" and was true when it was written.** C13's `settle(id)` ended a stream and left the document alone, so there was nothing to remeasure. `settle(id, doc)` arrived later — C13 §settle, ruled while C23 was being built — and it *replaces* the document and moves `rev`. The row was not re-read, and the consequence is the failure the paragraph below already describes: the app route appends a pending entry with no blocks, measures it at zero, settles it with the real document, and the height stays zero. `totalRows` of 0, an empty visible range, and a blank screen with an entry sitting in the store.
+
+**Found the same way as last time — by reading a frame.** Every unit test of every piece passed: C13 settles correctly, C14's cache invalidates on `rev` correctly, C09 measures correctly. Nothing compared the transition. That is the second instance of this exact symptom in this component, and the first is described immediately below.
 
 **The table reads as though each `Change` arrives at a store that changed only in that way, and C13 does not work like that.** One `transcript.append()` emits `append` **and then** `evict`, so when the `append` row above runs, the entry list has *already* lost its front and gained the eviction marker at its head. "Measure one entry; push onto the index" is correct only when nothing was evicted alongside, and the `evict` that follows is then repairing an index that desynchronised one row earlier.
 
@@ -343,6 +347,8 @@ Fake heights, no rendering.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
 - **T5.6**: copy mode selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text.
 
+- **T4.10** (with C13, §4): an entry appended empty and streaming, then settled with a document → `totalRows` covers its rows and `visible()` includes it. **The transition rather than either end**: `settle(id, doc)` is newer than this component's invalidation table, and both halves were separately correct while nothing measured the entry after the settle.
+
 ### Tier 6 — fail-on-revert
 
 - **T6.1** (I4): recomputing `topRow` from an index rather than the anchor → T1.10 and T5.3 fail; the view jumps whenever a stream above it grows.
@@ -356,6 +362,7 @@ Fake heights, no rendering.
 - **T6.9** (I10): an off-by-one in the visible range → T2.1 fails across the corpus.
 - **T6.10** (I14): dropping the prior follow state on copy-mode exit → T1.14 fails and users are stranded detached.
 - **T6.11** (I11): shelling out to a clipboard binary → T2.4 fails.
+- **T6.13** (§4): restoring `settle` to "invalidates nothing" → T4.10 fails, and the app route's entry has zero height for the rest of the session: appended with no blocks, measured at zero, settled with the real document, never remeasured. The screen is blank with the entry in the store, and every assertion about anchors, clamping and the cache passes.
 - **T6.12** (I12): C14 calling `commit` directly → T4.8's spy fails, and L2 gains a dependency on L0-terminal.
 - **T6.13** (I13): special-casing the eviction marker → T4.3's cache-delta assertions fail on the marker entry.
 - **T6.14** (I3): reading `(entryId, rev, width)` as a composite map key → T2.3b fails, and a `--watch` at a thousand lines a second accumulates a slot per tick. T2.3 still passes, which is why T2.3b exists.
