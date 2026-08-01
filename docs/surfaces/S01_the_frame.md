@@ -84,6 +84,56 @@ Every derived height is clamped at zero or greater, and the sum is asserted equa
 
 ---
 
+## 3a. Layers float, and the arithmetic above cannot see them
+
+A layer takes no rows from the four regions — it is drawn over the frame after
+they are painted, so `viewportRows` is the same with three overlays open as with
+none. **That is why the sum check could not see that nothing drew them at all.**
+C15 has been placing layers correctly since it landed and no component composited
+one, so the completion menu, reverse search and the exit confirm were all
+invisible while every height in §3 held at every width. A check that catches a
+region wrong by one row cannot catch a region that is never drawn.
+
+**A layer's box is relative to the viewport region, and the drawer adds that
+region's top.** C15 receives the region as a parameter to `layout()` and holds no
+geometry of its own — that is why it imports neither C14 nor `terminal/`. Handing
+it the whole terminal instead would require it to know where the viewport sits,
+which means knowing the header's height, which is this section's arithmetic
+arriving inside a component that was built specifically not to have it. So:
+
+```
+layout region  = { width: columns, height: viewportRows }
+frame row      = headerRows + placed.top
+frame column   =              placed.left
+```
+
+Three consequences, and each is a rule somewhere else that this one settles:
+
+- **A pushed view fills the viewport and nothing else.** Header and footer are
+  untouched (C15 T4.4), and the drawer treats it as a layer whose box *is* the
+  region rather than as a replacement for the transcript — one compositing rule
+  for both layer kinds instead of a second one that only view layers take.
+- **The prompt's anchor is a region row**, which puts it one row past the
+  region's bottom edge, because the prompt is not in the viewport. A menu
+  preferring `above` then occupies the last rows of the viewport, directly over
+  the transcript and immediately above the line it belongs to; `below` has no
+  room and flips. This is the one conversion where a region row and a terminal
+  row differ by exactly the header's height, and an off-by-one produces a menu
+  overlapping the line it was raised from.
+- **A mouse event is translated once, for both rungs.** C16 tests a point
+  against a layer's box and against the viewport, and the two must be in the
+  same coordinate system or a click near a layer's edge resolves to the row
+  above the one it landed on (C16 §4).
+
+**Every cell of a layer's box is written, background included.** The prompt or
+the transcript beneath it has already painted those cells, so a drawer that
+writes only the glyphs its blocks produced leaves the old content showing in the
+gaps — and the symptom is text bleeding through a menu, which reads as a renderer
+defect rather than as a compositing one. Layers are drawn in the order `layout()`
+returns them, bottom-first, so the top layer wins every cell it covers.
+
+---
+
 ## 4. Fields
 
 ### Header — left to right
@@ -187,6 +237,7 @@ Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` 
 13. The prompt draws the rows `editor.layout` returned rather than wrapping the buffer a second time.
 14. The elision marker needs a row to sit beside; at a prompt cap of one the last row is shown and no marker is.
 15. The prompt height the frame is composed with and the row count it is painted from are compared before output; a frame where they disagree draws the fallback.
+16. **Layers are composited over the four regions and take no rows from them.** A layer's box is relative to the viewport region and the drawer adds that region's top; every cell of the box is written, background included; the top layer wins each cell (§3a).
 
 ---
 
@@ -210,6 +261,10 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T1.9**: cluster and health survive at 60 columns.
 - **T1.10**: `activeTarget === "liveBlock"` → row-key footer; anything else → shell-key footer.
 - **T1.11**: the gutter is drawn beside exactly the entries whose `VisibleRange.live` is true.
+- **T1.12** (§3a): a layer placed at `top: 0` in the region draws on the frame's second row, not its first — the header survives, and the one conversion where a region row and a terminal row differ by exactly the header's height is asserted at the anchor as well as at the frame. At the frame an off-by-one reads as a rounding choice; at the anchor it is a wrong number.
+- **T1.12b** (§3a): a layer whose blocks produce no glyph for a cell inside its box still writes that cell — the prompt beneath does not show through. Asserted against a layer narrower and shorter than its box, because a full-bleed one passes whatever the loop does.
+- **T1.12c** (§3a): two overlapping layers → the later-pushed one owns every shared cell, and the earlier one owns the rest of its own box.
+- **T1.12d** (§3a): a pushed view fills the viewport region and leaves header, prompt and footer exactly as they were painted (C15 T4.4, from the frame's side).
 
 ### Tier 2 — contract / interface
 
@@ -275,6 +330,8 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T6.9** (C12): discarding state on the too-small transition → T3.13 fails.
 - **T6.10** (T4.7): committing the clock as `"input"` → keystroke latency regresses under an idle clock.
 - **T6.12** (C15): removing the comparison → T1.5c admits a frame composed for one prompt row and painted from three, which is what the session shipped: a wrapped prompt drawn as a single `⋯`, invisible to the sum check because that check compares the frame with itself.
+- **T6.14** (§3a): handing `layout()` the whole terminal instead of the viewport region → T1.12d fails, and a pushed view covers the header, the prompt and the footer. The failure is invisible to §3's sum, which holds at every width with every layer misplaced.
+- **T6.15** (§3a): writing only the glyphs a layer's blocks produced → T1.12b fails, and the prompt shows through the gaps in a menu, which reads as a C09 defect.
 - **T6.13** (C14): restoring the marker at a cap of one → T1.5b fails, and the prompt shows the marker and nothing else.
 
 ---
