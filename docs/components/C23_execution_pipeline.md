@@ -141,11 +141,15 @@ C09's `RenderContext.onAction` is supplied by C23. Nothing else may supply it �
 | `fill` | `editor.setText(command)`, cursor at end, one undo unit, then `commit("input")` and a fill-flash tick |
 | `exec` | Submitted through §2 exactly as if typed — same guard, same routes, same entry |
 | `open` | Handed to the injected `openUrl` (C22 §2); never spawned through a shell |
-| `expand` | A `replace` patch toggling the row's `expanded` flag (C04 §3) |
+| `expand` | An `op: "expand"` patch toggling the row's flag (C04 §4). **Not `replace`** — that arm carries data, and C13 gates data on the entry still streaming, so a `replace` would be rejected on every settled entry a reader would actually expand |
 
 `fill` populating the prompt rather than running is A01 D8's default, and it is why `production cancel <uuid>` is readable before it happens. Only filter pills use `exec`, because a filter is reversible.
 
 **`open` never goes through a shell.** A URL arriving from a far-side envelope is untrusted data, and `spawnShell("open " + url)` would be an injection through the one path that otherwise has none (D18). The opener takes a parsed URL and rejects any scheme outside `http` and `https`.
+
+**A refusal patches a notice into the entry that was acted upon. It never appends.** This is C23 §4's pop row one section over, and the reasoning transfers whole: an append freezes the block the action came from, so a second action on it is refused as *frozen* rather than for its own reason, and the selection A01 D7 preserves is cleared. A refusal that changes the thing it declined to act on is worse than the refusal.
+
+The mechanism differs from the pop's, because a pop has nothing to say and a refusal does. `patch(id, { op: "append", block: notice })` on the source entry works today — a frozen entry still accepts patches, which is what C13 §2's frozen-is-not-finished distinction was for. No new operation, no freeze, no selection loss, and the message appears where the reader was looking rather than at the bottom of a transcript they have scrolled away from.
 
 An action from a **frozen** entry is refused (A01 D5, C13 §2): frozen entries hold stale data and firing `↑ promote` from one is the footgun that rule exists to prevent. Actions from a frozen-but-streaming entry are refused for the same reason — it is not focusable, so an action on it can only have arrived by mistake.
 
@@ -313,7 +317,7 @@ Per submission.
 - **I15** — The displayed command and the spawned argv correspond exactly (D24).
 - **I16** — C23 is the sole supplier of `onAction`.
 - **I17** — `open` actions go through the injected opener with an `http`/`https` scheme check, never through a shell.
-- **I18** — Actions originating from a frozen entry are refused.
+- **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over.
 - **I19** — Stall detection, part refresh and the identity notice are C23's — the first two on C22's injected clock, the third on C22's signal. No adapter, view, layer or entry reads a clock, and no component but C23 appends.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
 - **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success.
@@ -345,7 +349,7 @@ Per submission.
 15. Submissions are refused once C22 sets `session.stopping` (I12).
 16. C23 supplies `onAction`; `exec` re-enters the normal submission path (I16).
 17. `open` is scheme-checked and never shelled (I17).
-18. Actions from frozen entries are refused (I18).
+18. Actions from frozen entries are refused, by a patch to the source entry rather than an append (I18).
 19. Anything periodic is C23's, on the injected clock, and so is the identity notice C22 signals; nothing below L4 reads time and nothing but C23 appends (I19).
 20. A stream silent for 120 s gets a muted stall notice, never an error (I25).
 21. View refreshes are staggered by offset and fail in isolation (I20, I21).

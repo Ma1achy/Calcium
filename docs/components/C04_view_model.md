@@ -379,12 +379,19 @@ type Action =
 
 ## 4. Patches
 
+**Four ops carry data and one carries view state, and that split is the whole reason the fifth exists.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
+
+Expressing it as `replace` was the first draft and it fails on that gate: an app verb's result is settled the moment it lands, so every entry worth expanding rejects the operation. C11 T4.7 and C25 I11 both say expansion reaches a *frozen* entry, which is true and insufficient — frozen and settled are different states, and only the first still accepts patches.
+
+A `viewState: true` flag on `replace` was the smaller change and is the worse one: it leaves one op meaning two things, and an adapter could set it to slip data past the gate. A named op is unambiguous at the call site and unforgeable at the boundary — the same argument as `settle(id, doc)` over a fourth patch op, one layer down.
+
 ```typescript
 type ViewPatch =
   | { op: "append";  block: Block }
   | { op: "replace"; blockId: string; block: Block }
   | { op: "merge";   blockId: string; rows: readonly MergeRow[] }
-  | { op: "status";  status: ViewDocument["status"] };
+  | { op: "status";  status: ViewDocument["status"] }
+  | { op: "expand";  blockId: string; rowId: string; expanded: boolean };
 
 type PatchResult =
   | Readonly<{ ok: true;  doc: ViewDocument }>

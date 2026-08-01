@@ -195,10 +195,16 @@ The payload arrives as `append`'s `opts.payload` and is discarded unread when re
 
 ## 6. Patching
 
+**`settled` gates data, not every patch.** The rule was written for data — a stream has ended, so nothing further can arrive from the far side, and a patch that says otherwise is a caller bug worth surfacing. Expansion is not data arriving: it is view state, and C11 T4.7 makes it a document patch precisely *so* it reaches a frozen entry and survives in the record.
+
+Gating it on `streaming` inverts that. An app verb's result is settled the moment it lands, so the entries a reader would expand are exactly the ones that reject the operation, while a live `--watch` — the one case where expanding is least useful — accepts it. C04's `op: "expand"` is what makes the distinction checkable rather than remembered: four ops carry data, one carries view state, and the gate reads the op rather than the caller's intent.
+
 ```
 patch(id, p):
   entry unknown            → { ok: false, reason: "unknown" }, store unchanged
-  entry not streaming      → { ok: false, reason: "settled" }, store unchanged
+  entry not streaming
+    and p carries data     → { ok: false, reason: "settled" }, store unchanged
+    and p is `op: "expand"` → applied; a reader may open a row on a finished table
   otherwise                → r = applyPatch(doc, p)
                              r.ok  → doc = r.doc; rev++; sweep; notify
                                      → { ok: true, rev }
