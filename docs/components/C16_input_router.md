@@ -109,7 +109,36 @@ type StoredFocus =
   | Readonly<{ at: "liveBlock"; rowId: string | null }>;
 ```
 
-It is a focus *location*, not a bit — when focus is in the live block, which row holds it is part of the same fact and has no separate owner. C09's `FocusState` is derived from this plus C13's `liveId`. `↓` from the prompt moves focus into the live block's rows; `Esc` returns it. C16 owns it, and **it resets to `{at: "prompt"}` on every C13 append** — running a command always returns focus to where the next one is typed.
+It is a focus *location*, not a bit — when focus is in the live block, which row holds it is part of the same fact and has no separate owner. C09's `FocusState` is derived from this plus C13's `liveId`. `↓` from the prompt moves focus into the live block's rows; `Esc` returns it.
+
+**`↓` is one binding with two effects, in order** (I22). The prompt's `↓` is
+`historyNext`, and this section's sentence says the same key enters the live
+block — two claims on one keystroke, which stood for four components with
+neither implemented: `enterLiveBlock` had no caller anywhere and focus could
+never leave the prompt in a live session, so C11's row keys were unreachable and
+`activeTarget` returned `liveBlock` for nobody.
+
+They are not competing cases. **C20's navigation already has a defined bottom** —
+`↓` past the newest entry restores the stashed draft — so entering the live block
+is what `↓` does *after* that end rather than instead of it. One key, one
+conceptual thing: move down through what is below the cursor. `historyNext`
+therefore gains one clause: with navigation inactive or already at the bottom, it
+enters the live block instead.
+
+**Focus must be able to come back, or entry is a session with no prompt.** Two
+ways, and both are advertised: `Esc` at the live block returns to the prompt —
+which S01's footer already prints as `esc prompt` — and `↑` from the *first*
+focusable row returns as well, mirroring the entry. Between rows, `↑` and `↓`
+move the selection.
+
+**And a live block with nothing focusable cannot be entered.** A notice or a raw
+block has no rows, so entering would put focus somewhere with nothing in it:
+`activeTarget` answers `liveBlock`, every key resolves against a target with no
+bindings, and they are dropped — the *somewhere invisible* symptom derived focus
+exists to prevent. The clause is a no-op in that case and `↓` does what it did
+before, which is nothing. Whether an entry is row-navigable is a question about
+the block and is answered from the block (C11's `focusableRowIds`, I14); C16
+takes the ids as data and holds no opinion about what a row is. C16 owns it, and **it resets to `{at: "prompt"}` on every C13 append** — running a command always returns focus to where the next one is typed.
 
 **L4 makes that reset as a call, and C16 does not subscribe to C13.** The information path is named here because leaving it implicit is how the same duty gets implemented twice or not at all. A subscription is constructible — `TranscriptView` exposes `subscribe` and C16 already takes the view — and it is the wrong mechanism, for a reason that is about the data rather than about layering: `Change` carries a single `append` kind, so a subscriber cannot tell a command outcome from a notice append (§2's bracketed-paste notice is one). The sentence above says *running a command* returns focus to the prompt, and only the caller knows it ran a command. So `resetFocus()` is on the interface and C23 §4's submit row calls it.
 
@@ -443,6 +472,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I19** — C16 names actions and executes none. The built-in names are a closed union and L4's effect table is total over it, so a binding with no executor and an executor with no binding are both compile errors — which is what makes `/help` rendering from the dispatch table a property rather than a coincidence. Block keymaps are open strings by design and dispatch through C23 §3a.
 - **I20** — A mouse event's row is translated into a region row **once**, and both positional rungs use the result. The event carries a 0-based terminal row; a layer's box and C14's entry map are both relative to the viewport region (S01 §3a, C15 I6). Two rungs of one table in two coordinate systems is a click near a layer's edge resolving to the row above the one it landed on — a wrong answer that reads as a placement defect in the component that placed it correctly.
 - **I21** — **C17's public surface is the action vocabulary for editing.** Every editing operation the editor exposes is named by exactly one `KeyAction`, and every editing `KeyAction` names exactly one of them. Totality over the union is what makes `/help` honest (I19), and totality over an incomplete union is honest about nothing: the union held no editing action at all while C17 implemented word motion, kill, yank and undo, so backspace did nothing at a real prompt and every check in the chain passed. Derived from the interface rather than maintained beside it, so a method added to C17 with no action fails rather than going unbound in silence.
+- **I22** — `↓` enters the live block only from the bottom of history, `Esc` and `↑`-from-the-first-row leave it, and an entry with no focusable row cannot be entered at all. One binding with two effects in order rather than two bindings competing for a keystroke: C20's navigation has a defined bottom, so entering is what `↓` does after that end. The three halves are one invariant because any one alone is a defect — entry with no exit is a session whose prompt is unreachable, exit with no entry is what shipped, and entry into a block with no rows drops every key silently.
 
 ---
 
@@ -466,6 +496,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 16. A suspension discards half-decoded state through `reset()`, which emits nothing; the decoder cannot see the gap and the shell calls it on resume (I18).
 17. C16 names actions and executes none; the built-in names are closed and L4's table is total over them, so `/help` cannot list a key that does nothing (I19).
 18. Both positional rungs test a region row, translated once from the event's terminal row (I20).
+20. `↓` at the bottom of history enters the live block; `Esc` and `↑`-from-the-first-row return; a block with no focusable row is not entered (I22).
 19. C17's public surface is the editing action vocabulary, and the bindings are readline's; each was pressed through the real decoder before being written down, and a candidate the decoder does not produce is dropped rather than met by widening the decoder (I21, I17).
 
 ---
@@ -513,6 +544,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T2.6** (I11): a source scan finds no scheduler call in `input/`.
 - **T2.7** (I13): the module graph shows no import from `terminal/`.
 - **T2.8**: `register` returns a disposable; disposing removes the handler mid-session.
+- **T2.15** (I22): the three halves, driven as one sequence against a real focus store and a real table — `↓` at the prompt with history available navigates history; `↓` again at the bottom enters the live block; `↑` moves between rows and returns to the prompt from the first; `Esc` returns from anywhere. Written as a sequence rather than four cases because the defect it replaces was an entry with no exit, which every case-at-a-time test passes.
+- **T2.15b** (I22): `↓` at the bottom of history with a live entry that has no focusable row leaves focus at the prompt. The control is the same sequence against an entry that does have rows, because a clause that never fires and a clause that always no-ops are the same green.
 - **T2.14** (I21): every editing operation on C17's `LineEditor` is reached by some binding in `defaultKeymap`, driven through L4's effect table against a real editor that records which of its methods were called. The non-editing surface — layout, measurement, the diagnostic counters — is named as an explicit exception with its reason, so a method added to C17 joins the covered set or the exception list deliberately. A count would have passed against a union with no editing action in it, which is the state this row was written in.
 - **T2.13b** (I17): every `key.name === "…"` literal under `src/` names a key the real decoder emits, against a set collected by pushing bytes through it rather than declared beside it. A declared set is a second table to drift from the decoder, which is the defect this rule is about. The fourth instance was a literal in a handler, which no walk of the keymap could reach.
 
@@ -572,6 +605,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.
 - **T6.4d** (I4, §5) — **structural guard, no failing test.** Reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails today, and the ladder is free to drift from `activeTarget` on the next edit touching one and not the other. Every other entry in this tier reads *change X → test Y fails*; this one names a change no assertion catches, and says so deliberately. Inventing an assertion that looked like a guard would be worse than pointing at the real one, which is **T2.5's exhaustiveness over `FocusTarget`**: while the rungs are handlers, a target with no binding is a compile-level gap, and the ladder cannot hold an order of its own to disagree with. Read this row as a signpost to that, not as an unfinished test (A02 §7).
+- **T6.21** (I22): removing the `Esc` binding at `liveBlock` → T2.15 fails at the return. The regression is a session whose prompt cannot be reached again, and nothing else in the tree notices.
 - **T6.20** (I21): removing an editing binding from `defaultKeymap` → T2.14 names the C17 method nothing reaches. The regression is silent everywhere else: the effect table is still total, `/help` still renders, and the key simply stops working.
 - **T6.15** (I19) — **structural guard, no failing test.** Widening `KeyAction` to `string`, or making L4's table partial, → nothing fails, and every binding is free to become one `/help` lists and nothing dispatches. The protection is the total `Record`, which is why this row names the shape rather than an assertion: the fourteen bindings had no executor at all while every test here passed, because a table of names is satisfied by names.
 - **T6.14** (I18): making `reset()` flush the accumulated run as keys rather than discard it → T1.16's heuristic case fails, and the characters a user typed at `vim` arrive at the prompt when they come back.
