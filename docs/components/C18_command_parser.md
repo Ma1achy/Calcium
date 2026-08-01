@@ -122,7 +122,7 @@ never needs to know what an fd is.
 0  a refusal (§5) — trailing bare "&", or a job-control
    word as the first token                           → error
 1  empty or whitespace only                          → empty
-1a first token is the TTY marker, unquoted (§5a)
+1a first token is the TTY marker (§5a)
      nothing after it                                → error
      next token is a built-in                        → error
      otherwise                                       → shell, interactive
@@ -267,8 +267,15 @@ rewrite never asks about the match because it never asks the manifest.
 ### What is refused, and where
 
 Rule 0 runs on the token list before anything else. A trailing bare `&` is the last
-token and `kind: "operator"`; a job-control word is refused **as a first token**, so
-`echo fg` is a line about the word `fg` and delegates.
+token and `kind: "operator"`; a job-control word is refused **as the line's command**,
+so `echo fg` is a line about the word `fg` and delegates.
+
+**Command, not position 0**, and the distinction only became visible when the TTY
+marker arrived. `/tty fg` is `fg` with the terminal asked for, and it wants the job
+table `fg` wants — but the marker sits at position 0, so a literal reading let it
+through. Until §5a there was no line where the two readings differed, which is why the
+original wording was correct and unfalsifiable at once: A03 §2's vacuity class in a
+sentence rather than in a rule. §8a's row is what asked.
 
 Quoting does not disable the refusal, for the reason interception ignores quoting
 (§4): `'fg'` is the `fg` built-in in bash, so it still wants a job table that still
@@ -313,8 +320,9 @@ consumes it during parsing and no route ever sees it. And it is not a `Builtin`:
 the marker has no effect at all. It modifies how the rest of the line is run.
 
 **It is read through the policy**, so `prefixPolicy(":")` gives `:tty` and `/tty` is
-then an ordinary path-ish token. The predicate is `verbOf(token) === TTY_MARKER`, which
-is §5's rewrite predicate with a name test added — one prefix rule, not two.
+then an ordinary path-ish token. The predicate is `verbOf(token) === TTY_MARKER` —
+rule 4's own question with a name test added, and deliberately *not* §5's rewrite
+predicate, which carries an unquoted clause this does not have.
 
 ### Head position only
 
@@ -333,16 +341,25 @@ That is the same outcome any other unknown `/verb` gets inside a delegated line,
 I17's principle is why: C18 may not disagree with the shell about which token is a
 command in a line it is handing over.
 
-### Quoting disables it, exactly as it disables the rewrite
+### Quoting does not disable it — and this was ruled the other way first
 
-`"/tty" vim` is a shell line running the command `/tty` with the argument `vim`.
-§4's asymmetry decides this and it decides it the same way: interception ignores
-quoting because quoting does not change what bash does with `cd`; the rewrite honours
-it because the rewrite is C18 *altering* what the user typed. Consuming the marker is
-altering what the user typed, and `sh` does nothing special with `/tty` either way —
-so a quoted marker is the user saying leave this alone, and there is nothing for them
-to be wrong about. It is also the escape hatch for anyone who really has a `/tty`
-binary.
+`"/tty" vim` is the marker, and hands `vim` the terminal.
+
+**The first ruling said the opposite** and reasoned from §4's asymmetry: the rewrite
+honours quoting because the rewrite is C18 *altering* what the user typed, and
+consuming the marker is altering what the user typed too. §8a's row is what corrected
+it, which is the artefact doing its job — the two statements were each right where
+they stood and could not both govern this cell.
+
+The marker is a **classification**, not a rewrite, and every classification rule here
+is quoting-blind: `'cd'` is the `cd` built-in (§4), `'fg'` is refused (§5), `'/ps'` is
+the app verb `ps` — and that last row already says so in this document, one table
+away. Quoting disables the rewrite alone, because the rewrite is the only thing that
+edits a string being handed to a shell that will read the quotes itself.
+
+The escape-hatch argument went with it. `'/ps'` offers no way to reach a `/ps` binary
+either, so the marker owing one was an argument for a symmetry the component does not
+have.
 
 ### `/tty` with a built-in is refused
 
@@ -589,16 +606,33 @@ applies is a restatement of §5a and is not here.
 | `ls \| /tty vim` | 3 × 5 | `shell` · `ls \| widget tty vim` · not interactive — command position, so the rewrite claims it (§5a) |
 | `/tty /ps` | 1a × 5 | `shell` · `widget ps` · **interactive** — one token consumed, the next rewritten, both on one line |
 | `/tty /usr/bin/less f` | 1a × 5 | `shell` · `/usr/bin/less f` · **interactive** — D23's slash rule still refuses the rewrite |
-| `"/tty" vim` | 1a × §4's asymmetry | `shell` · `"/tty" vim` · not interactive — quoting disables the marker as it disables the rewrite |
+| `"/tty" vim` | 1a × §4's asymmetry | `shell` · `vim` · **interactive** — **corrected.** The first ruling had quoting disable the marker; classification is quoting-blind and only the rewrite is not |
 | `/tty sleep 5 &` | 0 × 1a | `error` · the trailing-`&` refusal, because rule 0 runs on tokens before anything is classified |
-| `/tty fg` | 0 × 1a | `error` · job control is refused as a *first* token, and after the marker `fg` is one |
+| `/tty fg` | 0 × 1a | `error` · **corrected.** Rule 0 refuses job control as the line's *command*, and a leading marker is not the command — read as position 0 it let this through |
 | `/tty` under `prefixPolicy(":")` | 1a × I12 | `shell` · `/tty` · not interactive — and `:tty vim` is the marker |
 | `/tty vim` with a tool named `tty` | 1a × 4 | `error` · two records of one name, reported rather than resolved |
 | `/ttyx vim` | 4 | `error` · `unknown verb: /ttyx` — the marker is a name test, not a prefix test |
 
-Three of these were rulings rather than readings. `/tty pwd` is the one that argues
-for the whole table: refusing `cd` reads as obvious and refusing `pwd` does not, and
-`pwd` is where the wrong answer is least visible.
+Three of these were rulings rather than readings, and **two of the sixteen came back
+wrong when the table was replayed against the code** — which is the first time an
+artefact here has been corrected by its own replay rather than by a later component.
+
+`"/tty" vim` is the better of the two. The reasoning that produced the wrong answer
+was sound and cited the right section; it simply asked whether the marker resembles
+the *rewrite*, when the question was whether it resembles a *classification*. Every
+classification rule in §4 is quoting-blind and one of them is three tables above this
+one. A row governed by one rule would never have asked.
+
+`/tty fg` is the cheaper one and the more dangerous. Rule 0 says a job-control word is
+refused "as a first token", and with a marker in front of it `fg` is not the first
+token — so the refusal silently stopped applying to exactly the line that most wants
+it. **The wording was the defect**: rule 0 means the line's *command*, and until the
+marker existed those were the same thing, so nothing could tell the two readings
+apart. §5's paragraph now says command rather than first token.
+
+`/tty pwd` is the one that argues for the table having been written at all: refusing
+`cd` reads as obvious and refusing `pwd` does not, and `pwd` is where the wrong answer
+is least visible.
 
 ### What it found
 
@@ -686,10 +720,10 @@ with are different claims.
 - **I19** — `residual` on the result is exactly the array `validateInvocation` was given, and `validateInvocation` is called once per parse.
 - **I20** — `$_` expands where the following character is not a word character, matching the shell's own rule for the same sigil, and never inside single quotes.
 - **I21** — Tool lookup precedes `$_` expansion, and a failing validation keeps its `app` or `local` kind rather than becoming an `error`.
-- **I22** — The refusals are evaluated first and on tokens, never on the raw input; a job-control word is refused as a first token, quoted or not, because quoting does not stop bash treating it as the built-in — the same answer §4's interception gives.
+- **I22** — The refusals are evaluated first and on tokens, never on the raw input; a job-control word is refused as the line's **command** — position 0, or position 1 behind a TTY marker, which is not itself a command — quoted or not, because quoting does not stop bash treating it as the built-in — the same answer §4's interception gives.
 - **I23** — The distance-2 suggester is C05's; there is exactly one implementation, as there is exactly one tokeniser.
 - **I24** — A leading built-in with an empty remainder is not a split; it delegates whole, so a syntax error leaves the session's directory alone.
-- **I25** — The TTY marker is recognised at head position only, unquoted, through the policy. Elsewhere it is an ordinary rewrite candidate, because a line with a pipeline has no single owner to give the terminal to.
+- **I25** — The TTY marker is recognised at head position only, through the policy, and **quoting does not disable it** — classification is quoting-blind here as it is for built-ins, job control and app verbs; only the rewrite honours quoting. Elsewhere it is an ordinary rewrite candidate, because a line with a pipeline has no single owner to give the terminal to.
 - **I26** — The marker is stripped before delegation. A delegated command never contains it, on any route — `sh` would receive it as an argument.
 - **I27** — The marker with a `Builtin` after it is an error, and the built-in is not applied. The route destroys the effect, so giving the user one of the two things they asked for is worse than giving them neither and saying so.
 
@@ -720,7 +754,7 @@ with are different claims.
 21. Refusals run first, on tokens, and job control is a first-token word whether or not it is quoted (I22).
 22. One distance-2 suggester, shared with C05 (I23).
 23. An empty remainder is not a split (I24).
-24. The TTY marker is head-position, unquoted, policy-read, and always stripped before delegation (I25, I26).
+24. The TTY marker is head-position, policy-read, quoting-blind like every other classification rule, and always stripped before delegation (I25, I26).
 25. A marker with a built-in after it is refused rather than half-applied, and a marker with nothing after it is refused rather than delegated empty (I27).
 
 ---
@@ -796,8 +830,9 @@ Six tiers. No state machine — C18 is pure.
 - **T3.20** (§4): `'cd' /tmp` → `builtin`; quoting does not disable interception, and `echo "/ps"` in the same test does not get rewritten, so the asymmetry is one assertion.
 - **T3.21** (D18): `/tail *.log` → argv carries the literal `*.log`; `ls *.log` delegates.
 - **T3.22** (I17): `/zzzzz | cat` → delegated as `widget zzzzz | cat`; no manifest lookup occurs, proved by a spy on `findTool`.
-- **T3.23** (I25, I12): under `prefixPolicy(":")`, `:tty vim` is interactive and `/tty vim` is a plain shell line. Asserted as a pair, because a hardcoded `"/tty"` satisfies the first row and fails only the second.
-- **T3.24** (§5a): a manifest declaring a tool named `tty`, then `/tty vim` → `error` naming both records. The fixture manifest has no such tool, so this row builds its own — and it asserts the ordinary manifest still parses `/tty vim` as interactive, or the conflict rule is indistinguishable from the marker being broken.
+- **T3.23** (SS40's exemption): astral characters survive tokenising and splicing. Listed here because it was in the tree and not in this section — the same drift §8a's own history records, found while numbering the two rows below.
+- **T3.24** (I25, I12): under `prefixPolicy(":")`, `:tty vim` is interactive and `/tty vim` is a plain shell line. Asserted as a pair, because a hardcoded `"/tty"` satisfies the first row and fails only the second.
+- **T3.25** (§5a): a manifest declaring a tool named `tty`, then `/tty vim` → `error` naming both records. The fixture manifest has no such tool, so this row builds its own — and it asserts the ordinary manifest still parses `/tty vim` as interactive, or the conflict rule is indistinguishable from the marker being broken.
 
 ### Tier 4 — integration
 

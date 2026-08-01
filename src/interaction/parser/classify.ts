@@ -7,7 +7,7 @@
  * why 2b is a split rather than a reorder.
  */
 
-import { BUILTINS, type Builtin, type Token } from "./types.js";
+import { BUILTINS, TTY_MARKER, type Builtin, type Token } from "./types.js";
 
 /** §5's refusals, and the two words that are not a trailing `&`. */
 const JOB_CONTROL: readonly string[] = Object.freeze(["fg", "bg", "jobs"]);
@@ -17,6 +17,9 @@ const SPLITTERS: readonly string[] = Object.freeze(["&&", ";"]);
 export type Shape =
   | Readonly<{ rule: 0; refusal: "background" | "jobControl"; word: string }>
   | Readonly<{ rule: 1 }>
+  | Readonly<{ rule: "1a"; restFrom: number }>
+  | Readonly<{ rule: "1aEmpty" }>
+  | Readonly<{ rule: "1aBuiltin"; name: Builtin }>
   | Readonly<{ rule: "2a"; name: Builtin; args: readonly Token[] }>
   | Readonly<{ rule: "2b"; name: Builtin; args: readonly Token[]; restFrom: number }>
   | Readonly<{ rule: "2c" | 3 | 5 }>
@@ -50,15 +53,57 @@ export function classify(
   // there is still no. The two rules would otherwise disagree about the same
   // question — does quoting change what the shell does with this word — where
   // the answer is no for both.
+  //
+  // **"First token" means the line's command, and a leading marker is not it**
+  // (§5a). `/tty fg` is the `fg` built-in with the terminal asked for, and it
+  // wants the same job table `fg` wants. Reading position 0 literally let it
+  // through — §8a's row found it, because rule 0 and rule 1a are two correct
+  // statements about the same token list.
   const first = tokens[0];
-  if (first !== undefined && first.kind === "word" && JOB_CONTROL.includes(first.text)) {
-    return { rule: 0, refusal: "jobControl", word: first.text };
+  const marked =
+    first !== undefined && first.kind === "word" && verbOf(first) === TTY_MARKER;
+  const command = marked ? tokens[1] : first;
+  if (command !== undefined && command.kind === "word" && JOB_CONTROL.includes(command.text)) {
+    return { rule: 0, refusal: "jobControl", word: command.text };
   }
 
   // --- rule 1 --------------------------------------------------------------
   if (first === undefined) return { rule: 1 };
 
   const operatorAt = tokens.findIndex((t) => t.kind === "operator");
+
+  // --- rule 1a: the TTY marker (§5a, I25–I27) ------------------------------
+  //
+  // **Above 2 and 3 because both would otherwise claim the line.** `/tty cd /x`
+  // reaches rule 2 with `/tty` as its first token, so it is not a built-in at
+  // all and the refusal would never be reached; `/tty ls | cat` has an operator
+  // and rule 3 would delegate it whole with the marker still in the string.
+  //
+  // Below rule 0, because a trailing `&` is refused whether or not the terminal
+  // was asked for, and below rule 1 because there is no first token to test.
+  //
+  // **Quoting does not disable it** (I25), which was ruled the other way and
+  // corrected by §8a's `"/tty" vim` row. The marker is a *classification*, and
+  // every classification rule in this function is quoting-blind: `'cd'` is the
+  // `cd` built-in, `'fg'` is refused, `'/ps'` is the app verb `ps`. Only the
+  // rewrite honours quoting, because only the rewrite alters the user's string
+  // — and `'/ps'` offers no escape hatch for a `/ps` binary either, so the
+  // marker owing one was an argument for a symmetry that does not exist.
+  if (marked) {
+    const next = tokens[1];
+    if (next === undefined) return { rule: "1aEmpty" };
+
+    // I27. The marker forces the shell route, so the built-in would run in a
+    // subshell and the session's directory or environment would **silently**
+    // not change. Applying it and then handing off is rule 2b's split wearing a
+    // marker, and there is no `&&` to justify the reordering — so neither half
+    // happens and the conflict is reported.
+    if (next.kind === "word" && isBuiltin(next.text)) {
+      return { rule: "1aBuiltin", name: next.text };
+    }
+
+    return { rule: "1a", restFrom: next.start };
+  }
 
   // --- rule 2: a leading built-in ------------------------------------------
   //

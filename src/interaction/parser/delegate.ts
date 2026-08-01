@@ -46,10 +46,19 @@ const CONTROL: readonly string[] = Object.freeze(["|", "||", "&&", ";", "&"]);
  * delegated as `cd widget tmp | ls`, which is the commonest line in the spec
  * rather than an edge.
  */
-function commandPositions(tokens: readonly Token[]): ReadonlySet<number> {
+function commandPositions(tokens: readonly Token[], fromIndex: number): ReadonlySet<number> {
   const at = new Set<number>();
   let next = true;
   tokens.forEach((token, i) => {
+    // **Command position is a property of the line being handed over**, not of
+    // the line the user typed. `/tty /ps` delegates `/ps`, which is the first
+    // token of the delegated line and therefore a command — while in the typed
+    // line it is the second token and would not be. Starting the walk at the
+    // delegation boundary is what makes those the same question (§5a).
+    //
+    // Behaviour-preserving for `builtinThenShell`, whose boundary already
+    // follows a CONTROL operator and so already had `next` true.
+    if (i < fromIndex) return;
     if (token.kind === "operator") {
       next = CONTROL.includes(token.text);
       return;
@@ -84,7 +93,8 @@ export function delegated(
   from = 0,
 ): string {
   let out = input.slice(from);
-  const commands = commandPositions(tokens);
+  const startIndex = tokens.findIndex((t) => t.start >= from);
+  const commands = commandPositions(tokens, startIndex === -1 ? tokens.length : startIndex);
 
   for (let i = tokens.length - 1; i >= 0; i -= 1) {
     const token = tokens[i] as Token;

@@ -401,6 +401,31 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const streams = takeOptionalBoolean(raw, "streams", e, at);
   const oneShot = takeOptionalBoolean(raw, "oneShot", e, at);
   const hidden = takeOptionalBoolean(raw, "hidden", e, at);
+  const interactive = takeOptionalBoolean(raw, "interactive", e, at);
+
+  // I19 — the two combinations that describe a verb which cannot exist. Both
+  // are cross-field rules of I4's kind and sit where I4 sits, so the report
+  // reaches the author who wrote the manifest rather than the user watching a
+  // terminal misbehave. `interactive` alone is fine and is not checked here.
+  if (interactive === true) {
+    if (streams === true) {
+      fail(
+        e,
+        `${at}.interactive`,
+        `"${name}" declares both interactive and streams — a handoff gives the ` +
+          `terminal to the child and a stream reads its stdout into the transcript; ` +
+          `drop whichever one the verb does not do`,
+      );
+    }
+    if (local) {
+      fail(
+        e,
+        `${at}.interactive`,
+        `"${name}" is local and interactive — a local verb is handled in-process ` +
+          `and never spawned, so there is no child to hand the terminal to`,
+      );
+    }
+  }
 
   return {
     name,
@@ -411,6 +436,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     ...(streams === undefined ? {} : { streams }),
     ...(oneShot === undefined ? {} : { oneShot }),
     ...(hidden === undefined ? {} : { hidden }),
+    ...(interactive === undefined ? {} : { interactive }),
   };
 }
 

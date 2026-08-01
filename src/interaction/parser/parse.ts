@@ -15,6 +15,7 @@ import { delegated } from "./delegate.js";
 import { expand, needsExpansion } from "./expand.js";
 import { slashPolicy } from "./policy.js";
 import { tokenise } from "./tokenise.js";
+import { TTY_MARKER } from "./types.js";
 import type { ParseContext, ParseResult, Token } from "./types.js";
 
 /**
@@ -77,6 +78,54 @@ export function parse(input: string, ctx: ParseContext): ParseResult {
     case 1:
       return Object.freeze({ kind: "empty" as const });
 
+    case "1a": {
+      // §5a — a tool named `tty` makes `/tty vim` mean two things, and C18 is
+      // the only component that can see both records: it holds the manifest and
+      // the policy. C05 cannot hold the rule — it is L0 `data/` and the marker
+      // is L3's — so it is reported here rather than reserved there.
+      if (findTool(ctx.manifest, [TTY_MARKER]) !== null) {
+        return fail(
+          err(
+            "tty_marker_shadowed",
+            `${policy.prefix}${TTY_MARKER} is declared as a verb and is also the handoff marker`,
+            { verb: TTY_MARKER },
+            `rename the verb — the marker cannot move, since it is what strips itself from the line`,
+          ),
+        );
+      }
+      return Object.freeze({
+        kind: "shell" as const,
+        // **Stripped, always** (I26). `from` is the next token's start, so the
+        // marker is not in the delegated string on any route — `sh` would take
+        // it as an argument.
+        command: delegated(source, tokens, policy, ctx.binary, shape.restFrom),
+        interactive: true,
+      });
+    }
+
+    case "1aEmpty":
+      return fail(
+        err(
+          "tty_marker_bare",
+          `${policy.prefix}${TTY_MARKER} needs a command to run`,
+          { prefix: policy.prefix },
+          `${policy.prefix}${TTY_MARKER} vim, ${policy.prefix}${TTY_MARKER} less README.md`,
+        ),
+      );
+
+    case "1aBuiltin":
+      // I27 — and the built-in is **not** returned for L4 to apply. Refusing is
+      // only meaningful if neither half happens.
+      return fail(
+        err(
+          "tty_marker_builtin",
+          `${shape.name} changes this session's own state and cannot run under ` +
+            `${policy.prefix}${TTY_MARKER}`,
+          { builtin: shape.name },
+          `${shape.name} on its own, or drop the ${policy.prefix}${TTY_MARKER}`,
+        ),
+      );
+
     case "2a":
       return Object.freeze({
         kind: "builtin" as const,
@@ -100,6 +149,7 @@ export function parse(input: string, ctx: ParseContext): ParseResult {
       return Object.freeze({
         kind: "shell" as const,
         command: delegated(source, tokens, policy, ctx.binary),
+        interactive: false,
       });
 
     case 4:

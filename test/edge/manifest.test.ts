@@ -9,6 +9,7 @@ import {
   validateInvocation,
   type ToolDef,
 } from "../../src/data/manifest/index.js";
+import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
 import { fixture, largeManifest, raw, toolNamed } from "../support/manifest.js";
 import { contextAt, verbSource } from "../../src/interaction/completion/index.js";
 
@@ -57,7 +58,12 @@ describe("C05 parse edges", () => {
     // The shell must still open. An app with no verbs is unusual, not malformed.
     const m = parsedOrThrow({ ...raw(), tools: [] });
 
-    expect(m.tools).toEqual([]);
+    // `appTools` is what the app wrote; `tools` is that plus the framework's
+    // six, which `parseManifest` appends to every manifest (C05 §3). Asserted
+    // on the partition rather than on `tools` being empty — the original read
+    // `tools` and went red the day the six landed, because nothing re-ran it.
+    expect(m.appTools).toEqual([]);
+    expect(m.tools.map((t) => t.name)).toEqual(FRAMEWORK_TOOLS.map((t) => t.name));
     expect(findTool(m, ["ps"])).toBeNull();
     expect(findTool(m, [])).toBeNull();
   });
@@ -111,7 +117,8 @@ describe("C05 parse edges", () => {
     const m = parsedOrThrow(source);
     const parseMs = Number(process.hrtime.bigint() - parseStart) / 1e6;
 
-    expect(m.tools).toHaveLength(5000);
+    expect(m.appTools).toHaveLength(5000);
+    expect(m.tools).toHaveLength(5000 + FRAMEWORK_TOOLS.length);
     expect(size, "the spec names 10 MB; a smaller document would test a budget nobody set").toBeGreaterThan(
       9_000_000,
     );

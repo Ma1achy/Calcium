@@ -104,6 +104,19 @@ const SOURCE = {
       flags: [{ name: "once", type: "bool", summary: "write one frame and exit" }],
     },
     {
+      // C05 I19's field, and the fixture's only interactive verb. It exists so
+      // C23's handoff route has a real subject: the flag is what the app author
+      // knows and nothing else can work out, so a test asserting the handoff
+      // needs a manifest that declares one. `streams` and `local` are both
+      // absent here on purpose — I19 refuses either alongside it.
+      name: "edit",
+      local: false,
+      interactive: true,
+      summary: "open the config in $EDITOR",
+      args: [{ name: "file", type: "path", required: false, summary: "what to open" }],
+      flags: [],
+    },
+    {
       name: "guide",
       local: true,
       summary: "an app-supplied local verb",

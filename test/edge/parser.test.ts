@@ -2,9 +2,10 @@
 // and the SS40 exemption produced.
 import { describe, expect, it } from "vitest";
 
-import { parse, quote, tokenise } from "../../src/interaction/parser/index.js";
+import { parseManifest } from "../../src/data/manifest/index.js";
+import { parse, prefixPolicy, quote, tokenise } from "../../src/interaction/parser/index.js";
 import type { ParseContext, ParseResult } from "../../src/interaction/parser/index.js";
-import { fixture } from "../support/manifest.js";
+import { fixture, raw } from "../support/manifest.js";
 
 const ctx = (over: Partial<ParseContext> = {}): ParseContext => ({
   manifest: fixture(),
@@ -156,6 +157,54 @@ describe("C18 tier 3 — the edges", () => {
     // binary's own error — the same one bash would give. Consulting the
     // manifest here would make one typo fail two unrelated ways.
     expect(command(parse("/zzzzz | cat", ctx()))).toBe("widget zzzzz | cat");
+  });
+
+  it("T3.24 (I25, I12): the marker is the policy's verb, not the string /tty", () => {
+    // **Asserted as a pair.** A hardcoded `"/tty"` satisfies the first row and
+    // fails only the second, so the second is the one carrying the claim.
+    const colon = ctx({ policy: prefixPolicy(":") });
+
+    const marked = parse(":tty vim", colon);
+    expect(marked.kind).toBe("shell");
+    if (marked.kind !== "shell") return;
+    expect(marked.interactive).toBe(true);
+    expect(marked.command).toBe("vim");
+
+    const notMarked = parse("/tty vim", colon);
+    expect(notMarked.kind).toBe("shell");
+    if (notMarked.kind !== "shell") return;
+    expect(notMarked.interactive, "under `:` the slash form is an ordinary path").toBe(false);
+    expect(notMarked.command).toBe("/tty vim");
+  });
+
+  it("T3.25 (§5a): a verb named tty and the marker are two records of one name", () => {
+    // C18 is the only component that can see both — it holds the manifest and
+    // the policy — so it reports rather than picking. C05 cannot hold the rule:
+    // it is L0 `data/` and the marker is L3's.
+    const source = raw();
+    (source["tools"] as Record<string, unknown>[]).push({
+      name: "tty",
+      local: false,
+      summary: "an app verb that collides with the marker",
+      args: [],
+      flags: [],
+    });
+    const shadowed = parseManifest(source);
+    expect(shadowed.ok).toBe(true);
+    if (!shadowed.ok) return;
+
+    const r = parse("/tty vim", ctx({ manifest: shadowed.value }));
+    expect(r.kind).toBe("error");
+    if (r.kind !== "error") return;
+    expect(r.error.message).toMatch(/declared as a verb and is also the handoff marker/);
+
+    // The control: without that tool the same line is the marker doing its job.
+    // Without this half the conflict rule is indistinguishable from the marker
+    // being broken for every input.
+    const ordinary = parse("/tty vim", ctx());
+    expect(ordinary.kind).toBe("shell");
+    if (ordinary.kind !== "shell") return;
+    expect(ordinary.interactive).toBe(true);
   });
 
   it("T3.23 (SS40's exemption): astral characters survive tokenising and splicing", () => {

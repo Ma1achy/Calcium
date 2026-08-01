@@ -26,6 +26,7 @@
 import { parse } from "../interaction/parser/index.js";
 import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
+import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
@@ -41,6 +42,17 @@ import type { Pipeline, PipelineDeps } from "./types.js";
 
 /** Which foreground route holds the guard. `null` is idle (C23 §6). */
 export type InFlight = "app" | "local" | "shell" | null;
+
+/**
+ * The first word of a delegated line, for the refusal notice and the handoff's
+ * label (C23 I5).
+ *
+ * Naming what the user will recognise rather than the whole line: `vim` reads
+ * better than `vim -c 'set nu' notes.md` in *`vim` is still running*. It is not
+ * a parse — C18 owns that — and it does not need to be, because nothing branches
+ * on the answer.
+ */
+const headOf = (command: string): string => command.split(/\s+/u)[0] ?? "shell";
 
 /**
  * The state machine of §6, as one object.
@@ -228,7 +240,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
   /** C23 §2's `shell` route — `spawnShell`, and a `raw` document (C18 §5). */
   const runShell = async (line: string, command: string): Promise<void> => {
-    guard.take("shell", command.split(/\s+/)[0] ?? "shell");
+    guard.take("shell", headOf(command));
     try {
       const child = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd });
       let out = "";
@@ -255,6 +267,71 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
     } finally {
       // C23 §8a A5 — every exit releases it, this one included.
+      guard.release();
+    }
+  };
+
+  /**
+   * A02 Seam 4's `Child process needing a TTY` row — `lifecycle.suspend` →
+   * `runner.handoff` → `lifecycle.resume` → `scheduler.invalidate` (C23 §4).
+   *
+   * **One implementation for both opt-ins.** The routes differ in who knows —
+   * an app verb declares `interactive` on its `ToolDef` (C05 I19), a shell line
+   * carries `/tty` (C18 §5a) — and by the time the flag has been read they are
+   * the same four calls over a different argv. C23 reads the flag and never
+   * parses the line (C23 §4).
+   *
+   * **The inner `finally` is C23 §8a A6.5 and it is the whole point of the
+   * shape.** C21 §5 rejects `handoff()` when `stdin.isRaw` is still true — a
+   * good guard, checking a precondition of *this* sequence from inside its
+   * second step. Without the `finally`, the rejection unwinds out of a sequence
+   * that has already suspended the terminal: `resume` never runs, and the
+   * session sits on the primary screen with no frame, no prompt and no visible
+   * error, because the diagnostics path writes to a screen that was released.
+   *
+   * `suspend()` is deliberately **outside** it. A `resume()` that was never
+   * suspended throws in C01's own transition table ("nothing was suspended"),
+   * so a `finally` wrapped around the suspend would turn one failure into two.
+   *
+   * And the append waits for the resume. `appendAndCommit` commits, and a
+   * commit while suspended paints onto the child's screen.
+   */
+  const runHandoff = async (
+    line: string,
+    argv: readonly string[],
+    label: string,
+    kind: "shell" | "app",
+  ): Promise<void> => {
+    guard.take(kind, label);
+    try {
+      deps.lifecycle.suspend();
+      let exit: Exit;
+      try {
+        exit = await deps.runner.handoff(argv, { cwd: () => deps.session().cwd });
+      } finally {
+        deps.lifecycle.resume();
+        // The row's fourth call. C01's `resume()` fires no resume subscribers —
+        // only the SIGCONT path does — so the repaint is ours to ask for, and
+        // the whole screen belonged to the child.
+        deps.scheduler.invalidate();
+      }
+
+      // A notice rather than a `raw` block: the child wrote to the terminal
+      // directly, so there is no output to carry. What the transcript can say
+      // is that it ran and how it ended.
+      const code = exit.code ?? 1;
+      appendAndCommit(
+        exit.signal !== null
+          ? noticeDoc(line, `${label} ended on ${exit.signal}`, "warn", { origin: "user" }, "error")
+          : code === 0
+            ? noticeDoc(line, `${label} finished`, "muted", { origin: "user" })
+            : noticeDoc(line, `${label} exited ${String(code)}`, "warn", { origin: "user" }, "error"),
+      );
+    } catch (cause) {
+      appendAndCommit(
+        errorDoc(line, { message: String(cause), stage: "handoff" }, { origin: "user" }),
+      );
+    } finally {
       guard.release();
     }
   };
@@ -578,7 +655,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       }
 
       case "shell":
-        start(line, runShell(line, result.command));
+        // C18 §5a's marker, already stripped from `command` (C18 I26) — so the
+        // string handed to `sh -c` is the same one either way, and the flag is
+        // the only difference between the two routes.
+        start(
+          line,
+          result.interactive
+            ? runHandoff(line, ["sh", "-c", result.command], headOf(result.command), "shell")
+            : runShell(line, result.command),
+        );
         return;
 
       case "local":
@@ -595,7 +680,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
 
       case "app":
-        start(line, runApp(line, result));
+        // C05 I19's field, read off the `ToolDef` C18 already carries — one
+        // fact with one home, rather than a copy on the result. The transport
+        // is bypassed entirely: an interactive verb's child owns the terminal,
+        // and there is no stdout to read (C05 I19 refuses `streams` with it).
+        start(
+          line,
+          result.tool.interactive === true
+            ? runHandoff(line, [deps.binary, ...result.argv], result.tool.name, "app")
+            : runApp(line, result),
+        );
         return;
     }
   };

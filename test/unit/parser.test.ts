@@ -147,6 +147,50 @@ describe("C18 §4, §5 — the rules", () => {
     expect(r.validation.ok).toBe(false);
   });
 
+  it("T1.21 (I25, I26): the marker sets the flag and leaves the delegated line", () => {
+    const r = parse("/tty vim notes.md", ctx());
+    expect(r.kind).toBe("shell");
+    if (r.kind !== "shell") return;
+
+    expect(r.interactive).toBe(true);
+    // **Both halves in one test.** A test that checks only the flag passes
+    // while `sh -c` receives `/tty` as an argument and `vim` never opens —
+    // T6.22 is the revert, and it leaves the first assertion green.
+    expect(r.command, "the marker must not reach sh").toBe("vim notes.md");
+
+    // The negative control: the same line without the marker is the same
+    // command and not interactive, so the flag is responding to the marker
+    // rather than to the shell route.
+    const plain = parse("vim notes.md", ctx());
+    expect(plain.kind).toBe("shell");
+    if (plain.kind !== "shell") return;
+    expect(plain.command).toBe("vim notes.md");
+    expect(plain.interactive).toBe(false);
+  });
+
+  it("T1.22 (I27): a built-in under the marker is refused, and not also returned", () => {
+    for (const line of ["/tty cd /x", "/tty export A=1", "/tty pwd"]) {
+      const r = parse(line, ctx());
+      // The negative half is the assertion. Refusing is only meaningful if the
+      // built-in did not also come back for L4 to apply — which is what T6.23's
+      // revert does, and it reads as rule 2b's split.
+      expect(r.kind, line).toBe("error");
+      if (r.kind !== "error") continue;
+      expect(r.error.message, line).toMatch(/cannot run under \/tty/);
+    }
+
+    // `pwd` is the row that argues for the table: it looks harmless, and the
+    // subshell's directory is the session's until the first `cd`.
+    expect(parse("pwd", ctx()).kind, "and the built-in alone is untouched").toBe("builtin");
+  });
+
+  it("§5a: the marker with nothing after it says so", () => {
+    const r = parse("/tty", ctx());
+    expect(r.kind).toBe("error");
+    if (r.kind !== "error") return;
+    expect(r.error.message).toMatch(/needs a command to run/);
+  });
+
   it("T1.7 (I14): a near miss suggests and a far one does not", () => {
     const near = parse("/pss", ctx());
     expect(near.kind).toBe("error");

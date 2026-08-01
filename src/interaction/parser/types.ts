@@ -13,6 +13,21 @@ export type Builtin = "cd" | "export" | "pwd";
 export const BUILTINS: readonly Builtin[] = Object.freeze(["cd", "export", "pwd"]);
 
 /**
+ * The verb that marks a shell line as taking the terminal (§5a, I25).
+ *
+ * **Read through the policy**, never matched against the raw text: the
+ * predicate is `verbOf(token) === TTY_MARKER`, so `prefixPolicy(":")` gives
+ * `:tty` and one prefix rule stays one prefix rule (I12).
+ *
+ * It is not a `Builtin` — those are session-state effects with arguments of
+ * their own, and this has no effect at all; it modifies how the rest of the
+ * line is run. And it is not a manifest tool: the framework's six are
+ * `local: true` and C23 I27 fails construction for a local verb with no
+ * handler, while this has no handler because it never reaches a route.
+ */
+export const TTY_MARKER = "tty";
+
+/**
  * A token, with its source span.
  *
  * **The span is load-bearing, not a convenience** (I16). `builtinThenShell.rest`
@@ -65,7 +80,7 @@ export type ParseResult =
     }>
   | Readonly<{ kind: "builtin"; name: Builtin; args: readonly string[] }>
   | Readonly<{ kind: "builtinThenShell"; name: Builtin; args: readonly string[]; rest: string }>
-  | Readonly<{ kind: "shell"; command: string }>
+  | Readonly<{ kind: "shell"; command: string; interactive: boolean }>
   | Readonly<{ kind: "empty" }>
   | Readonly<{ kind: "error"; error: ErrorLike }>;
 

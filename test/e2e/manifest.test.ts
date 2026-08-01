@@ -26,7 +26,13 @@ describe("C05 e2e", () => {
       expect(() => validateInvocation(tool, [])).not.toThrow();
     }
 
-    expect(visibleTools(m).length).toBe(m.tools.length - 1); // one hidden tool
+    // **Derived from `hidden`, not from a count.** The literal was `- 1` and
+    // went stale the day `FRAMEWORK_TOOLS` added a second hidden tool; a count
+    // cannot say which tool moved, and this cannot go stale at all.
+    expect(visibleTools(m).map((t) => t.name)).toEqual(
+      m.tools.filter((t) => t.hidden !== true).map((t) => t.name),
+    );
+    expect(m.tools.filter((t) => t.hidden === true).length, "and there are some").toBeGreaterThan(0);
   });
 
   it.todo("T5.1: a session completes, validates and rejects for every tool, with no far side — waits on C23 — rejection is an invocation outcome, so it needs the pipeline that invokes");

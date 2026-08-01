@@ -78,6 +78,21 @@ export type ToolDef = Readonly<{
    * the entry is how a verb is deleted.
    */
   hidden?: boolean;
+  /**
+   * The verb takes the terminal — C23 §4's handoff row (C05 I19).
+   *
+   * **The app author is the only party who can know this.** Detection is not
+   * available: whether a child wants a TTY is not knowable before running it.
+   * A maintained list of TTY program names is wrong for every wrapper and
+   * alias and fails silently when it is wrong, which is the shape C23 I26
+   * forbids. So the declaration lives beside the other things only the author
+   * knows, and `parseTool` refuses it with `streams` and with `local`.
+   *
+   * C18 carries the whole `ToolDef` on an `app` result, so this reaches C23
+   * with no parser change — one fact with one home rather than a copy on the
+   * result and nothing reconciling the two.
+   */
+  interactive?: boolean;
 }>;
 
 export type Manifest = Readonly<{
