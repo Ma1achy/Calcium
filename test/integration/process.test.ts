@@ -173,7 +173,7 @@ describe("C21 with C06", () => {
     expect(app.calls, "and never through a shell — D18's whole claim").not.toContain("spawnShell");
   });
   it.todo(
-    "T4.5 (with C01, L4): the documented suspend → handoff → resume sequence runs in order, and T3.8's guard never fires on the correct path — waits on L4",
+    "T4.5 (with C01): the documented suspend → handoff → resume sequence runs in order, and T3.8's guard never fires on the correct path — waits on C23 — same missing trigger as C01 T4.4 (C23 §4)",
   );
   it.todo("T4.7 (with L4): session exit calls killAll before the terminal is released — waits on L4");
 });

@@ -263,6 +263,17 @@ Seam 4 entry at all until SP4 was written: `Pop a pushed view`, `Stall detected`
 `View refresh tick` and `cd` / `export`, each a cross-layer effect this section
 already declared and the architecture's table did not.
 
+**The `Child process needing a TTY` row has no trigger, and that is unresolved.** C21 §5 builds `handoff` for children that need the terminal — `vim`, `less`, `kubectl exec` — and this table sequences it. **Nothing decides which commands take it.** The manifest has no field, C18's `ParseResult` carries no signal, and `shell` results are arbitrary text; so the row is specified, agreed by two components, and unreachable — the shape the default transport, `origin: "refresh"` and `settle(id, doc)` each had.
+
+It is a design question rather than a consequence, which is why it is recorded rather than guessed:
+
+- **A list of known TTY programs** is the obvious answer and the worst one. It is a maintained list of exactly the kind I26 exists to forbid, it is wrong for every wrapper and alias, and it fails silently — a program not on it gets a raw-mode terminal and no line editing, which C21 §5 names as the symptom with no obvious cause.
+- **A manifest field** covers app verbs and not the `shell` route, which is where `vim` actually arrives.
+- **An explicit opt-in** — a prefix, or a binding — puts the decision where the knowledge is, at the cost of the user knowing to use it.
+- **Detection** is not available: whether a child will want a TTY is not knowable before running it.
+
+Until it is ruled, `handoff` has no caller and C01 T4.4 and C21 T4.5 wait on that rather than on C23.
+
 **`Scroll` is not here, and it was.** A02 Seam 4 assigns it to C22 with C14 I12 cited — C14 moves and C22 commits — and `src/shell/construct.ts` step 11 implements it there. A row listed in both places is a row with two owners, which is the condition the owner column was added to remove.
 
 **The three overlay rows above were absent, and C23 I13 is what makes that a defect rather than an omission.** I13 and commitment 11 both say every cross-layer sequence lives in this table; while Seam 4 listed three C23-owned rows that this section did not, the invariant was false rather than merely incomplete. A02 §Seam-4 records why that kept happening and what mechanism closes it.

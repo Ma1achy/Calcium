@@ -161,7 +161,7 @@ describe("C01 integration", () => {
     }
   });
   it.todo(
-    "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on L4",
+    "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on C23 — the Seam 4 row has no trigger: nothing decides which commands take a handoff (C23 §4)",
   );
   it("T4.5 (with C22): handlers, then acquire, then paint — asserted as a sequence", async () => {
     // A02 §3's 6 → 7 → 8, which is C22 §3's step 7 → acquire → first commit.
