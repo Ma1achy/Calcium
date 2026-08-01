@@ -263,16 +263,19 @@ Seam 4 entry at all until SP4 was written: `Pop a pushed view`, `Stall detected`
 `View refresh tick` and `cd` / `export`, each a cross-layer effect this section
 already declared and the architecture's table did not.
 
-**The `Child process needing a TTY` row has no trigger, and that is unresolved.** C21 §5 builds `handoff` for children that need the terminal — `vim`, `less`, `kubectl exec` — and this table sequences it. **Nothing decides which commands take it.** The manifest has no field, C18's `ParseResult` carries no signal, and `shell` results are arbitrary text; so the row is specified, agreed by two components, and unreachable — the shape the default transport, `origin: "refresh"` and `settle(id, doc)` each had.
+**The `Child process needing a TTY` row takes an explicit opt-in, and it is two mechanisms because the two routes have different knowledge.** C21 §5 builds `handoff` for children that need the terminal — `vim`, `less`, `kubectl exec` — and this table sequences it. **Nothing decides which commands take it.** The manifest has no field, C18's `ParseResult` carries no signal, and `shell` results are arbitrary text; so the row is specified, agreed by two components, and unreachable — the shape the default transport, `origin: "refresh"` and `settle(id, doc)` each had.
 
-It is a design question rather than a consequence, which is why it is recorded rather than guessed:
+**App verbs: `interactive: true` on the `ToolDef`.** The app author knows `prism shell` drops into a REPL and nobody else can. Declarative, in the single source C18 already reads, and it costs one field on the verbs that need it.
 
-- **A list of known TTY programs** is the obvious answer and the worst one. It is a maintained list of exactly the kind I26 exists to forbid, it is wrong for every wrapper and alias, and it fails silently — a program not on it gets a raw-mode terminal and no line editing, which C21 §5 names as the symptom with no obvious cause.
-- **A manifest field** covers app verbs and not the `shell` route, which is where `vim` actually arrives.
-- **An explicit opt-in** — a prefix, or a binding — puts the decision where the knowledge is, at the cost of the user knowing to use it.
-- **Detection** is not available: whether a child will want a TTY is not knowable before running it.
+**The `shell` route: a marker on the line, stripped by C18.** The user is typing the command, so the user is the only party with the knowledge — and C05 cannot help here, which the check settles rather than assumes. C05 describes *tools*; §5 hands anything with a shell operator to `sh -c` **whole**, and `ParseResult.shell` carries one `command: string`. A shell line has no flags C05 could describe, because `sh` is what parses it.
 
-Until it is ruled, `handoff` has no caller and C01 T4.4 and C21 T4.5 wait on that rather than on C23.
+**That places the shell half in C18 rather than here.** A marker left on the line would be passed to `sh` as an argument, so it has to be removed before delegation — and C18 already rewrites `/verb` tokens into `<binary> verb` before handing the line over (§5). Stripping a marker is the same operation on the same string, done by the component that already owns it. C23 reads the flag off the `ParseResult` and sequences the handoff; it never parses the line.
+
+So two mechanisms, and honestly two: the routes differ in who knows.
+
+**The list was the obvious answer and is disqualified.** A maintained set of TTY program names is exactly the shape I26 forbids, wrong for every wrapper and alias, and it fails **silently** — a program not on it gets a raw-mode terminal and no line editing, which C21 §5 names as the symptom with no obvious cause. Detection is not available either: whether a child wants a TTY is not knowable before running it.
+
+**What makes the opt-in cost less than it looks is the asymmetry.** A user who forgets the marker gets a broken-looking `vim`, presses Ctrl-C and adds it — annoying and obvious. A user who gets an unexpected handoff loses nothing. There is no false-positive case at all, which is why an opt-in beats a heuristic here and would not elsewhere. And `/help` renders from the manifest, so `interactive` verbs are discoverable without being remembered.
 
 **`Scroll` is not here, and it was.** A02 Seam 4 assigns it to C22 with C14 I12 cited — C14 moves and C22 commits — and `src/shell/construct.ts` step 11 implements it there. A row listed in both places is a row with two owners, which is the condition the owner column was added to remove.
 
