@@ -353,8 +353,39 @@ blocker is wrong is indistinguishable from one that is pending (A03 §9a).
 
 | Surface | Waits on |
 |---|---|
-| S13 dashboard | **C22** — see below |
-| S01, S02, S10, S11, S12 | **C22** — whole screens |
+| S02 §2 | **C22 §12b** — its two headerless tables declare no columns |
+| S12 §2 | **C22 §12b** — §2 and this file disagree about whether its box is rendered |
+
+Composed since: **S01 §2** (with C22), **S11 §2** (with C23's branch, after S11 §2
+gained a block list).
+
+## The five-surface row, split — and none of the five was C23's
+
+`test/contract/surfaces.test.ts` carried one deferral over S02, S10, S11, S12 and
+S13, waiting on C23. This table said C22 for all five, so the two records had
+already diverged and nothing compared them. Reading each against what it needs
+gives five different answers:
+
+| Surface | What it actually needed |
+|---|---|
+| S10 §2 | Nothing — §2 is a *shape listing*, six lines of `label description` prose, not a figure. **Deleted**, as S07 §3's was, and for the same reason |
+| S13 §2 | Nothing — this file already moved it to C22 and the test file's comment says so. **Deleted** as a stale label; its coverage sits with C22's frame row |
+| S11 §2 | A block list. §2 had none, so composing meant choosing where the spec was silent. Written down, and **composed** |
+| S02 §2 | Two declarations. `v1.0.0` was drawn and unlisted — the second verdict class, now fixed — and its two headerless tables declare **no columns at all**, which `cols()` reads from the spec precisely so a fixture cannot invent them |
+| S12 §2 | A ruling. §2 says the box is a diagram and is not rendered; §1 and §6 of this file call the same box a `panel`, count its inner rows and record its border as a drawing defect. Ten rows or eight, and nothing composes until it is settled |
+
+**A row over N surfaces with N different blockers cannot be triaged, only split.**
+The six-surface row was split during C22's triage on exactly this reasoning, and
+this is what was left of it — so the second instance makes it the rule rather
+than the observation. A bundled row comes due mostly unwritable, and
+mostly-unwritable is indistinguishable from correctly-expired at the moment it
+goes red.
+
+**And S11 §2's composition found the fixture rule again.** The first draft wrote
+its plot series as `{ id, label, points }` where C12 takes `{ label, values }`,
+so the plot rendered one row while measuring five — which reads as a C09 I1
+violation in shipped code. The fixture was inert and the failure it produced
+accused the component.
 
 Composed and asserted: S03, S05, S06, S14, S15 (with C11), and **S04 §3 and S09
 §2 (with C12)**.

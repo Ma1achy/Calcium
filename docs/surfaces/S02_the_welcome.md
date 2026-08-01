@@ -66,7 +66,9 @@ The wordmark's eight rows take the spectrum top to bottom — red, orange, yello
 
 Each row is exactly two coloured spans, never per-glyph colouring.
 
-Blocks, in order: `raw` (logo), `keyValue` (connection), `rule` + headerless `table` (outstanding), `rule` + headerless `table` (recent), `tip`.
+Blocks, in order: `raw` (logo), `notice` (version), `keyValue` (connection), `rule` + headerless `table` (outstanding), `rule` + headerless `table` (recent), `tip`. Every block after the logo carries `gapBefore`, which is where the six blank rows come from (HEIGHT_AUDIT §1) — eight, one, three, one, two, one, two, one, plus six joins is the twenty-four the figure draws.
+
+**The version was drawn and unlisted**, and this list had five entries against six visual groups. It is the height audit's second verdict class — a figure encoding intent the declaration does not carry — and the fix is the declaration rather than the picture: `v1.0.0` is on the screen, it is one row, and no block claimed it. Found by trying to compose the figure, which is what the composition test is for.
 
 Outstanding and Recent are `table` blocks with `showHeader: false` — a headerless list with per-row actions, which is exactly the shape needed and required no new block kind.
 

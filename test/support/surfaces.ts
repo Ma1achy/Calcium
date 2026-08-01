@@ -502,7 +502,69 @@ const S15_SECRETS: Block = block({
   ],
 });
 
+/**
+ * S11 §2 — `/run`, host-native. The block list is S11 §2's own, written down
+ * when this fixture was built: the figure implied a sequence and an implication
+ * is not a declaration, so composing it meant choosing where the spec was
+ * silent (S11 §2).
+ */
+const S11_RUN: readonly Block[] = [
+  block({ kind: "rule", id: "s11-rule", label: "run · fmx_models.jobs.training:job · host-native" }),
+  block({
+    kind: "steps",
+    id: "s11-steps",
+    gapBefore: true,
+    steps: [
+      { label: "importing target", state: "done", detail: "job resolved" },
+      { label: "resources resolved", state: "done", detail: "1×GPU · 8Gi  (satisfied)" },
+      { label: "secrets resolved", state: "done", detail: "3 · timescaledb-dsn · minio · mlflow" },
+      { label: "device", state: "done", detail: "cuda:0" },
+    ],
+  }),
+  block({
+    kind: "keyValue",
+    id: "s11-run",
+    gapBefore: true,
+    rows: [{ label: "run", value: "7f3a2c1  ·  ./prism-runs/7f3a2c1…/" }],
+  }),
+  block({ kind: "progress", id: "s11-progress", gapBefore: true, label: "epoch", current: 7, total: 10 }),
+  block({
+    kind: "plot",
+    id: "s11-loss",
+    gapBefore: true,
+    form: "line",
+    height: 3,
+    axes: true,
+    yFormat: "number",
+    xLabels: ["epoch 1", "epoch 5", "now"],
+    // Seven epochs, 0.82 down to the `train_loss 0.312` the metrics row states.
+    // `values`, not `points` — the first draft used the wrong field name and the
+    // plot rendered one row while measuring five, which read as a C09 I1
+    // violation in shipped code until the fixture was checked against S04's.
+    series: [{ label: "loss", values: [0.82, 0.71, 0.6, 0.5, 0.42, 0.36, 0.312] }],
+  }),
+  block({
+    kind: "keyValue",
+    id: "s11-metrics",
+    gapBefore: true,
+    rows: [{ label: "", value: "train_loss 0.312 ↓    val_loss 0.298 ↓    val_accuracy 0.871 ↑" }],
+  }),
+  block({
+    kind: "tip",
+    id: "s11-tip",
+    gapBefore: true,
+    text: "last checkpoint  epoch_7.pt                              ⌃c to stop",
+  }),
+];
+
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
+  {
+    file: "docs/surfaces/S11_local_execution.md",
+    fence: 0,
+    label: "S11 §2 — /run, host-native",
+    width: 76,
+    blocks: S11_RUN,
+  },
   {
     file: "docs/surfaces/S04_run_detail.md",
     fence: 1,

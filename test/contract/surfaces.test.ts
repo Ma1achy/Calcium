@@ -170,7 +170,39 @@ describe("the S-series' illustrated heights", () => {
     }
   });
 
+  // **The five-surface row is split, and none of the five was C23's.**
+  //
+  // It read "S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated
+  // rows — waits on C23 — every one of the five is a document some verb
+  // produced". HEIGHT_AUDIT's own table said C22 for all five, so the two
+  // records had already diverged; and reading each row against what it needs
+  // gives five different answers, of which C23 is none.
+  //
+  // **A row over N surfaces with N different blockers cannot be triaged, only
+  // split.** This file's comment above predicted it for the six-surface row that
+  // was split during C22's triage, and this is what was left of it. The second
+  // instance, so it is the rule rather than the observation: a bundled row comes
+  // due mostly unwritable, and mostly-unwritable is indistinguishable from
+  // correctly-expired at the moment it goes red.
+  //
+  // **S10 — deleted.** §2 is a *shape* listing — six lines of `label
+  // description` prose — not a rendered figure. There is nothing to compose
+  // against, so the row would have failed whenever it was written and accused
+  // whichever component it named. Third instance of S07's class, and S07's was
+  // deleted for exactly this reason.
+  //
+  // **S13 — deleted.** HEIGHT_AUDIT records it moving to C22 and the comment
+  // fifteen lines above says so too. A stale label rather than a deferral, and
+  // its coverage belongs with the C22 frame row that already carries S01's.
+  //
+  // **S11 — written, above**, after S11 §2 gained the block list it never had.
+  // The figure implied the sequence and an implication is not a declaration:
+  // composing it meant choosing where the spec was silent, which is guessing
+  // with a passing test attached.
   it.todo(
-    "S02 §2, S10 §2, S11 §2, S12 §2, S13 §2 compose to their illustrated rows — waits on C23 — every one of the five is a document some verb produced",
+    "S02 §2 composes to its illustrated rows — waits on C22 — S02 §2 declares no columns for its two headerless tables, and `cols()` reads them from the spec precisely so a fixture cannot invent them. The block list also drew `v1.0.0` without listing it, which is fixed; the columns are a design statement rather than a transcription (priorities, minimums, truncation) and belong with C22's whole-screen work",
+  );
+  it.todo(
+    "S12 §2 composes to its illustrated rows — waits on C22 — §2 says its box is a diagram and is not rendered; HEIGHT_AUDIT §1 and §6 call the same box a `panel`, count its inner rows, and record its right border as a drawing defect. Whether the rails are chrome or a rendered block decides whether the figure is 10 rows or 8, and nothing else can be asserted until it is ruled",
   );
 });

@@ -47,6 +47,18 @@ The design problem is that a long-running block competes with the transcript for
 ▌   last checkpoint  epoch_7.pt                              ⌃c to stop
 ```
 
+**Blocks, in order**: `rule`, `steps` (4), `keyValue` (the run line), `progress`,
+`plot`, `keyValue` (metrics), `tip` — every one after the first carrying
+`gapBefore`, which is where the seven blank rows come from (HEIGHT_AUDIT §1). One
+row, four, one, one, five, one, one, plus seven joins is the twenty the figure
+draws.
+
+**Written down because it was not**, and the contract test that composes this
+figure could not be written without it. The figure implies the sequence and an
+implication is not a declaration: composing it meant choosing where the spec was
+silent, which is guessing with a passing test attached. S02 §2 states its list
+and was short by one entry; this stated none.
+
 **This curve is C12's output too**, at height 3 and width 44, seven epochs from 0.82 to the `train_loss 0.312` the metrics row states. The earlier one carried S04's two defects — three empty interior dot columns and a curve stopping at 14 cells of a 28-cell area — and a third of its own: **it drew two y-labels where §3 made three unconditional.** That turned out to be a gap in C12 rather than in the picture, because T3.2 renders `height: 1` with axes and three labels cannot be placed in one row. Labels now sit at the max, mid and min rows and collapse from the middle outward (C12 I15), so at height 3 all three appear — and the midpoint is what this figure had been missing.
 
 **Per-epoch history collapses to a curve, not a log.** Ten epochs is ten lines; a hundred is a hundred, and a two-hundred-epoch run would own the entire viewport. The plot has a declared height (C12 I1), so the block's height is **constant from the second epoch onward** regardless of how long the run goes.
