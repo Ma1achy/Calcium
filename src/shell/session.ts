@@ -22,6 +22,8 @@ import { drawFallback, tooSmall } from "./fallback.js";
 import { compose, type Composed } from "./frame.js";
 import { cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
 import { renderSequenceToLines } from "../testing/index.js";
+import { focusableRowIds } from "../presentation/table/index.js";
+import type { FocusState } from "../presentation/blocks/index.js";
 import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
 import {
@@ -375,10 +377,44 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     const lines = renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
       theme: graph.theme.current,
       capabilities: graph.capabilities,
+      // **The third field, and the context was shipped with two** (C16 §3).
+      // Focus was stored, derived and routed, and a focused row rendered
+      // exactly like an unfocused one because nothing ever put it in the
+      // context C09 reads it from. Every reference existed and the seam was
+      // still broken — a partially-populated context, which counting
+      // references cannot see.
+      focus: focusFor(graph, entry.id),
     });
     out.push(...lines.slice(ve.skipRows, ve.skipRows + ve.takeRows));
   }
   return out;
+}
+
+/**
+ * C09's `FocusState` for an entry, derived from C16's stored focus and C13's
+ * `liveId` — which is the sentence C16 §3 writes and nothing implemented.
+ *
+ * Only the live entry can hold focus, and only a block that owns the focused
+ * row is told about it: `blockId` is what C11 compares against before it
+ * highlights anything (C11 I14). Focus is a **tone** there and nothing else —
+ * no marker, no extra row, no width — so this changes no measured height, and a
+ * height that moved would be a defect in C11 rather than in this line.
+ */
+function focusFor(graph: Graph, entryId: string): FocusState | null {
+  const stored = graph.focus.current;
+  if (stored.at !== "liveBlock") return null;
+  if (graph.transcript.liveId !== entryId) return null;
+
+  const entry = graph.transcript.entries.find((e) => e.id === entryId);
+  if (entry === undefined) return null;
+
+  for (const block of entry.doc.blocks) {
+    if (block.kind !== "table") continue;
+    if (stored.rowId === null || focusableRowIds(block).includes(stored.rowId)) {
+      return Object.freeze({ blockId: block.id, rowId: stored.rowId });
+    }
+  }
+  return null;
 }
 
 /** What `session` reads before the graph exists — §9's `created` state. */

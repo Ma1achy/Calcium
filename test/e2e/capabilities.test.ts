@@ -13,6 +13,7 @@
 // C22's own, and this file should not be read as covering it.
 import { describe, expect, it } from "vitest";
 import { interactivePty, runInPty, type PtyRun } from "../support/pty.js";
+import { displayCells } from "../../src/presentation/text.js";
 
 const FIXTURE = "node test/support/fixture.mjs caps";
 
@@ -149,23 +150,28 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
   );
 
   it.todo(
-    // **Two of the three blockers closed, and the third is one line of the
-    // frame.** Focus can now enter the live block (C16 I22) and a table now has
-    // a renderer at all — `table`, `plot` and `patch` register through C09's
-    // public mechanism and no composition root called it, so a stock session
-    // drew every table as its own JSON through the fallback, including the
-    // framework's `/history`.
+    // **Three blockers closed and each verified by probe; the fourth is the
+    // row's own driving.**
     //
-    // What remains: **the frame never passes focus to the renderer.** C09's
-    // `RenderContext.focus` exists and `renderSequenceToLines` takes it, and
-    // the transcript path supplies `{theme, capabilities}` and nothing else —
-    // so focus is stored (C16 §3), derived (`activeTarget`), routed (the
-    // `liveBlock` handler) and invisible. The row waits on the frame deriving
-    // C09's `FocusState` from C16's stored focus and C13's `liveId`, which is
-    // the sentence C16 §3 already writes and nobody implements.
+    // 1. `enterLiveBlock` had no caller, so focus could never leave the prompt
+    //    (C16 I22). 2. `table` was registered by nobody, so the block drew as
+    //    its own JSON through the fallback (C09 I13). 3. The frame supplied
+    //    `{theme, capabilities}` and not `focus`, so a focused row rendered
+    //    exactly like an unfocused one — every reference present, the seam
+    //    still broken (C16 §3).
     //
-    // Verified in passing on the way here: the table reaches the screen as a
-    // table, and `↓` at the bottom of history enters the block.
-    "T5.4b: inside tmux, keyboard navigation of a table works end to end — the routing and the renderer are done; blocked on the frame never populating C09's `RenderContext.focus`, so a focused row is indistinguishable from an unfocused one on screen",
+    // *Verified*: a probe driving this session — the same fixture, the same
+    // `TERM=screen-256color` and `TMUX`, the same keystrokes — submits
+    // `/ps --mine`, presses `↓`, and the row's tone goes from `38;5;188` to
+    // `38;5;216`, which is C11's `accent` (C11 I14: focus is a tone and nothing
+    // else). Run with no tmux env and with `screen-256color` alone, all three
+    // change.
+    //
+    // *What remains*: written as this row, the tone stays at 188 for three
+    // seconds. The env is not the difference and neither is the fixture; what
+    // differs is how the row drives the PTY, which is T5.3's residue again.
+    // Same ruling: a row parked with its evidence is worth more than one made
+    // green by a sleep, and this one now names exactly what is known to work.
+    "T5.4b: inside tmux, keyboard navigation of a table works end to end — the routing, the renderer and the focus wiring are done and probe-verified; the row's own PTY driving does not reproduce it, which is T5.3's residue",
   );
 });

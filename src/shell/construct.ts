@@ -157,6 +157,14 @@ export type Graph = Readonly<{
   lifecycle: TerminalLifecycle;
   scheduler: ReturnType<typeof createFrameScheduler>;
   router: ReturnType<typeof createRouter>;
+  /**
+   * C16's stored focus, exposed because the **frame** needs it too (C16 §3).
+   *
+   * C09's `FocusState` is derived from this plus C13's `liveId`, and the
+   * transcript path is where that derivation belongs — it is the only place
+   * that knows which entry is being rendered.
+   */
+  focus: ReturnType<typeof createFocusStore>;
   pipeline: Pipeline;
   session: SessionStore;
   log: readonly Step[];
@@ -624,6 +632,7 @@ export async function constructGraph(
     lifecycle,
     scheduler,
     router,
+    focus,
     pipeline,
     session,
     log: Object.freeze([...log]),
