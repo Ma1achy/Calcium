@@ -74,6 +74,8 @@ with `gutter = { first: 2, cont: 2 }` (D24a, C22 §6).
 
 **The prompt is capped at half the terminal.** Pasting two hundred lines is a real thing people do (C17 T5.2), and an uncapped prompt would consume the entire frame and leave the viewport at zero. Beyond the cap the prompt **windows around the cursor**, computed from C17's `cursorCell`, with `⋯` markers on whichever edges are elided. C17 needs no scroll model for this — buffer plus cursor position is enough.
 
+**A cap of one row shows the last row and no marker.** The window is the marker plus the rows that follow it, so at a cap of one there is nothing for the marker to sit beside: it elides everything it was written to annotate, and the prompt paints as `⋯` with the typed command nowhere on the screen. One row of the command is strictly more informative than a marker reporting that a command exists. The marker is therefore dropped at that cap and reappears at two. The cap reaches one only below the size gate's minimum — which is reachable rather than theoretical, because a resize can arrive between the gate and the frame (§6, C22 §8b), and the arithmetic has to be right there rather than nearly right.
+
 **The prompt draws the rows C17 measured, rather than wrapping the buffer again.** `editor.layout(width, gutter)` returns the display rows and this surface pads each by the gutter it passed in — the first by `first`, the rest by `cont` (C17 I18, §7b). A second wrap here would be C09 I1's divergence in the one place it moves the whole frame: the two would agree on ordinary commands and part company at a wrap boundary, a double-width glyph, or a line that exactly fills its row, which is where a prompt one row off comes from.
 
 Every derived height is clamped at zero or greater, and the sum is asserted equal to `rows` before any output is written.
@@ -181,6 +183,7 @@ Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` 
 11. The too-small fallback uses no layout engine, no registry, no theme, and no Unicode.
 12. Session state survives the too-small state; it is a render mode, not an error.
 13. The prompt draws the rows `editor.layout` returned rather than wrapping the buffer a second time.
+14. The elision marker needs a row to sit beside; at a prompt cap of one the last row is shown and no marker is.
 
 ---
 
@@ -195,6 +198,8 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T1.3**: a prompt whose `displayRows` exceeds `floor(rows/2)` → capped; the viewport keeps at least the remainder.
 - **T1.4**: at `rows = 16` with a 40-row prompt → prompt capped at 8, viewport 6, footer and header 1 each.
 - **T1.5**: the windowed prompt shows the rows around `cursorCell.row`, with `⋯` on each elided edge.
+- **T1.5b** (C14): a three-row prompt at a cap of one → the last row is rendered and no `⋯` appears.
+- **T1.5c** (C4, C13): a session whose editor holds a wrapped buffer → the frame's `promptRows` is what `layout` returned, and the painted prompt contains the typed text. The height the frame is composed with and the rows it is painted from are two records of one number, and this is the only test that compares them.
 - **T1.6**: each health state renders its documented glyph and tone — four cases.
 - **T1.7**: `expiring` with a live cluster → `expiring` wins.
 - **T1.8**: header elision at 100, 90, 89, 80, 79, 70 and 69 columns → the documented fields are present at the boundary and absent one cell below it.
@@ -266,6 +271,8 @@ Six tiers, plus golden frames at 80 / 100 / 120 / 160.
 - **T6.8** (C11): using `×` in the fallback → T3.11's ASCII case fails on a non-UTF-8 terminal.
 - **T6.9** (C12): discarding state on the too-small transition → T3.13 fails.
 - **T6.10** (T4.7): committing the clock as `"input"` → keystroke latency regresses under an idle clock.
+- **T6.12** (C4): composing the frame with a constant prompt height while painting the editor's rows → T1.5c fails, and a wrapped prompt paints as a single `⋯` with the command invisible.
+- **T6.13** (C14): restoring the marker at a cap of one → T1.5b fails, and the prompt shows the marker and nothing else.
 
 ---
 
