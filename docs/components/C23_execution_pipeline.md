@@ -240,7 +240,7 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 
 | Trigger | Sequence |
 |---|---|
-| Command submit | `parse` → route → … → `transcript.append` → `router.resetFocus` → `scheduler.commit` |
+| Command submit | `parse` → `editor.clear` → route → … → `transcript.append` → `router.resetFocus` → `scheduler.commit`, **then at settlement** `history.append(line, exitCode)` (I28, I29) |
 | Child process needing a TTY | `lifecycle.suspend` → `runner.handoff` → `lifecycle.resume` → `scheduler.invalidate` |
 | Pop a pushed view | `overlays.pop` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) |
 | History recall | `history.previous` → `editor.setText` → `commit("input")` |
@@ -350,6 +350,8 @@ Per submission.
 - **I25** — A stream producing nothing for 120 s is **patched** with a muted stall notice, and never an error. A patch rather than an append, so it never becomes a second entry — and so it carries no `meta.origin`, which is why it is not I22's business. On resumption the notice is **replaced by a record of the gap, never removed**: `ViewPatch` has no delete and a transcript is a record (§3b). A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
 - **I26** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
 - **I27** — `seal()` reconciles the local registry against the manifest and fails construction on a mismatch in either direction: a manifest verb marked `local` with no handler, or a handler for no manifest verb. Two records of one fact and no comparison is what lets a `local` route arrive with nothing to run (§8b B3).
+- **I28** — A submission clears the prompt, whatever becomes of it. The clear sits between the parse and the route, so a refusal, a parse error and a successful verb all leave the same empty prompt — bash's behaviour, and the only one that does not require the user to work out whether their line survived. Restoring it on refusal was the alternative and it is worse: the notice says what happened, and a line that sometimes stays is a prompt whose contents depend on a decision made after the keystroke.
+- **I29** — Every submitted line is recorded in C20 **at settlement, with the code the entry settled with**, on every terminal path — app, local, shell, handoff, refusal and parse error. At settlement because `append(command, exitCode)` requires a code and settlement is the only moment one exists; recording at acceptance would satisfy the signature by inventing a value, which is what a required field exists to prevent. **A refusal is a submission**: the user typed it and pressed Enter, and `↑` must recall it — history is not a log of successes. Five call sites is five chances to miss one, so the test is derived from `ParseResult`'s arms rather than from a list.
 
 ---
 
@@ -367,6 +369,7 @@ Per submission.
 10. Built-ins apply before delegation (I11).
 11. All cross-layer sequences live in §4 (I13).
 12. Local handlers ship for framework concerns; apps register their own (I14).
+12a. A submission clears the prompt whatever becomes of it, and every submitted line is recorded in C20 at settlement with the code it settled with — refusals and parse errors included, because `↑` recalls what was typed rather than what succeeded (I28, I29).
 13. `/help` renders from the manifest and C16's keymap, so help cannot drift from behaviour (I26).
 14. The displayed command equals the spawned command (I15).
 15. Submissions are refused once C22 sets `session.stopping` (I12).
@@ -700,6 +703,8 @@ Fake transport, fake stores.
 - **T1.5** (I4): a spy proves `validateInvocation` is not called during execution.
 - **T1.6** (I5): a second `submit` while running → refused with a notice naming the running verb.
 - **T1.7** (I6): a `--watch` submission returns to idle; a subsequent verb is not refused.
+- **T1.20** (I28): every route — app, local, shell, handoff, refusal, parse error — leaves the prompt empty. Enumerated over `ParseResult`'s arms, not listed: a route added later gets the clear or fails here.
+- **T1.21** (I29): each of those routes produces exactly one history entry, carrying the line as typed and the code the entry settled with. Also enumerated from the type, for the reason the invariant gives — five call sites is five chances to miss one, and the one missed would be silent.
 - **T1.8**: a patch arrives → applied, entry still streaming, `"stream"` commit issued.
 - **T1.9**: `end` → entry settled, `"completion"` commit issued.
 - **T1.10** (I10): cancel mid-stream → `partial`, prior output retained.

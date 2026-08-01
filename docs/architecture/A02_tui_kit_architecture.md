@@ -165,7 +165,7 @@ No component reaches sideways or upward to cause an effect in another. Where an 
 | Scroll | `viewport.pageUp()` etc → `scheduler.commit("input")` — C14 moves, C22 commits (C14 I12) | C22 |
 | Resize | C01's `onResize` snapshot → `viewport.resize()` → `scheduler.commit("resize")`; C14 captures its anchor before dropping the cache (C14 I8) | C22 |
 | History recall | `history.previous()` → `editor.setText()` → **not** `history.resetNavigation()` (C20 I3) | C23 |
-| Command submit | `parser.parse()` → `transport` → `adapters` → `transcript.append()` → `router.resetFocus()` → `scheduler.commit()` | C23 |
+| Command submit | `parser.parse()` → `editor.clear()` → `transport` → `adapters` → `transcript.append()` → `router.resetFocus()` → `scheduler.commit()`, **then at settlement** `history.append(line, exitCode)` | C23 |
 | Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — never pop-and-repush (C19, C15 §2) | C23 |
 | History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` | C23 |
 | Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) | C23 |
