@@ -34,7 +34,17 @@ export type ActionDeps = Readonly<{
   openUrl: (url: URL) => Promise<void>;
   /** §2's normal path — `exec` re-enters it rather than shortcutting (I16). */
   submit: (line: string) => void;
-  /** Where a refusal goes. An action refused silently is indistinguishable from one that did nothing. */
+  /**
+   * A refusal, **patched into the entry it declined to act on** (C23 I18).
+   *
+   * Never an append: an append freezes the block the action came from, so the
+   * next action on it is refused as *frozen* rather than for its own reason and
+   * the selection A01 D7 preserves is cleared. C23 §4's pop row is one section
+   * over and rules the same hazard. A frozen entry still accepts patches, which
+   * is what C13 §2's frozen-is-not-finished distinction was for.
+   */
+  refuse: (from: EntryId | null, text: string) => void;
+  /** For a refusal with no entry to patch — a malformed URL from a chrome action. */
   notify: (text: string) => void;
 }>;
 
@@ -54,7 +64,7 @@ export function createActionDispatcher(deps: ActionDeps) {
     // C23 I18 — before the switch, because every kind is refused and putting the
     // check inside each arm is three places to forget it.
     if (isFrozen(deps.transcript, from)) {
-      deps.notify(`\`${action.label}\` is from a frozen entry — its data is stale`);
+      deps.refuse(from, `\`${action.label}\` is from a frozen entry — its data is stale`);
       return;
     }
 
@@ -115,17 +125,13 @@ export function createActionDispatcher(deps: ActionDeps) {
           const row = b.rows.find((r) => r.id === action.target);
           if (row === undefined) continue;
 
-          deps.transcript.patch(from, {
-            op: "replace",
+          const outcome = deps.transcript.patch(from, {
+            op: "expand",
             blockId: b.id,
-            block: {
-              ...b,
-              rows: b.rows.map((r) =>
-                r.id === action.target ? { ...r, expanded: r.expanded !== true } : r,
-              ),
-            },
+            rowId: action.target,
+            expanded: row.expanded !== true,
           });
-          deps.scheduler.commit("input");
+          if (outcome.ok) deps.scheduler.commit("input");
           return;
         }
 

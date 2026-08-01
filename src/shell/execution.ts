@@ -571,6 +571,34 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     scheduler: deps.scheduler,
     openUrl: deps.openUrl,
     submit: (l) => void submit(l),
+
+    // **Patched into the source entry, never appended** (C23 I18, §3a). An
+    // append freezes the block the action came from, so the next action is
+    // refused as frozen rather than for its own reason and the selection A01 D7
+    // preserves is cleared — C23 §4's pop row, one section over.
+    refuse: (from, text) => {
+      if (from === null) {
+        appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
+        return;
+      }
+      const outcome = deps.transcript.patch(from, {
+        op: "append",
+        block: block({
+          kind: "notice",
+          id: blockId("refused"),
+          tone: "warn",
+          glyph: "warn",
+          text,
+        }),
+      });
+      // A settled entry rejects a data patch (C13 §6), and a notice is data. So
+      // a refusal on a settled entry has nowhere to go but the transcript —
+      // which is the freeze this exists to avoid, taken only when the
+      // alternative is saying nothing at all.
+      if (outcome.ok) deps.scheduler.commit("input");
+      else appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
+    },
+
     notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),
   });
 

@@ -123,9 +123,16 @@ class Store implements TranscriptStore {
     const entry = this.#entries.find((e) => e.id === id);
     // A patch for an entry that was evicted or cleared. Ordinary, not a bug.
     if (entry === undefined || isMarker(entry)) return { ok: false, reason: "unknown" };
-    // A stream outlived its `settle` — a caller bug, surfaced rather than
-    // absorbed (I8). C13 reports; C23 §5 decides what it means.
-    if (!entry.streaming) return { ok: false, reason: "settled" };
+    // **The gate is about data, not about patches** (§6). A stream outliving its
+    // `settle` is a caller bug, surfaced rather than absorbed (I8) — but
+    // `op: "expand"` is view state, and gating it here inverted the rule
+    // exactly: an app verb's result settles the moment it lands, so the entries
+    // a reader would expand were the ones refused, while a live `--watch` — the
+    // case where expanding is least useful — was allowed. C04 §4's named op is
+    // what makes the distinction unforgeable rather than remembered.
+    if (!entry.streaming && patch.op !== "expand") {
+      return { ok: false, reason: "settled" };
+    }
 
     const r = applyPatch(entry.doc, patch);
     if (!r.ok) {

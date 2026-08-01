@@ -205,6 +205,40 @@ export function applyPatch(doc: ViewDocument, patch: ViewPatch): PatchResult {
       return { ok: true, doc: deepFreeze({ ...doc, blocks }) };
     }
 
+    case "expand": {
+      // View state, so it neither validates against I3 nor touches `error`. It
+      // fails only when it names nothing: a target that does not exist is a
+      // caller bug, and silently succeeding is what makes an action that did
+      // nothing indistinguishable from one that worked.
+      const target = doc.blocks.find((b) => b.id === patch.blockId);
+      if (target === undefined) {
+        return fail(`expand: no block "${patch.blockId}" in the document`, "expand");
+      }
+      if (target.kind !== "table") {
+        return fail(`expand: block "${patch.blockId}" is a ${target.kind}, which has no rows`, "expand");
+      }
+      if (!target.rows.some((r) => r.id === patch.rowId)) {
+        return fail(`expand: no row "${patch.rowId}" in block "${patch.blockId}"`, "expand");
+      }
+
+      return {
+        ok: true,
+        doc: deepFreeze({
+          ...doc,
+          blocks: doc.blocks.map((b) =>
+            b.id === patch.blockId && b.kind === "table"
+              ? {
+                  ...b,
+                  rows: b.rows.map((r) =>
+                    r.id === patch.rowId ? { ...r, expanded: patch.expanded } : r,
+                  ),
+                }
+              : b,
+          ),
+        }),
+      };
+    }
+
     case "status": {
       // I3 — `error` is present iff status is "error". A status patch is the
       // one operation that can construct an I3-violating document out of two

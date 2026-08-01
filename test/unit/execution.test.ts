@@ -43,6 +43,7 @@ function harness(script: Scripted = {}) {
   const commits: string[] = [];
   const resets: number[] = [];
   const calls: string[] = [];
+  const typed: string[] = [];
 
   const transport = {
     for: () => ({
@@ -83,7 +84,9 @@ function harness(script: Scripted = {}) {
     },
     manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
     blocks: {} as never,
-    editor: {} as never,
+    // A real fake rather than `{} as never`: `fill` calls `setText`, and a stub
+    // that throws makes an action test fail for a reason about the harness.
+    editor: { setText: (t: string) => void typed.push(t), get text() { return typed.at(-1) ?? ""; } },
     overlays: {} as never,
     theme: {} as never,
     history: {} as never,
@@ -115,7 +118,7 @@ function harness(script: Scripted = {}) {
   pipeline.register("debug dump", () => doc({ command: "/debug" }));
   pipeline.seal();
 
-  return { pipeline, transcript, session, commits, resets, calls };
+  return { pipeline, transcript, session, commits, resets, calls, typed };
 }
 
 /** Lets every `void`-ed async route settle before assertions. */
@@ -716,5 +719,40 @@ describe("C23 §3a — action dispatch", () => {
         e.doc.blocks.some((b) => b.kind === "notice" && /nothing to expand/.test(b.text)),
       ),
     ).toBe(true);
+  });
+
+  it("T1.16 (I17): no action path reaches a shell", async () => {
+    // A spy rather than a reading: `spawnShell` is what an injection would use,
+    // and the whole of D18 is that this path does not exist.
+    for (const action of [
+      { kind: "open" as const, label: "a", url: "https://example.com/;rm -rf ~" },
+      { kind: "fill" as const, label: "b", command: "echo hi" },
+      { kind: "expand" as const, label: "c", target: "r1" },
+    ]) {
+      const h = withTable();
+      h.pipeline.onAction(action, h.id);
+      await settled();
+      expect(h.calls, `${action.kind} shelled`).not.toContain("spawnShell");
+    }
+  });
+
+
+
+
+  it("T1.14b (§3a): expand toggles the row's flag through a document patch", async () => {
+    // C11 T4.7's mechanism — expansion is content, not view state, so a frozen
+    // block records its own expansion. A test asserting only "a patch was
+    // issued" passes on a patch that changes nothing.
+    const h = withTable();
+
+    h.pipeline.onAction({ kind: "expand", label: "e", target: "r1" }, h.id);
+    await settled();
+    const first = h.transcript.entries[0]?.doc.blocks[0];
+    expect(first?.kind === "table" && first.rows[0]?.expanded).toBe(true);
+
+    h.pipeline.onAction({ kind: "expand", label: "e", target: "r1" }, h.id);
+    await settled();
+    const second = h.transcript.entries[0]?.doc.blocks[0];
+    expect(second?.kind === "table" && second.rows[0]?.expanded, "toggles").toBe(false);
   });
 });
