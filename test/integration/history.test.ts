@@ -43,8 +43,28 @@ describe("T4.3 (with C15) — the search overlay", () => {
       dismissable: true,
     });
 
+    // **The caret is at the end of the query, and it moves with it** (C15 I19).
+    // The search has a cursor because text is entered into it, which is the
+    // half of the field the completion menu answers the other way. Asserted
+    // before and after narrowing, because a cursor stated once and never
+    // updated passes every assertion about the layer's content.
+    const opened = store.searchLayer(ANCHOR);
+    expect(opened.cursor, "at the end of an empty query").toEqual({
+      row: 0,
+      col: "(reverse-i-search) `".length,
+    });
+
     store.searchType("logs");
-    expect(overlays.update(SEARCH_ID, { content: store.searchLayer(ANCHOR).content })).toBe(true);
+    const narrowed = store.searchLayer(ANCHOR);
+    expect(narrowed.cursor?.col, "and four cells further on after four keystrokes").toBe(
+      (opened.cursor?.col ?? 0) + 4,
+    );
+    expect(
+      overlays.update(SEARCH_ID, {
+        content: narrowed.content,
+        ...(narrowed.cursor !== undefined && { cursor: narrowed.cursor }),
+      }),
+    ).toBe(true);
 
     expect(overlays.stack.map((l) => l.id)).toEqual([SEARCH_ID, "later"]);
     const placed = overlays.layout(REGION);
@@ -52,6 +72,7 @@ describe("T4.3 (with C15) — the search overlay", () => {
     expect(line?.layer.content).toEqual([
       { kind: "raw", id: `${SEARCH_ID}-line`, text: "(reverse-i-search) `logs': /logs digit-42" },
     ]);
+    expect(line?.cursor, "and placement carries it through unchanged").toEqual(narrowed.cursor);
     // Anchored above the prompt, and measured by C09 rather than asserted.
     expect(line?.height).toBe(1);
     expect(line?.top).toBeLessThan(ANCHOR.row);

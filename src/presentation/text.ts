@@ -41,7 +41,7 @@ const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 export { stripControl } from "../data/text.js";
 
 import { stripControl } from "../data/text.js";
-import { sgrPattern } from "../terminal/escapes.js";
+import { SGR_RESET, sgrPattern } from "../terminal/escapes.js";
 
 /** A tab stop, in cells. Fixed rather than configurable — see `expandTabs`. */
 export const TAB_STOP = 8;
@@ -163,6 +163,105 @@ export function fitStyled(text: string, width: number, reset: string): string {
   // golden-frame test would then be asserting the reset rather than the row.
   if (cut && styled) out += reset;
   return out + " ".repeat(Math.max(0, width - used));
+}
+
+/**
+ * A window of display cells over a line that already carries SGR (C09 I20, §5a).
+ *
+ * `fitStyled` asked from the other end. Compositing a layer over a painted row
+ * keeps cells `[0, left)` of that row, writes the layer, and keeps cells
+ * `[left + width, columns)` — and the third has no expression as a `slice`. A
+ * cut by code unit lands inside an escape, `[38;5` reaches the terminal as
+ * literal text, the SGR is never terminated, and the colour bleeds down every
+ * row below. That is worse than the mis-measurement `displayCells` exists for,
+ * because it survives the frame.
+ *
+ * **Two rules, and they are the whole reason this is not a substring.**
+ *
+ * The skipped prefix's SGR is carried forward: a style opened before `from` is
+ * still in effect at `from`, and a tail that dropped it draws in the terminal's
+ * default colour — which reads as the layer having bled rather than as the base
+ * having lost its style. And a cluster straddling either boundary is dropped
+ * with its cell blanked, never halved, which is I9's rule over a window rather
+ * than over a cut: half a double-width glyph is a row one cell wide, and a row
+ * wider than it was measured wraps into a row nobody counted.
+ *
+ * The result is exactly `to - from` cells, or fewer only when the line itself
+ * ends first. Nothing is padded here — the caller knows whether a short tail
+ * should be filled, and `paint` does.
+ */
+export function sliceCells(text: string, from: number, to: number): string {
+  const start = Math.max(0, Math.floor(from));
+  const end = Math.max(start, Math.floor(to));
+  if (end === start) return "";
+
+  const sgr = sgrPattern();
+  // The style in effect at `start`, accumulated across everything skipped. A
+  // reset in the prefix clears it, so the tail opens with what the terminal
+  // would actually have been showing rather than with every escape ever seen.
+  let carried = "";
+  let out = "";
+  let used = 0;
+  let i = 0;
+  let started = false;
+  let styled = false;
+
+  while (i < text.length) {   // cells-ok: a cursor, not a width
+    sgr.lastIndex = i;
+    const m = sgr.exec(text);
+    if (m !== null && m.index === i) {
+      const esc = m[0];
+      if (started) {
+        out += esc;
+        styled = true;
+      } else {
+        carried = esc === SGR_RESET ? "" : carried + esc;
+      }
+      i = sgr.lastIndex;
+      continue;
+    }
+
+    const ch = [...text.slice(i)][0] ?? "";
+    if (ch === "") break;
+    const w = cells(ch);
+
+    // Straddling the left edge or the right: blanked in both directions, so the
+    // window measures `to - from` either way. The left case is a separate path
+    // and only the right one resembles `truncate` (C09 T1.13b).
+    if (used < start && used + w > start) {
+      if (!started) {
+        started = true;
+        out += carried;
+        if (carried !== "") styled = true;
+      }
+      out += " ".repeat(used + w - start);
+      used += w;
+      i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+      continue;
+    }
+
+    if (used >= start && !started) {
+      started = true;
+      out += carried;
+      if (carried !== "") styled = true;
+    }
+
+    if (used >= end) break;
+    if (used >= start && used + w > end) {
+      out += " ".repeat(end - used);
+      break;
+    }
+
+    if (started) out += ch;
+    used += w;
+    i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+  }
+
+  // Only a window that carried style needs closing, for `fitStyled`'s reason:
+  // a reset on every plain piece would put four bytes on every row of every
+  // frame, and a golden-frame test would then be asserting the reset.
+  if (styled) out += SGR_RESET;
+  return out;
 }
 
 /**

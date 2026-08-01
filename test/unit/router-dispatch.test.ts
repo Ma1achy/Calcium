@@ -253,6 +253,27 @@ describe("C16 §4 — mouse routes by position", () => {
       .toContain("viewport:row2");
   });
 
+  it("T3.12c (I20): both rungs test a region row, and the header is not the region's first", () => {
+    // **The case the row above cannot distinguish.** Its layer covers region
+    // rows 2 to 4 and terminal rows 3 to 5, and the click is at 3 — inside both
+    // readings, so it passed while this rung compared a terminal row to
+    // `Placed.top` and the transcript rung one line below subtracted
+    // `region.top`. Two adjacent lines in two coordinate systems.
+    //
+    // A layer on the region's first row is the discriminating case: it is the
+    // frame's second row, and the frame's first is the header.
+    const { router, layer } = harness();
+    layer.placed = [
+      { layer: { id: "menu", kind: "overlay", dismissable: true }, top: 0, left: 0, height: 1, width: 40 },
+    ];
+
+    router.dispatch(click(0, 4));
+    expect(router.lastStages, "the header is chrome, not the layer").toContain("chrome");
+
+    router.dispatch(click(1, 4));
+    expect(router.lastStages, "and the region's first row is the layer").toContain("layer:menu");
+  });
+
   it("T3.12 (I3): mouse events are dropped when the capability is absent", () => {
     const { router } = harness({ mouseEnabled: () => false });
     expect(router.dispatch(click(3))).toBe(false);

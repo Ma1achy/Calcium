@@ -33,8 +33,11 @@ import { renderSequenceToLines } from "../testing/index.js";
 import { fitStyled } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
 import { PROMPT, PROMPT_GUTTER } from "./config.js";
+import { composite } from "./composite.js";
 import { heightsSum, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
+import type { Placed } from "../viewport/overlay/index.js";
+import type { Cell } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -47,6 +50,19 @@ export type PaintDeps = Readonly<{
   transcriptRows: () => readonly string[];
   /** C17's display rows, already wrapped and gutter-aware (C17 §2, I18). */
   promptRows: () => readonly string[];
+  /**
+   * C15's boxes, placed against the frame's own `overlayRegion` (C22 I28).
+   *
+   * A function rather than a value for the same reason the two above are, and
+   * with the same rule: it is answered from the composed frame's region, never
+   * from a fresh one. Two regions for one frame is the two-records defect S01
+   * §3 already produced once.
+   */
+  overlays: () => readonly Placed[];
+  /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
+  promptCursor: () => Cell;
+  /** Whether the prompt is where keys are going — C16's derived focus. */
+  promptFocused: () => boolean;
 }>;
 
 /** The elision marker S01 §3 puts on a windowed prompt's edges. */
@@ -116,8 +132,7 @@ function region(
  * appears at a wrap boundary, a double-width glyph, or a line that exactly
  * fills its row (C17 I18, S01 §3).
  */
-function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
-  const rows = deps.promptRows();
+function promptWindow(frame: Composed, rows: readonly string[]): PromptWindow {
   const cap = frame.promptRows;
 
   // **A cap of one shows the last row and no marker** (S01 §3, commitment 14).
@@ -126,17 +141,34 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   // the typed command nowhere on the screen. An elision that elides everything
   // annotates nothing, and one row of the command beats a marker reporting that
   // a command exists.
-  const windowed =
-    rows.length <= cap
-      ? rows
-      : cap === 1
-        ? [rows[rows.length - 1] ?? ""]
-        : // Around the end rather than around the cursor, until C17's
-          // `cursorCell` is threaded through: the cursor is at the end for every
-          // case but a mid-buffer edit, and showing the wrong window is worse
-          // than showing the last rows. Named here so it is a known
-          // simplification rather than a silent one.
-          [ELISION, ...rows.slice(rows.length - (cap - 1))];
+  if (rows.length <= cap) return { rows, first: 0, offset: 0 };
+  if (cap === 1) return { rows: [rows[rows.length - 1] ?? ""], first: rows.length - 1, offset: 0 };
+
+  // Around the end rather than around the cursor, until C17's `cursorCell` is
+  // threaded through: the cursor is at the end for every case but a mid-buffer
+  // edit, and showing the wrong window is worse than showing the last rows.
+  // Named here so it is a known simplification rather than a silent one.
+  const first = rows.length - (cap - 1);
+  return { rows: [ELISION, ...rows.slice(first)], first, offset: 1 };
+}
+
+/**
+ * Which of the editor's rows the prompt is showing, and where they land.
+ *
+ * `first` is the index in the editor's full layout of the first *content* row
+ * in the window, and `offset` is how many painted rows precede it — one when
+ * the elision marker is drawn, zero otherwise. The cursor needs both and the
+ * paint needs neither, which is why they are returned rather than inlined.
+ */
+type PromptWindow = Readonly<{
+  rows: readonly string[];
+  first: number;
+  offset: number;
+}>;
+
+function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
+  const cap = frame.promptRows;
+  const windowed = promptWindow(frame, deps.promptRows()).rows;
 
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
@@ -182,12 +214,26 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
   // **The one width, read from the composed frame and never from a stream.**
   const width = frame.size.columns;
 
-  const lines = [
-    ...region(frame.header, 1, width, deps),
-    ...transcript(frame, deps, width),
-    ...promptRegion(frame, deps, width),
-    ...region(frame.footer, 1, width, deps),
-  ];
+  // **The layers go on last, and the count is checked after them** (I29). They
+  // take no rows — that is why `heightsSum` above holds identically with three
+  // overlays open and with none, and why nothing could see that for the whole
+  // life of C15 no component drew one at all (S01 §3a).
+  const lines = composite(
+    [
+      ...region(frame.header, 1, width, deps),
+      ...transcript(frame, deps, width),
+      ...promptRegion(frame, deps, width),
+      ...region(frame.footer, 1, width, deps),
+    ],
+    deps.overlays(),
+    {
+      registry: deps.registry,
+      theme: deps.theme,
+      capabilities: deps.capabilities,
+      regionTop: frame.region.top,
+      region: frame.overlayRegion,
+    },
+  );
 
   if (lines.length !== frame.size.rows) {
     throw new FrameError(
@@ -195,6 +241,45 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
     );
   }
   return Object.freeze(lines);
+}
+
+/**
+ * Where the terminal cursor goes, in frame coordinates, or `null` for hidden
+ * (C15 I19, C22 §6a).
+ *
+ * **The choice is the drawer's and never C17's.** A `cursorCell` that varied
+ * with focus would put focus inside a component that has no notion of it, so
+ * this reads the focused thing and asks it: the topmost layer states its own
+ * through `Placed.cursor`, and a layer without one hides the cursor rather than
+ * leaving it blinking at a prompt that is not taking keys — which is the
+ * *somewhere invisible* symptom derived focus exists to prevent. Reverse search
+ * has one, the completion menu does not, and the confirm does not.
+ *
+ * **The windowed prompt is the arithmetic half** (§6a trace row 8).
+ * `cursorCell.row` indexes the editor's full layout and the prompt paints only
+ * `promptRows` of it, so an untranslated row puts the cursor in the transcript.
+ * A cursor above the window is hidden rather than clamped to its edge: it
+ * genuinely is not on the screen, and a clamped one would claim otherwise.
+ */
+export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
+  const placed = deps.overlays();
+  const top = placed[placed.length - 1];
+  if (top !== undefined) {
+    if (top.cursor === undefined) return null;
+    return {
+      row: frame.region.top + top.top + top.cursor.row,
+      col: top.left + top.cursor.col,
+    };
+  }
+
+  if (!deps.promptFocused()) return null;
+
+  const cell = deps.promptCursor();
+  const window = promptWindow(frame, deps.promptRows());
+  const within = cell.row - window.first + window.offset;
+  if (within < 0 || within >= frame.promptRows) return null;
+
+  return { row: frame.region.top + frame.region.height + within, col: cell.col };
 }
 
 /** C14 selected these at this width; they are padded, never re-measured. */

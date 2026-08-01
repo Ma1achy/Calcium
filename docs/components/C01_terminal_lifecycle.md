@@ -35,6 +35,7 @@ interface TerminalLifecycle {
   onResize(cb: (size: TerminalSize) => void): Disposable;
   onResume(cb: () => void): Disposable;   // fired after a SIGCONT re-acquisition
   onInput(cb: (chunk: Uint8Array) => void): Disposable;   // raw bytes — I18
+  cursorSequence(at: Readonly<{ row: number; col: number }> | null): string;  // I19
   size(): TerminalSize;                   // one frozen snapshot per call — I12a, §5
   readonly writer: NodeJS.WriteStream;    // the privileged handle — see I9
   readonly acquired: boolean;
@@ -138,6 +139,7 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 - **I16** — `SIGTSTP` releases, removes its own handler, and re-raises with default disposition, so the shell's job control sees an ordinary stop rather than a process that swallowed it.
 - **I17** — Exit codes are `128 + signal`, per signal: 130 for `SIGINT`, 143 for `SIGTERM`, 129 for `SIGHUP`. One shutdown *path* is a property worth having; one shutdown *code* misreports a supervisor's signal as a user pressing Ctrl-C (D54).
 - **I18** — Raw stdin bytes reach subscribers only while the terminal is acquired. `acquire()` attaches the listener, `suspend()` **drops** it, `resume()` re-attaches, and `release()` drops it for good. The delivery is C01's rather than the shell's because the pause is a property of the transition: a listener the shell had to remember to remove would race the child for the same descriptor under `stdio: inherit`, and a forgotten removal shows up as a child dropping every other keystroke, with nothing in either component to point at. C21 I6 already refuses `handoff()` while raw mode is set; this is the same guarantee over the same window, made structural rather than conventional. **C01 delivers bytes and interprets none** — decoding is C16's (C16 §2), and a partially-decoded sequence spanning a suspension is the shell's to discard (C22 §4).
+- **I19** — The cursor's visibility is C01's mode and its position is the frame's, so C01 returns the sequence and the frame writes it. `cursorSequence(at)` yields a move plus a show, or a hide when `at` is null; the drawer embeds it in the same `write` as the rows. Two reasons it is a string rather than a call, and the second is the one that decides it: the mode is C01's to hold and restore at release (I1), and the bytes must land inside the frame's single write — a separate call cannot be kept inside C03's synchronised-update window, and outside it the hide arrives after the rows on a terminal that honours the move immediately. **The order within the string is hide, move, show**, and the sync window does not make it moot: `synchronisedUpdate` is a capability, so the unwrapped path is real and on it a visible cursor is dragged across the frame by every row written.
 
 ---
 
@@ -272,6 +274,7 @@ Nested suspend is refused — `suspend()` while already suspended throws. There 
 18. Exit codes are 128 + signal, per signal: 130, 143, 129 (I17).
 19. The terminal's dimensions are read in one file, and I12's snapshot covers the signal path only. §5 states where the guarantee stops rather than leaving it inferred from the absence of an accessor, because the per-frame snapshot is the frame path's to make and a partial fix here would look like a whole one (I12, I13).
 19a. `size()` is that accessor, added when both of §5's conditions arrived — a caller that cannot work without it, and a rule requiring its use. It answers while `constructed`, because C22 takes the viewport's dimensions before anything is acquired (I12a).
+21. The cursor's visibility is C01's mode and its position the frame's; `cursorSequence` hands over the bytes so they land inside the frame's one write, hide before move before show (I19, C15 I19).
 20. Raw stdin bytes are delivered through `onInput` while acquired and not otherwise: `acquire()` attaches, `suspend()` drops, `resume()` re-attaches, `release()` drops. C01 delivers and never interprets, and the bytes typed at a suspended terminal belong to the child rather than to a queue (I18).
 
 ---
@@ -289,6 +292,7 @@ Fabricated `TerminalCapabilities`, a fake `WriteStream` capturing bytes. No real
 
 - **T1.2** (I6): release emits the exact inverse in reverse order.
 
+- **T1.17** (I19): `cursorSequence({row, col})` is a hide, then a move to that cell, then a show, **in that order within the one string**; `cursorSequence(null)` is a hide and no move. The order is the assertion, not the members: all three present in any order passes a set comparison and still drags a visible cursor across the frame on a terminal without synchronised update, which is a capability rather than a guarantee.
 - **T1.16** (I18, C20): bytes reach an `onInput` subscriber only while acquired. Written across the whole transition rather than as four cases, because the subject is the transition: before `acquire()` nothing arrives; after it, a chunk does; after `suspend()` the same chunk does not; after `resume()` it does again; after `release()` it does not. The chunk written during suspension is asserted **absent from the subscriber and not buffered**, which is the half a per-state test would pass while queueing.
   *Given* an acquired instance. *When* `release()`. *Then* captured bytes are `1006l · 1002l · 2004l · 25h · 1049l` and `setRawMode(false)` was called once.
 
@@ -417,6 +421,7 @@ Tests whose only job is to fail loudly if a specific invariant is quietly undone
 - **T6.12** (I1): emitting a mode-setting sequence from C03, or a `2026` marker from C01 → T2.8 fails. The transactional exception stays exactly one sequence wide.
 - **T6.13** (I9): giving Ink `process.stdout` rather than `lifecycle.writer` → T1.7 fails, because the renderer's writes become indistinguishable from foreign ones and land in the debug sink. This is the regression that makes single-owner stdout a claim rather than a property.
 - **T6.15** (I12a): making `size` a getter rather than a method → nothing fails, and that is the finding. **Structural guard** (A02 17a): the protection is the call syntax, which makes `size()` read as work and `size` read as a field, so `{ w: size.columns, h: size.rows }` is the natural thing to write against a getter and two reads is what it does. T3.18b catches the two reads *inside* the accessor; nothing can catch two reads by a caller except the shape that makes one call the obvious spelling.
+- **T6.18** (I19): moving the show before the move, or the move before the hide → T1.17 fails, and on a terminal without synchronised update the cursor is drawn at its old position for a frame.
 - **T6.16** (I18): making `suspend()` pause the listener instead of dropping it, or buffering while suspended → T1.16 fails on the chunk that arrives during suspension, which a queue delivers late rather than never. The regression is a `vim` session replayed into the prompt on resume.
 - **T6.17** (I18, C20): moving the attach out of `acquire()` and into the constructor → T1.16's first case fails. Bytes would then reach a shell whose terminal is not acquired, which is the window I3 closes for handlers, arriving through the one subscription that was not one of them.
 - **T6.14** (I13): reading `stdout.columns` in a second module — the plausible version being a renderer that wants the width without being handed it → T2.10 fails, naming the file. The regression is not that the read is wrong on its own; it is that two readers at two moments in one frame is how a frame comes to be composed against two widths.

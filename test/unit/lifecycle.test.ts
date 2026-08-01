@@ -230,6 +230,28 @@ describe("C01 writer", () => {
   });
 });
 
+describe("C01 the frame's cursor (I19)", () => {
+  it("T1.17 (I19): hide, then move, then show — in that order within the one string", () => {
+    // **The order is the assertion, not the members.** All three present in any
+    // order passes a set comparison and still drags a visible cursor across the
+    // frame on a terminal without synchronised update — which is a capability,
+    // so that path is real rather than hypothetical.
+    const { lifecycle } = harness();
+    const shown = lifecycle.cursorSequence({ row: 4, col: 9 });
+
+    const hide = shown.indexOf("[?25l");
+    const move = shown.indexOf("[5;10H");
+    const show = shown.indexOf("[?25h");
+
+    expect(hide, "all three are present").toBeGreaterThanOrEqual(0);
+    expect(move, "and the move is 1-based on the wire").toBeGreaterThan(hide);
+    expect(show, "the show closes it").toBeGreaterThan(move);
+
+    // Hidden has nowhere to move to, so it does not move.
+    expect(lifecycle.cursorSequence(null)).toBe("[?25l");
+  });
+});
+
 describe("C01 raw input delivery", () => {
   it("T1.16 (I18, C20): bytes reach a subscriber only while acquired", () => {
     // **Written across the whole transition, not as four cases.** The subject

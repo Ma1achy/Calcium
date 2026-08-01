@@ -34,7 +34,12 @@ export type Composed = Readonly<{
   footer: readonly Block[];
   /** Where the transcript sits — C16's `region`, `{ top, height }`. */
   region: Readonly<{ top: number; height: number }>;
-  /** How big a layer may be — C15's `Region`, `{ width, height }`. */
+  /**
+   * How big a layer may be — C15's `Region`, `{ width, height }`.
+   *
+   * **The viewport region, not the terminal** (I28, S01 §3a). Every number
+   * C15 returns is relative to this, and the drawer adds `region.top`.
+   */
   overlayRegion: Readonly<{ width: number; height: number }>;
   /** Rows the prompt occupies, capped at half the terminal (S01 §3). */
   promptRows: number;
@@ -86,7 +91,13 @@ export function compose(deps: ComposeDeps): Composed {
     header: deps.chrome.header(ctx),
     footer: deps.chrome.footer(ctx),
     region: Object.freeze({ top: HEADER_ROWS, height }),
-    overlayRegion: Object.freeze({ width: size.columns, height: size.rows }),
+    // **The same height as the transcript region** (I28). It was the whole
+    // terminal, and nothing could see it: a layer floats above the four regions
+    // rather than taking rows, so `heightsSum` holds at every width with every
+    // layer misplaced, and no component drew a `Placed` at all. A pushed view
+    // laid out at `top: 0, height: rows` covers the header, the prompt and the
+    // footer — C15 T4.4's opposite.
+    overlayRegion: Object.freeze({ width: size.columns, height }),
     promptRows,
     /** What the prompt asked for, before the cap. Beyond it, S01 §3 windows. */
     promptWanted: wanted,

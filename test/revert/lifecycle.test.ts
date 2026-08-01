@@ -163,6 +163,9 @@ describe("C01 fail-on-revert", () => {
     expect(members).toEqual(
       new Set([
         "acquire",
+        // The frame's cursor: C01 owns the mode and yields the bytes, because
+        // they must land inside the frame's one write (I19).
+        "cursorSequence",
         "release",
         "suspend",
         "resume",

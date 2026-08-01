@@ -20,7 +20,7 @@ import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
 import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
 import { drawFallback, tooSmall } from "./fallback.js";
 import { compose, type Composed } from "./frame.js";
-import { paint, FrameError, type PaintDeps } from "./paint.js";
+import { cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
 import { renderSequenceToLines } from "../testing/index.js";
 import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
@@ -240,17 +240,34 @@ class Session implements TuiInstance {
     const frame = this.#composed();
     let lines: readonly string[];
     try {
-      lines = paint(frame, this.#paintDeps(graph, frame.size.columns));
+      lines = paint(frame, this.#paintDeps(graph, frame));
     } catch (err) {
       if (!(err instanceof FrameError)) throw err;
       drawFallback(frame.size, (s) => void graph.lifecycle.writer.write(s));
       return;
     }
 
-    graph.lifecycle.writer.write(`${HOME}${lines.join("\r\n")}`);
+    // **Hide, move, show — and the order is not made moot by the sync window**
+    // (C15 I19). `synchronisedUpdate` is a capability, so the unwrapped path is
+    // real: on a terminal without DECSET 2026 a visible cursor is dragged
+    // across the frame by `HOME` and every row after it, which is a cursor
+    // racing over the screen sixty times a second. So the hide leads the write
+    // and the position and show close it, all inside one `write` — one string,
+    // so it cannot straddle the scheduler's window either.
+    // **The sequence is C01's** (C01 I19, MG20). The cursor's visibility is a
+    // mode C01 holds and restores at release, so this file may not write it —
+    // and the bytes still have to land inside the one `write`, because a
+    // separate call cannot be kept inside C03's synchronised-update window. The
+    // owner yields them; the frame embeds them.
+    const cursor = cursorFor(frame, this.#paintDeps(graph, frame));
+    const hide = graph.lifecycle.cursorSequence(null);
+    graph.lifecycle.writer.write(
+      `${hide}${HOME}${lines.join("\r\n")}${graph.lifecycle.cursorSequence(cursor)}`,
+    );
   }
 
-  #paintDeps(graph: Graph, width: number): PaintDeps {
+  #paintDeps(graph: Graph, frame: Composed): PaintDeps {
+    const width = frame.size.columns;
     return {
       registry: graph.blocks,
       theme: graph.theme.current,
@@ -262,6 +279,17 @@ class Session implements TuiInstance {
       // note names, arriving through the one seam that looks harmless.
       transcriptRows: () => visibleRows(graph, width),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
+      promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
+      // C16's derived focus, read rather than stored — the cursor belongs to
+      // whatever holds the keys, and a second record of that would drift from
+      // the display exactly as a stored focus does (C16 §3, C15 I19).
+      promptFocused: () => graph.router.target === "prompt",
+      // **The region comes from the frame, not from a fresh one** (C22 I28).
+      // `#frameQueries` serves the same value to the router, and a second
+      // computation here is the two-records defect S01 §3 already produced once
+      // — with the added property that the router would then be hit-testing
+      // against boxes the screen never drew.
+      overlays: () => graph.overlays.layout(frame.overlayRegion),
     };
   }
 
@@ -276,9 +304,17 @@ class Session implements TuiInstance {
       // transcript ends, and its height is the one the frame reserved. A fresh
       // computation here is the two-records defect the same frame already had
       // once (S01 §3).
+      //
+      // **A region row, not a terminal row** (C22 I28, S01 §3a). C15 places
+      // against the viewport region, so the anchor is `region.height` — one row
+      // past the region's bottom edge, because the prompt is not in the
+      // viewport. A menu preferring `above` then takes the region's last rows,
+      // directly above the line it was raised from. This is the one conversion
+      // where the two coordinate systems differ by exactly the header's height,
+      // and an off-by-one here is a menu overlapping that line.
       promptAnchor: () => {
         const f = this.#composed();
-        return { row: f.region.top + f.region.height, rows: f.promptRows };
+        return { row: f.region.height, rows: f.promptRows };
       },
       mouseEnabled: () => this.#graph?.capabilities.mouse ?? false,
       // Ctrl-C and Ctrl-D raise a confirm; answering it is what stops. Until

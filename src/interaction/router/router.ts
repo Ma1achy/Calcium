@@ -196,10 +196,20 @@ export function createRouter(
     stages.push("mouse");
     if (!deps.mouseEnabled()) return false;
 
+    // **One translation, used by both rungs** (I20). The event's row is a
+    // 0-based terminal row; a layer's box and C14's entry map are both relative
+    // to the viewport region. This rung compared a terminal row directly to
+    // `Placed.top` while the one below subtracted `region.top` — two adjacent
+    // lines in two coordinate systems, and the symptom was a click near a
+    // layer's edge resolving to the row above the one it landed on, which reads
+    // as a placement defect in the component that placed it correctly.
+    const region = deps.region();
+    const regionRow = e.row - region.top;
+
     const covering = deps.placed().find(
       (p) =>
-        e.row >= p.top &&
-        e.row < p.top + p.height &&
+        regionRow >= p.top &&
+        regionRow < p.top + p.height &&
         e.col >= p.left &&
         e.col < p.left + p.width,
     );
@@ -216,9 +226,8 @@ export function createRouter(
       return run("copyMode", e) || run("global", e);
     }
 
-    const region = deps.region();
-    if (e.row >= region.top && e.row < region.top + region.height) {
-      const hit = deps.entryAtRow(e.row - region.top);
+    if (regionRow >= 0 && regionRow < region.height) {
+      const hit = deps.entryAtRow(regionRow);
       stages.push(hit === null ? "viewport:miss" : `viewport:${hit.id}`);
       return hit !== null && run("liveBlock", e);
     }

@@ -96,6 +96,21 @@ export type SgrStyle = Readonly<{
 export const CURSOR_HOME = "\x1b[H";
 
 /**
+ * Cursor to a 0-based row and column.
+ *
+ * `CURSOR_HOME` generalised, and here for its reason: every escape literal
+ * lives in this file. CUP is 1-based on the wire and every coordinate above
+ * this line is 0-based, so the conversion is here rather than at each call —
+ * one place to be off by one, and it is the place with the test.
+ *
+ * Clamped at the origin rather than trusting the caller: a negative row reaches
+ * the terminal as `\x1b[0;3H`, which most terminals read as row 1 and some read
+ * as an error, and the difference only shows on someone else's machine.
+ */
+export const cursorTo = (row: number, col: number): string =>
+  `\x1b[${String(Math.max(0, Math.floor(row)) + 1)};${String(Math.max(0, Math.floor(col)) + 1)}H`;
+
+/**
  * Every SGR sequence, for measuring a line that already carries them.
  *
  * Here for SS14's reason and not as a convenience: the pattern contains the

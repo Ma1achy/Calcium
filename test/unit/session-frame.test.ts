@@ -139,10 +139,18 @@ describe("C22 §6 — the frame", () => {
     expect(at(2, 4).region.height).toBe(0);
   });
 
-  it("T4.9c: the overlay region and the transcript region are different shapes", () => {
+  it("T4.9c (C22 I28): the two regions are different shapes and the same height", () => {
     // Both are called a region and they are `{width,height}` and `{top,height}`.
     // Passing either to the other's consumer compiles, because `height` is in
-    // both — so the two are built here and never derived from one another.
+    // both.
+    //
+    // **The height is one number, and this row used to assert it was two.** The
+    // reasoning was that the two are built independently so neither can drift
+    // into the other — and what it actually held was the whole terminal against
+    // the viewport, which puts a pushed view over the header, the prompt and
+    // the footer (C15 T4.4). Nothing could see it: a layer takes no rows, so
+    // the sum holds at every width with every layer misplaced, and no component
+    // drew a `Placed` at all. The shapes differ; the heights must not.
     const f = compose({
       chrome: { header: () => [], footer: () => [] },
       session: () => SESSION,
@@ -151,7 +159,8 @@ describe("C22 §6 — the frame", () => {
       promptRows: () => 1,
     });
 
-    expect(f.overlayRegion).toEqual({ width: 100, height: 30 });
+    expect(f.overlayRegion).toEqual({ width: 100, height: 27 });
     expect(f.region).toEqual({ top: 1, height: 27 });
+    expect(f.overlayRegion.height, "one number, not two").toBe(f.region.height);
   });
 });

@@ -10,7 +10,7 @@
  * to stay acyclic (§2, A03 MG3).
  */
 
-import { ALT_SCREEN, BRACKET_PASTE, CURSOR, MOUSE } from "./escapes.js";
+import { ALT_SCREEN, BRACKET_PASTE, CURSOR, MOUSE, cursorTo } from "./escapes.js";
 import type { TerminalCapabilities } from "./capabilities.js";
 
 export type TerminalSize = Readonly<{ columns: number; rows: number }>;
@@ -30,6 +30,22 @@ export interface TerminalLifecycle {
    * which a child owns the terminal is one the shell cannot forget to close.
    */
   onInput(cb: (chunk: Uint8Array) => void): Disposable;
+  /**
+   * The frame's cursor, as bytes for the frame to write (I19).
+   *
+   * **A string rather than a call, and the second reason decides it.** The
+   * cursor's visibility is a mode this component holds and restores at release
+   * (I1), so nothing else may write it — but the bytes have to land inside the
+   * frame's single `write`, and a separate call cannot be kept inside C03's
+   * synchronised-update window. So the owner yields the sequence and the drawer
+   * embeds it.
+   *
+   * **Hide, then move, then show**, and the sync window does not make the order
+   * moot: `synchronisedUpdate` is a capability, so the unwrapped path is real,
+   * and on it a visible cursor is dragged across the frame by every row written
+   * after it. `null` hides and does not move — there is nowhere to move to.
+   */
+  cursorSequence(at: Readonly<{ row: number; col: number }> | null): string;
   /**
    * One frozen snapshot per call (I12a) — the only route to a dimension outside
    * a `SIGWINCH`, and the reason SS42 can keep its single-file scope while the
@@ -542,6 +558,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     onResize: (cb) => subscribe(resizeSubscribers, cb),
     onResume: (cb) => subscribe(resumeSubscribers, cb),
     onInput: (cb) => subscribe(inputSubscribers, cb),
+    cursorSequence: (at) =>
+      at === null ? CURSOR.enter : `${CURSOR.enter}${cursorTo(at.row, at.col)}${CURSOR.leave}`,
     // Not gated on state, and that is the one difference from everything above
     // it: C22 needs the viewport's dimensions at construction step 5, before
     // any acquire. There is nothing to be wrong about — reading the size of a

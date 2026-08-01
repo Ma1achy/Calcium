@@ -39,6 +39,8 @@ type Layer = Readonly<{
   dismissable: boolean;                          // false = must be resolved, not escaped
   width?:      number;                            // cells; absent means the region's width
   maxHeightFraction?: number;                     // overlays; default 0.5
+  /** Where this layer wants the terminal cursor, relative to its own origin (I19). */
+  cursor?:     Readonly<{ row: number; col: number }>;
 }>;
 
 type Placed = Readonly<{
@@ -55,7 +57,7 @@ type Placed = Readonly<{
 type DismissReason = "explicit" | "anchorEvicted";
 
 /** What `update` may change — deliberately not `dismissable`. See below. */
-type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width">>;
+type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor">>;
 
 type OverlayChange =
   | Readonly<{ kind: "push";    id: string; layerKind: "overlay" | "view" }>
@@ -150,7 +152,17 @@ Three things follow, and they are decisions rather than details:
 
 **The terminal cursor is placed by whatever holds focus, and hidden when that thing has none** (I19). C16's `activeTarget` already puts `overlay` above `prompt`, so the cursor belongs to the layer for the same reason the keys do — and leaving it blinking at the prompt under a menu that owns the keystrokes is precisely the *somewhere invisible* symptom derived focus exists to prevent.
 
-`Placed.cursor` is how the layer says so, **relative to its own origin**, so the drawer never has to know what a prompt or a search field is. Absent means the layer has no cursor and the terminal's is hidden, which is the default and the case that matters: it is what a menu wants.
+**The field originates on `Layer` and `layout()` copies it through.** The ruling
+first put it on `Placed` alone, which is a shape nothing can produce: `place()`
+computes geometry from a measured height and a region and has no idea where a
+search's caret is, so a cursor that existed only on its output could only be
+invented there. The producer states it — `searchLayer` knows the caret because
+it drew the line — and it survives placement unchanged, because both ends of the
+copy are relative to the same origin. `update` carries it for the same reason it
+carries `content`: the caret moves as the search is typed into, and a
+pop-and-repush is not how a layer changes.
+
+`Placed.cursor` is how the drawer reads it, **relative to the layer's own origin**, so the drawer never has to know what a prompt or a search field is. Absent means the layer has no cursor and the terminal's is hidden, which is the default and the case that matters: it is what a menu wants.
 
 The two live producers answer oppositely, which is what makes this a field rather than a constant. **Reverse search has a cursor** — text is being typed into it — and **the completion menu has none**; nothing is entered into a menu, the keys move a selection. C15's exit confirm has none either, for the same reason, and it now has somewhere to appear at all.
 

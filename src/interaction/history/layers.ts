@@ -63,7 +63,24 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
     content: searchBlocks(state),
     dismissable: true,
     width: cells(searchLine(state)) + CHROME_CELLS,
+    // **The search has a cursor and the menu does not** (C15 I19). Text is
+    // being typed into this one, and leaving the terminal's cursor blinking at
+    // a prompt that is not taking keys is the *somewhere invisible* symptom
+    // derived focus exists to prevent.
+    //
+    // At the end of the query rather than of the line: the match after it is
+    // the history's text, not the user's, and a caret sitting after a recalled
+    // command claims the recall is editable here. Relative to the layer's own
+    // origin, which is what lets this be stated without knowing where the
+    // layer will be placed.
+    cursor: Object.freeze({ row: 0, col: cells(queryPrefix(state)) }),
   });
+}
+
+/** Everything before the caret on the search line — the label and the query. */
+function queryPrefix(state: SearchState): string {
+  const label = state.failed ? "(failed reverse-i-search)" : "(reverse-i-search)";
+  return `${label} \`${state.query}`;
 }
 
 /**

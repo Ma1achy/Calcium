@@ -191,7 +191,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.history.searchOlder();
       const state = deps.history.searchState;
       if (state === null) return;
-      deps.overlays.update(SEARCH_ID, { content: deps.history.searchLayer(deps.anchor()).content });
+      // **The cursor goes with the content** (C15 I19). The caret sits at the
+      // end of the query and the query is what just changed, so an update
+      // carrying only `content` leaves it where the previous keystroke put it —
+      // a caret that stops following the text being typed into it.
+      const next = deps.history.searchLayer(deps.anchor());
+      deps.overlays.update(SEARCH_ID, {
+        content: next.content,
+        ...(next.cursor !== undefined && { cursor: next.cursor }),
+      });
     },
   });
 

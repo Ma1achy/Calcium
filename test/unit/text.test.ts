@@ -7,12 +7,15 @@
 import { describe, expect, it } from "vitest";
 import {
   cells,
+  displayCells,
   expandTabs,
   hardWrapCells,
+  sliceCells,
   stripControl,
   truncate,
   wrapCells,
 } from "../../src/presentation/text.js";
+import { SGR_RESET } from "../../src/terminal/escapes.js";
 
 const FULL = { unicode: "full" } as const;
 const ASCII = { unicode: "ascii" } as const;
@@ -177,5 +180,77 @@ describe("wrapCells (§3)", () => {
       expect(wrapCells(text, 1), text).toHaveLength(3);
       expect(hardWrapCells(text, 1), text).toHaveLength(3);
     }
+  });
+});
+
+describe("sliceCells (C09 §5a, I20)", () => {
+  // The operation the compositor's ruling named, specified before the ruling
+  // was written down. `fitStyled` takes cells `[0, w)`; this takes `[from, to)`,
+  // and the frame cannot draw a layer over a painted row without both.
+  const RED = "\u001b[31m";
+  const BLUE = "\u001b[34m";
+
+  it("T1.16 (I20): a window over a styled line measures its cells and carries the prefix's style", () => {
+    const line = `${RED}abcdef${SGR_RESET}`;
+    const window = sliceCells(line, 2, 5);
+
+    expect(displayCells(window)).toBe(3);
+    expect(window).toContain("cde");
+
+    // **The carry is the half a substring cannot do.** `RED` opened before cell
+    // 2 and is still in effect there; a tail that dropped it draws in the
+    // terminal's default colour, which reads as the layer above having bled
+    // rather than as the base having lost its style.
+    expect(window.startsWith(RED), "the style in effect at `from`").toBe(true);
+
+    // And no cut lands inside an escape — the failure that survives the frame,
+    // because the SGR is never terminated and the colour bleeds down every row
+    // below. Every escape in the output is a whole one.
+    for (const esc of window.matchAll(/\u001b\[[0-9;]*m/g)) expect(esc[0]).toMatch(/m$/);
+    expect(window.replaceAll(/\u001b\[[0-9;]*m/g, "")).toBe("cde");
+  });
+
+  it("T1.16 (I20): a reset in the skipped prefix clears the carry", () => {
+    // What the terminal would actually be showing at `from`, rather than every
+    // escape ever seen. Accumulating blindly puts a dead colour on the tail.
+    const line = `${RED}ab${SGR_RESET}cdef`;
+
+    expect(sliceCells(line, 3, 5).startsWith(RED)).toBe(false);
+    expect(sliceCells(line, 3, 5).replaceAll(/\u001b\[[0-9;]*m/g, "")).toBe("de");
+  });
+
+  it("T1.16b (I20): a double-width cluster straddling either boundary is blanked, not halved", () => {
+    // Both directions, because they are different code paths and only the right
+    // one resembles `truncate`. Half a double-width glyph is a row one cell
+    // wide, and a row wider than it was measured wraps into a row nobody
+    // counted.
+    const line = "a日b";
+
+    expect(sliceCells(line, 2, 4), "straddling the left edge").toBe(" b");
+    expect(sliceCells(line, 0, 2), "straddling the right edge").toBe("a ");
+    expect(sliceCells(line, 0, 3), "and the glyph is kept when it fits").toBe("a日");
+  });
+
+  it("T1.16c (I20): the composition law, at every split point", () => {
+    // A property over the splits rather than three chosen ones: the `a` that
+    // breaks it is whichever lands inside a cluster, and no chosen `a` is that
+    // one by construction.
+    for (const line of ["abcdef", `${RED}ab${BLUE}cd${SGR_RESET}ef`, "a日本b", "x👨‍👩‍👧‍👦y"]) {
+      const whole = displayCells(line);
+      for (let a = 0; a <= whole; a += 1) {
+        const left = displayCells(sliceCells(line, 0, a));
+        const right = displayCells(sliceCells(line, a, whole));
+        expect(left + right, `${line} split at ${String(a)}`).toBe(whole);
+      }
+    }
+  });
+
+  it("T1.16c (I20): a window past the end of the line stops there and pads nothing", () => {
+    // The caller knows whether a short tail should be filled, and `paint` does.
+    // A pad here would double with the one `exact` applies and put the frame a
+    // cell wide.
+    expect(sliceCells("abc", 1, 99)).toBe("bc");
+    expect(sliceCells("abc", 5, 9)).toBe("");
+    expect(sliceCells("abc", 2, 2)).toBe("");
   });
 });

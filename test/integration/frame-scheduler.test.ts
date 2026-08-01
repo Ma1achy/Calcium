@@ -248,10 +248,23 @@ describe("C03 integration", () => {
     resize({ columns: 80, rows: 30 });
 
     // Every frame written since, examined on its own.
+    // **A frame is no longer `HOME` and rows.** It is hide, `HOME`, the rows,
+    // then the cursor's position and show — one write, because the cursor's
+    // bytes have to land inside C03's synchronised-update window (C01 I19). So
+    // the rows are what sits between `HOME` and the cursor sequence closing the
+    // frame. The `startsWith` this replaced matched nothing after that change,
+    // and the guard below is what said so rather than the assertions passing
+    // vacuously over an empty set.
+    const HOME_SEQ = "\u001b[H";
+    const HIDE_SEQ = "\u001b[?25l";
     const frames = stdout.chunks
       .slice(before)
-      .filter((c) => c.startsWith("\u001b[H"))
-      .map((c) => c.replace("\u001b[H", "").split("\r\n"));
+      .filter((c) => c.includes(HOME_SEQ))
+      .map((c) => {
+        const body = c.slice(c.indexOf(HOME_SEQ) + HOME_SEQ.length);
+        const end = body.indexOf(HIDE_SEQ);
+        return (end === -1 ? body : body.slice(0, end)).split("\r\n");
+      });
 
     // **The subject, before the claim.** A set of one is satisfied by a set of
     // none, so a frame that was never written would pass — the inert-subject

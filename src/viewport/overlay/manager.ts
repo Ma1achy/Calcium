@@ -107,6 +107,9 @@ class Manager implements OverlayManager {
       ...(next.content !== undefined && { content: next.content }),
       ...(next.placement !== undefined && { placement: next.placement }),
       ...(next.width !== undefined && { width: next.width }),
+      // The caret moves as the search is typed into, and `update` is how a
+      // layer changes — a pop-and-repush is not (§4).
+      ...(next.cursor !== undefined && { cursor: next.cursor }),
     });
 
     const copy = [...this.#stack];
