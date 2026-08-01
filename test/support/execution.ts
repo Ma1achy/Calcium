@@ -165,6 +165,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
         lifecycleCalls.push("resume");
       },
     },
+    resetInput: () => void calls.push("resetInput"),
     resetFocus: () => void calls.push("resetFocus"),
     stop: async () => {
       calls.push("stop");

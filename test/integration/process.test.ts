@@ -186,6 +186,10 @@ describe("C21 with C06", () => {
       "suspend",
       "handoff",
       "resume",
+      // **Between the resume and the repaint** (C22 I25). Whatever the decoder
+      // was holding belongs to a sequence the child interrupted; kept, the
+      // first keystroke back completes it wrongly.
+      "resetInput",
       "invalidate",
     ]);
     // The marker is C18's and never reaches the child (C18 I26).
@@ -203,6 +207,10 @@ describe("C21 with C06", () => {
       "suspend",
       "handoff",
       "resume",
+      // **Between the resume and the repaint** (C22 I25). Whatever the decoder
+      // was holding belongs to a sequence the child interrupted; kept, the
+      // first keystroke back completes it wrongly.
+      "resetInput",
       "invalidate",
     ]);
     expect(app.handed).toEqual([["widget", "edit", "config.yaml"]]);
@@ -235,6 +243,10 @@ describe("C21 with C06", () => {
 
     expect(h.lifecycle, "suspended and resumed, in that order").toEqual(["suspend", "resume"]);
     expect(h.pipeline.inFlight, "and the guard is not stranded").toBeNull();
+    // The reset is in the same `finally`, so the rejection path clears the
+    // decoder too. A reset placed after the `try` would leave a half-decoded
+    // sequence alive on exactly the path nobody drives by hand (C22 I25).
+    expect(h.calls, "and the decoder is cleared on the throw path as well").toContain("resetInput");
 
     const entry = h.transcript.entries.at(-1);
     expect(entry?.doc.status, "the failure is reported rather than swallowed").toBe("error");

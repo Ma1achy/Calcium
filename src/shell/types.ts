@@ -187,6 +187,16 @@ export type PipelineDeps = Readonly<{
   runner: ProcessRunner;
   lifecycle: TerminalLifecycle;
 
+  /**
+   * Discards whatever the decoder half-decoded (C16 I18, C22 I25).
+   *
+   * Called on the resume side of a handoff and nowhere else. C01 knows the
+   * terminal came back and holds no decoder; C16 holds the state and cannot see
+   * the gap, because a gap in bytes is what a slow link looks like. Only the
+   * shell knows both, and this is the shell's seam into it.
+   */
+  resetInput: () => void;
+
   /** C23's submit row ends here (A02 Seam 4, C16 I2). A call, not a subscription. */
   resetFocus: () => void;
   /** For `/exit` (C23 §2). */

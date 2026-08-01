@@ -407,6 +407,10 @@ export async function constructGraph(
       runner,
       lifecycle,
 
+      // The seam the handoff's resume side calls (I25). A thunk, because the
+      // decoder is built at step 12 and the pipeline at step 10 — the same
+      // temporal-dead-zone shape as `pipeline` above, and for the same reason.
+      resetInput: () => void decoder.reset(),
       resetFocus: () => router.resetFocus(),
       stop: deps.stop,
       clock: config.clock,

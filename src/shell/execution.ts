@@ -310,6 +310,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         exit = await deps.runner.handoff(argv, { cwd: () => deps.session().cwd });
       } finally {
         deps.lifecycle.resume();
+        // **Between the resume and the repaint** (C22 I25). C01 re-attaches the
+        // listener as part of `resume()`, and whatever the decoder was holding
+        // belongs to a sequence the child interrupted — an `Esc` mid-window, a
+        // paste mid-accumulation. Kept unreset, the first keystroke back
+        // completes a sequence begun before the child started.
+        deps.resetInput();
         // The row's fourth call. C01's `resume()` fires no resume subscribers —
         // only the SIGCONT path does — so the repaint is ours to ask for, and
         // the whole screen belonged to the child.
