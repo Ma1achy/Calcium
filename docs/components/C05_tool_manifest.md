@@ -81,7 +81,8 @@ type Manifest = Readonly<{
   schema: "tui.manifest/1";
   binary: string;
   version: string;                    // the far side's version, for skew reporting
-  tools: readonly ToolDef[];
+  tools: readonly ToolDef[];          // every tool — what findTool and validation read
+  appTools: readonly ToolDef[];       // what the app wrote — §3
 }>;
 
 function parseManifest(raw: unknown): Result<Manifest, readonly ManifestError[]>;
@@ -182,6 +183,18 @@ Three consequences, each checked rather than assumed:
 - **`hidden` is the mechanism for anything an app should not see in completion**, and `/debug` uses it. `visibleTools` drops it and `findTool` still resolves it, which is exactly the pair that field means (§ToolDef). The other five are ordinary.
 - **The six need no eighth `ArgType`.** `/theme` takes an `enum`, `/history` and `/debug` an optional `int`. EX5 claims the union stays domain-free, and the framework's own verbs failing it would have been the strongest counterexample there could be. They do not.
 - **They are a `ToolDef[]`, not a `Manifest` fragment.** A fragment implies a schema version and a merge of two schemas; an array is just tools, and tools is all this is.
+
+### The partition lives on `Manifest`, not on `ToolDef`
+
+`tools` is every tool; `appTools` is what the app wrote. **`ToolDef` stays a description of a verb**, and that is the point of putting the split one level up.
+
+A `source: "app" | "framework"` field on each tool would be settable by an app writing a manifest by hand — meaningless from its side, and a lie if set wrongly. Worse, every consumer *could* read it, and eventually one branches on it: `findTool` treating framework verbs differently, `visibleTools` filtering by source instead of by `hidden`, a renderer badging them. The partition makes the legitimate uses available and the illegitimate ones awkward, which a field does the opposite of.
+
+**Two consumers, not one.** `serialise` emits `appTools`, because what round-trips is what the app wrote. And **`/help` groups by it**: `/clear` and `/exit` are different in kind from `/ps` and `/promote`, and a flat list hides that. The second consumer is why this is a partition rather than a filter at one call site.
+
+**And T2.7's property gets sharper rather than weaker.** *Parsing its own serialised output yields an equal manifest* still holds exactly — serialise emits `appTools`, parse re-derives the framework's six, and the two are equal. That is a stronger claim than round-tripping a flat list, because it asserts the derivation is deterministic as well as that nothing is lost.
+
+Without the partition the property is simply false: a parsed manifest contains rows the parser added, and re-parsing them hits §3's collision check. The check cannot tell an app declaring `clear` from a re-parse of output that already contains it, and nothing in the input distinguishes them — the same shape as C13's patch gate before it read `origin`.
 
 **Error paths keep naming what the app wrote.** `fail` indexes as `tools[3]`, so framework rows are appended after the app's and never shift an index. A collision reports the framework by name rather than by index, because "already declared at `tools[7]`" is meaningless against a file with two entries in it.
 
