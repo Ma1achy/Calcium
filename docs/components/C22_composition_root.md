@@ -419,6 +419,71 @@ The prompt is `❯ ` and its gutter is `{ first: 2, cont: 2 }`, passed to C17's 
 
 ---
 
+## 6a. The drawer, walked by hand
+
+The component has structure **and** state, so it takes both artefact shapes.
+Taking the trace alone because the cursor is the obvious state machine is how the
+structural half goes unexamined — and the structural half is where five of these
+seven live.
+
+### The classification table — which rule owns a cell
+
+Indexed by rule interaction rather than by input: every row is a cell where two
+correct statements overlap. A row governed by one rule restates it and finds
+nothing.
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | Inside a layer's box, no glyph from its blocks | the base already painted it | the layer owns its box | **The layer**, blank. Every cell of the box is written, background included |
+| 2 | Inside two layers' boxes | bottom-first order | the top layer wins | The later-pushed one |
+| 3 | Inside the lower layer's box only, with a higher layer also placed | the lower owns it | the higher was drawn after | **The lower.** Each layer composites onto the accumulated rows, never onto the base again |
+| 4 | Outside every box | the base owns it | — | The base, untouched — no reset, no bytes |
+| 5 | A `fill` view's box, and also a header row | a view fills the region | header and footer are untouched | Unreachable once the region is the viewport's; the header is not in the region (§3a of S01) |
+| 6 | Past the box's right edge, layer content still going | C15 clamped the width | C09 rendered at that width | Cut to the box. C09 emitting a wider row is a C09 defect and must not be absorbed here |
+| 7 | Past the box's bottom edge, content still going | C15 reports `truncated` | C15 clips no content | Cut by the drawer — the split, both halves |
+| 8 | A box of zero width or zero height | splice the window | there is no window | **No-op.** Not two slices and two resets, which puts SGR bytes into a frame with no cells to carry them |
+| 9 | A box escaping the region | C15 clamps (I6) | the drawer honours the box | The drawer **refuses the frame** and the fallback is drawn. Not a clip: a clip repairs the symptom and hides a placement defect, and this is `heightsSum`'s shape — a claim about the frame rather than a restatement of the clamp |
+
+**Row 3 is the one that would have shipped.** The natural loop builds each row as
+`splice(baseRow, layer)` and stores it, which is correct for one layer and
+discards the previous layer for two — a menu under a search would vanish
+entirely, with the search drawn perfectly. Nothing about it looks wrong, no
+invariant of C15's is violated, and the first time two layers overlap will be in
+front of a user (§4 caution 2, C15). The remedy is one word: the rows accumulate.
+
+### The sequence trace — which cursor the next frame draws
+
+Event-mediated, because focus moves. Two rules meet in every row: *the focused
+layer's cursor if it has one* and *the prompt's if focus is `prompt`*.
+
+| # | Sequence | Frame draws |
+|---|---|---|
+| 1 | nothing open | the prompt's, from `editor.cursorCell` |
+| 2 | menu pushed | hidden — a menu has no cursor, and nothing is typed into one |
+| 3 | menu dismissed | the prompt's again |
+| 4 | search pushed over a menu | the search's — it is on top and text is being entered |
+| 5 | search cancelled, menu still open | hidden again, by row 2 |
+| 6 | a confirm over a search | hidden. The search below still holds text, and the confirm owns the keys |
+| 7 | a layer dismissed by the same key batch that is about to commit | the post-batch stack's — one commit per batch (I27) makes this automatic, and only because the commit is at the batch rather than in the handler |
+| 8 | the prompt is windowed (S01 §3) and the cursor is above the window | **hidden** |
+
+**Row 8 is the second finding, and it is arithmetic rather than focus.**
+`cursorCell.row` indexes the editor's full layout; the painted prompt shows only
+`cap` of those rows. Drawing at `cursorCell.row` unmodified puts the terminal
+cursor in the transcript whenever the prompt is windowed — a wrong position on a
+correct frame. So the row is translated into the window and hidden when it falls
+outside it, which is honest: the cursor is genuinely not on the screen, and a
+cursor clamped to the window's edge would claim it was.
+
+**One interaction the trace found and does not own.** With a menu open,
+`activeTarget` is `overlay`, the overlay handler consumes only bound keys, and
+C16 drops the rest — so a printable key does nothing while the menu is up. The
+cursor hiding is consistent with that: the prompt is not taking keys, and saying
+so is the point of I19. If typing is later allowed to filter an open menu, the
+cursor rule has to move with it, and this is where to look.
+
+---
+
 ## 7. Health and identity
 
 Identity is fetched at startup and refreshed on a five-minute cadence against the injected clock. **That loop covers identity only** — any live part in the banner or elsewhere is driven by C23 §3b, so there is one refresh mechanism rather than two (C24 §5). Two transitions commit a notice to the transcript rather than only changing the header:
@@ -560,6 +625,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I25** — A suspension is bracketed by `suspend()` before the handoff and `resume()` then `decoder.reset()` after it. The listener's removal is C01's, in the transition; the reset is C22's, because only this file knows both that the terminal came back and that a decoder is holding a sequence the child interrupted (C01 I18, C16 I18).
 - **I26** — Step 11 registers a handler for every focus target that has bindings, and the effect table in `keys.ts` is total over C16's `KeyAction` union. A binding `/help` renders is therefore one dispatch executes, by construction rather than by agreement (C16 I19).
 - **I27** — Exactly one `commit("input")` per decoded batch, issued by the read loop; no handler commits. Two committers is one frame too many for a scroll and none for whichever handler forgets, and only the second is invisible (C16 I11).
+- **I28** — The layer region is the viewport region, and it is the same `{ width, height }` the frame computed for the transcript. A drawer adds `region.top` to every `Placed.top` and the router subtracts it from every mouse row (C16 I20), so one number is translated in one direction in each direction of travel. Widening it to the whole terminal costs nothing that any check can see — §3's sum holds at every width with every layer misplaced — and puts a pushed view over the header, the prompt and the footer (C15 T4.4, S01 §3a).
+- **I29** — Layers are composited **onto the accumulated rows**, bottom-first in the order `layout()` returned them, and each writes every cell of its own box including the ones its blocks produced no glyph for. Compositing each layer onto the base rows instead is correct for one layer and discards the one beneath it for two; writing only the glyphs leaves the prompt showing through the gaps in a menu. Neither is visible until two layers overlap or a layer is narrower than its content, and both read as defects in the component that produced the content (§6a).
+- **I30** — A box that escapes the region refuses the frame rather than being clipped into it. C15's clamp is what makes this unreachable, which is why it is asserted rather than assumed: a clip repairs the symptom and leaves a placement defect drawing something plausible, and one row past the last row scrolls the alternate screen (S01 §3, `heightsSum`'s shape).
 
 ---
 
@@ -588,6 +656,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 14b. A suspension is `suspend()` → handoff → `resume()` → `decoder.reset()`, and the ordering is asserted rather than the outcome (I25, C01 I18, C16 I18).
 14c. Step 11 registers a handler per bound target and an effect table total over C16's action union, in `keys.ts` — which is not C23's `actions.ts`, and each says so (I26).
 14d. One `commit("input")` per decoded batch, issued by the loop; no handler commits (I27).
+14e. The layer region is the viewport region; the drawer adds its top and the router subtracts it (I28, C16 I20, S01 §3a).
+14f. Layers composite onto the accumulated rows, bottom-first, each writing every cell of its box; a box escaping the region refuses the frame (I29, I30).
 15. `stopped` is terminal (I16).
 
 ---
@@ -617,6 +687,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.8**: `stop("exit")` from running → §8's **four** steps in order, exit code 0. An earlier draft of this line said five, against a §8 and an I4 that both say four; the count is asserted against the list rather than restated, so the two cannot drift again.
 - **T1.9**: `stop` from created → stopped without acquiring anything.
 - **T1.10** (I4): `stop` twice → the second is a no-op; no double release, no double flush.
+- **T1.12** (I28, §6a): the region handed to `layout()` has the same height as the transcript region, and `promptAnchor.row` equals that height — the anchor sits one row past the region's bottom edge because the prompt is not in the viewport. Asserted at the anchor, not only at the drawn frame: this is the one conversion where a region row and a terminal row differ by exactly the header's height, and at the frame an off-by-one reads as a rounding choice.
+- **T1.12b** (I29, §6a row 3): two overlapping layers → the lower one's cells outside the upper's box survive. The natural loop discards them and draws the upper perfectly, so a menu under a search vanishes entirely with nothing else wrong.
+- **T1.12c** (I29, §6a row 1): a layer whose content is narrower and shorter than its box → every cell of the box is the layer's, and the prompt beneath shows through nowhere. Asserted against a small layer, because a full-bleed one passes whatever the loop does.
+- **T1.12d** (I30): a `Placed` box escaping the region → `FrameError`, and the fallback is drawn. Constructed by hand, because C15's clamp makes it unreachable through `layout()` — which is the reason to assert it rather than the reason not to.
+- **T1.12e** (§6a trace row 8): a windowed prompt whose cursor is above the window → the cursor is hidden, not clamped to the window's edge. `cursorCell.row` indexes the full layout and the painted prompt shows `cap` of those rows, so the unmodified row puts the terminal cursor in the transcript.
 - **T1.11** (I11): each session field is written only by its documented writer — a spy per field, all nine. `cluster` and `version` are asserted as **never written after construction**, which is the half a table with seven rows could not state.
 
 ### Tier 2 — contract / interface
@@ -714,6 +789,9 @@ PTY harness.
 - **T6.21** (I9): giving the fallback renderer its own writer instead of taking one → T3.15b fails, and the launch-time fallback either writes into an alternate screen that was never entered or the mid-session one is overwritten by the next frame.
 - **T6.22** (I7a): constructing steps 2–11 in `createTui` → T1.9 fails, because `stop` from `created` now has a lifecycle to release; and a manifest given as a path cannot be read at all, since a constructor cannot await.
 - **T6.23** (I13a): reading the clock once per chrome function instead of once per frame → T4.11 fails. **Structural guard as well** (A02 17a): `ChromeContext` carries `now` as a value, so a second read has nothing to read from — the shape is what prevents it, and T4.11 is what stops the shape being widened back to a function.
+- **T6.25** (I28): widening the layer region back to the whole terminal → T1.12 and T1.12d fail, and a pushed view covers the header, the prompt and the footer. Nothing in §3's arithmetic can see it.
+- **T6.26** (I29): compositing each layer onto the base rows instead of the accumulated ones → T1.12b fails, and the lower of two layers vanishes with the upper drawn correctly.
+- **T6.27** (I29): writing only the glyphs a layer's blocks produced → T1.12c fails, and text bleeds through a menu in a way that reads as a C09 defect.
 - **T6.24** (I13): putting `now` on `SessionSnapshot` → T1.11 fails, because a field written on every frame has no writer §5's table can name.
 
 ---
