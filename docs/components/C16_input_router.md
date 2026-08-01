@@ -309,6 +309,51 @@ Data because Phase 1B adds user-defined bindings and a keymap expressed as branc
 
 **The built-in action names are a closed set, and that is what makes `/help` honest.** The anti-drift claim has always been that help renders from the table dispatch uses — and until the effects existed, that claim was vacuous in the direction nobody checked: a binding could sit in the table with no executor anywhere, and `/help` would list a key that does nothing. The remedy is the one this project has taken four times before: make it unconstructible rather than checked. `defaultKeymap`'s rows are typed against a `KeyAction` union and L4's table is a total `Record<KeyAction, …>`, so a binding naming an action nobody implements does not compile, and neither does an implementation of an action nobody binds.
 
+**And the closed set was closed over the wrong vocabulary.** Until the editing
+bindings landed, `defaultKeymap`'s `prompt` target held eight rows — three
+newlines, Tab, right-for-ghost, history up and down, and reverse search — and not
+one of them edited. C17 implements word motion, kill, yank, undo and redo in
+full; C22's effect table is total over the action union; and the union had no
+editing action in it. Every mechanism was satisfied and the vocabulary they were
+total over was incomplete, which is A03 §2's vacuity class one level above where
+it was last found: **backspace did nothing at a real prompt**, and the row that
+found it (C17 T5.4) went *green* while asserting nothing, because the keystroke
+under test reached nothing and the two assertions either side of it were about
+history navigation, which was bound.
+
+Nobody shipped them because the obligation had two plausible owners and no path:
+§6 says the framework binds the concerns it owns and editing is C17's, and C17
+has no keymap. The same shape as `frameworkSources`.
+
+**So C17's public surface is the vocabulary** (I21). Every editing operation the
+editor exposes has an action, and every action names exactly one of them, which
+makes the union derivable from the interface rather than maintained beside it. A
+method with no action is the gap that just bit; an action with no method does not
+compile.
+
+The bindings are readline's set and no more — what a terminal user already knows,
+rather than a scheme this project invented. **Each was pressed through the real
+decoder before it was written down** (I17, T2.13b), and one candidate did not
+survive: `⌃_` and `⌃⇧-` are the same byte, `0x1f`, and the decoder maps `0x01`
+to `0x1a` and stops, so it emits a keyless raw name for it. Undo and redo
+therefore have **no binding**, which is recorded rather than repaired — widening
+the decoder to reach a binding is how a table comes to name keys nothing sends.
+
+| Key | Action | | Key | Action |
+|---|---|---|---|---|
+| `backspace`, `⌃h` | `backspace` | | `delete` | `delete` |
+| `⌃w`, `⌥⌫` | `killWordLeft` | | `⌥d` | `killWordRight` |
+| `⌃u` | `killToStart` | | `⌃k` | `killToEnd` |
+| `⌃y` | `yank` | | `⌃a`, `home` | `home` |
+| `⌃e`, `end` | `end` | | `⌥b`, `⌃←` | `wordLeft` |
+| `⌥f`, `⌃→` | `wordRight` | | `←` | `left` |
+
+`⌃w` and `⌥⌫` are both word-delete-left, in different traditions; they are
+distinct wire forms and no other binding wants either, so both are bound. **`→`
+is deliberately absent**: it is already `acceptGhostOrForward`, which falls
+through to a character-right move when there is no ghost, so binding it again
+would be the duplicate `(target, key)` construction error below.
+
 The set is closed for **built-in** bindings only. A `BlockKeymap`'s action is a surface's string dispatched through C23's block-action route (C23 §3a), and it is open by design — the surface supplies both halves.
 
 **Surfaces contribute bindings through the block.** A surface is not a component and cannot register a handler, so an adapter may attach a `BlockKeymap` to the block it produces. C16 merges it into the `liveBlock` target **while that block is live**, and withdraws it when the block freezes — so `s` sorts a `/ps` table and does nothing once a newer entry arrives.
@@ -386,6 +431,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I18** — `reset()` discards every partially-decoded state — pending bytes, the paste buffer, the escape window — and emits nothing. It exists for the one gap in the byte stream that is not a slow link: a suspension, whose bytes went to a child. The decoder cannot detect that gap itself — it owns no timer and reads no clock beyond the injected one (I9) — so the call belongs to whoever knows the terminal was handed over and taken back, which is L4 (C22 §4, C01 I18).
 - **I19** — C16 names actions and executes none. The built-in names are a closed union and L4's effect table is total over it, so a binding with no executor and an executor with no binding are both compile errors — which is what makes `/help` rendering from the dispatch table a property rather than a coincidence. Block keymaps are open strings by design and dispatch through C23 §3a.
 - **I20** — A mouse event's row is translated into a region row **once**, and both positional rungs use the result. The event carries a 0-based terminal row; a layer's box and C14's entry map are both relative to the viewport region (S01 §3a, C15 I6). Two rungs of one table in two coordinate systems is a click near a layer's edge resolving to the row above the one it landed on — a wrong answer that reads as a placement defect in the component that placed it correctly.
+- **I21** — **C17's public surface is the action vocabulary for editing.** Every editing operation the editor exposes is named by exactly one `KeyAction`, and every editing `KeyAction` names exactly one of them. Totality over the union is what makes `/help` honest (I19), and totality over an incomplete union is honest about nothing: the union held no editing action at all while C17 implemented word motion, kill, yank and undo, so backspace did nothing at a real prompt and every check in the chain passed. Derived from the interface rather than maintained beside it, so a method added to C17 with no action fails rather than going unbound in silence.
 
 ---
 
@@ -409,6 +455,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 16. A suspension discards half-decoded state through `reset()`, which emits nothing; the decoder cannot see the gap and the shell calls it on resume (I18).
 17. C16 names actions and executes none; the built-in names are closed and L4's table is total over them, so `/help` cannot list a key that does nothing (I19).
 18. Both positional rungs test a region row, translated once from the event's terminal row (I20).
+19. C17's public surface is the editing action vocabulary, and the bindings are readline's; each was pressed through the real decoder before being written down, and a candidate the decoder does not produce is dropped rather than met by widening the decoder (I21, I17).
 
 ---
 
@@ -455,6 +502,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T2.6** (I11): a source scan finds no scheduler call in `input/`.
 - **T2.7** (I13): the module graph shows no import from `terminal/`.
 - **T2.8**: `register` returns a disposable; disposing removes the handler mid-session.
+- **T2.14** (I21): every editing operation on C17's `LineEditor` is reached by some binding in `defaultKeymap`, driven through L4's effect table against a real editor that records which of its methods were called. The non-editing surface — layout, measurement, the diagnostic counters — is named as an explicit exception with its reason, so a method added to C17 joins the covered set or the exception list deliberately. A count would have passed against a union with no editing action in it, which is the state this row was written in.
 - **T2.13b** (I17): every `key.name === "…"` literal under `src/` names a key the real decoder emits, against a set collected by pushing bytes through it rather than declared beside it. A declared set is a second table to drift from the decoder, which is the defect this rule is about. The fourth instance was a literal in a handler, which no walk of the keymap could reach.
 
 ### Tier 3 — edge cases
@@ -513,6 +561,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.
 - **T6.4d** (I4, §5) — **structural guard, no failing test.** Reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails today, and the ladder is free to drift from `activeTarget` on the next edit touching one and not the other. Every other entry in this tier reads *change X → test Y fails*; this one names a change no assertion catches, and says so deliberately. Inventing an assertion that looked like a guard would be worse than pointing at the real one, which is **T2.5's exhaustiveness over `FocusTarget`**: while the rungs are handlers, a target with no binding is a compile-level gap, and the ladder cannot hold an order of its own to disagree with. Read this row as a signpost to that, not as an unfinished test (A02 §7).
+- **T6.20** (I21): removing an editing binding from `defaultKeymap` → T2.14 names the C17 method nothing reaches. The regression is silent everywhere else: the effect table is still total, `/help` still renders, and the key simply stops working.
 - **T6.15** (I19) — **structural guard, no failing test.** Widening `KeyAction` to `string`, or making L4's table partial, → nothing fails, and every binding is free to become one `/help` lists and nothing dispatches. The protection is the total `Record`, which is why this row names the shape rather than an assertion: the fourteen bindings had no executor at all while every test here passed, because a table of names is satisfied by names.
 - **T6.14** (I18): making `reset()` flush the accumulated run as keys rather than discard it → T1.16's heuristic case fails, and the characters a user typed at `vim` arrive at the prompt when they come back.
 - **T6.13b** (§7): registering the disarm as a handler rather than observing before dispatch → T3.8c fails, and an exit confirm appears after the user typed something in between.
