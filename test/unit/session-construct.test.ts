@@ -15,7 +15,7 @@ import { resolveConfig, type Ambient } from "../../src/shell/config.js";
 import { constructGraph, STEPS, type FrameQueries } from "../../src/shell/construct.js";
 import type { FileSystem, Pipeline, PipelineDeps, TuiConfig } from "../../src/shell/types.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
-import { fakeStdout } from "../support/fake-terminal.js";
+import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 // The parsed one, shared: a second hand-built copy is a second thing that can
 // drift from what `parseManifest` produces, and that drift is what the
 // framework-verb check now refuses.
@@ -75,7 +75,7 @@ async function build(
       theme: defaultTheme,
       stateDir: "/state",
       stdout: stdout as unknown as NodeJS.WriteStream,
-      stdin: { isRaw: false } as unknown as NodeJS.ReadStream,
+      stdin: fakeStdin(),
       ...overrides,
     },
     ambient(platform),
@@ -243,7 +243,7 @@ describe("C22 §3 — construction order", () => {
         theme: defaultTheme,
         stateDir: "/state",
         stdout: stdout as unknown as NodeJS.WriteStream,
-        stdin: { isRaw: false } as unknown as NodeJS.ReadStream,
+        stdin: fakeStdin(),
         blocks: [{ kind: "rule" } as never],
       },
       ambient(),

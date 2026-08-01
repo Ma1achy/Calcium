@@ -23,6 +23,14 @@ export interface TerminalLifecycle {
   onResize(cb: (size: TerminalSize) => void): Disposable;
   onResume(cb: () => void): Disposable;
   /**
+   * Raw stdin bytes, while acquired and not otherwise (I18).
+   *
+   * C01 delivers and interprets nothing — decoding is C16's. The attachment is
+   * part of `acquire()` and the removal part of `suspend()`, so the window in
+   * which a child owns the terminal is one the shell cannot forget to close.
+   */
+  onInput(cb: (chunk: Uint8Array) => void): Disposable;
+  /**
    * One frozen snapshot per call (I12a) — the only route to a dimension outside
    * a `SIGWINCH`, and the reason SS42 can keep its single-file scope while the
    * frame path needs a width.
@@ -162,7 +170,45 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   const held = new Set<HeldKey>();
   const resizeSubscribers = new Set<(size: TerminalSize) => void>();
   const resumeSubscribers = new Set<() => void>();
+  const inputSubscribers = new Set<(chunk: Uint8Array) => void>();
   let beforeReleaseRan = false;
+
+  // --- raw input delivery (I18) --------------------------------------------
+  //
+  // **Attached by `acquire()`, dropped by `suspend()`, and that is the whole
+  // point of it living here.** Under `stdio: inherit` the child reads the same
+  // descriptor, so a listener the shell forgot to remove races it for every
+  // byte — and the symptom is a child dropping every other keystroke, with
+  // nothing in either component to point at. C21 I6 already refuses `handoff()`
+  // while raw mode is set; this is the same guarantee over the same window,
+  // made part of the transition rather than a rule someone has to remember.
+  //
+  // Dropped rather than paused, and the bytes in between are lost on purpose:
+  // they were typed at the child. A queue would replay a `vim` session into the
+  // prompt on resume.
+  function onData(chunk: Buffer): void {
+    for (const cb of inputSubscribers) cb(chunk);
+  }
+
+  let listening = false;
+
+  function attachInput(): void {
+    if (listening) return;
+    listening = true;
+    stdin.on("data", onData);
+  }
+
+  function detachInput(): void {
+    if (!listening) return;
+    listening = false;
+    stdin.off("data", onData);
+    // Explicit, not incidental: removing the last `data` listener pauses the
+    // stream in Node's flowing mode, but that is a consequence of there being
+    // no listeners rather than a statement about who owns the descriptor. A
+    // second subscriber elsewhere would keep it flowing and keep reading the
+    // child's keystrokes.
+    stdin.pause();
+  }
 
   // --- stdout redirection (I9) ---------------------------------------------
   //
@@ -263,6 +309,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
    */
   function releaseInternal(emitSequences: boolean): void {
     if (state === "released") return; // I2
+
+    detachInput(); // I18 — dropped for good; `released` is terminal (I11).
 
     if (!beforeReleaseRan) {
       beforeReleaseRan = true;
@@ -435,10 +483,18 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     }
 
     state = "acquired";
+
+    // Last, and after the state: a subscriber that dispatched a keystroke into
+    // a shell whose terminal is half-acquired is the window I3 closes for
+    // handlers, arriving through the one subscription that is not one (I18).
+    attachInput();
   }
 
   /** Releases what is held without touching `state` or the handlers. */
   function unwind(): void {
+    // Before the sequences, because a child takes the terminal the moment the
+    // suspension completes and the ordering is what T4.4b asserts (I18).
+    detachInput();
     for (const key of [...held].reverse()) {
       if (key === "stdout") continue;
       try {
@@ -485,6 +541,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     resume,
     onResize: (cb) => subscribe(resizeSubscribers, cb),
     onResume: (cb) => subscribe(resumeSubscribers, cb),
+    onInput: (cb) => subscribe(inputSubscribers, cb),
     // Not gated on state, and that is the one difference from everything above
     // it: C22 needs the viewport's dimensions at construction step 5, before
     // any acquire. There is nothing to be wrong about — reading the size of a

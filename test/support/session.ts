@@ -14,7 +14,7 @@ import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { createTui } from "../../src/shell/session.js";
 import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
 import { parseManifest } from "../../src/data/manifest/index.js";
-import { fakeStdout, type FakeStdout } from "./fake-terminal.js";
+import { fakeStdin, fakeStdout, type FakeStdout } from "./fake-terminal.js";
 
 /**
  * **Parsed, not hand-built.** `parseManifest` is the only thing that appends
@@ -111,7 +111,7 @@ export async function buildSession(
     clock: () => 1_700_000_000_000,
     fs: fakeFs(),
     stdout: stdout as unknown as NodeJS.WriteStream,
-    stdin: { isRaw: false } as unknown as NodeJS.ReadStream,
+    stdin: fakeStdin(),
     ...overrides,
   });
 
@@ -162,7 +162,7 @@ export async function buildGraph(
       // omitted `env` would be testing a session that refuses to start.
       env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
       stdout: stdout as unknown as NodeJS.WriteStream,
-      stdin: { isRaw: false } as unknown as NodeJS.ReadStream,
+      stdin: fakeStdin(),
       ...overrides,
     },
     fakeAmbient(),

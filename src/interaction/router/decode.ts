@@ -447,6 +447,23 @@ export function createDecoder(options: DecoderOptions): Decoder {
       return Object.freeze([...out, ...drain()]);
     },
 
+    reset() {
+      // I18 — all four, and emitting nothing.
+      //
+      // **Every pending state, not the obvious one.** A reset that cleared only
+      // the escape window passes any single-state test and still emits a child's
+      // keystrokes inside the next paste, because the paste buffer and the
+      // heuristic run are just as capable of spanning the suspension.
+      //
+      // Nothing is flushed: `flushHeuristic` turns an accumulated run into keys
+      // because its *window closed*, and this window did not close — it stopped
+      // mattering. The characters in it were typed at the child.
+      pending = "";
+      paste = Object.freeze({ mode: "normal" });
+      heuristic = null;
+      escSince = null;
+    },
+
     nextDeadline() {
       const deadlines: number[] = [];
       if (paste.mode === "buffering") deadlines.push(paste.since + PASTE_TIMEOUT_MS);

@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import { makeBeforeRelease } from "../../src/shell/shutdown.js";
 import { createTerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import type { ProcessRunner } from "../../src/data/process/types.js";
-import { fakeStdout } from "../support/fake-terminal.js";
+import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 import { FULL_CAPS } from "../support/render.js";
 
 function harness() {
@@ -34,7 +34,7 @@ function harness() {
   const exit = vi.fn();
   const lifecycle = createTerminalLifecycle({
     stdout: stdout as unknown as NodeJS.WriteStream,
-    stdin: { isRaw: false, setRawMode: () => undefined } as unknown as NodeJS.ReadStream,
+    stdin: fakeStdin(),
     capabilities: FULL_CAPS,
     onFatal: (err) => {
       throw err;

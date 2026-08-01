@@ -153,6 +153,13 @@ describe("C01 fail-on-revert", () => {
     // deferred accessor, added on the commit where both of its conditions
     // arrived — a caller that cannot work without it (C22's viewport, at
     // construction step 5) and a rule requiring its use (SS42).
+    //
+    // **`onInput` is the second addition and was argued the same way.** C22 §4
+    // step 8 named "accept input" with no mechanism behind it: nothing in the
+    // tree read stdin, so C16's finished decoder was never handed a byte. The
+    // delivery is C01's because dropping the listener on `suspend()` is part of
+    // the transition — a listener the shell had to remember to remove races the
+    // child for the same descriptor (I18).
     expect(members).toEqual(
       new Set([
         "acquire",
@@ -161,6 +168,7 @@ describe("C01 fail-on-revert", () => {
         "resume",
         "onResize",
         "onResume",
+        "onInput",
         "size",
         "writer",
         "acquired",

@@ -96,6 +96,14 @@ export type DecoderOptions = Readonly<{
 export interface Decoder {
   push(chunk: Uint8Array): readonly InputEvent[];
   poll(): readonly InputEvent[];
+  /**
+   * Discard every partially-decoded state, emitting nothing (I18).
+   *
+   * For the one gap in the byte stream that is not a slow link: a suspension,
+   * whose bytes went to a child. The decoder cannot tell the two apart — that
+   * is what makes this a call rather than a rule — so L4 makes it on resume.
+   */
+  reset(): void;
   /** Absolute time, on the injected clock. `null` when nothing is pending. */
   nextDeadline(): number | null;
 }

@@ -229,3 +229,53 @@ describe("C01 writer", () => {
     expect(lifecycle.writer.isTTY).toBe(true);
   });
 });
+
+describe("C01 raw input delivery", () => {
+  it("T1.16 (I18, C20): bytes reach a subscriber only while acquired", () => {
+    // **Written across the whole transition, not as four cases.** The subject
+    // *is* the transition: a per-state test passes against an implementation
+    // that queues while suspended and delivers on resume, which is a `vim`
+    // session replayed into the prompt.
+    const { lifecycle, stdin } = harness();
+    const seen: string[] = [];
+    lifecycle.onInput((chunk) => void seen.push(Buffer.from(chunk).toString("utf8")));
+
+    // **The fixture responds before anything is asserted against it.** An
+    // `on` that discarded its callback would report "nothing arrived" for
+    // every state below, and the test would pass having tested nothing.
+    stdin.emit("before");
+    expect(seen, "nothing is attached before acquire()").toEqual([]);
+    expect(stdin.listeners, "and the fake would have delivered it").toBe(0);
+
+    lifecycle.acquire();
+    stdin.emit("a");
+    expect(seen).toEqual(["a"]);
+
+    lifecycle.suspend();
+    stdin.emit("typed at the child");
+    expect(seen, "dropped, and not queued — those bytes were the child's").toEqual(["a"]);
+
+    lifecycle.resume();
+    stdin.emit("b");
+    expect(seen, "the suspended chunk never arrives, then or later").toEqual(["a", "b"]);
+
+    lifecycle.release();
+    stdin.emit("after");
+    expect(seen).toEqual(["a", "b"]);
+    expect(stdin.listeners, "released is terminal, and so is the detachment").toBe(0);
+  });
+
+  it("T1.16b (I18): the listener is gone before the terminal is handed over", () => {
+    // The ordering, not the outcome (T4.4b, C22 I25). Under `stdio: inherit`
+    // the child reads the same descriptor, so "the child got its keystrokes"
+    // passes wherever the parent happens to lose the race.
+    const { lifecycle, stdin } = harness();
+    lifecycle.onInput(() => undefined);
+    lifecycle.acquire();
+
+    expect(stdin.listeners, "attached by acquire()").toBe(1);
+    lifecycle.suspend();
+    expect(stdin.listeners, "and gone by the time suspend() returns").toBe(0);
+    expect(stdin.rawModeCalls.at(-1), "raw mode off, as C21 I6 requires").toBe(false);
+  });
+});

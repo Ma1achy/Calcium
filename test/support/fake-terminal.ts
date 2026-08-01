@@ -106,19 +106,43 @@ export function fakeStdout(size = { columns: 80, rows: 24 }): FakeStdout {
 
 export type FakeStdin = NodeJS.ReadStream & {
   readonly rawModeCalls: boolean[];
+  /**
+   * Deliver bytes as the OS would, to whoever is listening **now** (C01 I18).
+   *
+   * The listener registry is real rather than a no-op, because the subject of
+   * T1.16 is precisely whether anyone is attached at a given moment. A fake
+   * whose `on` discarded the callback would report "no bytes arrived" for every
+   * state, which is the assertion passing for the wrong reason.
+   */
+  emit(chunk: string): void;
+  /** How many `data` listeners are attached. */
+  readonly listeners: number;
 };
 
 /** `tty: false` drops `setRawMode` entirely — stdin is not a TTY (T3.9). */
 export function fakeStdin({ tty = true } = {}): FakeStdin {
   const rawModeCalls: boolean[] = [];
+  const data = new Set<(chunk: Buffer) => void>();
   const stream: Record<string, unknown> = {
     isTTY: tty,
     get rawModeCalls() {
       return rawModeCalls;
     },
-    on: () => stream,
+    get listeners() {
+      return data.size;
+    },
+    emit: (chunk: string): void => {
+      for (const cb of [...data]) cb(Buffer.from(chunk, "utf8"));
+    },
+    on: (event: string, cb: (chunk: Buffer) => void): unknown => {
+      if (event === "data") data.add(cb);
+      return stream;
+    },
     once: () => stream,
-    off: () => stream,
+    off: (event: string, cb: (chunk: Buffer) => void): unknown => {
+      if (event === "data") data.delete(cb);
+      return stream;
+    },
     removeListener: () => stream,
     resume: () => stream,
     pause: () => stream,

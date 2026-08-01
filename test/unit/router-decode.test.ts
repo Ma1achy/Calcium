@@ -340,4 +340,47 @@ describe("C16 §4 — mouse", () => {
   });
 });
 
+describe("C16 §2 — reset across a suspension", () => {
+  it("T1.16 (I18): each of the three pending states is discarded, emitting nothing", () => {
+    // **Three cases, not one.** A reset that cleared only the escape window
+    // passes any single-state test and still emits a child's keystrokes inside
+    // the next paste — the paste buffer and the heuristic run span a suspension
+    // just as readily.
+
+    // 1 — a lone Esc waiting out its window.
+    {
+      const { d } = decoder();
+      expect(names(feed(d, "")), "held, not yet decidable").toEqual([]);
+      expect(d.nextDeadline(), "a deadline exists to be cleared").not.toBeNull();
+      d.reset();
+      expect(d.nextDeadline(), "and it is gone").toBeNull();
+      // `[A` alone is not an arrow key; it is what an arrow key's tail looks
+      // like. Two ordinary keys is the proof the Esc did not survive.
+      expect(names(feed(d, "[A"))).toEqual(["[", "A"]);
+    }
+
+    // 2 — a paste accumulating between its markers.
+    {
+      const { d } = decoder();
+      feed(d, "[200~child typed this");
+      d.reset();
+      const after = feed(d, "hi[201~");
+      expect(
+        after.filter((e) => e.kind === "paste"),
+        "no paste, because no open marker survived the reset",
+      ).toEqual([]);
+      expect(names(after), "and the bytes after it are ordinary keys").toEqual(["h", "i"]);
+    }
+
+    // 3 — a run inside the heuristic's window.
+    {
+      const { d, c } = decoder({ bracketedPaste: false });
+      feed(d, "abcdefghijkl");
+      d.reset();
+      c.advance(100);
+      expect(d.poll(), "nothing is flushed: the window stopped mattering").toEqual([]);
+    }
+  });
+});
+
 const HEURISTIC_ELAPSE = 30;
