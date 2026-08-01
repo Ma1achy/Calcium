@@ -335,9 +335,19 @@ The bindings are readline's set and no more — what a terminal user already kno
 rather than a scheme this project invented. **Each was pressed through the real
 decoder before it was written down** (I17, T2.13b), and one candidate did not
 survive: `⌃_` and `⌃⇧-` are the same byte, `0x1f`, and the decoder maps `0x01`
-to `0x1a` and stops, so it emits a keyless raw name for it. Undo and redo
-therefore have **no binding**, which is recorded rather than repaired — widening
-the decoder to reach a binding is how a table comes to name keys nothing sends.
+to `0x1a` and stops, so it emits a keyless raw name for it. Widening the decoder
+to reach one binding is how a table comes to name keys nothing sends, so that
+candidate is dropped rather than met.
+
+**Undo and redo are `⌃z` and `⌥z`**, which is not readline's convention and is
+the right trade anyway: an editor with 200-unit structural coalescing and a
+kill-append flag, reachable by no key, wastes the component. `⌃z` is the one
+binding whose failure mode is that the session *suspends*, so it was confirmed
+twice rather than reasoned about — the decoder emits `{name: "z", ctrl: true}`
+for `0x1a`, and a real session typing that byte keeps taking input, because raw
+mode clears `ISIG` at acquire (C01 §2). `⌥z` costs nothing: the ESC-prefixed
+path is already how `⌥b`, `⌥d` and `⌥f` arrive. `⌃y` is not available for redo —
+yank is the readline convention worth keeping.
 
 | Key | Action | | Key | Action |
 |---|---|---|---|---|
@@ -347,6 +357,7 @@ the decoder to reach a binding is how a table comes to name keys nothing sends.
 | `⌃y` | `yank` | | `⌃a`, `home` | `home` |
 | `⌃e`, `end` | `end` | | `⌥b`, `⌃←` | `wordLeft` |
 | `⌥f`, `⌃→` | `wordRight` | | `←` | `left` |
+| `⌃z` | `undo` | | `⌥z` | `redo` |
 
 `⌃w` and `⌥⌫` are both word-delete-left, in different traditions; they are
 distinct wire forms and no other binding wants either, so both are bound. **`→`
