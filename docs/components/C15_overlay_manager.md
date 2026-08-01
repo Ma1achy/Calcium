@@ -132,6 +132,20 @@ Popping emits a change. **C15 does not write to the transcript**, and after A01 
 
 Views fill the viewport region entirely: `top = 0`, `left = 0`, full height and width. Nothing to decide.
 
+### Drawing a layer is L4's, and nothing did it
+
+`layout(region)` returns `Placed` boxes and **no component draws them.** L4's paint composites header, transcript, prompt and footer, and calls `layout()` in exactly two places — C16's hit-testing, and the completion menu's own remainder count. So this component has never put a glyph on a screen: the completion menu, reverse search and the exit confirm are all invisible, and `raiseExitConfirm` stopping the session directly was a symptom of that rather than a simplification, because there was nowhere for a confirm to appear.
+
+**S01 §3's arithmetic is why nothing complained.** A layer floats above the four regions rather than taking rows from them, so the heights still sum to `rows` and the frame is internally consistent with every overlay missing. The check that catches a region wrong by one row cannot see a region that is not drawn at all.
+
+Three things follow, and they are decisions rather than details:
+
+**Clamping is C15's and drawing is L4's, and neither does the other's half.** `layout()` clamps the box to the region and reports `truncated` (§4 steps 3, 6, 7); the drawer composites exactly the box it is handed and never re-decides its extent. Two components with an opinion about a layer's extent is how a menu comes to be one row taller than the space computed for it. The corollary is that **the drawer must not exceed `height`**: C15 clips no *content* (below), so a layer whose blocks render taller than its box is cut by whoever draws it.
+
+**Width is clamped, and unlike height that is not optional.** A layer taller than its box loses rows the reader can scroll to; a layer wider than the region wraps, and a wrapped overlay row shifts every row below it — the failure S01 §3 and `docs/notes/resize-and-compositor.md` both name, arriving through a layer instead of through a frame.
+
+**Where the terminal cursor sits while a layer holds focus is not specified anywhere**, and it is the one of the four that will be discovered rather than designed. C16's `activeTarget` puts `overlay` above `prompt`, so focus already moved; the cursor did not, because nothing has drawn a layer for it to move onto. Left as it is, the cursor stays at the prompt's `cursorCell` under a menu drawn over it — visible, blinking, in the wrong place. **This is an open question and it belongs to whoever rules it, not to the first implementation that needs an answer.**
+
 **A view's content is already the region's worth, and C15 does not scroll it.** The owner windows it — S12 holds fifty thousand log lines and renders the visible ones, having committed to owning its own scroll and calling no C14 (S12 T2.3); C25 §3b's fullscreen patch does the same through `n`, `p`, `g` and `G`. Said explicitly because its absence invites C15 growing a scroll offset for views, and that is a second scroll model beside C14's — the thing A01 D3 spent a decision avoiding. C15 clips nothing vertically beyond reporting `truncated`.
 
 Overlays are content-sized and resolved in a fixed order:
