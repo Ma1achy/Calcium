@@ -547,9 +547,19 @@ switch (mode) {
     // manifest written here. Two copies drift, and the drift shows up as a
     // tier-5 row asserting against a tool the rest of the suite does not have.
     const { readFileSync } = await import("node:fs");
-    const parsed = parseManifest(
-      JSON.parse(readFileSync(new URL("./manifest.fixture.json", import.meta.url), "utf8")),
+    const document = JSON.parse(
+      readFileSync(new URL("./manifest.fixture.json", import.meta.url), "utf8"),
     );
+
+    // **A variant, not a second manifest** (C05 T5.4). "A manifest omitting a
+    // tool the app previously had" is this document with one tool removed —
+    // written as a filter so the two manifests cannot differ in any other way,
+    // which is what makes the row about the omission.
+    if (process.argv[3] === "no-ps") {
+      document.tools = document.tools.filter((t) => t.name !== "ps");
+    }
+
+    const parsed = parseManifest(document);
     if (!parsed.ok) {
       process.stderr.write(`manifest: ${JSON.stringify(parsed.error)}\n`);
       process.exit(5);
@@ -557,6 +567,28 @@ switch (mode) {
 
     const transport = createRouter({
       default: createFixtureTransport([
+        {
+          // C05 T5.1's "validates" half needs a *positive* answer: a line that
+          // cleared validation and reached the far side. Asserting the absence
+          // of a refusal would pass against a session that did nothing at all.
+          id: "promote-one",
+          verb: "promote",
+          argv: ["app.web:main"],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          result: {
+            stdout: JSON.stringify({
+              schema: "tui.view/1",
+              blocks: [{ kind: "notice", id: "n1", tone: "info", text: "promoted app.web:main" }],
+            }),
+            stderr: "",
+            code: 0,
+            signal: null,
+            durationMs: 1,
+          },
+        },
         {
           id: "ps-empty",
           verb: "ps",
@@ -566,7 +598,14 @@ switch (mode) {
           cliVersion: null,
           note: "the far side is not the subject of these rows",
           result: {
-            stdout: JSON.stringify({ schema: "tui.view/1", blocks: [] }),
+            // **A block, not an empty document.** The first version had
+            // `blocks: []`, which settles an entry that renders as nothing — a
+            // fixture indistinguishable from a route that never ran, which is
+            // the inert-subject class in the corpus rather than in the harness.
+            stdout: JSON.stringify({
+              schema: "tui.view/1",
+              blocks: [{ kind: "notice", id: "ps1", tone: "info", text: "no processes" }],
+            }),
             stderr: "",
             code: 0,
             signal: null,

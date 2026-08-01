@@ -1,19 +1,25 @@
 // C05 tier 5 — e2e. A session driven by the fixture manifest, with no far side
 // present at all.
 //
-// All four wait on C22: a session is what "started with the fixture manifest"
-// means, and asserting the pieces separately here would be tier 1 wearing a
-// tier 5 label. What C05 can hold to on its own is in tiers 1 to 3, and the
-// deferrals name the component that makes each of these writable.
+// **The manifest here is the one the rest of the suite uses**, read from
+// `test/support/manifest.fixture.json` by both `manifest.ts` and the spawned
+// `fixture.mjs`. Two copies would drift, and the drift shows up as a tier-5 row
+// asserting against a tool nothing else has.
 import { describe, expect, it } from "vitest";
 import { findTool, validateInvocation, visibleTools } from "../../src/data/manifest/index.js";
 import { fixture } from "../support/manifest.js";
+import { interactivePty, type InteractivePty } from "../support/pty.js";
+
+const PROMPT = /❯/;
+
+const session = (variant = ""): InteractivePty =>
+  interactivePty(`node test/support/fixture.mjs session ${variant}`, { cols: 100, rows: 24 });
 
 describe("C05 e2e", () => {
   it("every fixture tool resolves and validates with no far side present", () => {
     // Not T5.1 — that needs a session. This is the part of T5.1 that is C05's
-    // alone: the whole manifest is self-consistent, so when C22 lands the e2e
-    // failure will be C22's rather than a fixture nobody checked.
+    // alone: the whole manifest is self-consistent, so an e2e failure below is
+    // about the session rather than about a fixture nobody checked.
     const m = fixture();
 
     for (const tool of m.tools) {
@@ -35,12 +41,45 @@ describe("C05 e2e", () => {
     expect(m.tools.filter((t) => t.hidden === true).length, "and there are some").toBeGreaterThan(0);
   });
 
-  it.todo("T5.1: a session completes, validates and rejects for every tool, with no far side — waits on C23 — rejection is an invocation outcome, so it needs the pipeline that invokes");
-  it.todo("T5.2: replacing the fixture with a manifest fetched from a real binary changes the surface — waits on C23 — C22 fetches the manifest, but the surface it changes is `/help`, which is a local handler");
-  // **This deferral was exempt from the day it was written** and TD3 is what
-  // surfaced it: C07 was mapped to `src/data/adapters.ts`, a path that has never
-  // existed, so "waits on C07" could never expire. C07 landed long ago; the
-  // blocker is C22, which owns the session this asserts end to end.
-  it.todo("T5.3: a tool with no adapter renders through the fallback adapter — waits on C23 — adaptation happens on the app route, which is C23's");
-  it.todo("T5.4: a manifest omitting a previously-present tool reports it unavailable — waits on C23 — the report is an invocation outcome");
+  it.todo(
+    // **Two of its three halves are demonstrated and the third is a finding.**
+    // Driving this by hand: `/promote` with no argument shows C05's refusal —
+    // `x "promote" requires <target>` — and Tab completes from the manifest.
+    // But `/promote app.web:main` and `/ps`, both matched by the fixture
+    // corpus, settle without rendering anything: the app route produces no
+    // visible entry in a real session while the local, shell and refusal routes
+    // all do. Not the fixture — a `blocks: []` document was the first
+    // suspicion, and giving it a notice changed nothing.
+    "T5.1: a session completes, validates and rejects for every tool, with no far side — blocked on the app route producing no visible entry in a session; rejection and completion already verified by hand",
+  );
+
+  it("T5.4: a manifest omitting a tool reports it unavailable, and the session continues", async () => {
+    // The variant drops `ps` from the parsed manifest before construction, so
+    // this is the same session with one tool fewer — which is what "a manifest
+    // omitting a tool the app previously had" is, from the shell's side.
+    const pty = session("no-ps");
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      pty.type("/ps\r");
+      // C18's unknown-verb path, which is where a dropped tool arrives: it is
+      // no longer a manifest verb, so nothing can classify it as one.
+      await pty.waitFor(/ps/, 15_000);
+
+      // **And the session continues** — the half that makes this more than a
+      // parser test. A shell that reported the loss and then stopped taking
+      // input satisfies the first clause perfectly.
+      pty.type("/guide\r");
+      await pty.waitFor(/own local verb/, 15_000);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
+
+  it.todo(
+    "T5.2: replacing the fixture with a manifest fetched from a real binary changes the completable surface — needs C05 B6's fetch path, which nothing implements: `TuiConfig.manifest` takes a parsed manifest or a file path, and neither runs a binary",
+  );
+  it.todo(
+    "T5.3: a tool with no adapter renders through the fallback adapter — needs a fixture result that is not a tui.view/1 document, so the fallback has something to adapt",
+  );
 });
