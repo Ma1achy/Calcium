@@ -490,6 +490,32 @@ describe("C22 §3 step 12 — the read loop", () => {
     expect(graph.editor.text.split("\n"), "and all of them arrived").toHaveLength(200);
   });
 
+  it("T1.14 (C22 I32): a lone Esc reaches the router without a second keystroke", async () => {
+    // **The empty batch is the one that needs a wake.** `Esc` is held for
+    // C16's 50 ms window and decodes to *nothing*, so the early return on an
+    // empty batch sat above `arm()` and the deadline was never scheduled — the
+    // key arrived when the next one did, which is the symptom the arming was
+    // written to prevent. Every unit test of the decoder passed throughout: it
+    // reports its deadline correctly and nobody polled it.
+    const { graph, stdin, clock } = await buildGraph({}, { columns: 100, rows: 30 });
+    graph.lifecycle.acquire();
+    openOverlay(graph);
+
+    stdin.emit("\u001b");
+    expect(graph.overlays.top?.id, "nothing before the window closes").toBe("probe");
+
+    // **A real wait, and 80 ms of one.** The harness injects a real `schedule`
+    // and a fixed clock, so the wake is a real timer; the window is a constant
+    // (C16 §2's 50 ms) rather than a race, which is what makes a bounded sleep
+    // honest here. The assertion above is the control that keeps it so: a
+    // decoder emitting `Esc` immediately would satisfy the arrival below and
+    // break every arrow key.
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(graph.overlays.top, "the layer was dismissed with no second key").toBeNull();
+  });
+
   it("T1.13 (C22 I31): a completion that settles after its batch commits a frame of its own", async () => {
     // **Asserted as a commit after the batch, not as a layer on the stack.**
     // The layer was always on the stack — that is precisely why every unit test

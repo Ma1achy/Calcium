@@ -104,33 +104,37 @@ describe("C17 tier 5 — at a real prompt", () => {
     }
   }, 60_000);
 
-  it.todo(
-    // **Parked with its evidence, deliberately, rather than made green.**
-    //
-    // *The property*: a command containing CJK and emoji puts the cursor where
-    // the user sees it — two cells per glyph, so the caret after
-    // `/ps --search=日本語` sits at cell 21 and the frame writes column 22.
-    //
-    // *Where it is asserted*: the cell arithmetic is C17's `cursorCell` over
-    // C09's `cells()`, covered at tiers 1 to 3 for CJK, ZWJ sequences,
-    // variation selectors and combining marks; the frame's half — that the
-    // drawer emits that column at all — is C22 T1.20 and C01 T1.17. Driving it
-    // through a terminal adds the agreement of those two, and nothing else.
-    //
-    // *What remains unexplained*: written live, the prompt shows `日本`
-    // followed by two replacement characters and stays that way. It is not the
-    // decoder, which holds a partial sequence across chunks (C16 T3.14), and it
-    // is no longer node-pty decoding each read independently — that was real
-    // and is fixed with `encoding: null` plus one streaming decoder for the
-    // terminal's life. What is left is timing: an isolated probe typing the
-    // identical string into an identical session, one glyph at a time or all at
-    // once, gets all three every time, and this row does not.
-    //
-    // A row made green by a sleep is worth less than one parked with what is
-    // known, and chasing a timing artefact in how a row drives the PTY closes
-    // nothing about C17.
-    "T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it at every position — the property is asserted at tiers 1 to 3 and its frame half at C22 T1.20; blocked on a harness-side UTF-8 corruption an isolated probe of the same session cannot reproduce",
-  );
+  it("T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it", async () => {
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      // Two cells each, and the frame has to agree with the editor about that
+      // or the cursor drifts by one per glyph. **The cursor is read from the
+      // escape the frame writes**, which is observable at all only because C01
+      // yields the sequence and the drawer embeds it (C01 I19).
+      pty.type("/ps --search=日本語");
+      await pty.waitForFrame((f) => f.join("").includes("日本語"), 15_000);
+
+      const at = (): number => {
+        const m = [...pty.output.matchAll(/\u001b\[(\d+);(\d+)H/g)].at(-1);
+        return Number(m?.[2] ?? 0);
+      };
+      // `❯ ` is 2 cells, `/ps --search=` is 13, three CJK glyphs are 6 — cell
+      // 21, which is column 22 on the wire.
+      expect(at(), "2 + 13 + 6 cells, 1-based").toBe(22);
+
+      // A backspace removes one **cluster**, and the caret moves two cells
+      // rather than one — the property that fails by a cell per glyph if the
+      // frame and the editor disagree about width.
+      pty.type("\u007f");
+      await pty.waitForFrame((f) => !f.join("").includes("日本語"), 15_000);
+      expect(pty.frame.join(""), "one glyph, not one code unit").toContain("日本");
+      expect(at(), "two cells back").toBe(20);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
 
 
   it("T5.4: an undo/redo sequence interleaved with paste and history navigation returns to the expected text", async () => {

@@ -594,11 +594,26 @@ export async function constructGraph(
   at("input", () => {
     let wake: Disposable | null = null;
 
-    /** One commit per decoded batch, and no handler commits (I27). */
+    /**
+     * One commit per decoded batch, and no handler commits (I27).
+     *
+     * **`arm()` runs on every chunk, including the ones that decode to
+     * nothing** (I32). The early return used to sit above it, and an empty
+     * batch is exactly the state that needs a wake: a lone `Esc` is held for
+     * the 50 ms disambiguation window and emits no event at all, so the
+     * deadline was never armed and the key arrived only when the *next* one
+     * did. That is the symptom `arm()`'s own comment describes — a key that
+     * appears to do nothing until you press another one — and the guard added
+     * for the empty case defeated the mechanism written for it.
+     *
+     * The commit still belongs to a non-empty batch: nothing changed, so
+     * nothing needs drawing.
+     */
     const deliver = (events: readonly InputEvent[]): void => {
-      if (events.length === 0) return;
-      for (const e of events) router.dispatch(e);
-      scheduler.commit("input");
+      if (events.length > 0) {
+        for (const e of events) router.dispatch(e);
+        scheduler.commit("input");
+      }
       arm();
     };
 

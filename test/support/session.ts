@@ -72,9 +72,23 @@ export const FRAME: FrameQueries = {
   raiseExitConfirm: () => undefined,
 };
 
-export function fakeAmbient(): Ambient {
+/**
+ * The injected clock, advanceable.
+ *
+ * **A frozen clock cannot exercise a deadline.** C16 reports its own — the
+ * escape window, the paste heuristic, the exit arming — and the read loop polls
+ * them on a wake; with `now()` fixed, the wake fires and `poll()` correctly
+ * decides nothing is due. So the harness owns a number rather than a constant,
+ * and a test that needs a window to close says so.
+ */
+export function fakeClock(): { now: () => number; advance: (ms: number) => void } {
+  let t = 1_700_000_000_000;
+  return { now: () => t, advance: (ms) => void (t += ms) };
+}
+
+export function fakeAmbient(clock = fakeClock()): Ambient {
   return {
-    clock: () => 1_700_000_000_000,
+    clock: clock.now,
     cwd: "/work",
     fs: fakeFs(),
     schedule: (fn, ms) => {
@@ -107,7 +121,10 @@ export async function buildSession(
   tui: TuiInstance;
   stdout: FakeStdout;
   resize: (next: { columns: number; rows: number }) => void;
+  /** The injected clock — advance it to close one of C16's windows. */
+  clock: ReturnType<typeof fakeClock>;
 }> {
+  const clock = fakeClock();
   const stdout = fakeStdout(size);
   const tui = createTui({
     name: "prism",
@@ -117,7 +134,7 @@ export async function buildSession(
     stateDir: "/state",
     env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
     cwd: "/work",
-    clock: () => 1_700_000_000_000,
+    clock: clock.now,
     fs: fakeFs(),
     stdout: stdout as unknown as NodeJS.WriteStream,
     stdin: fakeStdin(),
@@ -129,6 +146,7 @@ export async function buildSession(
   return {
     tui,
     stdout,
+    clock,
     resize: (next) => {
       size.columns = next.columns;
       size.rows = next.rows;
@@ -155,7 +173,10 @@ export async function buildGraph(
    * a path nothing takes.
    */
   resize: (next: { columns: number; rows: number }) => void;
+  /** The injected clock — advance it to close one of C16's windows. */
+  clock: ReturnType<typeof fakeClock>;
 }> {
+  const clock = fakeClock();
   const stdout = fakeStdout(size);
   const stdin = fakeStdin();
   let renders = 0;
@@ -177,7 +198,7 @@ export async function buildGraph(
       stdin,
       ...overrides,
     },
-    fakeAmbient(),
+    fakeAmbient(clock),
   );
 
   const graph = await constructGraph(config, {
@@ -194,6 +215,7 @@ export async function buildGraph(
     graph,
     stdout,
     stdin,
+    clock,
     renders: () => renders,
     resize: (next) => {
       size.columns = next.columns;
