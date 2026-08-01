@@ -2,6 +2,7 @@
  * C16 §6 — the keymap as data. Tiers 1, 2 and 3.
  */
 
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { createKeymap, KeymapError, defaultKeymap } from "../../src/interaction/router/keymap.js";
@@ -275,5 +276,83 @@ describe("§6 — the default table (C17 I12)", () => {
       });
       expect(resolved, `${b.target}:${b.key.name} resolves`).toBe(b);
     }
+  });
+});
+
+describe("C16 I17 — the rule, over the half a table walk cannot reach", () => {
+  it("T2.13b (I17): every `key.name` literal in src/ names a key the decoder emits", () => {
+    // **T2.13 walks `defaultKeymap`; this walks the source.** The rule says "a
+    // key the keymap can name must be a key the decoder produces", and its
+    // mechanism only ever covered names in the table. The fourth instance was
+    // `key.name === "return"` in C22's prompt handler, against a decoder that
+    // has only ever emitted `enter` — so Enter did not submit, and no walk of
+    // the keymap could have reached the comparison.
+
+    // **Collected by pressing, never declared.** A list written here is a
+    // second table to drift from the decoder, which is the defect the rule is
+    // about. So the set is whatever the real decoder emits for a corpus of the
+    // wire forms terminals send.
+    const enc = new TextEncoder();
+    const ESC = "\u001b";
+    const corpus: string[] = [];
+    for (let b = 1; b <= 0x7f; b += 1) corpus.push(String.fromCharCode(b));
+    for (const final of "ABCDFHPQRS") corpus.push(`${ESC}[${final}`, `${ESC}O${final}`);
+    for (let n = 1; n <= 34; n += 1) corpus.push(`${ESC}[${String(n)}~`);
+    for (const code of [13, 9, 27, 32, 65, 97]) {
+      corpus.push(`${ESC}[${String(code)};2u`, `${ESC}[27;2;${String(code)}~`);
+    }
+
+    const produced = new Set<string>();
+    for (const seq of corpus) {
+      let t = 1_000;
+      const decoder = createDecoder({
+        capabilities: { bracketedPaste: true, mouse: true },
+        now: () => t,
+      });
+      const pushed = decoder.push(enc.encode(seq));
+      t += 1_000;
+      for (const e of [...pushed, ...decoder.poll()]) {
+        if (e.kind === "key") produced.add(e.key.name);
+      }
+    }
+
+    // The fixture responds before it is asserted against: a corpus that decoded
+    // to nothing would make every literal below "not produced" and the test
+    // would fail for the wrong reason, or — worse, with the assertion inverted
+    // — pass having checked nothing.
+    expect(produced.has("enter"), "the corpus reaches the decoder").toBe(true);
+    expect(produced.has("return"), "and `return` is not a name it emits").toBe(false);
+
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const path = `${dir}/${entry}`;
+        if (statSync(path).isDirectory()) walk(path);
+        else if (path.endsWith(".ts")) files.push(path);
+      }
+    };
+    walk("src");
+
+    const offenders: string[] = [];
+    let scanned = 0;
+    // `key.name`, `e.key.name`, `k.name` — the comparison, not the assignment,
+    // because the decoder itself is where these names are *made*.
+    const literal = /\bkey\.name\s*[=!]==?\s*"([^"]*)"/g;
+    for (const file of files) {
+      if (file.endsWith("src/interaction/router/decode.ts")) continue; // where they come from
+      const text = readFileSync(file, "utf8");
+      for (const m of text.matchAll(literal)) {
+        const name = m[1] ?? "";
+        scanned += 1;
+        if (!produced.has(name)) offenders.push(`${file}: "${name}"`);
+      }
+    }
+
+    // **A floor, because zero literals passes exactly like zero offenders.**
+    // The comparisons are real and in two files — the scroll table and the
+    // Ctrl-C rungs — so a regex that stopped matching would otherwise report a
+    // clean tree. A03 §2's vacuity class, applied to this test.
+    expect(scanned, "the scan found the comparisons it exists to read").toBeGreaterThan(5);
+    expect(offenders, "a key nothing can press").toEqual([]);
   });
 });
