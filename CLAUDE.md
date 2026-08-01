@@ -139,6 +139,18 @@ Each of these produces code that compiles, passes review, and is wrong.
   came back empty and no assertion about a source would have shown why. C18's table
   would have caught it, and C18's table was already in the repo.
 
+  **An artefact can be correct about the interaction it found and wrong about a
+  mechanism it assumed existed.** C23 §8a A4 found that a stall notice outlives its
+  condition — a real interaction, and the trace's job. Its ruling said *settlement
+  removes the notice*, and `ViewPatch` has no delete and should not have one. The
+  assumption came from §3b's prose, which described one moment twice: *replaced on the
+  next real patch **and removed if output resumes**.* Only the first half was ever
+  expressible, and the walk inherited the second. No index by rule interaction surfaces
+  that, because the flaw is not between two rules — it is a verb the prose uses and the
+  layer below does not have. So when a ruling names an operation, check the operation
+  exists before the ruling is written down; the finding survives either way, and only
+  the remedy has to change.
+
   **Two instances fitting a rule is not evidence for the rule — it is the minimum for
   noticing one.** C13's patch gate was re-founded three times. `settle(id, doc)` and
   `op: "expand"` both looked like *view state versus data*, and the classification held
