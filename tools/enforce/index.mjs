@@ -9,6 +9,7 @@ import {
   checkCommitments,
   checkOrdering,
   checkReferences,
+  checkSeamFour,
   referenceFiles,
   specFiles,
 } from "./commitments.mjs";
@@ -40,6 +41,10 @@ const violations = [
   // SP2 — the numbers locate what they name. SP3 — and everything that cites
   // one of them resolves, which for eleven hundred references nothing did.
   ...checkOrdering(specs),
+  // SP4 — Seam 4 and its owners agree, both directions. The only artefact
+  // several components write to and none owns, wrong at every one that touched
+  // it, because every row exists twice and nothing compared the copies.
+  ...checkSeamFour(),
   ...refViolations,
 ];
 

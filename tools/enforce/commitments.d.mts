@@ -97,3 +97,33 @@ export declare function checkReferences(
 
 /** SP1, SP2, SP3 — so A03 commitment 14b's equality can see the family. */
 export declare const SPEC_RULES: readonly string[];
+
+/** Lines inside one section, bounded by the next `---` or heading at that level. */
+export declare function sectionLines(
+  file: string,
+  headingRe: RegExp,
+  readFile?: (f: string) => string,
+): { line: string; n: number }[];
+
+/** One column of a section's first markdown table, normalised for comparison. */
+export declare function tableColumn(
+  file: string,
+  headingRe: RegExp,
+  index?: number,
+  readFile?: (f: string) => string,
+): string[];
+
+export declare const SEAM_FILE: string;
+export declare const SEAM_OWNERS: Readonly<Record<string, Readonly<{ file: string; heading: RegExp }>>>;
+
+/** Seam 4's rows, normalised. */
+export declare function seamRows(
+  readFile?: (f: string) => string,
+): { effect: string; owner: string }[];
+
+/** SP4 — Seam 4 and each owner's orchestration table agree, both directions. */
+export declare function checkSeamFour(
+  owners?: Readonly<Record<string, Readonly<{ file: string; heading: RegExp }>>>,
+  readFile?: (f: string) => string,
+  seam?: readonly { effect: string; owner: string }[],
+): Violation[];

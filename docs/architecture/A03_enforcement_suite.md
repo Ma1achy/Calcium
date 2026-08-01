@@ -433,6 +433,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP1 | Every commitment cites an invariant, several, or another spec's | `docs/components/` | A02 §1 |
 | SP2 | Invariants are numbered 1..n, in order, a lettered variant beside its base | `docs/components/` | A02 §1 |
 | SP3 | Every invariant reference resolves against the spec that owns it | `src/`, `test/`, `tools/`, `docs/` outside `components/` and `archive/` | A02 §1 |
+| SP4 | A02 Seam 4 and each owner's orchestration table hold the same rows, **both directions** | A02 Seam 4 · C22 §3c · C23 §4 | A02 §Seam 4 |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
 
@@ -452,6 +453,20 @@ Two things belong here rather than there. **This document has been on the other 
 
 **A dangling reference is not inert — it arms itself when the number gets used.** C22 §3 cited `C01 I17` twice, about `beforeRelease` running once before the first release, which is C01 I5 and always was. For months C01 declared no I17 at all, so both citations were dangling and nothing looked. Then the C25 commit added a real I17 — the width rule — and the two silently became *resolving* citations pointing at an unrelated invariant. SP3 would have caught them on any day before that one and on no day after, and what found them in the end was reading the renumber's diff. This is the boundary above with a date attached: the rule proves resolution, and resolution is exactly what the new invariant supplied. Qualifying all eleven hundred is not the remedy — that is a diff of pure noise, and `T3.7 (I5)` in `test/unit/capabilities.test.ts` is unambiguous to a reader. Saying where the rule stops is what keeps it from being read as stronger than it is, which is the failure mode of everything in §2's list.
 
+**SP4 is the class SP1 closes, in the architecture rather than in a spec.** A02 Seam 4 lists every cross-layer sequence and names an owner; each owner's spec lists the same sequences again. Two copies, and nothing compared them — so the table was wrong or incomplete at **every component that touched it**, in a different way each time: six rows missing by C20, `resetFocus` recorded as a subscription at C16, no owner column until C22, and at C23 a stale submit order, `Scroll` with two owners, and three C23-owned rows absent while C23 I13 claims the table holds them all.
+
+Six errors of six different kinds is not a run of bad luck. It is the signature of a duplicated source of truth with no reconciliation — the class SS30 closes for text primitives, SS35 for a type name, C05 T1.7c for a derived list and C22's `STEPS` for an ordering. Seam 4 was the only artefact several components write to and none owns; everything else shared already had a mechanism.
+
+**Equality, both directions, and that is the design rather than a detail.** Containment in either direction misses one of the two failures actually observed: C15–C20's rows were missing *from the table*, C23's were missing *from the spec*. Writing the rule found four more of the second kind — `Pop a pushed view`, `Stall detected`, `View refresh tick` and `cd` / `export` — before it ran, which is TD0's and ACKNOWLEDGED_BACKLOG's lesson arriving in a third place: a set compared by containment only ever grows.
+
+The mutation pass measured the cost of getting that wrong. Implementing SP4 as a subset leaves the first fabrication **passing** — so a single fixture would have shown a green suite over a rule checking half of what it claims. That is why there is one fabrication per direction and a third asserting two findings from one document.
+
+**It also found the asymmetry underneath.** C23 had a §4 listing what it orchestrates; C22 had nothing equivalent, so five of Seam 4's rows had no counterpart at all. Half a table cannot be checked against half a convention, and C22 §3c exists because the rule could not otherwise be written.
+
+Two things it deliberately does not do. It compares **row keys, not sequences** — that both tables spell out `append → resetFocus → commit` identically is not checkable without parsing prose, and the stale ordering C23 found would have survived it; what SP4 guarantees is that both tables know about the same rows, and the ordering is a reader's job on one row rather than on twelve. And markdown differences are normalised away — `` `cd` / `export` `` against `cd / export` is one row written by two hands, while "Submit" against "Command submit" is drift and still fails. Failing on backticks would make the rule about markdown.
+
+Deriving Seam 4 from the component specs was the alternative and is rejected: the table sits inside an argument, and generated content in argued prose goes stale in the other direction, where nothing is looking.
+
 **Why this is exact where a heuristic was not.** The 2026-07-29 pairing audit read 355 invariants against 358 commitments by hand and found 103 mismatches — 57 commitments nothing enforced, 46 invariants nothing agreed to. A word-overlap check over the corpus cannot replace that reading: a commitment is the *readable* form, so it deliberately shares few words with the invariant it summarises, and the noise floor is higher than the signal.
 
 What makes a mechanical rule possible is that the audit produced **categories**, and a category becomes a marker the spec writes down:
@@ -467,6 +482,8 @@ The check is then citation resolution rather than similarity: a commitment with 
 **Architecture documents are cited by section.** A01–A04 declare no invariants, deliberately: A03's own SS and MG rules *are* the architecture's invariants in enforceable form, and giving those documents an invariant list would duplicate this one. So `(→ A01 A.1)` is accepted and not chased for an `I<n>`.
 
 The rule's own vacuity risk is specific and worth naming: **a document with no Commitments section produces no findings and looks compliant.** The fire-test asserts twenty-five specs and more than three hundred commitments before asserting that none of them fails.
+
+SP4 carries the same risk in its own shape — **a heading that stopped matching yields no rows, no disagreements and a green run**, passing for exactly the reason it cannot see the table. It is closed twice: the rule returns a violation when Seam 4 reads as empty, and the fire-test asserts the row count and that both owners declare a table before asserting cleanliness.
 
 ---
 

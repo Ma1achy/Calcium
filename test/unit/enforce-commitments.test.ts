@@ -17,6 +17,7 @@ import {
   checkCommitments,
   checkOrdering,
   checkReferences,
+  checkSeamFour,
   commitmentsOf,
   expectedOrder,
   invariantOrderOf,
@@ -25,7 +26,11 @@ import {
   REFERENCE_EXCEPTIONS,
   referenceFiles,
   scanReferences,
+  SEAM_FILE,
+  SEAM_OWNERS,
+  seamRows,
   specFiles,
+  tableColumn,
 } from "../../tools/enforce/commitments.mjs";
 
 /**
@@ -536,5 +541,172 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
       "test/unit/enforce-commitments.test.ts",
       "tools/enforce/commitments.mjs",
     ]);
+  });
+});
+
+/**
+ * Seam 4 and an owner's own table, fabricated.
+ *
+ * The seam doc carries the owner column; the owner doc does not. That asymmetry
+ * is real — Seam 4 says who owns each row and the owner's section is already
+ * scoped to itself — and a fixture that gave both three columns would agree with
+ * a checker reading the wrong index in either.
+ */
+function seamDoc(rows: readonly (readonly [string, string])[]): string {
+  return [
+    "### Seam 4 — L4 orchestrates cross-layer effects",
+    "",
+    "| Effect | Sequence | Owner |",
+    "|---|---|---|",
+    ...rows.map(([effect, owner]) => `| ${effect} | \`a()\` → \`b()\` | ${owner} |`),
+    "",
+    "---",
+    "",
+  ].join("\n");
+}
+
+function ownerDoc(effects: readonly string[]): string {
+  return [
+    "### 3c. The sequences C99 owns",
+    "",
+    "| Effect | Sequence | Where |",
+    "|---|---|---|",
+    ...effects.map((effect) => `| ${effect} | \`a()\` → \`b()\` | §3 |`),
+    "",
+    "---",
+    "",
+  ].join("\n");
+}
+
+const FAKE_OWNER = { file: "docs/components/C99_fake.md", heading: /^###\s+3c\./ };
+
+/** A reader over the two fabricated documents and nothing else. */
+function reader(seam: string, owner: string) {
+  return (f: string): string => {
+    if (f === SEAM_FILE) return seam;
+    if (f === FAKE_OWNER.file) return owner;
+    throw new Error(`unexpected read: ${f}`);
+  };
+}
+
+describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
+  it("SP4: the real tree is clean, and it is a corpus", () => {
+    // **The corpus assertion first, for SP2's reason.** A heading that stopped
+    // matching would yield no rows and no disagreements, and "clean" would mean
+    // "could not read the table". The counts are asserted before the cleanliness
+    // so that failure mode is a red test rather than a green one.
+    const rows = seamRows();
+    expect(rows.length, "Seam 4's rows").toBeGreaterThanOrEqual(12);
+    expect(new Set(rows.map((r) => r.owner)), "both L4 components own rows").toEqual(
+      new Set(["C22", "C23"]),
+    );
+    for (const [id, o] of Object.entries(SEAM_OWNERS)) {
+      expect(tableColumn(o.file, o.heading).length, `${id} declares an orchestration table`)
+        .toBeGreaterThan(0);
+    }
+
+    expect(checkSeamFour().map((v) => v.message), "SP4").toEqual([]);
+  });
+
+  // --- the two directions, fabricated separately ---------------------------
+  //
+  // **Two fabrications, and the second is why.** A rule written for equality can
+  // be implemented as a subset and pass a single fixture — the vacuity class,
+  // arriving inside the check built to close a duplication. One fabrication per
+  // direction is the only arrangement where a one-directional implementation
+  // fails, and the third test below is what makes that explicit.
+
+  it("SP4 fires: a Seam 4 row its owner does not name", () => {
+    // The C15–C20 shape inverted: the table knows about a sequence and the spec
+    // that owns it has never heard of it.
+    const violations = checkSeamFour(
+      { C99: FAKE_OWNER },
+      reader(seamDoc([["Command submit", "C99"], ["Scroll", "C99"]]), ownerDoc(["Command submit"])),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP4");
+    expect(violations[0]?.message).toContain('"scroll"');
+    expect(violations[0]?.message).toContain("does not name it");
+    expect(violations[0]?.file, "reported against the spec that is missing the row")
+      .toBe(FAKE_OWNER.file);
+  });
+
+  it("SP4 fires: a sequence its owner declares that Seam 4 does not list", () => {
+    // **The direction a subset check does not look, and the live one.** Four real
+    // rows were found here — `Pop a pushed view`, `Stall detected`, `View refresh
+    // tick` and `cd` / `export` — each declared in C23 §4 and absent from Seam 4
+    // before this rule was written.
+    const violations = checkSeamFour(
+      { C99: FAKE_OWNER },
+      reader(seamDoc([["Command submit", "C99"]]), ownerDoc(["Command submit", "Stall detected"])),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain('"stall detected"');
+    expect(violations[0]?.message).toContain("does not list it");
+    expect(violations[0]?.file, "reported against the table that is missing the row")
+      .toBe(SEAM_FILE);
+  });
+
+  it("SP4: both directions at once produce two findings, not one", () => {
+    // **The control for the pair above, and the mutation pass measured it.**
+    // Implementing SP4 as a subset — dropping the second loop — leaves the first
+    // fabrication *passing*. Only the second direction's fabrication and this
+    // case go red. So one fixture would have shown a green suite over a rule that
+    // checks half of what it claims, which is the vacuity class arriving inside
+    // the check built to close a duplication.
+    const violations = checkSeamFour(
+      { C99: FAKE_OWNER },
+      reader(seamDoc([["Command submit", "C99"], ["Scroll", "C99"]]), ownerDoc(["Command submit", "Stall detected"])),
+    );
+
+    expect(violations).toHaveLength(2);
+    expect(violations.map((v) => v.file).sort()).toEqual([SEAM_FILE, FAKE_OWNER.file].sort());
+  });
+
+  it("SP4 fires: an owner with rows and no orchestration table at all", () => {
+    // C22's real state until SP4 was written: five Seam 4 rows and nothing to
+    // compare them against. Reported once rather than five times — the finding is
+    // the missing section, not each row.
+    const violations = checkSeamFour(
+      { C99: FAKE_OWNER },
+      reader(seamDoc([["Scroll", "C99"], ["Resize", "C99"]]), "### 3c. Nothing here\n\n---\n"),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("declares no orchestration table");
+    expect(violations[0]?.message).toContain("half a table");
+  });
+
+  it("SP4 fires: a Seam 4 table it cannot read reports the failure, not compliance", () => {
+    // **This rule's own vacuity, closed.** A heading that stopped matching yields
+    // no rows, no disagreements and a green run — passing for exactly the reason
+    // it cannot see the thing it was asked about. SS26's failure, which this
+    // family keeps rediscovering, so it is closed at the point of writing.
+    const violations = checkSeamFour(
+      { C99: FAKE_OWNER },
+      reader("### Seam 5 — something else\n\n---\n", ownerDoc(["Scroll"])),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain("could not be read");
+  });
+
+  it("SP4: markdown differences are not architectural differences", () => {
+    // `` `cd` / `export` `` and `cd / export` are one row written by two hands.
+    // Failing on that would make the rule about markdown; failing on "Submit"
+    // against "Command submit" is the point, and that still fails.
+    const violations = checkSeamFour(
+      { C99: FAKE_OWNER },
+      reader(seamDoc([["`cd` / `export`", "C99"]]), ownerDoc(["cd / export"])),
+    );
+    expect(violations, "backticks and emphasis are noise").toEqual([]);
+
+    const renamed = checkSeamFour(
+      { C99: FAKE_OWNER },
+      reader(seamDoc([["Command submit", "C99"]]), ownerDoc(["Submit"])),
+    );
+    expect(renamed, "two names for one row is drift, and is caught").toHaveLength(2);
   });
 });
