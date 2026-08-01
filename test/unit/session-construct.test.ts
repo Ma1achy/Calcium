@@ -16,15 +16,12 @@ import { constructGraph, STEPS, type FrameQueries } from "../../src/shell/constr
 import type { FileSystem, Pipeline, PipelineDeps, TuiConfig } from "../../src/shell/types.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { fakeStdout } from "../support/fake-terminal.js";
+// The parsed one, shared: a second hand-built copy is a second thing that can
+// drift from what `parseManifest` produces, and that drift is what the
+// framework-verb check now refuses.
+import { MANIFEST } from "../support/session.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
-
-const MANIFEST = {
-  schema: "tui.manifest/1",
-  binary: "prism",
-  version: "1.0.0",
-  tools: [],
-} as unknown as TuiConfig["manifest"];
 
 function fakeFs(): FileSystem {
   const files = new Map<string, string>();
@@ -341,6 +338,43 @@ describe("C22 §3 — construction order", () => {
       expect(typeof deps.transport.for, "and it routes by verb").toBe("function");
       expect(deps.transport.busy).toBe(false);
     });
+  });
+
+  it("T1.4d (I22): a config with no `pipeline` still gets one, and it is sealed", async () => {
+    // **The default, asserted.** `resolveConfig` passed `pipeline` through
+    // undefined and `constructGraph` answered `null`, so a production
+    // `createTui` built a shell whose submit handler was `pipeline?.submit(…)`
+    // — a no-op. Nothing failed, because only the tests ever supplied one.
+    const { graph } = await build();
+
+    expect(graph.pipeline, "a real C23, not null").not.toBeNull();
+    expect(typeof graph.pipeline.submit).toBe("function");
+    expect(graph.pipeline.sealed, "and step 10's seal ran on it (I3)").toBe(true);
+
+    // The injection point still injects, or the default has replaced the seam
+    // rather than filled it (C22 I22).
+    const injected = { seal: () => undefined, sealed: true } as unknown as Pipeline;
+    const { graph: withOwn } = await build({ pipeline: () => injected });
+    expect(withOwn.pipeline).toBe(injected);
+  });
+
+  it("T1.4e (I23): a hand-built Manifest is refused, naming the verbs it lacks", async () => {
+    // `parseManifest` is the only thing that appends `tui-kit`'s six (C05 §3),
+    // so an object satisfying the type is one nobody parsed — and C23 registers
+    // their handlers regardless, leaving `/help` installed and unclassifiable.
+    const handBuilt = {
+      schema: "tui.manifest/1",
+      binary: "prism",
+      version: "1.0.0",
+      tools: [],
+    } as unknown as TuiConfig["manifest"];
+
+    await expect(build({ manifest: handBuilt })).rejects.toThrow(
+      /missing tui-kit's own verbs \(help, clear, theme, history, debug, exit\)/,
+    );
+
+    // And the parsed one is accepted, or the check is refusing everything.
+    await expect(build()).resolves.toBeDefined();
   });
 
   it("an app-supplied transport is passed through untouched", () => {

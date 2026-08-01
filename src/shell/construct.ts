@@ -26,6 +26,7 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { createManifestStore, parseManifest } from "../data/manifest/index.js";
+import { FRAMEWORK_NAMES } from "../data/manifest/framework.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
   createTransport,
@@ -140,7 +141,7 @@ export type Graph = Readonly<{
   lifecycle: TerminalLifecycle;
   scheduler: ReturnType<typeof createFrameScheduler>;
   router: ReturnType<typeof createRouter>;
-  pipeline: Pipeline | null;
+  pipeline: Pipeline;
   session: SessionStore;
   log: readonly Step[];
 }>;
@@ -193,6 +194,31 @@ export async function constructGraph(
         ? parseManifest(await config.fs.readFile(config.manifest))
         : { ok: true as const, value: config.manifest };
     if (!parsed.ok) throw new ConstructionError("registries", parsed.error);
+
+    // **A `Manifest` handed over as an object is one nobody parsed** (C22 §3a).
+    // `parseManifest` appends `tui-kit`'s six verbs and is the only thing that
+    // does (C05 §3), so an object literal satisfying the type reaches here
+    // without them — and C23 registers their handlers regardless, so `/help`
+    // and `/clear` are installed and unclassifiable.
+    //
+    // C23 I27's reconciliation is what reports it, and it reported it only once
+    // `pipeline` had a default: until then the graph's pipeline was `null` and
+    // the two records were never compared. Checked here as well as there
+    // because the message from a registry mismatch names the symptom and this
+    // one names the cause.
+    const missing = FRAMEWORK_NAMES.filter(
+      (name) => !parsed.value.tools.some((t) => t.name === name),
+    );
+    if (missing.length > 0) {
+      throw new ConstructionError(
+        "registries",
+        new Error(
+          `the manifest is missing tui-kit's own verbs (${missing.join(", ")}) — ` +
+            `pass the raw document, or the result of parseManifest, rather than a hand-built Manifest`,
+        ),
+      );
+    }
+
     manifest.load(parsed.value);
 
     const completion = createEngine({ now: config.clock });
@@ -349,7 +375,6 @@ export async function constructGraph(
   // Takes the router, because C23's submit row ends `resetFocus()` (Seam 4).
   // Seals its own registry here, which is I3's fifth.
   const pipeline = at("pipeline", () => {
-    if (config.pipeline === undefined) return null;
     const p = config.pipeline({
       // A function, not a snapshot: the store freezes a fresh object per write,
       // so a value captured here could never show `stopping` and C23 I12 would

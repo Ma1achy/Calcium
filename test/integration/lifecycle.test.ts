@@ -13,6 +13,7 @@ import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import type { FrameScheduler } from "../../src/terminal/frame-scheduler.js";
+import { createProcessRunner } from "../../src/data/process/runner.js";
 import { fakeStdin, fakeStdout, MODES } from "../support/fake-terminal.js";
 
 const live: TerminalLifecycle[] = [];
@@ -160,9 +161,44 @@ describe("C01 integration", () => {
       expect(render.mock.calls.length, phase).toBe(drawn);
     }
   });
-  it.todo(
-    "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on C23 — the Seam 4 row has no trigger: nothing decides which commands take a handoff (C23 §4)",
-  );
+  it("T4.4 (with C21): the child gets an un-raw stdin on the primary screen", async () => {
+    // A02 Seam 4's TTY row from C01's side. C21 T4.5 asserts the *order* of the
+    // four calls through C23; what this asserts is the terminal state at the
+    // moment the child starts, which is the half a call-order spy cannot see.
+    const stdout = fakeStdout();
+    const stdin = fakeStdin();
+    const lifecycle = createTerminalLifecycle({
+      stdout,
+      stdin,
+      capabilities: detectCapabilities({ TERM: "xterm-256color" }).capabilities,
+      onFatal: ((err: unknown) => {
+        throw err;
+      }) as (err: unknown) => never,
+    });
+    live.push(lifecycle);
+    const runner = createProcessRunner({ env: process.env, stdin });
+
+    lifecycle.acquire();
+    expect(stdin.rawModeCalls.at(-1), "acquired means raw").toBe(true);
+    expect(stdout.output).toContain(MODES.altScreenOn);
+
+    lifecycle.suspend();
+
+    // **The two things a child expects, and the ones C21 cannot check.** C21 §5
+    // probes `stdin.isRaw` and throws if the caller skipped `suspend()`; it
+    // cannot import C01, so it cannot see the screen at all.
+    expect(stdin.rawModeCalls.at(-1), "a child that expects a cooked terminal").toBe(false);
+    expect(stdout.output.endsWith(MODES.altScreenOff), "on the primary screen").toBe(true);
+
+    // And the guard does not fire on this path, which is the negative half of
+    // C21 T3.8 — `handoff` resolving is the proof, since the guard rejects.
+    const exit = await runner.handoff(["true"], { cwd: () => process.cwd() });
+    expect(exit.code, "the child ran rather than being refused").toBe(0);
+
+    lifecycle.resume();
+    expect(stdin.rawModeCalls.at(-1), "and the terminal comes back raw").toBe(true);
+    expect(stdout.output).toContain(MODES.altScreenOn);
+  });
   it("T4.5 (with C22): handlers, then acquire, then paint — asserted as a sequence", async () => {
     // A02 §3's 6 → 7 → 8, which is C22 §3's step 7 → acquire → first commit.
     // **Asserted as an order, not as three facts**: each step happening is true

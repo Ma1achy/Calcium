@@ -27,6 +27,7 @@ import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import type { ViewDocument } from "../../src/data/viewmodel/index.js";
 import type { HistoryEntry } from "../../src/interaction/history/types.js";
+import type { Exit } from "../../src/data/process/types.js";
 
 export type PipelineScript = Readonly<{
   invoke?: () => Promise<RawResult>;
@@ -39,6 +40,8 @@ export type PipelineScript = Readonly<{
   };
   history?: readonly HistoryEntry[];
   theme?: ThemeStore;
+  /** For the handoff rows: reject to reach C23 §8a A6.5's throw path. */
+  handoff?: (argv: readonly string[]) => Promise<Exit>;
 }>;
 
 export type PipelineHarness = Readonly<{
@@ -52,6 +55,10 @@ export type PipelineHarness = Readonly<{
   calls: string[];
   /** Shell commands actually spawned, for the `cd` rows. */
   spawned: { command: string; cwd: string }[];
+  /** Each argv `runner.handoff` was given, for A02 Seam 4's TTY row. */
+  handed: string[][];
+  /** `suspend` / `resume`, interleaved into `calls` and also counted here. */
+  lifecycle: string[];
   tick: (ms: number) => void;
 }>;
 
@@ -71,6 +78,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const commits: string[] = [];
   const calls: string[] = [];
   const spawned: { command: string; cwd: string }[] = [];
+  const handed: string[][] = [];
+  const lifecycleCalls: string[] = [];
   const timers: (() => void)[] = [];
   let now = 0;
 
@@ -128,13 +137,34 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
         )(command);
       },
       spawn: () => undefined,
-      handoff: () => undefined,
+      // **Recorded, not stubbed** (`test/support/README.md`: a fake is shown to
+      // respond to the thing under test before it is asserted against). As a
+      // no-op it satisfied the type and made every handoff assertion vacuous.
+      handoff: async (argv: readonly string[]) => {
+        calls.push("handoff");
+        handed.push([...argv]);
+        return script.handoff === undefined
+          ? { code: 0, signal: null }
+          : await script.handoff(argv);
+      },
       live: [],
       killAll: async () => {
         calls.push("killAll");
       },
     },
-    lifecycle: { size: () => ({ columns: 80, rows: 24 }) },
+    lifecycle: {
+      size: () => ({ columns: 80, rows: 24 }),
+      // Into `calls` as well as their own list, because the row's claim is an
+      // *order* across three collaborators and one list is what can show it.
+      suspend: () => {
+        calls.push("suspend");
+        lifecycleCalls.push("suspend");
+      },
+      resume: () => {
+        calls.push("resume");
+        lifecycleCalls.push("resume");
+      },
+    },
     resetFocus: () => void calls.push("resetFocus"),
     stop: async () => {
       calls.push("stop");
@@ -167,6 +197,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     commits,
     calls,
     spawned,
+    handed,
+    lifecycle: lifecycleCalls,
     tick: (ms) => {
       now += ms;
       for (const fn of [...timers]) fn();

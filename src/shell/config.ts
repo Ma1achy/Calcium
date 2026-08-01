@@ -14,6 +14,7 @@
 
 import { createFallbackAdapter } from "../data/adapters/index.js";
 import { slashPolicy } from "../interaction/parser/index.js";
+import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 
@@ -124,6 +125,12 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     cluster: config.cluster ?? "",
     version: config.version ?? "",
 
-    pipeline: config.pipeline,
+    // **Defaulted, and it was not.** `pipeline: config.pipeline` passed through
+    // undefined, so `constructGraph` returned `pipeline: null` and `submit`
+    // became a no-op: a production `createTui` built a shell that could not
+    // execute anything. The injected factory is C22's test seam (I17's
+    // `config.pipeline`), and a test seam with no default is not a seam — it is
+    // a missing wire that only the tests were holding together.
+    pipeline: config.pipeline ?? createExecutionPipeline,
   });
 }

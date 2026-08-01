@@ -203,11 +203,32 @@ structural rather than documented. Passing the whole `SessionStore` would have p
 `beginStopping` and the identity loop's `refresh` within the pipeline's reach,
 which is the two-writer problem §5 exists to prevent.
 
-**And there was no wiring for a real C23 at all.** `resolveConfig` passed
+**And there was no wiring for a real C23 at all** (I22). `resolveConfig` passed
 `pipeline` through undefaulted, so `constructGraph` returned `pipeline: null` in
 production: the injected factory is a test seam that was never given a default.
 That is worse than a narrow seam, and it is why this is recorded as a correction
 to what C22 already committed to supply rather than as a widening.
+`resolveConfig` now defaults it to `createExecutionPipeline`, `config.pipeline`
+stays the injection point, and `Graph.pipeline` is a `Pipeline` rather than a
+`Pipeline | null` — the `?.` at the submit handler was the shape that made the
+missing wire look intentional.
+
+**The default is what found the next one, and that is the argument for it.** A
+`Manifest` reaches `createTui` as an object, and `parseManifest` is the only
+thing that appends `tui-kit`'s six verbs (C05 §3) — so a hand-built manifest
+satisfying the type arrives without them, while C23 registers their handlers
+regardless. `/help` and `/clear` are then installed and unclassifiable, which is
+exactly what C23 I27's reconciliation reports. **It could not report it while
+`pipeline` was `null`**, because the two records were never compared: the seam
+with no default was also hiding the defect that the seam's own consumer exists to
+catch.
+
+Construction refuses that manifest by name (I23) rather than appending the six
+here. Appending would put a second producer beside `parseManifest` and make
+`appTools` wrong, and C05 §3's whole argument is that a `parseManifest` returning
+something not yet a manifest is the seam-shaped defect — *valid at one call site
+and incomplete at another*. This is that defect arriving through the object
+literal rather than through the function.
 
 **And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
 
@@ -468,12 +489,14 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I19** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
 - **I20** — `tui-kit` reads no environment, variable or record. `PRISM_TUI_STATE_DIR` arrives as `TuiConfig.stateDir`, `PRISM_TUI_TRANSPORT` as `TuiConfig.transport` (C06 I18), and the process environment itself as `TuiConfig.env`, which C22 hands to C02 and C21. A03 SS10's allow-list names one file and that file does not use it — no module under `src/` touches `process.env`.
 - **I21** — `beforeRelease` is synchronous and returns `undefined`, never a thenable. `killAll()`'s promise is deliberately not awaited: its signals are delivered synchronously and only the reaping is deferred, and awaiting it would make the handler `async`, which C01 I5 forbids because a signal handler cannot await.
+- **I22** — `pipeline` has a working default, as every other optional field does (I17). `config.pipeline` remains the injection point C22's own tests construct a graph through, and a graph always carries a `Pipeline` — an injection seam with no default is a missing wire that only the tests hold together.
+- **I23** — A `Manifest` reaching construction carries `tui-kit`'s own six verbs, or construction fails naming them. `parseManifest` is the only thing that appends them (C05 §3); an object satisfying the type is one nobody parsed, and C23 would register handlers for verbs nothing can classify to.
 
 ---
 
 ## 11. Commitments
 
-1. Four required config fields; every other has a working default (I17).
+1. Four required config fields; every other has a working default, `pipeline` included (I17, I22).
 2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.prism` and the **app's entry point** resolves `PRISM_TUI_STATE_DIR` (I10, I20).
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
 3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
@@ -505,6 +528,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
 - **T1.4** (I3): all four seals are closed before the input router accepts anything — C05's, C07's and C09's, and C23's local registry, which is the one a test counting only the construction-time ones would miss. C19's engine has no `seal`, and the test asserts that too: a count is the wrong assertion when one member of the set does not belong to it.
 - **T1.4b** (I3, commitment 3a): the submit handler is registered after the pipeline exists, and the pipeline holds the router. Asserted on the event log: no handler registration precedes step 10. The construction cycle §3a found fails here rather than at the first Enter.
+- **T1.4d** (I22): a config omitting `pipeline` still yields a graph carrying a sealed `Pipeline`, and an injected factory is still used. Both halves, because a default that ignored `config.pipeline` would satisfy the first and remove the seam.
+- **T1.4e** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
 - **T1.6** (I10): a fake clock and filesystem reach every component that takes one — asserted per component.
 - **T1.7** (I5): on every exit path, `killAll` and `drain` each run **exactly once** — the double-flush regression, tested directly.
