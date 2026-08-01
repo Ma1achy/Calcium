@@ -256,6 +256,6 @@ describe("C02 integration", () => {
     expect(wrapped).toContain(MODES.syncOff);
   });
   it.todo(
-    "T4.7: altScreen:false → the shell prints help and exits 0 without acquiring anything — waits on L4",
+    "T4.7: altScreen:false → the shell prints help and exits 0 without acquiring anything — waits on C22 — the non-TTY gate is §4 step 1 and `createTui` does not perform it",
   );
 });

@@ -262,5 +262,5 @@ it("T4.6 (with C20, I2, I3): navigation replaces the buffer and the draft return
   expect(store.previous(e.text)).toBe("/logs digit-42");
 });
 it.todo(
-  "T4.7: the prompt's rendered height equals displayRows, asserted on the frame rather than the editor — waits on L4",
+  "T4.7: the prompt's rendered height equals displayRows, asserted on the frame rather than the editor — waits on C22 — the frame is `src/shell/frame.ts`, not the pipeline",
 );

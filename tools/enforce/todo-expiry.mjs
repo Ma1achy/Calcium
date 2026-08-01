@@ -454,7 +454,28 @@ export function backlogKey(violation) {
  * from nothing and every entry costs a sentence.
  */
 export const ACKNOWLEDGED_BACKLOG = Object.freeze([
-  // Empty, and it has been non-empty exactly once. C22's paint path put two
+  /**
+   * **The four rows waiting on a feature of a component that exists.**
+   *
+   * TD's model is *waits on a component*, and these wait on work inside one that
+   * is already built — theme persistence and the non-TTY gate, both C22's, both
+   * unbuilt (C22 §12a). Naming C22 expires them the moment it is read, because
+   * C22 exists; naming C23 was the lie the C23 triage found. There is no third
+   * id to name, so this is the list doing the job it exists for.
+   *
+   * Not a widening. Each cost a sentence, each names an assigned owner, and TD0
+   * compares by equality — so the day C22 §12a is built, removing them is
+   * forced rather than remembered.
+   *
+   *   C10 T4.5, T4.6   theme persistence: nothing writes a theme choice to
+   *                    disk and §2 has no field for one
+   *   C02 T4.7         the non-TTY gate, §4 step 1, which `createTui` does not
+   *                    perform
+   *   C17 T4.7         the prompt's height on the frame, which is `frame.ts`
+   */
+  "TD2 src/shell/session.ts (4)",
+
+  // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two
   // deferrals here — S01 §2's illustrated rows and C03 T5.4's edge drag — and
   // both are gone: T5.4 moved to C24, which is what a PTY needs to drive a
   // session, and S01 §2 became writable when the figure was ruled a diagram.

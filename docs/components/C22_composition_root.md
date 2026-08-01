@@ -611,6 +611,20 @@ PTY harness.
 
 ---
 
+## 12a. Unowned and unbuilt: theme persistence
+
+**`/theme light` does not survive a restart, and no component's spec claims the job.**
+
+C10 T4.5 and T4.6 have asserted it since C10, deferred on `L4` — waiting four layers on work that was never assigned. Nothing in the tree writes a theme choice to disk, and §2's config has no field for one. That is different from an unbuilt component: a deferral naming C23 was waiting for something scheduled, and these were waiting for something nobody had agreed to do.
+
+**It is C22's, and it is small.** C22 already owns `stateDir`, already resolves config at construction, and already holds the theme store. Persisting one value is C20's shape — a store with a file behind it — with one field and no format question worth having.
+
+**It is not C23's branch's work.** C23 is the last component and its branch already carries the largest expiry in the project; adding an unspecified feature to turn two deferrals green is scope creep with a green suite as its justification. The two rows now name **C22** and say the feature does not exist, which leaves them findable rather than silently waiting — the shape `PENDING_RULES` uses: named, assigned, and failing the day someone claims it is done.
+
+Recorded here rather than in a note, because the last three things handed over as notes were never landed (`docs/notes/`, third instance).
+
+---
+
 ## 13. Out of scope
 
 | Not here | Where |

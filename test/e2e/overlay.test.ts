@@ -132,6 +132,11 @@ describe("C15 e2e — layers under real input", () => {
     "T5.4: resizing with three layers open — all reposition, none escapes the region, no blank frames — waits on L4",
   );
   it.todo(
-    "T5.5: esc from the logs view — the view pops, a one-line trace appears, focus returns to the live block — waits on L4",
+    // **The trace was ruled out, not deferred.** S12 §3 records it: an earlier
+    // draft had C23 write `logs a3f9b21 — 1,284 lines … (esc 14:24:08)` and it
+    // could not be built — the trace is an entry, an entry freezes its
+    // predecessor, and the frozen block is the one A01 D7 returns focus to.
+    // C23 §4's pop row is the ruling, so the row asserts what remains true.
+    "T5.5: esc from the logs view — the view pops, nothing is appended, and focus returns to the live block — waits on C24 — a PTY needs a binary to drive",
   );
 });

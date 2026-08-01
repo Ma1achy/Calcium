@@ -104,8 +104,8 @@ describe("C10 integration", () => {
     direct.theme.setVariant("light");
     expect(direct.calls, "C10 never invalidates").not.toContain("invalidate");
   });
-  it.todo("T4.5 (with L4): /theme light persists to config and survives a restart — waits on L4");
-  it.todo("T4.6 (with L4): a corrupt override in config → base theme retained, notice committed — waits on L4");
+  it.todo("T4.5: /theme light persists to config and survives a restart — waits on C22 — theme persistence is unowned and unbuilt (C22 §2); nothing in the tree writes a theme choice to disk");
+  it.todo("T4.6: a corrupt override in config → base theme retained, notice committed — waits on C22 — the same unowned feature as T4.5; there is no config to corrupt");
 
   it("(with C02): a detected capability record drives the ladder end to end", () => {
     // The half of T4.3 that does not need a renderer: C02 decides the depth from
