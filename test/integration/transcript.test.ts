@@ -5,6 +5,7 @@
 // waits on C16 and on L4 — assertions about focus and about `/clear`, neither of
 // which has a component yet.
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { appendPatch, docOf, tableWithDetails } from "../support/transcript.js";
@@ -134,12 +135,42 @@ describe("C13 integration", () => {
   // T4.6 is resolved from C16's side, against real instances of both components:
   // `test/integration/router.test.ts`. Kept as a pointer rather than duplicated,
   // because the assertion needs a router to ask and this file has none.
-  it.todo(
-    // C20 landed, and its half of this is asserted in test/e2e/history.test.ts:
-    // nothing in `clear()` touches a transcript. What is missing is the command
-    // that drives both, which is the shell's.
-    "T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C23 — `/clear` is a local handler and C23 holds the registry (C23 §2)",
-  );
+  it("T4.7 (with C23, C20): /clear empties the transcript and leaves history intact", async () => {
+    // **The two stores answer different questions** — what is on screen, and
+    // what was typed — and C13 I16 is that clearing one does not clear the
+    // other. Conflating them is how `/clear` destroys work.
+    //
+    // Asserted through the pipeline rather than by calling `clear()`, because
+    // the claim is about the *command*: `/clear` is a local handler and C23
+    // holds the registry, so C13 alone cannot show it.
+    const h = pipelineHarness({
+      history: [
+        { command: "/ps", ts: 1, exitCode: 0 },
+        { command: "/tail", ts: 2, exitCode: 0 },
+      ],
+    });
+
+    h.pipeline.submit("/ps");
+    await settled();
+    expect(h.transcript.entries.length, "something to clear").toBeGreaterThan(0);
+
+    h.pipeline.submit("/clear");
+    await settled();
+
+    // The `/clear` entry itself is what remains: the command ran and said so.
+    expect(
+      h.transcript.entries.map((e) => e.doc.command),
+      "emptied, then its own notice",
+    ).toEqual(["/clear"]);
+
+    h.pipeline.submit("/history");
+    await settled();
+    const listing = h.transcript.entries.at(-1);
+    expect(
+      JSON.stringify(listing?.doc.blocks),
+      "C20 is untouched — both commands are still there",
+    ).toContain("/tail");
+  });
 
   it("T4.10 (C13 §6, C14 I-cache): a shell patch on a settled entry invalidates the cached height", () => {
     // **The case the origin gate creates and nothing else could.** Before it, a

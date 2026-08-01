@@ -4,6 +4,7 @@
 // names its blocker in the greppable form, so `tools/enforce/todo-expiry.mjs`
 // fails the day the blocker lands rather than the day someone remembers.
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { caps, store, TONES } from "../support/theme.js";
@@ -77,7 +78,32 @@ describe("C10 integration", () => {
     }
   });
 
-  it.todo("T4.4 (with C03, L4): a theme switch makes L4 call invalidate, and C10 never does — waits on L4");
+  it("T4.4 (with C03, C23): a theme switch makes L4 call invalidate, and C10 never does", async () => {
+    // **A02 Seam 4's theme row, from C10's side.** `theme.setVariant` →
+    // `scheduler.invalidate`, and the invalidate is L4's: a theme store that
+    // committed its own frame would be L1 reaching into L0.
+    //
+    // Asserted as *both halves* — that L4 invalidated, and that switching the
+    // variant directly does not. Either alone passes on an implementation where
+    // C10 invalidates and C23 does too, which is the two-owners defect Seam 4
+    // exists to prevent.
+    const h = pipelineHarness();
+    const before = h.theme.current.tokens.variant;
+
+    h.pipeline.submit("/theme light");
+    await settled();
+
+    expect(h.theme.current.tokens.variant, "C10 switched").toBe("light");
+    expect(h.calls, "and L4 invalidated").toContain("invalidate");
+    expect(before, "the fixture started somewhere else, so the switch did something").not.toBe(
+      "light",
+    );
+
+    // C10's own path, with no L4 in it.
+    const direct = pipelineHarness();
+    direct.theme.setVariant("light");
+    expect(direct.calls, "C10 never invalidates").not.toContain("invalidate");
+  });
   it.todo("T4.5 (with L4): /theme light persists to config and survives a restart — waits on L4");
   it.todo("T4.6 (with L4): a corrupt override in config → base theme retained, notice committed — waits on L4");
 

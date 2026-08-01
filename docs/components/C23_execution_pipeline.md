@@ -56,8 +56,9 @@ made by accident.
 ### Local handlers
 
 ```typescript
-type LocalHandler = (argv: readonly string[], ctx: LocalContext) =>
+type LocalHandler = (args: readonly string[], ctx: LocalContext) =>
   ViewDocument | Promise<ViewDocument>;
+  // `args` is what follows the verb, not `ParseResult.argv`
 
 interface LocalRegistry {
   register(verb: string, handler: LocalHandler): void;
@@ -68,6 +69,8 @@ interface LocalRegistry {
 `tui-kit` ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
 
 **The six are rows in every manifest (C05 §3), and that is what makes them reachable.** C18 classifies `local` from the manifest, so a handler for a verb the manifest does not declare is one nothing can ever route to — which is exactly what I27's reconciliation reports. Registering the handlers without the rows was tried and failed construction on all six, correctly.
+
+**A handler receives the arguments, not the whole `argv`.** `ParseResult.argv` begins with the verb — `["theme", "light"]` — and a handler knows its own name, so handing it back means every handler indexes from 1 and the one that forgets reads its own verb as an argument. A multi-token verb like `debug dump` turns that off-by-one into an off-by-two, which is the version that survives review. Found by `/theme light` switching to nothing.
 
 A local handler is the only place a component above L0 may reach several stores at once, and it does so through C23 rather than laterally.
 

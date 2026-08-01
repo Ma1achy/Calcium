@@ -582,7 +582,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
 
       case "local":
-        start(line, runLocal(line, result.tool.name, result.argv));
+        start(
+          line,
+          // **The arguments, not the whole argv.** `ParseResult.argv` begins
+          // with the verb — `["theme", "light"]` — and a handler knows its own
+          // name, so passing it back means every handler indexes from 1 and the
+          // one that forgets reads its own verb as an argument. A multi-token
+          // verb (`debug dump`) makes the off-by-one an off-by-two, which is
+          // the version that survives review.
+          runLocal(line, result.tool.name, result.argv.slice(result.tool.name.split(" ").length)),
+        );
         return;
 
       case "app":

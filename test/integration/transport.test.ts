@@ -7,6 +7,7 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import { findTool } from "../../src/data/manifest/index.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
@@ -253,6 +254,52 @@ describe("C06 with C05", () => {
     expect(remainder).toContain("502 Bad Gateway");
     expect(remainder).toContain("</html>");
   });
-  it.todo("T4.5b (with L4): the concurrency refusal surfaces as a notice naming the running verb — waits on L4");
-  it.todo("T4.6 (with L4): a cd built-in followed by a verb → the verb spawns in the new directory — waits on L4, which applies it. C18 classifies it now");
+  it("T4.5b (with C23): the concurrency refusal surfaces as a notice naming the running verb", async () => {
+    // **C06's guard is the backstop; C23's is authoritative** (C23 I5). C06
+    // throws `TransportBusyError` for direct misuse, and a user typing a second
+    // command must never see it — the refusal is a notice in the transcript,
+    // and it names what is running so the answer to "why" is on screen.
+    let release: (() => void) | undefined;
+    const h = pipelineHarness({
+      invoke: () =>
+        new Promise((r) => {
+          release = () => r(result({ exitCode: 0 }));
+        }),
+    });
+
+    h.pipeline.submit("/ps");
+    await new Promise((r) => setTimeout(r, 0));
+    h.pipeline.submit("/tail");
+    await settled();
+
+    const refusal = h.transcript.entries.at(-1);
+    const text = JSON.stringify(refusal?.doc.blocks);
+    expect(text, "it names the verb that is running").toContain("ps");
+    expect(
+      h.calls.filter((c) => c === "invoke"),
+      "and the second never reached the transport, so C06 never threw",
+    ).toHaveLength(1);
+
+    release?.();
+    await settled();
+  });
+  it("T4.6 (with C23): a cd built-in followed by a verb spawns in the new directory", async () => {
+    // **`cwd` is a function, read at spawn** (C21 I10, C22 I12). A value
+    // captured when the transport was built cannot move, and a `cd` between two
+    // verbs has to move the second one — which is invisible in any test that
+    // spawns only once.
+    const h = pipelineHarness();
+
+    h.pipeline.submit("echo before");
+    await settled();
+    h.pipeline.submit("cd /tmp");
+    await settled();
+    h.pipeline.submit("echo after");
+    await settled();
+
+    expect(h.spawned.map((x) => x.cwd), "the cd moved the second, not the first").toEqual([
+      "/work",
+      "/tmp",
+    ]);
+  });
 });

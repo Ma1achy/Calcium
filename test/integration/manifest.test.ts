@@ -6,6 +6,8 @@
 // as an ordinary error document is testable today — and a deferral naming a
 // component that exists is exactly what `tools/enforce/todo-expiry.mjs` fails.
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
+import { visibleTools } from "../../src/data/manifest/index.js";
 import { document, validateDocument, type ErrorLike, type ViewDocument } from "../../src/data/viewmodel/index.js";
 import { findTool, validateInvocation } from "../../src/data/manifest/index.js";
 import { fixture, raw, toolNamed } from "../support/manifest.js";
@@ -145,5 +147,29 @@ describe("C05 integration", () => {
   // routing decision is C06's to be driven by and C05's to supply, and it reads
   // better beside the transport than beside the loader. Named here so the pair
   // is findable from the spec that declares them.
-  it.todo("T4.7: help output is generated wholly from visibleTools — waits on the L4 shell");
+  it("T4.7 (with C23): help output is generated wholly from visibleTools", async () => {
+    // **C23 I26 — from the manifest and the keymap, never a maintained list.**
+    // The claim is `visibleTools`, not `tools`: a hidden verb stays invocable
+    // and leaves the help, which is the pair that field means. `/debug` is the
+    // live case, since the framework marks it hidden (C05 §3).
+    const h = pipelineHarness();
+    h.pipeline.submit("/help");
+    await settled();
+
+    const rendered = JSON.stringify(h.transcript.entries.at(-1)?.doc.blocks);
+    const manifest = fixture();
+
+    for (const t of visibleTools(manifest)) {
+      expect(rendered, `${t.name} is visible and must appear`).toContain(t.name);
+    }
+    const hidden = manifest.tools.filter((t) => t.hidden === true);
+    expect(hidden.length, "the fixture has a hidden verb, or this asserts nothing")
+      .toBeGreaterThan(0);
+    for (const t of hidden) {
+      expect(rendered, `${t.name} is hidden and must not`).not.toContain(`/${t.name}`);
+    }
+
+    // And the keymap half: every binding shown is one C16 will dispatch.
+    expect(rendered, "bindings come from the same table dispatch uses").toContain("c+c");
+  });
 });
