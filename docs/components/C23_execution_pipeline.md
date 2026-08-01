@@ -95,10 +95,12 @@ This is also what distinguishes `/debug` from `{ } json`, which several surfaces
 3  append a pending entry      C13 — the user sees the command immediately
 4  invoke or stream            C06
 5  adapt                       C07
-6  patch or replace the entry  C13
-7  settle                      C13
+6  settle with the document    C13 — steps 6 and 7 are one call on this route
+7  (streaming only) settle     C13 — with whatever accumulated
 8  commit                      C03
 ```
+
+**Steps 6 and 7 collapse on this route, and the step list says so rather than leaving two steps where one runs.** `settle(id, doc)` is the replacement: the adapted document arrives, the entry becomes it, and the entry is done (C13 §`settle`). They separate only for a stream, where patches arrive during and `settle` ends it with what accumulated. This matters beyond tidiness — §8a's trace is indexed against these steps, and a step nothing executes is a row that can never be walked.
 
 ### The submission guard
 
