@@ -28,6 +28,7 @@ import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import { block } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
+import { createActionDispatcher } from "./actions.js";
 import {
   createLocalRegistry,
   reconcile,
@@ -557,8 +558,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
+  /**
+   * C23 I16 — C23 supplies `onAction` and nothing else may.
+   *
+   * Built after `submit` because `exec` re-enters it: an action is a submission
+   * by another route, and giving it a shortcut past the guard would make one
+   * kind of submission exempt from the rule every other kind obeys.
+   */
+  const onAction = createActionDispatcher({
+    transcript: deps.transcript,
+    editor: deps.editor,
+    scheduler: deps.scheduler,
+    openUrl: deps.openUrl,
+    submit: (l) => void submit(l),
+    notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),
+  });
+
   return {
     submit,
+    onAction,
 
     /**
      * C22 I3's fourth seal (§3a step 10), and C23 I27's reconciliation.

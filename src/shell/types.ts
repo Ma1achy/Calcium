@@ -14,7 +14,8 @@ import type { Adapter, AdapterRegistry } from "../data/adapters/index.js";
 import type { Manifest, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
-import type { Block } from "../data/viewmodel/index.js";
+import type { Action, Block } from "../data/viewmodel/index.js";
+import type { EntryId } from "../viewport/transcript/index.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
@@ -128,6 +129,14 @@ export interface Pipeline {
    * app's handlers arrive with the pipeline (C22 I3).
    */
   register(verb: string, handler: LocalHandler): void;
+  /**
+   * C09's `RenderContext.onAction` (C23 §3a, I16).
+   *
+   * **Nothing else may supply it.** An action is a submission by another route,
+   * and routing submissions is what C23 does — a block library dispatching its
+   * own would be L1 causing effects in L2 and L4 at once.
+   */
+  onAction(action: Action, from?: EntryId | null): void;
 }
 
 /** Step 10. Takes the router because C23's submit row ends `resetFocus()`. */

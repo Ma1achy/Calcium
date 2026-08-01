@@ -623,3 +623,98 @@ describe("C23 tier 3 — edges", () => {
     ).toBe(false);
   });
 });
+
+describe("C23 §3a — action dispatch", () => {
+  /** A table entry with one row, live, so actions from it are permitted. */
+  function withTable() {
+    const h = harness();
+    const id = h.transcript.append(
+      doc({
+        command: "/ps",
+        blocks: [
+          {
+            kind: "table",
+            id: "t1",
+            columns: [
+              { key: "name", label: "Name", align: "left", priority: 10, minWidth: 8, sortable: true },
+            ],
+            rows: [{ id: "r1", cells: { name: { text: "one" } } }],
+          },
+        ],
+      }),
+    );
+    // **Asserted before it is used**, per test/support/README.md: an invalid
+    // table makes `append` throw, `id` undefined, and every action read as
+    // fired from a frozen entry — which is how the first run of these four
+    // tests failed for a reason that had nothing to do with actions.
+    expect(h.transcript.entries, "the fixture appended").toHaveLength(1);
+    expect(h.transcript.liveId, "and it is live, so actions from it are permitted").toBe(id);
+    return { ...h, id };
+  }
+
+  it("T1.15 (I17): only http and https reach the opener", async () => {
+    // **The security surface.** A URL from a far-side envelope is untrusted, and
+    // the check is here rather than in the opener because C22's opener is
+    // replaceable — an app supplying its own must not be the thing standing
+    // between `javascript:` and the OS handler.
+    //
+    // **One action per harness, deliberately.** A refusal is an append and an
+    // append freezes the live entry (C13 §4), so a second action fired from the
+    // same block is refused as *frozen* rather than for its own reason — the
+    // hazard C23 §4's pop row already rules against, arriving on this path and
+    // unresolved. Batching them here would have baked that in as expected.
+    for (const [url, why] of [
+      ["file:///etc/passwd", /refusing to open/],
+      ["javascript:alert(1)", /refusing to open/],
+      ["data:text/html,<script>", /refusing to open/],
+      ["not a url at all", /is not a URL/],
+    ] as const) {
+      const h = withTable();
+      h.pipeline.onAction({ kind: "open", label: "x", url }, h.id);
+      await settled();
+
+      expect(
+        h.transcript.entries.some((e) =>
+          e.doc.blocks.some((b) => b.kind === "notice" && why.test(b.text)),
+        ),
+        url,
+      ).toBe(true);
+    }
+
+    // And the one that is allowed reaches the opener rather than a refusal.
+    const ok = withTable();
+    ok.pipeline.onAction({ kind: "open", label: "docs", url: "https://example.com/" }, ok.id);
+    await settled();
+    expect(
+      ok.transcript.entries.some((e) =>
+        e.doc.blocks.some((b) => b.kind === "notice" && /refusing|not a URL/.test(b.text)),
+      ),
+      "https is not refused",
+    ).toBe(false);
+  });
+
+
+
+  it("T1.18 (I16): exec re-enters §2 and is indistinguishable from typing", async () => {
+    // Not a shortcut past the guard: same routes, same refusal, same entry.
+    const h = withTable();
+    h.pipeline.onAction({ kind: "exec", label: "run", command: "/ps" }, h.id);
+    await settled();
+
+    expect(h.calls, "it went through the app route").toContain("invoke");
+  });
+
+
+  it("T1.14c: an expand naming no row says so rather than doing nothing", () => {
+    // An action that silently does nothing is indistinguishable from one that
+    // worked, which is the failure this whole component is shaped against.
+    const h = withTable();
+    h.pipeline.onAction({ kind: "expand", label: "e", target: "nosuch" }, h.id);
+
+    expect(
+      h.transcript.entries.some((e) =>
+        e.doc.blocks.some((b) => b.kind === "notice" && /nothing to expand/.test(b.text)),
+      ),
+    ).toBe(true);
+  });
+});

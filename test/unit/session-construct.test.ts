@@ -181,6 +181,7 @@ describe("C22 §3 — construction order", () => {
         inFlight: null,
         cancel: () => undefined,
         register: () => undefined,
+        onAction: () => undefined,
       };
     };
 
@@ -290,6 +291,7 @@ describe("C22 §3 — construction order", () => {
             inFlight: null,
             cancel: () => undefined,
             register: () => undefined,
+            onAction: () => undefined,
           };
         },
       },
@@ -423,6 +425,7 @@ describe("C22 §3 — construction order", () => {
         },
         cancel: () => void (cancelled += 1),
         register: () => undefined,
+        onAction: () => undefined,
       }),
     });
 
