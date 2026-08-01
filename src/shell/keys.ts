@@ -200,6 +200,29 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const entry = deps.history.next();
       if (entry !== null) deps.editor.setText(entry);
     },
+    // --- C17 -----------------------------------------------------------
+    //
+    // **One C17 operation each** (C16 I21). The union is derived from the
+    // editor's surface, so these are a transcription rather than a design: an
+    // action with no method does not compile, and T2.14 fails on a method with
+    // no action.
+    backspace: () => void deps.editor.deleteBackward(),
+    delete: () => void deps.editor.deleteForward(),
+    killWordLeft: () => void deps.editor.killTo("wordLeft"),
+    killWordRight: () => void deps.editor.killTo("wordRight"),
+    killToStart: () => void deps.editor.killTo("lineStart"),
+    killToEnd: () => void deps.editor.killTo("lineEnd"),
+    yank: () => void deps.editor.yank(),
+    // Bound to nothing today: `⌃_` and `⌃⇧-` are the same byte and the decoder
+    // does not name it. Present because C17's methods are (I21).
+    undo: () => void deps.editor.undo(),
+    redo: () => void deps.editor.redo(),
+    wordLeft: () => void deps.editor.move("wordLeft"),
+    wordRight: () => void deps.editor.move("wordRight"),
+    home: () => void deps.editor.move("lineStart"),
+    end: () => void deps.editor.move("lineEnd"),
+    left: () => void deps.editor.move("charLeft"),
+
     reverseSearch: () => {
       deps.history.searchOpen(deps.editor.text);
       deps.overlays.push(deps.history.searchLayer(deps.anchor()));

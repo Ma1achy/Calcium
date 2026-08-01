@@ -77,13 +77,22 @@ export interface Keymap {
 /**
  * The default table (§6), seeded rather than filled.
  *
- * **Three rows, and the emptiness of the rest is honest.** C17's newline
- * bindings are the only prompt keys any landed spec names: C17 §4 states all
- * three and I12 requires that at least two work on a terminal that cannot
- * distinguish Shift-Enter. Nothing in the tree names Ctrl-K, Ctrl-W, Ctrl-A or
- * any other editing key, so writing them here would be inventing a contract in
- * the file that is supposed to *hold* one — and `/help` renders from this table,
- * which would publish the invention as documentation.
+ * **It was seeded with three rows and the emptiness was called honest**, on the
+ * grounds that C17's newline bindings were the only prompt keys any landed spec
+ * named and that writing Ctrl-K or Ctrl-W here would invent a contract in the
+ * file that is supposed to hold one. That was right about the reasoning and
+ * wrong about the consequence, and the consequence stood for four components:
+ * **backspace did nothing at a real prompt.** C17 implemented word motion, kill,
+ * yank and undo, C22's effect table was total over the action union, and the
+ * union had no editing action in it — every mechanism satisfied and the
+ * vocabulary they were total over incomplete.
+ *
+ * The remedy was not to invent a contract but to notice the one already here:
+ * **C17's public surface is the vocabulary** (C16 I21), so the union is derived
+ * from the interface and the bindings are readline's — what a terminal user
+ * already knows rather than a scheme this file chose. Each was pressed through
+ * the real decoder before being written down (I17), and the one candidate the
+ * decoder cannot produce is absent rather than approximated.
  *
  * C18, C19 and C20 add their rows when they land. A collision is a construction
  * error rather than last-wins (I10), so a later addition that shadows one of
@@ -151,6 +160,46 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // layer is on top — the handler reads `overlays.top`, which is L4's to do and
   // is why C20 adds no fourth row here.
   { target: "overlay", key: { name: "r", ctrl: true }, action: "searchOlder" },
+
+  // --- C17, readline's set and no more (I21, C16 §6) -----------------------
+  //
+  // **Every one of these was pressed through the real decoder before it was
+  // written here** (I17, T2.13b), which is what the rule is for: a binding the
+  // decoder cannot reach is a row `/help` renders and nothing dispatches. The
+  // meta forms are the ones most likely not to survive that — `⌥⌫`, `⌥d`,
+  // `⌥b`, `⌥f` — and all four do, arriving as the unmodified name with `meta`.
+  //
+  // **One candidate did not survive and is absent rather than approximated.**
+  // `⌃_` and `⌃⇧-` are the same byte, 0x1f; the decoder maps 0x01 to 0x1a and
+  // stops, so it emits a keyless raw name. `undo` and `redo` are actions with
+  // no binding until a key the decoder produces is chosen for them.
+  //
+  // **`→` is deliberately not here.** It is already `acceptGhostOrForward`,
+  // which moves a character right when there is no ghost, so a second row would
+  // be the duplicate `(target, key)` construction error below.
+  { target: "prompt", key: { name: "backspace" }, action: "backspace" },
+  { target: "prompt", key: { name: "h", ctrl: true }, action: "backspace" },
+  { target: "prompt", key: { name: "delete" }, action: "delete" },
+
+  // Both traditions for word-delete-left, because they are distinct wire forms
+  // and no other binding wants either.
+  { target: "prompt", key: { name: "w", ctrl: true }, action: "killWordLeft" },
+  { target: "prompt", key: { name: "backspace", meta: true }, action: "killWordLeft" },
+  { target: "prompt", key: { name: "d", meta: true }, action: "killWordRight" },
+  { target: "prompt", key: { name: "u", ctrl: true }, action: "killToStart" },
+  { target: "prompt", key: { name: "k", ctrl: true }, action: "killToEnd" },
+  { target: "prompt", key: { name: "y", ctrl: true }, action: "yank" },
+
+  { target: "prompt", key: { name: "a", ctrl: true }, action: "home" },
+  { target: "prompt", key: { name: "home" }, action: "home" },
+  { target: "prompt", key: { name: "e", ctrl: true }, action: "end" },
+  { target: "prompt", key: { name: "end" }, action: "end" },
+
+  { target: "prompt", key: { name: "b", meta: true }, action: "wordLeft" },
+  { target: "prompt", key: { name: "left", ctrl: true }, action: "wordLeft" },
+  { target: "prompt", key: { name: "f", meta: true }, action: "wordRight" },
+  { target: "prompt", key: { name: "right", ctrl: true }, action: "wordRight" },
+  { target: "prompt", key: { name: "left" }, action: "left" },
 ];
 
 /**

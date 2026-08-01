@@ -75,7 +75,34 @@ export type KeyAction =
   | "historyPrev"
   | "historyNext"
   | "reverseSearch"
-  | "searchOlder";
+  | "searchOlder"
+  // --- C17, and the vocabulary is C17's own surface (I21) ------------------
+  //
+  // Every editing operation the editor exposes has an action here and every
+  // action names exactly one of them, so the union is derivable from the
+  // interface rather than maintained beside it. Until these existed the prompt
+  // had eight bindings and none of them edited: the effect table was total, the
+  // union was incomplete, and backspace did nothing at a real prompt.
+  //
+  // **`undo` and `redo` are here and are not bound.** `⌃_` and `⌃⇧-` are the
+  // same byte, 0x1f, and the decoder maps 0x01 to 0x1a and stops — so no key
+  // readline uses for undo reaches the router. The actions exist because C17's
+  // methods do (I21); the binding waits for a key the decoder produces, rather
+  // than the decoder being widened to reach a binding.
+  | "backspace"
+  | "delete"
+  | "killWordLeft"
+  | "killWordRight"
+  | "killToStart"
+  | "killToEnd"
+  | "yank"
+  | "undo"
+  | "redo"
+  | "wordLeft"
+  | "wordRight"
+  | "home"
+  | "end"
+  | "left";
 
 export type Binding = Readonly<{
   target: FocusTarget;

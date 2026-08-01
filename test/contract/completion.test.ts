@@ -258,9 +258,20 @@ describe("C19 §2, §6 — the contract surface", () => {
     const actions = defaultKeymap.map((b) => `${b.target}:${b.key.name}`);
     expect(actions).toContain("prompt:tab");
     expect(actions).toContain("overlay:escape");
-    // One action for `→`, not two: a second row would be the KeymapError above.
-    expect(defaultKeymap.filter((b) => b.target === "prompt" && b.key.name === "right")).toHaveLength(
-      1,
-    );
+    // One action for the **bare** `→`, not two: a second row would be the
+    // KeymapError above. Modifiers are part of a slot's identity, which is why
+    // `⌃→` sits beside it as `wordRight` without colliding (C16 §6, C16 I21) — and
+    // this filter ignored them until that binding existed, so it counted two
+    // and failed on a table that is correct.
+    expect(
+      defaultKeymap.filter(
+        (b) =>
+          b.target === "prompt" &&
+          b.key.name === "right" &&
+          b.key.ctrl !== true &&
+          b.key.meta !== true &&
+          b.key.shift !== true,
+      ),
+    ).toHaveLength(1);
   });
 });

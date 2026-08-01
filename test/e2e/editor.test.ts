@@ -26,26 +26,39 @@ const session = (cols = 100, rows = 24): InteractivePty =>
   interactivePty("node test/support/fixture.mjs session", { cols, rows });
 
 describe("C17 tier 5 — at a real prompt", () => {
-  it.todo(
-    // **`defaultKeymap` binds no editing key at all**, and this row is what
-    // found it. The prompt target has eight bindings — three newlines, Tab,
-    // right-for-ghost, history up and down, and reverse search — and not one of
-    // them edits. C17 implements word motion, kill, undo and redo in full, C22
-    // step 11's table is total over C16's action union, and the union simply
-    // has no editing action in it: the anti-drift mechanism is satisfied and
-    // the vocabulary it is total over is incomplete. A03 §2's vacuity class one
-    // level up.
-    //
-    // **Backspace does nothing at a real prompt**, which is the plainest
-    // statement of it. Typing works, Enter works, and a typo cannot be
-    // corrected.
-    //
-    // Which keys bind to which motions is a decision — a readline subset is the
-    // obvious answer and "obvious" is what put fourteen unexecuted bindings in
-    // this file once already — so the row waits on that ruling rather than
-    // inventing one.
-    "T5.1: typing, correcting with word motions, and submitting a long flagged command — needs an editing keymap: `defaultKeymap` binds no editing key, so backspace and the word motions are unreachable from the keyboard",
-  );
+  it("T5.1: typing, correcting with word motions, and submitting a long flagged command", async () => {
+    // **This row is what found that `defaultKeymap` bound no editing key at
+    // all** — backspace did nothing at a real prompt, while C17 implemented
+    // word motion, kill, yank and undo in full and every mechanism in the chain
+    // passed. C16 I21 made C17's surface the vocabulary; this is the first row
+    // to press one of the results.
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      pty.type("/ps --status=running --limit=20 --mine");
+      await pty.waitFor(/--mine/, 15_000);
+
+      // A word motion, not a run of backspaces: `⌃w` reaches C17's
+      // `killTo("wordLeft")` through the decoder rather than through a method
+      // call, which is the half a unit test of the editor cannot see.
+      // **`waitForFrame`, not `waitFor`.** The stream already holds every
+      // pattern this row could wait on, so a stream match resolves before the
+      // frame it is about has been written — which is how the first draft
+      // concluded `⌃w` was broken when it was not.
+      pty.type("\u0017");
+      await pty.waitForFrame((f) => !f.join("").includes("--mine"), 15_000);
+      expect(pty.frame.join("\n"), "the word is gone from the screen").toContain("--limit=20");
+
+      // And put back by hand, then submitted — so the row ends where it began
+      // and the correction is the thing under test rather than the typing.
+      pty.type("--mine\r");
+      await pty.waitFor(/--mine/, 15_000);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
+
 
   it("T5.2: pasting a 200-line block → the prompt grows, the viewport shrinks, and submission sends one command", async () => {
     const pty = session();
@@ -92,15 +105,26 @@ describe("C17 tier 5 — at a real prompt", () => {
   }, 60_000);
 
   it.todo(
-    // Half of this is verified and the half that is not shares T5.1's blocker.
-    // **The cursor half passes**: typing `/ps --search=日本語` puts the caret at
-    // cell 21 — two for the prompt, thirteen for the flag, six for three
-    // double-width glyphs — and the frame writes it, which is observable at all
-    // only because C01 now yields the cursor sequence and the drawer embeds it
-    // (C01 I19). What cannot be driven is the *editing*: a backspace must
-    // remove one cluster and move the caret two cells, and no key reaches C17
-    // to do it.
-    "T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it at every position — the cursor half is verified; the editing half needs the editing keymap T5.1 names",
+    // **Half verified, and the other half is an open question about the
+    // harness rather than about C17.** Written live, the prompt shows
+    // `/ps --search=日本` followed by two replacement characters — the third
+    // glyph\u2019s UTF-8 arriving broken — and it stays that way, so it is the
+    // screen rather than a frame caught mid-write.
+    //
+    // It is not the decoder: C16 holds a partial sequence across chunks and
+    // T3.14 asserts it. It is not node-pty\u2019s per-chunk decoding either,
+    // which was real and is fixed — `encoding: null` plus one streaming decoder
+    // for the terminal\u2019s life (see `pty.ts`). What remains is timing: an
+    // isolated probe typing the identical string into the identical session,
+    // one glyph at a time or all at once, produces all three glyphs correctly
+    // every time, and this row does not. So the next step is to find what the
+    // row does that the probe does not, rather than to widen anything.
+    //
+    // The cursor arithmetic the row is really about is verified in passing:
+    // the caret sits at column 22 — two cells of prompt, thirteen of flag, six
+    // for three double-width glyphs — which is only observable at all because
+    // C01 yields the cursor sequence and the drawer embeds it (C01 I19).
+    "T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it at every position — the cursor arithmetic is verified; the row is blocked on a harness-side UTF-8 corruption that an isolated probe of the same session cannot reproduce",
   );
 
   it.todo(

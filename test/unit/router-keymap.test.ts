@@ -222,6 +222,33 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt down": ["\u001b[B", "\u001bOB"],
       "prompt c+r": ["\u0012"],
       "overlay c+r": ["\u0012"],
+
+      // C17's editing set (I21). **This table is the check the ruling asked
+      // for**, and it earned it: every meta form here is one a terminal has to
+      // be persuaded to send, and a binding whose wire form nobody could name
+      // is the fourteen-unexecuted-bindings defect arriving from the other end.
+      "prompt backspace": ["\u007f"],
+      "prompt c+h": ["\u0008"],
+      "prompt delete": ["\u001b[3~"],
+      "prompt c+w": ["\u0017"],
+      // ESC-prefixed, which is how a terminal sends a meta-modified key when it
+      // has no `modifyOtherKeys` — and the decoder's 50 ms window is what tells
+      // it from a lone `Esc` followed by a keystroke.
+      "prompt m+backspace": ["\u001b\u007f"],
+      "prompt m+d": ["\u001bd"],
+      "prompt c+u": ["\u0015"],
+      "prompt c+k": ["\u000b"],
+      "prompt c+y": ["\u0019"],
+      "prompt c+a": ["\u0001"],
+      "prompt c+e": ["\u0005"],
+      // Both forms, for the reason the arrows above carry both.
+      "prompt home": ["\u001b[H", "\u001b[1~"],
+      "prompt end": ["\u001b[F", "\u001b[4~"],
+      "prompt m+b": ["\u001bb"],
+      "prompt m+f": ["\u001bf"],
+      "prompt c+left": ["\u001b[1;5D"],
+      "prompt c+right": ["\u001b[1;5C"],
+      "prompt left": ["\u001b[D", "\u001bOD"],
     };
 
     const keymap = createKeymap(defaultKeymap);

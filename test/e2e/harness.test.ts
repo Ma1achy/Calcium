@@ -183,6 +183,43 @@ describe("interactivePty parameters", () => {
   );
 
   it(
+    "waitForFrame: resolves on the present screen, where waitFor cannot",
+    async () => {
+      // **The distinction this exists for.** `waitFor` matches the accumulated
+      // stream, so a pattern already in it resolves synchronously — right for
+      // "this appeared" and silently wrong for anything about the *present*
+      // state. An editor row asserting text had been deleted waited on a
+      // pattern that had been there since it was typed, so the assertion ran
+      // before the frame it was about had been written and `⌃w` looked broken
+      // when it was not.
+      const pty = interactivePty("node test/support/fixture.mjs session", {
+        cols: 80,
+        rows: 20,
+      });
+      try {
+        await pty.waitFor(/\u276f/, 15_000);
+        pty.type("alpha beta");
+        await pty.waitForFrame((f) => f.join("").includes("alpha beta"), 15_000);
+
+        // `⌃w` removes the last word. The old text is still in the stream, so
+        // `waitFor` could never see it go.
+        pty.type("\u0017");
+        await pty.waitForFrame((f) => !f.join("").includes("beta"), 15_000);
+        expect(pty.frame.join("\n")).toContain("alpha");
+        expect(pty.output, "and the stream still holds it").toContain("alpha beta");
+
+        // The control: a predicate that cannot hold rejects rather than hanging
+        // or passing, so a row built on this fails when its screen never
+        // arrives.
+        await expect(pty.waitForFrame(() => false, 300)).rejects.toThrow(/never satisfied/);
+      } finally {
+        pty.kill();
+      }
+    },
+    40_000,
+  );
+
+  it(
     "type(): what is typed reaches the program's stdin",
     async () => {
       // The reason the runner exists. `runInPty` starts a program and waits;

@@ -277,6 +277,18 @@ export type InteractivePty = {
   readonly frame: readonly string[];
   /** Resolve once `pattern` appears, or reject after `ms`. */
   waitFor(pattern: RegExp, ms?: number): Promise<RegExpExecArray>;
+  /**
+   * Resolve once the current frame satisfies `ok`, or reject after `ms`.
+   *
+   * **`waitFor` cannot express "the screen has changed".** It matches the
+   * accumulated stream, so a pattern already in it resolves synchronously —
+   * which is right for "this appeared" and silently wrong for anything about
+   * the *present* state. A row asserting text was deleted waited on a pattern
+   * that had been there since it was typed, so the assertion ran before the
+   * frame it was about had been written, and the key under test looked broken
+   * when it was not.
+   */
+  waitForFrame(ok: (frame: readonly string[]) => boolean, ms?: number): Promise<void>;
   done(): Promise<number>;
   kill(): void;
 };
@@ -304,15 +316,34 @@ export function interactivePty(
     cols: opts.cols ?? 80,
     rows: opts.rows ?? 24,
     env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
+    // Raw bytes rather than per-chunk strings — see `bytes` below.
+    encoding: null,
   });
 
   let output = "";
   let exited: number | null = null;
+  /**
+   * **A multi-byte character split across two reads is one character, not two
+   * replacements.** `node-pty` decodes each chunk it delivers independently, so
+   * a CJK glyph or an emoji straddling a read boundary arrives as `\uFFFD`
+   * twice — and the transcript then disagrees with the screen about content
+   * that is on it. C17 T5.3 saw `日本` followed by two replacement characters
+   * and the defect was here rather than in the decoder, which has held a
+   * partial sequence across chunks since it landed (C16 T3.14).
+   *
+   * `encoding: null` is what makes the fix possible: it stops node-pty decoding
+   * at all and hands over `Buffer`s, which one streaming decoder then turns
+   * into text for the life of the terminal. Taking the mangled string back
+   * apart would not work — by then the two halves are both `\uFFFD` and the
+   * original bytes are gone.
+   */
+  const bytes = new TextDecoder("utf-8");
   const waiters: { re: RegExp; resolve: (m: RegExpExecArray) => void }[] = [];
   const exitWaiters: ((code: number) => void)[] = [];
 
   term.onData((d) => {
-    output += d;
+    // Through the one streaming decoder — see `bytes`.
+    output += bytes.decode(d as unknown as Uint8Array, { stream: true });
     for (let i = waiters.length - 1; i >= 0; i -= 1) {
       const m = waiters[i]!.re.exec(output);
       if (m !== null) {
@@ -343,6 +374,27 @@ export function interactivePty(
         // and splitting on the written separator leaves a stray `\r` on the end
         // of every row, which breaks any assertion that touches a row's edge.
         .split(/\r*\n/);
+    },
+    waitForFrame(ok, ms = 15_000) {
+      // Polled rather than driven by the data event: the frame is a derived
+      // view of everything received so far, and a predicate over it is not a
+      // function of any single chunk.
+      const deadline = Date.now() + ms;
+      const self = this as InteractivePty;
+      return new Promise<void>((resolve, reject) => {
+        const tick = (): void => {
+          if (ok(self.frame)) {
+            resolve();
+            return;
+          }
+          if (Date.now() > deadline) {
+            reject(new Error(`the frame never satisfied it:\n${self.frame.join("\n")}`));
+            return;
+          }
+          setTimeout(tick, 20);
+        };
+        tick();
+      });
     },
     waitFor(re, ms = 15_000) {
       const existing = re.exec(output);

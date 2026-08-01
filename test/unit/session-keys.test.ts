@@ -12,6 +12,7 @@ import { defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { buildGraph } from "../support/session.js";
+import { createKeyEffects } from "../../src/shell/keys.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
@@ -52,8 +53,104 @@ describe("C22 §3 step 11 — the effect table", () => {
       const consumed = graph.router.dispatch(press(b.key));
       expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
+      // **Every layer, not just the probe.** `reverseSearch` is a *prompt*
+      // binding that pushes one, and nothing here was taking it back down — so
+      // `activeTarget` became `overlay` for every row after it and stayed
+      // there. Latent until C17's editing bindings arrived, because they are
+      // the first prompt rows that follow it: the loop was leaving state it
+      // claimed to have reset, and the failure named the new binding rather
+      // than the leak.
+      while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
       graph.editor.clear();
     }
+  });
+
+  it("T2.14 (C16 I21): every editing operation C17 exposes is reached by some binding", async () => {
+    // **The mechanism the vocabulary rests on.** C17's public surface is the
+    // action vocabulary, so this asks the editor which of its methods the
+    // keymap can reach — rather than comparing two lists that were written from
+    // each other. A count would have passed against the union that had no
+    // editing action in it at all, which is the state this row was written in:
+    // every mechanism satisfied, the vocabulary they were total over
+    // incomplete, and backspace doing nothing at a real prompt.
+    //
+    // The non-editing surface is an **explicit exception list with its reason**
+    // rather than a narrower selector, so a method added to C17 joins the
+    // covered set or this list deliberately (`allow-list rather than narrow
+    // scope`).
+    const NOT_EDITING = new Set([
+      // Geometry and measurement — the frame's, not a key's.
+      "layout",
+      "displayRows",
+      "cursorCell",
+      // Diagnostics, and C16's `lastStages` precedent.
+      "undoDepth",
+      "redoDepth",
+      "killBuffer",
+      // State the shell drives directly: `insert` is the printable path in the
+      // handler rather than a bound action, `setText` is how history and
+      // completion write a whole line, and `clear` is submission's (Seam 4).
+      "insert",
+      "setText",
+      "clear",
+      // Construction rather than an edit — it records no undo unit and
+      // `createEditor` is its only caller (C17 §5).
+      "seed",
+      // Accessors.
+      "text",
+      "cursor",
+      "lines",
+      "constructor",
+    ]);
+
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    const called = new Set<string>();
+    const real = graph.editor;
+    const spy = new Proxy(real, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, target);
+        if (typeof value !== "function") return value;
+        return (...args: unknown[]) => {
+          called.add(String(prop));
+          return (value as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      },
+    }) as typeof real;
+
+    const effects = createKeyEffects({
+      editor: spy,
+      completion: graph.completion,
+      overlays: graph.overlays,
+      history: graph.history,
+      manifest: null,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+    });
+
+    // Every prompt binding, through the table dispatch uses.
+    for (const b of defaultKeymap) {
+      if (b.target !== "prompt") continue;
+      const effect = effects.table[b.action];
+      expect(effect, `${b.action} has no effect`).toBeDefined();
+      effect?.();
+    }
+
+    // The surface, read off the editor rather than listed here.
+    const surface = Object.getOwnPropertyNames(Object.getPrototypeOf(real));
+    const editing = surface.filter((n) => !NOT_EDITING.has(n));
+    expect(editing.length, "the surface was read, not assumed").toBeGreaterThan(5);
+
+    // `undo` and `redo` are the recorded exception: `⌃_` and `⌃⇧-` are the same
+    // byte and the decoder maps 0x01 to 0x1a and stops, so no readline key for
+    // them reaches the router. Named here with the reason so the day a key is
+    // chosen, this list is where the choice is recorded (C16 §6).
+    const UNBOUND = new Set(["undo", "redo"]);
+    const unreached = editing.filter((n) => !called.has(n) && !UNBOUND.has(n));
+
+    expect(unreached, "a C17 editing method no key can reach").toEqual([]);
   });
 
   it("T1.4h2 (C22 I26): the effects that are observable from outside, each asserted", async () => {
@@ -91,6 +188,81 @@ describe("C22 §3 step 11 — the effect table", () => {
     graph.router.dispatch(press({ name: "r", ctrl: true }));
     expect(graph.overlays.top?.id, "reverseSearch raises C20's layer").toBe(SEARCH_ID);
     expect(graph.overlays.top?.id).not.toBe(MENU_ID);
+  });
+
+  it("T1.4h4 (C16 I21): each editing action's effect, not merely that C17 was called", async () => {
+    // **T2.14 asks which method a binding reaches and this asks what it does.**
+    // Rewiring `killWordLeft` to `killTo("wordRight")` passes T2.14 exactly —
+    // the same method is called — so every motion's *direction* was untested
+    // until this row. A mutation that fails nothing is a finding about the
+    // tests, and this is the finding.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    const ed = graph.editor;
+
+    const press = (name: string, mods: { ctrl?: boolean; meta?: boolean } = {}): void => {
+      graph.router.dispatch({
+        kind: "key",
+        key: {
+          name,
+          ctrl: mods.ctrl ?? false,
+          meta: mods.meta ?? false,
+          shift: false,
+          sequence: name,
+        },
+      });
+    };
+
+    ed.setText("git push origin", 15);
+    press("backspace");
+    expect(ed.text, "backspace removes behind the cursor").toBe("git push origi");
+
+    ed.setText("git push origin", 3);
+    press("delete");
+    expect(ed.text, "delete removes in front of the cursor").toBe("gitpush origin");
+
+    ed.setText("git push origin", 15);
+    press("w", { ctrl: true });
+    expect(ed.text, "⌃w kills the word to the left").toBe("git push ");
+    expect(ed.killBuffer, "and it is in the kill buffer").toBe("origin");
+
+    ed.setText("git push origin", 4);
+    press("d", { meta: true });
+    expect(ed.text, "⌥d kills the word to the right — the other direction").toBe("git  origin");
+
+    ed.setText("git push origin", 9);
+    press("u", { ctrl: true });
+    expect(ed.text, "⌃u kills to the start").toBe("origin");
+
+    ed.setText("git push origin", 4);
+    press("k", { ctrl: true });
+    expect(ed.text, "⌃k kills to the end").toBe("git ");
+
+    press("y", { ctrl: true });
+    expect(ed.text, "⌃y puts back what ⌃k took").toBe("git push origin");
+
+    ed.setText("git push origin", 15);
+    press("a", { ctrl: true });
+    expect(ed.cursor, "⌃a to the line's start").toBe(0);
+    press("e", { ctrl: true });
+    expect(ed.cursor, "⌃e to its end").toBe(15);
+
+    press("b", { meta: true });
+    expect(ed.cursor, "⌥b one word left, not right").toBe(9);
+    press("f", { meta: true });
+    expect(ed.cursor, "⌥f back the other way").toBe(15);
+
+    press("left");
+    expect(ed.cursor, "← one character").toBe(14);
+    press("left", { ctrl: true });
+    expect(ed.cursor, "⌃← one word").toBe(9);
+    press("right", { ctrl: true });
+    expect(ed.cursor, "⌃→ the other way").toBe(15);
+
+    press("home");
+    expect(ed.cursor).toBe(0);
+    press("end");
+    expect(ed.cursor).toBe(15);
   });
 
   it("T1.4h3 (C16 I17): Enter submits, and it is `enter` rather than `return`", async () => {
