@@ -31,7 +31,14 @@ export class KeymapError extends Error {
  * writing anywhere. Building both from the same parts was the remedy rather than
  * widening the rule, and it removed the separator this file was splitting on.
  */
-function keyText(key: Binding["key"]): string {
+/**
+ * A key as `c+p`, `ms+enter`, `enter`.
+ *
+ * Exported for `/help` (C23 I26): help renders from this table rather than a
+ * maintained list, so the formatting a binding is *shown* with has to be the one
+ * the keymap itself uses. A second formatter is a second thing to drift.
+ */
+export function keyText(key: Binding["key"]): string {
   const mods =
     (key.ctrl === true ? "c" : "") +
     (key.meta === true ? "m" : "") +

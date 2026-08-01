@@ -221,12 +221,34 @@ describe("C05 contract", () => {
   });
 
   it("T2.7: parseManifest accepts its own serialised output", () => {
+    // **Serialising emits `appTools`** (§3): what round-trips is what the app
+    // wrote, and parse re-derives the framework's six. So the property is
+    // *sharper* than round-tripping a flat list — it asserts the derivation is
+    // deterministic as well as that nothing is lost.
+    //
+    // Emitting `tools` instead is what makes it false, and instructively: the
+    // output then contains rows the parser added, and re-parsing them hits §3's
+    // collision check, which cannot tell an app declaring `clear` from a
+    // re-parse of output that already contains it.
     const first = fixture();
-    const round = parseManifest(JSON.parse(JSON.stringify(first)));
+    const serialised = { ...first, tools: first.appTools, appTools: undefined };
+    const round = parseManifest(JSON.parse(JSON.stringify(serialised)));
 
     expect(round.ok).toBe(true);
     if (!round.ok) return;
-    expect(round.value).toEqual(first);
+    expect(round.value, "equal, framework rows and all").toEqual(first);
+  });
+
+  it("T2.7b (§3): serialising `tools` rather than `appTools` is rejected, and says why", () => {
+    // The control for the test above. Without it, T2.7 passes on an
+    // implementation that never appends the framework's rows at all — the
+    // property would hold trivially and mean nothing.
+    const first = fixture();
+    const wrong = parseManifest(JSON.parse(JSON.stringify({ ...first, appTools: undefined })));
+
+    expect(wrong.ok, "the framework's own rows collide with themselves").toBe(false);
+    if (wrong.ok) return;
+    expect(wrong.error.map((e) => e.message).join("\n")).toContain("tui-kit ships");
   });
 
   it("T2.8 (I8): findTool caches by identity, and a second manifest does not observe the first's", () => {

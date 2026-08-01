@@ -30,6 +30,7 @@ import { block } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
+import { shippedHandlers } from "./local/handlers.js";
 import {
   createLocalRegistry,
   reconcile,
@@ -83,6 +84,27 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const guard = new Guard();
   const local = createLocalRegistry();
+
+  // **Registered before the app's and before `seal()`** (C22 I3, C23 I27). The
+  // six are rows in every manifest (C05 §3), which is what makes them reachable
+  // — C18 classifies `local` from the manifest, so handlers without rows are
+  // registered for verbs nothing can route to.
+  //
+  // From one map rather than six calls: the set is a fact about what the
+  // framework owns, and a call site listing them is a second place the list
+  // lives.
+  for (const [verb, handler] of Object.entries(
+    shippedHandlers({
+      manifest: () => deps.manifest.manifest,
+      transcript: deps.transcript,
+      theme: deps.theme,
+      history: () => deps.history.entries,
+      bindings: () => deps.bindings(),
+      stop: deps.stop,
+    }),
+  )) {
+    local.register(verb, handler);
+  }
 
   /**
    * What `cancel()` reaches, set for the length of one in-flight invocation.
@@ -257,6 +279,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       }
       const doc = await handler(argv, { command: line });
       appendAndCommit(doc);
+      // A02 Seam 4's theme row: `theme.setVariant` → `scheduler.invalidate`.
+      // C10 never invalidates; the sequence is L4's, which is the seam.
+      if (verb === "theme") deps.scheduler.invalidate();
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_` alone.
       if (doc.meta.resultId !== undefined) deps.writes.setLastUuid(doc.meta.resultId);
     } catch (cause) {

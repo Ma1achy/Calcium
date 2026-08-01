@@ -84,7 +84,22 @@ export type Manifest = Readonly<{
   schema: typeof MANIFEST_SCHEMA;
   binary: string;
   version: string; // the far side's version, for skew reporting
+  /** Every tool, the app's and the framework's — what `findTool` reads. */
   tools: readonly ToolDef[];
+  /**
+   * What the app wrote (§3).
+   *
+   * **The partition is here rather than a `source` field on `ToolDef`**, which
+   * would be settable by an app writing a manifest by hand — meaningless from
+   * its side and a lie if set wrongly — and readable by every consumer, so one
+   * eventually branches on it. This makes the two legitimate uses available and
+   * the illegitimate ones awkward.
+   *
+   * Two consumers: `serialise` emits it, because what round-trips is what the
+   * app wrote; and `/help` groups by it, because `/clear` and `/exit` are
+   * different in kind from `/ps` and a flat list hides that.
+   */
+  appTools: readonly ToolDef[];
 }>;
 
 export type ToolMatch = Readonly<{

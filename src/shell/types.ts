@@ -198,6 +198,13 @@ export type PipelineDeps = Readonly<{
   /** Scheme-checked by C23 before use (C23 I17). */
   openUrl: (url: URL) => Promise<void>;
 
+  /**
+   * Every binding C16 will dispatch, for `/help` (C23 I26).
+   *
+   * Read rather than restated: a hand-written help text guarantees drift, and
+   * a binding shown that C16 does not dispatch is the drift arriving.
+   */
+  bindings: () => readonly Readonly<{ keys: string; does: string }>[];
   /** For rewriting `/verb` inside a delegated command (C18 I5). */
   binary: string;
   commandPolicy: CommandPolicy;

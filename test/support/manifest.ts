@@ -104,9 +104,9 @@ const SOURCE = {
       flags: [{ name: "once", type: "bool", summary: "write one frame and exit" }],
     },
     {
-      name: "help",
+      name: "guide",
       local: true,
-      summary: "in-process help",
+      summary: "an app-supplied local verb",
       args: [],
       flags: [],
     },

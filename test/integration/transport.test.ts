@@ -60,7 +60,7 @@ describe("C06 with C05", () => {
       },
     });
 
-    const route = submit(router, manifest, invocation({ verb: "help", argv: ["help"] }));
+    const route = submit(router, manifest, invocation({ verb: "guide", argv: ["guide"] }));
 
     expect(route).toBe("local");
     // The manifest is what stops the TUI guessing, and `local` is the field
@@ -69,7 +69,7 @@ describe("C06 with C05", () => {
   });
 
   it("T4.4 (C05 T4.4): a local tool never reaches the transport; a spawnable one always does", () => {
-    expect(submit(createRouter({ default: createFixtureTransport([]) }), manifest, invocation({ verb: "help", argv: ["help"] }))).toBe("local");
+    expect(submit(createRouter({ default: createFixtureTransport([]) }), manifest, invocation({ verb: "guide", argv: ["guide"] }))).toBe("local");
     expect(submit(createRouter({ default: createFixtureTransport([]) }), manifest, invocation({ verb: "debug", argv: ["debug", "dump"] }))).toBe("local");
     expect(submit(createRouter({ default: createFixtureTransport([]) }), manifest, invocation())).toBe("invoke");
     expect(submit(createRouter({ default: createFixtureTransport([]) }), manifest, invocation({ verb: "promote", argv: ["promote"] }))).toBe("invoke");
@@ -103,8 +103,8 @@ describe("C06 with C05", () => {
     const ignoringLocal = (inv: Invocation): "local" | "invoke" =>
       inv.verb === "" ? "local" : "invoke";
 
-    expect(ignoringLocal(invocation({ verb: "help", argv: ["help"] }))).toBe("invoke");
-    expect(submit(createRouter({ default: createFixtureTransport([]) }), fixture(), invocation({ verb: "help", argv: ["help"] }))).toBe("local");
+    expect(ignoringLocal(invocation({ verb: "guide", argv: ["guide"] }))).toBe("invoke");
+    expect(submit(createRouter({ default: createFixtureTransport([]) }), fixture(), invocation({ verb: "guide", argv: ["guide"] }))).toBe("local");
   });
 
   it("T4.1 (with C21): the escalation ladder issues real signals through the real runner", async () => {

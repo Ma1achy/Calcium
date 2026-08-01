@@ -1,6 +1,7 @@
 // C05 tier 1 — unit. The loader's transition table, the parser's structural
 // rules, longest-match resolution, and every validation row in §3.
 import { describe, expect, it } from "vitest";
+import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
 import {
   ARG_TYPES,
   createManifestStore,
@@ -65,7 +66,13 @@ describe("C05 parse", () => {
 
     expect(Object.isFrozen(result.value)).toBe(true);
     expect(result.value.binary).toBe("widget");
-    expect(result.value.tools).toHaveLength(8);
+    // Eight from the fixture, plus the six `tui-kit` ships (C05 §3). Written as
+    // the sum rather than 14, so a change to either side names which moved.
+    expect(result.value.tools).toHaveLength(8 + FRAMEWORK_TOOLS.length);
+    expect(
+      result.value.tools.slice(-FRAMEWORK_TOOLS.length).map((t) => t.name),
+      "appended, so no index the app could read is shifted",
+    ).toEqual(FRAMEWORK_TOOLS.map((t) => t.name));
   });
 
   it("T1.5 (I3): unknown fields are ignored, at the top level and per tool", () => {

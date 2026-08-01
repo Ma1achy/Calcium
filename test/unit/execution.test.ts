@@ -92,8 +92,8 @@ function harness(script: Scripted = {}) {
     // that throws makes an action test fail for a reason about the harness.
     editor: { setText: (t: string) => void typed.push(t), get text() { return typed.at(-1) ?? ""; } },
     overlays: {} as never,
-    theme: {} as never,
-    history: {} as never,
+    theme: { current: {} as never, setVariant: () => undefined, applyOverrides: () => [] },
+    history: { entries: [{ command: "/ps", ts: 0, exitCode: 0 }] },
     runner: {
       spawnShell: () => {
         calls.push("spawnShell");
@@ -117,13 +117,18 @@ function harness(script: Scripted = {}) {
       return { [Symbol.dispose]: () => undefined };
     },
     openUrl: () => Promise.resolve(),
+    bindings: () => [{ keys: "c+c", does: "global: cancel" }],
     binary: "widget",
     commandPolicy: slashPolicy,
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);
-  pipeline.register("help", () => doc({ command: "/help" }));
-  pipeline.register("debug dump", () => doc({ command: "/debug" }));
+  // The app's own local verbs. The framework's six register themselves; these
+  // are the fixture manifest's, and `seal()` reconciles both (C23 I27).
+  pipeline.register("guide", () => doc({ command: "/guide" }));
+  pipeline.register("debug dump", () => doc({ command: "/debug dump" }));
+  
+  
   pipeline.seal();
 
   return {

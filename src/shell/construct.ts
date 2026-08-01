@@ -41,7 +41,7 @@ import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import { createEngine } from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
-import { createKeymap, defaultKeymap } from "../interaction/router/keymap.js";
+import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import type { InputEvent } from "../interaction/router/types.js";
 import { openHistory } from "../interaction/history/index.js";
@@ -326,10 +326,14 @@ export async function constructGraph(
   });
 
   // --- 9. the input router --------------------------------------------------
+  // Hoisted so the pipeline can read it: `/help` renders from the keymap rather
+  // than a maintained list (C23 I26), so both must be the same table.
+  const keymap = createKeymap(defaultKeymap);
+
   const router = at("router", () =>
     createRouter({
       focus: createFocusStore(),
-      keymap: createKeymap(defaultKeymap),
+      keymap,
       now: config.clock,
       // **The thunk is the 10 → 9 pair** (§3a). `pipeline` is declared below and
       // read only when a key arrives, which is after step 11 admits input.
@@ -372,6 +376,8 @@ export async function constructGraph(
       schedule: config.schedule,
       openUrl: config.openUrl ?? defaultOpener(config.platform, runner, session),
 
+      bindings: () =>
+        keymap.entries().map((b) => ({ keys: keyText(b.key), does: `${b.target}: ${b.action}` })),
       binary: config.binary,
       commandPolicy: config.commandPolicy,
     });
