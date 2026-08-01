@@ -125,6 +125,7 @@ type Pills    = Readonly<{ kind: "pills"; id: string;
 type Tip      = Readonly<{ kind: "tip"; id: string; text: string;
                            actions?: readonly Action[] }> & Gap;
 type Panel    = Readonly<{ kind: "panel"; id: string; title: string;
+                           footer?: string;                    // the bottom border
                            children: readonly Block[] }> & Gap;
 type Group    = Readonly<{ kind: "group"; id: string;
                            direction: "row" | "column"; children: readonly Block[] }> & Gap;
@@ -165,7 +166,7 @@ Both are optional and independent: pinning only `yMin` at 0 is the common case, 
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
 | `pills` | chips with actions | `ceil(totalWidth / w)` — one logical row that may wrap |
 | `tip` | text with fill actions | `ceil(len / w)` |
-| `panel` | title, children | children measured at `w - 2`, + 2 |
+| `panel` | title, footer, children | children measured at `w - 2`, + 2 |
 | `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
 | `raw` | pre-formatted text | lines |
 
@@ -216,6 +217,15 @@ one that does not think about it gets the rhythm the surfaces already draw.
 The three container kinds pass a width to `measureChild`, and until this was written down it was the largest hole in §5: two of them narrow the width and one of them splits it, and a measurer that passes `w` through unchanged agrees with nothing that renders.
 
 - **`panel`** measures children at `w - 2` — the border takes a column each side.
+
+**`footer` is text in a row that is already drawn**, which is why it changes no
+measurement. `title` lives in the top border and `footer` in the bottom one, and a
+panel was always two rows taller than its children — so this is a use for a row that
+exists rather than a new one. Two surfaces draw it: S12 §2's keymap line and S13 §2's
+outer keymap, both pushed views whose keys belong to the view rather than to the
+shell. A pushed view cannot put them in the frame's footer — C15 T4.4 leaves header
+and footer untouched, and C22's footer is one app-supplied row — so without this the
+figures draw something no block produces.
 - **`table`** measures an expanded row's `detail` at `w - 2`, matching `panel`, and matching the indent C11 §2 already applies.
 - **`group`, `direction: "column"`** measures every child at `w` and sums.
 - **`group`, `direction: "row"`** splits equally: `floor((w - gaps) / n)` where `gaps` is `n - 1` cells of gutter, one between each pair. Children are measured at that width and the group takes the `max`.

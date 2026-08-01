@@ -351,6 +351,16 @@ export type Panel = Readonly<{
   kind: "panel";
   id: string;
   title: string;
+  /**
+   * Text in the **bottom** border, as `title` is text in the top (C04 §3).
+   *
+   * It changes no measurement: a panel is children + 2 either way, so this is
+   * a use for a row that is drawn anyway rather than a new one. S12 §2 and
+   * S13 §2 both draw a keymap there, and neither can use the frame's footer —
+   * a pushed view leaves header and footer untouched (C15 T4.4) and C22's
+   * footer is one app-supplied row. The keys belong to the view.
+   */
+  footer?: string;
   children: readonly Block[];
 }> & Gap;
 

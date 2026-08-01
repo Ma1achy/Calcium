@@ -481,12 +481,13 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
    *   S02 §2         its two headerless tables declare no columns at all, and
    *                    `cols()` reads them from the spec precisely so a fixture
    *                    cannot invent them
-   *   S12 §2         §2 calls its box a diagram that is not rendered; HEIGHT_AUDIT
-   *                    §1 and §6 call the same box a `panel`, count its inner rows
-   *                    and record its border as a drawing defect. Ten rows or
-   *                    eight, and nothing composes until it is ruled
+   *
+   * S12 §2 was here and lasted one commit: its box was ruled a rendered `panel`,
+   * `panel` gained a `footer`, and the figure composes. The entry earning its
+   * removal on the commit after it was written is the list working — a backlog
+   * whose entries are argued rather than accumulated.
    */
-  "TD2 src/shell/session.ts (6)",
+  "TD2 src/shell/session.ts (5)",
 
   // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two
   // deferrals here — S01 §2's illustrated rows and C03 T5.4's edge drag — and

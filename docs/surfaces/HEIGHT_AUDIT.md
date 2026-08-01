@@ -332,7 +332,7 @@ surface's *composition*, not for a notice that indents to an arbitrary column.
 
 ---
 
-## 6. S12's panel does not close — **drawing defect**
+## 6. S12's panel does not close — **drawing defect, fixed**
 
 S12's illustration has its log rows ending one column short of the blank and rule
 rows below them, so the right border is ragged. Nothing measures wrong; the
@@ -340,6 +340,18 @@ drawing is inconsistent with itself. Worth fixing because a border that does not
 close is exactly the symptom C09's `panel` now produces when a child's measured
 and rendered heights disagree, and a surface that draws one by hand teaches
 readers to ignore it.
+
+**Fixed** when S12 §2 was composed: three rows were 78 cells against the border's
+77, and the figure now closes at 77 throughout. The composition test is what makes
+it stay closed — it renders the panel and compares, so a row drifting by one cell
+is a failure rather than a reading.
+
+**And the defect this section describes turned out to be the smaller half.** The
+same box was called a diagram by §2 and a `panel` by this file, so the figure was
+ten rows or eight depending on which document was read. That is settled: it is a
+`panel`, `panel` gained a `footer` for the keymap in its bottom rail (C04 §3), and
+the two records now agree because one of them was corrected rather than because
+both were left standing.
 
 ---
 
@@ -354,10 +366,9 @@ blocker is wrong is indistinguishable from one that is pending (A03 §9a).
 | Surface | Waits on |
 |---|---|
 | S02 §2 | **C22 §12b** — its two headerless tables declare no columns |
-| S12 §2 | **C22 §12b** — §2 and this file disagree about whether its box is rendered |
 
-Composed since: **S01 §2** (with C22), **S11 §2** (with C23's branch, after S11 §2
-gained a block list).
+Composed since: **S01 §2** (with C22), **S11 §2** and **S12 §2** (with C23's
+branch, each after its own §2 gained what it was missing).
 
 ## The five-surface row, split — and none of the five was C23's
 
@@ -372,7 +383,7 @@ gives five different answers:
 | S13 §2 | Nothing — this file already moved it to C22 and the test file's comment says so. **Deleted** as a stale label; its coverage sits with C22's frame row |
 | S11 §2 | A block list. §2 had none, so composing meant choosing where the spec was silent. Written down, and **composed** |
 | S02 §2 | Two declarations. `v1.0.0` was drawn and unlisted — the second verdict class, now fixed — and its two headerless tables declare **no columns at all**, which `cols()` reads from the spec precisely so a fixture cannot invent them |
-| S12 §2 | A ruling. §2 says the box is a diagram and is not rendered; §1 and §6 of this file call the same box a `panel`, count its inner rows and record its border as a drawing defect. Ten rows or eight, and nothing composes until it is settled |
+| S12 §2 | A ruling, taken: **the box is a rendered `panel`** and this file was right from §1 onwards. §2 opened by saying it was not rendered and closed four paragraphs later naming a title bar and a keymap line as two of its three regions — both of them rails. S01's convention copied to a figure it does not describe. **Composed** |
 
 **A row over N surfaces with N different blockers cannot be triaged, only split.**
 The six-surface row was split during C22's triage on exactly this reasoning, and

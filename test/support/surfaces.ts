@@ -557,7 +557,50 @@ const S11_RUN: readonly Block[] = [
   }),
 ];
 
+/**
+ * S12 §2 — the logs view, as the `panel` it is.
+ *
+ * **§2 used to open by saying its box was not rendered**, which was S01's
+ * convention copied to a figure it does not describe: two of the three regions
+ * §2 names — the title bar and the keymap — *are* the rails. `frameRows` strips
+ * exactly those two rows, which is why nothing composed. HEIGHT_AUDIT had it
+ * right from §1 onwards, calling this "S12's panel" and counting eight inner
+ * rows.
+ */
+const S12_LOGS: Block = block({
+  kind: "panel",
+  id: "s12",
+  title: "logs · a3f9b21 · gpu-04.fmx.internal ─────────────────────── ● following",
+  footer: "esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow",
+  children: [
+    block({
+      kind: "raw",
+      id: "s12-lines",
+      text: [
+        "14:23:01.882  INFO   [trainer] epoch 17 started",
+        "14:23:02.104  INFO   [dataloader] batch 41/256 loaded (148 samples)",
+        "14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB host_mem=91GiB",
+        "14:23:02.551  WARN   [dataloader] slow batch (87ms · 95p)",
+        "14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 · lr=3e-4",
+      ].join("\n"),
+    }),
+    block({ kind: "rule", id: "s12-rule", gapBefore: true, label: "" }),
+    block({
+      kind: "keyValue",
+      id: "s12-status",
+      rows: [{ label: "", value: "filter —    level ≥ DEBUG    1,284 lines    2 warnings" }],
+    }),
+  ],
+});
+
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
+  {
+    file: "docs/surfaces/S12_logs_view.md",
+    fence: 0,
+    label: "S12 §2 — the logs view",
+    width: 77,
+    blocks: [S12_LOGS],
+  },
   {
     file: "docs/surfaces/S11_local_execution.md",
     fence: 0,

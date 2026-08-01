@@ -199,10 +199,16 @@ describe("the S-series' illustrated heights", () => {
   // The figure implied the sequence and an implication is not a declaration:
   // composing it meant choosing where the spec was silent, which is guessing
   // with a passing test attached.
+  //
+  // **S12 — written, above**, once §2's self-contradiction was ruled. The
+  // section opened by saying its box was not rendered and closed four
+  // paragraphs later by naming a title bar and a keymap line as two of its
+  // three regions — both of which *are* the rails. S01's convention, copied to
+  // a figure it does not describe, and `frameRows` strips exactly the two rows
+  // that carry content. It is a `panel`: title in the top border, keymap in the
+  // new `footer` (C04 §3), and HEIGHT_AUDIT was right from §1 onwards.
   it.todo(
     "S02 §2 composes to its illustrated rows — waits on C22 — S02 §2 declares no columns for its two headerless tables, and `cols()` reads them from the spec precisely so a fixture cannot invent them. The block list also drew `v1.0.0` without listing it, which is fixed; the columns are a design statement rather than a transcription (priorities, minimums, truncation) and belong with C22's whole-screen work",
   );
-  it.todo(
-    "S12 §2 composes to its illustrated rows — waits on C22 — §2 says its box is a diagram and is not rendered; HEIGHT_AUDIT §1 and §6 call the same box a `panel`, count its inner rows, and record its right border as a drawing defect. Whether the rails are chrome or a rendered block decides whether the figure is 10 rows or 8, and nothing else can be asserted until it is ruled",
-  );
+
 });

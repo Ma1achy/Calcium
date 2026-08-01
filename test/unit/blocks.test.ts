@@ -1,5 +1,6 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
 import { describe, expect, it } from "vitest";
+import { displayCells } from "../../src/presentation/text.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/testing/index.js";
@@ -150,6 +151,28 @@ describe("C09 §6 — kinds", () => {
     expect(kit.measure(bare, 30)).toBe(2);
     expect(kit.measure(glyphed, 30), "two fewer columns per row").toBe(3);
     expect(kit.renderToLines(glyphed, 30)).toHaveLength(3);
+  });
+
+  it("T1.8b (C04): a panel's footer is text in a row that is drawn anyway", () => {
+    const kit = measurable();
+    const children = [{ kind: "notice", id: "p-n", tone: "info", text: "hi" } as const];
+    const plain = block({ kind: "panel", id: "p", title: "logs", children });
+    const footed = block({ kind: "panel", id: "p", title: "logs", footer: "esc back", children });
+
+    // **The height is the assertion.** A footer that added a row would be a new
+    // row rather than a use of the existing one — and a panel whose measurer and
+    // renderer disagree is what C09 reports as a border that does not close.
+    expect(kit.measure(footed, 40)).toBe(kit.measure(plain, 40));
+    expect(kit.renderToLines(footed, 40)).toHaveLength(kit.measure(footed, 40));
+
+    const lines = kit.renderToLines(footed, 40);
+    const bottom = lines.at(-1) ?? "";
+    expect(bottom, "the text is in the bottom border").toContain("esc back");
+    expect(displayCells(bottom), "and the border still closes at the width").toBe(40);
+
+    // The control: without a footer the same rail is plain, so the assertion
+    // above is about the field rather than about panels having a bottom row.
+    expect(kit.renderToLines(plain, 40).at(-1) ?? "").not.toContain("esc back");
   });
 
   it("T1.8: panel measures its children at w - 2", () => {

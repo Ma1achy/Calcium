@@ -85,7 +85,7 @@ that inserted spacing of its own would make a document's height unknowable from
 the document (C23 §2). A `row` group is not a sequence: its children sit side by
 side, so a gap before one of them is ignored rather than being an error.
 
-**`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close.
+**`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close. **`footer` sits in the bottom border for the same reason `title` sits in the top**, and changes nothing about measurement: the row is drawn either way, so this is a use for a row that already exists rather than a new one. S12 §2 and S13 §2 both draw it, and neither can put those keys in the frame's footer — a pushed view leaves header and footer untouched (C15 T4.4).
 
 **Animation state arrives through `ctx.tick`.** `steps` shows a spinner, and a renderer must stay pure, so the frame index cannot come from a clock inside the block. `tick` is a monotonic counter incremented by C03's `spinner` commit; a renderer computes `frames[tick % frames.length]`. Nothing else in C09 reads it, and `measure` never does — animation must never change height.
 
@@ -112,7 +112,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `diff` | rows + 1 | Field, a, b, comparator; three equal columns |
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
-| `panel` | children + 2 | Border and title; children measured at `w - 2` |
+| `panel` | children + 2 | Border, title and footer; children measured at `w - 2` |
 | `group` | sum or max of children | `column` sums children measured at `w`; `row` takes the max of children measured at `floor((w - gaps) / n)`, one cell of gutter between each pair (C04 §3) |
 | `raw` | lines | Pre-formatted, emitted as-is with control characters stripped |
 
@@ -370,6 +370,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.6b**: a `code` block with `wrap: false` truncates; the same content with `wrap: true` wraps, and both measure to their rendered height.
 - **T1.7**: `notice` text longer than `w` → wraps, and measurement matches the wrap count.
 - **T1.8**: `panel` measures children at `w - 2`, not `w`.
+- **T1.8b** (C04): a `panel` with a `footer` measures identically to one without, and renders its text in the bottom border with the border closing at the same width. Both halves, because a footer that changed the height would be a new row rather than a use of the existing one — and a height change is the failure `panel` reports as a border that does not close.
 - **T1.9**: `group` in `column` sums children; in `row` takes the max.
 - **T1.10** (I10): a block of unknown kind → renders via `raw`, no throw.
 - **T1.11** (I18): text containing `\x1b[31m` → stripped; the frame carries no injected styling.

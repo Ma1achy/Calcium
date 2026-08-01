@@ -22,9 +22,13 @@ It is where people spend the minutes after something fails, which sets the prior
 
 ## 2. The screen
 
-**The fence is a diagram, and its box is not rendered.** The outer border marks where the region begins and ends; `tui-kit` draws no frame around anything (S01 §3 — header, viewport, prompt, footer, and nothing between them). Counting the border gives two rows the terminal does not have, and the side rails give two cells every row does not have.
+**The box is a `panel`, and it is rendered.** Title in the top border, keymap in the bottom, log lines and a status line between them — `panel` measures children + 2 and draws the border itself, and C09 §Seam-1 puts the title in the top border for this figure's sake.
 
-Stated because the same picture produced a live ambiguity in S01, where the deferral asserting it could not be written for two commits while the figure and the arithmetic disagreed. `frameRows` in `test/support/surfaces.ts` strips the marks, so the convention is mechanical rather than remembered.
+**This section used to open by saying the opposite**, and the sentence was S01's convention copied to a figure it does not describe. S01's box marks region boundaries and carries nothing; here two of the three regions §2 goes on to name — *"a title bar carrying the source and connection state"* and the keymap half of the footer — **are** the rails. The section contradicted itself four paragraphs apart, and `frameRows` strips exactly the two rows that carry content, which is why nothing composed. `HEIGHT_AUDIT` had it right on both counts: it calls this "S12's panel", counts eight inner rows, and files the ragged right edge as the drawing defect C09 names for a panel whose measurer and renderer disagree.
+
+The convention sentence is still correct where it belongs — S01 §2, and S13's *inner* panels are real panels there too. It is not a property of box-drawing in a fence.
+
+**The keymap needed a block that did not exist.** A pushed view leaves header and footer untouched (C15 T4.4) and C22's footer is one app-supplied row, so these keys cannot go in the frame's footer — they belong to the view. `panel` now carries `footer?: string` (C04 §3), which is text in a row that was drawn anyway. S13 §2's outer panel draws the same thing, and two consumers is what settled it: a keymap *below* the panel would have cost only a figure, and would have left both surfaces drawing a bottom rail with words in it that no block produces.
 
 ```
 ┌ logs · a3f9b21 · gpu-04.fmx.internal ─────────────────────── ● following ─┐
@@ -33,13 +37,15 @@ Stated because the same picture produced a live ambiguity in S01, where the defe
 │ 14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB host_mem=91GiB          │
 │ 14:23:02.551  WARN   [dataloader] slow batch (87ms · 95p)                 │
 │ 14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 · lr=3e-4          │
-│                                                                            │
-│ ─────────────────────────────────────────────────────────────────────────  │
-│ filter —    level ≥ DEBUG    1,284 lines    2 warnings                     │
+│                                                                           │
+│ ───────────────────────────────────────────────────────────────────────── │
+│ filter —    level ≥ DEBUG    1,284 lines    2 warnings                    │
 └ esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow ───┘
 ```
 
-Three regions: a title bar carrying the source and connection state, the lines, and a two-row footer — a status line and a keymap line.
+Three regions: a title bar carrying the source and connection state, the lines, and a two-row footer — a status line and a keymap line. **The title bar is the panel's top border and the keymap is its `footer`**; the status line is an ordinary child.
+
+**Blocks, in order**: `panel` with `title` *logs · a3f9b21 · gpu-04.fmx.internal ─ ● following* and `footer` *esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow*, wrapping `raw` (5 log lines), `rule` with `gapBefore`, and `keyValue` (the status line). Five inner rows, one join, one rule, one status — eight children in ten rows with the border.
 
 **The status line answers "am I seeing everything?"** Active filter, level threshold, total lines received, and a warning count. A filtered view that looks empty is indistinguishable from a quiet process unless the filter is stated.
 
