@@ -22,10 +22,46 @@
 //   - T5.5's one-invocation-then-two is T3.8 on a fake clock.
 import { describe, it } from "vitest";
 
+import { interactivePty, type InteractivePty } from "../support/pty.js";
+
+/** The prompt glyph reaching the PTY: the shell composed and painted a frame. */
+const PROMPT = /❯/;
+
+const session = (): InteractivePty =>
+  interactivePty("node test/support/fixture.mjs session", { cols: 100, rows: 24 });
+
 describe("C19 tier 5 — at a real prompt", () => {
-  it.todo(
-    "T5.1: typing `/ps --status=` and pressing Tab → the statuses appear, arrow-selectable, Enter inserts — waits on L4",
-  );
+  it("T5.1: typing `/ps --status=` and pressing Tab → the statuses appear, arrow-selectable, Enter inserts", async () => {
+    // **The first row in this project to see an overlay on a screen**, and it
+    // found the last two things standing between C15 and one. Every piece
+    // passed its own suite for weeks: C19 produced the candidates, C15 placed
+    // the layer, C16 routed the keys — and nothing composited a `Placed`, so
+    // the menu existed everywhere except the terminal. Then, with the drawer
+    // built, it still took a second keystroke to appear: the continuation that
+    // pushes the layer runs after its batch has committed (C22 I31).
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+      pty.type("/ps --status=");
+      pty.type("\t");
+
+      // The enum's values, from the manifest rather than from a source that
+      // guesses: `status` is declared `enum` with exactly these three.
+      await pty.waitFor(/running/, 15_000);
+      await pty.waitFor(/failed/, 15_000);
+      await pty.waitFor(/queued/, 15_000);
+
+      // **Selectable, then inserted.** `↓` moves the selection and Enter
+      // accepts it, so the prompt ends up carrying a value the user never
+      // typed — which is what a menu is for, and the half a row asserting only
+      // that candidates appeared would miss.
+      pty.type("\u001b[B");
+      pty.type("\r");
+      await pty.waitFor(/--status=failed/, 15_000);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
   it.todo(
     "T5.2: a dynamic source with a 2-second delay → the spinner appears at 500 ms, typing continues freely, and the late result never touches the buffer — waits on L4",
   );

@@ -158,7 +158,22 @@ class Session implements TuiInstance {
     // cadence and the state, and the auth flow itself is the far side's (§13).
     this.#identity = createIdentityLoop({
       fetch: () => Promise.resolve(null),
-      writes: graph.session.refresh,
+      // **The second producer of C22 I31's class.** This loop settles on a
+      // five-minute cadence with no keystroke anywhere near it, and both fields
+      // it writes are drawn in the header — so without the commit the header
+      // shows an identity that expired minutes ago until the user happens to
+      // press a key. `refresh` is passed through rather than replaced, so the
+      // one-writer-per-field rule (I11) still has one writer.
+      writes: {
+        setIdentity: (identity) => {
+          graph.session.refresh.setIdentity(identity);
+          graph.scheduler.commit("completion");
+        },
+        setHealth: (health) => {
+          graph.session.refresh.setHealth(health);
+          graph.scheduler.commit("completion");
+        },
+      },
       now: this.config.clock,
       notify: () => undefined,
       // The ambient one, not a second copy. C06's `Clock` needs the same, and

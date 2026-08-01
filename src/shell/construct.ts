@@ -457,6 +457,11 @@ export async function constructGraph(
     manifest: built.manifest.manifest,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
+    // **I31 — an effect that settles after its batch commits its own frame.**
+    // `"completion"` because its window is zero (C03 I2): by the time this
+    // fires the screen is already showing a state that no longer holds, which
+    // is the opposite of the case a coalescing window is for.
+    redraw: () => void scheduler.commit("completion"),
   });
 
   /** A bound action, or `null` when the key is not bound at this target. */

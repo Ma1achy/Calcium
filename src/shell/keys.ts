@@ -41,6 +41,17 @@ export type KeyDeps = Readonly<{
   anchor: () => PromptAnchor;
   /** How big a layer may be (C15 `Region`), for the menu's "… n more". */
   overlayRegion: () => Readonly<{ width: number; height: number }>;
+  /**
+   * Commit a frame for something that settled after its batch (C22 I31).
+   *
+   * The keystroke's own commit is the read loop's (I27) and covers the
+   * synchronous effects of dispatch. A completion source is fire-and-forget by
+   * design — input is never blocked on a fetch (I18) — so the menu is pushed by
+   * a continuation running after that commit, and nothing composes a frame from
+   * it. The layer is on the stack and the screen has never heard of it, until
+   * the next key happens to draw one.
+   */
+  redraw: () => void;
 }>;
 
 /** What a bound key does. Returns nothing: the loop commits (C22 I27). */
@@ -113,6 +124,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         if (mine !== seq) return;
         if (result.candidates.length === 0) {
           closeMenu();
+          // The dismissal is a state change like the appearance is, and it
+          // settles in the same place (I31).
+          deps.redraw();
           return;
         }
         candidates = result.candidates;
@@ -129,6 +143,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
           .find((p) => p.layer.id === MENU_ID);
         remainder = remainderOf(placed ?? null, candidates.length, placed?.layer.content.length ?? 0);
         redrawMenu();
+
+        // **The frame this continuation has no batch to be part of** (I31).
+        deps.redraw();
       });
     },
 

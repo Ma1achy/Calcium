@@ -152,4 +152,37 @@ describe("C22 §3 step 12 — the read loop", () => {
     expect(commit.mock.calls, "two hundred lines are one commit").toEqual([["input"]]);
     expect(graph.editor.text.split("\n"), "and all of them arrived").toHaveLength(200);
   });
+
+  it("T1.13 (C22 I31): a completion that settles after its batch commits a frame of its own", async () => {
+    // **Asserted as a commit after the batch, not as a layer on the stack.**
+    // The layer was always on the stack — that is precisely why every unit test
+    // of C19, C15 and C16 passed while Tab did nothing at a real prompt. The
+    // menu appeared on the next keystroke, fully formed, because that keystroke
+    // brought the frame the continuation never asked for.
+    const { graph, stdin } = await buildGraph({}, { columns: 100, rows: 30 });
+    graph.lifecycle.acquire();
+
+    const commit = vi.spyOn(graph.scheduler, "commit");
+    // **Against the framework's own verbs**, because this harness's manifest
+    // declares no tools — a probe asking for an app's flag would come back
+    // empty, and an empty result about the *manifest* wears the shape of a
+    // finding about the wiring. The empty path commits too, so the menu below
+    // is what keeps this from passing vacuously.
+    stdin.emit("/hel");
+    const duringBatch = commit.mock.calls.length;
+
+    stdin.emit("\t");
+    const afterTab = commit.mock.calls.length;
+    expect(afterTab, "the keystroke's own commit").toBeGreaterThan(duringBatch);
+
+    // The source settles on a microtask; nothing else happens in between, and
+    // no further input arrives.
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(
+      commit.mock.calls.slice(afterTab),
+      "and the continuation commits its own, with no key pressed",
+    ).toContainEqual(["completion"]);
+    expect(graph.overlays.top?.id, "the menu it drew").toBe(MENU_ID);
+  });
 });
