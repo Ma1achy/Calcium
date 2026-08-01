@@ -249,6 +249,10 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt c+left": ["\u001b[1;5D"],
       "prompt c+right": ["\u001b[1;5C"],
       "prompt left": ["\u001b[D", "\u001bOD"],
+      // The byte that would be SIGTSTP if raw mode did not clear `ISIG`, which
+      // is why this row exists rather than a reasoned assurance.
+      "prompt c+z": ["\u001a"],
+      "prompt m+z": ["\u001bz"],
     };
 
     const keymap = createKeymap(defaultKeymap);

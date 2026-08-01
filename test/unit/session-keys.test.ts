@@ -143,12 +143,12 @@ describe("C22 §3 step 11 — the effect table", () => {
     const editing = surface.filter((n) => !NOT_EDITING.has(n));
     expect(editing.length, "the surface was read, not assumed").toBeGreaterThan(5);
 
-    // `undo` and `redo` are the recorded exception: `⌃_` and `⌃⇧-` are the same
-    // byte and the decoder maps 0x01 to 0x1a and stops, so no readline key for
-    // them reaches the router. Named here with the reason so the day a key is
-    // chosen, this list is where the choice is recorded (C16 §6).
-    const UNBOUND = new Set(["undo", "redo"]);
-    const unreached = editing.filter((n) => !called.has(n) && !UNBOUND.has(n));
+    // **No exceptions.** `undo` and `redo` were the one entry this list held,
+    // and the reason it held them was that `⌃_` is the same byte as `⌃⇧-` and
+    // the decoder maps 0x01 to 0x1a and stops. That argued against `⌃_` rather
+    // than against binding at all: `⌃z` and `⌥z` reach both, and the list is
+    // now empty — which is the state it should be kept in.
+    const unreached = editing.filter((n) => !called.has(n));
 
     expect(unreached, "a C17 editing method no key can reach").toEqual([]);
   });
@@ -263,6 +263,21 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(ed.cursor).toBe(0);
     press("end");
     expect(ed.cursor).toBe(15);
+
+    // **Undo and redo are each other's inverse**, so a check that asks which
+    // method was called cannot see them swapped — the same reading the
+    // `killWordLeft`/`wordRight` mutation exposed. Only the text after each
+    // says which way round they are.
+    ed.setText("", 0);
+    ed.insert("alpha");
+    ed.insert(" beta");
+    const typed = ed.text;
+    press("z", { ctrl: true });
+    expect(ed.text, "⌃z undoes, it does not redo").not.toBe(typed);
+    const undone = ed.text;
+    press("z", { meta: true });
+    expect(ed.text, "⌥z puts it back").toBe(typed);
+    expect(undone, "and the two are not the same state").not.toBe(typed);
   });
 
   it("T1.4h3 (C16 I17): Enter submits, and it is `enter` rather than `return`", async () => {

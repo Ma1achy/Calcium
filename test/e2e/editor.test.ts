@@ -105,40 +105,81 @@ describe("C17 tier 5 — at a real prompt", () => {
   }, 60_000);
 
   it.todo(
-    // **Half verified, and the other half is an open question about the
-    // harness rather than about C17.** Written live, the prompt shows
-    // `/ps --search=日本` followed by two replacement characters — the third
-    // glyph\u2019s UTF-8 arriving broken — and it stays that way, so it is the
-    // screen rather than a frame caught mid-write.
+    // **Parked with its evidence, deliberately, rather than made green.**
     //
-    // It is not the decoder: C16 holds a partial sequence across chunks and
-    // T3.14 asserts it. It is not node-pty\u2019s per-chunk decoding either,
-    // which was real and is fixed — `encoding: null` plus one streaming decoder
-    // for the terminal\u2019s life (see `pty.ts`). What remains is timing: an
-    // isolated probe typing the identical string into the identical session,
-    // one glyph at a time or all at once, produces all three glyphs correctly
-    // every time, and this row does not. So the next step is to find what the
-    // row does that the probe does not, rather than to widen anything.
+    // *The property*: a command containing CJK and emoji puts the cursor where
+    // the user sees it — two cells per glyph, so the caret after
+    // `/ps --search=日本語` sits at cell 21 and the frame writes column 22.
     //
-    // The cursor arithmetic the row is really about is verified in passing:
-    // the caret sits at column 22 — two cells of prompt, thirteen of flag, six
-    // for three double-width glyphs — which is only observable at all because
-    // C01 yields the cursor sequence and the drawer embeds it (C01 I19).
-    "T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it at every position — the cursor arithmetic is verified; the row is blocked on a harness-side UTF-8 corruption that an isolated probe of the same session cannot reproduce",
+    // *Where it is asserted*: the cell arithmetic is C17's `cursorCell` over
+    // C09's `cells()`, covered at tiers 1 to 3 for CJK, ZWJ sequences,
+    // variation selectors and combining marks; the frame's half — that the
+    // drawer emits that column at all — is C22 T1.20 and C01 T1.17. Driving it
+    // through a terminal adds the agreement of those two, and nothing else.
+    //
+    // *What remains unexplained*: written live, the prompt shows `日本`
+    // followed by two replacement characters and stays that way. It is not the
+    // decoder, which holds a partial sequence across chunks (C16 T3.14), and it
+    // is no longer node-pty decoding each read independently — that was real
+    // and is fixed with `encoding: null` plus one streaming decoder for the
+    // terminal's life. What is left is timing: an isolated probe typing the
+    // identical string into an identical session, one glyph at a time or all at
+    // once, gets all three every time, and this row does not.
+    //
+    // A row made green by a sleep is worth less than one parked with what is
+    // known, and chasing a timing artefact in how a row drives the PTY closes
+    // nothing about C17.
+    "T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it at every position — the property is asserted at tiers 1 to 3 and its frame half at C22 T1.20; blocked on a harness-side UTF-8 corruption an isolated probe of the same session cannot reproduce",
   );
 
-  it.todo(
-    // **This one passed, and that was the finding.** Written as a live row it
-    // went green while asserting nothing about undo: `Ctrl-_` reaches no
-    // handler, so the keystroke did nothing, and the two assertions either side
-    // of it were about history navigation, which is bound. A row whose subject
-    // is unreachable and whose neighbours are reachable is the most expensive
-    // kind of green.
-    //
-    // The navigation half is asserted in test/integration/editor.test.ts T4.6.
-    // What waits here is the same blocker as T5.1: no key binds to undo.
-    "T5.4: an undo/redo sequence interleaved with paste and history navigation returns to the expected text — needs the editing keymap T5.1 names; written live it passed while `Ctrl-_` reached nothing",
-  );
+
+  it("T5.4: an undo/redo sequence interleaved with paste and history navigation returns to the expected text", async () => {
+    // **This row went green once while asserting nothing**, because `⌃_`
+    // reached no handler and the assertions either side of it were about
+    // history navigation, which was bound. It is live now that `⌃z` and `⌥z`
+    // are — and every step below changes the buffer, so a keystroke that
+    // reached nothing would leave the next assertion holding the previous
+    // state.
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      // A command in history to navigate to, submitted first.
+      pty.type("/ps --mine\r");
+      await pty.waitForFrame((f) => f.join("").includes("--mine"), 15_000);
+
+      // **A paste is one undo unit** (C17 I5), which is the property this row
+      // exists for: undoing it must return the whole block rather than
+      // unpicking it a character at a time.
+      pty.type("\u001b[200~/logs digit-42\u001b[201~");
+      await pty.waitForFrame((f) => f.join("").includes("digit-42"), 15_000);
+
+      pty.type("\u001a");
+      await pty.waitForFrame((f) => !f.join("").includes("digit-42"), 15_000);
+
+      pty.type("\u001bz");
+      await pty.waitForFrame((f) => f.join("").includes("digit-42"), 15_000);
+
+      // Interleaved with history: `↑` replaces the buffer with the stored
+      // command, and the redone paste is what it replaced.
+      pty.type("\u001b[A");
+      await pty.waitForFrame(
+        (f) => (f.find((r) => r.startsWith("❯")) ?? "").includes("--mine"),
+        15_000,
+      );
+
+      // And back down to the buffer the navigation left, which is C20's own
+      // round trip seen from outside.
+      pty.type("\u001b[B");
+      await pty.waitForFrame(
+        (f) => !(f.find((r) => r.startsWith("❯")) ?? "").includes("--mine"),
+        15_000,
+      );
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
+
 
   it("T5.5: resizing with a wrapped multi-line command in the buffer → the prompt reflows and the frame stays whole", async () => {
     const pty = session(100, 24);

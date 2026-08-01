@@ -84,11 +84,6 @@ export type KeyAction =
   // had eight bindings and none of them edited: the effect table was total, the
   // union was incomplete, and backspace did nothing at a real prompt.
   //
-  // **`undo` and `redo` are here and are not bound.** `⌃_` and `⌃⇧-` are the
-  // same byte, 0x1f, and the decoder maps 0x01 to 0x1a and stops — so no key
-  // readline uses for undo reaches the router. The actions exist because C17's
-  // methods do (I21); the binding waits for a key the decoder produces, rather
-  // than the decoder being widened to reach a binding.
   | "backspace"
   | "delete"
   | "killWordLeft"

@@ -200,6 +200,16 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "prompt", key: { name: "f", meta: true }, action: "wordRight" },
   { target: "prompt", key: { name: "right", ctrl: true }, action: "wordRight" },
   { target: "prompt", key: { name: "left" }, action: "left" },
+
+  // **Not readline's, and confirmed twice before being written.** `⌃z` is the
+  // one binding whose failure mode is that the session suspends, so neither
+  // half was reasoned about: the decoder emits `{name: "z", ctrl: true}` for
+  // 0x1a, and a real session typing that byte keeps taking input because raw
+  // mode clears `ISIG` at acquire (C01 §2). `⌥z` is the same ESC-prefixed path
+  // `⌥b`, `⌥d` and `⌥f` already take, and `⌃y` is not available for redo —
+  // yank is the readline convention worth keeping.
+  { target: "prompt", key: { name: "z", ctrl: true }, action: "undo" },
+  { target: "prompt", key: { name: "z", meta: true }, action: "redo" },
 ];
 
 /**
