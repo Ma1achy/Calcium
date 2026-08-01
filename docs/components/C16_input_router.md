@@ -5,7 +5,7 @@
 | **Type** | Component |
 | **Package** | `tui-kit` |
 | **Layer** | L3 interaction |
-| **Depends on** | C15 (`top`, `layout` for hit-testing) · C14 (scroll ops, `entryAtRow`; copy mode as an injected `exitCopyMode` while C14 §6 is unbuilt) · C13 (live entry) · C02 (`bracketedPaste`, `mouse`) · C06 (`busy`, `cancel` — the highest-precedence Ctrl-C branch) |
+| **Depends on** | C15 (`top`, `layout` for hit-testing) · C14 (scroll ops, `entryAtRow`; copy mode as an injected `exitCopyMode` while C14 §6 is unbuilt) · C13 (live entry) · C02 (`bracketedPaste`, `mouse`) · C23 (`inFlight`, `cancel` — the two highest-precedence Ctrl-C branches) |
 | **Consumed by** | C17 editor · C19 completion · C20 history · L4 |
 | **Source** | A01 D3, D6 · A02 §2 focus priority · `j22` #10 |
 | **Status** | Draft |
@@ -180,7 +180,7 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 
 | Context | Behaviour |
 |---|---|
-| **A verb is in flight** | Cancel it (C06's escalation ladder). **Takes precedence over everything** |
+| **A verb is in flight** | Cancel it (C06's escalation ladder). **Takes precedence over everything.** *In flight* is `C23.inFlight`, not `C06.busy` — see below |
 | A piped shell child is running | Forward `SIGINT` to the child |
 | A dismissable overlay is on top | Dismiss it |
 | A non-dismissable overlay is on top | No-op — a confirm is not cancellable by Ctrl-C |
@@ -196,6 +196,16 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 >
 > **One consequence: the rung reachability table below becomes derivable.** A rung with no constructible state is now a *target* with no constructible state, which `activeTarget`'s own tests already cover. That is a check moving from hand-maintained to structural, which is the trade this component keeps making.
 
+**Rungs 1 and 2 ask C23 what is in flight, and asked C06 and the runner until C23's walk.** C23 I5 says it plainly — *C23's guard is authoritative; C06's is a backstop* — and rung 1 was wired to the backstop, through `RouterDeps.busy` supplied as `runner.live.length > 0`.
+
+The gap that leaves is not a corner. C23 I3 appends the pending entry **before** invoking the transport, deliberately, because three hundred milliseconds of interpreter startup otherwise read as a dropped keystroke. Through that whole window C23 holds its guard and no process exists, so `C06.busy` is false, every rung declines, and Ctrl-C clears the prompt instead of cancelling. The entry stays pending, the guard stays held, and every later submission is refused for the rest of the session. C23 T3.4 asserts that this case works, and nothing in the tree could produce it.
+
+**So `busy` becomes `inFlight`, and it returns the route rather than a boolean** — `null | "app" | "local" | "shell"`. A boolean was the thing that could not be right: C23's guard covers every foreground route (I5), so a boolean sourced from it would make rung 1 fire on a `shell` delegation and swallow rung 2 entirely, which is this table's own unconstructible-rung defect created by fixing the one above it. Rung 1 takes `app` and `local` — cancel the submission, and C23 decides what that means for each. Rung 2 takes `shell` — forward `SIGINT`, so the child sees the signal it would have seen from a terminal. That is C23 T4.7's two behaviours, kept apart by the component that knows which is running.
+
+**This vindicates the rejected alternative below rather than reversing it.** Making `spawnShell` set `C06.busy` was refused because it puts a foreground shell command under C06's concurrency guard, and two guards over one condition drift. Correct — and the conclusion is not that C06 should answer differently but that C06 should not be asked. The fact is C23's; it was being read from whichever collaborator happened to have a related flag.
+
+**And it is rung 7's lesson through the other door.** There a constructible state had no rung and the ladder answered confidently with the next one down. Here both rungs exist and ask the wrong component whether their state holds — and a ladder always returns something, so it is a confident wrong answer either way. What distinguishes this one is that no state column could have caught it: rung 1's state *is* constructible and *is* tested. The disagreement is about who owns the fact, which a reachability table does not ask.
+
 **Both overlay rungs sit above copy mode, and the order is not this spec's to choose.** A02 §2 and C14 §6 both put `overlay` above `copyMode` — "a confirm raised over copy mode still wins" — and an earlier draft of this table had copy mode above both. A ladder that disagrees with focus priority is two answers to "what does this key mean now", and the one that loses is whichever the reader did not consult.
 
 The defect it produced is the one C15's fourth drawn frame already found, one rung lower: Ctrl-C on an unanswered confirm raised over copy mode **exited copy mode behind it**, leaving the confirm over a screen that had changed. **Moving only the dismissable rung does not fix it** — a non-dismissable confirm would then fall through to copy mode and do the same thing. The two rungs move together or neither does, which is why they are adjacent here and why a test asserts the pair rather than the first of them.
@@ -208,7 +218,7 @@ Note that the reorder above widened this hazard rather than narrowing it: the th
 
 **Rung 2 is the piped shell child, and it used to name the pass-through child, which cannot reach here.** A pass-through child runs through A02 Seam 4's `lifecycle.suspend()` → `runner.handoff()`, and C21 I6 makes `handoff` *refuse* while raw mode is still set. With raw mode suspended C16 receives no stdin at all: the terminal delivers `SIGINT` to the foreground process group directly, and the rung had no constructible case for the children it named.
 
-The `shell` route is a different thing and is reachable. It goes through `spawnShell` rather than `C06.invoke`, so `busy` is false and rung 1 does not catch it, which is what leaves a real gap for this rung to fill.
+The `shell` route is a different thing and is reachable. It goes through `spawnShell` rather than `C06.invoke`, and it is what `C23.inFlight` reports as `shell` — which is what keeps this rung apart from rung 1 now that both read the same source.
 
 **Making `spawnShell` set `busy` instead was rejected.** It would put a foreground shell command under C06's concurrency guard, and C23 I5 already owns that condition at a different scope — C23's guard is authoritative and C06's is the backstop. Two guards over one condition is how they drift.
 
@@ -238,8 +248,8 @@ constructible case.
 
 | # | Rung | Constructed by | Test |
 |---|---|---|---|
-| 1 | In-flight verb | `C06.busy`, any focus target | T1.11 |
-| 2 | Piped shell child | a `shell` route running; `busy` false | T3.11 |
+| 1 | In-flight verb | `C23.inFlight` is `app` or `local`, any focus target | T1.11 |
+| 2 | Piped shell child | `C23.inFlight` is `shell` | T3.11 |
 | 3 | Dismissable overlay | completion menu or reverse search on top | T1.1x |
 | 4 | Non-dismissable overlay | a confirm on top — **over anything**, including copy mode and a view | T1.12, T1.12b |
 | 5 | Copy mode | `copyMode` true, no layer on the stack | T4.3 |

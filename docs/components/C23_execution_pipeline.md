@@ -69,6 +69,8 @@ interface LocalRegistry {
 
 A local handler is the only place a component above L0 may reach several stores at once, and it does so through C23 rather than laterally.
 
+**`seal()` reconciles the registry against the manifest, and fails construction on a mismatch** (I27, §8b B3). C18 classifies a verb as `local` from the **manifest**; the handler lives **here**. Two records of one fact with nothing comparing them is how a manifest verb reaches §2's "run an in-process handler" with nothing to run, and how a registered handler for no manifest verb sits unreachable while looking installed. `seal()` is the moment both sides are complete and input has not been accepted (C22 I3), which makes it the only place the check is both possible and cheap.
+
 #### `/debug` — inspecting what actually ran
 
 ```
@@ -87,7 +89,8 @@ This is also what distinguishes `/debug` from `{ } json`, which several surfaces
 ## 3. The app path
 
 ```
-1  validate                    C05 — already done by C18; the result is carried, not recomputed
+1  check validation            C05 — done by C18; the result is read, never recomputed (I4).
+                              Not ok → the `error` route; nothing is spawned (§8b B2)
 2  refuse if busy              C06 — surface the refusal, do not queue
 3  append a pending entry      C13 — the user sees the command immediately
 4  invoke or stream            C06
@@ -206,7 +209,17 @@ scrolls like any other, and nothing ends it because nothing is holding it. That
 asymmetry is the reason it is a third case and not a third instance of the
 second.
 
-The first two mechanisms stop when the entry settles or the view pops.
+The first two mechanisms stop when the entry settles or the view pops, and
+**settlement also removes a stall notice that is present** (§8a A4). Stopping the
+mechanism does not retract the block it already injected, so an entry that goes
+quiet and then settles would keep `no output for 2m` in its final document, where
+it is no longer true and can never be replaced. Removal is part of settling
+because by then the mechanism has stopped and cannot do it.
+
+**All three stop once `session.stopping` is set** (§8b B1). I12 refuses
+*submissions*, and none of these is one — so without this line an identity notice,
+a stall patch or a refresh tick lands in a transcript that is being torn down,
+which is precisely what I12's own sentence promises does not happen.
 
 ---
 
@@ -255,9 +268,9 @@ Every stage can fail, and none may kill the session (A02 §7).
 | Validation fails | Error document; nothing spawned |
 | Transport fails or times out | Error document from C07's mapping |
 | Adapter throws | C07 contains it; fallback rendering plus a muted notice |
-| Patch application fails | `applyPatch` returns `{ok: false}` (C04 §4, I15) — it does not throw. The entry is settled with what it had; a notice records the truncation, carrying the returned `ErrorLike`'s message |
+| Patch application fails | C13's `patch` returns one of three `{ok: false}` arms and never throws (C04 §4, I15), so the response is per arm (§8a A2). `"patch"` — settle with what it had, a notice carrying the `ErrorLike`'s message, **and cancel the subscription** (§8a A3): the entry is final, so a child still streaming into it spends a process on output nothing can consume. `"settled"` and `"unknown"` — drop it, no notice. Both mean the entry is already in its final state, and a notice would describe the transcript rather than the command |
 | A local handler throws | Error document naming the verb |
-| `transcript.append` throws | The only stage whose failure loses the outcome. Logged as a defect, the frame still commits, and I1's second exception names it rather than leaving the invariant false |
+| `transcript.append` throws | The only stage whose failure loses the outcome. Logged as a defect, the frame still commits, and I1's second exception names it rather than leaving the invariant false. **The machine still returns to `idle`** (§8a A5) — I1's exception is about the entry, not a licence to keep the guard, and a stranded guard refuses every submission for the life of the session |
 | Commit throws | C03 contains it; contamination is flagged for the next frame |
 
 **Cancellation is not a failure.** Ctrl-C routes through C16 to C06's ladder; whatever the child produced is retained and the document settles as `partial` (C07 §4). The transcript keeps forty log lines rather than discarding them because the user stopped watching.
@@ -272,6 +285,8 @@ Per submission.
 |---|---|---|---|---|
 | **idle** | → running (T1.1) | — | — | — |
 | **running** | refused, notice (T1.6) | applied, entry streams (T1.8) | → idle, entry settles (T1.9) | → idle, `partial` (T1.10) |
+
+**Every exit from `running` returns to `idle`, including a stage failure** (§8a A5). The guard is released by whatever ends the submission, and there is no path that ends one without ending the other.
 
 `running` covers every foreground route from guard check to settle — `app`, `shell`, `local` and `builtinThenShell` alike. Streaming subscriptions are exempt and do not hold this machine: a `--watch` returns to `idle` once its entry is appended, and patching continues in the background.
 
@@ -290,7 +305,7 @@ Per submission.
 - **I9** — A frozen entry keeps receiving patches until settled.
 - **I10** — Cancellation settles as `partial` with output retained.
 - **I11** — Built-ins apply to session state before any delegation.
-- **I12** — A submission is refused once `session.stopping` is set, so nothing is appended after shutdown begins.
+- **I12** — A submission is refused once `session.stopping` is set, **and §3b's three mechanisms stop**, so nothing is appended or patched after shutdown begins. The second clause is not a widening: without it the rule covers submissions while its reason claims everything, and an identity notice or a stall patch lands in a transcript being torn down (§8b B1).
 - **I13** — Every cross-layer effect in §4 is sequenced here; no component causes its own.
 - **I14** — Local handlers are the only place several stores are reached at once, and only through C23.
 - **I15** — The displayed command and the spawned argv correspond exactly (D24).
@@ -305,6 +320,7 @@ Per submission.
 - **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I25) and applied by the sequence (C09 I17). The rule has teeth in one direction only: C23 may not *add* rhythm.
 - **I25** — A stream producing nothing for 120 s is **patched** with a muted stall notice, and never an error. A patch rather than an append, so it replaces cleanly on the next real patch and never becomes a second entry — and so it carries no `meta.origin`, which is why it is not I22's business. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
 - **I26** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
+- **I27** — `seal()` reconciles the local registry against the manifest and fails construction on a mismatch in either direction: a manifest verb marked `local` with no handler, or a handler for no manifest verb. Two records of one fact and no comparison is what lets a `local` route arrive with nothing to run (§8b B3).
 
 ---
 
@@ -335,6 +351,246 @@ Per submission.
 23. `/debug` is a local command, not an action, because an action cannot reach a frozen entry and inspecting an older entry is the point (I23).
 24. `/debug` never re-runs; `{ } json` always does, and each surface says so (I23).
 25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
+26. `seal()` reconciles the local registry against the manifest, both directions, and fails construction on a mismatch (I27).
+
+---
+
+## 8a. The sequence trace
+
+The eight steps of §3 against one `--watch` that patches, fails and settles.
+**Indexed by rule interaction, not by step** — a row governed by one rule
+restates that rule and finds nothing. Every row below is a cell where two correct
+statements overlap.
+
+| # | Sequence | Rules meeting | Outcome |
+|---|---|---|---|
+| 1 | submit → guard → append → **Ctrl-C** → invoke | I3 × I5 × C16 rung 1 | **Defect A1.** Unreachable |
+| 2 | patch → **`applyPatch` fails** → settle | I2 × C04 I15 × C13 I13 | `rev` unmoved — correct |
+| 3 | patch → fails → settle → **stream yields again** | §5 × `PatchOutcome` arms | **Defect A2.** Reads `.error` off an arm without one |
+| 4 | patch → fails → settle → **child still running** | I2 × I10 | **Defect A3.** Orphan |
+| 5 | 120 s silent → stall patch → **settle** | I25 × §3b | **Defect A4.** A false notice, frozen in |
+| 6 | guard → **`append` throws** | I1 exception 2 × §6 | **Defect A5.** Guard stranded |
+| 7 | cancel → settle `partial` → **`end` arrives** | I10 × I8 | `settle` is a no-op on a settled id — correct |
+
+### A1 — the cancellation window, and the ladder that cannot see it
+
+**Ctrl-C between step 3 and step 4 does nothing, and the session is then stuck.**
+
+I3 puts the pending entry in the transcript *before* the transport is invoked —
+the immediate-feedback rule, and the whole reason a slow verb feels responsive.
+That deliberately creates a window in which C23 holds its guard and no child
+exists.
+
+C16's rung 1 is *In-flight verb*, and its constructor is **`C06.busy`** (C16 §8a),
+supplied as `runner.live.length > 0` (`src/shell/construct.ts`). During the window
+that is false, so Ctrl-C falls past every rung to *prompt with text* or *prompt
+empty* and clears the input. Meanwhile:
+
+- the pending entry stays `streaming` forever;
+- the guard stays held, so every later submission is refused (I5);
+- nothing can release either, because release is `settle`'s job and only
+  cancellation or the transport would call it.
+
+**C23 T3.4 asserts this case works** — "cancel before the subprocess starts → the
+pending entry settles as `partial` with a cancelled notice" — and nothing in the
+tree can produce that behaviour.
+
+The two statements are each correct. **I5 says C23's guard is authoritative and
+C06's is a backstop**; C16's rung 1 is wired to the backstop. That is the whole
+defect, and it is invisible to a reader checking either spec alone.
+
+**Ruled: `RouterDeps.busy` becomes `inFlight`, supplied by C23, returning the
+route** — `null | "app" | "local" | "shell"`. Rung 1 takes `app` and `local`; rung
+2 takes `shell`.
+
+A boolean was the answer that could not be right, and finding out why is the
+second half of this row. C23's guard covers **every** foreground route (I5), so a
+boolean sourced from it makes rung 1 fire on a `shell` delegation and swallows
+rung 2 — C16's own unconstructible-rung defect, created by the fix for the one
+above it. Two rungs with two behaviours (C23 T4.7: cancel a verb, forward `SIGINT`
+to a shell child) need the kind, not the fact.
+
+It also vindicates C16's rejected alternative rather than reversing it. Making
+`spawnShell` set `C06.busy` was refused because two guards over one condition
+drift. Correct — and the conclusion is not that C06 should answer differently but
+that C06 should not be asked.
+
+This is C16's own rung-7 lesson arriving through the other door. There the ladder
+had no rung for a constructible state and answered confidently with the next one
+down; here it has the rung and asks the wrong component whether the state holds.
+A ladder always returns something.
+
+### A2 — `PatchOutcome` has three arms and §5 named one
+
+§5's containment row reads: *`applyPatch` returns `{ok: false}` … a notice records
+the truncation, carrying the returned `ErrorLike`'s message.* C13's `patch` returns
+three shapes, and only one carries an error:
+
+```
+{ ok: false, reason: "unknown" }              evicted or cleared — no error
+{ ok: false, reason: "settled" }              the stream outlived its settle — no error
+{ ok: false, reason: "patch", error }         malformed — the only arm §5 describes
+```
+
+A patch arriving after cancellation settled the entry returns `"settled"`, and the
+row applied literally puts `undefined` in the notice. `"unknown"` is ordinary
+rather than exceptional — C13 says so — and deserves silence, not a notice.
+
+**Ruled**, and §5 now says so per arm: `"patch"` settles with a notice carrying the
+message; `"settled"` and `"unknown"` are dropped without a notice, because both
+mean the entry is already in its final state and a second notice would describe
+the transcript rather than the command.
+
+### A3 — a bad patch settles the entry and leaves the child running
+
+§5 settles on patch failure. Nothing stops the subscription or the process. A
+`--watch` whose adapter emits one malformed patch therefore settles its entry,
+releases the guard, and leaves a subprocess streaming into a store that will
+reject every subsequent patch with `"settled"` forever.
+
+**Ruled: settling on patch failure cancels the subscription**, through the same
+path I10 uses. The entry is final, so nothing downstream can consume what the
+child produces; keeping it alive spends a process on output nobody will read.
+
+### A4 — a stall notice outlives the condition it describes
+
+§3b: the notice is "replaced on the next real patch and removed if output
+resumes", and "the first two mechanisms stop when the entry settles or the view
+pops". **Stopping the mechanism does not remove the block it already injected.**
+An entry that goes quiet at 120 s and then settles keeps `no output for 2m` in its
+final document, where it is no longer true and can never be replaced.
+
+**Ruled: settlement removes a present stall notice**, as part of settling rather
+than as a separate tick — the mechanism has stopped by then, so it cannot be the
+mechanism's job.
+
+### A5 — the guard outlives the submission that took it
+
+§5 names `transcript.append` as the one stage whose failure loses the outcome: no
+entry, logged as a defect, the frame still commits. It says nothing about the
+state machine. §6 transitions **idle → running** on submit, and the guard is taken
+before the append (§3). If the append throws, C23 stays `running` with no entry
+and no child, and every subsequent submission is refused for the life of the
+session.
+
+**Ruled: the machine returns to `idle` on any stage failure, including this one.**
+I1's second exception is about the *entry*; it is not a licence to keep the guard.
+
+### What the trace confirmed rather than found
+
+**Row 2 is a checked negative and worth recording as one.** I13 says the entry
+settles with what it had, which requires `rev` to stay put on a rejected patch, or
+C14 invalidates a cached height for a change that did not happen. C13's `patch`
+returns before `entry.rev + 1` and cites I13 at the line. C23 is the first caller
+that can produce the case and the two had never met; they agree.
+
+**And it settles whether C04's shape change earned itself.** It did. Had
+`applyPatch` thrown, the throw would unwind out of the stream loop with no way to
+distinguish *this patch was malformed* from *the transport died* — the first wants
+settlement with what was kept, the second wants C07's error mapping. The entry
+would have been left `streaming` with no owner. Returning a value is what lets A2
+and A3 be decided at all, and both of those defects are about what C23 does with
+the value rather than about getting one.
+
+---
+
+## 8b. The classification table
+
+`ParseResult` kind × session state, and what the pipeline does. **The rows that
+matter are the cells two route rules could both claim**; the rest restate §2.
+
+`stopping` is C22's flag (I12); `running` is §6's machine; *sealed* is C23's local
+registry after step 10.
+
+| `ParseResult` | idle | running | `stopping` | Notes |
+|---|---|---|---|---|
+| `empty` | nothing (I1) | nothing | nothing | **B5.** Two rules, one outcome |
+| `error` | entry | refused? | refused | An error document spawns nothing — see B5 |
+| `builtin` | apply, notice | **B4** | refused | |
+| `builtinThenShell` | apply, delegate | **B4** | refused | |
+| `local` | run handler | refused | **B1** | **B3** if unregistered |
+| `app` | §3 | refused (I5) | refused | **B2** if `validation.ok === false` |
+| `shell` | `spawnShell` | refused (I5, T3.16) | refused | |
+| — | — | — | **B1** | Non-submission appends are not covered by I12 |
+
+### B1 — I12 governs submissions, and three things that append are not submissions
+
+I12: *a submission is refused once `session.stopping` is set, so nothing is
+appended after shutdown begins.* The rule is about submissions; **the rationale
+claims more than the rule delivers.** Three paths append or patch without being
+submissions: the identity notice (§3b), a stall patch, and a refresh tick. Each
+can land after `stop()` has begun tearing the transcript down.
+
+This is the vacuity class inverted — not a rule with nothing to be wrong about,
+but a *rationale* wider than its rule, which reads as covering the case and does
+not. **Ruled: `stopping` halts §3b's three mechanisms as well**, which is one line
+in §3b and is what I12's own sentence already promises.
+
+### B2 — an `app` result carrying a failed validation has two routes
+
+C18 classifies by *shape*, not by validity: a verb that exists with a bad flag is
+`kind: "app"` with `validation: {ok: false, errors}`. §2's route table sends `app`
+to *Transport → adapt → append*. §5's containment table says *Validation fails →
+Error document; nothing spawned.*
+
+Both are correct and they name different destinations for one value. Step 1 of §3
+says validation is "already done by C18; the result is carried, not recomputed"
+(I4) — carried, and then nothing in §3 says to *look* at it. A reader implementing
+§2's table spawns a command C18 already knows is invalid.
+
+**Ruled: step 1 checks the carried result and diverts to the `error` route.** I4 is
+untouched — the point of I4 is that the answer is not recomputed, not that it is
+not read.
+
+### B3 — `local` names a handler the registry may not have
+
+C18 classifies `local` from the **manifest** (the `ParseResult` carries a
+`ToolDef`). The handler lives in C23's **`LocalRegistry`**. Two sources, and
+nothing reconciles them — so a verb declared `local` in the manifest with no
+registered handler reaches §2's *Run an in-process handler* with nothing to run.
+
+It is SP4's class at runtime: two records of one fact, no comparison. And the
+moment to compare already exists — **`seal()`**, which is exactly when both sides
+are complete and before any input is accepted (C22 I3).
+
+**Ruled: `seal()` reconciles the two and fails construction on a mismatch.** A
+manifest verb marked local with no handler is a configuration error the app can
+fix, and startup is where it is cheap. The reverse — a registered handler for no
+manifest verb — is also an error, and it is the one that would otherwise sit
+unreachable and look installed.
+
+### B4 — a refused `builtinThenShell` and the built-in it was carrying
+
+`cd /tmp && sleep 30` submitted while a verb is running. I5 refuses the
+submission; I11 says built-ins apply **before** any delegation. Read in either
+order both are satisfied, and the outcomes differ: the `cd` persists and the
+delegation is refused, or the whole line is refused and the `cd` is lost.
+
+**Not ruled here.** It is a product decision rather than a consequence: `cd` is
+instantaneous and needs no guard, which argues for applying it; but a line the
+user watched get refused should not have half-happened, which argues against.
+`builtin` alone while running is the same question with the second half removed —
+`cd` needs nothing C23 is holding.
+
+Recorded rather than decided, and it is the one cell in either artefact where the
+walk produced a question instead of an answer.
+
+### B5 — `empty` while `stopping`, and the refusal that is itself an entry
+
+Two small cells, both of which read as settled and are not quite.
+
+**`empty` while `stopping`** is claimed by I1's first exception (`empty` produces
+no entry) and by I12 (refused once stopping). One outcome — nothing happens — from
+two rules, which is why it looks safe. It matters because I22 requires every
+appended document to carry an origin and a refusal *is* an append: the `stopping`
+refusal must not fire for `empty`, or a blank Enter during shutdown puts a notice
+in a transcript being torn down.
+
+**A refusal produces an entry**, and I1 counts it. §3's "a refused submission
+leaves no orphan entry" and T3.17's "no pending entry is created" are both about
+the *pending* entry specifically. The notice is an ordinary append with
+`origin: "user"`, and that is what keeps I1 true rather than making the refusal
+its exception.
 
 ---
 
