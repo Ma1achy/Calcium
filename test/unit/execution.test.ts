@@ -25,6 +25,7 @@ import { fixture } from "../support/manifest.js";
 import { doc } from "../support/blocks.js";
 import { result } from "../support/transport.js";
 import { slashPolicy } from "../../src/interaction/parser/index.js";
+import { assignOffsets, backoffOf, BACKOFF_CAP_MS } from "../../src/shell/refresh.js";
 import type { PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult, TransportRouter } from "../../src/data/transport/index.js";
 import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
@@ -44,6 +45,9 @@ function harness(script: Scripted = {}) {
   const resets: number[] = [];
   const calls: string[] = [];
   const typed: string[] = [];
+  /** A controllable clock and scheduler, so §3b's timers are driven not waited on. */
+  let now = 0;
+  const timers: (() => void)[] = [];
 
   const transport = {
     for: () => ({
@@ -107,7 +111,11 @@ function harness(script: Scripted = {}) {
     lifecycle: { size: () => ({ columns: 80, rows: 24 }) },
     resetFocus: () => void resets.push(1),
     stop: () => Promise.resolve(0),
-    clock: () => 0,
+    clock: () => now,
+    schedule: (fn: () => void) => {
+      timers.push(fn);
+      return { [Symbol.dispose]: () => undefined };
+    },
     openUrl: () => Promise.resolve(),
     binary: "widget",
     commandPolicy: slashPolicy,
@@ -118,7 +126,20 @@ function harness(script: Scripted = {}) {
   pipeline.register("debug dump", () => doc({ command: "/debug" }));
   pipeline.seal();
 
-  return { pipeline, transcript, session, commits, resets, calls, typed };
+  return {
+    pipeline,
+    transcript,
+    session,
+    commits,
+    resets,
+    calls,
+    typed,
+    /** Advance the injected clock and fire §3b's timers. */
+    tick: (ms: number) => {
+      now += ms;
+      for (const fn of [...timers]) fn();
+    },
+  };
 }
 
 /** Lets every `void`-ed async route settle before assertions. */
@@ -782,5 +803,94 @@ describe("C23 §3a — action dispatch", () => {
     h.pipeline.onAction({ kind: "fill", label: "f", command: "typed" }, live);
     await settled();
     expect(h.commits, "the live one committed a frame").toContain("input");
+  });
+});
+
+describe("C23 §3b — time-driven updates", () => {
+  it("T1.19 (I22, §3b): the identity notice is the only producer of origin `refresh`", async () => {
+    // **The cell the value was reserved for.** §3a's origin table listed
+    // `refresh` against stall detection and part refresh — and neither appends,
+    // while `meta.origin` is a field on an appended document. So the value read
+    // as reserved and was unreachable: A03 §2's vacuity class in a field.
+    //
+    // Asserting the origin rather than that a notice appeared is the whole
+    // point. A test checking only for the text leaves the field unreachable
+    // again, which is how it got here.
+    const h = harness();
+    h.pipeline.identityNotice("Token expires in 14h — run /login to refresh");
+    await settled();
+
+    const entry = h.transcript.entries.at(-1);
+    expect(entry?.doc.meta.origin, "C22 signals, C23 appends").toBe("refresh");
+    expect(
+      entry?.doc.blocks.some((b) => b.kind === "notice" && /Token expires/.test(b.text)),
+    ).toBe(true);
+  });
+
+  it("T3.19 (I12, §8b B1): §3b stops once stopping is set", async () => {
+    // I12 governs *submissions* and none of §3b's three is one, so without the
+    // second clause the rule covers submissions while its reason claims
+    // everything — and a notice lands in a transcript being torn down.
+    const h = harness();
+    h.session.beginStopping();
+    h.pipeline.identityNotice("Token expired");
+    await settled();
+
+    expect(h.transcript.entries, "nothing appended after shutdown begins").toHaveLength(0);
+  });
+
+  it("T1.20 (I25): a stream silent for 120 s is patched with a notice, never an error", async () => {
+    // **A notice, never an error.** A quiet stream is the normal state of a
+    // `--watch` on an idle cluster; reporting it as a failure trains the reader
+    // to ignore the one time it is one.
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise(() => undefined);
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+
+    h.tick(60_000);
+    const early = h.transcript.entries[0]?.doc.blocks.some(
+      (b) => b.kind === "notice" && /no output/.test(b.text),
+    );
+    expect(early, "not yet at 60 s").toBe(false);
+
+    h.tick(70_000);
+    const entry = h.transcript.entries[0];
+    const stall = entry?.doc.blocks.find((b) => b.kind === "notice" && /no output/.test(b.text));
+    expect(stall, "patched at 120 s").toBeDefined();
+    expect(stall?.kind === "notice" && stall.tone, "muted, not an error tone").toBe("muted");
+    expect(entry?.streaming, "and the subscription is untouched").toBe(true);
+  });
+
+  it("T1.21 (I20): offsets are spread so no two parts fire in the same tick", () => {
+    // Across the **smallest** interval rather than each part's own: two parts at
+    // 30 s and 300 s collide every tenth tick if each is staggered within its own
+    // period, and the smallest is the only window every part shares.
+    const parts = assignOffsets([
+      { id: "a", intervalMs: 30_000, fetch: () => Promise.reject(new Error("x")) },
+      { id: "b", intervalMs: 300_000, fetch: () => Promise.reject(new Error("x")) },
+      { id: "c", intervalMs: 60_000, fetch: () => Promise.reject(new Error("x")) },
+    ]);
+
+    const offsets = parts.map((p) => p.offsetMs);
+    expect(new Set(offsets).size, "all distinct").toBe(3);
+    for (const o of offsets) expect(o).toBeLessThan(30_000);
+  });
+
+  it("T1.22 (I21): backoff doubles from the interval to a five-minute cap", () => {
+    // A pure function so the doubling reads in a table. Off-by-one doubling is
+    // visible here and invisible in a running session.
+    expect(backoffOf(30_000, 0), "no failures — the declared interval").toBe(30_000);
+    expect(backoffOf(30_000, 1)).toBe(60_000);
+    expect(backoffOf(30_000, 2)).toBe(120_000);
+    expect(backoffOf(30_000, 3)).toBe(240_000);
+    expect(backoffOf(30_000, 4), "capped").toBe(BACKOFF_CAP_MS);
+    expect(backoffOf(30_000, 40), "and stays capped").toBe(BACKOFF_CAP_MS);
+    expect(backoffOf(30_000, 0), "recovery resets it").toBe(30_000);
   });
 });

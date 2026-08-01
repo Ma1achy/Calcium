@@ -182,6 +182,7 @@ describe("C22 §3 — construction order", () => {
         cancel: () => undefined,
         register: () => undefined,
         onAction: () => undefined,
+        identityNotice: () => undefined,
       };
     };
 
@@ -292,6 +293,7 @@ describe("C22 §3 — construction order", () => {
             cancel: () => undefined,
             register: () => undefined,
             onAction: () => undefined,
+            identityNotice: () => undefined,
           };
         },
       },
@@ -426,6 +428,7 @@ describe("C22 §3 — construction order", () => {
         cancel: () => void (cancelled += 1),
         register: () => undefined,
         onAction: () => undefined,
+        identityNotice: () => undefined,
       }),
     });
 

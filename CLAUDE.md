@@ -139,6 +139,17 @@ Each of these produces code that compiles, passes review, and is wrong.
   came back empty and no assertion about a source would have shown why. C18's table
   would have caught it, and C18's table was already in the repo.
 
+  **Two instances fitting a rule is not evidence for the rule — it is the minimum for
+  noticing one.** C13's patch gate was re-founded three times. `settle(id, doc)` and
+  `op: "expand"` both looked like *view state versus data*, and the classification held
+  because both happen to be view-state-ish. The third case broke it: a refusal notice
+  **is** data, so no partition of the operations could have covered it, and the axis was
+  wrong rather than the classification incomplete. The right axis was **who is writing**
+  — the far side, or the shell — which only became findable by stopping at the third
+  instance and asking instead of adding a second arm. A rule inferred from two cases has
+  been tested against one, and the cheapest moment to discover that is before the code
+  that assumes it.
+
   **And when a ruling chooses to throw, the walk asks what the throw leaves behind.**
   Both artefact shapes index rule interactions on the **accepted** paths — which rules
   could both claim a cell, which sequences produce a contradiction. The rejection path

@@ -137,6 +137,16 @@ export interface Pipeline {
    * own would be L1 causing effects in L2 and L4 at once.
    */
   onAction(action: Action, from?: EntryId | null): void;
+  /**
+   * C22's identity loop signalling a transition worth saying out loud (C23 §3b).
+   *
+   * **C22 signals, C23 appends** — the loop produces a *fact* and not an entry,
+   * which is every other Seam 4 row's shape and keeps C23 the only component
+   * that appends. The document carries `origin: "refresh"`, and this is the only
+   * path that sets it: §3b's other two mechanisms patch, and a patch has no
+   * `meta`.
+   */
+  identityNotice(text: string): void;
 }
 
 /** Step 10. Takes the router because C23's submit row ends `resetFocus()`. */
@@ -183,6 +193,8 @@ export type PipelineDeps = Readonly<{
   stop: (reason: StopReason) => Promise<number>;
   /** C22's injected clock — §3b's three mechanisms and nothing else (C23 I19). */
   clock: () => number;
+  /** C22's ambient `setTimeout`, for §3b's timers. Nothing else schedules. */
+  schedule: (fn: () => void, ms: number) => Disposable;
   /** Scheme-checked by C23 before use (C23 I17). */
   openUrl: (url: URL) => Promise<void>;
 

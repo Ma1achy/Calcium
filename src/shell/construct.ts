@@ -369,6 +369,7 @@ export async function constructGraph(
       resetFocus: () => router.resetFocus(),
       stop: deps.stop,
       clock: config.clock,
+      schedule: config.schedule,
       openUrl: config.openUrl ?? defaultOpener(config.platform, runner, session),
 
       binary: config.binary,

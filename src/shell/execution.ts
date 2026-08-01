@@ -29,6 +29,7 @@ import type { RawPatch } from "../data/transport/index.js";
 import { block } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
+import { createRefreshDriver } from "./refresh.js";
 import {
   createLocalRegistry,
   reconcile,
@@ -318,6 +319,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     );
     deps.resetFocus();
     deps.scheduler.commit("input");
+    // §3b — from here the entry can go quiet, so it is watched for silence.
+    refresh.watch(pendingId);
 
     const controller = new AbortController();
     cancelInFlight = () => {
@@ -365,6 +368,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // §settle). The document arrives, the entry becomes it, the entry is done
       // — and `meta` travels with it, which is what C23 I7 and `/debug` need and
       // what no block-level patch could carry.
+      refresh.settled(pendingId);
       deps.transcript.settle(pendingId, doc);
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -405,7 +409,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     try {
       for await (const patch of patches) {
         if (patch.kind === "end") {
-          // C23 I8 — settlement flushes at `"completion"`.
+          // C23 I8 — settlement flushes at `"completion"`. §8a A4: settling
+          // clears the stall state, so a notice does not outlive its condition.
+          refresh.settled(id);
           deps.transcript.settle(id);
           deps.scheduler.commit("completion");
           return;
@@ -425,6 +431,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
         const outcome = deps.transcript.patch(id, view);
         if (outcome.ok) {
+          // §3b — output resumed, so the entry is no longer silent.
+          refresh.sawPatch(id);
           // C23 I8 — patches coalesce at `"stream"`. C23 I9: a frozen entry keeps
           // receiving them, which is C13's business and not a condition here.
           deps.scheduler.commit("stream");
@@ -607,9 +615,26 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),
   });
 
+  /**
+   * C23 §3b. Constructed last because the identity notice appends through the
+   * same path a submission does — it is C23 speaking, on C22's signal.
+   */
+  const refresh = createRefreshDriver({
+    transcript: deps.transcript,
+    clock: deps.clock,
+    schedule: deps.schedule,
+    commit: (reason) => void deps.scheduler.commit(reason),
+    // **The only path in §3b that appends, and so the only producer of
+    // `origin: "refresh"`.** The other two patch, and a patch carries no `meta`.
+    append: (text) =>
+      void appendAndCommit(noticeDoc("", text, "info", { origin: "refresh" })),
+    stopping: () => deps.session().stopping,
+  });
+
   return {
     submit,
     onAction,
+    identityNotice: (text) => void refresh.identityNotice(text),
 
     /**
      * C22 I3's fourth seal (§3a step 10), and C23 I27's reconciliation.
