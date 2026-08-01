@@ -42,15 +42,65 @@ At 100 columns, fully resolved:
    Token        expires in 30d
 
    ── Outstanding ─────────────────────────────────────────────────────────────
-   1 promote MR awaiting review    digit-classifier v_b4f0c12          ↗ open
-   2 running experiments                                               ≡ ps
+   1 promote MR awaiting review    digit-classifier v_b4f0c12
+   2 running experiments
 
    ── Recent ──────────────────────────────────────────────────────────────────
-   digit-classifier-v_b4f0c12    succeeded    2h ago                ↑ promote
-   digit-classifier-test-r12     failed       3h ago                   ≡ logs
+   digit-classifier-v_b4f0c12    succeeded    2h ago
+   digit-classifier-test-r12     failed       3h ago
 
    Type /help for commands · ? for context help
 ```
+
+### Columns
+
+Both tables are headerless — a list with per-row actions, which is what
+`showHeader: false` is for. Neither is sortable: a welcome screen is a snapshot
+and there is nothing to sort by.
+
+**Outstanding**
+
+| Column | Priority | Min | Align | Flex | Sortable |
+|---|---|---|---|---|---|
+| what | 95 | 20 | left | yes | — |
+| detail | 50 | 16 | left | — | — |
+
+**Recent**
+
+| Column | Priority | Min | Align | Trunc | Flex | Sortable |
+|---|---|---|---|---|---|---|
+| name | 95 | 20 | left | **start** | yes | — |
+| status | 85 | 9 | left | — | — | — |
+| age | 60 | 6 | **right** | — | — | — |
+
+Three of the four numbers come from a precedent rather than a preference.
+**`status` never truncates**, so its minimum is its longest value — `succeeded`
+at 9 — because a half-word reads as a different word (S03 §3). **`name`
+truncates from the start**, since `digit-classifier-v_b4f0c12` is hierarchical
+and the suffix is what distinguishes it from `digit-classifier-test-r12`; that
+is what `truncateFrom` landed for and this surface is now a consumer. **`age`
+right-aligns**, per S03 §3's convention.
+
+### There is no `action` column, and the figure used to draw one
+
+An earlier figure drew `↗ open` and `≡ ps` at the right of each row. **C11 does
+not render row actions inline** — focus changes the tone and nothing else, no
+marker, no extra row, no width — and no surface declares an `action` column.
+Every other surface draws its action labels as a single bar for the focused row
+at the bottom of the table, and §7 below already declares S02's as row actions
+of exactly that kind. Two records of one fact, and the figure was the wrong one.
+
+**The bar itself is a separate piece of work**, because `TableRow.actions` is
+read by nothing: the field exists, C11 §Focus says it "surfaces its actions",
+and no code does. Every surface drawing that bar has been drawing something
+nothing produces. This figure gains one when they all do, and the composition
+test is what forces the figure and the height to move together — so the count
+below will change on that commit rather than drifting.
+
+**The ranking argument survived losing its column.** `action` outranked `detail`
+because a row that says something is pending and offers no way to reach it is
+worse than one missing its description. That is an argument about where the
+action bar sits, and it keeps.
 
 ### The art
 

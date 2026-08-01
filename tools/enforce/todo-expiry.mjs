@@ -478,16 +478,15 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
    * as C22 §12b. The row they came from named C23 while the audit named C22 for
    * all five, and nothing compared the two records.
    *
-   *   S02 §2         its two headerless tables declare no columns at all, and
-   *                    `cols()` reads them from the spec precisely so a fixture
-   *                    cannot invent them
    *
-   * S12 §2 was here and lasted one commit: its box was ruled a rendered `panel`,
-   * `panel` gained a `footer`, and the figure composes. The entry earning its
-   * removal on the commit after it was written is the list working — a backlog
-   * whose entries are argued rather than accumulated.
+   * S02 §2 and S12 §2 were both here and neither lasted a commit. S12's box was
+   * ruled a rendered `panel` and `panel` gained a `footer`; S02's tables got the
+   * column declarations only their author could write. **Entries argued rather
+   * than accumulated is the list working** — the alternative was two rows
+   * deferring a decision to a backlog while the decision-maker was in the
+   * conversation, which is a backlog used as somewhere to put a question.
    */
-  "TD2 src/shell/session.ts (5)",
+  "TD2 src/shell/session.ts (4)",
 
   // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two
   // deferrals here — S01 §2's illustrated rows and C03 T5.4's edge drag — and

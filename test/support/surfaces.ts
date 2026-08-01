@@ -593,7 +593,76 @@ const S12_LOGS: Block = block({
   ],
 });
 
+/**
+ * S02 §2 — the welcome screen.
+ *
+ * **Two declarations were missing and only one was findable by reading.**
+ * `v1.0.0` was drawn and listed by nothing — five declared blocks against six
+ * visual groups. The other appeared only on trying to compose it: the two
+ * headerless tables declared no columns at all, and `cols()` reads them from
+ * the spec precisely so a fixture cannot invent priorities and minimums.
+ *
+ * **And there is no `action` column.** The figure drew `↗ open` at the right of
+ * each row; C11 renders row actions nowhere in a row, and §7 already declares
+ * them as row actions. The bar those labels belong in is a separate piece —
+ * `TableRow.actions` is read by nothing — and this figure gains one when every
+ * other surface's does.
+ */
+const S02_WELCOME: readonly Block[] = [
+  block({
+    kind: "raw",
+    id: "s02-logo",
+    text: fences("docs/surfaces/S02_the_welcome.md")[0]!.split("\n").slice(0, 8).join("\n"),
+  }),
+  block({ kind: "notice", id: "s02-version", gapBefore: true, tone: "muted", text: "v1.0.0" }),
+  block({
+    kind: "keyValue",
+    id: "s02-connection",
+    gapBefore: true,
+    rows: [
+      { label: "", value: "Connected to prism.fmx.io as malachy.doherty@fmx.io" },
+      { label: "Teams", value: "vision · ml-platform-readonly" },
+      { label: "Token", value: "expires in 30d" },
+    ],
+  }),
+  block({ kind: "rule", id: "s02-outstanding-rule", gapBefore: true, label: "Outstanding" }),
+  block({
+    kind: "table",
+    id: "s02-outstanding",
+    showHeader: false,
+    columns: cols("docs/surfaces/S02_the_welcome.md", 0),
+    rows: [
+      cellsOfRow("mr", { what: "1 promote MR awaiting review", detail: "digit-classifier v_b4f0c12" }),
+      cellsOfRow("runs", { what: "2 running experiments", detail: "" }),
+    ],
+  }),
+  block({ kind: "rule", id: "s02-recent-rule", gapBefore: true, label: "Recent" }),
+  block({
+    kind: "table",
+    id: "s02-recent",
+    showHeader: false,
+    columns: cols("docs/surfaces/S02_the_welcome.md", 1),
+    rows: [
+      cellsOfRow("a", { name: "digit-classifier-v_b4f0c12", status: "succeeded", age: "2h ago" }),
+      cellsOfRow("b", { name: "digit-classifier-test-r12", status: "failed", age: "3h ago" }),
+    ],
+  }),
+  block({
+    kind: "tip",
+    id: "s02-tip",
+    gapBefore: true,
+    text: "Type /help for commands · ? for context help",
+  }),
+];
+
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
+  {
+    file: "docs/surfaces/S02_the_welcome.md",
+    fence: 0,
+    label: "S02 §2 — the welcome screen",
+    width: 80,
+    blocks: S02_WELCOME,
+  },
   {
     file: "docs/surfaces/S12_logs_view.md",
     fence: 0,

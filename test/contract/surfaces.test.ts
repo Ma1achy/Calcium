@@ -200,6 +200,16 @@ describe("the S-series' illustrated heights", () => {
   // composing it meant choosing where the spec was silent, which is guessing
   // with a passing test attached.
   //
+  // **S02 — written, above.** Two declarations short: `v1.0.0` was drawn and
+  // listed by nothing, and the two headerless tables declared no columns at
+  // all. And its figure drew `↗ open` at the right of each row, which C11
+  // renders nowhere — focus changes the tone and nothing else — while §7
+  // already declared those as row actions. Two records of one fact, and the
+  // figure was the wrong one.
+  //
+  // **All five are now answered and none of them was C23's**, which is the
+  // whole finding: two deletions, two spec edits, one ruling.
+  //
   // **S12 — written, above**, once §2's self-contradiction was ruled. The
   // section opened by saying its box was not rendered and closed four
   // paragraphs later by naming a title bar and a keymap line as two of its
@@ -207,8 +217,6 @@ describe("the S-series' illustrated heights", () => {
   // a figure it does not describe, and `frameRows` strips exactly the two rows
   // that carry content. It is a `panel`: title in the top border, keymap in the
   // new `footer` (C04 §3), and HEIGHT_AUDIT was right from §1 onwards.
-  it.todo(
-    "S02 §2 composes to its illustrated rows — waits on C22 — S02 §2 declares no columns for its two headerless tables, and `cols()` reads them from the spec precisely so a fixture cannot invent them. The block list also drew `v1.0.0` without listing it, which is fixed; the columns are a design statement rather than a transcription (priorities, minimums, truncation) and belong with C22's whole-screen work",
-  );
+
 
 });

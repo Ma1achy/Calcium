@@ -363,12 +363,35 @@ blocker is wrong is indistinguishable from one that is pending (A03 §9a).
 
 ## Deferred, by component
 
-| Surface | Waits on |
-|---|---|
-| S02 §2 | **C22 §12b** — its two headerless tables declare no columns |
+Nothing. **Every S-series §2 with an illustration now composes** — S01 with C22,
+and S02, S11 and S12 on C23's branch, each after its own §2 gained what it was
+missing. S07 §3 and S10 §2 were deleted; they never had figures.
 
-Composed since: **S01 §2** (with C22), **S11 §2** and **S12 §2** (with C23's
-branch, each after its own §2 gained what it was missing).
+**One thing is deferred and it is not a surface.** `TableRow.actions` is read by
+nothing — `grep '\.actions' src/` returns a single hit and it is `tip`. C11
+§Focus says it "renders it distinctly and **surfaces its actions**"; the first
+half is the tone change and the second half has no implementation. So the action
+bar at the foot of a table — `⏎ detail  ␣ expand  ≡ logs  ⚡ events` in S03 §2,
+and the equivalent in S05, S06 and S14 — is drawn by four figures and produced by
+nothing. **The fifth instance of specified, agreed and structurally absent**, and
+the worst hidden of the five: the field exists, so nothing looked.
+
+**The shape is forced by the measurement contract, not chosen.** `render` sees
+focus through `ctx` and `measure` does not, which is why C11 can tone the focused
+row. An actions row whose *presence* depended on focus would change a block's
+height without changing the document — `rev` would not move and C14's cache would
+return a stale height, breaking C09 I1 in the one way the cache cannot see. So
+the row is unconditional whenever any row declares actions, and only its
+*content* follows focus.
+
+| | |
+|---|---|
+| height | `rows + 1` when any row declares actions, independent of focus |
+| content | the focused row's actions; empty when no row is focused |
+| owner | C11 — a surface cannot compose it, because blocks have no focus |
+
+When it lands, S02, S03, S05, S06 and S14's figures and their compositions move
+together, which is what the composition test is for.
 
 ## The five-surface row, split — and none of the five was C23's
 
@@ -382,7 +405,7 @@ gives five different answers:
 | S10 §2 | Nothing — §2 is a *shape listing*, six lines of `label description` prose, not a figure. **Deleted**, as S07 §3's was, and for the same reason |
 | S13 §2 | Nothing — this file already moved it to C22 and the test file's comment says so. **Deleted** as a stale label; its coverage sits with C22's frame row |
 | S11 §2 | A block list. §2 had none, so composing meant choosing where the spec was silent. Written down, and **composed** |
-| S02 §2 | Two declarations. `v1.0.0` was drawn and unlisted — the second verdict class, now fixed — and its two headerless tables declare **no columns at all**, which `cols()` reads from the spec precisely so a fixture cannot invent them |
+| S02 §2 | Two declarations, both taken. `v1.0.0` was drawn and unlisted — the second verdict class. Its two headerless tables declared **no columns at all**, which `cols()` reads from the spec precisely so a fixture cannot invent them. And its figure drew `↗ open` at the right of every row: C11 renders row actions nowhere in a row, and §7 already declared them as row actions. **Composed** |
 | S12 §2 | A ruling, taken: **the box is a rendered `panel`** and this file was right from §1 onwards. §2 opened by saying it was not rendered and closed four paragraphs later naming a title bar and a keymap line as two of its three regions — both of them rails. S01's convention copied to a figure it does not describe. **Composed** |
 
 **A row over N surfaces with N different blockers cannot be triaged, only split.**
