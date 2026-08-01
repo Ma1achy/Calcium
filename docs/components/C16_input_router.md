@@ -303,6 +303,12 @@ type BlockKeymap = readonly Readonly<{
 
 Data because Phase 1B adds user-defined bindings and a keymap expressed as branching code cannot be overridden, listed, or shown in help. `/help` renders the keymap from this table, so documentation cannot drift from behaviour.
 
+**An action is a name, and C16 executes none of them** (I19). Resolving `historyPrev` into a call on C20 would put L3's router in charge of L3's history store and L2's overlay stack, which is the reaching A02 Seam 4 forbids; the effect table is L4's, and C22 §3 step 11 is where it lives.
+
+**The built-in action names are a closed set, and that is what makes `/help` honest.** The anti-drift claim has always been that help renders from the table dispatch uses — and until the effects existed, that claim was vacuous in the direction nobody checked: a binding could sit in the table with no executor anywhere, and `/help` would list a key that does nothing. The remedy is the one this project has taken four times before: make it unconstructible rather than checked. `defaultKeymap`'s rows are typed against a `KeyAction` union and L4's table is a total `Record<KeyAction, …>`, so a binding naming an action nobody implements does not compile, and neither does an implementation of an action nobody binds.
+
+The set is closed for **built-in** bindings only. A `BlockKeymap`'s action is a surface's string dispatched through C23's block-action route (C23 §3a), and it is open by design — the surface supplies both halves.
+
 **Surfaces contribute bindings through the block.** A surface is not a component and cannot register a handler, so an adapter may attach a `BlockKeymap` to the block it produces. C16 merges it into the `liveBlock` target **while that block is live**, and withdraws it when the block freezes — so `s` sorts a `/ps` table and does nothing once a newer entry arrives.
 
 **Conflict detection at startup**: two bindings for the same `(target, key)` is a construction error, not a last-wins. A block keymap colliding with a global binding is the same error, raised when the block is committed rather than at startup — the global always wins, and a silent shadow would be worse than a loud refusal.
@@ -374,6 +380,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 
   **Made mechanical, it immediately found a third.** T2.13 walks every row of `defaultKeymap` through a real decoder, and a row with no wire form fails. Shift-Enter has two — `CSI 13;2u` and xterm's `modifyOtherKeys` form `CSI 27;2;13~` — and the decoder discarded both as well-formed-but-unknown, because `u` is not in the letter table and `27` is not in the tilde table. The third of C17 I12's three bindings was unreachable in every terminal that sends it, and the two that a reader would check by hand had already been fixed. `27` is a marker rather than a keycode, so the tilde branch tests it before the table; the codepoint is named through the same `namedControl` the unprefixed byte uses, because a second naming path is exactly how the meta branch came to call Enter `\r`.
 - **I18** — `reset()` discards every partially-decoded state — pending bytes, the paste buffer, the escape window — and emits nothing. It exists for the one gap in the byte stream that is not a slow link: a suspension, whose bytes went to a child. The decoder cannot detect that gap itself — it owns no timer and reads no clock beyond the injected one (I9) — so the call belongs to whoever knows the terminal was handed over and taken back, which is L4 (C22 §4, C01 I18).
+- **I19** — C16 names actions and executes none. The built-in names are a closed union and L4's effect table is total over it, so a binding with no executor and an executor with no binding are both compile errors — which is what makes `/help` rendering from the dispatch table a property rather than a coincidence. Block keymaps are open strings by design and dispatch through C23 §3a.
 
 ---
 
@@ -395,6 +402,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 14. `\r` and `\n` decode to different keys and a modified key keeps the unmodified name, so both of C17's terminal-independent newline bindings resolve against events the decoder actually produces (I17).
 15. Every row of `defaultKeymap` is walked through a real decoder, and a row with no wire form fails — the rule made mechanical, which found the third instance (I17).
 16. A suspension discards half-decoded state through `reset()`, which emits nothing; the decoder cannot see the gap and the shell calls it on resume (I18).
+17. C16 names actions and executes none; the built-in names are closed and L4's table is total over them, so `/help` cannot list a key that does nothing (I19).
 
 ---
 
@@ -498,6 +506,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.
 - **T6.4d** (I4, §5) — **structural guard, no failing test.** Reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails today, and the ladder is free to drift from `activeTarget` on the next edit touching one and not the other. Every other entry in this tier reads *change X → test Y fails*; this one names a change no assertion catches, and says so deliberately. Inventing an assertion that looked like a guard would be worse than pointing at the real one, which is **T2.5's exhaustiveness over `FocusTarget`**: while the rungs are handlers, a target with no binding is a compile-level gap, and the ladder cannot hold an order of its own to disagree with. Read this row as a signpost to that, not as an unfinished test (A02 §7).
+- **T6.15** (I19) — **structural guard, no failing test.** Widening `KeyAction` to `string`, or making L4's table partial, → nothing fails, and every binding is free to become one `/help` lists and nothing dispatches. The protection is the total `Record`, which is why this row names the shape rather than an assertion: the fourteen bindings had no executor at all while every test here passed, because a table of names is satisfied by names.
 - **T6.14** (I18): making `reset()` flush the accumulated run as keys rather than discard it → T1.16's heuristic case fails, and the characters a user typed at `vim` arrive at the prompt when they come back.
 - **T6.13b** (§7): registering the disarm as a handler rather than observing before dispatch → T3.8c fails, and an exit confirm appears after the user typed something in between.
 - **T6.5** (I4): broadcasting to every handler → T1.7 fails and actions fire twice.

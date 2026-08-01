@@ -126,6 +126,17 @@ Three things depend on that split, and none of them is served by constructing ea
     read loop                                 C16, C01 — startup step 8's mechanism
 ```
 
+**Step 11 is four handlers and an effect table, and it was two handlers.** `prompt` took `Enter` and `global` took the five scroll keys; nothing inserted a printable character into the editor, and none of `defaultKeymap`'s fourteen bindings was executed anywhere — the action names appeared in C16's table and in no other file in the tree. A keymap is data that documents behaviour (C16 §6), so `/help` rendered fourteen bindings of which two did anything, which is the structurally-absent class arriving in the most visible place in the product.
+
+The effect table lives in `src/shell/keys.ts`, and it is **not** `src/shell/actions.ts`: that file is C23's block-action dispatch, a different thing wearing the same word, and each names the other so the collision is not tidied into one file later. The table is total over C16's `KeyAction` union (C16 I19), so a bound action with no effect and an effect with no binding are both compile errors rather than a `/help` entry that does nothing.
+
+| Target | What the handler owns |
+|---|---|
+| `prompt` | printable keys and pastes into C17; `Enter` submits; the eight bound actions — newline ×3, `complete`, `acceptGhostOrForward`, `historyPrev`, `historyNext`, `reverseSearch` |
+| `overlay` | the six bound actions — `menuNext` ×2, `menuPrev`, `menuAccept`, `dismiss`, `searchOlder` |
+| `liveBlock` | the block keymap C16 merges while the block is live (C16 §6), dispatched through C23 §3a |
+| `global` | scroll, which was already here |
+
 **Step 12 is the courier, and it was missing from this list while startup step 8 named its effect.** C16's decoder is `push(chunk) / poll() / nextDeadline()` and owns no timer; C01 delivers raw bytes through `onInput` and interprets none (C01 I18). Neither is wired to the other by existing, and nothing else in the tree is allowed to read stdin — so "accept input" was a step with a name and no mechanism, and a session built from this document decoded nothing while every component it needed was finished and tested. It is last because it is the moment the shell becomes live: a byte arriving before step 11 reaches a router with no handlers.
 
 The step does three things, and the third is the one with no other home:
@@ -135,6 +146,10 @@ decoder = createDecoder({ capabilities, now })
 lifecycle.onInput(chunk => { for (e of decoder.push(chunk)) dispatch(e) })
 after every push and every wake-up: arm a timer for decoder.nextDeadline()
 ```
+
+**One commit per decoded batch, in the read loop, and no handler commits.** C16 I11 says L4 commits and does not say where; two places is what that leaves open, and a scroll went through a handler that committed and would have gone through a loop that committed too. The rule is the same trade this project has taken every time it has arisen — construction over discipline: a handler that forgets to commit is a keystroke that changes state and draws no frame, nothing checks for it, and the symptom is a UI that intermittently does not respond. One commit at the end of the batch cannot be forgotten by a handler that does not have the duty.
+
+A batch is what one `push` returned, so a two-hundred-line paste is one commit rather than two hundred. C03 would coalesce the paints, but each of the two hundred would still schedule, and the reason the loop batches at all is that the decoder already told us they are one event.
 
 **The wake-ups are C22's because the decoder owns no timer and C01 owns no clock.** Three of C16's rules are timeouts — the 50 ms escape window, the 30 ms paste heuristic, the 500 ms exit arming — and each reports its moment through `nextDeadline()` rather than firing it. Without a scheduled `poll()`, a lone `Esc` is delivered only when the *next* key arrives, which is a keystroke that appears to do nothing until you press another one. The timer is `config.schedule`, the same injected one the identity loop takes (I10).
 
@@ -523,6 +538,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I23** — A `Manifest` reaching construction carries `tui-kit`'s own six verbs, or construction fails naming them. `parseManifest` is the only thing that appends them (C05 §3); an object satisfying the type is one nobody parsed, and C23 would register handlers for verbs nothing can classify to.
 - **I24** — Raw bytes reach the decoder through `lifecycle.onInput` and through nothing else, and the decoder's deadlines are polled on C22's injected schedule. C22 is the only file that may read stdin, for the reason it is the only one that may read the clock: two readers of one stream is two half-decoded sequences, and the second reader is invisible to the first. The wake-ups are here because C16 owns no timer and C01 owns no clock, so a decoder without them delivers a lone `Esc` on the next keystroke rather than after its window (§3 step 12).
 - **I25** — A suspension is bracketed by `suspend()` before the handoff and `resume()` then `decoder.reset()` after it. The listener's removal is C01's, in the transition; the reset is C22's, because only this file knows both that the terminal came back and that a decoder is holding a sequence the child interrupted (C01 I18, C16 I18).
+- **I26** — Step 11 registers a handler for every focus target that has bindings, and the effect table in `keys.ts` is total over C16's `KeyAction` union. A binding `/help` renders is therefore one dispatch executes, by construction rather than by agreement (C16 I19).
+- **I27** — Exactly one `commit("input")` per decoded batch, issued by the read loop; no handler commits. Two committers is one frame too many for a scroll and none for whichever handler forgets, and only the second is invisible (C16 I11).
 
 ---
 
@@ -547,6 +564,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 14. An offline cluster degrades rather than ends the session (I15).
 14a. Step 12 wires the read loop: bytes reach the decoder through `lifecycle.onInput` and nowhere else, and its deadlines are polled on the injected schedule. Startup step 8 had a name and no mechanism until this step existed (I24).
 14b. A suspension is `suspend()` → handoff → `resume()` → `decoder.reset()`, and the ordering is asserted rather than the outcome (I25, C01 I18, C16 I18).
+14c. Step 11 registers a handler per bound target and an effect table total over C16's action union, in `keys.ts` — which is not C23's `actions.ts`, and each says so (I26).
+14d. One `commit("input")` per decoded batch, issued by the loop; no handler commits (I27).
 15. `stopped` is terminal (I16).
 
 ---
@@ -565,6 +584,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4d** (I22): a config omitting `pipeline` still yields a graph carrying a sealed `Pipeline`, and an injected factory is still used. Both halves, because a default that ignored `config.pipeline` would satisfy the first and remove the seam.
 - **T1.4e** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
 - **T1.4f** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
+- **T1.4h** (I26): every `defaultKeymap` binding, pressed through a real decoder into a constructed graph, produces its documented effect — fourteen cases, driven from the table rather than listed. A hand-written list is the shape that let fourteen bindings go unexecuted while every test passed.
+- **T1.4i** (I27): a paste of two hundred lines → exactly one `commit("input")`; a scroll key → exactly one, issued by the loop and not by the handler. Both halves, because a handler that also commits passes the first.
 - **T1.4g** (I24): a lone `Esc` with no following byte → the key is dispatched when its window elapses on the injected schedule, not when the next key arrives. A decoder wired without wake-ups passes T1.4f and delivers `Esc` on the next keystroke, which is a key that appears to do nothing until you press another one.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
 - **T1.6** (I10): a fake clock and filesystem reach every component that takes one — asserted per component.

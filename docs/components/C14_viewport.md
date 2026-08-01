@@ -332,7 +332,7 @@ Fake heights, no rendering.
 - **T4.5** (with C10): switching theme mid-scroll → no remeasure, no movement, only a repaint.
 - **T4.6** (with C02, C09): a `unicode: "ascii"` session measures identically to UTF-8 at every width.
 - **T4.7** (with C01): a `SIGWINCH` snapshot drives one resize; the anchor is captured before the cache is dropped.
-- **T4.8** (with C03, L4): a scroll causes **L4** to issue one `commit("input")` — immediate, never coalesced. A spy asserts C14 never calls the scheduler itself, matching the C01 and C10 orchestration pattern.
+- **T4.8** (with C03, L4): a scroll causes **L4** to issue one `commit("input")` — immediate, never coalesced. A spy asserts C14 never calls the scheduler itself, matching the C01 and C10 orchestration pattern. **Driven through L4's read loop rather than by dispatching to the handler**, because the commit is the loop's (C22 I27): a test that dispatched directly would assert the mechanism it happened to find, and it passed while the handler and the loop would both have committed.
 
 ### Tier 5 — e2e
 
