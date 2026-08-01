@@ -180,6 +180,7 @@ describe("C22 §3 — construction order", () => {
         // C16 rungs 1 and 2 read these (C23 §8a A1).
         inFlight: null,
         cancel: () => undefined,
+        register: () => undefined,
       };
     };
 
@@ -288,6 +289,7 @@ describe("C22 §3 — construction order", () => {
             sealed: true,
             inFlight: null,
             cancel: () => undefined,
+            register: () => undefined,
           };
         },
       },
@@ -420,6 +422,7 @@ describe("C22 §3 — construction order", () => {
           return route;
         },
         cancel: () => void (cancelled += 1),
+        register: () => undefined,
       }),
     });
 

@@ -25,6 +25,7 @@ import type { FrameScheduler } from "../terminal/frame-scheduler.js";
 import type { TerminalLifecycle } from "../terminal/lifecycle.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { TranscriptStore } from "../viewport/transcript/index.js";
+import type { LocalHandler } from "./local/registry.js";
 import type { ExecutionWrites } from "./state.js";
 
 /** The five triggers of §8. Three reach `stop`; two are C01's (I4). */
@@ -119,6 +120,14 @@ export interface Pipeline {
   readonly inFlight: "app" | "local" | "shell" | null;
   /** Cancel what is in flight, settling the entry `partial` (C23 I10). */
   cancel(): void;
+  /**
+   * Where `tui-kit`'s own local handlers and the app's arrive (C23 §2).
+   *
+   * Before `seal()`, which reconciles them against the manifest (C23 I27) — and
+   * that is why the registry cannot seal at step 4 with the other three: the
+   * app's handlers arrive with the pipeline (C22 I3).
+   */
+  register(verb: string, handler: LocalHandler): void;
 }
 
 /** Step 10. Takes the router because C23's submit row ends `resetFocus()`. */

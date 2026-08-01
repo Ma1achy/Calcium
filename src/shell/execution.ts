@@ -24,8 +24,15 @@
  */
 
 import { parse } from "../interaction/parser/index.js";
-import type { ParseResult } from "../interaction/parser/index.js";
-import { errorDoc, noticeDoc } from "./documents.js";
+import type { Builtin, ParseResult } from "../interaction/parser/index.js";
+import { block } from "../data/viewmodel/index.js";
+import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
+import {
+  createLocalRegistry,
+  reconcile,
+  LocalRegistryError,
+  type LocalHandler,
+} from "./local/registry.js";
 import type { Pipeline, PipelineDeps } from "./types.js";
 
 /** Which foreground route holds the guard. `null` is idle (C23 §6). */
@@ -69,7 +76,7 @@ class Guard {
 
 export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const guard = new Guard();
-  let sealed = false;
+  const local = createLocalRegistry();
 
   /**
    * §2's routes need C18's classification, and C18 needs the live session for
@@ -149,7 +156,109 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     route(line, result);
   };
 
-  /** §2 — seven kinds, seven paths. */
+  /**
+   * C18's built-ins, applied to session state (C23 I11).
+   *
+   * Returns a discriminated result rather than a document, because C23 T3.13
+   * turns on the difference: a `cd` to a missing directory must **not** delegate
+   * the remainder, so the caller needs to know which happened without parsing a
+   * document to find out.
+   */
+  const applyBuiltin = (
+    name: Builtin,
+    args: readonly string[],
+  ): { ok: true; text: string } | { ok: false; message: string } => {
+    switch (name) {
+      case "cd": {
+        const target = args[0] ?? "~";
+        // The value only. Resolution happens at spawn (C21 I10), which is what
+        // lets a `cd` move the *next* verb rather than this one.
+        deps.writes.setCwd(target);
+        return { ok: true, text: target };
+      }
+      case "export": {
+        const pair = args[0];
+        const eq = pair === undefined ? -1 : pair.indexOf("=");
+        if (pair === undefined || eq <= 0) {
+          return { ok: false, message: `export: expected NAME=value, got \`${pair ?? ""}\`` };
+        }
+        deps.writes.setEnv(pair.slice(0, eq), pair.slice(eq + 1));
+        return { ok: true, text: pair };
+      }
+      case "pwd":
+        return { ok: true, text: deps.session().cwd };
+    }
+  };
+
+  /** C23 §2's `shell` route — `spawnShell`, and a `raw` document (C18 §5). */
+  const runShell = async (line: string, command: string): Promise<void> => {
+    guard.take("shell", command.split(/\s+/)[0] ?? "shell");
+    try {
+      const child = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd });
+      let out = "";
+      for await (const chunk of child.stdout) out += chunk;
+      const exit = await child.exited;
+
+      appendAndCommit(
+        compose({
+          command: line,
+          status: exit.code === 0 ? "ok" : "error",
+          blocks: [block({ kind: "raw", id: blockId("raw"), text: out })],
+          meta: {
+            origin: "user",
+            exitCode: exit.code ?? 1,
+            transport: "subprocess",
+            argv: [command],
+            truncated: child.overflowed,
+          },
+        }),
+      );
+    } catch (cause) {
+      appendAndCommit(
+        errorDoc(line, { message: String(cause), stage: "spawn" }, { origin: "user" }),
+      );
+    } finally {
+      // C23 §8a A5 — every exit releases it, this one included.
+      guard.release();
+    }
+  };
+
+  /** C23 §2's `local` route. §8b B3's missing-handler cell is closed by `seal()`. */
+  const runLocal = async (line: string, verb: string, argv: readonly string[]): Promise<void> => {
+    guard.take("local", verb);
+    try {
+      const handler = local.get(verb);
+      if (handler === undefined) {
+        // Unreachable once `seal()` has run (C23 I27), and answered rather than
+        // thrown because C23 I2 admits no escaping failure — including one the
+        // reconciliation was supposed to have made impossible.
+        appendAndCommit(
+          errorDoc(
+            line,
+            { message: `no handler is registered for \`${verb}\``, stage: "local" },
+            { origin: "user" },
+          ),
+        );
+        return;
+      }
+      const doc = await handler(argv, { command: line });
+      appendAndCommit(doc);
+      // C23 I7 — declared, never inferred. A verb declaring none leaves `$_` alone.
+      if (doc.meta.resultId !== undefined) deps.writes.setLastUuid(doc.meta.resultId);
+    } catch (cause) {
+      appendAndCommit(
+        errorDoc(
+          line,
+          { message: `\`${verb}\` failed: ${String(cause)}`, stage: "local" },
+          { origin: "user" },
+        ),
+      );
+    } finally {
+      guard.release();
+    }
+  };
+
+  /** C23 §2 — seven kinds, seven paths. */
   const route = (line: string, result: ParseResult): void => {
     switch (result.kind) {
       case "empty":
@@ -159,12 +268,42 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         appendAndCommit(errorDoc(line, result.error, { origin: "user" }));
         return;
 
-      default:
-        // The remaining five routes land as they are built. Until then the
-        // submission is answered rather than dropped — C23 I1 has no path that
-        // produces nothing, and a silent `return` here would be one.
+      case "builtin": {
+        const applied = applyBuiltin(result.name, result.args);
         appendAndCommit(
-          noticeDoc(line, `\`${result.kind}\` is not wired yet`, "warn", { origin: "user" }),
+          applied.ok
+            ? noticeDoc(line, `${result.name} ${applied.text}`, "muted", { origin: "user" })
+            : errorDoc(line, { message: applied.message }, { origin: "user" }),
+        );
+        return;
+      }
+
+      case "builtinThenShell": {
+        // **C23 I11 — the built-in applies before any delegation**, and C23 T3.13
+        // is the other half: one that fails does not delegate.
+        const applied = applyBuiltin(result.name, result.args);
+        if (!applied.ok) {
+          appendAndCommit(errorDoc(line, { message: applied.message }, { origin: "user" }));
+          return;
+        }
+        void runShell(line, result.rest);
+        return;
+      }
+
+      case "shell":
+        void runShell(line, result.command);
+        return;
+
+      case "local":
+        void runLocal(line, result.tool.name, result.argv);
+        return;
+
+      case "app":
+        // The eight-step path lands next. Answered rather than dropped: C23 I1
+        // has no path that produces nothing, so the scaffold is visibly a
+        // scaffold at runtime and not only in the source.
+        appendAndCommit(
+          noticeDoc(line, "the app route is not wired yet", "warn", { origin: "user" }),
         );
         return;
     }
@@ -173,12 +312,27 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   return {
     submit,
 
+    /**
+     * C22 I3's fourth seal (§3a step 10), and C23 I27's reconciliation.
+     *
+     * Construction fails on a mismatch in either direction, because startup is
+     * where the answer is cheap: after it, the same mistake is a verb that
+     * classifies and has nothing to run.
+     */
     seal: () => {
-      sealed = true;
+      local.seal();
+      const manifest = deps.manifest.manifest;
+      if (manifest !== null) {
+        const reasons = reconcile(local, manifest);
+        if (reasons.length > 0) throw new LocalRegistryError(reasons);
+      }
     },
     get sealed() {
-      return sealed;
+      return local.sealed;
     },
+
+    /** Where `tui-kit`'s own handlers and the app's arrive, before `seal()`. */
+    register: (verb: string, handler: LocalHandler) => void local.register(verb, handler),
 
     get inFlight() {
       return guard.route;
