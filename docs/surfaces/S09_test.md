@@ -117,8 +117,21 @@ pytest's assertion output is rendered as a `code` block verbatim. Its rewriting 
 
 | Width | Layout |
 |---|---|
-| ≥ 80 | Test name left, duration right-aligned |
-| < 80 | The duration **column** drops; a failing test's duration moves into its failure detail |
+| 100 · 80 | none — test name left, duration right-aligned |
+| 79 · 60 | drops `duration`; a failing test's duration moves into its failure detail |
+
+**Exact widths, and the key backticked — both so the check can read this.**
+The four drop tables CP6 had been running against all state widths as numbers;
+this one stated `≥ 80` and `< 80`, which `widthsIn` reads as the number 80
+twice, so the two rows contradicted each other at one width. `79 · 60` is the
+same claim at its boundary and at the shell's minimum.
+
+**And the key backticked is not decoration.** `surfaceDrops`
+identifies a drop table by finding a row that names a declared column key —
+the only property the four readable drop tables share, since a `| Width |`
+header does not distinguish one from a logo table or a panel layout. Stated in
+bold prose this row said the right thing to a reader and nothing to the check,
+so S09's drop order went unverified from the day it was written.
 
 C11 drops columns wholesale, not cells — a column that renders for some rows and blanks for others would still consume its width for nothing. So below 80 the column goes entirely, and the one duration that matters follows the failure it belongs to.
 

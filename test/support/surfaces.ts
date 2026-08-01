@@ -795,9 +795,13 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       S07_IDENTITY,
       block({ kind: "rule", id: "s07-metrics-rule", label: "metrics", gapBefore: true }),
       S07_METRICS,
-      // **Not converted, and correctly so.** The bar follows a `diff`, which is
-      // C25's kind and has no rows to carry actions. C11 I17's bar belongs to a
-      // table; a surface whose last block is not one keeps a separate bar.
+      // **Not converted: the bar follows a `diff`**, which is C25's kind and has
+      // no rows to carry actions. C11 I17's bar belongs to a table, so a surface
+      // whose last block is not one keeps a separate one.
+      //
+      // Two surfaces keep separate bars and the reasons are different — this
+      // one has no table, S15's has no row actions. Worth stating both, because
+      // "five converted and two did not" reads as unfinished otherwise.
       block({
         kind: "pills",
         id: "s07-actions",
@@ -973,14 +977,17 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         tone: "muted",
         text: "Values are never shown by the CLI.",
       }),
-      // **Not converted, and this one needs a ruling.** §5's figure draws the
-      // bar *after* the notice — table, blank, notice, blank, bar — and a
-      // table's own bar cannot sit there. Either the figure is wrong and the
-      // bar belongs directly under the table, or `≡ /secrets <target>` is a
-      // hint rather than a row action; §8 lists it beside `↻ /login` and
-      // `≡ /config`, which are surface-level and not per-row. The other five
-      // converted with no figure change at all, which is what makes this one
-      // a question rather than an oversight.
+      // **Not converted: it is a hint, not row actions** (ruled).
+      //
+      // **The placeholder is the tell.** `≡ /secrets <target>` needs a target
+      // supplied, and a row action never would — the row *is* the target. A bar
+      // telling you to type a command with an argument is describing a command,
+      // not offering to run one on what you have selected.
+      //
+      // Three independent readings agree: §8 groups it with `↻ /login` and
+      // `≡ /config`, which are surface-level; §5's figure puts it after the
+      // notice, where a table's own bar cannot sit; and the label carries an
+      // argument no selection could fill.
       block({
         kind: "pills",
         id: "s15-actions",

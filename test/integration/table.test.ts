@@ -85,9 +85,6 @@ const NO_DROP_TABLE = [
   "S02 table 1",
   // The pods sub-table, added with no drop order of its own.
   "S05 table 1",
-  // §7 states the drop in prose: "The duration **column** drops". The column key
-  // is not backticked, so nothing can read it.
-  "S09 table 0",
   // §7's `| Width |` table arranges panels, not columns.
   "S13 table 0",
   // S14 declares no `| Width |` table at all.
@@ -102,15 +99,26 @@ const NO_DROP_TABLE = [
 /**
  * Declarations whose stated order and `planColumns` disagree.
  *
- * **Empty, and that is the finding.** Three surfaces looked like disagreements
- * — S02 at 80 "dropping" `▲ prism v1.0.0`, S13 and S15 dropping columns their
- * tables never mention — and all three were one fixture defect: `surfaceDrops`
- * called any `| Width |` table a drop table. None of the four real drop orders
- * disagrees with the planner. Kept as a list rather than deleted, because the
- * next one is a defect in a surface or in C11 and needs somewhere to be named
- * that is not the gap list.
+ * **Three looked like disagreements and were one fixture defect** — S02 at 80
+ * "dropping" `▲ prism v1.0.0`, S13 and S15 dropping columns their tables never
+ * mention. `surfaceDrops` called any `| Width |` table a drop table.
+ *
+ * **The one that is real arrived when S09 became readable**, which is CP6 doing
+ * what it exists for on the first table it had never been pointed at.
  */
-const UNRESOLVED: readonly string[] = [];
+const UNRESOLVED = [
+  // §7 says `duration` drops below 80. Its three columns are `glyph` 1, `name`
+  // 30 and `duration` 6 — 37 cells plus two gaps — so `planColumns` keeps all
+  // three at 79 and drops nothing until roughly half that width.
+  //
+  // **The stated number is about double the threshold the declarations
+  // produce**, and which side is wrong is a ruling: either `name`'s minimum of
+  // 30 is too small for a test name that truncates from the start, or 80 was
+  // written about the terminal rather than about the table. Guessing here would
+  // be writing the expectation from the output, which is the one thing CP6
+  // exists to prevent.
+  "S09 table 0",
+] as const;
 
 const EXCLUDED: readonly string[] = [...NO_DROP_TABLE, ...UNRESOLVED];
 
@@ -144,7 +152,8 @@ describe("C11 tier 4 — the planner against the surfaces", () => {
       (s) => s.label,
     );
     expect(unpaired.sort()).toEqual([...NO_DROP_TABLE].sort());
-    expect(UNRESOLVED, "a stated order and the planner disagree").toEqual([]);
+    // Equality, so a second cannot join quietly and a ruled one cannot stay.
+    expect([...UNRESOLVED].sort()).toEqual(["S09 table 0"]);
   });
 
   for (const surface of SURFACES) {
