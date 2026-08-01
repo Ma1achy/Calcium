@@ -188,3 +188,19 @@ asserts nothing.
 
 Any later component whose claim is about *latency* rather than about *ordering*
 wants this one, for the same reason.
+
+## The rule covers fakes, not only fixtures
+
+A fixture must be shown to respond to the thing under test before it is asserted
+against. **So must a fake**, and the inert class has migrated there.
+
+Twice in one file: `test/unit/execution.test.ts` stubbed `editor: {} as never`
+and an action test failed with `setText is not a function` — a finding about the
+harness wearing the shape of a finding about actions. The same file's table
+fixture was invalid, so `append` threw, the entry id was `undefined`, and every
+action read as fired from a frozen entry.
+
+Neither is a subtle failure once seen, and both cost a diagnosis each. A stub
+that exists to satisfy a type is a stub that will be called eventually, and
+`as never` is the shape that makes the call site look checked. Either give the
+fake a working implementation, or make the harness assert it is unused.

@@ -141,7 +141,7 @@ C09's `RenderContext.onAction` is supplied by C23. Nothing else may supply it �
 | `fill` | `editor.setText(command)`, cursor at end, one undo unit, then `commit("input")` and a fill-flash tick |
 | `exec` | Submitted through §2 exactly as if typed — same guard, same routes, same entry |
 | `open` | Handed to the injected `openUrl` (C22 §2); never spawned through a shell |
-| `expand` | An `op: "expand"` patch toggling the row's flag (C04 §4). **Not `replace`** — that arm carries data, and C13 gates data on the entry still streaming, so a `replace` would be rejected on every settled entry a reader would actually expand |
+| `expand` | An `op: "expand"` patch toggling the row's flag (C04 §4), at `"shell"` origin. The op names the operation readably; the origin is what gets it past a settled entry (C13 §6) |
 
 `fill` populating the prompt rather than running is A01 D8's default, and it is why `production cancel <uuid>` is readable before it happens. Only filter pills use `exec`, because a filter is reversible.
 
@@ -149,7 +149,7 @@ C09's `RenderContext.onAction` is supplied by C23. Nothing else may supply it �
 
 **A refusal patches a notice into the entry that was acted upon. It never appends.** This is C23 §4's pop row one section over, and the reasoning transfers whole: an append freezes the block the action came from, so a second action on it is refused as *frozen* rather than for its own reason, and the selection A01 D7 preserves is cleared. A refusal that changes the thing it declined to act on is worse than the refusal.
 
-The mechanism differs from the pop's, because a pop has nothing to say and a refusal does. `patch(id, { op: "append", block: notice })` on the source entry works today — a frozen entry still accepts patches, which is what C13 §2's frozen-is-not-finished distinction was for. No new operation, no freeze, no selection loss, and the message appears where the reader was looking rather than at the bottom of a transcript they have scrolled away from.
+The mechanism differs from the pop's, because a pop has nothing to say and a refusal does: `patch(id, notice, "shell")` on the source entry. The `origin` argument is what makes it possible — a refusal notice *is* data, so gating on the operation refused it on every settled entry, which is most of the ones a reader acts on. C13 §6 records the three tries and why the distinction is **who is writing** rather than what is written. No append, no freeze, no selection loss, and the message appears where the reader was looking rather than at the bottom of a transcript they have scrolled away from.
 
 An action from a **frozen** entry is refused (A01 D5, C13 §2): frozen entries hold stale data and firing `↑ promote` from one is the footgun that rule exists to prevent. Actions from a frozen-but-streaming entry are refused for the same reason — it is not focusable, so an action on it can only have arrived by mistake.
 

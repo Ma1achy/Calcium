@@ -65,6 +65,7 @@ interface TranscriptView {
 interface TranscriptStore extends TranscriptView {
   append(doc: ViewDocument, opts?: { streaming?: boolean; payload?: unknown }): EntryId;
   patch(id: EntryId, patch: ViewPatch): PatchOutcome;
+  patch(id: EntryId, p: ViewPatch, origin?: "farSide" | "shell"): PatchOutcome;
   settle(id: EntryId, doc?: ViewDocument): PatchOutcome;   // the entry is done; the doc, if there is a final one
   clear(): void;
 
@@ -195,16 +196,32 @@ The payload arrives as `append`'s `opts.payload` and is discarded unread when re
 
 ## 6. Patching
 
-**`settled` gates data, not every patch.** The rule was written for data — a stream has ended, so nothing further can arrive from the far side, and a patch that says otherwise is a caller bug worth surfacing. Expansion is not data arriving: it is view state, and C11 T4.7 makes it a document patch precisely *so* it reaches a frozen entry and survives in the record.
+**A settled entry accepts nothing further from the far side.** That is the claim the gate was always making, and stating it as *settled entries reject patches* was the accident: it gated the shell on whether the far side was still talking.
 
-Gating it on `streaming` inverts that. An app verb's result is settled the moment it lands, so the entries a reader would expand are exactly the ones that reject the operation, while a live `--watch` — the one case where expanding is least useful — accepts it. C04's `op: "expand"` is what makes the distinction checkable rather than remembered: four ops carry data, one carries view state, and the gate reads the op rather than the caller's intent.
+The reason the original is right, kept: a settled entry means the stream ended, so a further patch **from the far side** means the transport lied or a stale stream leaked. That is a real defect and rejecting it surfaces one (I8).
+
+The shell is a different writer with a different claim. C23 telling a reader something about an entry — a refusal, an expansion — has nothing to do with whether the far side is still speaking, and gating it on that inverted the rule exactly: an app verb's result settles the moment it lands, so the entries a reader acts on are the ones the shell could not speak about, while a live `--watch` accepted everything.
+
+```typescript
+patch(id: EntryId, p: ViewPatch, origin?: "farSide" | "shell"): PatchOutcome
+```
+
+Defaulting to `"farSide"`, which is the conservative direction: an unmarked patch is gated, so the mistake a caller can make is a rejection rather than a leak.
+
+**Three tries, and the first two were per-operation.** `settle(id, doc)` covered a result; `op: "expand"` covered view state; a refusal broke both, because a refusal notice *is* data. The distinction was never data-versus-view-state — it is **who is writing**, and that had been read off the operation because there was only ever one caller to ask.
+
+**The forgery argument does not apply, and that is what makes this different from glyphs and from a `viewState` flag.** Adapters never call `patch`: C07 returns documents and C23 applies them. There is exactly one caller and it knows which case it is in, so `origin` describes what C23 is doing rather than asserting something about bytes the far side supplied.
+
+**`op: "expand"` stays** and stops being the exception. It names a real operation readably at the call site; it is now an instance of a shell-origin patch rather than a carve-out in the gate.
+
+**This is not `meta.origin`.** That is `user | action | agent | refresh` on a *document*, recording who initiated a command (C04 I13, C23 §Setting origin). This records which side of the boundary a *patch* came from. Similar word, different axis, and they are never derived from one another.
 
 ```
-patch(id, p):
+patch(id, p, origin = "farSide"):
   entry unknown            → { ok: false, reason: "unknown" }, store unchanged
   entry not streaming
-    and p carries data     → { ok: false, reason: "settled" }, store unchanged
-    and p is `op: "expand"` → applied; a reader may open a row on a finished table
+    and origin "farSide"   → { ok: false, reason: "settled" }, store unchanged
+    and origin "shell"     → applied; the shell may always speak about an entry it holds
   otherwise                → r = applyPatch(doc, p)
                              r.ok  → doc = r.doc; rev++; sweep; notify
                                      → { ok: true, rev }
