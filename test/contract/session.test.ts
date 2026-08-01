@@ -7,7 +7,9 @@
 // `tsconfig` type-checks `test/`, so a `@ts-expect-error` that stops being an
 // error fails the build. That is what makes these assertions rather than
 // comments — the check runs at compile time and cannot be skipped.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 
@@ -15,6 +17,10 @@ import { createProcessRunner } from "../../src/data/process/runner.js";
 import { createTerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 function srcFiles(dir = "src", out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

@@ -7,12 +7,18 @@
 // the build — which makes it the one assertion here that a passing run of this
 // file would not catch on its own.
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { createUtf8Decoder } from "../../src/data/process/decode.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import { collect, scripts } from "../support/process.js";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

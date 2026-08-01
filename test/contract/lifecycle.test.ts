@@ -2,10 +2,16 @@
 // can be written against it.
 import { readdirSync, statSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { capabilities, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 const live: TerminalLifecycle[] = [];
 

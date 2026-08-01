@@ -1,8 +1,14 @@
 // C17 tier 3 — edge cases. The inputs that arrive from a paste rather than
 // from a keyboard, and the sizes nobody types.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { CORPUS_BUDGET_MS } from "../support/budget.js";
+
 
 import { createEditor } from "../../src/interaction/editor/index.js";
+
+// This file builds a large corpus; `budget.ts` carries the measurement and
+// why the 5 s default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: CORPUS_BUDGET_MS });
 
 const G = { first: 2, cont: 2 } as const;
 

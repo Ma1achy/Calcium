@@ -6,12 +6,18 @@
 // lever that found five defects in C25 and three in C12. Stepping a sequence and
 // asserting the whole state after each step is the substitute, and it is what
 // turned up the sweep-on-settle defect that R2 fixed.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { CORPUS_BUDGET_MS } from "../support/budget.js";
+
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { countBlocks } from "../../src/viewport/transcript/cap.js";
 import { appendPatch, docOf, groupOf, tableWithDetails } from "../support/transcript.js";
 import { doc } from "../support/blocks.js";
 import type { Change, TranscriptStore } from "../../src/viewport/transcript/index.js";
+
+// This file builds a large corpus; `budget.ts` carries the measurement and
+// why the 5 s default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: CORPUS_BUDGET_MS });
 
 /** The marker sits at the head and is the only entry with an empty command. */
 const marker = (s: TranscriptStore): (typeof s.entries)[number] | undefined =>

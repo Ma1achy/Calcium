@@ -4,7 +4,9 @@
 // implementation: total, pure, cacheless, and registered rather than privileged.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable, TABLE_CORPUS } from "../support/blocks.js";
 import { measurable, registry as bareRegistry } from "../support/render.js";
@@ -14,6 +16,10 @@ import {
   formatReport,
 } from "../support/measurement-conformance.js";
 import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 /** The corner cases a planner has to survive rather than reject (T2.1). */
 const FUZZ: readonly (readonly ColumnDef[])[] = Object.freeze([

@@ -1,12 +1,18 @@
 // C02 tier 2 — contract. The promised interface holds.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import {
   DEGRADATION,
   detectCapabilities,
   type TerminalCapabilities,
 } from "../../src/terminal/capabilities.js";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 const FIELDS: readonly (keyof TerminalCapabilities)[] = [
   "colourDepth",
