@@ -23,6 +23,7 @@ import { TranscriptError } from "./types.js";
 import type {
   Change,
   EntryId,
+  PatchOrigin,
   PatchOutcome,
   TranscriptEntry,
   TranscriptOptions,
@@ -119,18 +120,19 @@ class Store implements TranscriptStore {
     return id;
   }
 
-  patch(id: EntryId, patch: ViewPatch): PatchOutcome {
+  patch(id: EntryId, patch: ViewPatch, origin: PatchOrigin = "farSide"): PatchOutcome {
     const entry = this.#entries.find((e) => e.id === id);
     // A patch for an entry that was evicted or cleared. Ordinary, not a bug.
     if (entry === undefined || isMarker(entry)) return { ok: false, reason: "unknown" };
-    // **The gate is about data, not about patches** (§6). A stream outliving its
-    // `settle` is a caller bug, surfaced rather than absorbed (I8) — but
-    // `op: "expand"` is view state, and gating it here inverted the rule
-    // exactly: an app verb's result settles the moment it lands, so the entries
-    // a reader would expand were the ones refused, while a live `--watch` — the
-    // case where expanding is least useful — was allowed. C04 §4's named op is
-    // what makes the distinction unforgeable rather than remembered.
-    if (!entry.streaming && patch.op !== "expand") {
+    // **The gate reads who is writing** (§6). A settled entry accepts nothing
+    // further from the far side — a patch after `settle` means the transport
+    // lied or a stale stream leaked, which is a real defect and rejecting it
+    // surfaces one (I8). The shell speaking about an entry it holds is a
+    // different claim entirely, and gating it on whether the far side is still
+    // talking inverted the rule: an app verb's result settles the moment it
+    // lands, so the entries a reader acts on were the ones the shell could not
+    // speak about.
+    if (!entry.streaming && origin === "farSide") {
       return { ok: false, reason: "settled" };
     }
 

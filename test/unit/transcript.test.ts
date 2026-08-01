@@ -118,7 +118,9 @@ describe("C13 unit", () => {
     const unknown = s.patch("nosuch", appendPatch("x"));
     const bad = s.patch(streaming, { op: "merge", blockId: "b0", rows: [] });
     s.settle(streaming);
-    const settled = s.patch(streaming, appendPatch("y"));
+    // `farSide` explicitly: this arm is about the far side outliving its own
+    // settle, and the default is what an unmarked caller gets (§6).
+    const settled = s.patch(streaming, appendPatch("y"), "farSide");
 
     expect(unknown).toEqual({ ok: false, reason: "unknown" });
     expect(settled).toEqual({ ok: false, reason: "settled" });
@@ -286,5 +288,86 @@ describe("C13 unit", () => {
     expect(() => s.settle(id, INVALID_DOC)).toThrow();
     expect(s.patch(id, appendPatch("still going"))).toMatchObject({ ok: true });
     expect(s.settle(id, doc({ command: "ok now" }))).toMatchObject({ ok: true });
+  });
+
+  // --- the gate reads who is writing (§6) ----------------------------------
+
+  it("T1.7d (I8): a settled entry rejects the far side and accepts the shell", () => {
+    // **The pair is what makes the distinction real rather than a widening.**
+    // Asserting only the acceptance would read as the gate having been relaxed;
+    // asserting only the rejection is the test that already existed. Both, on
+    // one entry, is the claim: *a settled entry accepts nothing further from the
+    // far side*, which is what the rule always meant.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+
+    expect(
+      s.patch(id, appendPatch("late"), "farSide"),
+      "the transport lied or a stale stream leaked — a real defect",
+    ).toEqual({ ok: false, reason: "settled" });
+
+    expect(
+      s.patch(id, appendPatch("refused"), "shell"),
+      "the shell may speak about an entry it holds",
+    ).toMatchObject({ ok: true });
+  });
+
+  it("T1.7e: the default is `farSide`, so an unmarked patch is gated", () => {
+    // The conservative direction, and worth asserting rather than reading off
+    // the signature: a caller's mistake should be a rejection, not a leak.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+
+    expect(s.patch(id, appendPatch("x"))).toEqual({ ok: false, reason: "settled" });
+  });
+
+  it("T1.7f: origin is not the operation — a shell `expand` and a shell notice both land", () => {
+    // `op: "expand"` stops being the exception it briefly was. It names a real
+    // operation readably; what gets it past a settled entry is the origin, and
+    // a plain notice at the same origin lands identically.
+    const s = createTranscriptStore();
+    const id = s.append(
+      doc({
+        blocks: [
+          {
+            kind: "table",
+            id: "t1",
+            columns: [
+              { key: "name", label: "Name", align: "left", priority: 10, minWidth: 8, sortable: true },
+            ],
+            rows: [{ id: "r1", cells: { name: { text: "one" } } }],
+          },
+        ],
+      }),
+      { streaming: true },
+    );
+    s.settle(id);
+
+    expect(
+      s.patch(id, { op: "expand", blockId: "t1", rowId: "r1", expanded: true }, "shell"),
+    ).toMatchObject({ ok: true });
+    const b = s.entries[0]?.doc.blocks[0];
+    expect(b?.kind === "table" && b.rows[0]?.expanded).toBe(true);
+
+    expect(s.patch(id, appendPatch("said"), "shell")).toMatchObject({ ok: true });
+  });
+
+  it("T1.7g (I13, C14): a shell patch on a settled entry still moves rev", () => {
+    // **The first time `rev` moves on a settled entry**, and C14's cache keys on
+    // `(entryId, rev, width)` and invalidates from the returned value. It should
+    // hold unchanged — this asserts it rather than assuming, because a fast path
+    // that treated settled as static would look like a correct optimisation
+    // until this op existed.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+    const before = s.entries[0]?.rev ?? 0;
+
+    const out = s.patch(id, appendPatch("said"), "shell");
+
+    expect(out).toMatchObject({ ok: true, rev: before + 1 });
+    expect(s.entries[0]?.rev, "and the entry carries it").toBe(before + 1);
   });
 });

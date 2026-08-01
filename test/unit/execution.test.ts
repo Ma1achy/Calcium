@@ -755,4 +755,32 @@ describe("C23 §3a — action dispatch", () => {
     const second = h.transcript.entries[0]?.doc.blocks[0];
     expect(second?.kind === "table" && second.rows[0]?.expanded, "toggles").toBe(false);
   });
+
+  it("T1.17 (I18): an action from a frozen entry is refused, from the live one runs", async () => {
+    const h = withTable();
+    const frozen = h.id;
+    h.transcript.append(doc({ command: "later" }), { streaming: true }); // freezes the first
+    const countBefore = h.transcript.entries.length;
+
+    h.pipeline.onAction({ kind: "fill", label: "f", command: "typed" }, frozen);
+    await settled();
+
+    // **The refusal patches the entry it declined to act on** (I18, §3a). An
+    // append would freeze the block the action came from, so the *next* action
+    // is refused as frozen rather than for its own reason — C23 §4's pop row,
+    // one section over. The entry count is what distinguishes the two: a notice
+    // appearing somewhere is true either way.
+    const source = h.transcript.entries.find((e) => e.id === frozen);
+    expect(
+      source?.doc.blocks.some((b) => b.kind === "notice" && /frozen entry/.test(b.text)),
+      "the notice is on the entry that was acted upon",
+    ).toBe(true);
+    expect(h.transcript.entries, "and nothing was appended").toHaveLength(countBefore);
+    expect(h.typed, "and the refused action did not run").toHaveLength(0);
+
+    const live = h.transcript.liveId;
+    h.pipeline.onAction({ kind: "fill", label: "f", command: "typed" }, live);
+    await settled();
+    expect(h.commits, "the live one committed a frame").toContain("input");
+  });
 });

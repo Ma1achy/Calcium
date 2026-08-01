@@ -581,22 +581,27 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
         return;
       }
-      const outcome = deps.transcript.patch(from, {
-        op: "append",
-        block: block({
-          kind: "notice",
-          id: blockId("refused"),
-          tone: "warn",
-          glyph: "warn",
-          text,
-        }),
-      });
-      // A settled entry rejects a data patch (C13 §6), and a notice is data. So
-      // a refusal on a settled entry has nowhere to go but the transcript —
-      // which is the freeze this exists to avoid, taken only when the
-      // alternative is saying nothing at all.
+      const outcome = deps.transcript.patch(
+        from,
+        {
+          op: "append",
+          block: block({
+            kind: "notice",
+            id: blockId("refused"),
+            tone: "warn",
+            glyph: "warn",
+            text,
+          }),
+        },
+        // **The whole of why this works now.** A refusal notice *is* data, so a
+        // gate reading the operation refused it on every settled entry — which
+        // is most of the ones a reader acts on. The gate reads who is writing
+        // (C13 §6), and this is the shell.
+        "shell",
+      );
+      // The entry was evicted or cleared under the action. Nothing to patch and
+      // nothing worth appending about it.
       if (outcome.ok) deps.scheduler.commit("input");
-      else appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
     },
 
     notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),

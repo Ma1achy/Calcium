@@ -140,4 +140,34 @@ describe("C13 integration", () => {
     // that drives both, which is the shell's.
     "T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C23 — `/clear` is a local handler and C23 holds the registry (C23 §2)",
   );
+
+  it("T4.10 (C13 §6, C14 I-cache): a shell patch on a settled entry invalidates the cached height", () => {
+    // **The case the origin gate creates and nothing else could.** Before it, a
+    // settled entry could never change, so C14's cache slot for one was correct
+    // forever. Now the shell can patch it — a refusal notice, an expansion — and
+    // the height moves.
+    //
+    // C14 keys on `(entryId, rev, width)` and invalidates from the returned
+    // `rev`, so it should hold unchanged. **Asserted rather than assumed**,
+    // because a fast path treating settled as static would read as a correct
+    // optimisation until this op existed, and would be wrong silently: a stale
+    // height is a viewport describing a document it no longer holds.
+    const transcript = createTranscriptStore();
+    const viewport = createViewport(transcript, { width: W, height: 40, measureSequence });
+
+    const id = transcript.append(rowsDoc(3, "e"), { streaming: true });
+    transcript.settle(id);
+
+    // Measured and cached. `totalRows` is the sum C14 keeps per entry, so it is
+    // the value a stale slot would hold.
+    const before = viewport.scroll.totalRows;
+    expect(before, "the entry has a height").toBeGreaterThan(0);
+
+    // The shell says something about it. One block more, so the height moves.
+    const out = transcript.patch(id, appendPatch("refused"), "shell");
+    expect(out).toMatchObject({ ok: true });
+
+    expect(viewport.scroll.totalRows, "the cache did not serve a height for a document that changed")
+      .toBeGreaterThan(before);
+  });
 });

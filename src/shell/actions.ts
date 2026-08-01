@@ -125,12 +125,18 @@ export function createActionDispatcher(deps: ActionDeps) {
           const row = b.rows.find((r) => r.id === action.target);
           if (row === undefined) continue;
 
-          const outcome = deps.transcript.patch(from, {
-            op: "expand",
-            blockId: b.id,
-            rowId: action.target,
-            expanded: row.expanded !== true,
-          });
+          const outcome = deps.transcript.patch(
+            from,
+            {
+              op: "expand",
+              blockId: b.id,
+              rowId: action.target,
+              expanded: row.expanded !== true,
+            },
+            // The shell speaking about an entry it holds. The op names the
+            // operation; the origin is what gets it past a settled entry.
+            "shell",
+          );
           if (outcome.ok) deps.scheduler.commit("input");
           return;
         }
