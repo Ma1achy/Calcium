@@ -101,7 +101,7 @@ This is a structural interaction rather than an oversight, which is why it survi
 
 ## 3. Construction order
 
-**`createTui` runs step 1 and nothing else.** Validation is eager — it needs nothing constructed, and a bad config should fail at the call site rather than on `start()` — so `createTui` throws for a missing required field (T2.7) and otherwise returns an instance in the `created` state. **Steps 2 to 11 run inside `start()`.**
+**`createTui` runs step 1 and nothing else.** Validation is eager — it needs nothing constructed, and a bad config should fail at the call site rather than on `start()` — so `createTui` throws for a missing required field (T2.7) and otherwise returns an instance in the `created` state. **Steps 2 to 12 run inside `start()`.**
 
 Three things depend on that split, and none of them is served by constructing eagerly: §9's `created` state has to be a state where something exists and nothing is built; `stop` from `created` must find no lifecycle and nothing acquired (T1.9); and `TuiConfig.manifest` may be a path, so step 3 reads a file and a constructor cannot await.
 
@@ -122,7 +122,21 @@ Three things depend on that split, and none of them is served by constructing ea
  9  construct the input router                C16
 10  construct the execution pipeline          C23 — seals the local registry
 11  register every handler                    C16, and 10's submit
+12  construct the decoder and wire the
+    read loop                                 C16, C01 — startup step 8's mechanism
 ```
+
+**Step 12 is the courier, and it was missing from this list while startup step 8 named its effect.** C16's decoder is `push(chunk) / poll() / nextDeadline()` and owns no timer; C01 delivers raw bytes through `onInput` and interprets none (C01 I18). Neither is wired to the other by existing, and nothing else in the tree is allowed to read stdin — so "accept input" was a step with a name and no mechanism, and a session built from this document decoded nothing while every component it needed was finished and tested. It is last because it is the moment the shell becomes live: a byte arriving before step 11 reaches a router with no handlers.
+
+The step does three things, and the third is the one with no other home:
+
+```
+decoder = createDecoder({ capabilities, now })
+lifecycle.onInput(chunk => { for (e of decoder.push(chunk)) dispatch(e) })
+after every push and every wake-up: arm a timer for decoder.nextDeadline()
+```
+
+**The wake-ups are C22's because the decoder owns no timer and C01 owns no clock.** Three of C16's rules are timeouts — the 50 ms escape window, the 30 ms paste heuristic, the 500 ms exit arming — and each reports its moment through `nextDeadline()` rather than firing it. Without a scheduled `poll()`, a lone `Esc` is delivered only when the *next* key arrives, which is a keystroke that appears to do nothing until you press another one. The timer is `config.schedule`, the same injected one the identity loop takes (I10).
 
 Three orderings are load-bearing and the rest are incidental. §3a walks every pair.
 
@@ -289,6 +303,22 @@ cell that value was reserved for.
 Gates 1, 2 and 4 are `t01`'s. **Gate 4 does not block construction** — the graph is built, the fallback is drawn, and a resize continues from step 5 with session state intact. The too-small render is C22's, deliberately layout-engine-free, because it must work in a terminal too small for the layout engine to produce a sane answer. The 60 × 16 threshold is C22's number and not C02's: C02 §8 assigns it to L4 explicitly, on the grounds that a minimum size is an app policy rather than a terminal capability. An earlier draft cited it as `C02 §Size`, a section C02 has never had — a dangling reference, and A03 §9a records what happens to those when a renumber gives them something to resolve against.
 
 Step 7 is non-blocking, so the banner completes visibly over the first second rather than delaying the prompt. Input is accepted at 8, not after 7 — a dev can type while the banner is still filling in.
+
+**Step 8 is `lifecycle.acquire()` plus construction step 12, and nothing else.** C01 attaches the stdin listener as part of acquiring (C01 I18), so there is no separate "start listening" call to forget or to make twice; the shell's part is the decoder, the dispatch and the wake-ups.
+
+**The suspension sequence, in order** (A02 Seam 4, C01 I18, C16 I18):
+
+```
+suspend:   lifecycle.suspend()      → the listener is dropped, before handoff
+           runner.handoff(...)         the child owns the terminal
+resume:    lifecycle.resume()       → the listener is re-attached
+           decoder.reset()             whatever it half-decoded belongs to the child
+           scheduler.invalidate()
+```
+
+**`decoder.reset()` is on the resume path and cannot be anywhere else.** C01 knows the terminal came back and holds no decoder; C16 holds the state and cannot see the gap, because a gap in bytes is what a slow link looks like (C16 I18). Only this file knows both. Without it, the first keystroke after a `vim` session completes a sequence begun before it started.
+
+The ordering is asserted rather than the outcome (C01 T4.4b). "The child received its keystrokes" passes wherever the parent's listener happens to lose the race and fails intermittently elsewhere — the same shape as `killAll` before release, where only the order is checkable.
 
 ---
 
@@ -473,7 +503,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I5** — Cleanup runs inside `beforeRelease` and nowhere else; it can therefore never run twice.
 - **I6** — Release precedes diagnostics on every path.
 - **I7** — History flushes on every path, faults included. A fault before the lifecycle exists flushes nothing and does not violate this: nothing can be appended before input is accepted, which is four steps later. The day anything appends earlier, I7 and I5 conflict for real (§8a).
-- **I7a** — `createTui` runs step 1 — validation — and returns; steps 2 to 11 run inside `start()`. §9's `created` state, T1.9's "nothing acquired" and a manifest given as a path all require it, and validation is the one step that can be eager because it needs nothing constructed.
+- **I7a** — `createTui` runs step 1 — validation — and returns; steps 2 to 12 run inside `start()`. §9's `created` state, T1.9's "nothing acquired" and a manifest given as a path all require it, and validation is the one step that can be eager because it needs nothing constructed.
 - **I8** — A failed size gate does not abort construction; session state survives until a resize.
 - **I9** — The too-small render uses no layout engine, and it takes its writer rather than reaching for one: at launch it draws to the primary screen because the terminal is never acquired, and mid-session it draws through the scheduler or the next frame overwrites it (§8b).
 - **I10** — Clock and filesystem enter the graph only here.
@@ -491,6 +521,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I21** — `beforeRelease` is synchronous and returns `undefined`, never a thenable. `killAll()`'s promise is deliberately not awaited: its signals are delivered synchronously and only the reaping is deferred, and awaiting it would make the handler `async`, which C01 I5 forbids because a signal handler cannot await.
 - **I22** — `pipeline` has a working default, as every other optional field does (I17). `config.pipeline` remains the injection point C22's own tests construct a graph through, and a graph always carries a `Pipeline` — an injection seam with no default is a missing wire that only the tests hold together.
 - **I23** — A `Manifest` reaching construction carries `tui-kit`'s own six verbs, or construction fails naming them. `parseManifest` is the only thing that appends them (C05 §3); an object satisfying the type is one nobody parsed, and C23 would register handlers for verbs nothing can classify to.
+- **I24** — Raw bytes reach the decoder through `lifecycle.onInput` and through nothing else, and the decoder's deadlines are polled on C22's injected schedule. C22 is the only file that may read stdin, for the reason it is the only one that may read the clock: two readers of one stream is two half-decoded sequences, and the second reader is invisible to the first. The wake-ups are here because C16 owns no timer and C01 owns no clock, so a decoder without them delivers a lone `Esc` on the next keystroke rather than after its window (§3 step 12).
+- **I25** — A suspension is bracketed by `suspend()` before the handoff and `resume()` then `decoder.reset()` after it. The listener's removal is C01's, in the transition; the reset is C22's, because only this file knows both that the terminal came back and that a decoder is holding a sequence the child interrupted (C01 I18, C16 I18).
 
 ---
 
@@ -500,7 +532,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.prism` and the **app's entry point** resolves `PRISM_TUI_STATE_DIR` (I10, I20).
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
 3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
-3b. `createTui` validates and returns; steps 2 to 11 run inside `start()` (I7a).
+3b. `createTui` validates and returns; steps 2 to 12 run inside `start()` (I7a).
 4. Four registries seal before input is accepted — C05's, C07's and C09's at construction, and C23's with the pipeline. C19's is the one with no seal, by its own design (I3).
 5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate (I8).
 6. The too-small render is layout-engine-free (I9).
@@ -513,6 +545,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 12a. `beforeRelease` is synchronous and returns no thenable; `killAll()`'s promise is not awaited and `drain()` is used rather than `flush()` (I21, C01 I5, C20 I18).
 13. Release precedes diagnostics; history flushes on every path (I6, I7).
 14. An offline cluster degrades rather than ends the session (I15).
+14a. Step 12 wires the read loop: bytes reach the decoder through `lifecycle.onInput` and nowhere else, and its deadlines are polled on the injected schedule. Startup step 8 had a name and no mechanism until this step existed (I24).
+14b. A suspension is `suspend()` → handoff → `resume()` → `decoder.reset()`, and the ordering is asserted rather than the outcome (I25, C01 I18, C16 I18).
 15. `stopped` is terminal (I16).
 
 ---
@@ -530,6 +564,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4b** (I3, commitment 3a): the submit handler is registered after the pipeline exists, and the pipeline holds the router. Asserted on the event log: no handler registration precedes step 10. The construction cycle §3a found fails here rather than at the first Enter.
 - **T1.4d** (I22): a config omitting `pipeline` still yields a graph carrying a sealed `Pipeline`, and an injected factory is still used. Both halves, because a default that ignored `config.pipeline` would satisfy the first and remove the seam.
 - **T1.4e** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
+- **T1.4f** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
+- **T1.4g** (I24): a lone `Esc` with no following byte → the key is dispatched when its window elapses on the injected schedule, not when the next key arrives. A decoder wired without wake-ups passes T1.4f and delivers `Esc` on the next keystroke, which is a key that appears to do nothing until you press another one.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
 - **T1.6** (I10): a fake clock and filesystem reach every component that takes one — asserted per component.
 - **T1.7** (I5): on every exit path, `killAll` and `drain` each run **exactly once** — the double-flush regression, tested directly.
@@ -584,6 +620,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 ### Tier 4 — integration
 
 - **T4.1** (with C01, C21): the `suspend` → `handoff` → `resume` → `invalidate` sequence runs in order; C01's raw-mode guard never fires.
+- **T4.1b** (I25, with C01, C16): the same sequence with the input path in it — the listener is dropped before `handoff` is called, `decoder.reset()` runs after `resume()`, and a partial escape sequence written before the suspension does not combine with the first byte written after it. One event log, asserted as an order; the last clause is what a test of the ordering alone would leave open, since a reset placed correctly and doing nothing keeps the order intact.
 - **T4.2** (with C10, C03): a theme switch triggers exactly one `invalidate`, issued by C22 and not by C10.
 - **T4.3** (with C14, C03): a scroll issues exactly one `commit("input")`, issued by C22 and not by C14.
 - **T4.4** (with C15, C13): popping a view appends nothing — C15 writes nothing and C22 composes nothing. A trace here would freeze the block the pop returns to and clear the selection A01 D7 preserves.

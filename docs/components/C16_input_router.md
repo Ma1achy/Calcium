@@ -66,6 +66,10 @@ a knob here is working around a link slow enough that the terminal is already
 unusable, and the knob's effect would be to make that failure intermittent instead
 of consistent. One constant, one behaviour, one bug report.
 
+**A suspension discards whatever was half-decoded, through `reset()`** (I18). Three of this component's states span more than one chunk — a lone `Esc` waiting out its 50 ms window, a paste accumulating between its markers, a run of printables inside the heuristic's window — and all three survive a gap in the byte stream by design, because a gap is what a slow link looks like. A suspension is a different gap: the bytes in it went to a child (C01 I18), and the pending state on the far side of it belongs to a sequence that will never be completed. Resumed without a reset, the next real keystroke completes a sequence begun before `vim` started — an arrow key arriving as an unrelated letter, or a paste emitted with a child's keystrokes inside it.
+
+`reset()` discards the pending bytes, the paste buffer and the escape window, and **emits nothing**: the flush rule that turns accumulated printables into keys (§7) is about a window closing, and this window did not close, it stopped mattering. The call is the shell's, on resume, because C01 delivers bytes and interprets none and C16 owns no timer — neither of them knows a suspension ended. That makes it C22's orchestration, and §4's ordering is where it is written down.
+
 Terminals send no key-up events and repeat held keys as fresh presses, so there is no chord support beyond modifiers. Saying so prevents someone designing a keymap that cannot work.
 
 ---
@@ -369,6 +373,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I17** — `\r` and `\n` are **different keys**. `\r` is `enter`; `\n` is `Ctrl-J`, which is what that byte is. Collapsing them is the obvious reading of "the Enter key" and it silently removes one of the two terminal-independent newline bindings C17 I12 requires — a binding that resolves against nothing, which is C16 §5's unconstructible-rung class arriving one layer lower, in the decoder. It also decides what a newline inside an unbracketed paste means: `enter` submits each line of a pasted block, `Ctrl-J` inserts it. **And a modified key carries the same `name` as the unmodified one**: `Alt-Enter` is `{name: "enter", meta: true}`, not `{name: "\r", meta: true}`. That is the same defect one path over — the ESC-prefixed branch passed its character through raw — and it removed the *other* of C17 I12's two terminal-independent bindings, so both of them resolved against events nothing could produce while the keymap read as complete. Found by pressing the bindings through a real decoder in C17's tier 4, not by reading either file. The general rule the two share: **a key the keymap can name must be a key the decoder produces**, and the only way to know is to press it.
 
   **Made mechanical, it immediately found a third.** T2.13 walks every row of `defaultKeymap` through a real decoder, and a row with no wire form fails. Shift-Enter has two — `CSI 13;2u` and xterm's `modifyOtherKeys` form `CSI 27;2;13~` — and the decoder discarded both as well-formed-but-unknown, because `u` is not in the letter table and `27` is not in the tilde table. The third of C17 I12's three bindings was unreachable in every terminal that sends it, and the two that a reader would check by hand had already been fixed. `27` is a marker rather than a keycode, so the tilde branch tests it before the table; the codepoint is named through the same `namedControl` the unprefixed byte uses, because a second naming path is exactly how the meta branch came to call Enter `\r`.
+- **I18** — `reset()` discards every partially-decoded state — pending bytes, the paste buffer, the escape window — and emits nothing. It exists for the one gap in the byte stream that is not a slow link: a suspension, whose bytes went to a child. The decoder cannot detect that gap itself — it owns no timer and reads no clock beyond the injected one (I9) — so the call belongs to whoever knows the terminal was handed over and taken back, which is L4 (C22 §4, C01 I18).
 
 ---
 
@@ -389,6 +394,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 13. C16 never commits a frame; L4 does (I11).
 14. `\r` and `\n` decode to different keys and a modified key keeps the unmodified name, so both of C17's terminal-independent newline bindings resolve against events the decoder actually produces (I17).
 15. Every row of `defaultKeymap` is walked through a real decoder, and a row with no wire form fails — the rule made mechanical, which found the third instance (I17).
+16. A suspension discards half-decoded state through `reset()`, which emits nothing; the decoder cannot see the gap and the shell calls it on resume (I18).
 
 ---
 
@@ -403,6 +409,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.3** (I15): `activeTarget` returns the documented target for each of the six conditions.
 - **T1.3b** (I2): moving focus to `liveBlock`, then `resetFocus()` → focus is back at `prompt`, and the stored `rowId` is gone with it.
 - **T1.3b2** (I2): a C13 append with no `resetFocus()` call leaves the stored location untouched — the reset is the caller's, and a router that quietly subscribed would pass T1.3b while failing this.
+- **T1.16** (I18): each of the three pending states, reset and then continued — a lone `Esc` mid-window, a paste between its markers, a run inside the heuristic's window. *Then* the bytes that would have completed each sequence decode as themselves, and `reset()` itself emitted nothing. Three cases rather than one, because a reset that cleared only the escape window passes any single-state test and still emits a child's keystrokes inside the next paste.
 - **T1.3c** (I3): a click at a transcript row resolves to that row's block, not to the focused target.
 - **T1.3d** (I3): a click inside an overlay's placed region resolves to the overlay even when focus is elsewhere.
 - **T1.3b** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
@@ -491,6 +498,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.
 - **T6.4d** (I4, §5) — **structural guard, no failing test.** Reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails today, and the ladder is free to drift from `activeTarget` on the next edit touching one and not the other. Every other entry in this tier reads *change X → test Y fails*; this one names a change no assertion catches, and says so deliberately. Inventing an assertion that looked like a guard would be worse than pointing at the real one, which is **T2.5's exhaustiveness over `FocusTarget`**: while the rungs are handlers, a target with no binding is a compile-level gap, and the ladder cannot hold an order of its own to disagree with. Read this row as a signpost to that, not as an unfinished test (A02 §7).
+- **T6.14** (I18): making `reset()` flush the accumulated run as keys rather than discard it → T1.16's heuristic case fails, and the characters a user typed at `vim` arrive at the prompt when they come back.
 - **T6.13b** (§7): registering the disarm as a handler rather than observing before dispatch → T3.8c fails, and an exit confirm appears after the user typed something in between.
 - **T6.5** (I4): broadcasting to every handler → T1.7 fails and actions fire twice.
 - **T6.6** (I5): falling through to the prompt on an unconsumed key → T1.8 fails and typing in the dashboard edits the hidden prompt.
