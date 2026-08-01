@@ -25,6 +25,7 @@
 
 import { parse } from "../interaction/parser/index.js";
 import type { Builtin, ParseResult } from "../interaction/parser/index.js";
+import type { RawPatch } from "../data/transport/index.js";
 import { block } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
 import {
@@ -74,9 +75,20 @@ class Guard {
   }
 }
 
+/** C06's default for a non-streaming verb. Streams pass 0, which is unbounded. */
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const guard = new Guard();
   const local = createLocalRegistry();
+
+  /**
+   * What `cancel()` reaches, set for the length of one in-flight invocation.
+   *
+   * C23 §8a A1 — `runner.killAll()` kills a child and leaves the entry
+   * streaming; cancellation has to settle the entry, so it goes through here.
+   */
+  let cancelInFlight: (() => void) | null = null;
 
   /**
    * §2's routes need C18's classification, and C18 needs the live session for
@@ -124,7 +136,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
-  /** I5's refusal. An ordinary append with `origin: "user"` — see C23 §8b B5. */
+  /** C23 I5's refusal. An ordinary append with `origin: "user"` — see C23 §8b B5. */
   const refuse = (line: string, reason: string): void => {
     appendAndCommit(
       noticeDoc(line, reason, "warn", { origin: "user" }),
@@ -258,6 +270,205 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
+  /**
+   * C23 §3 — the eight steps, and the ordering that fails silently.
+   *
+   * **Step 3 before step 4** (C23 I3). The pending entry reaches the transcript
+   * before the transport is invoked, so a verb whose interpreter takes three
+   * hundred milliseconds to start reads as a command that was accepted rather
+   * than a keystroke that was dropped. A test that waits for the result passes
+   * either way, which is why C23 T1.4 asserts the call order on a spy.
+   *
+   * **Validation is read, never recomputed** (C23 I4, §8b B2). C18 ran it and
+   * the answer travels on the `ParseResult`. Reading it is not recomputing it —
+   * §2 routes by *shape*, so an `app` result arrives here whatever its validation
+   * says, and the check has to happen or an invalid command is spawned.
+   */
+  const runApp = async (
+    line: string,
+    result: Extract<ParseResult, { kind: "app" }>,
+  ): Promise<void> => {
+    const verb = result.tool.name;
+
+    // Step 1 — the carried result. C23 §8b B2 is the cell where §2's route table
+    // and §5's containment row named different destinations for one value.
+    if (!result.validation.ok) {
+      appendAndCommit(
+        errorDoc(line, result.validation.errors[0] ?? { message: `${verb}: invalid arguments` }, {
+          origin: "user",
+          verb,
+        }),
+      );
+      return;
+    }
+
+    // Step 2 — the guard, before the pending entry, so a refusal leaves no
+    // orphan (C23 §3, T3.17).
+    guard.take("app", verb);
+
+    // Step 3 — the pending entry. Before step 4. This is the ordering.
+    const pendingId = deps.transcript.append(
+      compose({
+        command: line,
+        blocks: [],
+        meta: { origin: "user", verb, transport: "subprocess", argv: [...result.argv] },
+      }),
+      { streaming: true },
+    );
+    deps.resetFocus();
+    deps.scheduler.commit("input");
+
+    const controller = new AbortController();
+    cancelInFlight = () => {
+      controller.abort();
+      deps.transcript.settle(pendingId);
+      deps.scheduler.commit("completion");
+    };
+
+    try {
+      const transport = deps.transport.for(verb);
+      // `ToolDef.streams` is optional and `Invocation.streams` is not; absent
+      // means a single document, which is the safe direction — a verb wrongly
+      // streamed would hold a subscription nothing ends.
+      const streams = result.tool.streams ?? false;
+      const invocation = {
+        verb,
+        argv: result.argv,
+        streams,
+        // 0 is unbounded, which is what a live view needs (C06 commitment 7).
+        timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
+        signal: controller.signal,
+      };
+
+      if (streams) {
+        // C23 I6 — a subscription does not hold the guard. Released before the
+        // loop rather than after it, or one `--watch` blocks the session.
+        guard.release();
+        await streamInto(pendingId, line, verb, transport.stream(invocation));
+        return;
+      }
+
+      // Steps 4 and 5 — invoke, then adapt.
+      const raw = await transport.invoke(invocation);
+      const doc = deps.adapters.adapt(raw, {
+        command: line,
+        verb,
+        width: deps.lifecycle.size().columns,
+        userRequestedJson: result.argv.includes("--json"),
+        transport: "subprocess",
+        origin: "user",
+        tool: result.tool,
+      });
+
+      // **Steps 6 and 7, which are one call on this route** (C23 §3, C13
+      // §settle). The document arrives, the entry becomes it, the entry is done
+      // — and `meta` travels with it, which is what C23 I7 and `/debug` need and
+      // what no block-level patch could carry.
+      deps.transcript.settle(pendingId, doc);
+
+      // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
+      // alone, so `/promote $_` after a listing still names the submit before it.
+      if (doc.meta.resultId !== undefined) deps.writes.setLastUuid(doc.meta.resultId);
+
+      // Step 8.
+      deps.scheduler.commit("completion");
+    } catch (cause) {
+      // C23 I2 — a transport that fails, times out or throws ends in a document
+      // like everything else.
+      deps.transcript.settle(
+        pendingId,
+        errorDoc(line, { message: String(cause), stage: "transport" }, { origin: "user", verb }),
+      );
+      deps.scheduler.commit("completion");
+    } finally {
+      cancelInFlight = null;
+      guard.release();
+    }
+  };
+
+  /**
+   * Streaming (C23 §3, I8, I9), and where §8a A2 and A3 are decided.
+   *
+   * **The three `PatchOutcome` arms are not one case**, and that is the whole
+   * reason C04 returns a `PatchResult` rather than throwing. A throw would unwind
+   * out of this loop with no way to tell a malformed patch from a dead transport,
+   * and the two want opposite endings: settle with what was kept, or map the
+   * failure through C07. C23 is the first consumer of that shape.
+   */
+  const streamInto = async (
+    id: string,
+    line: string,
+    verb: string,
+    patches: AsyncIterable<RawPatch>,
+  ): Promise<void> => {
+    try {
+      for await (const patch of patches) {
+        if (patch.kind === "end") {
+          // C23 I8 — settlement flushes at `"completion"`.
+          deps.transcript.settle(id);
+          deps.scheduler.commit("completion");
+          return;
+        }
+
+        const view = deps.adapters.adaptPatch(patch, {
+          command: line,
+          verb,
+          width: deps.lifecycle.size().columns,
+          userRequestedJson: false,
+          transport: "subprocess",
+          origin: "user",
+          tool: null,
+          seq: 0,
+        });
+        if (view === null) continue;
+
+        const outcome = deps.transcript.patch(id, view);
+        if (outcome.ok) {
+          // C23 I8 — patches coalesce at `"stream"`. C23 I9: a frozen entry keeps
+          // receiving them, which is C13's business and not a condition here.
+          deps.scheduler.commit("stream");
+          continue;
+        }
+
+        // **§8a A2 — three arms, one of which carries an error.**
+        if (outcome.reason === "patch") {
+          // Malformed. Settle with what was kept, say why, and stop the child:
+          // the entry is final, so a subprocess still streaming into it spends a
+          // process on output nothing can consume (§8a A3).
+          deps.transcript.patch(id, {
+            op: "append",
+            block: block({
+              kind: "notice",
+              id: blockId("truncated"),
+              tone: "warn",
+              text: `output truncated: ${outcome.error.message}`,
+            }),
+          });
+          deps.transcript.settle(id);
+          deps.scheduler.commit("completion");
+          return;
+        }
+
+        // `"settled"` and `"unknown"` — already final, and a notice would
+        // describe the transcript rather than the command. This is the arm §5
+        // used to read `.error` off.
+        return;
+      }
+    } catch (cause) {
+      deps.transcript.patch(id, {
+        op: "append",
+        block: block({
+          kind: "notice",
+          id: blockId("stream-error"),
+          tone: "error",
+          text: `stream failed: ${String(cause)}`,
+        }),
+      });
+      deps.transcript.settle(id);
+      deps.scheduler.commit("completion");
+    }
+  };
+
   /** C23 §2 — seven kinds, seven paths. */
   const route = (line: string, result: ParseResult): void => {
     switch (result.kind) {
@@ -299,12 +510,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
 
       case "app":
-        // The eight-step path lands next. Answered rather than dropped: C23 I1
-        // has no path that produces nothing, so the scaffold is visibly a
-        // scaffold at runtime and not only in the source.
-        appendAndCommit(
-          noticeDoc(line, "the app route is not wired yet", "warn", { origin: "user" }),
-        );
+        void runApp(line, result);
         return;
     }
   };
@@ -339,6 +545,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     },
 
     cancel: () => {
+      // The in-flight invocation first, so the entry settles with what it had
+      // (C23 I10), then the guard.
+      cancelInFlight?.();
       guard.release();
     },
   };

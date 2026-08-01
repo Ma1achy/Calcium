@@ -139,6 +139,18 @@ Each of these produces code that compiles, passes review, and is wrong.
   came back empty and no assertion about a source would have shown why. C18's table
   would have caught it, and C18's table was already in the repo.
 
+  **And when a ruling chooses to throw, the walk asks what the throw leaves behind.**
+  Both artefact shapes index rule interactions on the **accepted** paths — which rules
+  could both claim a cell, which sequences produce a contradiction. The rejection path
+  is where a decision leaves state, and neither shape asks about it. A throw mid-
+  operation abandons whatever the function had already mutated, and the invariant that
+  forbids the resulting state usually lives in a different component from the decision
+  that produced it. C13's `settle(id, doc)` is the measured case: ruling that an invalid
+  document throws rather than returning was correct, and it created a way to leave an
+  entry **unpatchable and unsettled** — a state C23 I9 says cannot exist, two components
+  away from the choice that could produce it. Nothing in the ruling implied it and no
+  row of either artefact covered it.
+
   So the artefact's *shape* is a decision, not a consequence of the component looking
   like a state machine. Ask which kinds of interaction the component has before
   choosing: a component with state and structure needs a trace **and** a table, and
