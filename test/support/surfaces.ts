@@ -206,9 +206,31 @@ export type SurfaceDrops = Readonly<{ width: number; dropped: readonly string[] 
  * `column` selects which table's drops when a surface states two — S06 draws
  * families and versions side by side in one table with two cells per row.
  */
+/**
+ * A surface's stated drop order, for one column table.
+ *
+ * **A `| Width |` header does not make a drop table**, and reading it as one was
+ * live. S02's is `| Width | Logo |` and S13's and S15's are `| Width | Layout |`
+ * — a logo form, a panel arrangement and where an expiry timestamp goes. The
+ * old predicate matched all three and read `▲ prism v1.0.0` as a dropped column.
+ * The header name cannot discriminate either: S09's real column drop is stated
+ * under `| Width | Layout |` too.
+ *
+ * So the table has to name something. **A drop table is one where at least one
+ * row names a declared column key**, which is the only property all four real
+ * ones share and none of the three imposters has. A row naming nothing then
+ * means nothing drops at that width, which is what those rows already mean.
+ *
+ * Found by deriving CP6's surface list instead of hand-writing it — the parser
+ * had only ever been pointed at four tables chosen because they worked.
+ */
 export function surfaceDrops(file: string, column = 1): readonly SurfaceDrops[] {
-  const table = tables(file).find(
+  const declared = new Set(surfaceColumns(file).flatMap((t) => t.map((c) => c.key)));
+  const candidates = tables(file).filter(
     (t) => t.header[0] === "Width" && (t.header[column] ?? "") !== "",
+  );
+  const table = candidates.find((t) =>
+    t.rows.some((row) => keysIn(row[column] ?? "").some((k) => declared.has(k))),
   );
   if (table === undefined) return [];
 
@@ -655,6 +677,30 @@ const S02_WELCOME: readonly Block[] = [
   }),
 ];
 
+/**
+ * A table whose every row carries the surface's declared actions (C11 I17).
+ *
+ * **The bar was six `pills` blocks and belonged to none of them.** Every
+ * S-series figure drawing one draws it after the table, and the fixtures
+ * modelled it as a separate block because `TableRow.actions` was read by
+ * nothing — the field existed, C11 §5 said it surfaced them, and no code did.
+ * Now the table draws its own, so the fixture declares the actions where the
+ * surface declares them.
+ *
+ * Height-neutral by construction: a `pills` block with `gapBefore` was two rows
+ * and the bar is two rows, which is why these compositions did not move.
+ */
+function withActions(table: Block, labels: readonly string[]): Block {
+  if (table.kind !== "table") throw new Error("withActions expects a table");
+  return {
+    ...table,
+    rows: table.rows.map((r) => ({
+      ...r,
+      actions: labels.map((label) => ({ kind: "fill" as const, label, command: "/noop" })),
+    })),
+  };
+}
+
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
   {
     file: "docs/surfaces/S02_the_welcome.md",
@@ -749,6 +795,9 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       S07_IDENTITY,
       block({ kind: "rule", id: "s07-metrics-rule", label: "metrics", gapBefore: true }),
       S07_METRICS,
+      // **Not converted, and correctly so.** The bar follows a `diff`, which is
+      // C25's kind and has no rows to carry actions. C11 I17's bar belongs to a
+      // table; a surface whose last block is not one keeps a separate bar.
       block({
         kind: "pills",
         id: "s07-actions",
@@ -864,13 +913,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
           { label: "○ queued ×1" },
         ],
       }),
-      S03_TABLE,
-      block({
-        kind: "pills",
-        id: "s03-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "≡ logs" }, { label: "⚡ events" }],
-      }),
+      withActions(S03_TABLE, ["⏎ detail", "␣ expand", "≡ logs", "⚡ events"]),
     ],
   },
   {
@@ -880,13 +923,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     width: 78,
     blocks: [
       block({ kind: "rule", id: "s05-rule", label: "serving · 7 healthy · 1 degraded" }),
-      S05_TABLE,
-      block({
-        kind: "pills",
-        id: "s05-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↻ restart" }],
-      }),
+      withActions(S05_TABLE, ["⏎ detail", "␣ expand", "↻ restart"]),
     ],
   },
   {
@@ -896,13 +933,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     width: 78,
     blocks: [
       block({ kind: "rule", id: "s06-rule", label: "models · 6 families · 14 versions" }),
-      S06_FAMILIES,
-      block({
-        kind: "pills",
-        id: "s06-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ versions" }, { label: "␣ expand" }, { label: "↑ promote" }],
-      }),
+      withActions(S06_FAMILIES, ["⏎ versions", "␣ expand", "↑ promote"]),
     ],
   },
   {
@@ -912,13 +943,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     width: 78,
     blocks: [
       block({ kind: "rule", id: "s06v-rule", label: "models · digit-classifier · 4 versions" }),
-      S06_VERSIONS,
-      block({
-        kind: "pills",
-        id: "s06v-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↑ promote" }],
-      }),
+      withActions(S06_VERSIONS, ["⏎ detail", "␣ expand", "↑ promote"]),
     ],
   },
   {
@@ -930,13 +955,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({ kind: "rule", id: "s14-rule", label: "config · ~/.prism/config.toml" }),
       S14_KEYS,
       block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", gapBefore: true }),
-      S14_CONTEXTS,
-      block({
-        kind: "pills",
-        id: "s14-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ edit" }, { label: "␣ expand" }, { label: "↕ switch context" }, { label: "⊘ reset" }],
-      }),
+      withActions(S14_CONTEXTS, ["⏎ edit", "␣ expand", "↕ switch context", "⊘ reset"]),
     ],
   },
   {
@@ -954,6 +973,14 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         tone: "muted",
         text: "Values are never shown by the CLI.",
       }),
+      // **Not converted, and this one needs a ruling.** §5's figure draws the
+      // bar *after* the notice — table, blank, notice, blank, bar — and a
+      // table's own bar cannot sit there. Either the figure is wrong and the
+      // bar belongs directly under the table, or `≡ /secrets <target>` is a
+      // hint rather than a row action; §8 lists it beside `↻ /login` and
+      // `≡ /config`, which are surface-level and not per-row. The other five
+      // converted with no figure change at all, which is what makes this one
+      // a question rather than an oversight.
       block({
         kind: "pills",
         id: "s15-actions",

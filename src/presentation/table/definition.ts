@@ -23,12 +23,25 @@ import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
-import { clampSpans, paint } from "../blocks/paint.js";
+import { clampSpans, paint, tone } from "../blocks/paint.js";
 import type { BlockDefinition, RenderContext } from "../blocks/types.js";
 import { emptySpans, headerSpans, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
+
+/**
+ * Whether the action bar is drawn (I17).
+ *
+ * **The data decides, never focus.** `measure` does not receive focus at all
+ * (C04 §5), so a bar whose *presence* followed focus would give a block two
+ * heights for one document — and focus moves without `rev` moving, so C14's
+ * cache would keep answering with the old one. C09 I1 broken in the one way
+ * measurement cannot catch, because each half is right on its own.
+ */
+function hasActionBar(block: Table): boolean {
+  return block.rows.some((r) => (r.actions ?? []).length > 0); // cells-ok
+}
 
 /** Whether the header row is drawn. `showHeader` defaults to true (C04 §3). */
 function hasHeader(block: Table): boolean {
@@ -74,6 +87,12 @@ export const tableDefinition: BlockDefinition<Table> = {
 
     let total = header + block.rows.length; // cells-ok
     for (const row of block.rows) total += detailHeight(block, row, w, measureChild);
+    // I17 — a blank separator and a label row when any row has actions. Two,
+    // because every surface drawing a bar draws a blank above it and the gap
+    // cannot come from `gapBefore`: that applies *between* blocks in a sequence
+    // (C04 §3a), and a table cannot ask the sequence for a gap after itself.
+    // `measure` has no focus to consult and must not need one.
+    if (hasActionBar(block)) total += 2;
 
     return atLeastOne(total);
   },
@@ -155,6 +174,31 @@ export const tableDefinition: BlockDefinition<Table> = {
               ? [createElement(Text, { key: `gap-${index}` }, " "), drawn]
               : [drawn];
           }),
+        ),
+      );
+    }
+
+    // **The action bar** (I17, §5). Present because the data says so; empty
+    // because nothing is focused. Every S-series figure that draws one — S02,
+    // S03, S05, S06, S14 — has been drawing this row, and until now nothing
+    // produced it: `TableRow.actions` existed and no code read it.
+    if (hasActionBar(block)) {
+      const row = focused === null ? undefined : block.rows.find((r) => r.id === focused);
+      const labels = (row?.actions ?? []).map((a) => a.label).join("   ");
+      lines.push(createElement(Text, { key: "actions-gap" }, " "));
+      lines.push(
+        createElement(
+          Text,
+          { key: "actions" },
+          textOf(
+            paint(
+              clampSpans(
+                [{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }],
+                width,
+                ctx.capabilities,
+              ),
+            ),
+          ),
         ),
       );
     }

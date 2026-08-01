@@ -128,7 +128,7 @@ Sort is view state on the block (C04 §3), so it survives freezing and is record
 height = 1 (header)
        + rows
        + Σ over expanded rows of measureChild(detailBlocks, width − 2)
-       + 1 (the action bar, when any row declares actions)
+       + 2 (a blank and the action bar, when any row declares actions)
 ```
 
 Empty tables measure `1 + 1` — header plus the empty message, never zero.
@@ -143,7 +143,9 @@ A trailing row carrying the **focused row's** actions — `⏎ detail  ␣ expan
 
 **Its presence follows the data and its content follows focus, and the split is forced rather than chosen.** `render` sees focus through `ctx`; `measure` does not, which is what lets a focused row be toned without changing a width (§cells). A bar that appeared only when something was focused would make a block's height vary with focus — and focus changes without the document changing, so `rev` does not move and C14's cache returns a height for a frame that no longer exists. **That is C09 I1 broken in the one way the cache cannot see**, because both halves are individually correct and disagree only after a keystroke that touched no data.
 
-So the row is drawn whenever **any** row declares `actions`, and is blank when nothing is focused. A blank row that is always there costs one row on a table with affordances; a row that comes and goes costs a corrupted frame.
+So the bar is drawn whenever **any** row declares `actions`, and its label row is blank when nothing is focused. A blank row that is always there costs a row on a table with affordances; a row that comes and goes costs a corrupted frame.
+
+**Two rows, not one, and the figures are what said so.** Every surface drawing a bar — S03, S05, S06's two, S14, S15 — draws a blank line between the last data row and the labels, and the fixtures modelled that as a separate `pills` block carrying `gapBefore`. The separation cannot come from `gapBefore` once the bar is C11's: that field applies *between* blocks in a sequence (C04 §3a), and a table cannot ask the sequence for a gap after itself. So the blank is inside the table, as an expanded row's `gapBefore` children already are. The first draft of this section said `+ 1`; six figures said otherwise, which is the composition answering a question rather than the spec assuming one.
 
 **It is C11's and cannot be the surface's.** A surface composing its own bar would need to know which row has focus, and a block has no focus — that is precisely what I14 puts in C16. Every S-series figure drawing one has been drawing something nothing produced: `TableRow.actions` existed, this section said C11 "surfaces its actions", and no code read the field. **The fifth of specified, agreed and structurally absent, and the worst hidden** — the other four were missing values or missing verbs, and this one was a field that existed, so nothing looked.
 
@@ -167,7 +169,7 @@ So the row is drawn whenever **any** row declares `actions`, and is blank when n
 - **I14** — Focus is rendered by C11 and owned by C16. C11 holds no focus state; it draws what it is handed, which is what keeps I11 true for the one piece of state a table most looks like it should own.
 - **I15** — The expand marker is drawn only into a column declaring `role: "expand"`, and `planColumns` never reads `role`. A table declaring no such column shows no marker; C11 neither synthesises a column nor reserves a gutter, because either would change width arithmetic the surfaces already state.
 - **I16** — C11 registers through C09's public `register`; it is not privileged.
-- **I17** — The action bar's **presence** depends on the data and never on focus: one trailing row whenever any row declares `actions`, blank when nothing is focused. A height that varied with focus would move without `rev` moving, so C14's cache could not invalidate it — I9 broken in the one way measurement cannot catch, since `measure` never sees focus at all.
+- **I17** — The action bar's **presence** depends on the data and never on focus: a blank separator and a label row whenever any row declares `actions`, with the labels blank when nothing is focused. A height that varied with focus would move without `rev` moving, so C14's cache could not invalidate it — I9 broken in the one way measurement cannot catch, since `measure` never sees focus at all.
 
 ---
 
@@ -214,7 +216,7 @@ Six tiers. No state machine — C11 is pure over the block.
 - **T1.15**: duration sort orders `45s`, `12m`, `2h`, `3d` correctly.
 - **T1.16**: missing values sort last ascending *and* descending.
 - **T1.17** (I15): a `role: "expand"` column draws `expand` collapsed, `collapse` expanded, and blank on a row that is not expandable at this width. The same table with the role removed draws that column's cell data and no marker anywhere.
-- **T1.18** (I17): a table whose rows declare actions measures one row taller than the same table without them, and **measures the same with focus on a row, with focus elsewhere and with no focus at all**. The three-way equality is the assertion — a bar drawn only when focused satisfies the first half exactly.
+- **T1.18** (I17): a table whose rows declare actions measures two rows taller than the same table without them, and **measures the same with focus on a row, with focus elsewhere and with no focus at all**. The three-way equality is the assertion — a bar drawn only when focused satisfies the first half exactly.
 - **T1.19** (I17): the bar carries the focused row's action labels; with focus on a different row it carries that row's; with no focus it is blank and the height is unchanged. The blank case is what stops the row being conditional in the renderer while looking unconditional in the measurer.
 
 ### Tier 2 — contract / interface

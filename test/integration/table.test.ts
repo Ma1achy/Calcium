@@ -6,6 +6,7 @@
 // other — and both sides are read from the spec rather than restated, so neither
 // can quietly agree with itself.
 import { describe, expect, it } from "vitest";
+import { readdirSync } from "node:fs";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { focusableRowIds, planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import {
@@ -37,14 +38,115 @@ function occupied(plan: ReturnType<typeof planColumns>): number {
   return widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * plan.gap; // cells-ok
 }
 
-const SURFACES = [
-  { file: "docs/surfaces/S03_ps_list.md", label: "S03 ps list", table: 0, drops: 1 },
-  { file: "docs/surfaces/S05_serving.md", label: "S05 serving", table: 0, drops: 1 },
-  { file: "docs/surfaces/S06_models.md", label: "S06 models · families", table: 0, drops: 1 },
-  { file: "docs/surfaces/S06_models.md", label: "S06 models · versions", table: 1, drops: 2 },
+/**
+ * Every S-series column table, **discovered rather than listed**.
+ *
+ * The list was four entries written by hand, against twelve declared column
+ * tables — so eight surfaces' priorities and minimums had never been under
+ * width pressure, which is the only thing that checks them. Raising S02's
+ * `detail` minimum from 16 to 60 failed nothing, because the composition test
+ * asserts height and a minimum bites only when columns compete.
+ *
+ * **The allow-list rule, and the fifth time this project has taken it**: a
+ * check covers the directory and names its exceptions, because a hand-written
+ * list stops seeing what is added after it. A column table declared tomorrow is
+ * under pressure tomorrow.
+ *
+ * The pairing is positional — column table *i* against drop column *i + 1* —
+ * which is the convention S06 already uses for its two.
+ */
+const SURFACE_DIR = "docs/surfaces";
+
+function discovered(): readonly { file: string; label: string; table: number; drops: number }[] {
+  const out: { file: string; label: string; table: number; drops: number }[] = [];
+  for (const name of readdirSync(SURFACE_DIR).filter((f) => /^S\d\d_.*\.md$/.test(f)).sort()) {
+    const file = `${SURFACE_DIR}/${name}`;
+    surfaceColumns(file).forEach((_columns, table) => {
+      out.push({ file, label: `${name.slice(0, 3)} table ${String(table)}`, table, drops: table + 1 });
+    });
+  }
+  return out;
+}
+
+const DISCOVERED = discovered();
+
+/**
+ * Column tables with no drop declaration to check them against.
+ *
+ * **Named, not skipped.** Each is a surface stating priorities and minimums and
+ * never stating what they do under pressure, so the numbers are prose. Listed by
+ * equality below, so a fifth cannot join them quietly and a fixed one cannot
+ * stay listed.
+ */
+const NO_DROP_TABLE = [
+  // S02 §6 states its drop order in prose — "Recent's `age` column drops first,
+  // then `status`" — and its only `| Width |` table is about the logo.
+  "S02 table 0",
+  "S02 table 1",
+  // The pods sub-table, added with no drop order of its own.
+  "S05 table 1",
+  // §7 states the drop in prose: "The duration **column** drops". The column key
+  // is not backticked, so nothing can read it.
+  "S09 table 0",
+  // §7's `| Width |` table arranges panels, not columns.
+  "S13 table 0",
+  // S14 declares no `| Width |` table at all.
+  "S14 table 0",
+  "S14 table 1",
+  // **§5 says outright that it never drops a column** — it sums to 45 cells and
+  // the shell's minimum is 60 — so there is nothing to state and nothing to
+  // compare. The one entry here that is finished rather than missing.
+  "S15 table 0",
 ] as const;
 
+/**
+ * Declarations whose stated order and `planColumns` disagree.
+ *
+ * **Empty, and that is the finding.** Three surfaces looked like disagreements
+ * — S02 at 80 "dropping" `▲ prism v1.0.0`, S13 and S15 dropping columns their
+ * tables never mention — and all three were one fixture defect: `surfaceDrops`
+ * called any `| Width |` table a drop table. None of the four real drop orders
+ * disagrees with the planner. Kept as a list rather than deleted, because the
+ * next one is a defect in a surface or in C11 and needs somewhere to be named
+ * that is not the gap list.
+ */
+const UNRESOLVED: readonly string[] = [];
+
+const EXCLUDED: readonly string[] = [...NO_DROP_TABLE, ...UNRESOLVED];
+
+const SURFACES = DISCOVERED.filter((s) => !EXCLUDED.includes(s.label));
+
 describe("C11 tier 4 — the planner against the surfaces", () => {
+  it("T4.1b (CP6): every declared column table is checked, or named as unchecked", () => {
+    // The vacuity guard for the discovery itself. A `discovered()` that found
+    // nothing would make the whole suite pass by iterating an empty list — the
+    // same shape as a parser that reads no columns, one layer further out.
+    expect(DISCOVERED.length, "no column tables discovered").toBeGreaterThanOrEqual(12);
+    // **Four, and that number is the finding.** Deriving the list did not widen
+    // coverage: it showed that eight of the twelve declared column tables have
+    // no drop order anything can read. Two state it in prose (S02, S09), one
+    // states outright that it never drops (S15), one's `| Width |` table is
+    // about panels (S13), one has no such table (S14, twice), and two are
+    // sub-tables added without one (S02's Recent, S05's pods). The four that
+    // were hand-listed were hand-listed because they were the four that worked.
+    expect(SURFACES.length, "everything was excluded").toBeGreaterThanOrEqual(4);
+
+    // The two exclusion lists are different findings and are kept apart: one is
+    // a surface that never stated a drop order, the other a surface whose
+    // stated order and the planner disagree. Collapsing them would let a defect
+    // hide among the gaps.
+    expect(new Set(EXCLUDED).size, "a label on both lists").toBe(EXCLUDED.length);
+
+    // Equality, not superset: a new column table with no drop order fails here
+    // rather than being silently unchecked, and a gap that gets filled cannot
+    // stay on the list.
+    const unpaired = DISCOVERED.filter((s) => surfaceDrops(s.file, s.drops).length === 0).map(
+      (s) => s.label,
+    );
+    expect(unpaired.sort()).toEqual([...NO_DROP_TABLE].sort());
+    expect(UNRESOLVED, "a stated order and the planner disagree").toEqual([]);
+  });
+
   for (const surface of SURFACES) {
     describe(surface.label, () => {
       const parsed = surfaceColumns(surface.file)[surface.table] ?? [];
@@ -71,8 +173,17 @@ describe("C11 tier 4 — the planner against the surfaces", () => {
         // assertion below pass having compared two empty sets — test/support's
         // rule about a helper being vacuous in its *answer* rather than in its
         // parameters, one layer out.
-        expect(parsed.length, "no column table parsed").toBeGreaterThanOrEqual(6);
-        expect(stated.length, "no drop table parsed").toBeGreaterThanOrEqual(3);
+        // **Two, not six.** The floor was written when this suite covered four
+        // hand-listed surfaces whose tables all had twelve-ish columns, and it
+        // is a property of those four rather than of a column table: S02's
+        // Outstanding has two, S09's has three. A vacuity guard that excludes
+        // real subjects is a narrower rule wearing a guard's clothes.
+        expect(parsed.length, "no column table parsed").toBeGreaterThanOrEqual(2);
+        // Two, for the same reason: three was the smallest of the original
+        // four. Two is the floor at which a drop table can say anything — one
+        // width where nothing drops and one where something does — and the
+        // assertion below is what checks it actually does.
+        expect(stated.length, "no drop table parsed").toBeGreaterThanOrEqual(2);
         expect(
           stated.some((s) => s.dropped.length > 0),
           "every stated width drops nothing, so the comparison asserts nothing",

@@ -283,6 +283,83 @@ describe("C11 tier 1 — planColumns", () => {
     expect(rolelessFirst).toContain("#");
   });
 
+  it("T1.18 (I17): the bar's height follows the data, and never focus", () => {
+    const withActions = psTable({ rows: 2 });
+    const acted: Table = {
+      ...withActions,
+      rows: withActions.rows.map((r, i) =>
+        i === 0 ? { ...r, actions: [{ kind: "fill" as const, label: "≡ logs", command: "/ps --logs" }] } : r,
+      ),
+    };
+
+    // One row taller than the same table without actions.
+    // **Two rows, and the figures are what said so.** Every surface drawing a
+    // bar draws a blank above it, and the gap cannot come from `gapBefore` —
+    // that applies between blocks in a sequence, and a table cannot ask the
+    // sequence for a gap after itself.
+    expect(registry.measure(acted, 160)).toBe(registry.measure(withActions, 160) + 2);
+
+    // **Three ways, and the three-way equality is the assertion.** A bar drawn
+    // only when a row is focused satisfies the first comparison exactly, and
+    // gives a block two heights for one document — focus moves without `rev`
+    // moving, so C14 keeps answering with the old one (I17).
+    const onRow = measurable({
+      definitions: [tableDefinition],
+      focus: { blockId: acted.id, rowId: acted.rows[0]!.id },
+    });
+    const elsewhere = measurable({
+      definitions: [tableDefinition],
+      focus: { blockId: acted.id, rowId: acted.rows[1]!.id },
+    });
+
+    const heights = [
+      registry.measure(acted, 160),
+      onRow.measure(acted, 160),
+      elsewhere.measure(acted, 160),
+    ];
+    expect(new Set(heights).size, `measured ${heights.join(", ")} under three focus states`).toBe(1);
+
+    // And rendered agrees with measured in every one of them (I9).
+    for (const kit of [registry, onRow, elsewhere]) {
+      expect(kit.renderToLines(acted, 160).length).toBe(kit.measure(acted, 160)); // cells-ok
+    }
+  });
+
+  it("T1.19 (I17): the bar carries the focused row's actions, and is blank with none", () => {
+    const base = psTable({ rows: 2 });
+    const acted: Table = {
+      ...base,
+      rows: base.rows.map((r, i) => ({
+        ...r,
+        actions: [
+          i === 0
+            ? { kind: "fill" as const, label: "≡ logs", command: "/ps --logs" }
+            : { kind: "fill" as const, label: "⚡ events", command: "/ps --events" },
+        ],
+      })),
+    };
+
+    const last = (kit: typeof registry): string => kit.renderToLines(acted, 160).at(-1) ?? "";
+
+    const first = measurable({
+      definitions: [tableDefinition],
+      focus: { blockId: acted.id, rowId: acted.rows[0]!.id },
+    });
+    const second = measurable({
+      definitions: [tableDefinition],
+      focus: { blockId: acted.id, rowId: acted.rows[1]!.id },
+    });
+
+    expect(last(first)).toContain("≡ logs");
+    expect(last(first), "and not the other row's").not.toContain("⚡ events");
+    expect(last(second)).toContain("⚡ events");
+
+    // **The blank case is what stops the row being conditional in the renderer
+    // while looking unconditional in the measurer.** Without it a `return` on
+    // no-focus passes both assertions above and loses a row.
+    expect(last(registry).trim(), "no focus, and the row is still there").toBe("");
+  });
+
   it("T1.17 (I15): a row that cannot be expanded draws no marker", () => {
     // At 160 nothing drops and no row declares detail, so nothing is expandable —
     // and a marker that did nothing when pressed would be worse than none.
