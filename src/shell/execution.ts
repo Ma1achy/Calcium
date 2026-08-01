@@ -501,12 +501,22 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     });
   };
 
-  /** C23 §2 — seven kinds, seven paths. */
-  const route = (line: string, result: ParseResult): void => {
+  /**
+   * C23 §2 — seven kinds, seven paths, and `empty` is not one of the six here.
+   *
+   * **The type excludes it rather than a second `case` restating it.** `submit`
+   * must return on `empty` *before* the guard, so a blank Enter over a running
+   * verb is silent rather than a refusal — and an `empty` arm here as well is
+   * unreachable. The mutation pass is what showed it: removing either check
+   * failed nothing, because each defeated the other's mutation, and no test
+   * could distinguish two guards from one.
+   *
+   * `Exclude` turns that into a compile error instead. The exhaustiveness T2.6
+   * asserts is now over six reachable arms rather than seven with one that can
+   * never run — a dead branch being A03 §2's class in code rather than in a rule.
+   */
+  const route = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
     switch (result.kind) {
-      case "empty":
-        return;
-
       case "error":
         appendAndCommit(errorDoc(line, result.error, { origin: "user" }));
         return;

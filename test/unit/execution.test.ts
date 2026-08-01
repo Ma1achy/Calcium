@@ -426,3 +426,200 @@ describe("C23 §2 — the seven routes", () => {
     ).toBeGreaterThan(0);
   });
 });
+
+describe("C23 tier 2 — contract", () => {
+  it("T2.6: every ParseResult variant has a route, exhaustively", async () => {
+    // **Exhaustive over the union rather than a sample.** A route added to the
+    // parser and not to §2 is a submission that produces nothing, which is C23
+    // I1's failure in the one direction a per-case test does not sweep.
+    const byKind: Readonly<Record<string, string>> = {
+      empty: "   ",
+      error: "/nosuchverb",
+      builtin: "cd /tmp",
+      builtinThenShell: "cd /tmp && echo hi",
+      shell: "echo hi",
+      local: "/help",
+      app: "/ps",
+    };
+
+    for (const [kind, line] of Object.entries(byKind)) {
+      const h = harness();
+      h.pipeline.submit(line);
+      await settled();
+
+      const produced = h.transcript.entries.length;
+      if (kind === "empty") {
+        expect(produced, "empty is I1's first exception").toBe(0);
+      } else {
+        expect(produced, `${kind} produced no outcome`).toBe(1);
+      }
+    }
+  });
+
+  it("T2.2 (I1): entry count equals submission count minus empties", async () => {
+    // The property C23 I1 actually states, over a sequence rather than per case.
+    // A route appending twice and a route appending never both pass every
+    // single-submission test and both fail this.
+    const lines = [
+      "/ps", "   ", "cd /tmp", "/help", "", "echo hi", "/nosuchverb",
+      "cd /a && echo b", "  ", "/ps",
+    ];
+    const empties = lines.filter((l) => l.trim() === "").length;
+
+    const h = harness();
+    for (const line of lines) {
+      h.pipeline.submit(line);
+      await settled();
+    }
+
+    expect(h.transcript.entries).toHaveLength(lines.length - empties);
+  });
+
+  it("T2.4 (I8): patches commit `stream`, settlement commits `completion`", async () => {
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        yield { kind: "end", result: result({ exitCode: 0 }) } as RawPatch;
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+
+    expect(h.commits, "the patch").toContain("stream");
+    expect(h.commits.at(-1), "and the end flushes").toBe("completion");
+  });
+
+  it("T2.1 (I2): a fault at each stage still produces a document", async () => {
+    // Per stage, because "the session survives" is true of a pipeline that
+    // silently drops everything. What is asserted is the *outcome*, one per
+    // stage, which is the claim I2 makes.
+    const faults: readonly (readonly [string, string, Scripted])[] = [
+      ["transport", "/ps", { invoke: () => Promise.reject(new Error("transport")) }],
+      ["adapter", "/ps", { adapt: () => { throw new Error("adapter"); } }],
+      ["spawn", "echo hi", { spawnShell: () => { throw new Error("spawn"); } }],
+      ["stream", "/tail", { stream: () => { throw new Error("stream"); } }],
+    ];
+
+    for (const [stage, line, script] of faults) {
+      const h = harness(script);
+      h.pipeline.submit(line);
+      await settled();
+
+      expect(h.transcript.entries, `${stage}: no document`).toHaveLength(1);
+      expect(h.pipeline.inFlight, `${stage}: guard stranded`).toBeNull();
+    }
+  });
+});
+
+describe("C23 tier 3 — edges", () => {
+  it("T3.1: whitespace only is empty", () => {
+    const h = harness();
+    for (const line of ["", "   ", "\t", "\n  \t "]) h.pipeline.submit(line);
+    expect(h.transcript.entries).toHaveLength(0);
+  });
+
+  it("T3.2: a verb that exits immediately replaces the pending entry, never orphans it", async () => {
+    // **One entry, not two.** The pending entry and the result are the same
+    // entry, which is what `settle(id, doc)` made possible — before it, the only
+    // way to show the result was a second append.
+    const h = harness({ adapt: () => doc({ command: "/ps", status: "ok" }) });
+    h.pipeline.submit("/ps");
+    await settled();
+
+    expect(h.transcript.entries, "one entry").toHaveLength(1);
+    expect(h.transcript.entries[0]?.streaming, "and it is settled").toBe(false);
+  });
+
+  it("T3.17 (I5): a refused submission creates no pending entry", async () => {
+    // The refusal is an entry (§8b B5) and the *pending* one is what must not
+    // exist — an orphan that never settles and holds a live id.
+    let release: (() => void) | undefined;
+    const h = harness({
+      invoke: () => new Promise((r) => { release = () => r(result({ exitCode: 0 })); }),
+    });
+
+    h.pipeline.submit("/ps");
+    await new Promise((r) => setTimeout(r, 0));
+    const before = h.transcript.entries.length;
+    h.pipeline.submit("/ps");
+    await settled();
+
+    expect(h.transcript.entries.length, "one refusal notice, no second pending entry")
+      .toBe(before + 1);
+    expect(
+      h.transcript.entries.filter((e) => e.streaming),
+      "exactly one entry is still streaming — the first",
+    ).toHaveLength(1);
+
+    release?.();
+    await settled();
+  });
+
+  it("T3.16 (I5): a shell route holds the guard exactly as an app verb does", async () => {
+    // `sleep 30` delegated to the shell is a foreground command, and no shell
+    // lets you type another over it. Scoping the guard to app verbs is the
+    // revert T6.13 names.
+    let finish: (() => void) | undefined;
+    const h = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { yield "x"; })(),
+        exited: new Promise((r) => { finish = () => r({ code: 0 }); }),
+        overflowed: false,
+      }),
+    });
+
+    h.pipeline.submit("sleep 30");
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(h.pipeline.inFlight, "a shell route is in flight").toBe("shell");
+    h.pipeline.submit("/ps");
+    await settled();
+    expect(h.calls, "the second submission never reached the transport").not.toContain("invoke");
+
+    finish?.();
+    await settled();
+  });
+
+  it("T3.8: a stream that never settles holds nothing", async () => {
+    // The entry stays `streaming` indefinitely and the guard is not held — the
+    // two halves are independent, and a test asserting only the first passes on
+    // an implementation that blocks the session forever.
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise(() => undefined); // never ends
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+
+    expect(h.pipeline.inFlight, "the guard is free").toBeNull();
+    expect(h.transcript.entries[0]?.streaming, "and the entry is still open").toBe(true);
+  });
+
+  it("T3.7: a stream in flight does not refuse a following app verb", async () => {
+    // C23 I6 from the other side: subscriptions are exempt, so the prompt keeps
+    // working while a `--watch` runs.
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise(() => undefined);
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+    h.pipeline.submit("/ps");
+    await settled();
+
+    expect(h.calls, "the app verb ran").toContain("invoke");
+    expect(
+      h.transcript.entries.some((e) =>
+        e.doc.blocks.some((b) => b.kind === "notice" && /still running/.test(b.text)),
+      ),
+      "and nothing was refused",
+    ).toBe(false);
+  });
+});
