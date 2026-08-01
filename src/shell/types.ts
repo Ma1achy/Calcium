@@ -227,6 +227,15 @@ export type TuiConfig = Readonly<{
   theme: ThemeSet;
 
   adapters?: Readonly<Record<string, Adapter>>;
+  /**
+   * The app's own local verbs (§2a, I3a).
+   *
+   * Registered at step 10 before `seal()`, which is what makes C23 I27's
+   * reconciliation see them. A manifest verb marked `local` with no handler
+   * here fails construction naming the verb — correctly, and until this field
+   * existed there was no way to satisfy it.
+   */
+  localHandlers?: Readonly<Record<string, LocalHandler>>;
   commandPolicy?: CommandPolicy;
   completionSources?: readonly CompletionSource[];
   chrome?: Readonly<{ header: ChromeFn; footer: ChromeFn }>;

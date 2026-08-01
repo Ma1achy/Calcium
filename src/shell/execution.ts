@@ -157,9 +157,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * and one issued after the commit paints a frame with focus in a block that
    * has just been frozen.
    */
-  const appendAndCommit = (doc: Parameters<typeof deps.transcript.append>[0]): string | null => {
+  const appendAndCommit = (
+    doc: Parameters<typeof deps.transcript.append>[0],
+    /** The line as typed, when this append settles a submission (I29). */
+    line?: string,
+  ): string | null => {
     try {
       const id = deps.transcript.append(doc);
+      if (line !== undefined) recordHistory(line, doc);
       deps.resetFocus();
       deps.scheduler.commit("input");
       return id;
@@ -172,11 +177,28 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
+  /**
+   * I29 — the submitted line enters C20 at settlement, with the code it settled
+   * with, on every terminal path including refusals and parse errors.
+   *
+   * **The line as typed, passed in — not `doc.command`.** The first version read
+   * the document, which is right for five routes and wrong for the sixth: the
+   * app route settles with the *adapter's* document, whose `command` is whatever
+   * the far side put there. `/ps` recorded as `adapted`, and `↑` would have
+   * recalled a string nobody typed. T1.21 caught it because it asserts the line
+   * rather than that something was recorded.
+   *
+   * Passing it only where an append settles a submission also keeps the two
+   * other things `appendAndCommit` appends out of history: an identity notice
+   * and an action's outcome are not lines anybody typed.
+   */
+  const recordHistory = (line: string, doc: Parameters<typeof deps.transcript.append>[0]): void => {
+    deps.history.append(line, doc.meta.exitCode ?? 0);
+  };
+
   /** C23 I5's refusal. An ordinary append with `origin: "user"` — see C23 §8b B5. */
   const refuse = (line: string, reason: string): void => {
-    appendAndCommit(
-      noticeDoc(line, reason, "warn", { origin: "user" }),
-    );
+    appendAndCommit(noticeDoc(line, reason, "warn", { origin: "user" }), line);
   };
 
   const submit = (line: string): void => {
@@ -191,6 +213,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // Checked before the guard so a blank Enter over a running verb is silent
     // rather than a refusal notice.
     if (result.kind === "empty") return;
+
+    // **I28 — the prompt clears whatever becomes of the line**, and before the
+    // route so every one of them starts from the same empty prompt. After
+    // `empty`, which is not a submission: a blank Enter has nothing to clear.
+    //
+    // Restoring it on a refusal was the alternative and is worse — the notice
+    // says what happened, and a line that sometimes stays is a prompt whose
+    // contents depend on a decision taken after the keystroke.
+    deps.editor.clear();
 
     if (guard.route !== null) {
       // **Whole-line and unconditional** (C23 I5, C23 §8b B4). No part of a refused
@@ -260,10 +291,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             truncated: child.overflowed,
           },
         }),
+        line,
       );
     } catch (cause) {
       appendAndCommit(
         errorDoc(line, { message: String(cause), stage: "spawn" }, { origin: "user" }),
+        line,
       );
     } finally {
       // C23 §8a A5 — every exit releases it, this one included.
@@ -332,10 +365,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           : code === 0
             ? noticeDoc(line, `${label} finished`, "muted", { origin: "user" })
             : noticeDoc(line, `${label} exited ${String(code)}`, "warn", { origin: "user" }, "error"),
+        line,
       );
     } catch (cause) {
       appendAndCommit(
         errorDoc(line, { message: String(cause), stage: "handoff" }, { origin: "user" }),
+        line,
       );
     } finally {
       guard.release();
@@ -357,11 +392,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             { message: `no handler is registered for \`${verb}\``, stage: "local" },
             { origin: "user" },
           ),
+          line,
         );
         return;
       }
       const doc = await handler(argv, { command: line });
-      appendAndCommit(doc);
+      appendAndCommit(doc, line);
       // A02 Seam 4's theme row: `theme.setVariant` → `scheduler.invalidate`.
       // C10 never invalidates; the sequence is L4's, which is the seam.
       if (verb === "theme") deps.scheduler.invalidate();
@@ -374,6 +410,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           { message: `\`${verb}\` failed: ${String(cause)}`, stage: "local" },
           { origin: "user" },
         ),
+        line,
       );
     } finally {
       guard.release();
@@ -408,6 +445,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           origin: "user",
           verb,
         }),
+        line,
       );
       return;
     }
@@ -434,6 +472,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     cancelInFlight = () => {
       controller.abort();
       deps.transcript.settle(pendingId);
+      // I29 — the streaming route settles here rather than through
+      // `appendAndCommit`, so these are the settlements the funnel does not
+      // reach. A cancellation is a settlement and carries its own code.
+      deps.history.append(line, 130);
       deps.scheduler.commit("completion");
     };
 
@@ -478,6 +520,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // what no block-level patch could carry.
       refresh.settled(pendingId);
       deps.transcript.settle(pendingId, doc);
+      recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
       // alone, so `/promote $_` after a listing still names the submit before it.
@@ -488,10 +531,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     } catch (cause) {
       // C23 I2 — a transport that fails, times out or throws ends in a document
       // like everything else.
-      deps.transcript.settle(
-        pendingId,
-        errorDoc(line, { message: String(cause), stage: "transport" }, { origin: "user", verb }),
+      const failed = errorDoc(
+        line,
+        { message: String(cause), stage: "transport" },
+        { origin: "user", verb },
       );
+      deps.transcript.settle(pendingId, failed);
+      recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {
       cancelInFlight = null;
@@ -609,6 +655,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       try {
         appendAndCommit(
           errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user" }),
+          line,
         );
       } catch {
         // The document itself is unbuildable. C23 §5's one stage whose failure
@@ -635,7 +682,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   const route = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
     switch (result.kind) {
       case "error":
-        appendAndCommit(errorDoc(line, result.error, { origin: "user" }));
+        appendAndCommit(errorDoc(line, result.error, { origin: "user" }), line);
         return;
 
       case "builtin": {
@@ -644,6 +691,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           applied.ok
             ? noticeDoc(line, `${result.name} ${applied.text}`, "muted", { origin: "user" })
             : errorDoc(line, { message: applied.message }, { origin: "user" }),
+          line,
         );
         return;
       }
@@ -653,7 +701,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // is the other half: one that fails does not delegate.
         const applied = applyBuiltin(result.name, result.args);
         if (!applied.ok) {
-          appendAndCommit(errorDoc(line, { message: applied.message }, { origin: "user" }));
+          appendAndCommit(errorDoc(line, { message: applied.message }, { origin: "user" }), line);
           return;
         }
         start(line, runShell(line, result.rest));

@@ -17,6 +17,7 @@
 // **The three `PatchOutcome` arms need the wrong-arm case.** Three tests each
 // taking their own arm correctly cannot see a mis-dispatch; what catches it is
 // the entry ending in the *other* arm's state.
+import { createEditor } from "../../src/interaction/editor/index.js";
 import { describe, expect, it } from "vitest";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
@@ -45,6 +46,7 @@ function harness(script: Scripted = {}) {
   const resets: number[] = [];
   const calls: string[] = [];
   const typed: string[] = [];
+  const recorded: { command: string; exitCode: number }[] = [];
   /** A controllable clock and scheduler, so §3b's timers are driven not waited on. */
   let now = 0;
   const timers: (() => void)[] = [];
@@ -88,12 +90,38 @@ function harness(script: Scripted = {}) {
     },
     manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
     blocks: {} as never,
-    // A real fake rather than `{} as never`: `fill` calls `setText`, and a stub
-    // that throws makes an action test fail for a reason about the harness.
-    editor: { setText: (t: string) => void typed.push(t), get text() { return typed.at(-1) ?? ""; } },
+    // **The real editor**, wrapped only to record what `fill` set. A two-method
+    // stub was the previous version and it broke the day the submit path gained
+    // `clear()` (C23 I28) — the same defect as `{} as never`, with a smaller
+    // surface and the same cause: a double that satisfies the type and cannot
+    // do the thing.
+    editor: (() => {
+      const real = createEditor();
+      return new Proxy(real, {
+        // `target` as the receiver, not the proxy — C17 holds `#text` in a
+        // private field, and a proxy receiver cannot read one. The same reason
+        // C01's `writer` proxy passes the target.
+        get(target, prop) {
+          if (prop === "setText") {
+            return (t: string, cursor?: number) => {
+              typed.push(t);
+              real.setText(t, cursor);
+            };
+          }
+          const value: unknown = Reflect.get(target, prop, target);
+          return typeof value === "function" ? (value as () => unknown).bind(target) : value;
+        },
+      });
+    })(),
     overlays: {} as never,
     theme: { current: {} as never, setVariant: () => undefined, applyOverrides: () => [] },
-    history: { entries: [{ command: "/ps", ts: 0, exitCode: 0 }] },
+    // `append` is real: C23 I29 records every settled submission through it,
+    // and a fake without it throws inside the funnel — where the failure reads
+    // as a transcript defect rather than as a missing method.
+    history: {
+      entries: [{ command: "/ps", ts: 0, exitCode: 0 }],
+      append: (command: string, exitCode: number) => void recorded.push({ command, exitCode }),
+    },
     runner: {
       spawnShell: () => {
         calls.push("spawnShell");
@@ -139,6 +167,9 @@ function harness(script: Scripted = {}) {
     resets,
     calls,
     typed,
+    /** What reached C20 (I29), and the prompt (I28). */
+    recorded,
+    editor: deps.editor,
     /** Advance the injected clock and fire §3b's timers. */
     tick: (ms: number) => {
       now += ms;
@@ -947,5 +978,70 @@ describe("C23 §3b — time-driven updates", () => {
       "and the row records the gap rather than blanking",
     ).toBe(true);
     expect(stallBlocks(blocks), "replaced in place — still exactly one").toBe(1);
+  });
+});
+
+describe("C23 §4 — the submit row's two other steps", () => {
+  // The same enumeration T2.6 uses, and for the same reason: a route added to
+  // the parser and given neither of these is silent in both directions — a
+  // prompt that keeps its line, and a command `↑` cannot recall.
+  const byKind: Readonly<Record<string, string>> = {
+    error: "/nosuchverb",
+    builtin: "cd /tmp",
+    builtinThenShell: "cd /tmp && echo hi",
+    shell: "echo hi",
+    local: "/help",
+    app: "/ps",
+  };
+
+  it("T1.20 (I28): every route leaves the prompt empty", async () => {
+    // **The prompt is filled first, and the mutation pass is why.** The first
+    // draft called `submit(line)` against an untouched editor and asserted it
+    // was empty afterwards — true before the call, so removing `editor.clear()`
+    // from the pipeline failed nothing. C22's handler reads `editor.text` and
+    // then submits it, so the state under test is a prompt holding the line.
+    for (const [kind, line] of Object.entries(byKind)) {
+      const h = harness();
+      h.editor.setText(line);
+      expect(h.editor.text, "the prompt holds the line before the submit").toBe(line);
+
+      h.pipeline.submit(line);
+      await settled();
+      expect(h.editor.text, `${kind} left the line under the cursor`).toBe("");
+    }
+
+    // The control: `empty` is not a submission, so there is nothing to clear
+    // and nothing is recorded either.
+    const h = harness();
+    h.editor.setText("   ");
+    h.pipeline.submit("   ");
+    await settled();
+    expect(h.editor.text, "a blank Enter is not a submission").toBe("   ");
+    expect(h.recorded, "and nothing reaches C20").toEqual([]);
+  });
+
+  it("T1.21 (I29): every route records exactly one history entry, as typed", async () => {
+    for (const [kind, line] of Object.entries(byKind)) {
+      const h = harness();
+      h.pipeline.submit(line);
+      await settled();
+
+      expect(h.recorded.map((r) => r.command), `${kind} recorded ${String(h.recorded.length)}`).toEqual([
+        line,
+      ]);
+      expect(typeof h.recorded[0]?.exitCode, `${kind} recorded no code`).toBe("number");
+    }
+  });
+
+  it("T1.21b (I29): a refusal is a submission and is recorded", async () => {
+    // History is not a log of successes — the user typed it and pressed Enter,
+    // so `↑` recalls it. Driven through the guard, which is the refusal a
+    // session actually produces.
+    const h = harness({ invoke: () => new Promise<never>(() => undefined) });
+    h.pipeline.submit("/ps");
+    h.pipeline.submit("/ps --mine");
+    await settled();
+
+    expect(h.recorded.map((r) => r.command), "the refused line is in C20").toContain("/ps --mine");
   });
 });

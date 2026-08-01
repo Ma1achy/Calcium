@@ -20,6 +20,7 @@ import { createSessionStore } from "../../src/shell/state.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { loadTheme, defaultTheme, type ThemeStore } from "../../src/presentation/theme/index.js";
 import { slashPolicy } from "../../src/interaction/parser/index.js";
+import { createEditor } from "../../src/interaction/editor/index.js";
 import { fixture } from "./manifest.js";
 import { doc } from "./blocks.js";
 import { result } from "./transport.js";
@@ -77,6 +78,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
 
   const commits: string[] = [];
   const calls: string[] = [];
+  /** What reached C20 (C23 I29), for the tests that assert the record. */
+  const recorded: { command: string; exitCode: number }[] = [];
   const spawned: { command: string; cwd: string }[] = [];
   const handed: string[][] = [];
   const lifecycleCalls: string[] = [];
@@ -117,10 +120,21 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
     blocks: {} as never,
-    editor: { setText: () => undefined, text: "" },
+    // **The real editor, not a stub.** `editor: {} as never` cost a diagnosis
+    // once and `{ setText, text }` cost another the day C23 gained
+    // `editor.clear()` on the submit path (I28) — a two-method stub is the same
+    // defect with a smaller surface. C17 has no dependencies to fake around, so
+    // there is nothing bought by standing in for it.
+    editor: createEditor(),
     overlays: {} as never,
     theme,
-    history: { entries: script.history ?? [] },
+    // `append` is real, because C23 I29 records every settled submission
+    // through it — a fake without it throws inside the append funnel and the
+    // failure reads as a transcript defect.
+    history: {
+      entries: script.history ?? [],
+      append: (command: string, exitCode: number) => void recorded.push({ command, exitCode }),
+    },
     runner: {
       spawnShell: (command: string, opts: { cwd: () => string }) => {
         calls.push("spawnShell");
@@ -174,7 +188,9 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     clock: () => now,
     schedule: (fn: () => void) => {
       timers.push(fn);
-      return { [Symbol.dispose]: () => undefined };
+      return {
+    recorded,
+[Symbol.dispose]: () => undefined };
     },
     openUrl: () => Promise.resolve(),
     bindings: () => [{ keys: "c+c", does: "global: cancel" }],

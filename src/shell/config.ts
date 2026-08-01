@@ -101,6 +101,9 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     theme: config.theme,
 
     adapters: config.adapters ?? {},
+    // I3a — registered at step 10 before `seal()`. Defaulted like every other
+    // optional field, so an app with no local verbs supplies nothing.
+    localHandlers: config.localHandlers ?? {},
     fallbackAdapter: createFallbackAdapter(),
     commandPolicy: config.commandPolicy ?? slashPolicy,
     completionSources: config.completionSources ?? [],

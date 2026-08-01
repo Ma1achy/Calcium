@@ -515,6 +515,91 @@ switch (mode) {
     break;
   }
 
+  // The whole stack, for the tier-5 rows that need a real session (C22 §4).
+  //
+  // **One mode with variants rather than one per row.** Every mode above
+  // hand-composes from primitives; none built a session, because until steps 11
+  // and 12 landed there was nothing to drive one with. The variants arrive
+  // through `argv[3]` and the environment, so a row that needs `TERM=dumb` or a
+  // real far side changes what it launches rather than what runs.
+  //
+  // **Readiness is the first frame, not a sentinel.** C01 replaces
+  // `stdout.write` at construction (I9), so a `process.stdout.write("READY")`
+  // after `start()` goes to the debug sink and never leaves the process — which
+  // is the redirection working. The prompt glyph reaching the PTY is the honest
+  // signal that the shell painted, and it is what the test waits for.
+  case "session": {
+    const { createTui } = await import("../../dist/shell/session.js");
+    const { noticeDoc } = await import("../../dist/shell/documents.js");
+    const { parseManifest } = await import("../../dist/data/manifest/index.js");
+    const { createFixtureTransport, createRouter } = await import(
+      "../../dist/data/transport/index.js"
+    );
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    // **Parsed, never hand-built** (C22 I23). `parseManifest` is the only thing
+    // that appends the framework's own six verbs, so an object satisfying the
+    // type is one nobody parsed and construction refuses it.
+    //
+    // **The same JSON `test/support/manifest.ts` reads**, rather than a second
+    // manifest written here. Two copies drift, and the drift shows up as a
+    // tier-5 row asserting against a tool the rest of the suite does not have.
+    const { readFileSync } = await import("node:fs");
+    const parsed = parseManifest(
+      JSON.parse(readFileSync(new URL("./manifest.fixture.json", import.meta.url), "utf8")),
+    );
+    if (!parsed.ok) {
+      process.stderr.write(`manifest: ${JSON.stringify(parsed.error)}\n`);
+      process.exit(5);
+    }
+
+    const transport = createRouter({
+      default: createFixtureTransport([
+        {
+          id: "ps-empty",
+          verb: "ps",
+          argv: [],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          result: {
+            stdout: JSON.stringify({ schema: "tui.view/1", blocks: [] }),
+            stderr: "",
+            code: 0,
+            signal: null,
+            durationMs: 1,
+          },
+        },
+      ]),
+    });
+
+    /** A local handler's answer: one notice, carrying the command it ran. */
+    const sessionNotice = (ctx, text) => noticeDoc(ctx.command, text, "info", { origin: "user" });
+
+    const tui = createTui({
+      name: "prism",
+      binary: "widget",
+      manifest: parsed.value,
+      theme: defaultTheme,
+      transport,
+      env: process.env,
+      stateDir: mkdtempSync(join(tmpdir(), "tui-kit-session-")),
+      // **The manifest's two app-local verbs** (C22 I3a). C23 I27 refuses a
+      // manifest verb marked `local` with no handler, and this is the route
+      // that did not exist until the first session ran against this manifest.
+      localHandlers: {
+        guide: (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "the app's own local verb")),
+        "debug dump": (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "internal state")),
+      },
+    });
+
+    await tui.start();
+    break;
+  }
+
   default:
     process.stderr.write(`unknown mode: ${String(mode)}\n`);
     process.exit(1);

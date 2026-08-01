@@ -20,6 +20,8 @@ import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 // drift from what `parseManifest` produces, and that drift is what the
 // framework-verb check now refuses.
 import { MANIFEST } from "../support/session.js";
+import { parseManifest } from "../../src/data/manifest/index.js";
+import { noticeDoc } from "../../src/shell/documents.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
 
@@ -475,5 +477,33 @@ describe("C22 §3 — construction order", () => {
     route = "app";
     graph.graph.router.dispatch(ctrlC);
     expect(cancelled, "a value captured at step 9 would still read null").toBe(1);
+  });
+});
+
+describe("C22 §2a — the app's local handlers", () => {
+  it("T1.4j (C22 I3a): a local verb constructs with a handler and fails without one", async () => {
+    // **Both halves, and the failure alone is what shipped.** C23 I27 refuses a
+    // manifest verb marked `local` with no handler, correctly — and there was
+    // no route for an app to supply one, so a manifest declaring a local verb
+    // could not start a session at all. On its own the refusal reads as the
+    // check working rather than as a missing half.
+    const local = {
+      schema: "tui.manifest/1",
+      binary: "widget",
+      version: "1.0.0",
+      tools: [{ name: "guide", local: true, summary: "an app verb", args: [], flags: [] }],
+    };
+    const parsed = parseManifest(local);
+    if (!parsed.ok) throw new Error("the fixture manifest must parse");
+
+    await expect(build({ manifest: parsed.value })).rejects.toThrow(/guide/);
+
+    const { graph } = await build({
+      manifest: parsed.value,
+      localHandlers: {
+        guide: () => Promise.resolve(noticeDoc("guide", "the app's own verb", "info", { origin: "user" })),
+      },
+    });
+    expect(graph.pipeline.sealed, "and the registry still seals").toBe(true);
   });
 });

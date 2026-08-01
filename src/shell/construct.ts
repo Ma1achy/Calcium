@@ -422,6 +422,13 @@ export async function constructGraph(
       binary: config.binary,
       commandPolicy: config.commandPolicy,
     });
+    // **Before the seal** (I3a). C23 I27 reconciles the registry against the
+    // manifest, and a handler registered after that check is a second window in
+    // which the two records can differ — which is the window the seal exists to
+    // close.
+    for (const [verb, handler] of Object.entries(config.localHandlers)) {
+      p.register(verb, handler);
+    }
     p.seal();
     return p;
   });

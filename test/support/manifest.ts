@@ -12,6 +12,8 @@
 // what a target is, so there is nothing for a `uuid` type to buy. Anyone tempted
 // to add one later should change this comment first and see whether they still
 // want to.
+import { readFileSync } from "node:fs";
+
 import { parseManifest, type Manifest } from "../../src/data/manifest/index.js";
 
 /** A fresh, mutable plain object each call, so a test can break one field. */
@@ -19,120 +21,18 @@ export function raw(): Record<string, unknown> {
   return structuredClone(SOURCE) as Record<string, unknown>;
 }
 
-const SOURCE = {
-  schema: "tui.manifest/1",
-  binary: "widget",
-  version: "2.4.0",
-  tools: [
-    {
-      name: "ps",
-      local: false,
-      summary: "list processes",
-      args: [],
-      flags: [
-        {
-          name: "status",
-          type: "enum",
-          values: ["running", "failed", "queued"],
-          summary: "filter by status",
-        },
-        { name: "mine", short: "m", type: "bool", summary: "only mine" },
-        { name: "limit", short: "n", type: "int", summary: "how many" },
-        { name: "search", short: "s", type: "string", summary: "substring match" },
-        { name: "since", type: "duration", summary: "only newer than" },
-        { name: "open-mr", type: "bool", summary: "open the merge request" },
-        { name: "quiet", short: "q", type: "bool", summary: "less output" },
-        { name: "label", type: "string", repeatable: true, summary: "repeatable label" },
-      ],
-    },
-    {
-      name: "serving",
-      local: false,
-      summary: "serving overview",
-      args: [],
-      flags: [],
-    },
-    {
-      // The sub-verb, and the reason findTool takes tokens. T1.9 is the test
-      // that matters: both this and `serving` exist, and the longer one wins.
-      name: "serving scale",
-      local: false,
-      summary: "scale a service",
-      args: [
-        { name: "service", type: "string", required: true, summary: "which service" },
-        { name: "replicas", type: "int", required: true, summary: "how many" },
-      ],
-      flags: [
-        { name: "to", type: "enum", values: ["canary", "stable"], summary: "which track" },
-        { name: "traffic", type: "int", requires: ["to"], summary: "percent of traffic" },
-        { name: "side-by-side", type: "bool", conflicts: ["overlay"], summary: "two columns" },
-        { name: "overlay", type: "bool", summary: "one column" },
-        { name: "config", type: "path", summary: "config file" },
-      ],
-    },
-    {
-      name: "promote",
-      local: false,
-      summary: "promote a candidate",
-      args: [
-        {
-          // EX5, in the only form the framework understands: a shape it can
-          // check without knowing what it means.
-          name: "target",
-          type: "pattern",
-          pattern: "^[\\w.]+:[\\w]+$",
-          required: true,
-          summary: "family:name",
-        },
-      ],
-      flags: [],
-    },
-    {
-      name: "tail",
-      local: false,
-      streams: true,
-      summary: "follow output",
-      args: [{ name: "paths", type: "path", required: false, variadic: true, summary: "what to follow" }],
-      flags: [],
-    },
-    {
-      name: "dashboard",
-      local: false,
-      oneShot: true,
-      summary: "one frame to stdout",
-      args: [],
-      flags: [{ name: "once", type: "bool", summary: "write one frame and exit" }],
-    },
-    {
-      // C05 I19's field, and the fixture's only interactive verb. It exists so
-      // C23's handoff route has a real subject: the flag is what the app author
-      // knows and nothing else can work out, so a test asserting the handoff
-      // needs a manifest that declares one. `streams` and `local` are both
-      // absent here on purpose — I19 refuses either alongside it.
-      name: "edit",
-      local: false,
-      interactive: true,
-      summary: "open the config in $EDITOR",
-      args: [{ name: "file", type: "path", required: false, summary: "what to open" }],
-      flags: [],
-    },
-    {
-      name: "guide",
-      local: true,
-      summary: "an app-supplied local verb",
-      args: [],
-      flags: [],
-    },
-    {
-      name: "debug dump",
-      local: true,
-      hidden: true,
-      summary: "internal state",
-      args: [],
-      flags: [],
-    },
-  ],
-} as const satisfies Record<string, unknown>;
+/**
+ * **The record itself lives in JSON, and is read rather than declared here.**
+ *
+ * `test/support/fixture.mjs` needs the same manifest for the tier-5 session and
+ * cannot import a `.ts` module — it runs from `dist/` in a spawned process. Two
+ * copies of a manifest is two things to keep in step, and the drift would show
+ * up as a tier-5 row asserting against a tool the tier-1 fixture does not have.
+ * One file, two readers.
+ */
+const SOURCE = JSON.parse(
+  readFileSync(new URL("./manifest.fixture.json", import.meta.url), "utf8"),
+) as Record<string, unknown>;
 
 /** The parsed fixture. Fails loudly rather than handing tests a null. */
 export function fixture(): Manifest {
