@@ -1,4 +1,4 @@
-# tui-kit
+# Calcium
 
 **A framework for building terminal interfaces out of structured data.**
 
