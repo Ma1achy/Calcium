@@ -33,11 +33,13 @@ type ParseResult =
   | Readonly<{ kind: "builtin"; name: Builtin; args: readonly string[] }>
   | Readonly<{ kind: "builtinThenShell"; name: Builtin;
                args: readonly string[]; rest: string }>
-  | Readonly<{ kind: "shell";   command: string }>
+  | Readonly<{ kind: "shell";   command: string; interactive: boolean }>
   | Readonly<{ kind: "empty" }>
   | Readonly<{ kind: "error";   error: ErrorLike }>;
 
 type Builtin = "cd" | "export" | "pwd";
+
+const TTY_MARKER = "tty";                // read through the policy: /tty, or :tty
 
 type ParseContext = Readonly<{
   manifest: Manifest;
@@ -88,6 +90,12 @@ neither can be served by token text:
 
 One shape serves both, which is what I11 is for.
 
+**`interactive` is on the `shell` arm and on no other.** It is the shell half of C23
+§4's handoff opt-in. The `app` arm needs nothing: it already carries `tool: ToolDef`,
+and C05 I19's `interactive` field lives there — so C23 reads `result.tool.interactive`
+for an app verb and `result.interactive` for a shell line, and the fact has one home
+on each route rather than a copy with no reconciliation between the copies.
+
 ---
 
 ## 3. Tokenising
@@ -114,6 +122,10 @@ never needs to know what an fd is.
 0  a refusal (§5) — trailing bare "&", or a job-control
    word as the first token                           → error
 1  empty or whitespace only                          → empty
+1a first token is the TTY marker, unquoted (§5a)
+     nothing after it                                → error
+     next token is a built-in                        → error
+     otherwise                                       → shell, interactive
 2  first token is a built-in
      2a  no shell operator follows                   → builtin
      2b  followed by "&&" or ";"                     → builtin, then delegate the remainder
@@ -123,6 +135,13 @@ never needs to know what an fd is.
      and contains no further "/"                     → app or local (§6)
 5  otherwise                                         → shell
 ```
+
+**Rule 1a sits above 2 and 3 because both would otherwise claim the line first.**
+`/tty cd /x` reaches rule 2 with `/tty` as its first token and so is not a built-in at
+all; `/tty ls | cat` contains an operator and rule 3 would delegate it whole with the
+marker still in the string. The marker is a statement about the *whole* line, so it is
+read before the line is classified — and rule 0's refusals still run ahead of it,
+because a trailing `&` is refused whether or not the terminal was asked for.
 
 **Rule 2b is the case that ordering alone gets wrong.** `cd /tmp && make` must change the session's directory and *then* run `make` there — that is what bash does, and delegating the whole line to `sh -c` would change a subshell's directory and discard it. So a leading built-in followed by `&&` or `;` is split: the built-in is applied by L4, the remainder is delegated.
 
@@ -275,6 +294,97 @@ The output of a delegated command is a `raw` block. If you piped it, you asked f
 | `fg`, `bg`, `jobs` | No job table to act on |
 
 `&&` is not `&` — the tokeniser distinguishes them, and only a trailing bare `&` is refused. Nothing else is refused, because nothing else needs to be.
+
+---
+
+## 5a. The TTY marker
+
+`/tty vim notes.md` hands the terminal to the child. It is the shell half of C23 §4's
+handoff opt-in, and it is C18's rather than C23's for one reason: **a marker left on
+the line would be passed to `sh` as an argument.** It has to be removed before
+delegation, and removing a token from a line that is about to be delegated is the
+operation §5 already performs on `/verb`. Same string, same splice, same owner. C23
+reads the flag off the result and never parses the line.
+
+It is not a manifest tool. `FRAMEWORK_TOOLS` are all `local: true` and C23 I27 fails
+construction for a local verb with no handler; `/tty` has no handler, because C18
+consumes it during parsing and no route ever sees it. And it is not a `Builtin`:
+`cd`, `export` and `pwd` are session-state effects with arguments of their own, while
+the marker has no effect at all. It modifies how the rest of the line is run.
+
+**It is read through the policy**, so `prefixPolicy(":")` gives `:tty` and `/tty` is
+then an ordinary path-ish token. The predicate is `verbOf(token) === TTY_MARKER`, which
+is §5's rewrite predicate with a name test added — one prefix rule, not two.
+
+### Head position only
+
+| Input | Result |
+|---|---|
+| `/tty vim notes.md` | `shell` · `vim notes.md` · **interactive** |
+| `ls \| /tty vim` | `shell` · `ls \| widget tty vim` · not interactive |
+
+The second is not a special case; it is rule 3 and §5 doing exactly what they do to
+every command-position `/verb`. The marker is a claim about who owns the terminal for
+the duration of the line, and **a line with a pipeline has no single owner to give it
+to** — `ls | vim` runs both at once. So the marker is meaningless anywhere but at the
+head, and rather than inventing a rule to refuse it there, the token falls through to
+the rewrite and reaches the binary, which reports an unknown verb in its own words.
+That is the same outcome any other unknown `/verb` gets inside a delegated line, and
+I17's principle is why: C18 may not disagree with the shell about which token is a
+command in a line it is handing over.
+
+### Quoting disables it, exactly as it disables the rewrite
+
+`"/tty" vim` is a shell line running the command `/tty` with the argument `vim`.
+§4's asymmetry decides this and it decides it the same way: interception ignores
+quoting because quoting does not change what bash does with `cd`; the rewrite honours
+it because the rewrite is C18 *altering* what the user typed. Consuming the marker is
+altering what the user typed, and `sh` does nothing special with `/tty` either way —
+so a quoted marker is the user saying leave this alone, and there is nothing for them
+to be wrong about. It is also the escape hatch for anyone who really has a `/tty`
+binary.
+
+### `/tty` with a built-in is refused
+
+| Input | Result |
+|---|---|
+| `/tty cd /x` | `error` · *`cd` changes this session's directory and cannot run under `/tty`* |
+| `/tty export A=1` | `error` · same shape |
+
+The marker forces the shell route, so `cd` would run in a subshell and exit, and the
+session's directory would **silently** not change. That is correct behaviour for the
+route and an unacceptable failure mode — it is precisely the silence C23 §4's argument
+disqualified the maintained program list for, arriving through a door the argument had
+not looked at.
+
+Refusing is the only answer that says something. The user asked for two incompatible
+things: a built-in is a session-state effect and a handoff is a subshell. Applying the
+built-in and then handing off would be rule 2b's split wearing a marker, which reads as
+clever and is wrong — `cd /x` under `/tty` is not `cd /x && …`, and there is no `&&`
+to justify the reordering. Giving one of the two quietly is how a user learns not to
+trust either.
+
+This is the same knowledge rule 2 already encodes. C18 knows built-ins are session
+effects, which is why it intercepts them at all; this is the one case where the route
+the user selected destroys the effect.
+
+### `/tty` with nothing after it
+
+`error` — *`/tty` needs a command to run*. A marker with nothing to mark is not a
+shell line with an empty command; the shell would report nothing, because there is
+nothing left to report on once the marker is stripped.
+
+### A tool named `tty`
+
+An app may declare a verb called `tty`, and then `/tty vim` means two things. C18 is
+the only component that can see both records — it holds the manifest and the policy —
+so it reports the conflict rather than picking:
+
+> `tty` is declared as a verb and is also the handoff marker — rename the verb
+
+C05 cannot hold this rule: it is L0 `data/` and the marker is L3's, so a reserved-name
+list there would be C05 knowing about a component four layers up. Reporting from here
+costs one lookup and is loud, which is the property the whole opt-in was chosen for.
 
 ---
 
@@ -461,6 +571,35 @@ Context throughout: the fixture manifest, `binary: "widget"`, `lastUuid: "web:v3
 | `/ps --since -1h` | `app` · fail (missing value, C05's remediation) — carried |
 | input with a NUL | stripped; the remainder parses |
 
+### The marker against everything already in this table
+
+Added when the marker was, and indexed the same way: every row is a cell where the
+marker rule and one existing rule both have a claim. A row where only the marker
+applies is a restatement of §5a and is not here.
+
+| Input | Rules | Result |
+|---|---|---|
+| `/tty vim notes.md` | 1a | `shell` · `vim notes.md` · **interactive** |
+| `/tty` | 1a | `error` · a marker with nothing to mark |
+| `/tty ` (trailing space) | 1a | same — the tokeniser has already dropped it |
+| `/tty cd /x` | 1a × 2 | `error` · the built-in's effect cannot survive the route |
+| `/tty export A=1` | 1a × 2 | `error` · same |
+| `/tty pwd` | 1a × 2 | `error` · same, and `pwd` is the row that looks harmless — it reports the *subshell's* directory, which is the session's until the first `cd` and then quietly is not |
+| `/tty ls \| cat` | 1a × 3 | `shell` · `ls \| cat` · **interactive** — the marker is stripped, and the rest is an ordinary delegation with an operator in it |
+| `ls \| /tty vim` | 3 × 5 | `shell` · `ls \| widget tty vim` · not interactive — command position, so the rewrite claims it (§5a) |
+| `/tty /ps` | 1a × 5 | `shell` · `widget ps` · **interactive** — one token consumed, the next rewritten, both on one line |
+| `/tty /usr/bin/less f` | 1a × 5 | `shell` · `/usr/bin/less f` · **interactive** — D23's slash rule still refuses the rewrite |
+| `"/tty" vim` | 1a × §4's asymmetry | `shell` · `"/tty" vim` · not interactive — quoting disables the marker as it disables the rewrite |
+| `/tty sleep 5 &` | 0 × 1a | `error` · the trailing-`&` refusal, because rule 0 runs on tokens before anything is classified |
+| `/tty fg` | 0 × 1a | `error` · job control is refused as a *first* token, and after the marker `fg` is one |
+| `/tty` under `prefixPolicy(":")` | 1a × I12 | `shell` · `/tty` · not interactive — and `:tty vim` is the marker |
+| `/tty vim` with a tool named `tty` | 1a × 4 | `error` · two records of one name, reported rather than resolved |
+| `/ttyx vim` | 4 | `error` · `unknown verb: /ttyx` — the marker is a name test, not a prefix test |
+
+Three of these were rulings rather than readings. `/tty pwd` is the one that argues
+for the whole table: refusing `cd` reads as obvious and refusing `pwd` does not, and
+`pwd` is where the wrong answer is least visible.
+
 ### What it found
 
 Thirteen, and four are contradictions rather than gaps — two statements each correct
@@ -550,6 +689,9 @@ with are different claims.
 - **I22** — The refusals are evaluated first and on tokens, never on the raw input; a job-control word is refused as a first token, quoted or not, because quoting does not stop bash treating it as the built-in — the same answer §4's interception gives.
 - **I23** — The distance-2 suggester is C05's; there is exactly one implementation, as there is exactly one tokeniser.
 - **I24** — A leading built-in with an empty remainder is not a split; it delegates whole, so a syntax error leaves the session's directory alone.
+- **I25** — The TTY marker is recognised at head position only, unquoted, through the policy. Elsewhere it is an ordinary rewrite candidate, because a line with a pipeline has no single owner to give the terminal to.
+- **I26** — The marker is stripped before delegation. A delegated command never contains it, on any route — `sh` would receive it as an argument.
+- **I27** — The marker with a `Builtin` after it is an error, and the built-in is not applied. The route destroys the effect, so giving the user one of the two things they asked for is worse than giving them neither and saying so.
 
 ---
 
@@ -578,6 +720,8 @@ with are different claims.
 21. Refusals run first, on tokens, and job control is a first-token word whether or not it is quoted (I22).
 22. One distance-2 suggester, shared with C05 (I23).
 23. An empty remainder is not a split (I24).
+24. The TTY marker is head-position, unquoted, policy-read, and always stripped before delegation (I25, I26).
+25. A marker with a built-in after it is refused rather than half-applied, and a marker with nothing after it is refused rather than delegated empty (I27).
 
 ---
 
@@ -611,6 +755,8 @@ Six tiers. No state machine — C18 is pure.
 - **T1.18** (I22): `fg` → `error`; `echo fg` → `shell`; `'fg'` → `error`, the same answer `'cd'` gets.
 - **T1.19** (I21): `/zzz $_` with `lastUuid: null` → the unknown-verb error, not the `$_` one.
 - **T1.20** (I21): `/ps --status=nonsense` → kind `app` with a failing validation, and `tool` still present.
+- **T1.21** (I25, I26): `/tty vim notes.md` → `shell` · `vim notes.md` · `interactive` true. Both halves in one assertion: the flag is set **and** the command does not contain the marker, because a test that checks only the flag passes while `sh` receives `/tty` as an argument.
+- **T1.22** (I27): `/tty cd /x` → `error`, and the result is not a `builtin` or a `builtinThenShell`. The negative half is the assertion — refusing is only meaningful if the built-in did not also come back for L4 to apply.
 
 ### Tier 2 — contract / interface
 
@@ -650,6 +796,8 @@ Six tiers. No state machine — C18 is pure.
 - **T3.20** (§4): `'cd' /tmp` → `builtin`; quoting does not disable interception, and `echo "/ps"` in the same test does not get rewritten, so the asymmetry is one assertion.
 - **T3.21** (D18): `/tail *.log` → argv carries the literal `*.log`; `ls *.log` delegates.
 - **T3.22** (I17): `/zzzzz | cat` → delegated as `widget zzzzz | cat`; no manifest lookup occurs, proved by a spy on `findTool`.
+- **T3.23** (I25, I12): under `prefixPolicy(":")`, `:tty vim` is interactive and `/tty vim` is a plain shell line. Asserted as a pair, because a hardcoded `"/tty"` satisfies the first row and fails only the second.
+- **T3.24** (§5a): a manifest declaring a tool named `tty`, then `/tty vim` → `error` naming both records. The fixture manifest has no such tool, so this row builds its own — and it asserts the ordinary manifest still parses `/tty vim` as interactive, or the conflict rule is indistinguishable from the marker being broken.
 
 ### Tier 4 — integration
 
@@ -695,6 +843,9 @@ Six tiers. No state machine — C18 is pure.
 - **T6.19** (I22): checking the refusals on the raw input → T3.8 fails, and `echo "a & b"` is refused as a background job.
 - **T6.20** (I24): splitting on an empty remainder → T1.17 fails, and `cd /tmp &&` changes the directory on a line the shell rejects.
 - **T6.21** (I23): a second distance-2 implementation in `parser/` → T2.10 and SS30 fail.
+- **T6.22** (I26): dropping the strip — delegating the line with the marker still in it → T1.21's second half fails. The first half still passes, which is why the two are one test.
+- **T6.23** (I27): applying the built-in and delegating the rest under a marker → T1.22 fails. The revert is the plausible one: it reads as rule 2b's split and there is no `&&` to justify it, so the session's directory changes and the child gets a terminal, and only the negative assertion sees it.
+- **T6.24** (I25): recognising the marker in any command position rather than at the head → T2.11's `ls | /tty vim` row fails, and one member of a pipeline claims a terminal both members are using.
 
 ---
 

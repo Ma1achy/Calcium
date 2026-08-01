@@ -267,7 +267,7 @@ already declared and the architecture's table did not.
 
 **App verbs: `interactive: true` on the `ToolDef`.** The app author knows `prism shell` drops into a REPL and nobody else can. Declarative, in the single source C18 already reads, and it costs one field on the verbs that need it.
 
-**The `shell` route: a marker on the line, stripped by C18.** The user is typing the command, so the user is the only party with the knowledge — and C05 cannot help here, which the check settles rather than assumes. C05 describes *tools*; §5 hands anything with a shell operator to `sh -c` **whole**, and `ParseResult.shell` carries one `command: string`. A shell line has no flags C05 could describe, because `sh` is what parses it.
+**The `shell` route: `/tty <command>`, stripped by C18** (C18 §5a). The user is typing the command, so the user is the only party with the knowledge — and C05 cannot help here, which the check settles rather than assumes. C05 describes *tools*; §5 hands anything with a shell operator to `sh -c` **whole**, and a shell line has no flags C05 could describe, because `sh` is what parses it. The marker is read through the command policy, so a consumer using `prefixPolicy(":")` writes `:tty`.
 
 **That places the shell half in C18 rather than here.** A marker left on the line would be passed to `sh` as an argument, so it has to be removed before delegation — and C18 already rewrites `/verb` tokens into `<binary> verb` before handing the line over (§5). Stripping a marker is the same operation on the same string, done by the component that already owns it. C23 reads the flag off the `ParseResult` and sequences the handoff; it never parses the line.
 
@@ -275,7 +275,11 @@ So two mechanisms, and honestly two: the routes differ in who knows.
 
 **The list was the obvious answer and is disqualified.** A maintained set of TTY program names is exactly the shape I26 forbids, wrong for every wrapper and alias, and it fails **silently** — a program not on it gets a raw-mode terminal and no line editing, which C21 §5 names as the symptom with no obvious cause. Detection is not available either: whether a child wants a TTY is not knowable before running it.
 
-**What makes the opt-in cost less than it looks is the asymmetry.** A user who forgets the marker gets a broken-looking `vim`, presses Ctrl-C and adds it — annoying and obvious. A user who gets an unexpected handoff loses nothing. There is no false-positive case at all, which is why an opt-in beats a heuristic here and would not elsewhere. And `/help` renders from the manifest, so `interactive` verbs are discoverable without being remembered.
+**What makes the opt-in cost less than it looks is the asymmetry.** A user who forgets the marker gets a broken-looking `vim`, presses Ctrl-C and adds it — annoying and obvious. A user who gets an unexpected handoff loses nothing. There is no false-positive case at all, which is why an opt-in beats a heuristic here and would not elsewhere.
+
+**Discoverability covers one of the two halves, and the sentence used to claim both.** `/help` renders from the manifest, so an `interactive` app verb is discoverable without being remembered — that half holds. The marker is not a manifest tool and cannot be (C18 §5a), so it is exactly as discoverable as `cd`, which is to say not from `/help` at all. Stated rather than left implied: the shell half is documentation and habit, and if that turns out to cost more than it looks, the remedy is a section in `/help` for the things C18 recognises structurally, not a field on a `ToolDef` that would have nowhere to live.
+
+**And C05 refuses two combinations rather than C23 arbitrating them** (C05 I19). `interactive` with `streams` is a verb whose child owns the terminal and whose stdout is being read into the transcript at the same time; `interactive` with `local: true` is a handoff to a child that is never spawned. Neither has an arbitration that is not a guess, and refusing at parse puts the report in front of the author who wrote the manifest rather than the user watching a terminal misbehave.
 
 **`Scroll` is not here, and it was.** A02 Seam 4 assigns it to C22 with C14 I12 cited — C14 moves and C22 commits — and `src/shell/construct.ts` step 11 implements it there. A row listed in both places is a row with two owners, which is the condition the owner column was added to remove.
 
@@ -511,6 +515,44 @@ session.
 
 **Ruled: the machine returns to `idle` on any stage failure, including this one.**
 I1's second exception is about the *entry*; it is not a licence to keep the guard.
+
+### A6 — the handoff's four calls, and what arrives during them
+
+Added when the handoff was built. §4's row is `lifecycle.suspend` →
+`runner.handoff` → `lifecycle.resume` → `scheduler.invalidate`, and the trace's
+question is not whether those four run in order — T4.3 asserts that — but what
+else can happen while they are running.
+
+| Sequence | Interaction | Ruling |
+|---|---|---|
+| submit `/tty vim`, then a second submit while suspended | handoff × the guard | The guard is taken for the whole sequence, as it is for any submission. §6's machine is `running` from `submit` to `invalidate`, so the second submission is refused by the ordinary rule and no new case is needed. Recorded because "the terminal is gone" looks like it needs one |
+| `stop("eof")` while the child holds the terminal | handoff × I12 | `beginStopping` sets the flag, and the flag refuses *submissions*. It cannot interrupt a child that owns the terminal, and it must not: `lifecycle.release()` while suspended would restore a screen the child is drawing on. Shutdown waits for `resume`, which the guard already serialises |
+| SIGWINCH during the suspend | handoff × C01 | Nothing. While suspended the dimensions belong to the child (C01 §3), and the terminating `invalidate` is a full repaint at whatever size the terminal now is. The resize path's `commit("resize")` would paint onto the child's screen |
+| an entry still streaming when `suspend()` is called | handoff × §3's stream path | Cannot arise on the accepted path — the guard is held, so no stream is in flight when a submission begins. But §3b's stall detection is **not** a submission and does patch on a timer, so it fires onto a suspended terminal. Ruled: `commit` during a suspend is dropped, and the trailing `invalidate` is what makes that safe. The patch still lands in the store; only the paint waits |
+| `runner.handoff` rejects | **the throw path** | See below |
+| an app verb declaring `interactive` and `streams` | structural, not sequential | Refused at parse (C05 I19). It is in this table only to record that it was asked and answered somewhere else — the interaction is between two manifest fields with no event between them, so it is C05's classification rule and not a row of this trace |
+
+**A6.5 — the rejected handoff leaves a suspended terminal, and nothing resumes
+it.** This is the row worth the whole subsection, and it is the second instance of
+the shape T1.9f named: *when a ruling chooses to throw, ask what the throw leaves
+behind.*
+
+C21 §5 rejects `handoff()` when `stdin.isRaw` is still true, on the grounds that
+the caller skipped `lifecycle.suspend()`. It is a good guard and it is checking a
+*precondition of the caller's sequence from inside the second step of it*. So the
+one case it fires on the handoff path is the case where `suspend()` ran and did
+not un-raw stdin — and the rejection then unwinds out of a sequence that has
+already suspended the terminal. `resume` never runs. The session is left on the
+primary screen with no frame, no prompt and no error visible, because the
+diagnostics path writes to a screen that was released.
+
+Predicted rather than discovered, which is the difference from T1.9f — so it is
+asserted rather than found. **Ruled: the sequence resumes on any failure of the
+middle two steps, and the resume is not conditional on the handoff having
+started.** A `resume()` that was never suspended throws in C01's own transition
+table ("nothing was suspended"), so the ordering is: suspend, then everything
+after it inside a scope whose exit resumes, and the failure is reported as an
+ordinary execution error into the transcript that survives.
 
 ### What the trace confirmed rather than found
 

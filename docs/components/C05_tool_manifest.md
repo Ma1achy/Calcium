@@ -75,6 +75,7 @@ type ToolDef = Readonly<{
   streams?:  boolean;                 // emits NDJSON patches rather than one document
   oneShot?:  boolean;                 // writes one frame to stdout and exits; bypasses the TTY gate
   hidden?:   boolean;                 // omitted from help and completion, still invocable
+  interactive?: boolean;              // takes the terminal — C23 §4's handoff (I19)
 }>;
 
 type Manifest = Readonly<{
@@ -112,6 +113,40 @@ The list is a runtime constant with the type derived from it, so a new member wi
 ### `hidden` — invocable, not offered
 
 `visibleTools` omits a hidden tool; `findTool` still resolves it. That pair *is* the meaning of the field, and it is what makes it useful for a deprecation or an internal escape hatch: the verb keeps working for whoever knows its name while it leaves the help. A `hidden` that also stopped resolving would be a weak form of deleting the entry, and deleting the entry is how you delete a verb. T1.15 asserts the pair in one test, because separately both halves pass while the intent disappears between them.
+
+### `interactive` — the app author is the only party who knows
+
+A verb that drops into a REPL or opens an editor needs the terminal, and C23 §4's
+handoff row gives it one. **Nothing can work out which verbs those are.** Detection is
+not available — whether a child wants a TTY is not knowable before running it — and a
+maintained list of TTY program names is the shape C23 I26 forbids, wrong for every wrapper
+and alias, and silent when it is wrong. The app author knows that `prism shell` is a
+REPL and nobody else does, so the declaration lives beside the other things only they
+know.
+
+It is a `ToolDef` field for the same reason `streams` is: it describes how the verb
+behaves when invoked, which is what this type is for. C18 carries the whole `ToolDef`
+on an `app` result, so the flag reaches C23 with no parser change at all — one fact
+with one home, rather than a copy on the result and no reconciliation between them.
+
+**Two combinations are refused at parse (I19), and both are refused because the
+alternative is silent.**
+
+- **`interactive` with `streams`.** A handoff gives the terminal to the child; a
+  stream reads its stdout into the transcript. Mutually exclusive at the level of who
+  owns the file descriptor, and there is no arbitration that is not a guess. Whichever
+  C23 picked, the other declaration would do nothing and say nothing.
+- **`interactive` with `local: true`.** A local verb is handled in-process and never
+  spawned (I12), so there is no child to hand the terminal to. The flag would be
+  inert — A03 §2's vacuity class arriving in a manifest rather than in a rule.
+
+Both are cross-field rules of I4's kind and are enforced where I4 is, so they fail at
+parse with a path rather than at the first invocation — which for an `interactive`
+verb is a user watching a terminal do the wrong thing.
+
+**C05 knows nothing about the `shell` route's marker.** That half of the opt-in is
+C18's (C18 §5), because a shell line has no flags C05 could describe: `sh` is what
+parses it. The asymmetry is in C23 §4 and is the reason there are two mechanisms.
 
 ---
 
@@ -250,6 +285,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I16** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
 - **I17** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
 - **I18** — There is exactly one distance-2 suggester in the tree, and it is C05's. A01 A.2's cutoff is a policy about *when a suggestion is worth making*, and two implementations agree about the distance and diverge about the tie-break — which is where a suggestion is wrong rather than absent, and a wrong suggestion is the thing the cutoff exists to prevent.
+- **I19** — `interactive` is refused with `streams` and refused with `local: true`. Enforced at parse, as I4 is. Both combinations describe a verb that cannot exist, and both would otherwise be discovered by a user watching a terminal misbehave rather than by the author who declared them.
 
 ---
 
@@ -270,6 +306,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I16).
 14. Conflicts are directional in the check and deduplicated in the report (I17).
 15. The distance-2 suggester is exported, so C18's unknown verbs and C05's unknown flags are one implementation (I18).
+16. `interactive` declares a verb that takes the terminal, and the two combinations that cannot exist are refused at parse (I19).
 
 ---
 
@@ -300,6 +337,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.16** (I16): `--status running` and `--status=running` produce the same `args`. Both forms, one result — the permissive rule as an equality rather than as two separate passes.
 - **T1.17** (I16, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
 - **T1.18** (I17): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
+- **T1.19** (I19): `interactive` with `streams` → parse error at the tool's path; `interactive` with `local: true` → parse error; `interactive` alone on a spawned tool → parses, and the field survives onto the `ToolDef`. The third half is what stops the rule from being a blanket refusal that passes the first two.
 
 ### Tier 2 — contract / interface
 
@@ -365,6 +403,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T6.10** (I16): rejecting `--flag value` pre-spawn → T1.16 fails, and the gate starts refusing invocations the far side would have run.
 - **T6.11** (§3): reverting the `-`-value remediation to a bare "missing value" → T1.17 fails on the message, leaving the user to discover `=` for themselves.
 - **T6.12** (I17): deduplicating conflicts by name order rather than by the unordered pair → T1.18 fails on the one-directional case, which is the ordinary way an app declares it.
+- **T6.13** (I19): accepting `interactive` alongside `streams` → T1.19 fails. A verb declaring both reaches C23, where whichever path loses does nothing and reports nothing — the failure the parse-time refusal exists to move to the author.
 
 ---
 
