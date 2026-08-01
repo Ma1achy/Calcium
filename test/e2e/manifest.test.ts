@@ -42,19 +42,19 @@ describe("C05 e2e", () => {
   });
 
   it.todo(
-    // **Two of its three halves work and are demonstrated by hand.**
-    // `/promote` alone shows C05's refusal — `x "promote" requires <target>` —
-    // and `/promote app.web:main` clears validation, reaches the fixture far
-    // side and renders `promoted app.web:main` in the transcript. That second
-    // half is what found C14's settle defect, now fixed: it settles a streaming
-    // entry with a document, which is every app-route submission.
+    // **Two of its three halves are verified; the third is the sixth wiring
+    // gap and the largest.** `/promote` alone shows C05's refusal, and
+    // `/promote app.web:main` clears validation, reaches the far side and
+    // renders — that half found C14's settle defect.
     //
-    // The third does not. `Tab` after a prefix produces no menu, so either the
-    // manifest-derived completion source is not registered in a constructed
-    // session or the menu layer is not reaching the frame. C19's own tiers pass,
-    // which is the same shape as the C14 finding and wants the same treatment:
-    // split it at the store — is there a layer on C15's stack after the Tab?
-    "T5.1: a session completes, validates and rejects for every tool, with no far side — the reject and validate halves are verified; blocked on Tab producing no completion menu in a real session",
+    // Tab now produces a menu: with `frameworkSources` registered, a probe
+    // through a constructed graph puts `completion-menu` on C15's stack. It
+    // does not reach the screen, because **`paint.ts` composites no layers at
+    // all** — the frame is header, transcript, prompt and footer, and
+    // `overlays.layout()` is called only for C16's hit-testing and for the
+    // menu's own remainder count. Every overlay is invisible: the completion
+    // menu, reverse search, and C15's confirm.
+    "T5.1: a session completes, validates and rejects for every tool, with no far side — reject and validate verified; blocked on L4 drawing no overlays, so C15's stack never reaches the frame",
   );
 
   it("T5.4: a manifest omitting a tool reports it unavailable, and the session continues", async () => {
