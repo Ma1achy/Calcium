@@ -100,30 +100,45 @@ export interface RefreshDriver {
 
 export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   /** Last patch time per streaming entry, and whether it carries a stall notice. */
-  const watched = new Map<EntryId, { last: number; stalled: boolean }>();
+  const watched = new Map<EntryId, { last: number; stalled: boolean; stalledAt: number }>();
   const timers: Disposable[] = [];
 
   /**
-   * **Blocked: `ViewPatch` has no way to remove a block.**
+   * **Replaced, never removed** (C23 §3b, §8a A4).
    *
-   * §3b says the stall notice is *removed if output resumes*, and §8a A4 rules
-   * that settlement removes one that is present — otherwise a settled entry
-   * keeps `no output for 2m` where it is no longer true. The five ops are
-   * `append`, `replace`, `merge`, `status` and `expand`; none deletes.
+   * `ViewPatch` has no delete and should not: a transcript is a record, C13's
+   * only removal path is the cap and it leaves a marker, and a patch that made a
+   * block vanish would leave a document whose earlier state cannot be
+   * reconstructed from its own history — `rev` is a counter, not a log.
    *
-   * `replace` with an empty notice is the available shape and it is wrong: an
-   * empty notice is still a notice, so it still occupies a row. A blank line
-   * appearing where a stall notice was is a worse artefact than the stale notice,
-   * because nothing explains it.
+   * Removal was never what this wanted anyway. The notice said *this stream has
+   * gone quiet*; then the stream spoke, or ended. Either way the thing it
+   * describes still exists and its state changed, which is `replace`.
    *
-   * So this does the half that is correct — stops the driver treating the entry
-   * as stalled — and leaves the block. Named rather than papered over: the
-   * fourth instance of C23 specifying an operation the layer below does not have.
+   * The row is spent and it says something true. A zero-height replacement is
+   * not available and should not be — C09's floor is one row for any block that
+   * is present, which is the constraint that keeps measurement honest.
    */
-  const clearStallState = (id: EntryId): void => {
+  const resolveStall = (id: EntryId): void => {
     const state = watched.get(id);
-    if (state === undefined) return;
+    if (state === undefined || !state.stalled) return;
     state.stalled = false;
+
+    const gap = Math.max(1, Math.round((deps.clock() - state.stalledAt) / 60_000));
+    deps.transcript.patch(
+      id,
+      {
+        op: "replace",
+        blockId: STALL_BLOCK,
+        block: block({
+          kind: "notice",
+          id: STALL_BLOCK,
+          tone: "muted",
+          text: `resumed after ${String(gap)}m`,
+        }),
+      },
+      "shell",
+    );
   };
 
   const tick = (): void => {
@@ -135,6 +150,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     for (const [id, state] of watched) {
       if (state.stalled || now - state.last < STALL_MS) continue;
       state.stalled = true;
+      state.stalledAt = now;
 
       // **A notice, never an error** (C23 I25). A quiet stream is the normal
       // state of a `--watch` on an idle cluster; reporting it as a failure
@@ -156,12 +172,12 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   timers.push(deps.schedule(tick, STALL_MS / 4));
 
   return {
-    watch: (id) => void watched.set(id, { last: deps.clock(), stalled: false }),
+    watch: (id) => void watched.set(id, { last: deps.clock(), stalled: false, stalledAt: 0 }),
 
     sawPatch: (id) => {
       const state = watched.get(id);
       if (state === undefined) return;
-      clearStallState(id);
+      resolveStall(id);
       state.last = deps.clock();
     },
 
@@ -170,7 +186,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // already injected, so an entry that goes quiet and then settles would
       // keep `no output for 2m` in its final document — where it is no longer
       // true and can never be replaced.
-      clearStallState(id);
+      resolveStall(id);
       watched.delete(id);
     },
 

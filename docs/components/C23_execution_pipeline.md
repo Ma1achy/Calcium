@@ -177,7 +177,7 @@ Adapters are pure and read no clock (C07 I1); C15's layout is pure (C15 I5). **A
 Three cases. **Two patch an existing host and one appends**, and that distinction
 is what §3b was missing rather than a detail of it.
 
-**Stall detection.** A streaming entry that has received no patch for **120 s** gets a synthetic notice patch — `no output for 2m` in muted tone — replaced on the next real patch and removed if output resumes. It is not an error: a build pulling a large base layer is silent for minutes, and the honest reading of a motionless block is usually "working". Saying how long it has been quiet is better than implying a fault or saying nothing.
+**Stall detection.** A streaming entry that has received no patch for **120 s** gets a synthetic notice patch — `no output for 2m` in muted tone — **replaced, on resumption, by a record of the gap**. The earlier wording said *replaced on the next real patch and removed if output resumes*, which is one event described twice and only the first half is expressible: `ViewPatch` has no delete, and it should not. **A transcript is a record.** C13 has exactly one path that removes anything — the cap — and it leaves a marker so the removal is visible (C13 §5). A patch that made a block vanish would leave a document whose earlier state cannot be reconstructed from its own history, and `rev` is a counter rather than a log, so nothing would say a block had ever been there. What resumption wants is not removal anyway: the notice said *this stream has gone quiet*, and then the stream spoke. That is a state change on a thing that still exists. **So the row is spent, and it says something true** — `resumed after 2m` rather than a blank. The entry did go quiet, and that is part of its record. A zero-height replacement is not available and should not be: C09's floor is one row for any block that is present, which is the constraint that makes measurement honest. It is not an error: a build pulling a large base layer is silent for minutes, and the honest reading of a motionless block is usually "working". Saying how long it has been quiet is better than implying a fault or saying nothing.
 
 **Part refresh.** A **transcript entry or a pushed view** may declare intervals — `b.live` (C24 §5) is the consumer-facing form, and both are driven by the same code here. An earlier split had C22's identity loop refreshing banner sections while C23 refreshed view panels; one mechanism replaces two, and C22's loop is now about identity alone.
 
@@ -216,11 +216,11 @@ asymmetry is the reason it is a third case and not a third instance of the
 second.
 
 The first two mechanisms stop when the entry settles or the view pops, and
-**settlement also removes a stall notice that is present** (§8a A4). Stopping the
-mechanism does not retract the block it already injected, so an entry that goes
-quiet and then settles would keep `no output for 2m` in its final document, where
-it is no longer true and can never be replaced. Removal is part of settling
-because by then the mechanism has stopped and cannot do it.
+**settlement replaces a stall notice that is present with a record of the gap**
+(§8a A4). Stopping the mechanism does not retract the block it already injected,
+so an entry that goes quiet and then settles would otherwise keep `no output for
+2m` in its final document, where it is no longer true. The replacement is part of
+settling because by then the mechanism has stopped and cannot do it.
 
 **All three stop once `session.stopping` is set** (§8b B1). I12 refuses
 *submissions*, and none of these is one — so without this line an identity notice,
@@ -324,7 +324,7 @@ Per submission.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
 - **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
 - **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I25) and applied by the sequence (C09 I17). The rule has teeth in one direction only: C23 may not *add* rhythm.
-- **I25** — A stream producing nothing for 120 s is **patched** with a muted stall notice, and never an error. A patch rather than an append, so it replaces cleanly on the next real patch and never becomes a second entry — and so it carries no `meta.origin`, which is why it is not I22's business. A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
+- **I25** — A stream producing nothing for 120 s is **patched** with a muted stall notice, and never an error. A patch rather than an append, so it never becomes a second entry — and so it carries no `meta.origin`, which is why it is not I22's business. On resumption the notice is **replaced by a record of the gap, never removed**: `ViewPatch` has no delete and a transcript is a record (§3b). A quiet stream is the normal state of a `--watch` on an idle cluster; reporting it as a failure trains the reader to ignore the one time it is one. The notice clears on the next patch and the subscription is untouched.
 - **I26** — `/help` is rendered from the manifest and C16's keymap, never from a maintained list. Every verb it names is one C05 will accept and every binding it shows is one C16 will dispatch, so help cannot drift from behaviour — the drift being what a hand-written help text guarantees eventually.
 - **I27** — `seal()` reconciles the local registry against the manifest and fails construction on a mismatch in either direction: a manifest verb marked `local` with no handler, or a handler for no manifest verb. Two records of one fact and no comparison is what lets a `local` route arrive with nothing to run (§8b B3).
 
@@ -460,15 +460,26 @@ child produces; keeping it alive spends a process on output nobody will read.
 
 ### A4 — a stall notice outlives the condition it describes
 
-§3b: the notice is "replaced on the next real patch and removed if output
-resumes", and "the first two mechanisms stop when the entry settles or the view
-pops". **Stopping the mechanism does not remove the block it already injected.**
-An entry that goes quiet at 120 s and then settles keeps `no output for 2m` in its
-final document, where it is no longer true and can never be replaced.
+§3b said the notice was "removed if output resumes", and that the first two
+mechanisms "stop when the entry settles or the view pops". **Stopping a mechanism
+does not retract the block it already injected.** An entry that goes quiet at
+120 s and then settles keeps `no output for 2m` in its final document, where it is
+no longer true.
 
-**Ruled: settlement removes a present stall notice**, as part of settling rather
-than as a separate tick — the mechanism has stopped by then, so it cannot be the
-mechanism's job.
+**Ruled: settlement replaces it with a record of the gap. Nothing is removed.**
+
+The first ruling here said *removes*, and writing the driver found that
+`ViewPatch` has no delete — which is correct and stays. A transcript is a record:
+C13 has exactly one path that removes anything, the cap, and it leaves a marker so
+the removal is visible. A patch that made a block vanish would leave a document
+whose earlier state cannot be reconstructed from its own history, and `rev` is a
+counter rather than a log.
+
+**And removal was never what this wanted.** The notice said *this stream has gone
+quiet*; the stream then stopped, or spoke. Either way the thing it describes still
+exists and its state changed — which is `replace`, not delete. The row is spent
+and it says something true, because the entry did go quiet and that belongs in its
+record.
 
 ### A5 — the guard outlives the submission that took it
 

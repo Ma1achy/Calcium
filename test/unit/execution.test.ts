@@ -893,4 +893,54 @@ describe("C23 §3b — time-driven updates", () => {
     expect(backoffOf(30_000, 40), "and stays capped").toBe(BACKOFF_CAP_MS);
     expect(backoffOf(30_000, 0), "recovery resets it").toBe(30_000);
   });
+
+  it("T1.20b (I25, §8a A4): resumption replaces the notice, and the row says something true", async () => {
+    // **Replaced, never removed.** `ViewPatch` has no delete and should not: a
+    // transcript is a record, and a patch that made a block vanish would leave a
+    // document whose earlier state cannot be reconstructed from its own history.
+    //
+    // Removal was never what this wanted. The notice said *this stream has gone
+    // quiet*; the stream then spoke. The thing it describes still exists and its
+    // state changed, which is `replace` — and the spent row records the gap,
+    // because the entry did go quiet and that belongs in its record.
+    let resume: (() => void) | undefined;
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise<void>((r) => { resume = r; });
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise(() => undefined);
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+    h.tick(130_000);
+
+    const stalled = h.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice");
+    expect(
+      stalled?.some((b) => b.kind === "notice" && /no output for/.test(b.text)),
+      "quiet at 120 s",
+    ).toBe(true);
+    // Counted by *block id*, not by total rows: resumption also delivers a real
+    // patch, so the document grows by one legitimately. Totalling rows would
+    // measure that and call it the stall handling.
+    const stallBlocks = (bs: readonly { id: string }[]) =>
+      bs.filter((b) => b.id === "stall-notice").length;
+    expect(stallBlocks(stalled ?? []), "one stall block").toBe(1);
+
+    resume?.();
+    await settled();
+
+    const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
+    expect(
+      blocks.some((b) => b.kind === "notice" && /no output for/.test(b.text)),
+      "the stale claim is gone",
+    ).toBe(false);
+    expect(
+      blocks.some((b) => b.kind === "notice" && /resumed after/.test(b.text)),
+      "and the row records the gap rather than blanking",
+    ).toBe(true);
+    expect(stallBlocks(blocks), "replaced in place — still exactly one").toBe(1);
+  });
 });
