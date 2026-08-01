@@ -51,6 +51,10 @@ function truncate(
   from?: "start" | "end",          // default "end" — removes from the end, keeps the start
 ): string;
 
+// The two that operate on a line that already carries SGR (§5a).
+function fitStyled(text: string, width: number, reset: string): string;
+function sliceCells(text: string, from: number, to: number): string;
+
 interface BlockDefinition<B extends Block = Block> {
   kind:    string;
   measure: Measure<B>;                // contract from C04; receives measureChild
@@ -299,6 +303,45 @@ It is substituted by a one-cell `?` (I19). Three answers were available and two 
 
 ---
 
+## 5a. A line that already carries SGR
+
+`cells()` is wrong for a rendered line, and wrong in a way that looks right.
+`stripControl` drops the ESC byte because it is a control character and keeps
+`[38;5;241m`, which is ordinary printable text — so a themed row measures eleven
+cells too wide per colour change. C22's frame padded every chrome row to eighty
+*counted with the escapes*, which made the visible row about thirty-eight and
+left the previous frame showing across the rest of it. `displayCells` and
+`fitStyled` are that answer, and they live here rather than in C22 because this
+is where display width is decided (I1, I6).
+
+**`sliceCells` is the same question asked from the other end, and the frame
+cannot composite without it.** Drawing a layer over a painted row means keeping
+cells `[0, left)` of that row, writing the layer's cells, and keeping cells
+`[left + width, columns)`. `fitStyled` answers the first. The third has no
+expression as a `slice`: a cut by code unit lands inside an escape, `[38;5`
+reaches the terminal as literal text, the SGR is never terminated, and the colour
+bleeds down every row below — which is worse than the mis-measurement, because it
+survives the frame.
+
+So the tail is taken by the same grapheme walk, with two rules that are the whole
+reason it is not a substring:
+
+- **The skipped prefix's SGR is carried forward.** A style opened before `from`
+  is still in effect at `from`; a tail that dropped it draws in the terminal's
+  default colour, which reads as the layer having bled rather than as the base
+  having lost its style.
+- **A cluster straddling either boundary is dropped and its cell blanked**, never
+  halved — I9's rule, applied to a window rather than to a cut. Half a
+  double-width glyph is a row one cell wide, and a row wider than it was measured
+  wraps into a row nobody counted.
+
+I20's composition law is what makes the splice provably width-preserving, and it
+is stated as a law rather than as three cases because the failure it prevents is
+arithmetic: three pieces that each measure right and together measure `columns +
+1` put the frame one cell into the next row.
+
+---
+
 ## 6. Registry state machine
 
 | From ↓ / call → | `register` | `seal` | `measure` / `render` |
@@ -331,6 +374,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I17** — `gapBefore` is applied by the sequence, never by the block (C04 §3a, C04 I19). `measure` never counts it; `measureSequence` and every container do.
 - **I18** — Control characters are stripped from every text field before measurement and render, by C09 and not by its callers. A far side's output cannot inject escape sequences into the frame: `\x1b[2J` cannot clear the screen, a cursor-position query cannot get its answer typed into the prompt, and a stray `\r` cannot make a measured row and a rendered row disagree. Stripping happens once, at the last point before both, so measurement and render cannot see different text.
 - **I19** — Wrapping never deletes a cluster. A cluster wider than the line it must fit into is **substituted** by a one-cell `?`, never dropped: a row that silently loses a glyph is a frame that is arithmetically consistent and describing different content than it holds. Substitution rather than overflow, because a row wider than it was measured wraps into a row nobody counted — the one failure I1 exists to prevent. C17 I20 answers the same question the other way and says why: a block renders someone's data, an editor holds what the user typed.
+- **I20** — A cell window over a styled line composes and preserves width: for every `0 ≤ a ≤ b`, `displayCells(sliceCells(t, 0, a)) + displayCells(sliceCells(t, a, b))` equals `displayCells(sliceCells(t, 0, b))`. The window carries the skipped prefix's SGR forward, so a tail draws in the style that was in effect where it starts, and it never splits a cluster or half-draws a double-width glyph — I9's rule over a window rather than a cut. This is what makes compositing a layer into a painted row width-preserving by construction rather than by three separate measurements happening to agree: three pieces that each measure right and together measure `columns + 1` put the frame one cell into a row nobody counted (§5a).
 
 ---
 
@@ -352,6 +396,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 14. No renderer emits a colour. Every style comes from `resolve` against a declared palette slot, so degradation, theme switching and the 1-bit collapse happen in one place instead of once per kind (I4). Enforced by SS17 and, for the Ink-prop route, SS37.
 15. **Control characters are stripped from every text field before measurement and render** (I18). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
 16. **Wrapping substitutes a cluster it cannot place rather than dropping it** (I19). It dropped, and both halves called the same function, so `measure` and `render` agreed and nothing failed — a frame arithmetically consistent and describing content it did not hold. The reach is a fact about child count rather than terminal width (§5).
+17. **A line that already carries SGR is measured, fitted and windowed here, not by its caller** (I20, §5a). `displayCells` and `fitStyled` exist because `cells()` counts an escape as printable text; `sliceCells` exists because the frame cannot draw a layer over a painted row without taking a cell window out of one, and a `slice` by code unit cuts inside an escape and bleeds colour down every row below. Three answers to "how wide is this line" is I1's divergence in the one place that moves the whole frame.
 
 ---
 
@@ -375,6 +420,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.10** (I10): a block of unknown kind → renders via `raw`, no throw.
 - **T1.11** (I18): text containing `\x1b[31m` → stripped; the frame carries no injected styling.
 - **T1.12**: `steps` renders a spinner frame while active and a settled glyph after.
+- **T1.13** (I20, §5a): `sliceCells` over a line carrying SGR — the window measures exactly `to − from` cells by `displayCells`, the escapes in the skipped prefix are re-emitted at its head, and a cut that lands mid-escape is impossible because the escape is copied whole. The failure is not a wrong width: it is `[38;5` reaching the terminal as text with the SGR never terminated, so the colour bleeds down every row below.
+- **T1.13b** (I20): a double-width cluster straddling either boundary is dropped and its cell blanked, in both directions — the window is still exactly `to − from` cells and never `to − from ± 1`. Asserted at the left edge as well as the right, because the two are different code paths and only the right one resembles `truncate`.
+- **T1.13c** (I20): the composition law over a styled line, for every split point — `sliceCells(t, 0, a)` and `sliceCells(t, a, b)` measure `b` together. A property over the splits rather than three chosen ones, because the case that breaks it is whichever `a` lands inside a cluster and no chosen `a` is that one by construction.
 
 ### Tier 2 — contract / interface
 
@@ -456,6 +504,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.15** (§3): setting an Ink colour prop instead of emitting SGR → T2.17 fails, and every golden frame renders monochrome while production renders truecolour.
 - **T6.17** (I17): counting `gapBefore` inside `measure` instead of at the sequence → a block measures differently in a document than in a panel, and T2.18 fails.
 - **T6.16** (§3): letting Ink wrap or truncate rather than pre-breaking through `cells()` → T2.1 fails at the wrapping widths, and T3.4's ASCII marker becomes `…` again.
+- **T6.18** (I20): dropping the skipped prefix's SGR from `sliceCells` → T1.13 fails, and a layer composited over a themed row leaves the row's tail drawn in the terminal's default colour, which reads as the layer having bled rather than as the base having lost its style.
+- **T6.19** (I20): windowing by `slice` on code units instead of by cells → T1.13 and T1.13c fail; a frame composited from three pieces measures `columns + 1` and wraps into a row nobody counted.
 - **T6.17** (I19): dropping a cluster wider than the line, as both wrappers did → T3.9d and T3.9e fail, and CJK leaves the output at a usable width of 1 with every measurement still agreeing.
 
 ---
