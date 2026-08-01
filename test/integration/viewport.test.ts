@@ -137,6 +137,34 @@ describe("C14 integration", () => {
     ).toBeGreaterThan(wide);
   });
 
+  it("T4.10 (with C13, C14 §4): an entry settled with a document is remeasured", async () => {
+    // **The transition, not either end.** C13 settles correctly and C14
+    // invalidates on `rev` correctly; what nothing measured was an entry
+    // appended empty and streaming and then settled with the real document —
+    // which is every app-route submission, and a shape `settle(id, doc)`
+    // created after C14's invalidation table was written.
+    //
+    // C14 ignored `settle` on the grounds that settling does not change
+    // content, true of the bare form. The entry kept the height of the pending
+    // document — no blocks, zero rows — so `totalRows` stayed 0, the visible
+    // range stayed empty, and the screen was blank with the entry in the store.
+    const { graph } = await buildGraph({}, { columns: 100, rows: 20 });
+    graph.lifecycle.acquire();
+
+    // The pending entry the app route appends: no blocks, streaming.
+    const id = graph.transcript.append(rowsDoc(0, "pending"), { streaming: true });
+
+    expect(graph.viewport.scroll.totalRows, "an empty pending entry is zero rows").toBe(0);
+
+    graph.transcript.settle(id, rowsDoc(3, "settled"));
+
+    expect(graph.viewport.scroll.totalRows, "the settled document's rows").toBeGreaterThan(0);
+    expect(
+      graph.viewport.visible().entries.map((v) => v.id),
+      "and the entry is on the screen",
+    ).toEqual([id]);
+  });
+
   it("T4.8 (with C03, C22): a scroll issues one commit, and C14 issues none", async () => {
     // C14 moves, C22 commits (C14 I12). A viewport that committed its own frame
     // would be L2 reaching into L0, which is the edge Seam 4 exists to prevent

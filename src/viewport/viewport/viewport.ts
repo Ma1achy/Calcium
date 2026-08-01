@@ -214,10 +214,18 @@ class ViewportImpl implements Viewport {
    */
   #onChange(change: Change): void {
     switch (change.kind) {
+      // **`settle` shares `patch`'s arm, and the comment it replaces was true
+      // when it was written** (§4). `settle(id)` ended a stream and left the
+      // document alone; `settle(id, doc)` replaces it and moves `rev`, which is
+      // a content change by any reading. Ignoring it left the app route's entry
+      // measured at the height of the *pending* document — no blocks, zero rows
+      // — for the rest of the session: `totalRows` of 0, an empty visible range,
+      // and a blank screen with the entry sitting in the store.
+      //
+      // A bare settle costs a cache lookup that returns the same height, since
+      // `rev` did not move (C13 I13). That is cheaper than an arm that has to
+      // know which kind of settle it was.
       case "settle":
-        // Settling does not change content, so it invalidates nothing at all.
-        return;
-
       case "patch": {
         // `rev` moved, so this entry's slot is stale and no other entry's is.
         const i = this.#ids.indexOf(change.id);

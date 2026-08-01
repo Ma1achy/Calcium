@@ -565,6 +565,53 @@ switch (mode) {
       process.exit(5);
     }
 
+    /**
+     * A `RawResult`, in full.
+     *
+     * **Every field, because the missing ones are silent.** The first version
+     * wrote `{ stdout, stderr, code, signal, durationMs }` — plausible, and
+     * `code` is not the field's name, so `exitCode` was `undefined`, the
+     * adapter produced a document with a non-finite `meta.exitCode`, and
+     * `settle` refused it under C13 I10. The refusal is correct and it arrives
+     * three components from the fixture that caused it.
+     */
+    const raw = (argv, blocks) => ({
+      argv,
+      exitCode: 0,
+      signal: null,
+      // **A complete document, or C07's view adapter declines it** and the
+      // fallback renders the JSON as a table — which is correct behaviour and
+      // not what a `tui.view/1` fixture is for. `schema` and `blocks` alone
+      // looked like a document and was not one.
+      stdout: {
+        schema: "tui.view/1",
+        command: argv.join(" "),
+        status: "ok",
+        blocks,
+        // Every field C04 requires. `identityDocument` **validates** rather than
+        // sniffing (C07 I5), so a partial `meta` is not a partial document — it
+        // is a rejected one, and the fallback renders the JSON as a table.
+        meta: {
+          verb: argv[0],
+          adapter: "identity",
+          exitCode: 0,
+          durationMs: 1,
+          truncated: false,
+          argv,
+          stderr: "",
+          transport: "fixture",
+          origin: "user",
+        },
+      },
+      stdoutRaw: "",
+      stderr: "",
+      durationMs: 1,
+      parseError: null,
+      cancelled: false,
+      timedOut: false,
+      overflowed: false,
+    });
+
     const transport = createRouter({
       default: createFixtureTransport([
         {
@@ -573,44 +620,29 @@ switch (mode) {
           // of a refusal would pass against a session that did nothing at all.
           id: "promote-one",
           verb: "promote",
-          argv: ["app.web:main"],
+          argv: ["promote", "app.web:main"],
           provenance: "authored",
           capturedAt: null,
           cliVersion: null,
           note: "the far side is not the subject of these rows",
-          result: {
-            stdout: JSON.stringify({
-              schema: "tui.view/1",
-              blocks: [{ kind: "notice", id: "n1", tone: "info", text: "promoted app.web:main" }],
-            }),
-            stderr: "",
-            code: 0,
-            signal: null,
-            durationMs: 1,
-          },
+          result: raw(["promote", "app.web:main"], [
+            { kind: "notice", id: "n1", tone: "info", text: "promoted app.web:main" },
+          ]),
         },
         {
           id: "ps-empty",
           verb: "ps",
-          argv: [],
+          // **argv includes the verb** — `sameArgv` compares the whole invocation.
+          argv: ["ps"],
           provenance: "authored",
           capturedAt: null,
           cliVersion: null,
           note: "the far side is not the subject of these rows",
-          result: {
-            // **A block, not an empty document.** The first version had
-            // `blocks: []`, which settles an entry that renders as nothing — a
-            // fixture indistinguishable from a route that never ran, which is
-            // the inert-subject class in the corpus rather than in the harness.
-            stdout: JSON.stringify({
-              schema: "tui.view/1",
-              blocks: [{ kind: "notice", id: "ps1", tone: "info", text: "no processes" }],
-            }),
-            stderr: "",
-            code: 0,
-            signal: null,
-            durationMs: 1,
-          },
+          // **A block, not an empty document.** The first version had
+          // `blocks: []`, which settles an entry that renders as nothing — a
+          // fixture indistinguishable from a route that never ran, which is the
+          // inert-subject class in the corpus rather than in the harness.
+          result: raw(["ps"], [{ kind: "notice", id: "ps1", tone: "info", text: "no processes" }]),
         },
       ]),
     });

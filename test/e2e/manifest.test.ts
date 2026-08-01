@@ -42,15 +42,19 @@ describe("C05 e2e", () => {
   });
 
   it.todo(
-    // **Two of its three halves are demonstrated and the third is a finding.**
-    // Driving this by hand: `/promote` with no argument shows C05's refusal —
-    // `x "promote" requires <target>` — and Tab completes from the manifest.
-    // But `/promote app.web:main` and `/ps`, both matched by the fixture
-    // corpus, settle without rendering anything: the app route produces no
-    // visible entry in a real session while the local, shell and refusal routes
-    // all do. Not the fixture — a `blocks: []` document was the first
-    // suspicion, and giving it a notice changed nothing.
-    "T5.1: a session completes, validates and rejects for every tool, with no far side — blocked on the app route producing no visible entry in a session; rejection and completion already verified by hand",
+    // **Two of its three halves work and are demonstrated by hand.**
+    // `/promote` alone shows C05's refusal — `x "promote" requires <target>` —
+    // and `/promote app.web:main` clears validation, reaches the fixture far
+    // side and renders `promoted app.web:main` in the transcript. That second
+    // half is what found C14's settle defect, now fixed: it settles a streaming
+    // entry with a document, which is every app-route submission.
+    //
+    // The third does not. `Tab` after a prefix produces no menu, so either the
+    // manifest-derived completion source is not registered in a constructed
+    // session or the menu layer is not reaching the frame. C19's own tiers pass,
+    // which is the same shape as the C14 finding and wants the same treatment:
+    // split it at the store — is there a layer on C15's stack after the Tab?
+    "T5.1: a session completes, validates and rejects for every tool, with no far side — the reject and validate halves are verified; blocked on Tab producing no completion menu in a real session",
   );
 
   it("T5.4: a manifest omitting a tool reports it unavailable, and the session continues", async () => {
