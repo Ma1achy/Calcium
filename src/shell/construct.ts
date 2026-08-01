@@ -34,7 +34,10 @@ import {
   type TransportRouter,
 } from "../data/transport/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
-import { createBlockRegistry } from "../presentation/blocks/index.js";
+import { createBlockRegistry, type BlockDefinition } from "../presentation/blocks/index.js";
+import { tableDefinition } from "../presentation/table/index.js";
+import { plotDefinition } from "../presentation/plot/index.js";
+import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
@@ -42,6 +45,7 @@ import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import { createEngine, frameworkSources } from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
+import { focusableRowIds } from "../presentation/table/index.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createDecoder } from "../interaction/router/decode.js";
@@ -196,6 +200,17 @@ export async function constructGraph(
   // empty tool list and never refill.
   const built = await (async () => {
     const blocks = createBlockRegistry({ defaults: true });
+    // **The three the framework itself produces** (C09 §1, I13). `defaults`
+    // ships C09's fourteen; `table`, `plot` and `patch` register through the
+    // public mechanism, and until this line nobody called it — so a stock
+    // session had no renderer for a `table` and every one fell through to the
+    // fallback, which draws the block's JSON. The framework's own `/history`
+    // returns a table, so it was rendering its own output as source.
+    //
+    // Before `config.blocks`, so an app may still replace any of them.
+    blocks.register(tableDefinition as unknown as BlockDefinition);
+    blocks.register(plotDefinition as unknown as BlockDefinition);
+    blocks.register(patchDefinition as unknown as BlockDefinition);
     for (const definition of config.blocks) blocks.register(definition);
 
     const adapters = createAdapterRegistry(config.adapters);
@@ -379,9 +394,14 @@ export async function constructGraph(
   // than a maintained list (C23 I26), so both must be the same table.
   const keymap = createKeymap(defaultKeymap);
 
+  // Hoisted rather than inline: the effect table moves focus too, and a store
+  // only `createRouter` could see is why `enterLiveBlock` had no caller for four
+  // components (C16 I22).
+  const focus = createFocusStore();
+
   const router = at("router", () =>
     createRouter({
-      focus: createFocusStore(),
+      focus,
       keymap,
       now: config.clock,
       // **The thunk is the 10 → 9 pair** (§3a). `pipeline` is declared below and
@@ -457,6 +477,21 @@ export async function constructGraph(
     manifest: built.manifest.manifest,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
+    focus,
+    // **Answered from the block** (C16 I22, C11 I14). C16 takes row ids as data
+    // and holds no opinion about what a row is, so this is the one place that
+    // knows a live entry's blocks and can ask C11 which of them are navigable.
+    liveRows: () => {
+      const id = stores.transcript.liveId;
+      if (id === null) return [];
+      const entry = stores.transcript.entries.find((e) => e.id === id);
+      if (entry === undefined) return [];
+      const out: string[] = [];
+      for (const block of entry.doc.blocks) {
+        if (block.kind === "table") out.push(...focusableRowIds(block));
+      }
+      return out;
+    },
     // **I31 — an effect that settles after its batch commits its own frame.**
     // `"completion"` because its window is zero (C03 I2): by the time this
     // fires the screen is already showing a state that no longer holds, which
@@ -510,6 +545,17 @@ export async function constructGraph(
 
     router.register("overlay", (e) => {
       const effect = bound("overlay", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+
+    // **The target `↓` now leads to** (C16 I22). Registered for the same reason
+    // the others are: a binding with no handler is a key that resolves and does
+    // nothing, and this target had neither bindings nor a handler while §3 said
+    // focus goes here.
+    router.register("liveBlock", (e) => {
+      const effect = bound("liveBlock", e);
       if (effect === null) return false;
       effect();
       return true;

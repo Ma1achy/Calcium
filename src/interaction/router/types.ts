@@ -97,7 +97,15 @@ export type KeyAction =
   | "wordRight"
   | "home"
   | "end"
-  | "left";
+  | "left"
+  // --- focus (I22) ---------------------------------------------------------
+  //
+  // `↓` enters through `historyNext`'s second clause rather than an action of
+  // its own: one binding, two effects, in order. These three are the way back
+  // and the movement between rows.
+  | "focusPrompt"
+  | "rowUp"
+  | "rowDown";
 
 export type Binding = Readonly<{
   target: FocusTarget;

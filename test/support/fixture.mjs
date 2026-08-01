@@ -644,6 +644,49 @@ switch (mode) {
           // inert-subject class in the corpus rather than in the harness.
           result: raw(["ps"], [{ kind: "notice", id: "ps1", tone: "info", text: "no processes" }]),
         },
+        {
+          // **A table, because a notice has no rows to focus.** C02 T5.4b
+          // navigates a live block with the keyboard, and `enterLiveBlock` is a
+          // no-op over an entry with nothing focusable (C16 I22) — so a fixture
+          // whose only reply is a notice makes that row unwritable rather than
+          // failing. The two rows are the minimum that can show a selection
+          // moving.
+          id: "ps-mine",
+          verb: "ps",
+          argv: ["ps", "--mine"],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          result: raw(["ps", "--mine"], [
+            {
+              kind: "table",
+              id: "ps-table",
+              columns: [
+                {
+                  key: "uuid",
+                  label: "uuid",
+                  align: "left",
+                  priority: 10,
+                  minWidth: 8,
+                  sortable: false,
+                },
+                {
+                  key: "status",
+                  label: "status",
+                  align: "left",
+                  priority: 5,
+                  minWidth: 6,
+                  sortable: false,
+                },
+              ],
+              rows: [
+                { id: "a3f9b21", cells: { uuid: { text: "a3f9b21" }, status: { text: "running" } } },
+                { id: "7c2d4e1", cells: { uuid: { text: "7c2d4e1" }, status: { text: "failed" } } },
+              ],
+            },
+          ]),
+        },
       ]),
     });
 

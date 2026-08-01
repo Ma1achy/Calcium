@@ -13,6 +13,7 @@ import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
 import { buildGraph } from "../support/session.js";
 import { createKeyEffects } from "../../src/shell/keys.js";
+import { createFocusStore } from "../../src/interaction/router/focus.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
@@ -37,6 +38,73 @@ function openOverlay(graph: Graph): void {
   });
 }
 
+/** A table block, so the live entry has rows to focus (C11 `focusableRowIds`). */
+const TABLE = {
+  kind: "table" as const,
+  id: "t",
+  columns: [
+    { key: "name", label: "Name", align: "left" as const, priority: 10, minWidth: 4, sortable: false },
+  ],
+  rows: [
+    { id: "r1", cells: { name: { text: "api" } } },
+    { id: "r2", cells: { name: { text: "worker" } } },
+  ],
+};
+
+/** A complete document carrying a table, for the rows that need a live block. */
+const LIVE_DOC = {
+  schema: "tui.view/1",
+  command: "/ps",
+  status: "ok",
+  blocks: [TABLE] as unknown[],
+  meta: {
+    verb: "ps",
+    adapter: "passthrough",
+    exitCode: 0,
+    durationMs: 0,
+    truncated: false,
+    argv: [] as string[],
+    stderr: "",
+    transport: "local",
+    origin: "user",
+  },
+};
+
+
+/**
+ * Focus in the live block, reached the way a user reaches it (C16 I22).
+ *
+ * Through the keystroke rather than by setting the store: the store is not on
+ * `Graph` and should not be, and entering by the real path is what makes this
+ * setup a claim about the mechanism rather than about a field.
+ */
+function enterLive(graph: Graph): void {
+  if (graph.transcript.liveId === null) {
+    graph.transcript.append(
+      {
+        schema: "tui.view/1",
+        command: "/ps",
+        status: "ok",
+        blocks: [TABLE],
+        meta: {
+          verb: "ps",
+          adapter: "passthrough",
+          exitCode: 0,
+          durationMs: 0,
+          truncated: false,
+          argv: [],
+          stderr: "",
+          transport: "local",
+          origin: "user",
+        },
+      } as never,
+      { streaming: true },
+    );
+  }
+  graph.editor.clear();
+  graph.router.dispatch(press({ name: "down" }));
+}
+
 describe("C22 §3 step 11 — the effect table", () => {
   it("T1.4h (C22 I26): every binding in the table is consumed at its target", async () => {
     // **Derived from `defaultKeymap`, never listed here.** A hand-written list
@@ -50,6 +118,9 @@ describe("C22 §3 step 11 — the effect table", () => {
 
     for (const b of defaultKeymap) {
       if (b.target === "overlay") openOverlay(graph);
+      // `liveBlock` needs both halves of what `activeTarget` reads: a live
+      // entry in C13 and focus stored there (C16 §3).
+      if (b.target === "liveBlock") enterLive(graph);
       const consumed = graph.router.dispatch(press(b.key));
       expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
@@ -128,6 +199,8 @@ describe("C22 §3 step 11 — the effect table", () => {
       anchor: () => ({ row: 10, rows: 1 }),
       overlayRegion: () => ({ width: 80, height: 24 }),
       redraw: () => undefined,
+      focus: createFocusStore(),
+      liveRows: () => ["row-0", "row-1"],
     });
 
     // Every prompt binding, through the table dispatch uses.
@@ -151,6 +224,83 @@ describe("C22 §3 step 11 — the effect table", () => {
     const unreached = editing.filter((n) => !called.has(n));
 
     expect(unreached, "a C17 editing method no key can reach").toEqual([]);
+  });
+
+  it("T1.4l (C09 I13): a constructed graph can render all seventeen kinds", async () => {
+    // **`table`, `plot` and `patch` register through the public mechanism, and
+    // nobody called it.** `defaults: true` ships C09's fourteen; the other
+    // three came from C11, C12 and C25 and no composition root registered them,
+    // so a stock session had no renderer for a table and every one fell through
+    // to the fallback — which draws the block's JSON. The framework's own
+    // `/history` returns a table, so it rendered its own output as source.
+    //
+    // Asserted as the three by name rather than as a count: a count passes
+    // against any three, and these are the three the framework itself produces.
+    const { graph } = await buildGraph();
+    for (const kind of ["table", "plot", "patch"]) {
+      expect(graph.blocks.kinds, `${kind} has no renderer`).toContain(kind);
+    }
+    expect(graph.blocks.kinds.length, "and C09's fourteen are still there").toBe(17);
+  });
+
+  it("T2.15 (C16 I22): ↓ into the live block, ↑ and Esc back out — as one sequence", async () => {
+    // **A sequence, not four cases.** The defect it replaces was an entry with
+    // no exit — `enterLiveBlock` had no caller and nothing bound `Esc` at the
+    // live block — and every case-at-a-time test passes against that: each
+    // assertion sets up the state it then checks. Only a walk that has to
+    // *arrive* somewhere can see there is no way back.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    graph.transcript.append(LIVE_DOC as never, { streaming: true });
+    graph.history.append("/ps --mine", 0);
+
+    const down = (): void => void graph.router.dispatch(press({ name: "down" }));
+    const up = (): void => void graph.router.dispatch(press({ name: "up" }));
+
+    // History first, because entering is what `↓` does *after* its end.
+    up();
+    expect(graph.editor.text, "↑ walks history").toBe("/ps --mine");
+    expect(graph.router.target, "still the prompt").toBe("prompt");
+
+    down();
+    expect(graph.router.target, "↓ restores the draft — still history's").toBe("prompt");
+
+    down();
+    expect(graph.router.target, "↓ past the end enters the live block").toBe("liveBlock");
+
+    // Between rows, then out of the top.
+    down();
+    up();
+    up();
+    expect(graph.router.target, "↑ from the first row returns to the prompt").toBe("prompt");
+
+    // And `Esc`, the route S01's footer advertises.
+    down();
+    expect(graph.router.target).toBe("liveBlock");
+    graph.router.dispatch(press({ name: "escape" }));
+    expect(graph.router.target, "Esc returns from anywhere in the block").toBe("prompt");
+  });
+
+  it("T2.15b (C16 I22): a live entry with no focusable row is not entered", async () => {
+    // A notice has no rows, so entering would put focus where `activeTarget`
+    // says `liveBlock`, every key would resolve against a target with no
+    // bindings, and they would all be dropped.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    graph.transcript.append(
+      { ...LIVE_DOC, blocks: [{ kind: "raw", id: "r", text: "no rows here" }] } as never,
+      { streaming: true },
+    );
+
+    graph.router.dispatch(press({ name: "down" }));
+    expect(graph.router.target, "nothing to focus, so ↓ does nothing").toBe("prompt");
+
+    // **The control**, because a clause that never fires and a clause that
+    // always no-ops are the same green: the same sequence against an entry that
+    // does have rows enters.
+    graph.transcript.append(LIVE_DOC as never, { streaming: true });
+    graph.router.dispatch(press({ name: "down" }));
+    expect(graph.router.target, "and a table is entered").toBe("liveBlock");
   });
 
   it("T1.4h2 (C22 I26): the effects that are observable from outside, each asserted", async () => {

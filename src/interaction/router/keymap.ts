@@ -210,6 +210,18 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // yank is the readline convention worth keeping.
   { target: "prompt", key: { name: "z", ctrl: true }, action: "undo" },
   { target: "prompt", key: { name: "z", meta: true }, action: "redo" },
+
+  // --- the live block, and the way out of it (I22) -------------------------
+  //
+  // **Entry is `prompt:down`'s second clause, not a row here.** `↓` at the
+  // bottom of history enters; these three are what makes that safe. Without
+  // them focus lands in a block with no bindings and every key is dropped —
+  // which is why the invariant holds entry, exit and the empty case together.
+  //
+  // `escape` is the route S01's footer already advertises as `esc prompt`.
+  { target: "liveBlock", key: { name: "escape" }, action: "focusPrompt" },
+  { target: "liveBlock", key: { name: "down" }, action: "rowDown" },
+  { target: "liveBlock", key: { name: "up" }, action: "rowUp" },
 ];
 
 /**

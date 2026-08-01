@@ -27,6 +27,7 @@ import type { HistoryStore } from "../interaction/history/index.js";
 import type { KeyAction } from "../interaction/router/types.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
+import type { FocusStore } from "../interaction/router/focus.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
 export type PromptAnchor = Readonly<{ row: number; rows: number }>;
@@ -41,6 +42,17 @@ export type KeyDeps = Readonly<{
   anchor: () => PromptAnchor;
   /** How big a layer may be (C15 `Region`), for the menu's "… n more". */
   overlayRegion: () => Readonly<{ width: number; height: number }>;
+  /** C16's stored focus — the one piece of it in the system (C16 §3). */
+  focus: FocusStore;
+  /**
+   * The live entry's focusable rows, or empty (C16 I22).
+   *
+   * C16 takes row ids as data and holds no opinion about what a row is, so
+   * whether a block is navigable is answered from the block (C11 I14). Empty is
+   * what makes `↓` a no-op over a notice rather than focus landing somewhere
+   * with nothing in it.
+   */
+  liveRows: () => readonly string[];
   /**
    * Commit a frame for something that settled after its batch (C22 I31).
    *
@@ -196,9 +208,50 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const entry = deps.history.previous(deps.editor.text);
       if (entry !== null) deps.editor.setText(entry);
     },
+    // **One binding, two effects, in order** (C16 I22). C20's walk has a defined
+    // bottom — `↓` past the newest entry restores the stashed draft — so
+    // entering the live block is what `↓` does *after* that end rather than a
+    // case competing with history. `next()` answering `null` is precisely
+    // "navigation is inactive or already finished".
     historyNext: () => {
       const entry = deps.history.next();
-      if (entry !== null) deps.editor.setText(entry);
+      if (entry !== null) {
+        deps.editor.setText(entry);
+        return;
+      }
+      const rows = deps.liveRows();
+      // A block with nothing focusable is not entered: `activeTarget` would say
+      // `liveBlock`, every key would resolve against a target with no bindings,
+      // and they would all be dropped.
+      if (rows.length === 0) return;
+      deps.focus.enterLiveBlock(rows[0] ?? null);
+    },
+
+    // --- the way back, and between rows (C16 I22) ------------------------
+    //
+    // Entry with no exit is a session whose prompt cannot be reached, so both
+    // routes are bindings rather than one: `Esc`, which S01's footer already
+    // prints as `esc prompt`, and `↑` from the first row, mirroring the entry.
+    focusPrompt: () => void deps.focus.reset(),
+    rowDown: () => {
+      const rows = deps.liveRows();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const i = rows.indexOf(current.rowId ?? "");
+      const next = rows[i + 1];
+      if (next !== undefined) deps.focus.focusRow(next);
+    },
+    rowUp: () => {
+      const rows = deps.liveRows();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const i = rows.indexOf(current.rowId ?? "");
+      // At the first row — or at a row the block no longer has — `↑` leaves.
+      if (i <= 0) {
+        deps.focus.reset();
+        return;
+      }
+      deps.focus.focusRow(rows[i - 1] ?? null);
     },
     // --- C17 -----------------------------------------------------------
     //

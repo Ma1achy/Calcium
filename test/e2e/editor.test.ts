@@ -144,9 +144,14 @@ describe("C17 tier 5 — at a real prompt", () => {
     try {
       await pty.waitFor(PROMPT, 15_000);
 
-      // A command in history to navigate to, submitted first.
+      // A command in history to navigate to, submitted first. **Waited on its
+      // result rather than on its text**: the transcript carries results and
+      // not the lines that produced them, and this row previously matched
+      // `--mine` only because no fixture answered that argv — so it was waiting
+      // on the failure message. A fixture reply changed and the row broke,
+      // which is the coupling worth not having.
       pty.type("/ps --mine\r");
-      await pty.waitForFrame((f) => f.join("").includes("--mine"), 15_000);
+      await pty.waitForFrame((f) => f.join("").includes("a3f9b21"), 15_000);
 
       // **A paste is one undo unit** (C17 I5), which is the property this row
       // exists for: undoing it must return the whole block rather than

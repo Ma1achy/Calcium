@@ -12,7 +12,7 @@
 // emits — not that the application wires detection to rendering. That wiring is
 // C22's own, and this file should not be read as covering it.
 import { describe, expect, it } from "vitest";
-import { runInPty, type PtyRun } from "../support/pty.js";
+import { interactivePty, runInPty, type PtyRun } from "../support/pty.js";
 
 const FIXTURE = "node test/support/fixture.mjs caps";
 
@@ -148,25 +148,24 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
     45_000,
   );
 
-  // **The blocker is now named, and it is not the shell.** A composed session
-  // exists and runs verbs, so the table to navigate is reachable; what is
-  // missing is that **nothing moves focus into the live block**. `enterLiveBlock`
-  // has no caller anywhere in `src/` — `resetFocus` is wired, its inverse is
-  // not — so `activeTarget` can never be `liveBlock` in a live session and the
-  // row keys C11 exposes are unreachable.
-  //
-  // Two claims sit on one key and that is the decision to take first. C16 §3
-  // says "`↓` from the prompt moves focus into the live block's rows; `Esc`
-  // returns it", and `defaultKeymap` binds `prompt:down` to `historyNext`. Both
-  // are reasonable and they cannot both own the keystroke: the plausible
-  // reading is that `↓` moves focus when history has nothing further to offer,
-  // which is a ruling rather than an implementation detail, and inventing it
-  // here would put a contract in a test file.
-  //
-  // The navigation itself is asserted against the router at tier 4
-  // (test/integration/router.test.ts) and C11's `focusableRowIds` at tier 1;
-  // what waits is the one call that makes them reachable from a keyboard.
   it.todo(
-    "T5.4b: inside tmux, keyboard navigation of a table works end to end — blocked on focus never entering the live block: `enterLiveBlock` has no caller in src/, and `prompt:down` is bound to `historyNext` while C16 §3 says `↓` moves focus. The routing is asserted at tier 4; the trigger is unruled",
+    // **Two of the three blockers closed, and the third is one line of the
+    // frame.** Focus can now enter the live block (C16 I22) and a table now has
+    // a renderer at all — `table`, `plot` and `patch` register through C09's
+    // public mechanism and no composition root called it, so a stock session
+    // drew every table as its own JSON through the fallback, including the
+    // framework's `/history`.
+    //
+    // What remains: **the frame never passes focus to the renderer.** C09's
+    // `RenderContext.focus` exists and `renderSequenceToLines` takes it, and
+    // the transcript path supplies `{theme, capabilities}` and nothing else —
+    // so focus is stored (C16 §3), derived (`activeTarget`), routed (the
+    // `liveBlock` handler) and invisible. The row waits on the frame deriving
+    // C09's `FocusState` from C16's stored focus and C13's `liveId`, which is
+    // the sentence C16 §3 already writes and nobody implements.
+    //
+    // Verified in passing on the way here: the table reaches the screen as a
+    // table, and `↓` at the bottom of history enters the block.
+    "T5.4b: inside tmux, keyboard navigation of a table works end to end — the routing and the renderer are done; blocked on the frame never populating C09's `RenderContext.focus`, so a focused row is indistinguishable from an unfocused one on screen",
   );
 });

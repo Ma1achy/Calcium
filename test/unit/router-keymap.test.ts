@@ -253,6 +253,12 @@ describe("§6 — the default table (C17 I12)", () => {
       // is why this row exists rather than a reasoned assurance.
       "prompt c+z": ["\u001a"],
       "prompt m+z": ["\u001bz"],
+
+      // The live block (I22). `escape` needs the disambiguation window to
+      // close, like `overlay escape` above.
+      "liveBlock escape": ["\u001b"],
+      "liveBlock down": ["\u001b[B", "\u001bOB"],
+      "liveBlock up": ["\u001b[A", "\u001bOA"],
     };
 
     const keymap = createKeymap(defaultKeymap);
