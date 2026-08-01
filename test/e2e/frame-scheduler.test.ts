@@ -4,6 +4,14 @@
 // clock, and the only place the coalescing budget is a measurement rather than
 // an assertion about a fake. Tiers 1-3 prove the policy; this proves the policy
 // is worth having.
+// **This file measures wall-clock and must not share the machine.** T5.2 is a
+// p95 input-to-frame latency and T5.6 is sixty seconds of idle CPU; run
+// alongside fifteen other PTY files they measure the contention rather than
+// the scheduler, and T5.2 failed once in a full-directory run and passed alone.
+// `npm run e2e` therefore passes `--no-file-parallelism`: tier 5 is PTY-bound
+// and already serial in wall-clock terms, so the cost is small and it removes
+// a whole class of failure that reads as a defect in the component under test.
+
 import { describe, expect, it } from "vitest";
 import { interactivePty, runInPty } from "../support/pty.js";
 

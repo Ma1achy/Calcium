@@ -148,13 +148,25 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
     45_000,
   );
 
-  // T5.4's second half — "keyboard navigation of a table still works end to
-  // end" — is not here. C11 now renders the table and exposes `focusableRowIds`,
-  // so the half that was waiting on C11 is done; what remains is the routing,
-  // which is C16's and is still a stub. Written now it would assert that a
-  // fixture I wrote navigates a structure I built, with nothing moving focus
-  // between them — weaker than the title, and it would read as covered.
+  // **The blocker is now named, and it is not the shell.** A composed session
+  // exists and runs verbs, so the table to navigate is reachable; what is
+  // missing is that **nothing moves focus into the live block**. `enterLiveBlock`
+  // has no caller anywhere in `src/` — `resetFocus` is wired, its inverse is
+  // not — so `activeTarget` can never be `liveBlock` in a live session and the
+  // row keys C11 exposes are unreachable.
+  //
+  // Two claims sit on one key and that is the decision to take first. C16 §3
+  // says "`↓` from the prompt moves focus into the live block's rows; `Esc`
+  // returns it", and `defaultKeymap` binds `prompt:down` to `historyNext`. Both
+  // are reasonable and they cannot both own the keystroke: the plausible
+  // reading is that `↓` moves focus when history has nothing further to offer,
+  // which is a ruling rather than an implementation detail, and inventing it
+  // here would put a contract in a test file.
+  //
+  // The navigation itself is asserted against the router at tier 4
+  // (test/integration/router.test.ts) and C11's `focusableRowIds` at tier 1;
+  // what waits is the one call that makes them reachable from a keyboard.
   it.todo(
-    "T5.4b: inside tmux, keyboard navigation of a table works end to end. The router landed and is not the blocker — end to end needs a composed shell to drive it — waits on C23 — the table to navigate is a verb's output, so a constructed graph is not enough",
+    "T5.4b: inside tmux, keyboard navigation of a table works end to end — blocked on focus never entering the live block: `enterLiveBlock` has no caller in src/, and `prompt:down` is bound to `historyNext` while C16 §3 says `↓` moves focus. The routing is asserted at tier 4; the trigger is unruled",
   );
 });
