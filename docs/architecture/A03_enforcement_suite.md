@@ -36,6 +36,12 @@ The first four are **build gates**: they fail the build, not a test run, because
 
 This is not belt-and-braces. Every check here reports success the same way whether the tree is clean or the rule is broken, and a broken rule is indistinguishable from compliance at exactly the moment it matters.
 
+**One failure mode here is not about a rule that cannot fire, and its mitigation is different.** A rule that fires *correctly* on an edge the design requires does not get fixed — it gets **routed around**, by renaming the variable or restructuring the import until the pattern misses. That is worse than no rule, because it reports compliance while the practice continues under another name, and nothing in the suite can tell the two apart: the tree is clean either way.
+
+MG23 is where this was named. It counts a component's store imports, and C11 and C12 import C09's paint helpers and C10's tones — an edge CLAUDE.md records as *required rather than tolerated*. A rule that flagged it would have been defeated within a week and left looking enforced.
+
+**The mitigation is not a fabricated violation.** A fabrication proves the rule fires; this failure is the rule firing. What catches it is asserting the **required edges do not trip it** before landing — a boundary test per legitimate practice the rule sits next to, written from the design rather than from the rule. MG23 carries two: type-only imports count, and paint helpers and tones do not.
+
 **The failure mode of an enforcement suite is not a rule that is wrong — it is a rule that cannot fire.** Sixteen have been found this way, and none of them was a wrong rule; each was a rule with nothing to be wrong about, and each passed:
 
 - **A pattern that cannot match a real subject.** MG20 compared a resolved specifier against `src/terminal/escapes` while every NodeNext specifier ends `.js`. It matched nothing and reported compliance.
