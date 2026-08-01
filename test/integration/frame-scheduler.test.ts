@@ -5,6 +5,7 @@
 // as the injected `write`. The rest name their blocker in a greppable form.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildSession } from "../support/session.js";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
@@ -188,9 +189,41 @@ describe("C03 integration", () => {
   // The blocker clause is everything after "waits on", so the reasoning lives
   // here rather than in the title — a title reading "waits on C22. Neither C13
   // nor C14 …" names three blockers, two of which exist, and the rule fires.
-  it.todo(
-    "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C23 — A02 §4 gives transcript writes to the execution pipeline, so C22 has nothing to append with",
-  );
+  it("T4.4 (with C23, C13): a submission issues one commit, and a stream burst coalesces", async () => {
+    // **A02 §4 gives transcript writes to the pipeline**, so this is C03's claim
+    // from the side that actually appends. Two halves, and the second is the one
+    // C03 exists for: a thousand log lines a second must not be a thousand
+    // frames.
+    const h = pipelineHarness();
+
+    h.pipeline.submit("/ps");
+    await settled();
+    expect(
+      h.commits.filter((c: string) => c === "input"),
+      "one submission, one input commit — not one per block",
+    ).toHaveLength(1);
+
+    // A burst of stream patches: each commits `"stream"`, and coalescing is
+    // C03's to do from there. What C23 must not do is commit `"input"` per
+    // patch, which would bypass the window entirely.
+    const streamed = pipelineHarness({
+      stream: () =>
+        (async function* () {
+          for (let i = 0; i < 20; i += 1) yield { kind: "data", value: {} } as never;
+        })(),
+    });
+    streamed.pipeline.submit("/tail");
+    await settled();
+
+    expect(
+      streamed.commits.filter((c: string) => c === "input"),
+      "the pending append, and nothing else at input priority",
+    ).toHaveLength(1);
+    expect(
+      streamed.commits.every((c: string) => c === "input" || c === "stream" || c === "completion"),
+      "every commit names a documented class (C23 I8)",
+    ).toBe(true);
+  });
   it("T4.9 (with C22): a resize mid-frame cannot produce a two-width frame", async () => {
     // **The test `docs/notes/resize-and-compositor.md` specifies**, at the scope
     // where the property lives. Compose at 100, let the terminal become 80

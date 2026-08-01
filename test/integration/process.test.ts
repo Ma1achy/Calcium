@@ -13,6 +13,7 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import { createSubprocessTransport } from "../../src/data/transport/index.js";
 import { fakeClock } from "../support/fake-scheduler.js";
@@ -155,9 +156,22 @@ describe("C21 with C06", () => {
     expect(result.exitCode).toBe(0);
   }, 60_000);
 
-  it.todo(
-    "T4.4: a shell ParseResult routes to spawnShell and an app result to spawn — waits on L4, which owns the routing. C18 produces both results now",
-  );
+  it("T4.4 (with C23, C18): a shell result routes to spawnShell and an app result does not", async () => {
+    // **C18 classifies, C23 routes** — and the pair is the assertion. A test
+    // that only checks the shell half passes on a pipeline that shells
+    // *everything*, which is D18's injection path opened for every verb.
+    const shell = pipelineHarness();
+    shell.pipeline.submit("echo hi");
+    await settled();
+    expect(shell.calls, "a shell command is delegated").toContain("spawnShell");
+    expect(shell.calls, "and never invoked as a verb").not.toContain("invoke");
+
+    const app = pipelineHarness();
+    app.pipeline.submit("/ps");
+    await settled();
+    expect(app.calls, "an app verb goes through the transport").toContain("invoke");
+    expect(app.calls, "and never through a shell — D18's whole claim").not.toContain("spawnShell");
+  });
   it.todo(
     "T4.5 (with C01, L4): the documented suspend → handoff → resume sequence runs in order, and T3.8's guard never fires on the correct path — waits on L4",
   );

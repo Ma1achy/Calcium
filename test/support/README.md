@@ -204,3 +204,21 @@ Neither is a subtle failure once seen, and both cost a diagnosis each. A stub
 that exists to satisfy a type is a stub that will be called eventually, and
 `as never` is the shape that makes the call site look checked. Either give the
 fake a working implementation, or make the harness assert it is unused.
+
+## A tier-4 fake is a tier-4 defect
+
+The fixture rule generalises from an input to a **collaborator**.
+
+**A tier-4 claim is that two components agree.** So a fake on either side tests
+that the fake agrees with itself — which is not a weaker version of the claim, it
+is a different claim that happens to pass.
+
+`test/support/execution.ts` exists for that reason rather than for thoroughness:
+it builds a C23 pipeline with a **real** transcript, a real theme and a real
+session store. The unit harness in `test/unit/execution.test.ts` fakes
+everything, which is correct — tier 1's claim is about one component, and a real
+collaborator there would make a failure ambiguous about which side broke.
+
+The two harnesses are not a duplication to be merged. They encode the difference
+between the tiers, and merging them would mean one of the tiers stopped asserting
+what it is for.
