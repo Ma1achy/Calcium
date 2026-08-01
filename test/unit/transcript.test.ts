@@ -213,4 +213,78 @@ describe("C13 unit", () => {
     );
     expect(seen.size).toBe(3);
   });
+
+  // --- settle carries the final document (C23 §3 step 6) -------------------
+  //
+  // **The operation C13 did not have, and nothing noticed for as long as nothing
+  // executed a command.** C23 §3 said "patch or replace the entry" and every
+  // `ViewPatch` op is block-level, so no caller could give an entry a different
+  // document — or, the part that mattered, a different `meta`. C23 I7 reads
+  // `$_` from the adapted document's `meta.resultId`, and `/debug` renders its
+  // `argv`, `exitCode` and `durationMs`.
+
+  it("T1.9b (I13): settle with a document replaces it and moves rev", () => {
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    const before = s.entries[0]?.rev;
+
+    const final = doc({ command: "settled" });
+    const outcome = s.settle(id, final);
+
+    expect(outcome).toMatchObject({ ok: true });
+    expect(s.entries[0]?.doc.command, "the entry became the document").toBe("settled");
+    expect(outcome.ok === true && outcome.rev, "and rev moved with it").toBe((before ?? 0) + 1);
+    expect(s.entries[0]).toMatchObject({ streaming: false });
+  });
+
+  it("T1.9c (I13): a bare settle moves nothing, because the document did not change", () => {
+    // **The common case, and the one a careless `rev` bump would cost.** Every
+    // stream that ends settles without a document; moving `rev` there would
+    // invalidate a C14 height that is still correct, silently and every time.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    const before = s.entries[0]?.rev ?? 0;
+
+    const outcome = s.settle(id);
+
+    expect(outcome).toEqual({ ok: true, rev: before });
+    expect(s.entries[0]?.rev).toBe(before);
+  });
+
+  it("T1.9d (I8): settle reports its two conditions rather than absorbing them", () => {
+    // The same two arms `patch` returns, for the same reason: an unknown id is a
+    // stale reference and a settled entry is a caller bug, and C23 §8a A2 turns
+    // on telling them apart — neither carries an error, and §5 read `.error` off
+    // one of them until the trace was walked.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+
+    expect(s.settle("nosuch"), "a stale reference").toEqual({ ok: false, reason: "unknown" });
+    expect(s.settle(id), "already final").toEqual({ ok: false, reason: "settled" });
+  });
+
+  it("T1.9e (I10): settle throws on an invalid document, as append does", () => {
+    // **Thrown, not returned, and the asymmetry is the point** (§3). The two
+    // above are conditions a caller meets legitimately; this is a caller bug —
+    // three layers had to fail for an invalid document to arrive, so there is
+    // nothing to recover from and returning would invite absorbing it.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+
+    expect(() => s.settle(id, INVALID_DOC)).toThrow(TranscriptError);
+    expect(s.entries[0], "and nothing was stored").toMatchObject({ streaming: true });
+  });
+
+  it("T1.9f: a settle that throws leaves the entry patchable", () => {
+    // The half a throw makes easy to get wrong: rejecting the document must not
+    // half-settle the entry, or a stream that emits one bad final document ends
+    // up unpatchable *and* unsettled — the state C23 I9 says cannot exist.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+
+    expect(() => s.settle(id, INVALID_DOC)).toThrow();
+    expect(s.patch(id, appendPatch("still going"))).toMatchObject({ ok: true });
+    expect(s.settle(id, doc({ command: "ok now" }))).toMatchObject({ ok: true });
+  });
 });

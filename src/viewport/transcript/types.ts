@@ -109,8 +109,19 @@ export interface TranscriptStore extends TranscriptView {
   /** Applies a patch, or says why it could not. Never throws (§6, I8). */
   patch(id: EntryId, patch: ViewPatch): PatchOutcome;
 
-  /** The stream ended; the entry stops accepting patches. Unknown ids are a no-op. */
-  settle(id: EntryId): void;
+  /**
+   * The entry is done, and `doc` is the final one if there is one.
+   *
+   * **Settling *is* the replacement** on C23's app route, where steps 6 and 7 are
+   * one call (C23 §3). They separate only for a stream. Returns the same
+   * `PatchOutcome` as `patch` so C14 invalidates from `rev` through one path,
+   * and `rev` moves **iff** a document is given (I13): a bare settle changes
+   * nothing about the document, and moving it would invalidate a height still
+   * correct on every stream that ends.
+   *
+   * Throws on an invalid document, as `append` does and for its reason (§3).
+   */
+  settle(id: EntryId, doc?: ViewDocument): PatchOutcome;
 
   /** Empties the transcript. Command history is C20's and is untouched (I16). */
   clear(): void;
