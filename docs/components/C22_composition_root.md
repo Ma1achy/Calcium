@@ -6,7 +6,7 @@
 | **Package** | `tui-kit` |
 | **Layer** | L4 shell |
 | **Depends on** | Everything below. It is the only component that may |
-| **Consumed by** | The app's entry point · C23 (receives the constructed graph) |
+| **Consumed by** | The app's entry point · C23 (receives a subset of the graph, by interface — §3a step 10) |
 | **Source** | A01 §5 · A02 §3, §4, §6 · `t01` · the obligations deferred by C01, C05, C07, C09, C10, C14, C15, C16, C17, C19, C20, C21 |
 | **Status** | Draft |
 
@@ -162,6 +162,41 @@ Registration is therefore its own step. I3 is unharmed: it says sealed *before i
 **Four registries are built and three of them seal.** C19's is the exception, and it is not an oversight in C19: `register` returns a `Disposable`, because a dynamic completion source is meant to come and go within a session (C19 §2). There is nothing to seal, and adding a seal would contradict the interface.
 
 The step list said "seal all four registries" against a line naming three components, `C05, C07, C09` — the two halves of one entry disagreeing, with the count in the half a reader skims. What made it visible was writing the code: `completion.seal()` does not compile.
+
+**What step 10 hands over, and the correction it took.** C23 receives each
+collaborator as its owning component's own interface — the transcript store, the
+scheduler, the transport router, the adapter and block registries, the manifest,
+the editor, the overlays, the theme, the history store, the runner and the
+lifecycle — plus `resetFocus`, `stop`, the clock and the opener. It does **not**
+receive `Graph`. That type is C22's, and handing it over would give the pipeline
+every store including the ones it must not touch; the narrowness lives in each
+component's interface, which is where it already is, rather than in thirteen new
+consumer-named wrappers that would then have to be kept in step with their owners.
+
+`Consumed by` above used to read "receives the constructed graph", and the
+imprecision is what would have licensed the wider reading the first time C23
+needed one more collaborator.
+
+**Session state is the part that was wrong rather than merely vague.** The seam
+handed over `session: SessionSnapshot`, evaluated once at step 10 — and §5's store
+deliberately freezes a *fresh* object per write, so the value the pipeline held
+could never change. C23 I12 says a submission is refused once `stopping` is set,
+and against a snapshot captured before `stop()` can ever have run, `stopping` is
+false forever: the invariant was unobservable, and its test T3.15 could not have
+been written. Nothing supplied `ExecutionWrites` either, though §5 names those
+four fields as C23's.
+
+So step 10 hands over `session: () => SessionSnapshot` and `writes: ExecutionWrites`
+— a live read and exactly §5's four rows, which keeps one-writer-per-field
+structural rather than documented. Passing the whole `SessionStore` would have put
+`beginStopping` and the identity loop's `refresh` within the pipeline's reach,
+which is the two-writer problem §5 exists to prevent.
+
+**And there was no wiring for a real C23 at all.** `resolveConfig` passed
+`pipeline` through undefaulted, so `constructGraph` returned `pipeline: null` in
+production: the injected factory is a test seam that was never given a default.
+That is worse than a narrow seam, and it is why this is recorded as a correction
+to what C22 already committed to supply rather than as a widening.
 
 **And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
 
@@ -534,7 +569,7 @@ PTY harness.
 | Not here | Where |
 |---|---|
 | Running a command | C23 |
-| The narrative of execution | B02 |
+| The narrative of execution | C23 — B02 was dropped and its content is C23's |
 | Every component's own construction | The component |
 | The auth flow itself | The far side; C22 displays and offers |
 | Prism's chrome content | `prism-tui` |

@@ -8,7 +8,7 @@
 | **Depends on** | C18 · C05 · C06 · C07 · C13 · C03 · C21 · C22 (session) · C10 C14 C15 C17 C20 (local handlers) |
 | **Consumed by** | C16 (submit) · C22 (constructs it) |
 | **Source** | A02 §4, §5, Seam 4 · A01 D3, D7, D8 |
-| **Status** | Draft. **B02 is the narrative; this is the contract.** The two must not restate each other |
+| **Status** | Draft. The contract. **B02 does not exist** — it was dropped during the drift B01 §1 records, and this line cited it until C23 |
 
 ---
 
@@ -201,10 +201,16 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 | Stall detected | inject notice patch → `commit("stream")` |
 | View refresh tick | `fetch()` → patch the layer → `commit("stream")` |
 | Theme switch | `theme.setVariant` → `scheduler.invalidate` |
-| Scroll | `viewport.scroll` → `scheduler.commit("input")` |
+| Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — **never pop-and-repush** (C19, C15 §2) |
+| History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` |
+| Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) |
 | `cd` / `export` | apply to `session` → `commit` |
 
 Every one of these crosses a layer boundary that the components deliberately do not cross themselves. Four were caught as attempted violations during specification; this table is where they resolved.
+
+**`Scroll` is not here, and it was.** A02 Seam 4 assigns it to C22 with C14 I12 cited — C14 moves and C22 commits — and `src/shell/construct.ts` step 11 implements it there. A row listed in both places is a row with two owners, which is the condition the owner column was added to remove.
+
+**The three overlay rows above were absent, and C23 I13 is what makes that a defect rather than an omission.** I13 and commitment 11 both say every cross-layer sequence lives in this table; while Seam 4 listed three C23-owned rows that this section did not, the invariant was false rather than merely incomplete. A02 §Seam-4 records why that kept happening and what mechanism closes it.
 
 ---
 
@@ -389,7 +395,7 @@ Fake transport, fake stores.
 - **T6.2** (I4): recomputing validation → T1.5 fails, and two answers can disagree.
 - **T6.3** (I5): queueing a second verb → T1.6 fails, and `$_` becomes ambiguous.
 - **T6.13** (I5): scoping the guard to app verbs only → T3.16 fails, and the prompt accepts submissions over a running `sleep`.
-- **T6.14** (I12): ignoring `session.stopping` → T3.15 fails, and an entry lands after the transcript is being torn down.
+- **T6.15** (I12): ignoring `session.stopping` → T3.15 fails, and an entry lands after the transcript is being torn down.
 - **T6.4** (I6): holding the guard for streams → T1.7 fails, and one `--watch` blocks the session.
 - **T6.5** (I7): inferring `$_` from an envelope field → T1.11 fails on any verb whose shape differs.
 - **T6.6** (I2): letting an adapter throw escape → T2.1 fails and the session dies.
@@ -407,7 +413,7 @@ Fake transport, fake stores.
 | Not here | Where |
 |---|---|
 | Building the graph, session lifecycle, shutdown | C22 |
-| The narrative of a command's journey | B02 |
+| The narrative of a command's journey | Nowhere — B02 was dropped, and §1 and §3 are the account |
 | Classification and validation | C18, C05 |
 | Spawning, signalling | C06, C21 |
 | Adapting | C07 |

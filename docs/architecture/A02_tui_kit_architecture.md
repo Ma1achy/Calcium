@@ -165,7 +165,7 @@ No component reaches sideways or upward to cause an effect in another. Where an 
 | Scroll | `viewport.pageUp()` etc → `scheduler.commit("input")` — C14 moves, C22 commits (C14 I12) | C22 |
 | Resize | C01's `onResize` snapshot → `viewport.resize()` → `scheduler.commit("resize")`; C14 captures its anchor before dropping the cache (C14 I8) | C22 |
 | History recall | `history.previous()` → `editor.setText()` → **not** `history.resetNavigation()` (C20 I3) | C23 |
-| Command submit | `parser.parse()` → `transport` → `adapters` → `transcript.append()` → `scheduler.commit()` → `router.resetFocus()` | C23 |
+| Command submit | `parser.parse()` → `transport` → `adapters` → `transcript.append()` → `router.resetFocus()` → `scheduler.commit()` | C23 |
 | Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — never pop-and-repush (C19, C15 §2) | C23 |
 | History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` | C23 |
 | Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) | C23 |
@@ -178,6 +178,27 @@ This is the rule that keeps L0's two halves unaware of each other and keeps L1 a
 **The owner column, and six rows that were missing.** The table listed five sequences when it was written, and every seam added since C15 landed went into the component spec that needed it and not into this table: `resetFocus()` on append (C16 I2), C19's menu push and `update`, C20's search layer and its three-way `searchEnd`, C20's suppressed `resetNavigation`, C25's fullscreen view, and C22's own three. Each is a real cross-layer effect and each was already specified somewhere; what was missing is the one place that says *all* of them are L4's, which is the only form in which the rule is checkable.
 
 The owner column exists because "L4" now means two components. A row owned by C23 is not C22's to implement, and without the column the difference is a judgement each reader makes again.
+
+**The submit row's order is `append → resetFocus → commit`, and it was wrong here until C23.** It read `append → commit → resetFocus`. C23 §4 and its T4.7b have the correct order and the reason: a reset issued *after* the commit paints one frame with focus in a block that has just been frozen, and a reset issued before the append is undone by nothing. The ordering is the whole content of that row, so the table was carrying a row that would have produced the defect it exists to prevent.
+
+### Seam 4 has no owner, and that is the finding
+
+This table has been wrong or incomplete at **every component that touched it**, in a different way each time:
+
+| Found at | What was wrong |
+|---|---|
+| C15 → C20 | Six rows missing entirely — every seam added since C15 went into the component spec that needed it and not into this table |
+| C16 | `resetFocus()` recorded as a subscription; it is a call |
+| C22 | No owner column, so "L4 owns it" named two components |
+| C23 | The submit row's order stale; `Scroll` listed with two owners; three C23-owned rows absent while C23 I13 claims the table holds all of them |
+
+Six independent errors of six different kinds is not a run of bad luck. It is the signature of a **duplicated source of truth with no reconciliation**: every row exists twice, once here and once in the owning component's own orchestration section, and nothing compares the copies. The project already names this class in four places — C05 T1.7c's list derived from the thing it checks, C22's `STEPS` against a test carrying its own copy of the order, SS30's second implementation of a shared primitive, SS35's second `Result`. Seam 4 is the same shape and is the **only artefact several components write to and none owns**. Everything else shared has a mechanism: A03's rules have implementations, `COMPONENT_SOURCES` has TD3, invariants have SP1 and SP2.
+
+So it is one structural problem, not six errors, and the fix is a mechanism rather than a seventh correction. **The shape is an equality check, both directions** — every row here names its sequence in its owner's spec, and every orchestrated sequence in a component's spec appears here. A subset check in either direction misses one of the two failures actually observed: C15–C20's rows were missing *from here*, and C23's three are missing *from there*. That is TD0's and commitment 14b's lesson — an exemption or an inventory compared by containment only ever grows.
+
+The alternative considered was deriving this table from the component specs entirely. It removes the hand-maintained copy, which is better in principle, and it is rejected for now: this table sits inside an argument, and a generated table inside argued prose goes stale in the other direction — the paragraphs around it stop matching and nothing notices. Keeping both copies and comparing them by equality is the arrangement A03 already uses for every other shared thing.
+
+The rule lands with its implementation, per A03 commitment 14b.
 
 ### Seam 5 — the five extension hooks
 
