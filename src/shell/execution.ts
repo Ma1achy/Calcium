@@ -441,6 +441,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
               kind: "notice",
               id: blockId("truncated"),
               tone: "warn",
+              // C04 I6 — a toned notice carries a glyph, or `block()` throws and
+              // the containment path produces no entry at all.
+              glyph: "warn",
               text: `output truncated: ${outcome.error.message}`,
             }),
           });
@@ -461,12 +464,41 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           kind: "notice",
           id: blockId("stream-error"),
           tone: "error",
+          glyph: "error",
           text: `stream failed: ${String(cause)}`,
         }),
       });
       deps.transcript.settle(id);
       deps.scheduler.commit("completion");
     }
+  };
+
+  /**
+   * Starts a route and guarantees its failure is still an outcome.
+   *
+   * **`void runX(...)` loses a throw that happens before the route's own `try`.**
+   * An async function that rejects with nobody awaiting is an unhandled
+   * rejection: no entry, no commit, no error — and C23 I1 violated in the one way
+   * nothing reports. The window is small and real, and it is exactly where the
+   * glyph defect lived: `errorDoc` threw at *construction*, inside `runApp` and
+   * ahead of its `try`, so every containment path produced nothing at all.
+   *
+   * The guard is released here too, because a route that fails before its own
+   * `finally` never reaches one (C23 §8a A5).
+   */
+  const start = (line: string, run: Promise<void>): void => {
+    void run.catch((cause: unknown) => {
+      guard.release();
+      try {
+        appendAndCommit(
+          errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user" }),
+        );
+      } catch {
+        // The document itself is unbuildable. C23 §5's one stage whose failure
+        // loses the outcome, reached from the one direction §5 did not name.
+        deps.scheduler.commit("input");
+      }
+    });
   };
 
   /** C23 §2 — seven kinds, seven paths. */
@@ -497,20 +529,20 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           appendAndCommit(errorDoc(line, { message: applied.message }, { origin: "user" }));
           return;
         }
-        void runShell(line, result.rest);
+        start(line, runShell(line, result.rest));
         return;
       }
 
       case "shell":
-        void runShell(line, result.command);
+        start(line, runShell(line, result.command));
         return;
 
       case "local":
-        void runLocal(line, result.tool.name, result.argv);
+        start(line, runLocal(line, result.tool.name, result.argv));
         return;
 
       case "app":
-        void runApp(line, result);
+        start(line, runApp(line, result));
         return;
     }
   };

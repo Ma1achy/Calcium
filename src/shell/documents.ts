@@ -84,6 +84,27 @@ export function compose(spec: DocSpec): ViewDocument {
   });
 }
 
+/**
+ * The glyph each toned notice carries.
+ *
+ * **C04 I6 requires one for `warn` and `error`** — colour alone survives neither
+ * 1-bit nor a colour-blind reader (A01 D29) — and `block()` throws without it. A
+ * table rather than a per-call argument, because every call site would otherwise
+ * choose, and the one that forgot would throw at *construction*: not a wrong
+ * glyph, no document at all.
+ *
+ * That is how this was found. Every containment path in C23 built a `warn` or
+ * `error` notice with no glyph, so every one threw inside `appendAndCommit` and
+ * produced no entry — C23 I1 says every submission produces exactly one outcome,
+ * and the paths that exist to guarantee it produced none.
+ */
+const GLYPH_OF = Object.freeze({
+  muted: undefined,
+  info: "info",
+  warn: "warn",
+  error: "error",
+} as const);
+
 /** A single-block notice. The shape most containment paths end in. */
 export function noticeDoc(
   command: string,
@@ -92,10 +113,19 @@ export function noticeDoc(
   metaSpec: MetaSpec,
   status: DocumentStatus = "ok",
 ): ViewDocument {
+  const glyph = GLYPH_OF[tone];
   return compose({
     command,
     status,
-    blocks: [block({ kind: "notice", id: blockId("notice"), tone, text })],
+    blocks: [
+      block({
+        kind: "notice",
+        id: blockId("notice"),
+        tone,
+        text,
+        ...(glyph === undefined ? {} : { glyph }),
+      }),
+    ],
     meta: metaSpec,
   });
 }
@@ -113,11 +143,23 @@ export function errorDoc(
   metaSpec: MetaSpec,
 ): ViewDocument {
   const blocks: Block[] = [
-    block({ kind: "notice", id: blockId("error"), tone: "error", text: error.message }),
+    block({
+      kind: "notice",
+      id: blockId("error"),
+      tone: "error",
+      glyph: "error",
+      text: error.message,
+    }),
   ];
   if (error.remediation !== undefined) {
     blocks.push(
-      block({ kind: "notice", id: blockId("remediation"), tone: "info", text: error.remediation }),
+      block({
+        kind: "notice",
+        id: blockId("remediation"),
+        tone: "info",
+        glyph: "info",
+        text: error.remediation,
+      }),
     );
   }
 
