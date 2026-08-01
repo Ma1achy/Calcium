@@ -172,6 +172,10 @@ No component reaches sideways or upward to cause an effect in another. Where an 
 | Resume from `SIGCONT` | C01's `onResume` → `scheduler.invalidate()` — the same call an orchestrated `resume()` makes, because C01 sets no contamination flag (C01 §Signals) | C22 |
 | Terminal too small | size gate → C22's layout-engine-free fallback → `onResize` → resume the normal frame, state intact (C22 §4) | C22 |
 | Shutdown | `session.stopping = true` → `lifecycle.release()` (which runs `beforeRelease`) → diagnostics → exit (C22 §8) | C22 |
+| Pop a pushed view | `overlays.pop()` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) | C23 |
+| Stall detected | inject a notice patch → `commit("stream")` (C23 §3b, I25) | C23 |
+| View refresh tick | `fetch()` → patch the layer → `commit("stream")` (C23 §3b) | C23 |
+| `cd` / `export` | apply to `session` → `commit` | C23 |
 
 This is the rule that keeps L0's two halves unaware of each other and keeps L1 and L2 unaware of the terminal. It has caught four attempted violations during specification — contamination, invalidation, scroll commits and handoff — and it is the first thing to check when a component wants a dependency that feels awkward.
 
@@ -197,6 +201,10 @@ Six independent errors of six different kinds is not a run of bad luck. It is th
 So it is one structural problem, not six errors, and the fix is a mechanism rather than a seventh correction. **The shape is an equality check, both directions** — every row here names its sequence in its owner's spec, and every orchestrated sequence in a component's spec appears here. A subset check in either direction misses one of the two failures actually observed: C15–C20's rows were missing *from here*, and C23's three are missing *from there*. That is TD0's and commitment 14b's lesson — an exemption or an inventory compared by containment only ever grows.
 
 The alternative considered was deriving this table from the component specs entirely. It removes the hand-maintained copy, which is better in principle, and it is rejected for now: this table sits inside an argument, and a generated table inside argued prose goes stale in the other direction — the paragraphs around it stop matching and nothing notices. Keeping both copies and comparing them by equality is the arrangement A03 already uses for every other shared thing.
+
+**Writing the check found four more missing rows, in the direction a subset check would not look.** `Pop a pushed view`, `Stall detected`, `View refresh tick` and `cd` / `export` were all declared in C23 §4 and absent here — the second direction firing before the rule existed, which is the argument for equality made by the thing it was arguing about.
+
+**And it found the asymmetry underneath.** C23 has a §4 that lists what it orchestrates; C22 had nothing equivalent, so five of this table's rows had no counterpart to compare against at all. Half a table cannot be checked against half a convention. C22 §3c now lists its five, keyed by the same Effect names, and that keying is itself a requirement: "Submit" here and "Command submit" there is drift no cheap check can see through.
 
 The rule lands with its implementation, per A03 commitment 14b.
 

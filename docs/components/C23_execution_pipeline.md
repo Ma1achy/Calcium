@@ -194,8 +194,8 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 
 | Trigger | Sequence |
 |---|---|
-| Submit | `parse` → route → … → `transcript.append` → `router.resetFocus` → `scheduler.commit` |
-| A TTY child | `lifecycle.suspend` → `runner.handoff` → `lifecycle.resume` → `scheduler.invalidate` |
+| Command submit | `parse` → route → … → `transcript.append` → `router.resetFocus` → `scheduler.commit` |
+| Child process needing a TTY | `lifecycle.suspend` → `runner.handoff` → `lifecycle.resume` → `scheduler.invalidate` |
 | Pop a pushed view | `overlays.pop` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) |
 | History recall | `history.previous` → `editor.setText` → `commit("input")` |
 | Stall detected | inject notice patch → `commit("stream")` |
@@ -207,6 +207,14 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 | `cd` / `export` | apply to `session` → `commit` |
 
 Every one of these crosses a layer boundary that the components deliberately do not cross themselves. Four were caught as attempted violations during specification; this table is where they resolved.
+
+**The Trigger column uses A02 Seam 4's Effect names exactly**, and that is a
+requirement rather than a courtesy. Two names for one row — "Submit" here and
+"Command submit" there — is the drift SP4 exists to catch, and it makes the two
+tables uncomparable by the only cheap means there is. Four of these rows had no
+Seam 4 entry at all until SP4 was written: `Pop a pushed view`, `Stall detected`,
+`View refresh tick` and `cd` / `export`, each a cross-layer effect this section
+already declared and the architecture's table did not.
 
 **`Scroll` is not here, and it was.** A02 Seam 4 assigns it to C22 with C14 I12 cited — C14 moves and C22 commits — and `src/shell/construct.ts` step 11 implements it there. A row listed in both places is a row with two owners, which is the condition the owner column was added to remove.
 

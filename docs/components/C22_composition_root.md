@@ -200,6 +200,36 @@ to what C22 already committed to supply rather than as a widening.
 
 **And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
 
+
+### 3c. The sequences C22 owns
+
+A02 Seam 4's rows whose owner is C22, in one place. **The Effect names are Seam
+4's exactly**, because SP4 compares the two tables by that key and "Scroll" here
+against "Scrolling" there is drift no cheap check sees through.
+
+| Effect | Sequence | Where |
+|---|---|---|
+| Scroll | `viewport.pageUp()` etc → `scheduler.commit("input")` — C14 moves, C22 commits (C14 I12) | §3 step 11 |
+| Resize | C01's `onResize` snapshot → `viewport.resize()` → `scheduler.commit("resize")`; C14 captures its anchor before dropping the cache (C14 I8) | §3 step 8a |
+| Resume from `SIGCONT` | C01's `onResume` → `scheduler.invalidate()` — the same call an orchestrated `resume()` makes, because C01 sets no contamination flag (C01 §Signals) | §3 step 8a |
+| Terminal too small | size gate → the layout-engine-free fallback → `onResize` → resume the normal frame, state intact | §4, §8b |
+| Shutdown | `session.stopping = true` → `lifecycle.release()` (which runs `beforeRelease`) → diagnostics → exit | §8, §8a |
+
+**This section did not exist until SP4 was written, and its absence is the finding
+underneath the six Seam 4 defects.** C23 has a §4 listing what it orchestrates;
+C22 had nothing equivalent, so five of Seam 4's twelve rows had no counterpart to
+be compared against — half a table checked against half a convention. The `Where`
+column is what makes that honest rather than a fourth copy: the sequences are
+specified in §3, §4 and §8 as they always were, and this table indexes them.
+
+**One row is unresolved and named rather than quietly listed.** §7's *token under
+one day* transition says a notice is committed to the transcript, and C23 §1 says
+C23 is the only component that appends documents. Either the identity loop reaches
+the transcript — which Seam 4 forbids — or the notice is C23's on a trigger C22
+raises, in which case it is a C23 row and needs an `origin` (C23 §3a) that §3b's
+two mechanisms do not currently produce. C23 §8b resolves it; it is recorded here
+so the question has a home until then.
+
 ---
 
 ## 4. Startup
