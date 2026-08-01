@@ -14,7 +14,7 @@ import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { createTui } from "../../src/shell/session.js";
 import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
 import { parseManifest } from "../../src/data/manifest/index.js";
-import { fakeStdin, fakeStdout, type FakeStdout } from "./fake-terminal.js";
+import { fakeStdin, fakeStdout, type FakeStdin, type FakeStdout } from "./fake-terminal.js";
 
 /**
  * **Parsed, not hand-built.** `parseManifest` is the only thing that appends
@@ -59,6 +59,7 @@ export const FRAME: FrameQueries = {
   entryAtRow: () => null,
   region: () => ({ top: 1, height: 20 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
+  promptAnchor: () => ({ row: 21, rows: 1 }),
   mouseEnabled: () => true,
   raiseExitConfirm: () => undefined,
 };
@@ -134,6 +135,8 @@ export async function buildGraph(
 ): Promise<{
   graph: Graph;
   stdout: FakeStdout;
+  /** The keyboard. Bytes go in here, not events into the router (C22 I24). */
+  stdin: FakeStdin;
   renders: () => number;
   /**
    * Resize the terminal and deliver the signal, as the OS would.
@@ -146,6 +149,7 @@ export async function buildGraph(
   resize: (next: { columns: number; rows: number }) => void;
 }> {
   const stdout = fakeStdout(size);
+  const stdin = fakeStdin();
   let renders = 0;
 
   const config = resolveConfig(
@@ -162,7 +166,7 @@ export async function buildGraph(
       // omitted `env` would be testing a session that refuses to start.
       env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8" },
       stdout: stdout as unknown as NodeJS.WriteStream,
-      stdin: fakeStdin(),
+      stdin,
       ...overrides,
     },
     fakeAmbient(),
@@ -181,6 +185,7 @@ export async function buildGraph(
   return {
     graph,
     stdout,
+    stdin,
     renders: () => renders,
     resize: (next) => {
       size.columns = next.columns;

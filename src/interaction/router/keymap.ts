@@ -14,7 +14,7 @@
  * apart, and identity is what makes that checkable.
  */
 
-import type { Binding, BlockKeymap, FocusTarget, Key } from "./types.js";
+import type { Binding, BlockKeymap, BuiltinBinding, FocusTarget, Key } from "./types.js";
 
 export class KeymapError extends Error {
   override readonly name = "KeymapError";
@@ -100,7 +100,7 @@ export interface Keymap {
  * (I17). It arrived here as a row resolving against an event nothing could
  * produce, which is what found that.
  */
-export const defaultKeymap: readonly Binding[] = [
+export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "prompt", key: { name: "enter", shift: true }, action: "insertNewline" },
   { target: "prompt", key: { name: "enter", meta: true }, action: "insertNewline" },
   { target: "prompt", key: { name: "j", ctrl: true }, action: "insertNewline" },

@@ -267,6 +267,14 @@ class Session implements TuiInstance {
       entryAtRow: () => null,
       region: () => this.#composed().region,
       overlayRegion: () => this.#composed().overlayRegion,
+      // From the composed frame, both numbers: the prompt starts where the
+      // transcript ends, and its height is the one the frame reserved. A fresh
+      // computation here is the two-records defect the same frame already had
+      // once (S01 §3).
+      promptAnchor: () => {
+        const f = this.#composed();
+        return { row: f.region.top + f.region.height, rows: f.promptRows };
+      },
       mouseEnabled: () => this.#graph?.capabilities.mouse ?? false,
       // Ctrl-C and Ctrl-D raise a confirm; answering it is what stops. Until
       // C15's confirm layer is composed here, the rung stops directly, which is

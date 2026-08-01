@@ -50,11 +50,41 @@ export type InputEvent =
  * from this table — a keymap expressed as conditionals cannot be overridden,
  * listed, or shown.
  */
+/**
+ * The built-in action names, closed (I19).
+ *
+ * **Closed is what makes `/help` honest.** C16 executes none of these — the
+ * effect table is L4's, in `shell/keys.ts` — and until that table existed every
+ * one of them was a name `/help` rendered and nothing dispatched. A union plus a
+ * total `Record` makes both halves of that unconstructible: a binding naming an
+ * action nobody implements does not compile, and neither does an implementation
+ * of an action nobody binds.
+ *
+ * A `BlockKeymap`'s action stays an open `string` (below). A surface supplies
+ * both the binding and the handler, through C23 §3a, so there is nothing here to
+ * agree with it.
+ */
+export type KeyAction =
+  | "insertNewline"
+  | "complete"
+  | "acceptGhostOrForward"
+  | "menuNext"
+  | "menuPrev"
+  | "menuAccept"
+  | "dismiss"
+  | "historyPrev"
+  | "historyNext"
+  | "reverseSearch"
+  | "searchOlder";
+
 export type Binding = Readonly<{
   target: FocusTarget;
   key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }>;
   action: string;
 }>;
+
+/** A built-in row: a `Binding` whose action is one L4 implements (I19). */
+export type BuiltinBinding = Binding & Readonly<{ action: KeyAction }>;
 
 /** What an adapter attaches to a block; C16 merges it into `liveBlock` while live. */
 export type BlockKeymap = readonly Readonly<{

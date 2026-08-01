@@ -44,7 +44,9 @@ import { createEngine } from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
-import type { InputEvent } from "../interaction/router/types.js";
+import { createDecoder } from "../interaction/router/decode.js";
+import { createKeyEffects } from "./keys.js";
+import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { createFrameScheduler } from "../terminal/frame-scheduler.js";
@@ -75,6 +77,8 @@ export const STEPS = Object.freeze([
   "router",
   "pipeline",
   "register",
+  "decoder",
+  "input",
 ] as const);
 
 export type Step = (typeof STEPS)[number];
@@ -108,6 +112,14 @@ export type FrameQueries = Readonly<{
   /** The area layers are placed within (C15 `Region`). */
   overlayRegion: () => Readonly<{ width: number; height: number }>;
   mouseEnabled: () => boolean;
+  /**
+   * The prompt's own extent, for anchoring a menu or a search line.
+   *
+   * A frame property like `region`, and taken from the composed frame rather
+   * than recomputed: a menu anchored to a row the frame does not agree with is
+   * C15 I17's self-consistent-but-wrong placement.
+   */
+  promptAnchor: () => Readonly<{ row: number; rows: number }>;
   /** Raises the Ctrl-C / Ctrl-D confirm — a layer over C15, composed by C22. */
   raiseExitConfirm: () => void;
 }>;
@@ -415,22 +427,116 @@ export async function constructGraph(
   // the pipeline built at 10, and the pipeline closes over the router built at
   // 9. Registering with the router would require one of the two to exist before
   // it does.
+  const keys = createKeyEffects({
+    editor: stores.editor,
+    completion: built.completion,
+    overlays: stores.overlays,
+    history: stores.history,
+    manifest: built.manifest.manifest,
+    anchor: deps.frame.promptAnchor,
+    overlayRegion: deps.frame.overlayRegion,
+  });
+
+  /** A bound action, or `null` when the key is not bound at this target. */
+  const bound = (target: FocusTarget, e: InputEvent): (() => void) | null => {
+    if (e.kind !== "key") return null;
+    const binding = keymap.resolve(target, e.key);
+    if (binding === null) return null;
+    // A block keymap's action is a surface's string and dispatches through
+    // C23 §3a; the built-in table is total over C16's union and has no entry
+    // for one (C16 I19).
+    return keys.table[binding.action as KeyAction] ?? null;
+  };
+
   at("register", () => {
     router.register("prompt", (e) => {
-      if (!(e.kind === "key" && e.key.name === "return")) return false;
-      pipeline?.submit(stores.editor.text);
+      const effect = bound("prompt", e);
+      if (effect !== null) {
+        effect();
+        return true;
+      }
+
+      // **`enter`, not `return`** — C16 I17's rule applied to a handler rather
+      // than to a keymap row. The decoder has only ever produced `enter` for
+      // `\r`, so this test named a key nothing sends and Enter did not submit.
+      // It was invisible because no decoded event ever reached the router: the
+      // two halves were each correct about a name and never compared.
+      if (e.kind === "key" && e.key.name === "enter") {
+        pipeline?.submit(stores.editor.text);
+        return true;
+      }
+
+      // A paste is one edit and one undo unit (C17 I5), which is why it is a
+      // kind of its own here rather than a run of keys.
+      if (e.kind === "paste") {
+        stores.editor.insert(e.text, { atomic: true });
+        return true;
+      }
+
+      if (e.kind === "key" && isPrintable(e.key)) {
+        stores.editor.insert(e.key.sequence);
+        return true;
+      }
+
+      return false;
+    });
+
+    router.register("overlay", (e) => {
+      const effect = bound("overlay", e);
+      if (effect === null) return false;
+      effect();
       return true;
     });
 
     // Scroll is Seam 4's C22 row: C14 moves and **C22 commits** (C14 I12). A
     // viewport that committed its own frame would be L2 reaching into L0.
+    //
+    // **The commit is the loop's, not this handler's** (I27). Two committers
+    // means one frame too many for a scroll and none for whichever handler
+    // forgets, and only the second is invisible.
     router.register("global", (e) => {
       const move = scrollAmount(e);
       if (move === null) return false;
       move(stores.viewport);
-      scheduler.commit("input");
       return true;
     });
+  });
+
+  // --- 12. the read loop ----------------------------------------------------
+  // Startup step 8's mechanism (I24). C16's decoder owns no timer and C01
+  // delivers bytes and interprets none; neither is wired to the other by
+  // existing, and nothing else in the tree may read stdin.
+  const decoder = at("decoder", () =>
+    createDecoder({ capabilities: detection.capabilities, now: config.clock }),
+  );
+
+  at("input", () => {
+    let wake: Disposable | null = null;
+
+    /** One commit per decoded batch, and no handler commits (I27). */
+    const deliver = (events: readonly InputEvent[]): void => {
+      if (events.length === 0) return;
+      for (const e of events) router.dispatch(e);
+      scheduler.commit("input");
+      arm();
+    };
+
+    // The three timeouts C16 reports and does not fire: the escape window, the
+    // paste heuristic, the exit arming. Without this a lone `Esc` is delivered
+    // when the *next* key arrives — a key that appears to do nothing until you
+    // press another one.
+    function arm(): void {
+      wake?.[Symbol.dispose]();
+      wake = null;
+      const at = decoder.nextDeadline();
+      if (at === null) return;
+      wake = config.schedule(() => {
+        wake = null;
+        deliver(decoder.poll());
+      }, Math.max(0, at - config.clock()));
+    }
+
+    lifecycle.onInput((chunk) => void deliver(decoder.push(chunk)));
   });
 
   return Object.freeze({
@@ -596,4 +702,21 @@ function defaultOpener(
     runner.spawn([command, url.href], { cwd: session.cwd });
     return Promise.resolve();
   };
+}
+
+/**
+ * A key that types a character, as opposed to one that means something.
+ *
+ * The test is on the modifiers and on the sequence being one printable
+ * codepoint, rather than on a list of named keys: a list is the shape that goes
+ * stale as the decoder learns new names, and every name it learns would
+ * otherwise start typing itself into the prompt.
+ */
+function isPrintable(key: Key): boolean {
+  if (key.ctrl || key.meta) return false;
+  if (key.sequence.length === 0) return false;
+  const [first] = [...key.sequence];
+  if (first === undefined || [...key.sequence].length !== 1) return false;
+  const code = first.codePointAt(0) ?? 0;
+  return code >= 0x20 && code !== 0x7f;
 }

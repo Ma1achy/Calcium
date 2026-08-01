@@ -47,6 +47,7 @@ const FRAME: FrameQueries = {
   entryAtRow: () => null,
   region: () => ({ top: 1, height: 20 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
+  promptAnchor: () => ({ row: 21, rows: 1 }),
   mouseEnabled: () => false,
   raiseExitConfirm: () => undefined,
 };

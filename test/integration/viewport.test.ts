@@ -141,20 +141,20 @@ describe("C14 integration", () => {
     // C14 moves, C22 commits (C14 I12). A viewport that committed its own frame
     // would be L2 reaching into L0, which is the edge Seam 4 exists to prevent
     // — and the spy is what makes "never" checkable rather than asserted.
-    const { graph } = await buildGraph({}, { columns: 100, rows: 8 });
+    // **Driven through the read loop, not by dispatching to the handler**
+    // (C22 I27). The commit is the loop's: this test asserted the handler's,
+    // which was the mechanism it happened to find, and it passed unchanged
+    // while the handler and the loop would both have committed.
+    const { graph, stdin } = await buildGraph({}, { columns: 100, rows: 8 });
     for (let i = 0; i < 20; i += 1) graph.transcript.append(rowsDoc(3, `e${i}`));
     graph.lifecycle.acquire();
 
     const commit = vi.spyOn(graph.scheduler, "commit");
     const before = graph.viewport.scroll.topRow;
 
-    const consumed = graph.router.dispatch({
-      kind: "key",
-      key: { name: "pageup", ctrl: false, meta: false, shift: false, sequence: "\u001b[5~" },
-    });
+    stdin.emit("\u001b[5~");
 
-    expect(consumed, "the shell's handler took it").toBe(true);
-    expect(graph.viewport.scroll.topRow, "and the viewport moved").not.toBe(before);
+    expect(graph.viewport.scroll.topRow, "the viewport moved").not.toBe(before);
     expect(commit.mock.calls, "exactly one, and it is an input commit").toEqual([["input"]]);
   });
 });
