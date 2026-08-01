@@ -135,6 +135,46 @@ describe("C22 §6 — the paint", () => {
     expect(lines.some((l) => l.includes("line 199")), "and the newest rows are shown").toBe(true);
   });
 
+  it("T1.5b (S01 C14): a cap of one shows the last row, not a marker with nothing after it", () => {
+    // The window is the marker plus the rows that follow it, and at a cap of
+    // one there are none: `rows.slice(len - 0)` is empty, so the prompt painted
+    // as `⋯` alone with the typed command nowhere on the screen. An elision
+    // that elides everything annotates nothing.
+    //
+    // Reachable below the size gate, which `frame.ts` already records as a real
+    // window rather than a theoretical one — a resize can arrive between the
+    // gate and the frame.
+    const f = frameAt(40, 3, 3);
+    expect(f.promptRows, "half of three, floored").toBe(1);
+
+    const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
+    const prompt = lines[1 + f.region.height];
+
+    expect(prompt?.startsWith("❯ third"), "the last row, gutter and all").toBe(true);
+    expect(lines.join("").includes("⋯"), "and no marker, because there is no room for one").toBe(
+      false,
+    );
+  });
+
+  it("T1.5c (S01 C15): a frame composed for one prompt row and painted from three is refused", () => {
+    // The height enters the frame twice — as a number when the regions are
+    // computed, as rows when the prompt is drawn — and `heightsSum` cannot see
+    // them disagree, because it compares the frame with itself and stays
+    // consistent at every width. This is the live defect the session shipped:
+    // `#composed()` passed `() => 1` while `#paintDeps` handed over the
+    // editor's real rows, so every wrapped prompt hit the degeneracy above.
+    const f = frameAt(80, 24, 1);
+    expect(f.promptWanted, "the frame was composed against one row").toBe(1);
+
+    expect(() => paint(f, deps({ promptRows: () => ["one", "two", "three"] }))).toThrow(FrameError);
+
+    // And the agreeing case still paints, so the comparison is not simply a
+    // throw with a condition that never holds.
+    expect(paint(frameAt(80, 24, 3), deps({ promptRows: () => ["one", "two", "three"] }))).toHaveLength(
+      24,
+    );
+  });
+
   it("T4.12e: the prompt glyph is on the first row and the gutter on the rest", () => {
     // The gutter C22 passes must match the prompt it draws (T4.9), and this is
     // the drawing half — `displayRows` is computed against `{first: 2}` and the

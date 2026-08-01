@@ -282,7 +282,15 @@ class Session implements TuiInstance {
       session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
       now: this.config.clock,
       size: () => graph?.lifecycle.size() ?? { columns: 80, rows: 24 },
-      promptRows: () => 1,
+      // **The same number the paint path reads** (S01 §3, commitment 4 and 13).
+      // A constant here made the frame reserve one row while `#paintDeps` handed
+      // `paint` the editor's real rows: `promptRegion` then windowed them to a
+      // cap of one, and a wrapped prompt drew as a single elision marker with
+      // the command invisible. `heightsSum` cannot see it — it checks the
+      // composed frame against itself, and 1 + 1 + region + 1 is consistent at
+      // every width. Two records of one number, and T1.5c is the only thing
+      // comparing them.
+      promptRows: (width, gutter) => graph?.editor.layout(width, gutter).length ?? 1,
     });
   }
 }

@@ -120,15 +120,23 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   const rows = deps.promptRows();
   const cap = frame.promptRows;
 
+  // **A cap of one shows the last row and no marker** (S01 §3, commitment 14).
+  // The window below is the marker plus the rows after it, and at `cap = 1`
+  // there are none: the slice is empty and the prompt paints as `⋯` alone, with
+  // the typed command nowhere on the screen. An elision that elides everything
+  // annotates nothing, and one row of the command beats a marker reporting that
+  // a command exists.
   const windowed =
     rows.length <= cap
       ? rows
-      : // Around the end rather than around the cursor, until C17's `cursorCell`
-        // is threaded through: the cursor is at the end for every case but a
-        // mid-buffer edit, and showing the wrong window is worse than showing
-        // the last rows. Named here so it is a known simplification rather than
-        // a silent one.
-        [ELISION, ...rows.slice(rows.length - (cap - 1))];
+      : cap === 1
+        ? [rows[rows.length - 1] ?? ""]
+        : // Around the end rather than around the cursor, until C17's
+          // `cursorCell` is threaded through: the cursor is at the end for every
+          // case but a mid-buffer edit, and showing the wrong window is worse
+          // than showing the last rows. Named here so it is a known
+          // simplification rather than a silent one.
+          [ELISION, ...rows.slice(rows.length - (cap - 1))];
 
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
@@ -153,6 +161,21 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
         `header 1 + viewport ${String(frame.region.height)} + prompt ${String(frame.promptRows)} + footer 1`,
+    );
+  }
+
+  // **The prompt's height entered the frame twice** (S01 §3, commitment 15).
+  // `heightsSum` above cannot see the two disagree — it compares the frame with
+  // itself, and the four regions total `rows` whatever number the prompt was
+  // composed with. So the number and the rows are compared where they meet.
+  // Composed for one row and painted from three, the frame is coherent and
+  // describes a different prompt than the editor holds; the screen gets a lone
+  // elision marker and the typed command is nowhere on it.
+  const promptRowCount = deps.promptRows().length;
+  if (promptRowCount !== frame.promptWanted) {
+    throw new FrameError(
+      `prompt height disagrees: composed from ${String(frame.promptWanted)} rows, ` +
+        `painting ${String(promptRowCount)}`,
     );
   }
 
