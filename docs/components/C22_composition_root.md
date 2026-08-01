@@ -32,6 +32,7 @@ type TuiConfig = Readonly<{
   theme:    ThemeSet;
 
   adapters?:          Readonly<Record<string, Adapter>>;
+  localHandlers?:     Readonly<Record<string, LocalHandler>>;   // §2a
   commandPolicy?:     CommandPolicy;
   completionSources?: readonly CompletionSource[];
   chrome?:            Readonly<{ header: ChromeFn; footer: ChromeFn }>;
@@ -80,6 +81,14 @@ interface TuiInstance {
 Four required fields. Every optional one has a working default: the fallback adapter, the `/` prefix policy, manifest-derived completion, default chrome, no extra blocks, subprocess transport, real clock and filesystem.
 
 `debug.retainPayloads` turns on C13's raw-payload retention (C13 §5a) so `/debug` can show what an adapter was actually given. Absent, nothing is retained. Present without a count, the default is 50 — a number rather than "all" because doubling memory against a 100,000-block cap is how a debug mode becomes one nobody turns on.
+
+### 2a. `localHandlers` — the route that did not exist
+
+C23 §2 says an app registers its own local handlers alongside the framework's, and C23 I27 fails construction when a manifest verb marked `local` has none. Both are right, and **nothing carried the app's handlers into the pipeline**: `Pipeline.register` is reachable only after `start()` returns, and step 10 calls `seal()` before it does. So a manifest declaring any local verb could not start a session at all — the framework refused a configuration it gave no way to complete, and the refusal was the correct half of a pair whose other half was missing.
+
+Found by running the fixture manifest through a real session for the first time. It declares two — `guide` and `debug dump` — and construction refused them by name, which is I27 working.
+
+They arrive as config because that is where everything an app supplies arrives, and they are registered at step 10 **before** `seal()`, which is what makes the reconciliation see them. Registering after the seal would be a second window in which the two records can differ, and the seal exists to close the first.
 
 `stateDir` defaults to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
 
@@ -513,6 +522,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I1** — Stores and the process runner are constructed before the lifecycle, so `beforeRelease` can reach them.
 - **I2** — The lifecycle is constructed before any acquire.
 - **I3** — Every registry that has a seal is sealed before input is accepted: C05's, C07's and C09's at step 4, and C23's local registry at step 10, because the app's handlers arrive with the pipeline. C19's completion sources are the fourth registry built and the one with no seal — `register` returns a `Disposable` by design (C19 §2), so a dynamic source may come and go within a session.
+- **I3a** — The app's local handlers arrive through `TuiConfig.localHandlers` and are registered at step 10 before `seal()`. I3 says the app's handlers arrive with the pipeline, and until §2a there was no route for them: a manifest declaring a local verb could not start, because C23 I27 correctly refused a registry the config had no way to fill.
 - **I4** — **`beforeRelease` is the function all five callers share**, and it is what makes cleanup once-only. `/exit`, Ctrl-D confirm and double Ctrl-C additionally run `stop`'s four steps in order, idempotently; `signal` and `fault` are C01's, which releases, writes diagnostics and exits with 128 + signal or 1 — C01 exposes no signal hook, so `stop` cannot run there. An earlier wording said *one function, five callers* without saying which function, and the two readings are both defensible, which is how it survived.
 - **I4a** — `session.stopping` is not set on the signal and fault paths, and nothing may make either of them asynchronous. `process.exit` inside the handler is what stops a submission interleaving; the flag is unnecessary only for as long as that is true.
 - **I5** — Cleanup runs inside `beforeRelease` and nowhere else; it can therefore never run twice.
@@ -550,6 +560,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
 3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
 3b. `createTui` validates and returns; steps 2 to 12 run inside `start()` (I7a).
+3c. The app's local handlers arrive as config and are registered before `seal()`, so I27's reconciliation sees them. Without the route the framework refused a configuration it offered no way to complete (I3a).
 4. Four registries seal before input is accepted — C05's, C07's and C09's at construction, and C23's with the pipeline. C19's is the one with no seal, by its own design (I3).
 5. Gates are TTY, config, then size; the size gate defers rather than aborts, and a manifest-declared one-shot verb bypasses the TTY gate (I8).
 6. The too-small render is layout-engine-free (I9).
@@ -582,6 +593,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4** (I3): all four seals are closed before the input router accepts anything — C05's, C07's and C09's, and C23's local registry, which is the one a test counting only the construction-time ones would miss. C19's engine has no `seal`, and the test asserts that too: a count is the wrong assertion when one member of the set does not belong to it.
 - **T1.4b** (I3, commitment 3a): the submit handler is registered after the pipeline exists, and the pipeline holds the router. Asserted on the event log: no handler registration precedes step 10. The construction cycle §3a found fails here rather than at the first Enter.
 - **T1.4d** (I22): a config omitting `pipeline` still yields a graph carrying a sealed `Pipeline`, and an injected factory is still used. Both halves, because a default that ignored `config.pipeline` would satisfy the first and remove the seam.
+- **T1.4j** (I3a): a manifest declaring a local verb constructs when `localHandlers` supplies it, and fails naming the verb when it does not. Both halves: the failure alone is what shipped, and it read as the check working rather than as a route that did not exist.
 - **T1.4e** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
 - **T1.4f** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
 - **T1.4h** (I26): every `defaultKeymap` binding, pressed through a real decoder into a constructed graph, produces its documented effect — fourteen cases, driven from the table rather than listed. A hand-written list is the shape that let fourteen bindings go unexecuted while every test passed.
