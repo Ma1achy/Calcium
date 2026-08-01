@@ -48,6 +48,8 @@ type Placed = Readonly<{
   height: number;
   width:  number;
   truncated: boolean;
+  /** Where this layer wants the terminal cursor, relative to its own origin (I19). */
+  cursor?: Readonly<{ row: number; col: number }>;
 }>;
 
 type DismissReason = "explicit" | "anchorEvicted";
@@ -144,7 +146,13 @@ Three things follow, and they are decisions rather than details:
 
 **Width is clamped, and unlike height that is not optional.** A layer taller than its box loses rows the reader can scroll to; a layer wider than the region wraps, and a wrapped overlay row shifts every row below it — the failure S01 §3 and `docs/notes/resize-and-compositor.md` both name, arriving through a layer instead of through a frame.
 
-**Where the terminal cursor sits while a layer holds focus is not specified anywhere**, and it is the one of the four that will be discovered rather than designed. C16's `activeTarget` puts `overlay` above `prompt`, so focus already moved; the cursor did not, because nothing has drawn a layer for it to move onto. Left as it is, the cursor stays at the prompt's `cursorCell` under a menu drawn over it — visible, blinking, in the wrong place. **This is an open question and it belongs to whoever rules it, not to the first implementation that needs an answer.**
+**The terminal cursor is placed by whatever holds focus, and hidden when that thing has none** (I19). C16's `activeTarget` already puts `overlay` above `prompt`, so the cursor belongs to the layer for the same reason the keys do — and leaving it blinking at the prompt under a menu that owns the keystrokes is precisely the *somewhere invisible* symptom derived focus exists to prevent.
+
+`Placed.cursor` is how the layer says so, **relative to its own origin**, so the drawer never has to know what a prompt or a search field is. Absent means the layer has no cursor and the terminal's is hidden, which is the default and the case that matters: it is what a menu wants.
+
+The two live producers answer oppositely, which is what makes this a field rather than a constant. **Reverse search has a cursor** — text is being typed into it — and **the completion menu has none**; nothing is entered into a menu, the keys move a selection. C15's exit confirm has none either, for the same reason, and it now has somewhere to appear at all.
+
+**`cursorCell` stays exactly as it is** (C17 §2). C17 is a data structure with no notion of focus: it reports where its own cursor sits and always has. The *drawer* chooses — the focused layer's cursor if it has one, the prompt's if focus is `prompt`, hidden otherwise. A `cursorCell` that answered differently depending on focus would be C17 knowing about focus, which is what keeps it testable.
 
 **A view's content is already the region's worth, and C15 does not scroll it.** The owner windows it — S12 holds fifty thousand log lines and renders the visible ones, having committed to owning its own scroll and calling no C14 (S12 T2.3); C25 §3b's fullscreen patch does the same through `n`, `p`, `g` and `G`. Said explicitly because its absence invites C15 growing a scroll offset for views, and that is a second scroll model beside C14's — the thing A01 D3 spent a decision avoiding. C15 clips nothing vertically beyond reporting `truncated`.
 
@@ -232,6 +240,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I16** — An overlay's width is `min(layer.width ?? region.width, region.width)`, and its content is measured at that width rather than at the region's. `Placed.left` is derived from it.
 - **I17** — An anchored overlay never covers its anchor's own rows, `[row, row + rows − 1]`, **whenever either side has a row to offer**. A single-row anchor is the default and the special case, not the general one. The qualification is T3.8's: a one-row region with a one-row anchor has no room on either side, and an overlay covering its anchor is a better answer than one silently absent.
 - **I18** — The `maxHeightFraction` clamp is floored at one row. `floor(1 × 0.5)` is zero, and a region too short for the fraction must not swallow every overlay it holds.
+- **I19** — The terminal cursor is placed by whatever holds focus and hidden when that thing has none. A layer states its own through `Placed.cursor`, relative to its origin; absent means hidden. The choice is the drawer's and never C17's — a `cursorCell` that varied with focus would put focus inside a component that has no notion of it.
 
 ---
 
@@ -254,6 +263,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 15. An overlay's width is its owner's to declare, and its content is measured at that width; `left` follows from it (I16, I6).
 16. An anchor is a span rather than a row, and an overlay never covers it while either side has room (I17).
 17. Both clamps have a floor of one row, so a short region never silently swallows a layer (I18).
+18. The terminal cursor is placed by whatever holds focus and hidden when that thing has none; a layer states its own in `Placed`, and C17's `cursorCell` is unchanged because it has no notion of focus (I19).
 
 ---
 
@@ -262,6 +272,8 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 1 — unit
+
+- **T1.20** (I19): a layer carrying a cursor and a layer carrying none, placed → the first's `Placed.cursor` is relative to its own origin and survives the flip from `below` to `above`; the second's is absent. Both, because a field that is always present and always ignored passes any test of the first alone — and the two live producers answer oppositely, which is why this is a field.
 
 - **T1.1**: `push(overlay)` on empty → stack of one, `top` is it, `hasView` false.
 - **T1.2**: `push(view)` on empty → `hasView` true.
