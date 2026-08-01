@@ -141,6 +141,48 @@ describe("interactivePty parameters", () => {
   );
 
   it(
+    "frame: the current screen, and not what was on it three frames ago",
+    async () => {
+      // **The parameter is shown to respond before anything asserts against
+      // it** (`test/support/README.md`). `output` is cumulative, and that is
+      // the whole reason this exists: a shell repaints the screen on every
+      // keystroke, so text deleted three frames ago stays in `output` forever
+      // and an assertion that it is *gone* passes by accident.
+      //
+      // Driven by a real session rather than by `echo`, because the
+      // reconstruction is the frame's own shape and an `echo` that never wrote
+      // a `CSI H` would leave `frame` empty and this row green.
+      const pty = interactivePty("node test/support/fixture.mjs session", {
+        cols: 80,
+        rows: 20,
+      });
+      try {
+        await pty.waitFor(/\u276f/, 15_000);
+
+        pty.type("first-text");
+        await pty.waitFor(/first-text/, 15_000);
+        expect(pty.frame.join("\n"), "the current frame carries it").toContain("first-text");
+        expect(pty.frame, "and it is the terminal's height, not every frame ever").toHaveLength(20);
+
+        // Clear the prompt and type something else. The old text is gone from
+        // the screen and still in `output` — which is the distinction.
+        //
+        // `Ctrl-C` on a prompt with text clears it (C16 §5's ladder), which is
+        // a binding that exists; `Ctrl-U` is not one, and the first draft of
+        // this row used it and produced `first-textsecond-text`.
+        pty.type("\u0003second-text");
+        await pty.waitFor(/second-text/, 15_000);
+        expect(pty.frame.join("\n")).toContain("second-text");
+        expect(pty.frame.join("\n"), "gone from the screen").not.toContain("first-text");
+        expect(pty.output, "still in the stream").toContain("first-text");
+      } finally {
+        pty.kill();
+      }
+    },
+    40_000,
+  );
+
+  it(
     "type(): what is typed reaches the program's stdin",
     async () => {
       // The reason the runner exists. `runInPty` starts a program and waits;

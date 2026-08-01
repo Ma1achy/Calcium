@@ -17,6 +17,12 @@ import { spawn } from "node-pty";
 
 const MARKER = "__TERMIOS__";
 
+/** The frame's prefix, and the anchor `frame` slices from (C22 §6). */
+const HOME = "\u001b[H";
+
+/** Every escape, for reading a frame as the rows a user would see. */
+const CSI_ANY = /\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])/g;
+
 export type DecsetState = {
   altScreen: boolean;
   cursorVisible: boolean;
@@ -253,6 +259,22 @@ export type InteractivePty = {
   resize(cols: number, rows: number): void;
   /** Everything received so far. */
   readonly output: string;
+  /**
+   * The most recently written frame, as rows, with escapes removed.
+   *
+   * **`output` is cumulative and almost never what a row wants to assert
+   * against.** A shell repaints the whole screen on every keystroke, so text
+   * deleted three frames ago is still in `output` forever — an assertion that
+   * something is *gone* passes only by accident, and one about the frame's
+   * height counts every frame ever written. Four editor rows were written
+   * against `output` and three of them failed on exactly that.
+   *
+   * The reconstruction is the frame's own shape (S01 §3, C22 §6): one write per
+   * frame, beginning with a hide and `CSI H` and ending with the cursor's
+   * position. So the current frame is everything after the last `CSI H`, and
+   * this is the same slice C03's T4.9 takes in-process.
+   */
+  readonly frame: readonly string[];
   /** Resolve once `pattern` appears, or reject after `ms`. */
   waitFor(pattern: RegExp, ms?: number): Promise<RegExpExecArray>;
   done(): Promise<number>;
@@ -309,6 +331,18 @@ export function interactivePty(
     resize: (cols, rows) => term.resize(cols, rows),
     get output() {
       return output;
+    },
+    get frame() {
+      const at = output.lastIndexOf(HOME);
+      if (at === -1) return [];
+      return output
+        .slice(at + HOME.length)
+        .replaceAll(CSI_ANY, "")
+        // **`\r*\n`, not `\r\n`.** The frame joins its rows with `\r\n` and the
+        // PTY's ONLCR translates the `\n` again, so what arrives is `\r\r\n` —
+        // and splitting on the written separator leaves a stray `\r` on the end
+        // of every row, which breaks any assertion that touches a row's edge.
+        .split(/\r*\n/);
     },
     waitFor(re, ms = 15_000) {
       const existing = re.exec(output);
