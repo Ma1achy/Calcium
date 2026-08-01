@@ -21,6 +21,7 @@ import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 // framework-verb check now refuses.
 import { MANIFEST } from "../support/session.js";
 import { parseManifest } from "../../src/data/manifest/index.js";
+import { contextAt } from "../../src/interaction/completion/index.js";
 import { noticeDoc } from "../../src/shell/documents.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
@@ -40,6 +41,14 @@ function fakeFs(): FileSystem {
     appendFileSync: (p, d) => void files.set(p, (files.get(p) ?? "") + d),
     mkdir: () => Promise.resolve(),
     exists: (p) => Promise.resolve(files.has(p)),
+    // A real answer, not an empty list: C19's path and executable sources take
+    // this, and a fake returning nothing makes a completion assertion pass for
+    // the wrong reason (`test/support/README.md`).
+    readDir: () =>
+      Promise.resolve([
+        { name: "src", directory: true },
+        { name: "notes.md", directory: false },
+      ]),
   };
 }
 
@@ -505,5 +514,38 @@ describe("C22 §2a — the app's local handlers", () => {
       },
     });
     expect(graph.pipeline.sealed, "and the registry still seals").toBe(true);
+  });
+});
+
+describe("C22 §2b — the completion sources", () => {
+  it("T1.4k (C22 I3b): the framework's sources are registered, filesystem ones included", async () => {
+    // **Both halves.** §2 called manifest-derived completion a working default
+    // and construction registered `config.completionSources` alone, which is
+    // empty — so `Tab` produced no candidates in any real session while every
+    // C19 tier passed on every source. A test that checked only the verb source
+    // would pass against a wiring that forgot the two with a dependency.
+    const { graph } = await build();
+
+    // `/hel` rather than an app verb: this harness's manifest carries the
+    // framework's six and nothing else, so a probe for `serving` would report
+    // an empty result about the *manifest* while looking like a finding about
+    // the wiring — which is what it did on the first attempt.
+    const verbs = await graph.completion.request(
+      contextAt("/hel", 4, graph.manifest.manifest),
+      1,
+    );
+    expect(
+      verbs.candidates.map((c) => c.value),
+      "the manifest's verbs, through the verb source",
+    ).toContain("/help");
+
+    const paths = await graph.completion.request(
+      contextAt("cat ./no", 8, graph.manifest.manifest),
+      2,
+    );
+    expect(
+      paths.candidates.map((c) => c.value).join(" "),
+      "and the injected readDir, through the path source",
+    ).toContain("notes.md");
   });
 });

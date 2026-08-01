@@ -95,6 +95,13 @@ export interface FileSystem {
   appendFileSync(path: string, data: string): void;
   mkdir(path: string): Promise<void>;
   exists(path: string): Promise<boolean>;
+  /**
+   * C19's `ReadDir`, for the path and executable completion sources (§2b).
+   *
+   * Here rather than beside them because C22 is the only file that may reach
+   * `node:fs` (I10) — a second filesystem route would put two in the graph.
+   */
+  readDir(path: string): Promise<readonly Readonly<{ name: string; directory: boolean }>[]>;
 }
 
 /**

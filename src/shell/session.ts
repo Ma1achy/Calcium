@@ -14,7 +14,7 @@
  */
 
 import { appendFileSync } from "node:fs";
-import { access, appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
 import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
@@ -60,6 +60,11 @@ const nodeFileSystem: FileSystem = {
   appendFile: (path, data) => appendFile(path, data, "utf8"),
   appendFileSync: (path, data) => appendFileSync(path, data, "utf8"),
   mkdir: async (path) => void (await mkdir(path, { recursive: true })),
+  readDir: async (path) =>
+    (await readdir(path, { withFileTypes: true })).map((e) => ({
+      name: e.name,
+      directory: e.isDirectory(),
+    })),
   exists: (path) =>
     access(path).then(
       () => true,

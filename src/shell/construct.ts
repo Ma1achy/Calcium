@@ -40,7 +40,7 @@ import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
-import { createEngine } from "../interaction/completion/index.js";
+import { createEngine, frameworkSources } from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
@@ -234,6 +234,17 @@ export async function constructGraph(
     manifest.load(parsed.value);
 
     const completion = createEngine({ now: config.clock });
+    // **The framework's six first, then the app's** (I3b). §2 called
+    // manifest-derived completion a working default and nothing built it, so
+    // `Tab` produced no candidates in any real session while every C19 tier
+    // passed on every source.
+    for (const source of frameworkSources({
+      manifest: () => built.manifest.manifest,
+      readDir: config.fs.readDir,
+      path: () => (config.env["PATH"] ?? "").split(":").filter((p) => p !== ""),
+    })) {
+      completion.register(source);
+    }
     for (const source of config.completionSources) completion.register(source);
 
     return { blocks, adapters, manifest, completion };
