@@ -65,12 +65,55 @@ describe("C19 tier 5 — at a real prompt", () => {
   it.todo(
     "T5.2: a dynamic source with a 2-second delay → the spinner appears at 500 ms, typing continues freely, and the late result never touches the buffer — waits on L4",
   );
-  it.todo(
-    "T5.3: Tab near the bottom of the terminal → the menu flips above the prompt and shows every candidate — waits on L4",
-  );
-  it.todo(
-    "T5.4: completing a path with `ls ` and Tab → filesystem candidates from the real reader, not verbs — waits on L4",
-  );
+  it("T5.3: Tab near the bottom of the terminal → the menu flips above the prompt and shows every candidate", async () => {
+    // **"Near the bottom" is every frame, and that is a finding about the row.**
+    // It was written for a shell whose prompt moves with the content; in this
+    // frame the prompt is always the last row but one (S01 §3), so a menu
+    // preferring `above` has nowhere below to go and the flip is unconditional.
+    // What is left worth asserting is the case where the *region* is smallest —
+    // the minimum supported height, where a menu has the fewest rows to fit in
+    // and is likeliest to be clamped to one.
+    //
+    // 12 rows would have been below the size gate (C22 §8b, 60×16) and the
+    // session draws the fallback instead of a prompt, which is what the first
+    // draft of this row did and what its timeout said.
+    const pty = interactivePty("node test/support/fixture.mjs session", {
+      cols: 60,
+      rows: 16,
+    });
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+      pty.type("/ps --status=");
+      pty.type("\t");
+
+      await pty.waitFor(/running/, 15_000);
+
+      // **Every candidate, not just the first.** A menu clamped to one row by a
+      // short region shows `running` and satisfies a test that stopped there.
+      await pty.waitFor(/queued/, 15_000);
+
+      // And above the prompt rather than over it: the prompt still carries what
+      // was typed, so the layer did not take its rows.
+      await pty.waitFor(/--status=/, 15_000);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
+  it("T5.4: completing a path with `ls ` and Tab \u2192 filesystem candidates from the real reader, not verbs", async () => {
+    // The `pathSource` cases are tier 3 over an injected reader. Here the
+    // reader is the real one, reading the real working directory \u2014 which is the
+    // repository, so `package.json` is a candidate no fake supplied.
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+      pty.type("ls pack");
+      pty.type("\t");
+
+      await pty.waitFor(/package\.json/, 15_000);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
   it.todo(
     "T5.5: sixty seconds of repeated Tab on one dynamic slot → one source invocation, then a second after expiry — waits on L4",
   );
