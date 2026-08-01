@@ -154,6 +154,18 @@ The two live producers answer oppositely, which is what makes this a field rathe
 
 **`cursorCell` stays exactly as it is** (C17 §2). C17 is a data structure with no notion of focus: it reports where its own cursor sits and always has. The *drawer* chooses — the focused layer's cursor if it has one, the prompt's if focus is `prompt`, hidden otherwise. A `cursorCell` that answered differently depending on focus would be C17 knowing about focus, which is what keeps it testable.
 
+#### Four things the drawer has to get right
+
+Written here before the build rather than after it, because each has a failure that looks like something else.
+
+**1 — A layer over the prompt is the case with two owners.** The prompt paints its rows and the layer composites over them, so those cells are written twice. That is correct, and it means **the layer must paint every cell in its box, background included**. A loop that writes only the glyphs its blocks produce leaves the prompt showing through the gaps, and the symptom is text bleeding through a menu rather than anything that reads as a layout error.
+
+**2 — Stacking order is push order, and the last layer wins each cell.** I1 and I2 settle it and nothing currently produces two overlapping layers, which is exactly why it is worth asserting rather than inheriting: "the last one wins" is obvious only once two of them overlap, and the first time that happens will be in front of a user.
+
+**3 — A pushed view occupies the viewport region rather than floating.** Header and footer are untouched (T4.4). The drawer treats it as a layer whose box *is* the viewport region rather than as a replacement for the transcript — one path for both kinds, and the alternative is a second compositing rule that only one layer kind takes. S12's composed frame is the one to check it against.
+
+**4 — Read the frame.** This will be the first time anything this component places appears on a screen, and every comparable first in this project was caught by looking rather than by an assertion: the glyph column rendering `…`, C12's y-label decimals, C25's five defects. Compose a menu over a prompt, a confirm over a view, and a search over a menu, and look at all three.
+
 **A view's content is already the region's worth, and C15 does not scroll it.** The owner windows it — S12 holds fifty thousand log lines and renders the visible ones, having committed to owning its own scroll and calling no C14 (S12 T2.3); C25 §3b's fullscreen patch does the same through `n`, `p`, `g` and `G`. Said explicitly because its absence invites C15 growing a scroll offset for views, and that is a second scroll model beside C14's — the thing A01 D3 spent a decision avoiding. C15 clips nothing vertically beyond reporting `truncated`.
 
 Overlays are content-sized and resolved in a fixed order:
