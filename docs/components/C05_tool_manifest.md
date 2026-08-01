@@ -167,6 +167,26 @@ The *report* is deduplicated on the unordered pair. One error for one mistake �
 
 ---
 
+## 3. The framework's own verbs
+
+**`parseManifest` returns the app's tools plus `tui-kit`'s six**, and this belongs here rather than in C22 because it is a statement about what a manifest *is*.
+
+`/help`, `/clear`, `/theme`, `/history`, `/debug` and `/exit` are verbs. They have names, they take arguments, they complete, they validate, and they appear in help. Everything the manifest exists to describe is true of them, and the only reason they were absent is that nobody wrote them down. C23 ships the handlers (C23 §2); C18 classifies `local` from the manifest; so without the rows, the handlers are registered for verbs nothing can ever classify to — which is precisely what C23 I27's reconciliation reports, and it is right to.
+
+**In C05 rather than C22.** Put the merge in session construction and `parseManifest` returns something that is not yet a manifest — the seam-shaped defect where a value is valid at one call site and incomplete at another. C05 already validates, rejects duplicates and seals; "the framework's verbs are present" is one more thing that is true of every parsed manifest.
+
+**Shadowing becomes a parse error for free**, which is the property worth more than the tidiness. I6 already refuses duplicate names, so an app declaring its own `clear` collides with the framework's and fails loudly at parse rather than silently overriding a verb the framework's own code depends on. No rule had to be added for that.
+
+Three consequences, each checked rather than assumed:
+
+- **`hidden` is the mechanism for anything an app should not see in completion**, and `/debug` uses it. `visibleTools` drops it and `findTool` still resolves it, which is exactly the pair that field means (§ToolDef). The other five are ordinary.
+- **The six need no eighth `ArgType`.** `/theme` takes an `enum`, `/history` and `/debug` an optional `int`. EX5 claims the union stays domain-free, and the framework's own verbs failing it would have been the strongest counterexample there could be. They do not.
+- **They are a `ToolDef[]`, not a `Manifest` fragment.** A fragment implies a schema version and a merge of two schemas; an array is just tools, and tools is all this is.
+
+**Error paths keep naming what the app wrote.** `fail` indexes as `tools[3]`, so framework rows are appended after the app's and never shift an index. A collision reports the framework by name rather than by index, because "already declared at `tools[7]`" is meaningless against a file with two entries in it.
+
+---
+
 ## 3a. The match index
 
 `findTool` must stay sub-millisecond on a manifest of 5,000 tools (T3.14), and a linear scan comparing multi-token prefixes does not. Tools are indexed by name, with the longest token count tried first, so longest-match falls out of the walk order rather than out of a sort at the end.
@@ -204,7 +224,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I3** — Parsing is strict about structure and lenient about extension. Unknown *fields* are ignored; malformed *known* fields are errors. A newer far side can add fields without breaking an older TUI.
 - **I4** — `values` is present iff `type === "enum"`; `pattern` is present iff `type === "pattern"`. Enforced at parse.
 - **I5** — No `ArgType` encodes an app-domain concept. The union is closed and generic; app-specific shapes use `pattern`.
-- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins.
+- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins — **including against the framework's six** (§3), so an app shadowing `clear` fails at parse rather than silently overriding a verb `tui-kit`'s own handlers depend on.
 - **I7** — `findTool` returns the longest matching tool.
 - **I8** — `validateInvocation` is pure and performs no I/O.
 - **I9** — Validation failures are `ErrorLike`, rendering through the ordinary error path.

@@ -67,6 +67,8 @@ interface LocalRegistry {
 
 `tui-kit` ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
 
+**The six are rows in every manifest (C05 §3), and that is what makes them reachable.** C18 classifies `local` from the manifest, so a handler for a verb the manifest does not declare is one nothing can ever route to — which is exactly what I27's reconciliation reports. Registering the handlers without the rows was tried and failed construction on all six, correctly.
+
 A local handler is the only place a component above L0 may reach several stores at once, and it does so through C23 rather than laterally.
 
 **`seal()` reconciles the registry against the manifest, and fails construction on a mismatch** (I27, §8b B3). C18 classifies a verb as `local` from the **manifest**; the handler lives **here**. Two records of one fact with nothing comparing them is how a manifest verb reaches §2's "run an in-process handler" with nothing to run, and how a registered handler for no manifest verb sits unreachable while looking installed. `seal()` is the moment both sides are complete and input has not been accepted (C22 I3), which makes it the only place the check is both possible and cheap.
