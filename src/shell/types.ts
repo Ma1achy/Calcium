@@ -10,14 +10,22 @@
  * C23 satisfies it structurally when it lands.
  */
 
-import type { Adapter } from "../data/adapters/index.js";
-import type { Manifest } from "../data/manifest/index.js";
+import type { Adapter, AdapterRegistry } from "../data/adapters/index.js";
+import type { Manifest, ManifestStore } from "../data/manifest/index.js";
+import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
+import type { LineEditor } from "../interaction/editor/index.js";
+import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
-import type { BlockDefinition } from "../presentation/blocks/index.js";
-import type { ThemeSet } from "../presentation/theme/index.js";
+import type { BlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
+import type { ThemeSet, ThemeStore } from "../presentation/theme/index.js";
+import type { FrameScheduler } from "../terminal/frame-scheduler.js";
+import type { TerminalLifecycle } from "../terminal/lifecycle.js";
+import type { OverlayManager } from "../viewport/overlay/index.js";
+import type { TranscriptStore } from "../viewport/transcript/index.js";
+import type { ExecutionWrites } from "./state.js";
 
 /** The five triggers of §8. Three reach `stop`; two are C01's (I4). */
 export type StopReason = "exit" | "eof" | "interrupt" | "signal" | "fault";
@@ -100,15 +108,69 @@ export interface Pipeline {
   submit(line: string): void;
   seal(): void;
   readonly sealed: boolean;
+  /**
+   * Which foreground route is in flight, for C16's Ctrl-C rungs 1 and 2
+   * (C16 §5, C23 §8a A1). `null` when idle.
+   *
+   * The route rather than a boolean: C23's guard covers every foreground route
+   * (C23 I5), so a boolean makes rung 1 fire on a `shell` delegation and swallows
+   * rung 2.
+   */
+  readonly inFlight: "app" | "local" | "shell" | null;
+  /** Cancel what is in flight, settling the entry `partial` (C23 I10). */
+  cancel(): void;
 }
 
 /** Step 10. Takes the router because C23's submit row ends `resetFocus()`. */
 export type PipelineFactory = (deps: PipelineDeps) => Pipeline;
 
+/**
+ * What step 10 hands C23 — **a subset of the graph, by interface, never `Graph`**
+ * (C22 §Consumed-by, §3a step 10).
+ *
+ * Each collaborator arrives as its owning component's own interface. The
+ * narrowness lives there, which is where it already is; thirteen consumer-named
+ * wrappers would be thirteen more things to keep in step with their owners, and
+ * `Graph` itself would hand over stores C23 must not touch.
+ *
+ * **`session` is a function and that is a correction, not a style.** It was
+ * `SessionSnapshot`, evaluated once at step 10, against a store that freezes a
+ * *fresh* object per write (`state.ts`) — so the value could never change, C23
+ * I12's `stopping` was false forever, and T3.15 could not have been written.
+ *
+ * **`writes` is exactly §5's four rows for C23.** Passing the whole `SessionStore`
+ * would put `beginStopping` and the identity loop's `refresh` in the pipeline's
+ * reach, which is the two-writer problem §5 exists to prevent.
+ */
 export type PipelineDeps = Readonly<{
-  session: SessionSnapshot;
+  session: () => SessionSnapshot;
+  writes: ExecutionWrites;
+
+  transcript: TranscriptStore;
+  scheduler: FrameScheduler;
+  transport: TransportRouter;
+  adapters: AdapterRegistry;
+  manifest: ManifestStore;
+  blocks: BlockRegistry;
+  editor: LineEditor;
+  overlays: OverlayManager;
+  theme: ThemeStore;
+  history: HistoryStore;
+  runner: ProcessRunner;
+  lifecycle: TerminalLifecycle;
+
+  /** C23's submit row ends here (A02 Seam 4, C16 I2). A call, not a subscription. */
   resetFocus: () => void;
+  /** For `/exit` (C23 §2). */
   stop: (reason: StopReason) => Promise<number>;
+  /** C22's injected clock — §3b's three mechanisms and nothing else (C23 I19). */
+  clock: () => number;
+  /** Scheme-checked by C23 before use (C23 I17). */
+  openUrl: (url: URL) => Promise<void>;
+
+  /** For rewriting `/verb` inside a delegated command (C18 I5). */
+  binary: string;
+  commandPolicy: CommandPolicy;
 }>;
 
 export type TuiConfig = Readonly<{

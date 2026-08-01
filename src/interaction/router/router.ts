@@ -44,10 +44,29 @@ export type RouterDeps = Readonly<{
   exitCopyMode: () => void;
   liveEntry: () => Readonly<{ id: string }> | null;
   entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
-  /** C06. `busy` is rung 1; `shellChild` is rung 2 (a piped `shell` route). */
-  busy: () => boolean;
+  /**
+   * **C23, not C06 — rungs 1 and 2 both read this one pull** (C16 §5).
+   *
+   * It returns the route rather than a boolean, and that is the whole reason it
+   * replaced `busy` and `shellChild`. C23's guard covers every foreground route
+   * (C23 I5), so a boolean sourced from it would make rung 1 fire on a `shell`
+   * delegation and swallow rung 2 — this table's own unconstructible-rung defect,
+   * created by the fix for the one above it.
+   *
+   * `busy` came from `C06`/`runner.live`, which is false through the whole window
+   * C23 I3 opens deliberately: the pending entry is appended *before* the
+   * transport is invoked, so for the length of a process spawn a verb is in
+   * flight and no process exists. Ctrl-C fell past every rung and cleared the
+   * prompt (C23 §8a A1).
+   */
+  inFlight: () => "app" | "local" | "shell" | null;
+  /**
+   * C23's, for the same reason. `runner.killAll()` kills the child and leaves the
+   * entry streaming forever; C23 I10 settles it `partial` with output retained,
+   * and only C23 can do that.
+   */
   cancel: () => void;
-  shellChild: () => boolean;
+  /** Rung 2's action. Stays on the runner: it forwards a signal and changes no entry state. */
   signalShellChild: () => void;
   /** Where the transcript region sits, for mouse routing. */
   region: () => Readonly<{ top: number; height: number }>;
@@ -119,7 +138,7 @@ export function createRouter(
     const atEmptyPrompt =
       focus.current.at === "prompt" && !deps.promptHasText() && deps.overlayTop() === null;
 
-    if (isExitKey && atEmptyPrompt && !deps.busy()) {
+    if (isExitKey && atEmptyPrompt && deps.inFlight() === null) {
       if (armedAt !== null) {
         armedAt = null;
         return "raise";
@@ -233,12 +252,14 @@ export function createRouter(
     if (e.kind === "mouse") return routeMouse(e);
 
     if (isCtrlC(e)) {
-      if (deps.busy()) {
+      // Rungs 1 and 2, discriminated by route rather than by two sources.
+      const route = deps.inFlight();
+      if (route === "app" || route === "local") {
         stages.push("cancel");
         deps.cancel();
         return true;
       }
-      if (deps.shellChild()) {
+      if (route === "shell") {
         stages.push("shellChild");
         deps.signalShellChild();
         return true;

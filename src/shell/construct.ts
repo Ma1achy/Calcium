@@ -27,6 +27,11 @@
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { createManifestStore, parseManifest } from "../data/manifest/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
+import {
+  createTransport,
+  createRouter as createTransportRouter,
+  type TransportRouter,
+} from "../data/transport/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import { createBlockRegistry } from "../presentation/blocks/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
@@ -326,7 +331,13 @@ export async function constructGraph(
       focus: createFocusStore(),
       keymap: createKeymap(defaultKeymap),
       now: config.clock,
-      deps: routerDeps(stores, runner, scheduler, deps.frame),
+      // **The thunk is the 10 → 9 pair** (§3a). `pipeline` is declared below and
+      // read only when a key arrives, which is after step 11 admits input.
+      // A `const` in the temporal dead zone rather than `let pipeline = null`:
+      // the nullable form answers quietly, and a quiet `null` here is Ctrl-C
+      // taking a lower rung over a running verb — C23 §8a A1 restored by its
+      // own fix.
+      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline),
     }),
   );
 
@@ -336,9 +347,32 @@ export async function constructGraph(
   const pipeline = at("pipeline", () => {
     if (config.pipeline === undefined) return null;
     const p = config.pipeline({
-      session: session.snapshot,
+      // A function, not a snapshot: the store freezes a fresh object per write,
+      // so a value captured here could never show `stopping` and C23 I12 would
+      // be unobservable (§3a step 10).
+      session: () => session.snapshot,
+      writes: session.execution,
+
+      transcript: stores.transcript,
+      scheduler,
+      transport: config.transport ?? defaultTransport(config, runner, session),
+      adapters: built.adapters,
+      manifest: built.manifest,
+      blocks: built.blocks,
+      editor: stores.editor,
+      overlays: stores.overlays,
+      theme: stores.theme,
+      history: stores.history,
+      runner,
+      lifecycle,
+
       resetFocus: () => router.resetFocus(),
       stop: deps.stop,
+      clock: config.clock,
+      openUrl: config.openUrl ?? defaultOpener(config.platform, runner, session),
+
+      binary: config.binary,
+      commandPolicy: config.commandPolicy,
     });
     p.seal();
     return p;
@@ -412,7 +446,8 @@ function scrollAmount(e: InputEvent): ((v: Scroller) => void) | null {
 }
 
 /**
- * C16's seventeen pulls, every one supplied here.
+ * C16's sixteen pulls, every one supplied here — seventeen until `busy` and
+ * `shellChild` became one `inFlight` that returns the route (C16 §5).
  *
  * **Every one is a pull and none is a subscription** (C16 §2). C13 emits
  * `append` then `evict` for one call, so a consumer reading deltas as current
@@ -428,6 +463,7 @@ function routerDeps(
   runner: ProcessRunner,
   scheduler: ReturnType<typeof createFrameScheduler>,
   frame: FrameQueries,
+  pipeline: () => Pipeline | null,
 ): RouterDeps {
   const top = (): Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null => {
     const layer = stores.overlays.top;
@@ -448,12 +484,15 @@ function routerDeps(
       return id === null ? null : { id };
     },
     entryAtRow: frame.entryAtRow,
-    busy: () => runner.live.length > 0,
-    // Not awaited, and for `beforeRelease`'s reason one layer over: the signals
-    // go out synchronously and the reaping is what the promise is for. A
-    // keystroke handler is not a place to await a child's exit.
-    cancel: () => void runner.killAll(),
-    shellChild: () => runner.live.some((h) => h.running),
+    // **Rungs 1 and 2, from C23 rather than from the runner** (C16 §5, C23 §8a
+    // A1). `runner.live` is empty through the window C23 I3 opens on purpose —
+    // the pending entry is appended before the transport is invoked — so a
+    // runner-sourced answer says "idle" while a verb is in flight, and Ctrl-C
+    // fell past every rung and cleared the prompt.
+    inFlight: () => pipeline()?.inFlight ?? null,
+    // C23's, not `runner.killAll`: killing the child leaves the entry streaming
+    // forever, and C23 I10 settles it `partial` with its output retained.
+    cancel: () => void pipeline()?.cancel(),
     signalShellChild: () => {
       for (const handle of runner.live) handle.signal("SIGINT");
     },
@@ -465,5 +504,64 @@ function routerDeps(
       scheduler.commit("input");
     },
     raiseExitConfirm: frame.raiseExitConfirm,
+  };
+}
+
+
+/**
+ * The subprocess transport, when the app supplies no router.
+ *
+ * **C22 always owed this and never built it**, because nothing consumed it:
+ * `resolveConfig` passed `transport` through possibly-undefined and the graph
+ * had no field for one. A02 §3 and C22 §2 both say the default is subprocess,
+ * and C23 is the first thing that would have noticed it was absent.
+ *
+ * `cwd` is a function rather than a value (C06 commitment 14, C22 I12): a `cd`
+ * between two verbs has to move the second one, and a value read here cannot.
+ */
+function defaultTransport(
+  config: ResolvedConfig,
+  runner: ProcessRunner,
+  session: SessionStore,
+): TransportRouter {
+  return createTransportRouter({
+    default: createTransport({
+      mode: "subprocess",
+      binary: config.binary,
+      runner,
+      clock: { now: config.clock, schedule: config.schedule },
+      env: config.env,
+      cwd: session.cwd,
+    }),
+  });
+}
+
+/** `open`, `start` or `xdg-open` — the OS handler, by platform. */
+const OPENER: Partial<Record<NodeJS.Platform, string>> = {
+  darwin: "open",
+  win32: "start",
+};
+
+/**
+ * The default `openUrl`, and the second thing C22 owed with no consumer.
+ *
+ * **It spawns and never shells** (C23 I17, A01 D18). A URL from a far-side
+ * envelope is untrusted data, and `spawnShell("open " + url)` would be an
+ * injection through the one path that otherwise has none — so the URL travels as
+ * an argv element, where no shell can read it as syntax.
+ *
+ * The scheme check is C23's and stays C23's (I17). Doing it here as well would be
+ * two guards over one condition, which is the arrangement C16's rung 1 was in.
+ */
+function defaultOpener(
+  platform: NodeJS.Platform,
+  runner: ProcessRunner,
+  session: SessionStore,
+): (url: URL) => Promise<void> {
+  const command = OPENER[platform] ?? "xdg-open";
+  return async (url) => {
+    // `cwd` is the function, not its value — C21 I10 reads it at spawn.
+    runner.spawn([command, url.href], { cwd: session.cwd });
+    return Promise.resolve();
   };
 }

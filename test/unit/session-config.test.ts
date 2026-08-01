@@ -28,11 +28,13 @@ const minimal = (): TuiConfig => ({
   theme: defaultTheme,
 });
 
-/** The three ambient values, faked. `session.ts` supplies the real ones. */
+/** The five ambient values, faked. `session.ts` supplies the real ones. */
 const AMBIENT = Object.freeze({
   clock: (): number => 1_700_000_000_000,
   cwd: "/ambient",
   fs: {} as unknown as FileSystem,
+  schedule: (): Disposable => ({ [Symbol.dispose]: () => undefined }),
+  platform: "linux" as NodeJS.Platform,
 });
 
 describe("C22 §2 — config", () => {

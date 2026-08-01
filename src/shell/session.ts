@@ -67,9 +67,18 @@ const nodeFileSystem: FileSystem = {
     ),
 };
 
-/** The three ambient reads, in the one file allowed to perform them. */
+/** The ambient reads, in the one file allowed to perform them. */
 function ambient(): Ambient {
-  return { clock: () => Date.now(), cwd: process.cwd(), fs: nodeFileSystem };
+  return {
+    clock: () => Date.now(),
+    cwd: process.cwd(),
+    fs: nodeFileSystem,
+    schedule: (fn, ms) => {
+      const t = setTimeout(fn, ms);
+      return { [Symbol.dispose]: () => void clearTimeout(t) };
+    },
+    platform: process.platform,
+  };
 }
 
 export function createTui(config: TuiConfig): TuiInstance {
@@ -147,10 +156,9 @@ class Session implements TuiInstance {
       writes: graph.session.refresh,
       now: this.config.clock,
       notify: () => undefined,
-      schedule: (fn, ms) => {
-        const t = setTimeout(fn, ms);
-        return { [Symbol.dispose]: () => void clearTimeout(t) };
-      },
+      // The ambient one, not a second copy. C06's `Clock` needs the same, and
+      // two inlined `setTimeout`s is the duplication SP4 is about, in code.
+      schedule: this.config.schedule,
     });
     this.#identity.start();
   }

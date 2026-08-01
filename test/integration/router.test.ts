@@ -57,9 +57,8 @@ function world() {
       return id === null ? null : { id };
     },
     entryAtRow: () => null,
-    busy: () => false,
+    inFlight: () => null,
     cancel: () => undefined,
-    shellChild: () => false,
     signalShellChild: () => undefined,
     region: () => ({ top: 0, height: 10 }),
     mouseEnabled: () => true,

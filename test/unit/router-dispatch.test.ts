@@ -36,9 +36,8 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
     exitCopyMode: () => void calls.push("exitCopy"),
     liveEntry: () => ({ id: "e1" }),
     entryAtRow: (row) => (row < 5 ? { id: `row${String(row)}`, rowOffset: row } : null),
-    busy: () => false,
+    inFlight: () => null,
     cancel: () => void calls.push("cancel"),
-    shellChild: () => false,
     signalShellChild: () => void calls.push("sigint"),
     region: () => ({ top: 1, height: 10 }),
     mouseEnabled: () => true,
@@ -121,7 +120,7 @@ describe("C16 §4 — dispatch", () => {
 
 describe("C16 §5 — the ladder, as handlers on their targets", () => {
   it("T1.11 (I7): a verb in flight cancels, ahead of everything else", () => {
-    const { router, calls, layer } = harness({ busy: () => true });
+    const { router, calls, layer } = harness({ inFlight: () => "app" });
     layer.top = { id: "confirm", kind: "overlay", dismissable: false };
 
     expect(router.dispatch(ctrlC)).toBe(true);
@@ -129,7 +128,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
   });
 
   it("T3.11: a piped shell child takes SIGINT when no verb is in flight", () => {
-    const { router, calls } = harness({ shellChild: () => true });
+    const { router, calls } = harness({ inFlight: () => "shell" });
     expect(router.dispatch(ctrlC)).toBe(true);
     expect(calls).toEqual(["sigint"]);
   });

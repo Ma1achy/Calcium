@@ -75,6 +75,17 @@ export type Ambient = Readonly<{
   cwd: string;
   /** The real filesystem — `node:fs` at the boundary, which is C22 (A04 §2). */
   fs: FileSystem;
+  /**
+   * `setTimeout`, for the same reason the other three are here.
+   *
+   * Two consumers and they had a copy each: §7's identity loop inlined one, and
+   * C06's `Clock` needs one for the subprocess transport's timeouts. The second
+   * is what surfaced it — nothing had ever built the default transport, because
+   * nothing consumed it until C23.
+   */
+  schedule: (fn: () => void, ms: number) => Disposable;
+  /** `process.platform`, for the default opener's command. One place reads it. */
+  platform: NodeJS.Platform;
 }>;
 
 export function resolveConfig(config: TuiConfig, ambient: Ambient) {
@@ -102,6 +113,8 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     env: config.env ?? {},
     cwd: config.cwd ?? ambient.cwd,
     clock: config.clock ?? ambient.clock,
+    schedule: ambient.schedule,
+    platform: ambient.platform,
     fs: config.fs ?? ambient.fs,
     stateDir: config.stateDir ?? DEFAULT_STATE_DIR,
     openUrl: config.openUrl,

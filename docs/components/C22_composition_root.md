@@ -158,6 +158,8 @@ Three orderings are load-bearing and the rest are incidental. §3a walks every p
 
 Read as construction that is a cycle, and it is the one §3a found once already. **It is not, because `RouterDeps` is seventeen pulls and no subscriptions** (C16 §2) — `inFlight` is an eighteenth of the same kind. The closure is written at step 9 and evaluated when a key arrives, which is after step 11 and after startup step 8 admits input. Nothing calls it in between.
 
+**The mutation pass measured this rather than arguing it.** Rewriting the pull as a value captured at step 9 does not fail one test — it fails **fourteen**, because the capture evaluates `pipeline` inside the dead zone and construction throws. The wrong shape is unbuildable rather than silently wrong, which is the whole of the argument below.
+
 **And the shape fails loudly if that ever stops being true.** `pipeline` is a `const` declared at step 10, so a call between 9 and 10 is a `ReferenceError` from the temporal dead zone rather than a `null`. The tempting alternative — `let pipeline = null`, assigned at 10 — reads as more defensive and is worse: it would answer `null` silently, and a silent `null` here means Ctrl-C taking a lower rung and clearing the prompt over a running verb, which is A1's defect restored by the fix for it. The binding that cannot be read early is the one to keep.
 
 `signalShellChild` stays on the runner. Rung 2 forwards `SIGINT` to a child and changes no entry state; the transport observes the exit through its normal path.

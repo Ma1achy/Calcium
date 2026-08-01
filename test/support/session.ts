@@ -51,7 +51,16 @@ export const FRAME: FrameQueries = {
 };
 
 export function fakeAmbient(): Ambient {
-  return { clock: () => 1_700_000_000_000, cwd: "/work", fs: fakeFs() };
+  return {
+    clock: () => 1_700_000_000_000,
+    cwd: "/work",
+    fs: fakeFs(),
+    schedule: (fn, ms) => {
+      const t = setTimeout(fn, ms);
+      return { [Symbol.dispose]: () => void clearTimeout(t) };
+    },
+    platform: "linux",
+  };
 }
 
 export type Harness = Readonly<{
