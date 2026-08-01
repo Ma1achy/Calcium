@@ -224,12 +224,26 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG20 | Each mode export of `terminal/escapes.ts` is imported by exactly its owner — the five persistent modes by C01, `2026` by C03 | C01 I1, T2.8 |
 | MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I15, T2.17 |
 | MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
+| MG23 | A component in L1–L3 imports at most one **store**; several at once is L4's, through C23 | C23 §2, C23 I14, A02 Seam 4 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
 
 **MG22 is a cycle rule, not a layer rule.** C11 imports C12's `sparkline` for a `Cell.spark` (C12 §2), which is legal: A02 §1 forbids importing *upward* and importing *cyclically*, and both directories are L1, so the layer walk sees nothing either way. What must never exist is the return edge — a plot reaching into the table engine for a column width or a truncation helper, which is exactly the shape a reader would reach for and which would close the cycle. Type-only counts, as MG6 and MG19 both record: a reference is a dependency whether or not it survives the build.
 
 MG2 would catch the cycle once closed; MG22 catches the edge that would close it, one commit earlier. That is the MG13/MG18 precedent and the reason the table holds specific prohibitions alongside the general walk.
+
+**MG23 is SS29, folded — and it is the SS7/SS8/SS12 pattern a fourth time: a rule whose scope was covered by a broader mechanism at birth.** It was inventoried as a source scan for "multi-store access outside local handlers", and neither half survived being written.
+
+Scoped to `src/shell/` it fires on the component it exists to permit. C23 reaches the transcript, the scheduler, the runner and the manifest by design — Seam 4 is the reason — so its only in-scope file would have been its own exception, which is not a rule.
+
+Scoped to L1–L3, which is the sentence C23 §2 actually argues, *reaching a store* means **importing** one — a module-graph question this family already answers per component. MG10 forbids C13 from `terminal/` and `presentation/`, MG18 covers C20, and each L2/L3 component has a row. **Those rows are prohibitions between named pairs; MG23 is the property they are instances of**, so the twenty-sixth component cannot reach two stores merely because nobody has written its row yet. SS40 covering a directory rather than naming files, one family across.
+
+Two things it defines rather than leaving to inference, because both were undetermined in SS29's row:
+
+- **The stores are enumerated** — `STORE_SYMBOLS`, `MODE_OWNERS`'s precedent. A rule governing named entities whose names are never checked is §2's third clause, so `storeNamesAreReal` asserts every symbol is one the tree exports.
+- **"Above L0" qualifies the component, not the store.** C05's manifest and C07's adapter registry are L0 and are still stores; what the sentence forbids is an L1–L3 component holding two stateful things at once. So they are in the list and `src/data/` is not in scope: C06 reaching C05 is L0 business with no component above it involved.
+
+It counts imports of the **store itself**, not any symbol from a module that happens to hold one. C11 and C12 import C09's paint helpers and C10's tones, which is required rather than tolerated, and neither imports a registry or a theme store. A component's own store is not a reach either — `viewport.ts` naming `Viewport` was the first run's only finding, and it is the false positive that gets a rule deleted.
 
 **MG13 is that precedent armed, and it is the first *sideways* prohibition in the table.** MG10 and MG11 are downward edges the layer walk permits; C13, C14 and C15 are all L2, so C15 → C13 is not merely permitted, it is invisible to every other rule at once — the walk sees no direction to object to and MG2 sees no cycle, because there is none. MG12 is its neighbour and covers the same component's other two reaches, C14 and `terminal/`.
 
@@ -313,7 +327,6 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS27 | Timer or escalation logic, including a `SIGTERM` literal | `process/` | C21 I8, I11, T2.4 |
 | SS41 | `process.env` or `process.stdin` | `process/` | C21 I14, T2.7 |
 | SS28 | Scheduler calls | `src/interaction/`, allowing `history/types.ts`, `history/persist.ts` and `history/store.ts`, whose `flush` is C20's write to disk and not C03's frame | C16 T2.6, C17 T2.6, C18 T2.4, C19 T2.5, C20 T2.6 |
-| SS29 | Multi-store access | outside local handlers | C23 T2.7 |
 | SS30 | A second implementation of a shared text primitive — tokeniser, quoter, edit distance | `src/`, allowing `interaction/parser/tokenise.ts`, `data/manifest/validate.ts` and `blocks/kinds/code.ts` | C18 T2.3, C18 T2.10, C19 T2.4, C05 T2.9 |
 | SS31 | A runtime dependency absent from `DEPENDENCIES.md` | `package.json` | A04 §2 |
 | SS32 | A `postinstall`, `preinstall` or `prepare` script in any dependency | the install tree | A04 §3 |

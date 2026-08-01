@@ -1,7 +1,13 @@
 // A03 MG1/MG3 — the layer rule itself. Fabricated modules at layer paths, with
 // the reader injected, so no fixture touches src/.
 import { describe, expect, it } from "vitest";
-import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
+import { readdirSync, statSync } from "node:fs";
+import {
+  checkModuleGraph,
+  checkOneStorePerComponent,
+  STORE_SYMBOLS,
+  storeNamesAreReal,
+} from "../../tools/enforce/module-graph.mjs";
 
 const check = (files: Record<string, string>) =>
   checkModuleGraph(Object.keys(files), (f) => files[f] ?? "");
@@ -72,5 +78,109 @@ describe("A03 module graph", () => {
     });
     expect(violations).toHaveLength(1);
     expect(violations[0]!.rule).toBe("MG3");
+  });
+});
+
+describe("A03 MG23 — one store per component, above L0", () => {
+  const stores = (files: Record<string, string>) =>
+    checkOneStorePerComponent(Object.keys(files), (f) => files[f] ?? "");
+
+  const srcFiles = (): string[] => {
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const p = `${dir}/${name}`;
+        return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(p) ? [p] : [];
+      });
+    return walk("src");
+  };
+
+  it("MG23: the real tree is clean, and the rule can see it", () => {
+    // Corpus before cleanliness, for SP2's reason: a rule whose scopes stopped
+    // matching reports no violations because it looked at nothing.
+    const files = srcFiles().filter((f) =>
+      /^src\/(presentation|viewport|interaction)\//.test(f),
+    );
+    expect(files.length, "L1–L3 files in scope").toBeGreaterThan(20);
+    expect(checkOneStorePerComponent(srcFiles()).map((v) => v.message)).toEqual([]);
+  });
+
+  it("MG23's store names are all symbols the tree exports", () => {
+    // **The rule's own vacuity, closed** — `modeOwnersAreReal`'s precedent. A
+    // symbol nobody exports can never be imported, so a typo in `STORE_SYMBOLS`
+    // is a row that reports compliance because it cannot find what it was asked
+    // about. A03 §2's third clause, in the rule that cites it.
+    expect(storeNamesAreReal(srcFiles())).toEqual([]);
+    expect(Object.keys(STORE_SYMBOLS).length, "and it is a list, not an empty one")
+      .toBeGreaterThan(8);
+  });
+
+  it("MG23: a component's own store is not a reach", () => {
+    // **The false positive that gets a rule deleted**, and the first run's only
+    // finding: `viewport.ts` declaring `Viewport` is C14 naming its own handle,
+    // not C14 reaching for someone else's.
+    expect(
+      stores({
+        "src/viewport/viewport/viewport.ts": [
+          'import type { Viewport } from "./types.js";',
+          'import type { TranscriptView } from "../transcript/index.js";',
+        ].join("\n"),
+      }),
+      "its own plus one other is one reach",
+    ).toEqual([]);
+  });
+
+  it("MG23 fires: two stores, neither of them the file's own", () => {
+    const found = stores({
+      "src/viewport/overlay/manager.ts": [
+        'import type { TranscriptView } from "../transcript/index.js";',
+        'import { createBlockRegistry } from "../../presentation/blocks/index.js";',
+      ].join("\n"),
+    });
+
+    expect(found).toHaveLength(1);
+    expect(found[0]?.rule).toBe("MG23");
+    expect(found[0]?.message).toContain("C13");
+    expect(found[0]?.message).toContain("C09");
+  });
+
+  it("MG23 counts a type-only import, because a reference is a reach", () => {
+    // MG6 and MG19 both record this: a type-only import erases at build and so
+    // passes every graph check that reads emitted edges. Holding two stores is a
+    // fact about the component's design, not about its output.
+    expect(
+      stores({
+        "src/interaction/completion/engine.ts": [
+          'import type { TranscriptView } from "../../viewport/transcript/index.js";',
+          'import type { ThemeStore } from "../../presentation/theme/index.js";',
+        ].join("\n"),
+      }),
+    ).toHaveLength(1);
+  });
+
+  it("MG23 ignores a symbol that is not a store", () => {
+    // C11 and C12 import C09's paint helpers and C10's tones, which CLAUDE.md
+    // records as required rather than tolerated. Neither is a store, and a rule
+    // that fired here would be one people route around.
+    expect(
+      stores({
+        "src/presentation/table/render.ts": [
+          'import { paintCell } from "../blocks/paint.js";',
+          'import { toneOf } from "../theme/tones.js";',
+        ].join("\n"),
+      }),
+    ).toEqual([]);
+  });
+
+  it("MG23 is out of scope below L1", () => {
+    // "Above L0" qualifies the *component*, not the store: C06 reaching C05 is
+    // L0 business with no component above it involved.
+    expect(
+      stores({
+        "src/data/transport/factory.ts": [
+          'import type { ManifestStore } from "../manifest/index.js";',
+          'import type { AdapterRegistry } from "../adapters/index.js";',
+        ].join("\n"),
+      }),
+    ).toEqual([]);
   });
 });

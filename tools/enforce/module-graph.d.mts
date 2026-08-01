@@ -19,3 +19,17 @@ export declare function modeOwnersAreReal(readFile?: (file: string) => string): 
   missing: string[];
   owned: string[];
 };
+
+export declare const STORE_SYMBOLS: Readonly<Record<string, string>>;
+
+/** MG20's realness check, for MG23's enumerated store symbols. */
+export declare function storeNamesAreReal(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): string[];
+
+/** MG23 — a component in L1–L3 imports at most one store (C23 §2, I14). */
+export declare function checkOneStorePerComponent(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+): Violation[];

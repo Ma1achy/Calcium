@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -514,5 +514,166 @@ export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8"
       }
     }
   }
+  return violations;
+}
+
+
+// --- MG23 — one store per component, above L0 -------------------------------
+//
+// **SS29 folded, and it is the SS7/SS8/SS12 pattern a fourth time**: a rule
+// whose scope was covered by a broader mechanism at birth. It was inventoried as
+// a source scan for "multi-store access outside local handlers", and neither
+// half survived reading.
+//
+// Scoped to `src/shell/` it fires on the component it exists to permit — C23
+// reaches the transcript, the scheduler, the runner and the manifest by design,
+// and Seam 4 is the reason. A rule whose only in-scope file is its own exception
+// is not a rule.
+//
+// Scoped to L1–L3, which is the sentence C23 §2 actually argues — *a local
+// handler is the only place a component above L0 may reach several stores at
+// once* — "reaching a store" means **importing** one, which is a module-graph
+// question. MG already answers it per component: MG10 forbids C13 from
+// `terminal/` and `presentation/`, MG18 covers C20, and each L2/L3 component has
+// a row. Those rows are prohibitions between named pairs; this is the property
+// they are instances of, so the twenty-sixth component cannot reach two stores
+// merely because nobody has written its row yet. SS40 covering a directory
+// rather than naming files, one family across.
+//
+// **The stores are enumerated, not pattern-matched** (`MODE_OWNERS`'s
+// precedent). A rule governing named entities whose names are never checked is
+// A03 §2's third clause, so `storeNamesAreReal` asserts every symbol below is one
+// the tree actually exports.
+//
+// **"Above L0" qualifies the component, not the store.** C05's manifest and
+// C07's adapter registry are L0 and are still stores; what the sentence forbids
+// is an L1–L3 component holding two of anything stateful at once. So they are in
+// the list and `src/data/` is not in scope — C06 reaching C05 is L0 business and
+// no component above it is involved.
+//
+// It is *imports of the store itself* that count, not any symbol from a module
+// that happens to hold one. C11 and C12 import C09's paint helpers and C10's
+// tones (CLAUDE.md), which is required rather than tolerated; neither imports a
+// registry or a theme store, and neither should fire.
+
+/** Symbol → the component whose store it is. Enumerated for A03 §2's third clause. */
+export const STORE_SYMBOLS = Object.freeze({
+  createTranscriptStore: "C13",
+  TranscriptStore: "C13",
+  TranscriptView: "C13",
+  createViewport: "C14",
+  Viewport: "C14",
+  createOverlayManager: "C15",
+  OverlayManager: "C15",
+  openHistory: "C20",
+  HistoryStore: "C20",
+  loadTheme: "C10",
+  ThemeStore: "C10",
+  createBlockRegistry: "C09",
+  BlockRegistry: "C09",
+  createManifestStore: "C05",
+  ManifestStore: "C05",
+  createAdapterRegistry: "C07",
+  AdapterRegistry: "C07",
+});
+
+const MG23_SCOPES = ["src/presentation/", "src/viewport/", "src/interaction/"];
+
+/**
+ * Which component owns a directory, so a file is not charged with reaching its
+ * own store.
+ *
+ * `viewport.ts` naming `Viewport` was the first run's only finding, and it is a
+ * false positive of exactly the kind that gets a rule deleted: C14 declaring its
+ * own handle is not C14 reaching for someone else's. The map is written out
+ * rather than derived from the path, because "the directory two levels down" is
+ * a guess that holds until a component implements into a different shape.
+ */
+const STORE_HOME = Object.freeze({
+  "src/viewport/transcript/": "C13",
+  "src/viewport/viewport/": "C14",
+  "src/viewport/overlay/": "C15",
+  "src/presentation/blocks/": "C09",
+  "src/presentation/theme/": "C10",
+  "src/interaction/history/": "C20",
+});
+
+function selfStore(file) {
+  for (const [dir, id] of Object.entries(STORE_HOME)) {
+    if (file.startsWith(dir)) return id;
+  }
+  return null;
+}
+
+/** Named import members, type-only included: a `type ThemeStore` is still a reach. */
+const IMPORT_MEMBERS = /import\s+(?:type\s+)?\{([^}]*)\}\s*from/gs;
+
+function storeReaches(file, readFile) {
+  const src = readFile(file);
+  const found = new Map();
+
+  IMPORT_MEMBERS.lastIndex = 0;
+  let m;
+  while ((m = IMPORT_MEMBERS.exec(src))) {
+    for (const raw of (m[1] ?? "").split(",")) {
+      // `type X as Y` and `X as Y` both name X as the thing being reached.
+      const name = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]?.trim();
+      if (name === undefined || name === "") continue;
+      const owner = STORE_SYMBOLS[name];
+      if (owner === undefined) continue;
+      if (!found.has(owner)) found.set(owner, name);
+    }
+  }
+  return found;
+}
+
+/**
+ * The rule's own vacuity, closed the way `modeOwnersAreReal` closes MG20's.
+ *
+ * A symbol nobody exports can never be imported, so a typo in the list above is
+ * a row that reports compliance because it cannot find what it was asked about.
+ */
+export function storeNamesAreReal(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const exported = new Set();
+  for (const file of files) {
+    const src = readFile(file);
+    for (const m of src.matchAll(/^\s*export\s+(?:type\s+|interface\s+|function\s+|const\s+|class\s+)?(\w+)/gm)) {
+      if (m[1] !== undefined) exported.add(m[1]);
+    }
+    for (const m of src.matchAll(/^\s*export\s*\{([^}]*)\}/gms)) {
+      for (const raw of (m[1] ?? "").split(",")) {
+        const name = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop()?.trim();
+        if (name !== undefined && name !== "") exported.add(name);
+      }
+    }
+  }
+  return Object.keys(STORE_SYMBOLS).filter((n) => !exported.has(n));
+}
+
+export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (!MG23_SCOPES.some((s) => f.startsWith(s))) continue;
+
+    const found = storeReaches(f, readFile);
+    // A component's own store is not a reach.
+    const own = selfStore(f);
+    if (own !== null) found.delete(own);
+    if (found.size < 2) continue;
+
+    const named = [...found.entries()].map(([owner, sym]) => `${owner} (${sym})`).sort();
+    violations.push({
+      rule: "MG23",
+      file: f,
+      message:
+        `reaches ${String(found.size)} stores — ${named.join(", ")}. ` +
+        `A component above L0 may hold one; several at once is L4's, through C23 ` +
+        `and its local handlers, never laterally`,
+      spec: "C23 §2 · C23 I14 · A02 Seam 4",
+    });
+  }
+
   return violations;
 }

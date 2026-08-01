@@ -25,6 +25,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   checkModuleGraph,
+  checkOneStorePerComponent,
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
 } from "../../tools/enforce/module-graph.mjs";
@@ -385,6 +386,19 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? "~/.prism",',
   },
   {
+    // **The shape SS29 could not catch and MG23 does.** An overlay manager
+    // wanting the live entry's id to title a view is the reach a reader makes:
+    // both are L2, so no layer walk objects, and no per-component row names this
+    // pair. C15 holds one store already, so a second is L4's — through C23 and
+    // its local handlers, never laterally.
+    rule: "MG23",
+    file: "src/viewport/overlay/manager.ts",
+    source: [
+      'import type { TranscriptView } from "../transcript/index.js";',
+      'import { createBlockRegistry } from "../../presentation/blocks/index.js";',
+    ].join("\n"),
+  },
+  {
     // The edge a reader would reach for: a plot inside an expanded table row
     // wants a width, and `planColumns` has one. Written as a type-only import
     // deliberately — that is the form that erases at build and passes every other
@@ -517,9 +531,12 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
 
   it.each(FABRICATED)("$rule fires on a fabricated violation", ({ rule, file, source }) => {
     const read = (f: string): string => (f === file ? source : "");
-    const violations = rule.startsWith("MG")
-      ? checkModuleGraph([file], read)
-      : checkSourceScans([file], read);
+    const violations =
+      rule === "MG23"
+        ? checkOneStorePerComponent([file], read)
+        : rule.startsWith("MG")
+          ? checkModuleGraph([file], read)
+          : checkSourceScans([file], read);
 
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
@@ -841,7 +858,14 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
       "arrival is what made it visible",
     SS12: "C10 — folded into SS11's scope for now",
     SS18: "C10 — needs the block-producing module list",
-    SS29: { waitsOn: "C23", why: "the execution pipeline does not exist" },
+
+    // **SS29 is gone, folded into MG23.** It waited on C23, C23 landed, and the
+    // rule did not survive being written: as a source scan over `src/shell/` its
+    // only in-scope file is C23 itself, which reaches four stores by design and
+    // is the component the rule exists to permit. The sentence C23 §2 argues is
+    // about L1–L3, where reaching a store means importing one — a module-graph
+    // question. Fourth instance of the pending-entry-covered-at-birth class,
+    // after SS5, SS6, SS7 and SS8, and the second found by `waitsOn`.
 
     // SS31, SS32 and SS38 were here, each saying "implemented in
     // dependencies.mjs, not source-scans.mjs" — which is not a pending rule but
