@@ -2,10 +2,52 @@
 
 | | |
 |---|---|
-| **Status** | Working document. Nothing committed. |
+| **Status** | **Partly superseded.** C25's half is folded into the specs; three questions stay open here. See the resolution note below |
 | **Prompted by** | `patch` is git-shaped by its field names and by nothing else — no illustration pins it. `code` has no gutter, so it renders as a highlighted quotation rather than an editor view |
 | **Scope** | C25 (unbuilt), C09's `code` renderer (built), C04's `Code` shape (built). §4 records a wanted editor surface, deliberately undesigned |
 | **When** | After L1–L4. C25 is unbuilt so its half is free now; `code.startLine` is a small change to a built component and should wait for a reason to touch it |
+
+---
+
+## 0. Resolution note — read before the argument
+
+**Partly superseded, and the split is not the usual one.** Per `docs/README.md`,
+where a scratchpad and a spec disagree the spec wins — so the four sections below
+are history. What is unusual is that the rest is not merely unfolded: **C25 §Open
+cites this document by section as its source of record** for three live questions.
+Marking the whole thing superseded would break three citations that are load-bearing.
+
+**C25 was built from rulings given in conversation rather than from this document**,
+which is why the fold-in is invisible in its history and why this note is being
+written after the fact rather than with the commit.
+
+### Superseded — folded into the specs
+
+| §here | Where it lives now |
+|---|---|
+| §2 Row anatomy | C25 §2, and C10 §4a, which cites it as the *requirement* forcing the background channel |
+| §2 `Style.background` | **C10 §4a** — the second colour channel and deliberately the last. C25 §6 keeps the two rejected options |
+| §7 Three levels | C25 §3b — `inline`, `expanded`, `fullscreen`, with the two viewport-height thresholds |
+| §2 `collapsedAfter` | C04's `Patch` type, and C25 I11: expansion is a document patch, not view state. There is no `expanded` flag — expansion *is* the rewrite |
+
+### Not superseded — and cited from C25 §Open
+
+Three questions, each recorded in C25 §Open as open, each pointing back here for
+the design or the measurements. This document is where that work is:
+
+1. **`code.startLine`** (§3). Designed here — a number rather than a boolean,
+   absent meaning no gutter, width derived. Deferred: its consumer is S08, which
+   is not built, and it moves golden frames for every `code` fixture that opts in.
+   `markLine` is weaker again and stays open.
+2. **Lezer** (§4). Researched and undecided — 856 KB against lowlight's 9.5 MB,
+   incremental by design, and a **closed** 78-tag vocabulary, which is the
+   palette-slot argument arrived at independently. Recorded because the obstacle
+   it answers, a resumable parser for Node, was what blocked the editor.
+3. **`hunksFromStructuredPatch`** (§6). Open. The type conversion may be worth
+   shipping while the dependency stays the app's; it may belong in
+   `tui-kit/testing`, in the app, or nowhere.
+
+§4's editor surface remains deliberately undesigned, as it says.
 
 ---
 
@@ -63,6 +105,12 @@ consequences.
 ```
 
 ### Row anatomy
+
+> **Superseded (§0).** Folded into C25 §2, and cited by C10 §4a as the
+> requirement that forces `Style.background` — the row anatomy cannot be
+> expressed without a second colour channel, because `syntax` spoke for the
+> foreground and the 1-bit tone collapse spoke for bold and dim. C25 §6 keeps
+> the two rejected alternatives.
 
 Four columns, and every one of them is toned by the line's kind.
 
@@ -145,6 +193,10 @@ width: two gutters, two number columns, one separator, and the text twice.
 ---
 
 ## 3. `code.startLine`
+
+> **Not superseded — cited from C25 §Open (§0).** This section is the design of
+> record. Deferred because its consumer is S08, which is not built, and it moves
+> golden frames for every `code` fixture that opts in. `markLine` stays open.
 
 One field, and a number rather than a boolean.
 
@@ -492,6 +544,11 @@ if the experiment says so; expensive now for a preference untested.
 
 ## 7. Three levels, and where they stop
 
+> **Superseded (§0).** Folded into C25 §3b — `inline`, `expanded`, `fullscreen`,
+> with the two viewport-height thresholds. `collapsedAfter` is in C04's `Patch`,
+> and C25 I11 settles the mechanism: expansion is a document patch, never view
+> state, so there is no `expanded` flag and expansion *is* the rewrite.
+
 A patch has three presentations. Two already work; the third is a pushed view.
 
 ```
@@ -578,6 +635,10 @@ component with editing turned off. That is the order to build it in.
 ---
 
 ## 8. Open
+
+> **Still open, and cited from C25 §Open (§0).** Lezer is researched and
+> undecided; `hunksFromStructuredPatch` is unresolved. Both point back here for
+> the measurements and the mapping.
 
 **Q1 — does `patch` need the file header row at all?** S10 renders one patch per
 file and names the file in its own rule. Two headers for one file is noise; but a
