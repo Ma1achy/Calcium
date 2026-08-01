@@ -149,9 +149,18 @@ Three orderings are load-bearing and the rest are incidental. §3a walks every p
 | 7 → acquire | the registered handlers | **I2.** C01's crash window reopens | **load-bearing** |
 | 9 → 10 | the router, by the pipeline | C23's submit row ends `router.resetFocus()` (A02 Seam 4, C16 I2) | **constitutive** |
 | 10 → 11 | the pipeline, by the submit handler | **The cycle, and the defect this table found.** See below | **load-bearing in effect** |
+| 10 → 9 | the pipeline, by the router's `inFlight` and `cancel` pulls | **The second direction of 9 → 10, and it does not reopen the cycle.** See below | **constitutive, deferred by the pull** |
 | 5 → 11 | C15, by `raiseExitConfirm` | The Ctrl-C and Ctrl-D rungs have nothing to raise; C16's ladder answers and nothing appears | **constitutive** |
 | 5, 8 → 8a | the viewport and the scheduler, by the resize subscription | Nothing, in effect: it is placed at the earliest point both halves exist, and the cost of placing it later is a resize arriving during construction and being dropped | **incidental** |
 | 8 → 11 | the scheduler, by the scroll handler | C14 moves and nothing paints — the frame is one scroll behind until an unrelated commit catches it up | **constitutive** |
+
+**10 → 9 arrived with C23's walk, and the table is what settled it.** C16's Ctrl-C rungs 1 and 2 now read `C23.inFlight` rather than `C06.busy` (C16 §5, C23 §8a A1), and cancellation goes through C23 rather than `runner.killAll` — because killing the child does not settle the entry, and I10 says a cancelled submission settles `partial` with its output retained. So the router needs the pipeline, and the pipeline already needed the router for `resetFocus`.
+
+Read as construction that is a cycle, and it is the one §3a found once already. **It is not, because `RouterDeps` is seventeen pulls and no subscriptions** (C16 §2) — `inFlight` is an eighteenth of the same kind. The closure is written at step 9 and evaluated when a key arrives, which is after step 11 and after startup step 8 admits input. Nothing calls it in between.
+
+**And the shape fails loudly if that ever stops being true.** `pipeline` is a `const` declared at step 10, so a call between 9 and 10 is a `ReferenceError` from the temporal dead zone rather than a `null`. The tempting alternative — `let pipeline = null`, assigned at 10 — reads as more defensive and is worse: it would answer `null` silently, and a silent `null` here means Ctrl-C taking a lower rung and clearing the prompt over a running verb, which is A1's defect restored by the fix for it. The binding that cannot be read early is the one to keep.
+
+`signalShellChild` stays on the runner. Rung 2 forwards `SIGINT` to a child and changes no entry state; the transport observes the exit through its normal path.
 
 **The 9 / 10 / 11 split is a correction.** The step list read "9 construct the input router and register every handler · 10 construct the execution pipeline", and both halves are correct read alone. Together they require the prompt's submit handler — registered at 9 — to close over a pipeline that does not exist until 10, while the pipeline closes over the router for `resetFocus`. A construction cycle, invisible to a reader checking either statement on its own, and it would have surfaced during the build as a `undefined is not a function` on the first Enter.
 

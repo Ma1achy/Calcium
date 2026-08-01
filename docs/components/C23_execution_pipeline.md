@@ -298,7 +298,7 @@ Per submission.
 - **I2** — No stage failure escapes; every one produces a document. For patch application the mechanism is C04's `PatchResult` (C04 I15) rather than a caught throw: the failure is a value on the return path, so "settled with what it had" is something C23 *does* with a result, not something it recovers from.
 - **I3** — The pending entry is appended before the transport is invoked.
 - **I4** — Validation is carried from C18, never recomputed.
-- **I5** — A second submission on any foreground route while one is in flight is refused with a notice, never queued. C23's guard is authoritative; C06's is a backstop.
+- **I5** — A second submission on any foreground route while one is in flight is refused with a notice, never queued. C23's guard is authoritative; C06's is a backstop. **Refusal is whole-line and unconditional**: no part of a refused submission takes effect, including a `builtin` that needs nothing C23 is holding. Stated because the sympathetic reading — a `cd` is instantaneous, let it through — is what someone re-derives, and a refused line that silently moved the working directory is a lie about what the tool did, discoverable only when the *next* command runs somewhere unexpected (§8b B4).
 - **I6** — Streaming subscriptions do not hold the submission guard.
 - **I7** — `session.lastUuid` is set only from `meta.resultId`; a verb declaring none leaves it unchanged.
 - **I8** — Patches commit `"stream"`; settlement commits `"completion"`.
@@ -329,7 +329,7 @@ Per submission.
 1. Seven routes, one per `ParseResult` kind; `empty` produces no entry (I1).
 2. The pending entry is appended before the subprocess starts (I3).
 3. Validation travels from C18 and is never recomputed (I4).
-4. The submission guard covers every foreground route and is checked before the pending entry is appended; streams are exempt (I5, I6).
+4. The submission guard covers every foreground route, is checked before the pending entry is appended, and refuses whole lines unconditionally; streams are exempt (I5, I6).
 5. `$_` comes from `meta.resultId` alone; nothing is inferred (I7).
 6. Patches coalesce at `"stream"`; settlement flushes at `"completion"` (I8).
 7. Frozen entries keep streaming until settled (I9).
@@ -506,8 +506,8 @@ registry after step 10.
 |---|---|---|---|---|
 | `empty` | nothing (I1) | nothing | nothing | **B5.** Two rules, one outcome |
 | `error` | entry | refused? | refused | An error document spawns nothing — see B5 |
-| `builtin` | apply, notice | **B4** | refused | |
-| `builtinThenShell` | apply, delegate | **B4** | refused | |
+| `builtin` | apply, notice | refused (B4) | refused | |
+| `builtinThenShell` | apply, delegate | refused whole (B4) | refused | |
 | `local` | run handler | refused | **B1** | **B3** if unregistered |
 | `app` | §3 | refused (I5) | refused | **B2** if `validation.ok === false` |
 | `shell` | `spawnShell` | refused (I5, T3.16) | refused | |
@@ -566,14 +566,27 @@ submission; I11 says built-ins apply **before** any delegation. Read in either
 order both are satisfied, and the outcomes differ: the `cd` persists and the
 delegation is refused, or the whole line is refused and the `cd` is lost.
 
-**Not ruled here.** It is a product decision rather than a consequence: `cd` is
-instantaneous and needs no guard, which argues for applying it; but a line the
-user watched get refused should not have half-happened, which argues against.
-`builtin` alone while running is the same question with the second half removed —
-`cd` needs nothing C23 is holding.
+**Ruled: refuse the whole line. Nothing half-happens.**
 
-Recorded rather than decided, and it is the one cell in either artefact where the
-walk produced a question instead of an answer.
+The decisive argument is what the user watched. They typed one line and saw it
+refused; a refused command that silently changed the working directory is a lie
+about what the tool did, and it is discoverable only when their *next* command
+runs somewhere unexpected. Losing the `cd` costs four characters of retyping. A
+hidden partial effect costs a command running in the wrong place with no visible
+cause.
+
+It is also what the rest of the design already says. `builtinThenShell` splits so
+that `cd /tmp && make` runs `make` in `/tmp` (C18 §4 rule 2b) — **the built-in
+exists to serve the delegation**, so refusing the delegation makes it
+purposeless. And I11's *built-ins apply before any delegation* is an ordering rule
+*within an accepted line*, not a claim that a built-in survives the line's
+rejection. Reading it as the latter is what makes this cell look open.
+
+**`builtin` alone while running is refused for the same reason**, and that is the
+half worth stating: the guard is about the session's foreground being occupied,
+not about what a command touches. A rule that admits some commands while a verb
+runs is a rule whose shape someone has to remember, and the shape is what gets
+misremembered. I5 now says refusal is whole-line and unconditional.
 
 ### B5 — `empty` while `stopping`, and the refusal that is itself an entry
 
