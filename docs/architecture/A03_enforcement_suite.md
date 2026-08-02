@@ -655,7 +655,26 @@ They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, be
 
 **Correction 1 — functions and classes, not every export.** A constant exported so a test asserts against the constant rather than a literal is exactly the noise the 55-hit measurement found. A function is *behaviour offered across a seam*, and behaviour is the thing that can have no consumer. 281 candidates rather than 376, and the seventeen constants leave with the distinction rather than with an exception apiece.
 
-**Correction 2 — occurrences, not files, and comments stripped.** Both halves are load-bearing and each was found by a false result. A function used inside its own module is consumed: `validateConfig` and `isFrozen` look unconsumed to a file-counting scan and are called one screen below their own declarations. And prose runs the other way — `backoffOf` is named in four comments and called in none, so a scan that counts comment mentions **reads the rule's own documentation as evidence the seam is wired**. A producer with no consumer is described more often than most, which makes this the failure mode rather than an edge case.
+**Correction 2 — occurrences, not files, and comments stripped.** Both halves are load-bearing and each was found by a false result. A function used inside its own module is consumed: `validateConfig` and `isFrozen` look unconsumed to a file-counting scan and are called one screen below their own declarations. And prose runs the other way — `backoffOf` is named in four comments and called in none, so a scan that counts comment mentions **reads the rule's own documentation as evidence the seam is wired**.
+
+**That second half is not a refinement. It is what makes the rule correct at all**, and it generalises past this rule: **prose about a mechanism inflates every textual signal of its existence.** A producer with no consumer is documented *more* than a working one — it is the thing that needs explaining, so it accumulates comments in the exact proportion that it lacks calls. So the naïve count does not merely miss `backoffOf`; it reports it consumed **with the highest confidence in the tree**, and confidence and correctness point in opposite directions. Every grep-shaped tool counts comments by default, and every future rule here that counts textual occurrences inherits this.
+
+### What MG25 does not catch
+
+Stated because **a rule whose limits are unrecorded reads as stronger than it is** — which is now the shape every rule in this suite is written in: the rule, its fabricated violation, and its known blind spot. MG24 has one, MG25 has two, SP3 has its resolving-but-wrong boundary.
+
+- **Name collisions.** MG25 matches on names, so an unrelated declaration of the same name reads as a call. `renderToLines` is the measured case: `measurement-conformance.ts` declares a registry member of that name and different arity, and the rule counted it as consumption. MG24 has the same hole for the same reason, and neither closes it without resolving imports.
+- **A rule expressed twice, when the second expression is called somewhere.** `isUsable` and `plotAreaWidth` are found here *only because they look like unconsumed producers*. The class is wider than that: two callable things that state one rule, where both are called, are invisible to any import-graph tool — the graph is precisely the thing that cannot see that two functions say the same thing. What MG25 catches is the subset where the duplicate went unreached.
+
+**Both blind spots are the same shape**, which is why they belong together: an import graph knows what is *reached*, and neither *what a thing means* nor *whether two names denote one function*. A rule built on it inherits both limits, and the honest disposition is a sentence rather than a scope carved to hide them.
+
+### A near miss, recorded because the luck was not a mechanism
+
+Not MG25's, and it surfaced on the same commit. `measurement-conformance.ts` waited in `test/support/` under a `DESTINATION: src/testing/` header, carrying a comment saying it must replace its local width function on arrival **or the suite and the measurer it audits would disagree about width — the exact class of bug it exists to find.** SS14 and SS43 fired the moment it arrived and forced the replacement.
+
+Nothing sequenced those two. The scans are scoped to `src/` and could not see the file while it lived under `test/`; the instruction was a comment with no mechanism behind it. **A file waiting to move is a file outside the rules of the place it is going**, so its deferred instructions and the scans that would enforce them are, by construction, never in force at the same time. Had the deferred instruction been one no scan covers — "use the shared retry helper", say — the move lands clean and the duplicate ships.
+
+**No rule is added for this, and the reason is A03 §2 applied to itself.** The class is currently empty: the sweep found no remaining `DESTINATION:` header anywhere in the tree. A rule over an empty scope passes exactly like a satisfied one, which is the failure this whole document is written against, so building one now would produce a rule with nothing to be wrong about on the very commit that introduces it. The disposition is a sentence in `test/support/README.md`, where the next file to carry such a header will be written: **the scans at the destination are part of the move.**
 
 **7 of 281 on the first run**, and they fall into two classes rather than one:
 

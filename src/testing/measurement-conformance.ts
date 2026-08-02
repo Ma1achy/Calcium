@@ -37,10 +37,19 @@ import { displayCells } from "../presentation/text.js";
 export const DEFAULT_WIDTHS: readonly number[] = [40, 60, 80, 100, 120, 160, 200];
 
 /**
- * What the suite needs from C09's registry, and nothing more. Declared
- * structurally so this file does not import C09 — which it could not do anyway
- * once it moves to `src/testing/`, and should not do from `test/support/` while
- * C09 is unbuilt.
+ * What the suite needs from C09's registry, and nothing more.
+ *
+ * Declared structurally, and the reason changed with the move rather than went
+ * away. It used to be *this file cannot import C09*; now it can, and it still
+ * must not — **a consumer's registry is not C09's.** C24 §7 ships this for an
+ * app to run against its own registered kinds, and a parameter typed as C09's
+ * concrete registry would accept only ours. The structural shape is the
+ * parameterisation, not a workaround for a layering problem that no longer
+ * exists.
+ *
+ * `renderToLines` here is a *member of that shape*, not the function of the
+ * same name in `./index.ts`, which takes a registry and has four parameters.
+ * The collision is why MG25 reads that function as consumed — see its note.
  */
 export interface MeasurableRegistry {
   measure: MeasureFn;

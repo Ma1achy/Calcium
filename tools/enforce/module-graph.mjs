@@ -837,9 +837,35 @@ export function checkSeamConsumers(
 //   2. **Occurrences, not files, and comments stripped.** A function used inside
 //      its own module is consumed; `validateConfig` and `isFrozen` both look
 //      unconsumed to a file-counting scan and are called one screen below their
-//      declaration. Prose mentions run the other way: `assignOffsets` is named
-//      in four comments and called nowhere, and a scan that counts them agrees
-//      the seam is wired.
+//      declaration. Prose mentions run the other way: `backoffOf` is named in
+//      four comments and called nowhere, and a scan that counts them agrees the
+//      seam is wired.
+//
+// **Stripping comments is not a refinement of this rule; it is what makes it
+// correct at all.** The general trap, and it is worth stating for the next scan
+// someone writes here: **prose about a mechanism inflates every textual signal
+// of its existence.** A producer with no consumer is documented *more* than a
+// working one — it is the thing that needs explaining, so it accumulates
+// comments in the exact proportion that it lacks calls. A naïve occurrence
+// count therefore does not merely miss `backoffOf`; it reports it consumed with
+// the highest confidence in the tree. Any future rule counting textual
+// occurrences inherits this, and the default in every grep-shaped tool is to
+// count comments.
+//
+// **What MG25 does not catch**, stated because a rule whose limits are
+// unrecorded reads as stronger than it is:
+//
+//   - **Name collisions.** It matches on names, so an unrelated declaration of
+//     the same name reads as a call — `renderToLines` is the measured case, a
+//     registry member of different arity in `measurement-conformance.ts`. MG24
+//     has this hole for the same reason, and neither can close it without
+//     resolving imports.
+//   - **The reverse of a name collision**: a rule expressed twice with the
+//     second expression unreachable. `isUsable` and `plotAreaWidth` are found
+//     here, but only because they *look* like unconsumed producers. A duplicate
+//     expression that happens to be called somewhere is invisible to any
+//     import-graph tool, because the graph is exactly the thing that cannot see
+//     that two callable things say one thing.
 //
 // **7 of 281 on the first run**, which is the number that made it a rule. What
 // it found that MG24 could not:
