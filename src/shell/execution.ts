@@ -416,7 +416,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         );
         return;
       }
-      const doc = await handler(argv, { command: line });
+      const produced = await handler(argv, { command: line });
+      // **C23 states the command, not the handler** (I15, C22 I33) — the same
+      // argument as C07 I16 makes for `doc.command` on the adapter side, and the
+      // same one I13 makes for `meta`: the framework knows what was submitted
+      // and the handler does not need to say. Six handlers each named their own,
+      // and `/theme light` said `/theme` — a displayed command that dropped its
+      // argument, which nothing could see while nothing was displayed.
+      const doc = { ...produced, command: line };
       appendAndCommit(doc, line);
       // A02 Seam 4's theme row: `theme.setVariant` → `scheduler.invalidate`.
       // C10 never invalidates; the sequence is L4's, which is the seam.
