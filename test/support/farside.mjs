@@ -139,6 +139,42 @@ switch (verb) {
   // is the only place the moved directory can actually be observed from.
   case "ps": {
     const limit = Math.max(0, Math.min(20_000, numeric(flag("limit", "n"), 2)));
+
+    // **`--search=prose` answers with wrapping text instead of a table**, and it
+    // exists because a table does not wrap: C11 truncates a cell to its column
+    // (`runni~`), so a `ps` document is exactly as many rows at 64 columns as at
+    // 120. C04 T5.2 walks the same document at four widths and every pass was
+    // eleven screenfuls — the fixture agreeing with a working resize and a
+    // broken one alike, which is the trap `test/support/viewport.ts` records one
+    // tier down and the reason `wrappingDoc` exists there.
+    //
+    // A manifest-declared flag rather than a new verb: C18 refuses a verb the
+    // manifest does not declare before a transport is consulted, and `--search`
+    // is already `ps`'s.
+    if (flag("search") !== null) {
+      const prose =
+        "a considerably longer line of prose that occupies several rows at sixty-four " +
+        "columns and appreciably fewer at a hundred and twenty, which is the whole " +
+        "point of it";
+      emit(
+        document(
+          Array.from({ length: limit }, (_, i) => ({
+            kind: "notice",
+            id: `n${String(i)}`,
+            tone: "info",
+            // **The index at both ends, and the tail one is the load-bearing
+            // half.** Wrapped prose repeats: every one of these notices ends
+            // with the same continuation row, so a test that identifies the
+            // document's last row by its text matches the second row of the
+            // document as readily as the last. C04 T5.2 stopped its walk on the
+            // first screenful for exactly that reason.
+            text: `${String(i).padStart(7, "0")} ${prose} #${String(i).padStart(7, "0")}`,
+          })),
+        ),
+      );
+      break;
+    }
+
     const rows = [];
     for (let i = 0; i < limit; i += 1) {
       rows.push({

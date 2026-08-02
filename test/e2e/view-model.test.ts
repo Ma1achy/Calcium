@@ -60,6 +60,74 @@ function region(frame: readonly string[]): readonly string[] {
   return frame.slice(1, at).map((r) => r.trimEnd());
 }
 
+/**
+ * Page to the top, then walk down to the bottom, returning every screenful.
+ *
+ * Shared by T5.1 and T5.2 because the property is the same at every width and a
+ * second copy is where the two would drift apart. `lastRow` is the document's
+ * final row, captured from a tail-following frame rather than computed — so
+ * nothing here has to know the document's height, which is the quantity under
+ * test.
+ */
+async function walk(pty: InteractivePty, lastRow: string): Promise<(readonly string[])[]> {
+  // To the top by paging, since `Home` cannot get there (see `KEY`). Paged
+  // rather than jumped, so the walk starts from a position reached the way a
+  // user would reach it.
+  for (let i = 0; i < 400; i += 1) {
+    const before = region(pty.frame).join("\n");
+    pty.type(KEY.pageUp);
+    try {
+      await pty.waitForFrame((f) => region(f).join("\n") !== before, 2_000);
+    } catch {
+      break; // the top: the frame stopped changing
+    }
+  }
+
+  const screens: (readonly string[])[] = [];
+  for (let guard = 0; guard <= 200; guard += 1) {
+    const here = region(pty.frame);
+    screens.push(here);
+    if (here[here.length - 1] === lastRow) return screens;
+
+    pty.type(KEY.pageDown);
+    // The frame after the key, not the stream: the bytes for the previous frame
+    // are already in `output`, so a stream match would resolve before the frame
+    // this key caused had been written.
+    const before = here.join("\n");
+    await pty.waitForFrame((f) => region(f).join("\n") !== before, 20_000);
+  }
+  throw new Error(`the walk never reached ${JSON.stringify(lastRow)}`);
+}
+
+/**
+ * The two claims every screenful must satisfy, at any width.
+ *
+ * `height − 1` per page (C14 I17) — the overlap is the point, because a
+ * full-height page turn leaves a reader with no anchor in what they just read —
+ * and the last screenful ends on the document's last row, which is the clause a
+ * viewport sized to the terminal rather than the region cannot satisfy.
+ */
+function expectCoherent(screens: (readonly string[])[], lastRow: string, at: string): void {
+  expect(screens.length, `${at}: a tall document is many screenfuls`).toBeGreaterThan(3);
+  expect(screens[screens.length - 1]?.at(-1), `${at}: the last row is reachable`).toBe(lastRow);
+
+  // Between every consecutive pair rather than on the total: a compensating pair
+  // of errors sums correctly. The final pair is exempt — the bottom clamps, so
+  // the last page is short by whatever was left.
+  for (let i = 1; i < screens.length - 1; i += 1) {
+    const prev = screens[i - 1] ?? [];
+    const here = screens[i] ?? [];
+    expect(here[0], `${at}: screen ${String(i)} starts where ${String(i - 1)} ended`).toBe(
+      prev[prev.length - 1],
+    );
+  }
+
+  // And no screenful is short, which is what makes the overlap check a claim
+  // about scrolling rather than about padding.
+  const heights = new Set(screens.map((s) => s.length));
+  expect(heights.size, `${at}: every screenful is ${[...heights].join(", ")} rows`).toBe(1);
+}
+
 describe("C04 e2e — the drift tests", () => {
   it("T5.1 (C22 I34, C14 I17): a tall transcript pages from top to bottom, and the last row is reachable", async () => {
     const pty = session();
@@ -81,65 +149,8 @@ describe("C04 e2e — the drift tests", () => {
       const lastRow = tail[tail.length - 1] ?? "";
       expect(lastRow, "the tail is content, not padding").not.toBe("");
 
-      // To the top by paging, since `Home` cannot get there (see `KEY`). Paged
-      // rather than jumped, so the walk down below starts from a position this
-      // test reached the same way a user would.
-      for (let i = 0; i < 400; i += 1) {
-        const before = region(pty.frame).join("\n");
-        pty.type(KEY.pageUp);
-        try {
-          await pty.waitForFrame((f) => region(f).join("\n") !== before, 2_000);
-        } catch {
-          break; // the top: the frame stopped changing
-        }
-      }
-      expect(region(pty.frame).at(-1), "at the top, not still at the tail").not.toBe(lastRow);
-
-      const screens: (readonly string[])[] = [];
-      let guard = 0;
-      for (;;) {
-        const here = region(pty.frame);
-        screens.push(here);
-        if (here[here.length - 1] === lastRow) break;
-        if ((guard += 1) > 200) break;
-
-        pty.type(KEY.pageDown);
-        // The frame after the key, not the stream: the bytes for the previous
-        // frame are already in `output` and a stream match would resolve before
-        // the frame this key caused had been written.
-        const before = here.join("\n");
-        await pty.waitForFrame((f) => region(f).join("\n") !== before, 20_000);
-      }
-
-      expect(guard, "it reached the bottom rather than giving up").toBeLessThan(200);
-      expect(screens.length, "a tall document is many screenfuls").toBeGreaterThan(10);
-
-      // **The last screenful ends on the document's last row.** This is the
-      // clause the height defect broke: `#maxTop()` was short by the chrome, so
-      // paging stopped three rows early and `End` stopped at the same place.
-      expect(screens[screens.length - 1]?.at(-1)).toBe(lastRow);
-
-      // **Every page advances by exactly `height − 1`** (C14 I17). The overlap is
-      // the point — a full-height page turn leaves a reader with no anchor in
-      // what they just read — so the last row of one screen is the first row of
-      // the next. Asserted between every consecutive pair rather than on the
-      // total, because a compensating pair of errors sums correctly.
-      //
-      // The final pair is exempt: the bottom clamps, so the last page is short
-      // by however much was left rather than a full page.
-      for (let i = 1; i < screens.length - 1; i += 1) {
-        const prev = screens[i - 1] ?? [];
-        const here = screens[i] ?? [];
-        expect(here[0], `screen ${String(i)} starts where screen ${String(i - 1)} ended`).toBe(
-          prev[prev.length - 1],
-        );
-      }
-
-      // And no screenful is short: the region is full at every step of a
-      // document this tall, which is what makes the overlap check above a claim
-      // about scrolling rather than about padding.
-      const heights = new Set(screens.map((s) => s.length));
-      expect(heights.size, `every screenful is the same height: ${[...heights].join(", ")}`).toBe(1);
+      const screens = await walk(pty, lastRow);
+      expectCoherent(screens, lastRow, "100 columns");
 
       // **And paging past the bottom does not move it.** The clamp, from the
       // outside: a viewport that kept scrolling would show blank rows below the
@@ -154,9 +165,64 @@ describe("C04 e2e — the drift tests", () => {
     }
   }, 120_000);
 
-  it.todo(
-    "T5.2: the same, at four terminal widths, with a resize between passes — waits on L4",
-  );
+  it("T5.2 (C14 I8): the same at four widths, with a resize between every pass", async () => {
+    // **The width axis, and the one that wraps.** A width change invalidates
+    // every cached height (C14 I8), so each pass below walks a document that was
+    // remeasured between it and the last — which is the state a cache bug
+    // produces and a single-width run can never reach.
+    //
+    // The resize is `pty.resize`, so the path is the real one: the kernel
+    // delivers `SIGWINCH`, C01 snapshots, C22 hands the width down. Setting a
+    // size without the signal would exercise a path nothing takes.
+    const pty = session(120, 24);
+    try {
+      await pty.waitFor(PROMPT, 20_000);
+      // **`--search`, so the document wraps.** A `ps` table does not: C11
+      // truncates a cell to its column, so the same document is the same number
+      // of rows at every width and four passes over it would satisfy every
+      // assertion below while proving nothing about a resize. The far side's
+      // `--search` arm answers with prose for exactly this row.
+      pty.type("/ps --limit 200 --search=prose\r");
+      await pty.waitForFrame((f) => region(f).some((r) => r.includes("0000199")), 30_000);
+
+      const seen: number[] = [];
+      for (const cols of [120, 80, 64, 100]) {
+        pty.resize(cols, 24);
+
+        // **Wait for the frame at the new width, not for a beat.** Every row is
+        // squared off to the terminal's width (C22 §6), so the width of a
+        // painted row is what says the resize has been composed — and reading
+        // before it has is how a resize test asserts against the previous frame.
+        await pty.waitForFrame((f) => f.length === 24 && (f[0] ?? "").length === cols, 20_000);
+
+        // Back to the tail after the resize, so `lastRow` is the document's last
+        // row at *this* width. It differs per width — the rows re-wrap — which
+        // is why it is captured per pass rather than once.
+        pty.type(KEY.pageDown);
+        pty.type(KEY.pageDown);
+        await new Promise((r) => setTimeout(r, 300));
+
+        const tail = region(pty.frame);
+        const lastRow = tail[tail.length - 1] ?? "";
+        expect(lastRow, `${String(cols)}: the tail is content`).not.toBe("");
+        expect(region(pty.frame).join("\n"), `${String(cols)}: and it is the document's end`).toContain("0000199");
+
+        const screens = await walk(pty, lastRow);
+        expectCoherent(screens, lastRow, `${String(cols)} columns`);
+        seen.push(screens.length);
+      }
+
+      // **The control: the widths really did change what the walk walked.** Four
+      // passes over an identical layout would satisfy every assertion above, and
+      // that is exactly what a resize that never reached C14 would look like —
+      // the defect this row is for.
+      expect(new Set(seen).size, `four widths, screenful counts ${seen.join(", ")}`).toBeGreaterThan(
+        1,
+      );
+    } finally {
+      pty.kill();
+    }
+  }, 180_000);
   it.todo(
     "T5.3: a --watch stream applying merge patches for sixty seconds — the viewport does not jump, and an expanded row stays expanded and stays put — waits on L4",
   );
