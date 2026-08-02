@@ -125,6 +125,8 @@ The guard is checked **before the pending entry is appended**, so a refused subm
 
 For `streams: true` tools, step 4 yields `RawPatch`es. Each is adapted (C07 §6) and applied to the entry, which stays `streaming` until `end`.
 
+**C23 counts the patches, and the count is not decoration** (I30, C07 I15). `StreamContext.seq` is the patch's position within *this* invocation, from `0`, and it is the only thing the §3 interface carries about stream identity. C07 spends it twice — as the namespace for generated block ids, and as the per-stream reset, since one `PatchAdapter` outlives many streams. A constant here is therefore two defects at once and neither is visible from this file: the second patch of every stream collides with the first under C04 I14 and C13 refuses it, and C06 I12's sticky degradation is un-stuck before the remainder can be composed. The sentence above said *each is adapted* and named no counter, which is how a literal `0` sat in the one call site that supplies it.
+
 Commits follow C03's classes: patches commit `"stream"` and coalesce at 33 ms; `end` commits `"completion"` and flushes immediately. A thousand log lines a second produce roughly thirty frames, and the final state is never lost behind a pending one.
 
 The entry may be **frozen while still streaming** (C13 §2) — a `--watch` followed by another command keeps updating in the scrollback. C23 keeps patching a frozen entry; only `settle` ends that.
@@ -352,6 +354,7 @@ Per submission.
 - **I27** — `seal()` reconciles the local registry against the manifest and fails construction on a mismatch in either direction: a manifest verb marked `local` with no handler, or a handler for no manifest verb. Two records of one fact and no comparison is what lets a `local` route arrive with nothing to run (§8b B3).
 - **I28** — A submission clears the prompt, whatever becomes of it. The clear sits between the parse and the route, so a refusal, a parse error and a successful verb all leave the same empty prompt — bash's behaviour, and the only one that does not require the user to work out whether their line survived. Restoring it on refusal was the alternative and it is worse: the notice says what happened, and a line that sometimes stays is a prompt whose contents depend on a decision made after the keystroke.
 - **I29** — Every submitted line is recorded in C20 **at settlement, with the code the entry settled with**, on every terminal path — app, local, shell, handoff, refusal and parse error. At settlement because `append(command, exitCode)` requires a code and settlement is the only moment one exists; recording at acceptance would satisfy the signature by inventing a value, which is what a required field exists to prevent. **A refusal is a submission**: the user typed it and pressed Enter, and `↑` must recall it — history is not a log of successes. Five call sites is five chances to miss one, so the test is derived from `ParseResult`'s arms rather than from a list.
+- **I30** — C23 supplies `StreamContext.seq` as the patch's position within its invocation, counted from `0`. C07 I15 spends it as both the block-id namespace and the per-stream reset, so a constant value is an id collision *and* a reset that fires on every patch — two invariants in two other components, broken from one literal here.
 
 ---
 
@@ -384,6 +387,7 @@ Per submission.
 24. `/debug` never re-runs; `{ } json` always does, and each surface says so (I23).
 25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 26. `seal()` reconciles the local registry against the manifest, both directions, and fails construction on a mismatch (I27).
+27. C23 counts stream patches and supplies `seq`; C07 spends it as an id namespace and a reset, so a constant breaks both (I30, C07 I15).
 
 ---
 
@@ -788,6 +792,7 @@ Fake transport, fake stores.
 - **T6.10** (I13): letting a component issue its own cross-layer effect → T2.3 fails.
 - **T6.11** (I1): appending twice for one submission → T2.2 fails.
 - **T6.12** (I15): rewriting the command shown after submission → T2.5 fails, and history stops reproducing what ran.
+- **T6.13** (I30, C07 I15): pinning `seq` to a constant in `streamInto` → T1.7b fails on both halves. This was the tree's state: the second `data` patch of every stream collided with the first under C04 I14, so a streaming verb could render exactly one block, and the per-stream reset fired on every patch. Found by the first tier-5 row to drive a `streams: true` verb through a real session; the unit suite passed throughout, because its `adaptPatch` double took no arguments and so could not see the one that was wrong.
 
 ---
 

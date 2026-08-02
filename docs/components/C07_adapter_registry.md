@@ -222,6 +222,15 @@ C06's degradation is sticky (C06 I12), so a `data` patch never follows a `degrad
 
 An adapter without `adaptPatch` still streams: each `data` patch goes through the fallback, which appends a block. Streaming therefore works before anyone writes a stream adapter.
 
+### 6a. `seq` counts patches within one invocation, and the caller supplies it
+
+`StreamContext.seq` is the **position of this patch inside this stream**, from `0`. It is the whole of what the §3 interface carries about stream identity, and it does two jobs — which is why a caller that pins it to a constant breaks two things at once rather than none:
+
+- **It namespaces the generated block ids.** A fallback block for patch *n* is prefixed `s`*n*, and C04 I14 requires block ids to be unique within a document. Every patch of one stream sharing a `seq` therefore makes the *second* patch collide with the first, and C13 refuses it.
+- **`seq === 0` is the per-stream reset.** One `PatchAdapter` outlives many streams — degradation, the remainder and the one-line lookbehind are its state — so the first patch of a new stream is the signal to clear them. A verb that degraded once must not open its next invocation already degraded.
+
+**Both failures are silent in the direction that matters** (I15). With `seq` pinned to `0` the reset fires on *every* patch, so C06 I12's stickiness is defeated at this seam: `degraded` is cleared before the next `malformed` arrives, the lookbehind is dropped with it, and the remainder never reaches the document — while I12 holds perfectly inside C06 and every unit test here passes, because a test that constructs its own `StreamContext` supplies the counter correctly by construction. It is reachable only from the one caller, and only by a stream with more than one patch.
+
 ---
 
 ## 7. Failure containment
@@ -263,6 +272,7 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I12** — A degraded stream's remainder reaches the document **whole**. `malformed` patches are dropped before `degraded` arrives and compose the `raw` block after it, except the one immediately preceding the notice — the line that tripped degradation, which seeds the block. C06 supplies no other carrier for the remainder (C06 §5).
 - **I13** — The registry owns `meta`. An adapter's `meta` is overwritten from the `RawResult` and the context, `resultId`, `adapter` and `truncated` excepted — the three the registry cannot know. No adapter can produce a document with absent or wrong provenance, which is what makes I5 hold without every app author holding it up.
 - **I14** — `meta.exitCode` is finite on every path. `-1` means the process never started and means nothing else.
+- **I15** — `seq` is the patch's position within its stream, counted by the caller from `0` (§6a). It namespaces the generated block ids and its zero value is the per-stream reset, so a constant `seq` is an id collision *and* a reset that never stops firing.
 
 ---
 
@@ -284,6 +294,7 @@ The notice is muted rather than an error because the *command* may have succeede
 14. A degraded stream's remainder is composed from the `malformed` patches that follow the notice, plus the one that preceded it; C06 carries it nowhere else (I12, §6).
 15. The registry owns `meta`, so no adapter states provenance and none can state it wrongly (I13).
 16. `meta.exitCode` is finite on every path, and `-1` has one documented cause (I14).
+17. `seq` is supplied by the caller and counts patches within one invocation; it is both the id namespace and the per-stream reset (I15, §6a).
 
 ---
 
@@ -379,6 +390,7 @@ Six tiers. Every cell of the §8 transition table is covered.
 - **T6.9** (§5): flattening nested objects into columns → T3.12 fails.
 - **T6.10** (I7): deferring schema checks to first use → T2.5 fails.
 - **T6.11** (I13): letting an adapter's `meta` through unmodified → T1.18 fails, and provenance becomes whatever a hundred adapters happened to write.
+- **T6.12** (I15): a caller passing a constant `seq` → C23's T1.7b fails on the sequence *and* on the blocks that reached the entry. Named here as well as in C23 because the number is spent here and supplied there: nothing in this component can detect it, since every test constructs its own `StreamContext` and supplies the counter correctly by construction.
 - **T6.12** (I12): dropping the `malformed` patch that precedes `degraded` → T3.19c fails, and every degraded stream loses its first remainder line silently.
 
 ---
