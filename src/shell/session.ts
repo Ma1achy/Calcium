@@ -255,6 +255,22 @@ class Session implements TuiInstance {
     if (graph === null || !graph.lifecycle.acquired) return;
 
     const frame = this.#composed();
+
+    // **C22 I34 — the viewport is as tall as the region, and this is where the
+    // region's height is known.** It is `rows − header − footer − promptRows`,
+    // and the prompt's height changes with what is typed rather than with the
+    // terminal, so no handler on a terminal event can compute it. Set from the
+    // composed frame, before the visible rows are read from it.
+    //
+    // Per frame, and cheap because C14 refuses a resize to the size it holds
+    // (C14 I21) — the guard is what makes one owner affordable.
+    //
+    // It was `size.rows` in the resize handler: three rows too tall from the
+    // first frame, so `#maxTop()` stopped short by exactly the chrome and the
+    // last rows of a tall entry were unreachable by `End`, `PageDown` or `↓`.
+    // Nothing could see it, because the surplus rows were discarded below.
+    graph.viewport.resize({ width: frame.size.columns, height: frame.region.height });
+
     let lines: readonly string[];
     try {
       lines = paint(frame, this.#paintDeps(graph, frame));

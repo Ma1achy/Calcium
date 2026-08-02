@@ -310,6 +310,25 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
 /** C14 selected these at this width; they are padded, never re-measured. */
 function transcript(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const rows = deps.transcriptRows();
+
+  // **More rows than the region has is refused, not trimmed** (I35). The trim was
+  // `rows[0 … height)` — the *top* of the selection — so a viewport that thought
+  // it was three rows taller than the region scrolled to what it believed was the
+  // foot of the document and the last three rows were dropped before they reached
+  // the screen. `End`, `PageDown` and `↓` all stopped at the same row and nothing
+  // anywhere disagreed: `heightsSum` compares the frame with itself and C14 I10
+  // compares the viewport with itself, so the only place the two quantities meet
+  // is here, where the trim was quietly reconciling them.
+  //
+  // Unreachable with I34 held, and asserted for the same reason I30 is: a repair
+  // at the symptom leaves the component that chose the rows believing it was
+  // obeyed.
+  if (rows.length > frame.region.height) {
+    throw new FrameError(
+      `the viewport selected ${String(rows.length)} rows for a ${String(frame.region.height)}-row region`,
+    );
+  }
+
   const out: string[] = [];
   // Bottom-aligned: a half-full transcript sits above the prompt, not under the
   // header, because the prompt is where the eye is and content should grow

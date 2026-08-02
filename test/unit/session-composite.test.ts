@@ -44,7 +44,19 @@ function frameAt(columns = 40, rows = 12): Composed {
   });
 }
 
-function deps(overlays: () => readonly Placed[], base = "·"): PaintDeps {
+/**
+ * `rows` is the **region's** height, and it is a parameter rather than a
+ * generous constant (C22 I35). It was 40 for a 9-row region and the paint
+ * trimmed the surplus, so five rows here asserted against a silently truncated
+ * transcript — the same reconciliation that hid a viewport three rows too tall.
+ * Now the double answers what C14 would answer, and the paint refuses anything
+ * else.
+ */
+function deps(
+  overlays: () => readonly Placed[],
+  base = "·",
+  rows = frameAt().region.height,
+): PaintDeps {
   return {
     registry: createBlockRegistry({ defaults: true }),
     theme: DARK_THEME,
@@ -52,7 +64,7 @@ function deps(overlays: () => readonly Placed[], base = "·"): PaintDeps {
     // A fill character rather than blanks: a layer that failed to write a cell
     // of its own box shows the base through it, and a blank base would look
     // exactly like a correctly written one.
-    transcriptRows: () => Array.from({ length: 40 }, () => base.repeat(200)),
+    transcriptRows: () => Array.from({ length: rows }, () => base.repeat(200)),
     promptRows: () => [base.repeat(30)],
     overlays,
     promptCursor: () => ({ row: 0, col: 2 }),
@@ -182,6 +194,29 @@ describe("C22 §6a — compositing", () => {
 
     const escaping: Placed = { ...real, top: f.region.height - 1, height: 3 };
     expect(() => paint(f, deps(() => [escaping]))).toThrow(FrameError);
+  });
+
+  it("T1.12f (C22 I35): a selection longer than the region refuses the frame", () => {
+    // **The state the shipped code was in for the whole life of the component.**
+    // The viewport was sized to the terminal and the region is three rows
+    // shorter, so `visible()` chose three rows more than there was room for —
+    // and `transcript()` kept `rows[0 … height)`, the *top* of the selection.
+    // The bottom three rows of the document were dropped before they reached the
+    // screen, `End`, `PageDown` and `↓` all stopped at the same row, and nothing
+    // in six tiers disagreed: `heightsSum` compares the frame with itself and
+    // C14 I10 compares the viewport with itself. The trim was the only place the
+    // two quantities met, and it reconciled them silently.
+    //
+    // By hand, for T1.12d's reason: with C22 I34 held a real viewport cannot produce
+    // this, which is why the refusal is asserted rather than assumed.
+    const f = frameAt();
+
+    // The control first — the honest count paints, so the throw below is about
+    // the surplus and not about the double.
+    expect(() => paint(f, deps(() => []))).not.toThrow();
+
+    const over = { ...deps(() => []), transcriptRows: () => Array.from({ length: f.region.height + 1 }, () => "x") };
+    expect(() => paint(f, over)).toThrow(FrameError);
   });
 
   it("T1.12 (S01 §3a): layers take no rows — the frame is the same shape with and without them", () => {

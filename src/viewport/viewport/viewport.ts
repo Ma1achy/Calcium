@@ -167,6 +167,22 @@ class ViewportImpl implements Viewport {
   }
 
   resize(size: Readonly<{ width: number; height: number }>): void {
+    // Step 0 (§5, I21) — the size already held is not a resize.
+    //
+    // **The emit is the load-bearing half.** A `Change` says the view moved, and
+    // the steps below are not inert: they capture an anchor and restore it, so a
+    // caller handing over the same size gets a report of a move that did not
+    // happen. L4's answer to a change is to compose a frame, and L4 sets the
+    // height from the frame it just composed (C22 I34) — without this guard that
+    // is one frame per frame, forever.
+    //
+    // Argued without reference to that caller, because it is true without it: a
+    // `SIGWINCH` says the size *may* have changed, terminals send one for a font
+    // change or a pane re-layout that ends where it began, and C01 holds no
+    // previous size to compare against (C01 §Signals). This is the first place
+    // that can tell.
+    if (size.width === this.#width && size.height === this.#height) return;
+
     const widthChanged = size.width !== this.#width;
 
     // Step 1 before step 2 (§5): the anchor is captured *before* anything is
@@ -186,7 +202,19 @@ class ViewportImpl implements Viewport {
       this.#rebuild();
     }
 
-    this.#restoreFromAnchor();
+    // Step 6 (§5) — **and it had no mechanism.** The step is written in the
+    // spec and `resize` went straight to `#restoreFromAnchor`, which for a
+    // following viewport (`anchor === null`) only clamps `topRow` into the new
+    // bounds. So a viewport at the tail did not stay at the tail: shrinking the
+    // region left `topRow` where it was and the last rows of the transcript slid
+    // off the bottom of the screen, one row per row lost.
+    //
+    // Invisible until now because `resize` was only ever called on `SIGWINCH`,
+    // where the drift is one event deep and reads as the terminal's doing. It is
+    // per frame now (C22 I34), so it compounds — which is how this was found.
+    // `#afterContent` had the same two-branch shape all along, ten lines away.
+    if (this.#followTail) this.#setTop(this.#maxTop());
+    else this.#restoreFromAnchor();
     this.#emit({ kind: "resize" });
   }
 

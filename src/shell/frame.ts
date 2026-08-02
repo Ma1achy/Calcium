@@ -105,6 +105,22 @@ export function compose(deps: ComposeDeps): Composed {
 }
 
 /**
+ * The region height a session opens at, for the one moment before a frame exists.
+ *
+ * `compose` is the authority (I34) and overwrites this on the first render. This
+ * is here rather than in the construction root so that the subtraction has one
+ * implementation: a caller spelling `size.rows - 3` agrees with this today and
+ * silently disagrees the moment the chrome changes, which is the drift C09 I1
+ * names one layer down.
+ *
+ * A one-row prompt, which is what a session opens with — an empty buffer lays out
+ * as one row.
+ */
+export function initialRegionHeight(size: TerminalSize): number {
+  return Math.max(0, size.rows - HEADER_ROWS - FOOTER_ROWS - 1);
+}
+
+/**
  * S01 §3's sum, checked **before any output is written**.
  *
  * The four regions must total exactly `rows`. One too many and the frame

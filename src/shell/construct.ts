@@ -26,6 +26,7 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { commandRows } from "./paint.js";
+import { initialRegionHeight } from "./frame.js";
 import { createManifestStore, parseManifest } from "../data/manifest/index.js";
 import { FRAMEWORK_NAMES } from "../data/manifest/framework.js";
 import { createProcessRunner } from "../data/process/runner.js";
@@ -315,7 +316,13 @@ export async function constructGraph(
     // — C14 takes the reader half, and passing the store satisfies it.
     const viewport = createViewport(transcript, {
       width: size.columns,
-      height: size.rows,
+      // **The region's height, not the terminal's** (C22 I34, C14 I22). The
+      // first `#render` overwrites this from the composed frame; it is computed
+      // rather than left at `size.rows` because `visible()` is answerable before
+      // that frame exists, and an initial value in the wrong axis is the same
+      // defect with a shorter life. One row of prompt is the floor, which is
+      // what a session opens with.
+      height: initialRegionHeight(size),
       measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
       // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
       // it is part of the height the index virtualises against. **The same
@@ -394,7 +401,14 @@ export async function constructGraph(
   // and does not compute anything from it.
   at("resize", () => {
     lifecycle.onResize((size) => {
-      stores.viewport.resize({ width: size.columns, height: size.rows });
+      // **The width, and not the height** (C22 I34). Width is what invalidates
+      // every cached height (C14 I8) and is knowable here; the height is the
+      // *region's*, which only the composed frame knows, so `#render` sets it.
+      // Setting both here is what made the viewport three rows too tall — two
+      // writers with different ideas of one quantity, and the wrong one ran
+      // first. The height passed through is the one C14 already holds, so this
+      // call carries no opinion about it.
+      stores.viewport.resize({ width: size.columns, height: stores.viewport.scroll.viewportHeight });
       scheduler.commit("resize");
     });
     // `SIGCONT` re-acquires and says so through `onResume`; C01 sets no

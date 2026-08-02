@@ -8,7 +8,7 @@
 // fails on its own.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildGraph } from "../support/session.js";
-import { rowsDoc } from "../support/viewport.js";
+import { wrappingDoc } from "../support/viewport.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
@@ -227,15 +227,35 @@ describe("C01 integration", () => {
     // snapshot is coherent per signal (I12) and **C22 is what carries it across
     // the layer** — C14 never reads a dimension and C01 never knows a viewport
     // exists.
-    const { graph, resize } = await buildGraph({}, { columns: 100, rows: 30 });
-    for (let i = 0; i < 6; i += 1) graph.transcript.append(rowsDoc(4, `e${i}`));
+    // **The two dimensions travel by different routes, and this row now covers
+    // one of them** (C22 I34). Width reaches C14 from the signal, because width
+    // is what invalidates every cached height (C14 I8) and C01's snapshot is
+    // where it is known. **Height reaches it from the composed frame** — the
+    // region is `rows − header − footer − promptRows` and the prompt's height is
+    // not a function of the terminal's, so no handler on a terminal event can
+    // compute it.
+    //
+    // The height half is therefore unobservable here *by construction*: this
+    // harness stubs `render` with a counter (`test/support/session.ts`), so no
+    // frame is ever composed and nothing pushes a height. It is asserted where a
+    // frame exists — C22 T4.12 against a spy, and C04 T5.2 through a real PTY
+    // resize. Stated rather than left, because a row that quietly stopped
+    // covering half its claim reads exactly like one that still does.
+    const { graph, resize } = await buildGraph({}, { columns: 200, rows: 30 });
+    // **`wrappingDoc`, not `rowsDoc`** — and the support file says why: a `raw`
+    // block measures one row at every width, so a resize assertion built on one
+    // passes without exercising anything. Written with `rowsDoc` first, and it
+    // reported an unchanged height at columns 6, which is the fixture agreeing
+    // with a broken product and a working one alike.
+    for (let i = 0; i < 6; i += 1) graph.transcript.append(wrappingDoc(`e${i}`));
     graph.lifecycle.acquire();
 
-    const tall = graph.viewport.visible().entries.length;
-    resize({ columns: 100, rows: 10 });
+    const wide = graph.viewport.scroll.totalRows;
+    resize({ columns: 20, rows: 30 });
 
-    // Height clamps what is on screen; the observable is that fewer entries fit.
-    expect(graph.viewport.visible().entries.length).toBeLessThan(tall);
+    // The observable is that every height was remeasured, which happens only if
+    // the width arrived: C14 drops the whole cache on a width change (C14 I8).
+    expect(graph.viewport.scroll.totalRows, "remeasured at the new width").toBeGreaterThan(wide);
   });
   it("T4.7 (with C03): SIGCONT fires onResume, the shell invalidates, the next commit repaints", () => {
     const { scheduler, lifecycle, render, repaint } = wireScheduler();

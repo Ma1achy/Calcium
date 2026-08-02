@@ -138,6 +138,62 @@ describe("C14 edge — resize", () => {
     // Dragging a terminal's bottom edge must not cost a remeasure per frame.
     expect(viewport.stats.cacheSize).toBe(before);
   });
+
+  it("T3.12c (§5 step 6): a following viewport resized shorter is still at the tail", () => {
+    // **Step 6 was written and never built.** `resize` went straight to
+    // `#restoreFromAnchor`, which for a follower (`anchor === null`) only clamps
+    // `topRow` into the new bounds — so shrinking the region left `topRow` where
+    // it was and the transcript's last rows slid off the bottom, one per row
+    // lost. `#afterContent` has the same two-branch shape ten lines away, which
+    // is exactly what makes the omission read as a finished step.
+    //
+    // It stayed invisible while `resize` fired only on `SIGWINCH`: one event
+    // deep, and a tail that drifts after a resize reads as the terminal's doing.
+    // L4 now sets the height per frame (C22 I34), where it compounds.
+    const { store, viewport } = mk(10);
+    for (let i = 0; i < 8; i += 1) store.append(rowsDoc(3, `d${i}`));
+    expect(viewport.scroll.followTail, "the control: following to begin with").toBe(true);
+
+    const lastRow = viewport.scroll.totalRows - 1;
+    const bottomOf = (): number => viewport.scroll.topRow + viewport.scroll.viewportHeight - 1;
+    expect(bottomOf(), "the tail is on screen").toBe(lastRow);
+
+    // Shrinking, which is what a growing prompt does to the region.
+    for (const height of [9, 8, 7, 4]) {
+      viewport.resize({ width: W, height });
+      expect(viewport.scroll.followTail, `still following at ${String(height)}`).toBe(true);
+      expect(bottomOf(), `the last row is still the last row at ${String(height)}`).toBe(lastRow);
+      expect(viewport.visible().atBottom, `atBottom at ${String(height)}`).toBe(true);
+    }
+  });
+
+  it("T3.12b (I21): a resize to the size already held does nothing and emits nothing", () => {
+    // **From a detached viewport with a captured anchor**, and that is the whole
+    // setup. From a tail-following one at the top of a short transcript, steps 1
+    // and 4 capture and restore the same value and the row passes with the guard
+    // removed — the convenient state is the one where both readings agree.
+    const { store, viewport } = mk(6);
+    for (let i = 0; i < 8; i += 1) store.append(rowsDoc(3, `d${i}`));
+    viewport.scrollToTop();
+    viewport.scrollBy(4);
+    expect(viewport.anchor, "detached, with something to lose").not.toBeNull();
+
+    const changes: string[] = [];
+    using _sub = viewport.subscribe((c) => void changes.push(c.kind));
+    const before = { scroll: viewport.scroll, anchor: viewport.anchor, stats: viewport.stats };
+
+    viewport.resize({ width: W, height: 6 });
+
+    // **The emit is the half that matters.** A `Change` says the view moved, and
+    // L4 answers a change by composing a frame — while L4 now sets the height
+    // from the frame it just composed (C22 I34), so without this guard that is
+    // one frame per frame. The state assertions are the corroboration; the empty
+    // `changes` is the claim.
+    expect(changes, "no change for a resize that is not one").toEqual([]);
+    expect(viewport.scroll).toEqual(before.scroll);
+    expect(viewport.anchor).toEqual(before.anchor);
+    expect(viewport.stats).toEqual(before.stats);
+  });
 });
 
 describe("C14 edge — the anchor", () => {
