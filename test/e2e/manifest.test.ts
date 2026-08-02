@@ -134,7 +134,57 @@ describe("C05 e2e", () => {
   it.todo(
     "T5.2: replacing the fixture with a manifest fetched from a real binary changes the completable surface — not deferred on a component, and that is the honest label: C05 is built and B6's fetch path is unbuilt work inside it, so naming C05 would expire the moment it was read. What is missing is `TuiConfig.manifest` accepting something that runs a binary; it takes a parsed manifest or a file path, and neither does: `TuiConfig.manifest` takes a parsed manifest or a file path, and neither runs a binary",
   );
-  it.todo(
-    "T5.3: a tool with no adapter renders through the fallback adapter — not deferred on a component: every component this needs is built, and what is missing is a harness route whose stdout is not a `tui.view/1` document, so the fallback has something to adapt. Writable as soon as `farside.mjs` grows one",
-  );
+  it("T5.3 (C07 §fallback): a tool with no adapter renders through the fallback", async () => {
+    // **The fallback is the *primary* case and had no subject in this tier.**
+    // Every other far-side route emits a `tui.view/1` document, so the adapter
+    // that exists for a CLI nobody has written an adapter for was never
+    // exercised end to end. `serving` emits a tool's own JSON — no `schema`, no
+    // `blocks`, no `meta` — which is what a real far side prints.
+    // **`subprocess`, because the default transport is the fixture corpus.**
+    // A miss there is refused rather than rendered (C06 T3.23) — which is that
+    // harness working, and the reason the first draft of this row got a refusal
+    // notice instead of a document. The fallback needs a real far side.
+    const pty = session("subprocess");
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      // `serving scale`, not `serving`: the parent has sub-verbs, so C05 refuses
+      // a bare invocation of it and the row would fail on validation rather
+      // than on the adapter. The far side's case keys on the first token, so
+      // both reach the same route.
+      pty.type("/serving scale api 3");
+      await pty.waitForFrame((f) => promptRow(f).includes("/serving scale"), 15_000);
+      pty.type("\r");
+
+      // The scalars, which the fallback renders as a definition list.
+      await pty.waitFor(/widget-00042/, 15_000);
+
+      // **Asserted on the *shape*, not on the words** — and the mutation is why.
+      // A first draft matched `revision`, `public` and `internal` anywhere on
+      // the screen, and a far side emitting a view document with all three
+      // words in one notice passed it. Every word here is one the far side
+      // chose, so a document that merely mentions them proves nothing; what
+      // only the fallback produces is the *structure* it derives from JSON it
+      // was never told about.
+      const rows = pty.frame.map((r) => r.trim());
+
+      // A scalar becomes a labelled row: the key the far side chose and its
+      // value on the same line.
+      expect(
+        rows.find((r) => r.includes("revision") && r.includes("widget-00042")),
+        `no labelled row for revision: ${rows.filter((r) => r !== "").join(" | ")}`,
+      ).toBeDefined();
+
+      // **And the array of like-shaped records is the other branch**, which a
+      // fallback that showed the top level and stopped would fail. Each record
+      // is its own row, so the two URLs cannot be on one line.
+      const publicRow = rows.findIndex((r) => r.includes("widget.example"));
+      const internalRow = rows.findIndex((r) => r.includes("widget.svc"));
+      expect(publicRow, "the first endpoint is on the screen").toBeGreaterThan(-1);
+      expect(internalRow, "and the second").toBeGreaterThan(-1);
+      expect(internalRow, "on rows of their own, which is the table branch").not.toBe(publicRow);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
 });

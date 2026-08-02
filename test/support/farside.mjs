@@ -273,6 +273,28 @@ switch (verb) {
   // The manifest's `oneShot` verb. It has no reader in `src/` — nothing parses
   // argv at launch, so C22 §4's gate-1 exception has no subject — and it is
   // answered here so that the day it does, the far side is not the missing piece.
+  // **The one route that does not speak `tui.view/1`** (C05 T5.3, C07 §fallback).
+  // Every other case here emits a view document, so the fallback adapter — the
+  // *primary* case for a far side nobody has written an adapter for — had no
+  // subject in the whole tier. This one emits a tool's own JSON: a shape a
+  // real CLI would print, with no `schema`, no `blocks` and no `meta`.
+  //
+  // Plain values and a list of records, because the fallback's two interesting
+  // branches are exactly those: scalars become a definition list, and an array
+  // of like-shaped objects becomes a table.
+  case "serving": {
+    emit({
+      revision: "widget-00042",
+      ready: true,
+      replicas: 3,
+      endpoints: [
+        { name: "public", url: "https://widget.example", healthy: true },
+        { name: "internal", url: "http://widget.svc", healthy: false },
+      ],
+    });
+    break;
+  }
+
   case "dashboard": {
     emit(document([{ kind: "notice", id: "d1", tone: "info", text: "one frame" }]));
     break;
