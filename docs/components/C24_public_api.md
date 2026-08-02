@@ -52,6 +52,9 @@ export type {
 
 // builders — §4
 export { b };
+export type {
+  ColumnDef, CellInput, StepInput, LogLine, EventLine, ChipInput, ComparisonRow,
+};
 
 // adapters — the extension point they use most
 export type { Adapter, AdapterContext, StreamContext, RawResult, RawPatch };
@@ -67,7 +70,7 @@ export { defaultTheme };
 export type { CompletionSource, CompletionContext, Candidate, Slot };
 export type { CommandPolicy, Classification, ParseResult };
 export type { BlockDefinition, Measure, MeasureFn, RenderContext, BlockKeymap };
-export type { TransportRouter, VerbTransport, Invocation, ViewRefresh };
+export type { TransportRouter, VerbTransport, Invocation };
 export type { WorldDriver };
 
 // utilities a custom block kind needs
@@ -76,11 +79,25 @@ export { cells, truncate, planColumns };
 
 **`planColumns` is public** because a custom table-like kind needs it and it is pure. `cells` and `truncate` likewise — a kind that measured width itself would be wrong in a different way from every other kind.
 
+**The builder-argument types are exported because §4's signatures name them.** A list that exports `b.table` and not `ColumnDef` gives a consumer a function whose parameter they cannot annotate, and the workaround — `Parameters<typeof b.table>[0]["columns"][number]` — is the shape of an omission rather than a design. Six of the seven are introduced by the builders themselves and exist nowhere else; `ColumnDef` is C04's and was absent from this list while `TableRow`, `Series` and `Hunk` were on it, which is the same omission caught by consistency rather than by use.
+
 ### What is deliberately absent
 
 `TerminalLifecycle`, `FrameScheduler`, `TranscriptStore`, `Viewport`, `OverlayManager`, `InputRouter`, `LineEditor`, `HistoryStore`, `ProcessRunner`, `AdapterRegistry`, `BlockRegistry`.
 
 A consumer never constructs, inspects or drives any of them. If one is ever needed, that is a signal the layering has a gap — not a request to widen the export list.
+
+**Three published-and-unconsumed members were ruled against this list, and all three drop.** MG24 holds them in `UNCONSUMED_MEMBERS` — an interface member with no consumer anywhere in the tree — and *available* is not an argument for *exported*. The list above is the instrument: an export whose owner is one of the eleven is interior by construction.
+
+| Member | Owner | Ruling |
+|---|---|---|
+| `Keymap.mergeBlock` | `Keymap`, which is `InputRouter`'s | **Drop.** `BlockKeymap` is already in the hooks above — a consumer *declares* a block keymap, and merging it into the live block is the router's work on the other side of that declaration. Exporting the merge would hand a consumer the router's job while the router stays absent. |
+| `ThemeStore.applyOverrides` | `ThemeStore`, which a consumer never holds | **Drop**, and the finding is not an export. Overrides would arrive as a `TuiConfig` field, and no such field is specified — this is a missing ruling at the shell, in the place theme *persistence* was before C22 I40, rather than a surface that wants widening. |
+| `ExecutionWrites.setRetained` | C22 session state | **Drop.** `SessionSnapshot` already carries the readable half of the session; the writable half is the shell driving itself, and a consumer that could write it could contradict the shell. |
+
+None of the three moves the export list, and all three stay in `UNCONSUMED_MEMBERS` naming their owner — this ruling says they are not public, not that they are finished.
+
+**`ViewRefresh` is off the hooks list until C23 drives it.** It is the declaration type for C23 §3b's part refresh, and §3b implements two of its three mechanisms: stall detection and the identity notice have drivers, and part refresh does not. `ViewRefresh`, `assignOffsets` and `backoffOf` are a complete producer whose only consumer is a unit test. Exporting the declaration type of a mechanism nothing runs is A03 §2's vacuity class arriving as an export — a consumer declares a refreshing part, everything type-checks, and nothing ever fires. It returns with `b.live` (§5) and not before.
 
 **No `b.hunk`, and no diff parser.** `Patch` is exported as a block shape, but nothing here turns two texts into hunks. That is the app's problem — hunks arrive from a diff tool or already structured from the far side, and the framework renders them.
 
@@ -150,11 +167,35 @@ export const b: {
 C04 §3a puts vertical rhythm in the block; if every adapter had to think about it,
 half of them would not, and the surfaces would render dense while the specs drew
 them spaced. So the builders decide: `b.table`, `b.plot`, `b.panel`, `b.rule`,
-`b.steps`, `b.keyValue`, `b.diff`, `b.code` and `b.tip` set `gapBefore` when they
-are not the first block in the sequence they are built into; `b.pills`,
-`b.notice`, `b.progress`, `b.logs`, `b.events` and `b.raw` do not — a second
-`pills` row belongs against the first, and a run of notices is a list rather than
-a set of sections.
+`b.steps`, `b.kv`, `b.comparison`, `b.patch`, `b.code` and `b.tip` set `gapBefore`
+when they are not the first block in the sequence they are built into; `b.pills`,
+`b.notice`, `b.progress`, `b.logs`, `b.events`, `b.raw`, `b.spark`, `b.group` and
+`b.spinner` do not — a second `pills` row belongs against the first, and a run of
+notices is a list rather than a set of sections.
+
+**Nineteen builders return blocks, and this paragraph names nineteen** — `b.live`
+is the twentieth and is deferred with §5, so it takes its default when it lands.
+It named fifteen, and two of those — `b.keyValue` and `b.diff` — are builders that do not
+exist: the `comparison` rename reached §3, the renderer and the goldens and not
+this sentence, and `b.kv` never had the name it was listed under. A prose list
+paired with T2.9's enumeration is what makes that a failing test rather than a
+paragraph nobody re-reads. The four that were simply missing are `b.patch`,
+`b.spark`, `b.group` and `b.spinner`, and three of them needed a ruling rather
+than a lookup:
+
+- **`b.group` does not gap**, because it is a layout wrapper rather than a
+  section. Gapping the group *and* the first child that carries its own default
+  produces two blank rows where the surfaces draw one.
+- **`b.spark` does not gap.** It is `b.plot`'s inline form at height 1, and it
+  appears beside the thing it summarises rather than below it.
+- **`b.spinner` does not gap, and `b.steps` does** — though both return `Steps`.
+  This is the case that shows **the default belongs to the builder and not to
+  the block kind**: a spinner is one transient line reporting on what precedes
+  it, and a `steps` list is a section. I15 says "per its kind" and means per
+  builder; a default keyed on `block.kind` could not express this row.
+
+The cell shorthands, `b.col`, `b.row` and the action helpers return no block, so
+they have no default and T2.9 does not enumerate them.
 
 **A default is not a policy.** Every builder takes an explicit `gapBefore` that
 wins, and a document assembled without builders has whatever its author wrote.
@@ -166,6 +207,15 @@ so that the framework owns a surface's rhythm.
 ---
 
 ## 5. `b.live` — failure isolation as a primitive
+
+> **Specified, not shipped.** `b.live` is not in the first release of this
+> surface, and neither is `ViewRefresh` (§3). The mechanism it rests on is C23
+> §3b's *part refresh*, and C23 implements two of §3b's three: stall detection
+> and the identity notice have drivers, part refresh has none. `assignOffsets`
+> and `backoffOf` are a complete producer with no consumer in `src/` — the class
+> MG24 exists for, arriving one level below where MG24 looks. So this section
+> describes work, not code, and a reader should not take the table below as a
+> list of things that currently happen. It ships when the driver does.
 
 A02 §7 specifies the pattern precisely; assembling one by hand means wiring an interval, backoff, staleness, error rendering and teardown. Nobody does that five times correctly, so the isolation would be specified and not shipped.
 
@@ -276,7 +326,8 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **I12** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.
 - **I13** — `tui-kit/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 - **I14** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
-- **I15** — Every `b.*` builder sets a `gapBefore` default per its kind (§4), and an explicit `gapBefore` always wins over it. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
+- **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
+- **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
 
 ---
 
@@ -294,7 +345,8 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 10. `tui-kit/testing` ships the assertions, so no consumer reimplements them (I13).
 11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect (I9).
 12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them (I14).
-13. Every builder sets a `gapBefore` default per kind, and an explicit value always wins (I15, §4).
+13. Every block-returning builder sets a `gapBefore` default of its own, and an explicit value always wins (I15, §4).
+14. Nothing is exported that declares work no code performs; *available* is not an argument for *exported*, and neither is *specified* (I16, §3).
 
 ---
 
@@ -322,6 +374,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **T2.9** (I15): every `b.*` builder is enumerated and asserted to set the §4 default for its kind; a builder added without a row fails. For each, an explicit `gapBefore: false` and `true` overrides the default.
 - **T2.7** (I5): a source scan finds no field-name-keyed tone or glyph table in `builders/`.
 - **T2.8**: every block kind in C04's union has a builder — exhaustive over the type.
+- **T2.10** (I16): MG25 — every exported value in `src/` is referenced by another `src/` module, or named in an allow-list that is **compared by equality**. A new test-only export fails until it is named, which is the arm the rule needs rather than the list: an allow-list checked by membership is one where the thirty-fourth entry arrives behind the thirty-first unread. Shown to fire against fabricated files.
 
 ### Tier 3 — edge cases
 
@@ -367,6 +420,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **T6.6** (I8): `testing` reachable from the runtime entry → T2.3 fails.
 - **T6.7** (I1): an export nothing consumes → T2.2 fails, and the surface starts accreting.
 - **T6.8** (§8): erroring on an adapter/manifest mismatch → T3.11 fails, and a shrunk manifest stops the app starting.
+- **T6.9** (I16): MG25's allow-list compared by membership rather than by equality → its fabricated-file test fails. Membership passes for every list that has ever been too permissive, which is the failure this project has now found four times — SS40's directory scope, CP6's hand-written surfaces, MG24's constant-dominated form, and this one, pre-empted.
 
 ---
 
