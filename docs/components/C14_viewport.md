@@ -170,6 +170,7 @@ Width changes invalidate every cached height, because wrapping changes. Height c
 
 ```
 on resize:
+  0  if neither width nor height changed: return, emitting nothing
   1  capture the anchor before anything else
   2  if width changed: drop the cache, rebuild the index
   3  recompute viewportHeight from the same snapshot (C01 SIGWINCH, D31)
@@ -178,7 +179,17 @@ on resize:
   6  if followTail: snap to the bottom instead
 ```
 
+**Step 0 is a property of `resize`, not an accommodation for a caller** (I21). A resize to the size already held has no work in it, and the steps below are not inert: 1 and 4 capture and restore an anchor, and the emit at the end tells L4 something moved. A caller that hands over the same size therefore gets a `Change` reporting a move that did not happen, and L4's answer to a change is to compose a frame — so an unchanging size becomes a frame per call.
+
+There is already a caller that does this without meaning to. **A `SIGWINCH` is a notification that the size *may* have changed**, and a terminal delivers one for events that leave the reported size identical — a font change, a pane re-layout that ends where it began, a multiplexer redrawing. C01 hands the snapshot on without comparing it to the last (C01 §Signals: C01 holds no viewport state to compare against), so the comparison has to be here, and it belongs here anyway: this is the component that knows what size it is.
+
+The guard is stated separately from anything that relies on it. A guard justified by its caller is removed when the caller changes, and this one is worth having with no caller at all.
+
 Step 1 before step 2 matters: the anchor is an entry id and a row offset within it, and after remeasuring at a new width that row offset may exceed the entry's new height. It clamps to the entry's last row rather than spilling into the next entry, so the anchor degrades gracefully rather than drifting.
+
+**The height C14 is given is the transcript region's, not the terminal's** (I22). They differ by the frame's chrome — a header row, a footer row, and a prompt whose height varies with what is typed (S01 §3) — and C14 cannot derive one from the other, because it holds no geometry above itself and the prompt's height is not a function of anything it knows. So the caller must hand over the region's height, and the caller that knows it is the one that composed the frame.
+
+Handing over the terminal's is the near-miss, and it is silent in both directions. `#maxTop()` is `totalRows − viewportHeight`, so a viewport that believes it is taller stops scrolling early by exactly the chrome: the last rows of the document are unreachable by `End`, `PageDown` or `↓`, all three stopping at the same row. And the surplus rows it selects are discarded by whoever paints, so nothing downstream ever sees a count it did not expect. Every invariant here still holds — `visible()` sums to `viewportHeight` exactly (I10) — because they all compare the viewport with itself.
 
 Dragging an edge continuously must produce continuously correct frames, never a blank one (C02 §5, D31).
 
@@ -237,6 +248,8 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
 - **I19** — `entryAtRow` is pure and total: it reads the index and the current scroll, stores nothing, and returns `null` for any row the transcript does not occupy. It is the **only** place a region row becomes an entry — C16 routes mouse events by position and does not recompute the mapping, because two components computing where a row is will agree until one of them learns about a height change and the other does not.
 - **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I18's live gutter is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
+- **I21** — `resize` to the size already held is a no-op: nothing is captured, nothing is restored, and **no `Change` is emitted**. The emit is the load-bearing half — a change reports that the view moved, and a view that did not move must not report one, whatever the caller intended by the call. C01 delivers a `SIGWINCH` whenever the size *may* have changed and holds no previous size to compare against, so this component is the first one that can tell.
+- **I22** — The height handed to `resize` is the **transcript region's**, not the terminal's. C14 holds no geometry above itself and cannot derive one from the other — the difference includes the prompt, whose height varies with what is typed — so the caller composing the frame owns the value (C22 I34). The failure is silent in both directions: too tall and `#maxTop()` leaves the document's last rows unreachable by any key, while the surplus rows `visible()` selects are discarded by the paint, so no count downstream is ever surprised. I10 holds throughout, because it compares the viewport with itself.
 
 ---
 
@@ -261,6 +274,8 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 17. An entry's height is `measureSequence`, so `gapBefore` is counted — never `Σ measure`, which is short by one row per gap (I1, C09 I17).
 18. A region row resolves to an entry and a row within it here, once, and C16 does not recompute the mapping (I19).
 19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the live gutter is the second (I20, I18).
+20. A resize to the size already held does nothing and emits nothing (I21).
+21. The height `resize` is given is the transcript region's, and the caller that composed the frame owns it (I22).
 
 ---
 
@@ -322,6 +337,7 @@ Fake heights, no rendering.
 - **T3.10**: eviction while following → still at the bottom.
 - **T3.11**: rapid resize between two widths fifty times → final state is correct for the final width; no accumulated drift.
 - **T3.12** (I8): a height-only resize → no cache entry is invalidated.
+- **T3.12b** (I21): a resize to the width and height already held → **no `Change` is emitted**, and `scroll`, `anchor` and `stats` are identical afterwards. Asserted from a *detached* viewport with a captured anchor, because from a tail-following one at the top of a short transcript the capture-and-restore is a round trip to the same value and the row passes with the guard removed — the state that distinguishes the two readings is the one that has something to lose.
 - **T3.13**: a patch that shrinks an entry below the current `topRow`'s dependence → `topRow` clamps rather than exceeding `totalRows`.
 - **T3.14**: movement in copy mode moves the cursor and scrolls only when the cursor reaches an edge.
 - **T3.15**: yank with an empty selection → clipboard untouched, no throw.
@@ -369,6 +385,8 @@ Fake heights, no rendering.
 - **T6.13** (I13): special-casing the eviction marker → T4.3's cache-delta assertions fail on the marker entry.
 - **T6.14** (I3): reading `(entryId, rev, width)` as a composite map key → T2.3b fails, and a `--watch` at a thousand lines a second accumulates a slot per tick. T2.3 still passes, which is why T2.3b exists.
 - **T6.15** (I9): keeping the front offset and never rebuilding → T2.8 fails on a session that evicts without resizing, and the index outgrows the transcript it indexes.
+- **T6.17** (I21): removing the unchanged-size guard → T3.12b fails, and every frame L4 composes emits a `Change` back at L4, because L4 now hands the region's height over per frame (C22 I34).
+- **T6.18** (I22): handing `resize` the terminal's height instead of the region's → C04 T5.1 fails at the foot of the document, and `paint`'s transcript region refuses the over-long selection instead of silently keeping its first rows. **Neither half of that existed when the defect did**: the paint truncated and the drift test was deferred, so the last three rows of every tall entry were unreachable and nothing in six tiers could say so.
 - **T6.16** (I1): summing `measure(b, w)` instead of calling `measureSequence` → T2.9 fails, and every entry with a `gapBefore` is short by one row per gap. The most likely single defect in this component, because the summation is what a reader writes.
 
 ---
