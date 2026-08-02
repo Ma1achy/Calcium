@@ -29,7 +29,7 @@
  * than the terminal has.
  */
 
-import { renderSequenceToLines } from "../testing/index.js";
+import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
 import { PROMPT, PROMPT_GUTTER } from "./config.js";

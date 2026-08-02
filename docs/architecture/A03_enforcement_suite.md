@@ -233,6 +233,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG23 | A component in L1–L3 imports at most one **store**; several at once is L4's, through C23 | C23 §2, C23 I14, A02 Seam 4 |
 | MG24 | A member of an `export interface` under `src/` is named somewhere else under `src/` — a component complete on its own side of a seam, with nothing on the other | A02 Seam 4, C16 I23, C22 I38, I39 |
 | MG25 | An exported **function or class** under `src/` is named somewhere else under `src/`, comments excluded. MG24's blind spot: a producer expressed as free functions rather than as an interface | A02 Seam 4, C23 §3b, C24 I16 |
+| MG26 | No module under `src/` outside `testing/` and `fixtures/` value-imports either of them | C24 I8, T2.3 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
 
@@ -682,6 +683,48 @@ They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, be
 **Correction 2 — occurrences, not files, and comments stripped.** Both halves are load-bearing and each was found by a false result. A function used inside its own module is consumed: `validateConfig` and `isFrozen` look unconsumed to a file-counting scan and are called one screen below their own declarations. And prose runs the other way — `backoffOf` is named in four comments and called in none, so a scan that counts comment mentions **reads the rule's own documentation as evidence the seam is wired**.
 
 **That second half is not a refinement. It is what makes the rule correct at all**, and it generalises past this rule: **prose about a mechanism inflates every textual signal of its existence.** A producer with no consumer is documented *more* than a working one — it is the thing that needs explaining, so it accumulates comments in the exact proportion that it lacks calls. So the naïve count does not merely miss `backoffOf`; it reports it consumed **with the highest confidence in the tree**, and confidence and correctness point in opposite directions. Every grep-shaped tool counts comments by default, and every future rule here that counts textual occurrences inherits this.
+
+### MG26 — the dev-only entry points stay out of the bundle
+
+C24 I8 says `tui-kit/testing` and `tui-kit/fixtures` are absent from a
+production bundle, and T2.3 is its test. **Until C24 there was no bundle to be
+absent from.** `src/index.ts` was `export {}`, so nothing rooted the graph and
+the invariant had nothing to be false about — A03 §2's vacuity class holding an
+*invariant* open rather than a rule, which is the same failure one level up.
+
+It was false the moment there was a root. `shell/paint.ts`,
+`shell/composite.ts` and `shell/session.ts` imported `renderSequenceToLines`
+from `../testing/index.js`, and the built runtime entry reached
+`dist/testing/index.js` and both conformance suites behind it. **Nothing was
+mislayered.** L4 importing L1 is downward whichever directory it lands in, so
+MG1 was correct to stay silent; the helper had simply been written where its
+first caller was, and its first caller was a test. The remedy was an address,
+not a redesign: `presentation/render-lines.ts`, beside the registry it drives.
+
+**The rule is flat, and its first shape was wrong in a way commitment 14 caught.**
+It was written as reachability from `src/index.ts`, because that is how the
+defect was found — trace the built entry, see the edges. As a *rule* that shape
+fails: a fabricated violation has no root, so MG26 matched nothing and would
+have passed on a real violation presented alone. Commitment 14 indicted the rule
+rather than the tree, which is the case it exists for and the second time this
+stretch a fabrication has changed a rule's shape rather than confirming it. The
+flat claim is also the stronger one — a non-dev module importing the dev entry
+is either shipping it or is dead code, and neither wants to be silent.
+
+**Type-only imports do not count, and that is the rule rather than an
+exemption.** The claim is about what ships, and an `import type` erases at
+build. This is the one rule in the file where erasure is the right answer —
+MG6 and MG19 both count type-only edges because their claims are about
+*dependency*, and this claim is about *output*. `export type { WorldDriver }`
+names a module and puts nothing in the bundle.
+
+**What MG26 does not catch.** A dynamic `import()` built from a computed
+specifier: it reads static relative specifiers only. And, being flat, it says
+nothing about whether a flagged edge is *reachable* — a production module that
+nothing imports would still fire, which is the right trade, because dead code
+importing the dev entry is a finding either way. It also says nothing about *size* — a
+module can be in the bundle for one constant and MG26 is indifferent, because
+the invariant it serves is about what ships at all rather than what it costs.
 
 ### What MG25 does not catch
 

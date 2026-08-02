@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { renderToLines } from "../../src/testing/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";

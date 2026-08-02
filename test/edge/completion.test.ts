@@ -15,7 +15,7 @@ import { at, deferredSource, fakeClock, fakeDirs, instantSource } from "../suppo
 import type { Candidate } from "../../src/interaction/completion/index.js";
 import { createBlockRegistry, type BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
-import { renderSequenceToLines } from "../../src/testing/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 
 const FLAG_SLOT = "/ps --status=‸";

@@ -10,7 +10,7 @@
 import { detectCapabilities, isUsable } from "../../dist/terminal/capabilities.js";
 import { createBlockRegistry } from "../../dist/presentation/blocks/index.js";
 import { defaultTheme, loadTheme } from "../../dist/presentation/theme/index.js";
-import { renderSequenceToLines } from "../../dist/testing/index.js";
+import { renderSequenceToLines } from "../../dist/presentation/render-lines.js";
 import { createTerminalLifecycle } from "../../dist/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../dist/terminal/frame-scheduler.js";
 import { createProcessRunner } from "../../dist/data/process/runner.js";

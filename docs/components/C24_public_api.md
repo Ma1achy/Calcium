@@ -374,6 +374,8 @@ export function fakeTerminal(size?: TerminalSize): FakeTerminal;
 export function withCapabilities(caps: Partial<TerminalCapabilities>): TestContext;
 ```
 
+**`renderToLines` is not part of this surface, and used to be.** It takes a `BlockRegistry` — one of the eleven §3 keeps unreachable — so no consumer could construct one and call it, and exporting it named an absent component in this entry's declarations for nothing. It lives in `presentation/render-lines.ts`, where `shell/paint.ts` was already depending on it for real frame composition; the public way to assert about a rendered document is `expectDocument`. **The general form is worth keeping:** a helper written in a dev-only module because a test was its first caller becomes a production dependency the moment a second caller is not a test, and no layer rule objects, because the layers were never crossed.
+
 **`measuresCorrectly` is a wrapper, not an implementation.** The conformance suite it runs is written with C04 — parameterised over a registry and a corpus, and deliberately free of anything test-runner-specific, returning failures as data so the caller asserts. C09's registry-completeness test, this method, and the reference app all drive the same code. It lives in `test/support/` until C09 exists to consume it, then moves here unchanged.
 
 **`degradesTo1Bit` is the one that earns the module.** It is B04's compliance sweep — every distinction carried by a glyph or a word — and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
@@ -401,13 +403,13 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 ## 9. Invariants
 
 - **I1** — Every export is used by **the union of** `prism-tui` and the reference app. Neither alone exercises the whole surface — docker touches no `spectrum`, no `WorldDriver` and only part of the manifest schema. An export used by neither is removed.
-- **I2** — The eleven components in §3's absent list are not reachable from any entry point.
+- **I2** — The eleven components in §3's absent list are not reachable from any entry point. **This was unfalsifiable until the entry points existed** — `src/index.ts` was `export {}`, so the claim held over a surface with no exports — and its first real run found `BlockRegistry` named in `tui-kit/testing`, where `renderToLines` took one as a parameter. The sharper half of that finding was not the naming: `createBlockRegistry` is exported from no entry, so the two functions were uncallable by any consumer. An export nothing can invoke is A03 §2's vacuity class reached through the surface rather than through a rule.
 - **I3** — Builders return frozen blocks; there is no second description type.
 - **I4** — A generated id is stable within one document and never rendered.
 - **I5** — No builder infers a tone, glyph or action from a field name.
 - **I6** — `b.live`'s behaviour is not configurable; only its renderings are.
 - **I7** — `measure` never receives `tick`; animation cannot affect geometry.
-- **I8** — `testing` and `fixtures` are absent from the production bundle.
+- **I8** — `testing` and `fixtures` are absent from the production bundle. MG26 is the mechanical form, and it was false on the day it could first be checked: `shell/paint.ts`, `shell/composite.ts` and `shell/session.ts` imported `renderSequenceToLines` from `../testing/index.js`, so the built runtime entry reached `dist/testing/index.js` and both conformance suites behind it. **Nothing was mislayered** — L4 importing L1 is downward whichever directory it lands in — so no existing rule was wrong to stay silent. The helper had been written where its first caller was, and its first caller was a test. It is `presentation/render-lines.ts` now.
 - **I9** — Startup validation severities are those of §8, and each cites the spec that set it.
 - **I10** — The runtime entry exports no function that performs I/O except `createTui`.
 - **I11** — The reference app lives in its own repository and consumes `tui-kit` as a published dependency, so the unused-export scan runs against `prism-tui` plus the app's declared import manifest, refreshed on each version bump. It is a reported signal, not a build gate.

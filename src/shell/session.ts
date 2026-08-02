@@ -22,7 +22,7 @@ import { drawFallback, tooSmall } from "./fallback.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
-import { renderSequenceToLines } from "../testing/index.js";
+import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { PROMPT_GUTTER } from "./config.js";

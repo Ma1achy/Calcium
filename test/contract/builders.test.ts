@@ -19,7 +19,7 @@ import type { Block, BlockKind } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { defaulted, seq, wasDefaulted } from "../../src/shell/builders/seq.js";
 import { checkMeasurement, formatMeasurementReport } from "../../src/testing/index.js";
-import { renderSequenceToLines } from "../../src/testing/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";

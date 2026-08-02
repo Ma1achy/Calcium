@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
-import { renderSequenceToLines } from "../../src/testing/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { defaultTheme, diffPairs, floorFor, ratio } from "../../src/presentation/theme/index.js";
 import { hunkOf, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
@@ -75,14 +75,17 @@ describe("C25 integration", () => {
     }
   });
 
-  it("T4.6 (with C04): a constructed patch validates and renders", async () => {
-    // **Asserted through `block()` rather than through `b.patch(…)`**, and the
-    // difference is worth stating rather than deferring. C24's `b` namespace does
-    // not exist — `src/index.ts` is `export {}` — and `b.patch` will be an
-    // ergonomic wrapper over exactly this constructor, so the substance of the
-    // test is here: the shape validates, freezes, and renders. A deferral naming
-    // C24 would defer the validation too, which is C04's and is testable now.
+  it("T4.6 (with C04, C24): a constructed patch validates and renders, both ways in", async () => {
+    // **Both constructors, and they must agree.** This asserted through
+    // `block()` alone while C24's `b` did not exist, with a comment saying
+    // `b.patch` would be an ergonomic wrapper over exactly this call. It exists
+    // now, so the deferral is spent — and the assertion that earns the pairing
+    // is that the two produce the same block, since a wrapper that quietly
+    // shaped its output differently would render and pass everything written
+    // about either one alone.
     const { block } = await import("../../src/data/viewmodel/index.js");
+    const { b } = await import("../../src/shell/builders/index.js");
+
     const built = block({
       kind: "patch" as const,
       id: "built",
@@ -90,10 +93,20 @@ describe("C25 integration", () => {
       language: "yaml",
       hunks: [hunkOf([" a: 1", "+b: 2"])],
     });
+    const viaBuilder = b.patch({
+      id: "built",
+      path: "a.yaml",
+      language: "yaml",
+      hunks: [hunkOf([" a: 1", "+b: 2"])],
+      gapBefore: false,
+    });
 
     expect(built.kind).toBe("patch");
     expect(Object.isFrozen(built), "constructed blocks are frozen (C04)").toBe(true);
+    expect(Object.isFrozen(viaBuilder), "b never returns an unfrozen block (C24 I3)").toBe(true);
+    expect(viaBuilder).toEqual(built);
     expect(() => kit().renderToLines(built, 80)).not.toThrow();
+    expect(kit().renderToLines(viaBuilder, 80)).toEqual(kit().renderToLines(built, 80));
   });
 
   it("T4.7 (with C10, I13): the background walks the ladder, and one bit has none", () => {

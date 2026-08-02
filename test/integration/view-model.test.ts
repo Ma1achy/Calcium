@@ -23,7 +23,7 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence, rowsDoc } from "../support/viewport.js";
-import { renderToLines } from "../../src/testing/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
 import type { RenderContext } from "../../src/presentation/blocks/index.js";
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";

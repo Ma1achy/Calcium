@@ -380,6 +380,20 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'const mode = process.env["PRISM_TUI_TRANSPORT"] ?? "subprocess";',
   },
   {
+    // The edge that actually shipped, and the reason MG26 exists: a production
+    // module reaching into the dev-only entry for a render helper that was
+    // written there because a test called it first.
+    rule: "MG26",
+    file: "src/shell/paint.ts",
+    source: 'import { renderSequenceToLines } from "../testing/index.js";',
+  },
+  {
+    // The fixtures half, which never shipped but is the same claim.
+    rule: "MG26",
+    file: "src/shell/session.ts",
+    source: 'import { recordFixture } from "../fixtures/index.js";',
+  },
+  {
     // C24 I5's table, in the form a builder would actually grow one. `b.row`
     // takes a `Record<string, CellInput>` and the keys are the data's own field
     // names, so a lookup from key to tone is one small step from where the

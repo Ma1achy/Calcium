@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -488,6 +488,7 @@ export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8"
     ...checkModeOwnership(files, readFile),
     ...checkPresentationEdges(files, readFile),
     ...checkForbiddenEdges(files, readFile),
+     ...checkDevEntryIsolation(files, readFile),
   ];
   for (const file of files) {
     const from = layerOf(file);
@@ -944,6 +945,68 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
  * Otherwise the list outlives what it excuses, which is how a list stops being
  * read.
  */
+/**
+ * MG26 — no module outside `testing/` and `fixtures/` imports them
+ * (C24 I8, T2.3).
+ *
+ * `tui-kit/testing` and `tui-kit/fixtures` are dev-only entry points, and I8
+ * says they are absent from a production bundle. Until C24 there was no
+ * production bundle: with `src/index.ts` at `export {}`, nothing rooted the
+ * graph, so the claim had nothing to be false about — A03 §2's vacuity class
+ * holding an invariant open rather than a rule.
+ *
+ * **It was false the moment there was a root.** Three modules —
+ * `shell/paint.ts`, `shell/composite.ts` and `shell/session.ts` — imported
+ * `renderSequenceToLines` from `../testing/index.js`, and the built runtime
+ * entry reached `dist/testing/index.js` and both conformance suites behind it.
+ * Nothing was mislayered; L4 importing L1 is downward either way. The helper
+ * was simply written where its first caller was, and its first caller was a
+ * test. It lives in `presentation/render-lines.ts` now.
+ *
+ * **Stated flatly rather than as reachability from `src/index.ts`.** The first
+ * version walked the graph from the runtime entry, which is how the defect was
+ * found and is the wrong shape for a rule: a fabricated violation has no root,
+ * so it matched nothing and would have passed on a real one presented alone —
+ * A03 commitment 14 catching the rule rather than the tree. The flat claim is
+ * also the stronger one, because a non-dev module importing the dev entry is
+ * either shipping it or is dead code.
+ *
+ * **Type-only imports do not count, and that is the rule rather than an
+ * exemption.** The claim is about what ships, and an `import type` erases at
+ * build — `export type { WorldDriver }` puts no module in the bundle. This is
+ * the one place in this file where erasure is the right answer; MG6 and MG19
+ * both count type-only edges because their claims are about *dependency*, and
+ * this claim is about *output*.
+ */
+export function checkDevEntryIsolation(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const violations = [];
+
+  for (const raw of files) {
+    const file = raw.replaceAll("\\", "/");
+    if (!file.startsWith("src/")) continue;
+    // A dev module importing its own sibling is the point of the directory.
+    if (file.startsWith("src/testing/") || file.startsWith("src/fixtures/")) continue;
+
+    for (const spec of importsOf(file, readFile)) {
+      const resolved = resolve(file, spec);
+      if (resolved === null) continue;
+      const target = resolved.replace(/\.js$/, ".ts");
+      if (!target.startsWith("src/testing/") && !target.startsWith("src/fixtures/")) continue;
+
+      violations.push({
+        rule: "MG26",
+        file,
+        message:
+          `imports ${spec} — \`testing/\` and \`fixtures/\` are dev-only entry points, and a ` +
+          `module outside them that imports one puts it in the production bundle (C24 I8)`,
+        spec: "A03 §3, MG26 · C24 I8, T2.3",
+      });
+    }
+  }
+
+  return violations;
+}
+
 export function checkFunctionConsumers(
   files,
   readFile = (f) => readFileSync(f, "utf8"),

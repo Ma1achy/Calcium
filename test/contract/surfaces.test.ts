@@ -15,7 +15,7 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
-import { renderSequenceToLines } from "../../src/testing/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { frameLines, frameRows, illustratedRows, SURFACE_FRAMES } from "../support/surfaces.js";
 import { compose, heightsSum } from "../../src/shell/frame.js";
 import { paint } from "../../src/shell/paint.js";

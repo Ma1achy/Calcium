@@ -12,6 +12,7 @@ export { tokenise, quote } from "./tokenise.js";
 export { slashPolicy, prefixPolicy } from "./policy.js";
 export type {
   Builtin,
+  Classification,
   CommandPolicy,
   ParseContext,
   ParseResult,

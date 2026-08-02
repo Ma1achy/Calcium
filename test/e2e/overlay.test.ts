@@ -206,6 +206,20 @@ describe("C15 e2e — layers under real input", () => {
     // could not be built — the trace is an entry, an entry freezes its
     // predecessor, and the frozen block is the one A01 D7 returns focus to.
     // C23 §4's pop row is the ruling, so the row asserts what remains true.
-    "T5.5: esc from the logs view — the view pops, nothing is appended, and focus returns to the live block — waits on C24 — a PTY needs a binary to drive",
+    // **The reason was wrong, and TD2 is what said so.** It read "waits on C24 —
+    // a PTY needs a binary to drive", and C24 landing expired it. Checking what
+    // it was actually waiting for found the binary had been there all along:
+    // two tests in this file drive `node test/support/fixture.mjs session`
+    // through `interactivePty`, and have since before C24 existed. The clause
+    // named the wrong blocker and would have gone on reading as a good reason
+    // indefinitely, because nothing re-reads a deferral that is not failing.
+    //
+    // What it waits on is the gap T5.3 above already records, and the two are
+    // one finding: **nothing in the tree pushes a `kind: "view"` layer.** C15
+    // supports them and `focus.ts` routes to `pushedView`; the shell pushes
+    // overlays only. There is no logs view to press `esc` in, and there will
+    // not be until the decision that makes a verb's result a pushed view rather
+    // than a transcript entry is taken — recorded in C22 §13.
+    "T5.5: esc from the logs view — the view pops, nothing is appended, and focus returns to the live block — **not deferred on a component**, and the correction is the same one T5.3 carries: it named C24, which is built, and a PTY binary was never the blocker — two tests in this file drive `node test/support/fixture.mjs session` and have since before C24 existed. What is missing is the ruling in C22 §13 that makes a verb\'s result a pushed view; nothing pushes a `kind: \"view\"` layer, so the view this row pops out of cannot be opened",
   );
 });

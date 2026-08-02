@@ -35,7 +35,7 @@
  * the other's half.
  */
 
-import { renderSequenceToLines } from "../testing/index.js";
+import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { sliceCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
 import { FrameError, exact } from "./paint.js";

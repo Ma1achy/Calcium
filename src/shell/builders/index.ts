@@ -82,12 +82,14 @@ import type {
  */
 function finish<B extends Block>(spec: B, opts: BlockOpts | undefined, gapDefault: boolean): B {
   const explicit = opts?.gapBefore;
-  const withGap =
-    explicit !== undefined
-      ? { ...spec, gapBefore: explicit }
-      : gapDefault
-        ? { ...spec, gapBefore: true }
-        : spec;
+  const gap = explicit ?? gapDefault;
+
+  // **Written only when it is true.** C04's `Gap` is `gapBefore?: boolean` and
+  // `measure` counts `=== true`, so `false` and absent are the same block said
+  // two ways — and a builder that emitted `gapBefore: false` where `block()`
+  // omits it would produce something that renders identically and compares
+  // unequal. T4.6's pairing assertion found exactly that.
+  const withGap = gap ? { ...spec, gapBefore: true } : spec;
 
   const built = block(withGap as B);
   if (explicit === undefined) defaulted(built);
@@ -426,6 +428,22 @@ const toned =
   };
 
 // --- the object -----------------------------------------------------------
+
+/**
+ * The builders' argument types, re-exported so C24's entry point has one place
+ * to take them from — `b` and the types it accepts are one surface, and a
+ * consumer importing them from two paths would be the first to notice.
+ */
+export type {
+  BlockOpts,
+  CellInput,
+  ChipInput,
+  ComparisonRow,
+  EventLine,
+  KeyValueInput,
+  LogLine,
+  StepInput,
+} from "./types.js";
 
 export const b = {
   rule,
