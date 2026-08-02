@@ -53,7 +53,8 @@ export type {
 // builders — §4
 export { b };
 export type {
-  ColumnDef, CellInput, StepInput, LogLine, EventLine, ChipInput, ComparisonRow,
+  BlockOpts, ColumnDef, CellInput, KeyValueInput, StepInput, LogLine,
+  EventLine, ChipInput, ComparisonRow,
 };
 
 // adapters — the extension point they use most
@@ -114,36 +115,46 @@ The API's quality is mostly this, because an adapter is the thing a consumer wri
 **`b` never freezes or validates directly.** It delegates both. Freezing here as well would give C04 I1 two enforcement points, and the one that drifts is always the one with fewer tests — a block frozen twice is indistinguishable from a block frozen once, right up until one of the two paths stops doing it.
 
 ```typescript
+/** What every block-returning builder accepts, and the only declaration of it. */
+export type BlockOpts = Readonly<{ id?: string; gapBefore?: boolean }>;
+
 export const b: {
-  rule(label: string, meta?: string): Rule;
+  rule(label: string, meta?: string, opts?: BlockOpts): Rule;
   notice: {
-    (tone: Tone, text: string, glyph?: Glyph): Notice;
-    ok(text: string): Notice;  warn(text: string): Notice;
-    error(text: string): Notice;  info(text: string): Notice;
+    (tone: Tone, text: string, glyph?: Glyph, opts?: BlockOpts): Notice;
+    ok(text: string, opts?: BlockOpts): Notice;
+    warn(text: string, opts?: BlockOpts): Notice;
+    error(text: string, opts?: BlockOpts): Notice;
+    info(text: string, opts?: BlockOpts): Notice;
   };
-  kv(rows: Record<string, string | CellInput>): KeyValue;
-  table(spec: { columns: ColumnDef[]; rows: TableRow[]; showHeader?: boolean;
-                emptyMessage?: string; id?: string }): Table;
+  kv(rows: Record<string, string | KeyValueInput>, opts?: BlockOpts): KeyValue;
+  table(spec: BlockOpts & { columns: ColumnDef[]; rows: TableRow[];
+                            showHeader?: boolean; emptyMessage?: string }): Table;
   col(key: string, spec?: Partial<Omit<ColumnDef, "key">>): ColumnDef;
   seq(blocks: readonly Block[]): readonly Block[];      // §4a
   row(id: string, cells: Record<string, string | CellInput>,
       opts?: { detail?: Block[]; actions?: Action[] }): TableRow;
-  steps(steps: StepInput[]): Steps;
-  logs(lines: LogLine[]): Logs;
-  events(events: EventLine[]): Events;
-  plot(spec: { series: Series[]; height: number; axes?: boolean }): Plot;
-  spark(values: number[]): Plot;                   // the sparkline path; height 1
-  progress(spec: { label: string; current: number; total: number }): Progress;
-  code(language: string, text: string, opts?: { wrap?: boolean }): Code;
-  comparison(rows: ComparisonRow[]): Comparison;
-  patch(spec: { path: string; language: string; hunks: Hunk[];
-                layout?: "unified" | "split" }): Patch;
-  pills(chips: ChipInput[]): Pills;
-  tip(text: string, actions?: Action[]): Tip;
-  panel(title: string, children: Block[]): Panel;
-  group(direction: "row" | "column", children: Block[]): Group;
-  raw(text: string): Raw;
-  spinner(label: string): Steps;
+  steps(steps: StepInput[], opts?: BlockOpts): Steps;
+  logs(lines: LogLine[], opts?: BlockOpts): Logs;
+  events(events: EventLine[], opts?: BlockOpts): Events;
+  plot(spec: BlockOpts & { series: Series[]; height: number;
+                           axes?: boolean }): Plot;
+  spark(values: number[], opts?: BlockOpts): Plot; // the sparkline path; height 1
+  progress(spec: BlockOpts & { label: string; current: number;
+                               total: number }): Progress;
+  code(language: string, text: string,
+       opts?: BlockOpts & { wrap?: boolean }): Code;
+  comparison(rows: ComparisonRow[], opts?: BlockOpts): Comparison;
+  patch(spec: BlockOpts & { path: string; language: string; hunks: Hunk[];
+                            layout?: "unified" | "split" }): Patch;
+  pills(chips: ChipInput[], opts?: BlockOpts): Pills;
+  tip(text: string, actions?: Action[], opts?: BlockOpts): Tip;
+  panel(title: string, children: Block[],
+        opts?: BlockOpts & { footer?: string }): Panel;
+  group(direction: "row" | "column", children: Block[],
+        opts?: BlockOpts): Group;
+  raw(text: string, opts?: BlockOpts): Raw;
+  spinner(label: string, opts?: BlockOpts): Steps;
 
   // cell shorthands
   id(text: string): Cell;   ok(text: string): Cell;   warn(text: string): Cell;
@@ -161,6 +172,39 @@ export const b: {
 **Builders return frozen blocks directly**, not descriptions. Deferred construction would buy call-site error messages at the cost of a second type family every consumer must learn — and the error messages are recoverable later by carrying a source hint on the validator.
 
 **Ids are generated unless supplied.** They matter only for blocks a consumer will address with a `replace` or `merge` patch; supply one then, and otherwise ignore them. Row ids come from data (`b.row(r.uuid, …)`), ids are never rendered, and golden frames therefore never see them.
+
+**`BlockOpts` is one type, declared once, and every block-returning builder takes
+it.** This paragraph and the one on `gapBefore` below used to commit to something
+the signatures could not express: only `b.table` took an `id`, and *nothing* took
+a `gapBefore`. So "an explicit `gapBefore` always wins" (I15), T2.9's explicit
+`false` and `true` per builder, and T2.11's explicit `true` on a first block were
+all unwritable — three tests and an invariant resting on an argument that did not
+exist. `b.panel` had the same shape of hole against `footer`, which S12 §2 and
+S13 §2 both draw and C04's `Panel` has carried since.
+
+The seventeen positional builders take `opts?` last. **`b.table`, `b.plot`,
+`b.progress`, `b.patch` and `b.panel` spread `BlockOpts` into the spec object
+they already take** rather than growing a second bag beside it — two places for
+one set of fields is the drift a shared type prevents, and it is the argument
+that gives the tree one block-id counter rather than two. `b.code` and `b.panel`
+intersect it with the option that is theirs alone.
+
+**A post-modifier was rejected, and §4a is why.** `b.at(block, { gapBefore })`
+would leave the signatures alone, and it cannot work: the default is a
+*preference* until `b.seq` resolves it, and `b.at(block, { gapBefore: false })`
+is indistinguishable from a block whose default happened to be false. `b.seq`
+could not tell *the consumer said no gap* from *no gap decided yet*. An argument
+is set-or-absent at construction, which is exactly the distinction the marker
+records.
+
+**`b.kv` narrows rather than discarding.** `KeyValue` rows are
+`{ label; value: string; tone? }` — no glyph, no spark — so a `CellInput`
+carrying either has nowhere to put it. `b.kv` takes `KeyValueInput`
+(`{ text: string; tone?: Tone }`) instead: the cell shorthands set only `text`
+and `tone` and still pass, and a hand-written literal with a `glyph` is a compile
+error under excess property checking. Silently dropping the field would be a
+parameter that accepts what it cannot honour — the vacuity class arriving as an
+argument type.
 
 **A bare string is a cell with default tone.** `{ family: "digit-classifier" }` and `{ status: b.warn("degraded") }` in the same object, because most cells carry no tone and paying `{ text: … }` for all of them is the noise this removes.
 
@@ -370,7 +414,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **I12** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.
 - **I13** — `tui-kit/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 - **I14** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
-- **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
+- **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The explicit value arrives through `BlockOpts`, which every one of them accepts; before that argument existed the invariant was unwritable as a test, and so was the half of §4 that promised it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 - **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
 - **I17** — `b.seq` is the only place a block's position changes what it carries, and it changes it at construction rather than at measurement (§4a). C04 §3a's ruling stands: a block measures the same wherever it is concatenated. Before this, no code anywhere stripped a first block's gap — the rule every S-series figure depends on was discipline, and the one file in `src/` that set `gapBefore` set it by hand, per position.
 
