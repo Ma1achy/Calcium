@@ -40,6 +40,13 @@ const CHROME_CELLS = 4;
  */
 const GLYPH_CELLS = 2;
 
+/** The widest hint, in cells — the detail column's floor, since the label flexes. */
+function widestDetail(candidates: readonly Candidate[]): number {
+  let widest = 1;
+  for (const c of candidates) widest = Math.max(widest, c.detail === undefined ? 0 : cells(c.detail));
+  return widest;
+}
+
 /** The widest candidate label plus its glyph, in cells — the value column's floor. */
 function widestLabel(candidates: readonly Candidate[]): number {
   let widest = 1;
@@ -83,6 +90,14 @@ export function menuBlocks(
             align: "left",
             priority: 1,
             minWidth: widestLabel(candidates),
+            // **The flex is C19's declaration, not a default C11 should
+            // change** (I18). C11 gives residual width only to a `flex` column
+            // — plan.ts step 8, a stated decision — and every surface's drop
+            // table was computed against it, so widening the default would
+            // invalidate twelve column declarations to repair one programmatic
+            // table. The label is the column that should absorb: it is what the
+            // user is reading, and the hint is right-aligned against it.
+            flex: true,
             sortable: false,
           },
           {
@@ -90,8 +105,7 @@ export function menuBlocks(
             label: "",
             align: "right",
             priority: 2,
-            minWidth: 1,
-            flex: true,
+            minWidth: widestDetail(candidates),
             sortable: false,
           },
         ],

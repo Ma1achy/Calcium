@@ -20,6 +20,7 @@ import {
   COMPONENT_SOURCES,
   KIND_OF_COMPONENT,
   LAYER_SOURCES,
+  NO_COMPONENT_MARKER,
   todoCalls,
 } from "../../tools/enforce/todo-expiry.mjs";
 
@@ -326,15 +327,44 @@ describe("todo expiry", () => {
     ]);
   });
 
-  it("a skip that declares no wait is not a deferral", () => {
-    // The other half of the skip ruling, and the reason it adds a verb rather
-    // than a code path: a skip with no clause names no blocker and falls out
-    // through `blockersIn`'s empty array, exactly as everything else without one.
+  it("TD6: a skip that declares no wait at all is a violation, not an exemption", () => {
+    // **This row asserted the hole, and TD6 is what closed it.** It used to say
+    // *a skip with no clause is not a deferral* — which was true of the
+    // mechanism and false of what the mechanism was for. A title carrying no
+    // `waits on` fell out through `blockersIn`'s empty array and was skipped by
+    // every other arm, so a blocker phrased as a condition — "blocked on L4
+    // drawing no overlays" — named nothing to watch and outlived what it
+    // described by four components.
     const calls = todoCalls(`it.skip("T9.8: quarantined, flaky on CI", () => {});`);
 
     expect(calls).toHaveLength(1);
     expect(blockersIn(calls[0]!.title)).toEqual([]);
+    const raised = checkTodoExpiry([{ file: "test/x.test.ts", ...calls[0]! }]);
+    expect(raised.map((v) => v.rule)).toEqual(["TD6"]);
+  });
+
+  it("TD6: and the explicit-none form is what a quarantine writes instead", () => {
+    // **The legitimate case stays legitimate, and becomes an assertion.** Some
+    // work is deferred on no component because none is planned — an emulator
+    // honouring DECSET 2026, a 1-bit session that cannot exist, a quarantine.
+    // The arm is not "every deferral names a component"; it is *name one, or
+    // say there is none*, so the second is something someone wrote rather than
+    // the default a missing clause falls into.
+    const calls = todoCalls(
+      `it.skip("T9.8: quarantined, flaky on CI — ${NO_COMPONENT_MARKER}", () => {});`,
+    );
+
     expect(checkTodoExpiry([{ file: "test/x.test.ts", ...calls[0]! }])).toEqual([]);
+  });
+
+  it("TD6: a condition is not a blocker, which is the shape it was written for", () => {
+    // The real title, verbatim from `manifest.test.ts` before it was restated.
+    // It reads as a deferral with a reason and it is one nothing can expire.
+    const title =
+      "T5.1: a session completes, validates and rejects for every tool, with no far side — " +
+      "blocked on L4 drawing no overlays, so C15's stack never reaches the frame";
+    const raised = checkTodoExpiry([{ file: "test/x.test.ts", title }]);
+    expect(raised.map((v) => v.rule), "names a condition, not an id").toEqual(["TD6"]);
   });
 
   it("a call with no literal title is not a deferral this rule can read", () => {

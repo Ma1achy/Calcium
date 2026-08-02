@@ -311,6 +311,32 @@ export function blockersIn(title) {
   return ids.size === 0 ? null : [...ids];
 }
 
+// --- TD6 — a blocker is a component id, or explicitly none ------------------
+//
+// **The third hole in the deferral mechanism, and the one nothing watched.**
+// TD1 catches a `waits on` naming an unrecognisable id, TD3 catches a mapped
+// path that does not exist, and neither can see a deferral that declares no
+// wait at all. A title carrying no `waits on` clause is skipped entirely, and a
+// blocker phrased as a *condition* is exactly that shape:
+//
+//   "blocked on L4 drawing no overlays, so C15's stack never reaches the frame"
+//
+// It names a fact about the tree rather than an id, so there is nothing to
+// watch and nothing to expire. That one outlived what it described by four
+// components: L4 draws overlays now, and the row stayed deferred until someone
+// happened to read it.
+//
+// The legitimate case is real and stays legitimate: some work is deferred on no
+// component because none is planned — a terminal emulator that honours DECSET
+// 2026, a 1-bit session that cannot exist. So the arm is not "every deferral
+// names a component". It is **name one, or say in as many words that there is
+// none**, which makes the second an assertion someone had to write rather than
+// the default a missing clause falls into.
+const EXPLICIT_NONE = /not deferred on a component/i;
+
+/** The marker phrase, exported so a test and the rule cannot drift apart. */
+export const NO_COMPONENT_MARKER = "not deferred on a component";
+
 /**
  * The check, as a pure function over its inputs.
  *
@@ -347,6 +373,24 @@ export function checkTodoExpiry(
     }
 
     const blockers = blockersIn(title);
+
+    // TD6 — declares no wait at all. Either it names a blocker or it says
+    // there is none; a title that does neither is invisible to every other arm
+    // here, which is how a blocker phrased as a condition survived four
+    // components.
+    if (blockers !== null && blockers.length === 0 && !EXPLICIT_NONE.test(title)) {
+      violations.push({
+        rule: "TD6",
+        file,
+        message:
+          `todo declares no blocker — no "waits on <id>" clause and no ` +
+          `"${NO_COMPONENT_MARKER}". A blocker phrased as a condition ("blocked on ` +
+          `L4 drawing no overlays") names nothing to watch, so nothing can expire it. ` +
+          `Title: ${JSON.stringify(title.slice(0, 90))}`,
+        spec: "A03 commitment 14",
+      });
+      continue;
+    }
 
     if (blockers === null) {
       violations.push({

@@ -99,6 +99,6 @@ describe("C22 §4 step 1 — the TTY gate", () => {
   // `expect(true).toBe(true)` under an honest comment — which is the vacuity
   // class arriving in the test written to record a vacuity.
   it.todo(
-    "T3.5b: non-TTY stdout with a `oneShot` verb → one frame to stdout, exit 0, no session — unwritable: `oneShot` has no subject. `parse.ts` produces the field and `types.ts` documents it as bypassing this gate; nothing outside the parser reads it, because `createTui(config)` takes no argv and §4 step 1's parse does not happen at all. It resolves by `oneShot` arriving through `config` with the app parsing argv — C06 I18 settled that pattern for `PRISM_TUI_TRANSPORT`, and C22 §12a's theme persistence is the same shape",
+    "T3.5b: non-TTY stdout with a `oneShot` verb → one frame to stdout, exit 0, no session — unwritable, and not deferred on a component: `oneShot` has no subject. `parse.ts` produces the field and `types.ts` documents it as bypassing this gate; nothing outside the parser reads it, because `createTui(config)` takes no argv and §4 step 1's parse does not happen at all. It resolves by `oneShot` arriving through `config` with the app parsing argv — C06 I18 settled that pattern for `PRISM_TUI_TRANSPORT`, and C22 §12a's theme persistence is the same shape",
   );
 });

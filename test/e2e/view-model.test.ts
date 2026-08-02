@@ -341,6 +341,6 @@ describe("C04 e2e — the drift tests", () => {
   }, 90_000);
 
   it.todo(
-    "T5.3b: a --watch stream applying *merge* patches — an expanded row stays expanded and stays put. The append half is T5.3a. What this needs is a patch that is not an append: the default stream adapter maps every `data` patch to `op: \"append\"` (`src/data/adapters/stream.ts`), and `op: \"merge\"` is only reachable through an app adapter's `adaptPatch`. So it needs two harness parameters — a registered adapter in `fixture.mjs` mapping a far-side line onto an existing table row, and a `tail` that emits rows rather than notices — and neither exists. Split from T5.3 rather than left bundled: the append half was reachable and was waiting behind the merge half's blocker",
+    "T5.3b: a --watch stream applying *merge* patches — an expanded row stays expanded and stays put. Not deferred on a component: what it needs is two harness parameters, and every component involved is built. The append half is T5.3a. What this needs is a patch that is not an append: the default stream adapter maps every `data` patch to `op: \"append\"` (`src/data/adapters/stream.ts`), and `op: \"merge\"` is only reachable through an app adapter's `adaptPatch`. So it needs two harness parameters — a registered adapter in `fixture.mjs` mapping a far-side line onto an existing table row, and a `tail` that emits rows rather than notices — and neither exists. Split from T5.3 rather than left bundled: the append half was reachable and was waiting behind the merge half's blocker",
   );
 });

@@ -40,6 +40,14 @@ export declare function blockerClause(text: string): string;
 /** Every `it`/`test`/`describe` `.todo`/`.skip` call, past comments (A03 §9a). */
 export declare function todoCalls(source: string): TodoCall[];
 
+/**
+ * The phrase a deferral writes when it waits on no component (TD6).
+ *
+ * Exported rather than repeated, so the rule and the tests that fabricate
+ * against it cannot come to disagree about the form.
+ */
+export declare const NO_COMPONENT_MARKER: string;
+
 /** Exists, and holds more than the scaffold's `export {}`. */
 export declare function defaultIsImplemented(path: string): boolean;
 

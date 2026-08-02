@@ -132,9 +132,9 @@ describe("C05 e2e", () => {
   }, 40_000);
 
   it.todo(
-    "T5.2: replacing the fixture with a manifest fetched from a real binary changes the completable surface — needs C05 B6's fetch path, which nothing implements: `TuiConfig.manifest` takes a parsed manifest or a file path, and neither runs a binary",
+    "T5.2: replacing the fixture with a manifest fetched from a real binary changes the completable surface — not deferred on a component, and that is the honest label: C05 is built and B6's fetch path is unbuilt work inside it, so naming C05 would expire the moment it was read. What is missing is `TuiConfig.manifest` accepting something that runs a binary; it takes a parsed manifest or a file path, and neither does: `TuiConfig.manifest` takes a parsed manifest or a file path, and neither runs a binary",
   );
   it.todo(
-    "T5.3: a tool with no adapter renders through the fallback adapter — needs a fixture result that is not a tui.view/1 document, so the fallback has something to adapt",
+    "T5.3: a tool with no adapter renders through the fallback adapter — not deferred on a component: every component this needs is built, and what is missing is a harness route whose stdout is not a `tui.view/1` document, so the fallback has something to adapt. Writable as soon as `farside.mjs` grows one",
   );
 });

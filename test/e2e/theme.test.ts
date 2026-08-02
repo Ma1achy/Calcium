@@ -148,7 +148,7 @@ describe("C10 e2e", () => {
     // to ask for depth 1, because the only route to it is the one that also
     // makes a session impossible. That is a capability decision rather than a
     // test, and it is recorded here because this row is where it surfaced.
-    "T5.3: a real session under TERM=dumb emits no colour at all — unwritable: `dumb` is the only trigger for depth 1 and it also fails C01's alternate-screen gate, so a 1-bit session cannot exist. The property is T5.1a; the gap is that nothing else can ask for depth 1",
+    "T5.3: a real session under TERM=dumb emits no colour at all — unwritable, and not deferred on a component: `dumb` is the only trigger for depth 1 and it also fails C01's alternate-screen gate, so a 1-bit session cannot exist. The property is T5.1a; the gap is that nothing else can ask for depth 1",
   );
 
 

@@ -542,6 +542,7 @@ Each check names, on failure: the rule, the file, the line, and the spec that de
 15. **The deferral rule reports mislabelled blockers, not only expired ones.** That is its second value, and it is the one nobody designs for. For surface deferrals it is a check rather than a consequence: TD4 asserts the named blocker's kind appears in that surface's own composition, which is the one form of "wrong blocker" that is derivable from two things a surface spec already states (§9a).
 15a. **A surface deferral's blocker is the right component** (TD4, §9a), checked from two things a surface spec already states: which section holds its illustration, and what the surface composes to. Half of it has no live subject once C25 lands, and the suite asserts that rather than leaving it to be assumed.
 15b. **No rule id appears twice in this document.** Every other check here compares sets, so a duplicated id is one member and the second rule is invisible to all of them (§2).
+15b. **A deferral names a component id or says it names none** (TD6, §9a). A blocker phrased as a fact about the tree names nothing to watch, so nothing can expire it — the third hole, after a wrong blocker and a missing path, and the only one whose failure mode is a deferral that reads correctly.
 16. **Every path the deferral map names exists** (TD3, §9a). A mapped file that is not there reports compliance because it cannot find what it was asked about, which is commitment 14's vacuity class inside the deferral machinery itself.
 17. **A spec's invariants are numbered 1..n, in order** (SP2, §7a). The numbers are what a citation resolves against, so a list that has stopped ascending has stopped locating anything — and this one drifted for twenty specs because it was a habit rather than a mechanism (§2). A lettered variant sits beside its base, because adjacency is the whole of what the letter says.
 18. **Every invariant reference resolves, everywhere, not only in the specs** (SP3, §7a). SP1 stops at `docs/components/`; the eleven hundred bare references in `src/`, `test/` and the other documents were resolved by nothing. **The rule states where it stops**: it proves a reference resolves against its owner, not that the owner is the intended one, and a qualified reference is preferred wherever a file's owner is not obvious from its path.
@@ -607,6 +608,18 @@ Four forms now reached, each with a fabrication:
 The last is TD5 proper, and it is the one that survives the obvious verification. A concatenated title *is* found, so a count against `grep -c` agrees — while only the first fragment is read. That fragment rarely contains "waits on", so the deferral files as declaring no wait at all: exempt, and indistinguishable from a test that never claimed to be waiting. So the rule **rejects** a concatenated title rather than reading it. Joining the operands was the alternative and it is the worse one: a clause split across the join reassembles into something nobody wrote, and a rejection is visible where a truncation is not.
 
 **The verification is two assertions, and the second is the point.** A count catches every locator miss and is blind to TD5. So the suite also asserts that nothing collected is a fragment — the half with no live subject in the tree today, which the mutation pass surfaced and which is stated there rather than left to look covered.
+
+### TD6 — a blocker is a component id, or explicitly none
+
+**The third hole, and the one nothing watched.** TD1 catches a `waits on` naming an unrecognisable id and TD3 catches a mapped path that does not exist; neither can see a deferral that declares no wait at all. A title with no `waits on` clause fell out through `blockersIn`'s empty array and was skipped by every arm — so a blocker phrased as a *condition* named nothing to watch:
+
+> *blocked on L4 drawing no overlays, so C15's stack never reaches the frame*
+
+It reads as a deferral with a reason and it is one nothing can expire. L4 draws overlays now, and that row stayed deferred for four components until someone read it; the defect it was hiding — half the completion menu rendering as ellipses (C19 I18) — went with it.
+
+**The legitimate case is real and stays legitimate.** Some work is deferred on no component because none is planned: an emulator honouring DECSET 2026, a 1-bit session that cannot exist, a quarantined flake. So the rule is not *every deferral names a component*. It is **name one, or say in as many words that there is none** — `not deferred on a component` — which makes the second something a person wrote rather than the default a missing clause falls into. That is the same shape as `UNSCAFFOLDED` and `ACKNOWLEDGED_BACKLOG`: the exemption exists, and it costs a sentence.
+
+Seven deferrals in the tree took the marker when the rule landed, and two of the seven were restatements it forced: one naming a component that is built with unbuilt work inside it, one naming a harness gap that no component owns.
 
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
 
