@@ -668,7 +668,8 @@ The generic suite. **These run against every registered block kind, including ap
 
 - **T5.1**: a real session scrolls a 10,000-block transcript top to bottom; every block's on-screen row count matches its measured height, sampled at every screenful. The drift test.
 - **T5.2**: the same, at four terminal widths, with resize between passes.
-- **T5.3**: a `--watch` stream applying `merge` patches for sixty seconds → the viewport does not jump, and an expanded row stays expanded and stays put.
+- **T5.3a** (C14 I4): a live stream appending above a **detached** viewport does not move it. The control has to come *after* the claim: the lines that arrive while detached are never drawn — which is the property — so counting them in the captured bytes cannot work, and the stream's advance is read from the bottom once the view is re-attached.
+- **T5.3b**: the same with `merge` patches → an expanded row stays expanded and stays put. **Split from T5.3 rather than left bundled**, because the two halves have different blockers and the append half was reachable while waiting behind the other. What the merge half needs is a patch that is not an append: the default stream adapter maps every `data` patch to `op: "append"` (`src/data/adapters/stream.ts`), and `op: "merge"` is reachable only through an app adapter's `adaptPatch`. So two harness parameters — a registered adapter mapping a far-side line onto an existing table row, and a streaming verb that emits rows rather than notices.
 
 ### Tier 6 — fail-on-revert
 

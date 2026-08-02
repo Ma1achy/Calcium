@@ -499,14 +499,14 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
    * resolve to `src/shell/execution.ts`, and the rows naming them are the tier-5
    * ones still to be written or restated. They were 8 and 6; the transport,
    * parser and harness groups took them to 7 and 2, the TTY gate to 6, and
-   * C04's two drift rows to 4. The remaining groups take them to nothing.
+   * C04's three drift rows to 3. The remaining groups take them to nothing.
    *
    * **Listed rather than left failing**, because TD0 compares by equality and a
    * red suite mid-stretch is a suite nobody reads. The count is the progress
    * bar: each group that lands lowers it, and the day it reaches zero these two
    * lines are deleted rather than remembered.
    */
-  "TD2 src/shell/execution.ts (4)",
+  "TD2 src/shell/execution.ts (3)",
   "TD2 src/shell/execution.ts (2)",
 
   // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two

@@ -223,7 +223,68 @@ describe("C04 e2e — the drift tests", () => {
       pty.kill();
     }
   }, 180_000);
+  it("T5.3a (C14 I4): a live stream appending above a detached viewport does not move it", async () => {
+    // **The single most noticeable correctness property in C14** (C14 §3), and
+    // the half of T5.3 that is reachable today. A frozen streaming entry that
+    // gains rows while the reader is looking further up must move only the
+    // content *below* — the anchor is what prevents the shove, and from outside
+    // the claim is simply that the rows on the screen are the same rows.
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 20_000);
+
+      // Something tall to be detached *within*, then the live stream above it.
+      pty.type("/ps --limit 120\r");
+      await pty.waitForFrame((f) => region(f).some((r) => r.includes("0000119")), 30_000);
+      pty.type("/tail\r");
+      await pty.waitForFrame((f) => region(f).some((r) => r.includes("tail 3")), 30_000);
+
+      /** The highest `tail N` on the screen right now. */
+      const streamedTo = (): number =>
+        Math.max(
+          0,
+          ...(pty.frame.join("\n").match(/tail (\d+)/g) ?? []).map((m) => Number(m.slice(5))),
+        );
+      const atDetach = streamedTo();
+      expect(atDetach, "the stream is running").toBeGreaterThan(0);
+
+      // Detach: page up, so the viewport holds an anchor and stops following.
+      pty.type(KEY.pageUp);
+      pty.type(KEY.pageUp);
+      await new Promise((r) => setTimeout(r, 400));
+
+      const before = region(pty.frame);
+      // Detached *within* the `ps` entry rather than at the stream: its rows are
+      // numbered, the stream's are `tail N`, so the two are told apart by what
+      // is on the screen and not by a row count.
+      expect(
+        before.filter((r) => /^\d{7}\b/.test(r)).length,
+        "detached inside the older entry",
+      ).toBeGreaterThan(5);
+      expect(before.join("\n"), "and not at the live stream").not.toContain("tail ");
+
+      await new Promise((r) => setTimeout(r, 1_500));
+
+      // The claim: the screen is the same screen.
+      expect(region(pty.frame), "the detached view did not move").toEqual(before);
+
+      // **And the control, which has to come afterwards.** "The frame did not
+      // change" is equally satisfied by a far side that died, and the obvious
+      // check — counting `tail N` in the captured bytes — cannot work here: the
+      // lines that arrived while detached were never *drawn*, which is the very
+      // property being asserted. So the stream is read from the bottom, after
+      // re-attaching, where the rows it wrote while nobody was looking are.
+      for (let i = 0; i < 60; i += 1) pty.type(KEY.pageDown);
+      await pty.waitForFrame((f) => f.join("\n").includes("tail "), 20_000);
+      expect(streamedTo(), `the stream advanced past ${String(atDetach)} unseen`).toBeGreaterThan(
+        atDetach + 3,
+      );
+    } finally {
+      pty.kill();
+    }
+  }, 90_000);
+
   it.todo(
-    "T5.3: a --watch stream applying merge patches for sixty seconds — the viewport does not jump, and an expanded row stays expanded and stays put — waits on L4",
+    "T5.3b: a --watch stream applying *merge* patches — an expanded row stays expanded and stays put. The append half is T5.3a. What this needs is a patch that is not an append: the default stream adapter maps every `data` patch to `op: \"append\"` (`src/data/adapters/stream.ts`), and `op: \"merge\"` is only reachable through an app adapter's `adaptPatch`. So it needs two harness parameters — a registered adapter in `fixture.mjs` mapping a far-side line onto an existing table row, and a `tail` that emits rows rather than notices — and neither exists. Split from T5.3 rather than left bundled: the append half was reachable and was waiting behind the merge half's blocker",
   );
 });
