@@ -208,6 +208,10 @@ Two rows of pills when the candidate set is short, a table when entries have `de
 
 Pills carry `active`, which already exists, so only the table form needed a ruling. The overlay flips above the prompt when there is no room below (C15 §4) — the case that matters, since the prompt is near the bottom by definition.
 
+**The table form must declare a flex column, and until it did the menu showed nothing but ellipses** (I18). C11 hands residual width only to columns declaring `flex: true` — plan.ts step 8, a stated decision rather than an omission — so a table whose columns declare neither sits at its minimums whatever width it is given. The menu declared `minWidth: 1` and `minWidth: 0`, so at 100 columns each cell was one cell wide and every row rendered `…  …`. **Every manifest verb carrying a summary was affected and no verb without one was**, which is why it survived: `/serving` has sub-verbs and therefore no `detail`, so it takes the pills path and drew correctly, while `/promote` and `/ps` drew as ellipses. A test asserting "the menu appears" passes against both.
+
+So the value column's floor is the widest candidate label rather than a literal, and the detail column flexes into what is left. **The floor includes the selection glyph**, because the glyph is on whichever row is selected and the column has to hold it either way — a floor derived from the label alone truncates exactly one row, which reads as a flicker rather than as a width defect. `menuWidth` counts it too, and did not.
+
 Truncation is reported by C15 through `Placed.truncated`; **C19 renders the "N more" indicator itself**, because only C19 knows what the remainder is (C15 I8).
 
 Arrow keys move the selection, `Enter` accepts, `Esc` dismisses. Those bindings are C16's, dispatched to the `overlay` target — C16's `defaultKeymap` says in as many words that C18, C19 and C20 add their rows when they land, so these are C19's to write:
@@ -455,6 +459,7 @@ Columns are the whole result, not the field the row is about.
 - **I15** — Every piece of state outliving a single event carries the sequence it belongs to and is used only while that sequence is `active` (§4). The one exception is the spinner, which asks how long the earliest call still in flight has been outstanding (§7).
 - **I16** — A unique match is inserted whole followed by its own `delimiter`; a common prefix is inserted without one. The delimiter is declared by the candidate, because only its source knows whether the value is a directory, a flag taking a value, or a finished word.
 - **I17** — C19 reads no filesystem. The `path` and `executable` sources take an injected directory reader, so every test runs without one.
+- **I18** — Every candidate the menu holds is legible in it. The table form declares a flex column, so C11 has somewhere to put residual width — it gives residual width only to columns declaring `flex: true` — and the value column's floor is the widest candidate label **plus the selection glyph**, which is on whichever row is selected. Without the flex column every cell rendered `…` at any width; without the glyph in the floor, exactly the selected row truncates, which reads as a flicker rather than as a width defect. It held for every verb carrying a summary and for no verb without one, because a candidate with no `detail` takes the pills path — so half the menu was correct and a row asserting the menu appears passed against both.
 
 ---
 
@@ -545,6 +550,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T3.16**: unbalanced quotes in the input → context is `none`; nothing is offered rather than something wrong.
 - **T3.17**: cursor at position 0 of a non-empty line → verb or executable slot, as if empty.
 - **T3.18**: a dynamic source returning duplicates → deduplicated before display.
+- **T3.19** (I18): a candidate carrying a `detail` renders its label and its hint at every width from `menuWidth` upward, and the selected row renders its glyph without losing a character of the label. **Asserted on the rendered rows, not on the block**, because the block was correct throughout: the defect was `minWidth: 1` meeting C11's rule that only a `flex` column absorbs residual width, and every statement on either side of that was true. The control is a candidate with no `detail`, which takes the pills path and drew correctly all along — which is why a row asserting only that the menu appears passed against the defect.
 
 ### Tier 4 — integration
 
@@ -590,6 +596,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T6.14** (I16): appending the delimiter after a common prefix as well as after a unique match → T1.15 fails, and the second `Tab` never reaches the menu because the token it would have widened has been closed.
 - **T6.15** (I16): moving the delimiter into the engine as one rule → T1.15b fails on two of its three cases, since nothing outside the source knows a directory from a file.
 - **T6.11** (I14): offering verbs for bare text → T1.2 fails.
+- **T6.16** (I18): removing `flex` from the detail column, or putting the value column's floor back to a literal → T3.19 fails on the first and on the second, and the menu goes back to a column of ellipses at any terminal width. The two are separate mutations because they truncate differently: without the flex every row is lost, and without the glyph in the floor exactly the selected one is.
 
 ---
 
