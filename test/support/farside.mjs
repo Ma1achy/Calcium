@@ -151,7 +151,13 @@ switch (verb) {
     // A manifest-declared flag rather than a new verb: C18 refuses a verb the
     // manifest does not declare before a transport is consulted, and `--search`
     // is already `ps`'s.
-    if (flag("search") !== null) {
+    // **Keyed on the exact value, not on the flag's presence.** `--search` is a
+    // real flag of a real verb and parser T5.5 already spends it on a resolved
+    // `$_` UUID — so an arm that fired on any `--search` answered that row with
+    // prose instead of the table it asserts against, and a harness parameter
+    // added for one row silently changed another. Caught by the full tier-5 run
+    // and not by the row that introduced it.
+    if (flag("search") === "prose") {
       const prose =
         "a considerably longer line of prose that occupies several rows at sixty-four " +
         "columns and appreciably fewer at a hundred and twenty, which is the whole " +
