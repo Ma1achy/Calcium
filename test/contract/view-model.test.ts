@@ -50,7 +50,7 @@ const EXPECTED_KINDS = [
   "plot",
   "progress",
   "code",
-  "diff",
+  "comparison",
   "patch",
   "pills",
   "tip",

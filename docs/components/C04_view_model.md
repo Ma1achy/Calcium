@@ -81,7 +81,7 @@ Seventeen kinds ship as defaults. The union is **open** — an app registers add
 ```typescript
 type Block =
   | Rule | Notice | KeyValue | Table | Steps | Logs | Events
-  | Plot | Progress | Code | Diff | Patch | Pills | Tip | Panel | Group | Raw;
+  | Plot | Progress | Code | Comparison | Patch | Pills | Tip | Panel | Group | Raw;
 ```
 
 ```typescript
@@ -103,7 +103,7 @@ type Progress = Readonly<{ kind: "progress"; id: string; label: string;
                            current: number; total: number }> & Gap;
 type Code     = Readonly<{ kind: "code"; id: string; language: string; text: string;
                            wrap?: boolean }> & Gap;   // default false — truncate
-type Diff     = Readonly<{ kind: "diff"; id: string;
+type Comparison = Readonly<{ kind: "comparison"; id: string;
                            rows: readonly Readonly<{ field: string; a: string; b: string;
                              comparison?: "same" | "better" | "worse" | "changed" }>[] }> & Gap;
 type Patch    = Readonly<{ kind: "patch"; id: string;
@@ -162,7 +162,7 @@ Both are optional and independent: pinning only `yMin` at 0 is the common case, 
 | `plot` | series, axis labels, `line \| sparkline` | `sparkline` → 1; `line` → declared `height`, or `height + 2` with `axes: true` (C12 §3) |
 | `progress` | label, current, total | 1 |
 | `code` | language, text, `wrap` | lines when truncating; `Σ ceil(len / w)` when wrapping |
-| `diff` | field / a / b rows | rows + header |
+| `comparison` | field / a / b rows | rows + header |
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
 | `pills` | chips with actions | `ceil(totalWidth / w)` — one logical row that may wrap |
 | `tip` | text with fill actions | `ceil(len / w)` |
@@ -240,9 +240,9 @@ This is a rule about a degenerate width rather than a layout feature: above `2n 
 
 A `pills` block is **one logical row**. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks, not one block that wraps — wrapping is overflow behaviour, not a layout choice.
 
-### `patch` and `diff` are not variants of each other
+### `patch` and `comparison` are not variants of each other
 
-They share a name and nothing else. `diff` is rows of `{field, a, b, comparison}` — a **structured** comparison, right for S07's metric table. `patch` is hunks of text with line numbers, two palettes and collapse. Merging them would produce a block whose measurement depends on which mode it is in, and C09 I1 is the invariant that cannot bend: a kind whose height rule branches on a mode flag is a kind whose measurer and renderer drift apart quietly.
+**They used to share a name, and that was the whole problem.** `comparison` is rows of `{field, a, b, comparison}` — a structured comparison of two values for one key, right for S07's metric table. `patch` is hunks of text with line numbers, two palettes and collapse. Merging them would produce a block whose measurement depends on which mode it is in, and C09 I1 is the invariant that cannot bend: a kind whose height rule branches on a mode flag is a kind whose measurer and renderer drift apart quietly.
 
 `patch` is declared here because C04 owns every block shape — settled when `plot` moved out to C12 — but it is **registered by C25**, exactly as `table` is by C11 and `plot` by C12. `collapsedBefore` is view state that affects height, so it lives in the block (commitment 4); expanding a collapsed region patches the document rather than mutating anything external, which is the same mechanism C11 uses for expanded rows and the reason it reaches a frozen entry when an action cannot.
 
@@ -548,7 +548,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I30** — `truncateFrom` names the end characters are removed from, and defaults to `"end"`. A column that does not declare it truncates as prose does, keeping the start — the same behaviour as before the field existed, so adding it changed no rendering that had not asked to change.
 - **I31** — Row ids are unique within a table, checked by `validateDocument` alongside I14's block ids. Three things address a row by id — `merge` upserts by it (I9), C16's focus names it, and a rendered row is keyed by it — so a duplicate is ambiguous in three ways at once. It is a separate invariant from I14 because the namespaces are separate: two tables may each hold a row `r1`, and a row id never collides with a block id. Raised from C11, the first component to depend on it.
 - **I32** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
-- **I33** — `patch` and `diff` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
+- **I33** — `patch` and `comparison` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
 
 ---
 
@@ -577,7 +577,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it (I28a, D49).
 18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts (I13).
 19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump (I12).
-20. `patch` and `diff` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag (I33, D50).
+20. `patch` and `comparison` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag (I33, D50).
 21. `applyPatch` returns a `PatchResult` and never throws. Four failure cases, each named, each leaving the input document untouched (I15).
 22. Block ids are unique within a document, and `validateDocument` is where that is established (I14).
 23. `merge` never deletes a row; `replace` is how a table sheds one, and the adapter decides which it means (I21).

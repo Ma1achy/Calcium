@@ -270,14 +270,14 @@ asserted on every run.
 
 ---
 
-## 3. `Diff` carries no header labels — **C04 gap, no height delta**
+## 3. `Comparison` carries no header labels — **C04 gap, no height delta**
 
 S07 heads its columns with the two run identifiers, `a3f9b21` and `7c2d4e1`.
-`Diff` is `{field, a, b, comparison}` and carries nothing to put there, so C09
+`Comparison` is `{field, a, b, comparison}` and carries nothing to put there, so C09
 renders `field · before · after`. One row either way, so nothing drifts — but the
 surface cannot say what it is comparing, which is most of the point of a diff.
 
-Left as a finding rather than a change: adding two optional labels to `Diff` is a
+Left as a finding rather than a change: adding two optional labels to `Comparison` is a
 C04 edit, and C04 is the schema every surface derives from. It should be made
 because a surface needs it, in the commit that needs it, not speculatively here.
 

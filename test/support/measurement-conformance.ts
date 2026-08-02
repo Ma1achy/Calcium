@@ -282,7 +282,7 @@ function withOneMoreItem(b: Block): Block | null {
       return { ...b, events: [...b.events, { ts: "00:00:00", type: "extra", message: "extra" }] };
     case "steps":
       return { ...b, steps: [...b.steps, { label: "extra", state: "pending" }] };
-    case "diff":
+    case "comparison":
       return { ...b, rows: [...b.rows, { field: "extra", a: "1", b: "2" }] };
     case "table":
       return { ...b, rows: [...b.rows, { id: `${b.id}-extra`, cells: {} }] };

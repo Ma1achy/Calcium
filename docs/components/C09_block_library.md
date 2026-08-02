@@ -113,7 +113,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 | `plot` | delegated to C12 | Registered by C12 |
 | `progress` | 1 | Label, bar, percentage; bar takes the residual width |
 | `code` | lines, or wrapped lines when `wrap` | Syntax highlighting via the **`syntax` palette** (C10 §2), not tones — eight roles do not fit ten semantic slots. Truncates by default; wraps when `wrap: true` |
-| `diff` | rows + 1 | Field, a, b, comparator; three equal columns |
+| `comparison` | rows + 1 | Field, a, b, comparator; three equal columns |
 | `pills` | `ceil(totalCells / w)` | One logical row that may wrap |
 | `tip` | `ceil(cells(text) / w)` | Dim, with fill actions |
 | `panel` | children + 2 | Border, title and footer; children measured at `w - 2` |

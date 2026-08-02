@@ -242,7 +242,7 @@ export function surfaceDrops(file: string, column = 1): readonly SurfaceDrops[] 
 // --- S07 diff --------------------------------------------------------------
 
 const S07_IDENTITY: Block = block({
-  kind: "diff",
+  kind: "comparison",
   id: "s07-identity",
   gapBefore: true,
   rows: [
@@ -257,7 +257,7 @@ const S07_IDENTITY: Block = block({
 });
 
 const S07_METRICS: Block = block({
-  kind: "diff",
+  kind: "comparison",
   id: "s07-metrics",
   gapBefore: true,
   rows: [

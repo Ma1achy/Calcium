@@ -186,7 +186,7 @@ describe("C09 contract — measurement", () => {
     expect([...kit.kinds].sort()).toEqual(
       [
         "code",
-        "diff",
+        "comparison",
         "events",
         "group",
         "keyValue",
@@ -236,7 +236,7 @@ describe("C09 contract — measurement", () => {
 
     expect([...kit.kinds].sort()).toEqual([
       "code",
-      "diff",
+      "comparison",
       "events",
       "group",
       "keyValue",

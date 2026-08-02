@@ -284,8 +284,8 @@ export type Code = Readonly<{
   wrap?: boolean;
 }> & Gap;
 
-export type Diff = Readonly<{
-  kind: "diff";
+export type Comparison = Readonly<{
+  kind: "comparison";
   id: string;
   rows: readonly Readonly<{
     field: string;
@@ -385,7 +385,7 @@ export type Block =
   | Plot
   | Progress
   | Code
-  | Diff
+  | Comparison
   | Patch
   | Pills
   | Tip

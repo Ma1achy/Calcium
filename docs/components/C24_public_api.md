@@ -46,7 +46,7 @@ export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
 // blocks — the type a consumer returns
 export type {
   Block, Rule, Notice, KeyValue, Table, TableRow, Cell, Steps, Logs, Events,
-  Plot, Series, Progress, Code, Diff, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
+  Plot, Series, Progress, Code, Comparison, Patch, Hunk, Pills, Tip, Panel, Group, Raw,
   Tone, Glyph, Action, ErrorLike, ViewDocument, ViewPatch,
 };
 
@@ -117,7 +117,7 @@ export const b: {
   spark(values: number[]): Plot;                   // the sparkline path; height 1
   progress(spec: { label: string; current: number; total: number }): Progress;
   code(language: string, text: string, opts?: { wrap?: boolean }): Code;
-  diff(rows: DiffRow[]): Diff;
+  comparison(rows: ComparisonRow[]): Comparison;
   patch(spec: { path: string; language: string; hunks: Hunk[];
                 layout?: "unified" | "split" }): Patch;
   pills(chips: ChipInput[]): Pills;

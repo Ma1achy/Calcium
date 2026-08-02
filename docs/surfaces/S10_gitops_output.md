@@ -100,7 +100,7 @@ Dry run still renders the artefact — seeing it is the point of the flag.
 ▌   ↗ !1255                                                              1.8s
 ```
 
-A `diff` block of the changed fields only. `undeploy` likewise shows the file being removed rather than its contents.
+A `comparison` block of the changed fields only. `undeploy` likewise shows the file being removed rather than its contents.
 
 ---
 
@@ -112,7 +112,7 @@ The whole-manifest `code` form survives for exactly one case — **a first submi
 
 `patch` does not wrap (C25 I2) — a wrapped diff line destroys the gutter alignment that makes a diff readable. That is not the same compromise as truncating a manifest: a diff line truncated at the right is still recognisably the line that changed, whereas a manifest truncated at the right is a different manifest. The two blocks make opposite calls because they are answering different questions.
 
-§4's `scale` case is unaffected and stays a `diff`. A replica count is a structured change, not a textual one, and rendering it as hunks would be a worse fit than the field comparison it already uses.
+§4's `scale` case is unaffected and stays a `comparison`. A replica count is a structured change, not a textual one, and rendering it as hunks would be a worse fit than the field comparison it already uses.
 
 ---
 
@@ -199,7 +199,7 @@ File paths in steps truncate from the left, keeping the filename.
 9. Partial failures name the branch, so work is never stranded silently.
 10. Artefact blocks set `code.wrap: true`; a manifest is never truncated.
 11. A change against something already deployed renders as a `patch`; the whole-manifest `code` form is kept only for a first submission, where there is nothing to diff against.
-12. `scale` stays a `diff` — a replica count is a structured change, not a textual one.
+12. `scale` stays a `comparison` — a replica count is a structured change, not a textual one.
 11. No action approves, merges or retries.
 12. Nothing on this surface is reversible from this surface.
 
@@ -213,7 +213,7 @@ File paths in steps truncate from the left, keeping the filename.
 - **T1.2**: the notice block precedes the artefact block in every successful render.
 - **T1.3**: `candidates/` → `ok` tone and auto-merge wording; `serving/` → `warn` tone and review wording.
 - **T1.4**: the human-review notice contains the bypass sentence verbatim.
-- **T1.5**: `scale` produces a `diff` block, not a `code` block.
+- **T1.5**: `scale` produces a `comparison` block, not a `code` block.
 - **T1.6**: a resubmission against a deployed manifest produces a `patch` block, not a `code` block, and a two-line change renders as two changed lines plus context.
 - **T1.7**: a *first* submission produces a `code` block with `wrap: true` — there is nothing to diff against, and a patch of all-additions is a worse rendering of a new file.
 - **T1.6**: `undeploy` names the file and does not render its contents.

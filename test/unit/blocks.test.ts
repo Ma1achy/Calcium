@@ -59,7 +59,7 @@ describe("C09 §6 — the registry's transition table", () => {
       events: 1, // events
       progress: 1, // label, bar, percentage
       code: 2, // lines
-      diff: 2, // rows + header
+      comparison: 2, // rows + header
       pills: 1, // one logical row
       tip: 1, // ceil(cells / w)
       panel: 4, // children + 2
@@ -69,6 +69,14 @@ describe("C09 §6 — the registry's transition table", () => {
 
     for (const [kind, height] of Object.entries(documented)) {
       const fixture = ONE_PER_KIND[kind as "raw"];
+
+      // **A missing fixture measures as 1, which seven of these entries
+      // document.** The `comparison` rename found it: the key here went stale,
+      // `ONE_PER_KIND["diff"]` became `undefined`, and `measure` answered 1
+      // rather than raising — so `rule`, `notice`, `events`, `progress`,
+      // `pills`, `tip` and `group` would each have passed against no fixture at
+      // all. Only `comparison` failed, and only because its height is 2.
+      expect(fixture, `${kind} has a fixture`).toBeDefined();
       expect(kit.measure(fixture, 80), `${kind} at width 80`).toBe(height);
     }
   });
@@ -253,6 +261,25 @@ describe("C09 §6 — kinds", () => {
     expect(later[1]).not.toBe(first[1]);
     expect(later[0]).toBe(first[0]);
     expect(later, "and the height never changes").toHaveLength(first.length);
+  });
+
+  it("T1.4b (C04 §2): a comparison's columns are labelled `a` and `b`, never directional", () => {
+    // **The ruling the rename carried, and nothing covered it.** The type has
+    // said `a`/`b` since C04 and the renderer's header said `before`/`after` —
+    // directional names for a kind whose primary consumer, S07, compares two
+    // *runs*. There is no before-and-after there, and a label that is wrong for
+    // half a kind's consumers invites an adapter to swap the fields to make the
+    // naming true.
+    //
+    // Asserted on the rendered header rather than on the type, because the type
+    // was already right; the two disagreed, and only the screen showed it.
+    const kit = measurable();
+    const header = visible(kit.renderToLines(ONE_PER_KIND.comparison, 60)[0] ?? "");
+
+    expect(header, "positional labels").toMatch(/\ba\b/);
+    expect(header, "both of them").toMatch(/\bb\b/);
+    expect(header, "and not directional ones").not.toContain("before");
+    expect(header, "either of them").not.toContain("after");
   });
 
   it("T1.12b (I5): under ASCII every glyph is one cell and the row count is unchanged", () => {

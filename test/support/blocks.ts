@@ -91,9 +91,9 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
     text: "name: api\nreplicas: 3\n",
   }),
 
-  diff: block({
-    kind: "diff",
-    id: "diff-1",
+  comparison: block({
+    kind: "comparison",
+    id: "comparison-1",
     rows: [{ field: "p99", a: "120ms", b: "98ms", comparison: "better" }],
   }),
 

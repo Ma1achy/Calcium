@@ -2,9 +2,37 @@
 
 | | |
 |---|---|
-| **Status** | Decided, unscheduled. Working note |
-| **When** | After C23 lands, **before C24 starts** |
+| **Status** | **Done.** Landed before C24, as scheduled |
+| **When** | After C23 landed, before C24 started — the window it names |
 | **Why then** | C24 exports every block kind by name. After that it is a breaking change to a published package with `docker-tui` consuming it; before it, an internal rename |
+
+---
+
+## What landed
+
+Mechanical, as predicted: the type, the union, the definition, the validator arm,
+the registry entry, five specs and two surfaces. Both of this note's own
+corrections were already satisfied by the code — `Diff.rows[].comparison` and
+`a`/`b` were in `types.ts` before the rename touched it.
+
+**Two findings came out of it, and neither is a rename.**
+
+**The renderer's header said `before` and `after`.** The type has carried `a`/`b`
+since C04 and the screen said otherwise, so the ruling in this note was half
+implemented for as long as the kind has existed — directional labels on a kind
+whose primary consumer compares two *runs*, where there is no before-and-after.
+Nothing asserted the labels, which is why the two could disagree. T1.4b asserts
+the rendered header now, and the mutation fails it.
+
+**A missing fixture measures as 1.** `ONE_PER_KIND["diff"]` went stale under the
+rename and `measure` answered 1 rather than raising — and seven of T1.4's
+fourteen entries document a height of 1, so each would have passed against no
+fixture at all. Only `comparison` failed, and only because its height is 2. The
+row asserts the fixture is defined before measuring it.
+
+**The arrow needed no confirmation in the end.** It is not in this kind's
+renderer at all — `2 → 3` is a surface's rendering and C09 §4's substitution is
+the glyph table's, so a rename of the kind could not disturb it.
 
 ---
 
