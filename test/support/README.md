@@ -56,6 +56,12 @@ Two things follow for anyone adding a helper here.
   `SIGTERM` passes identically when the child died. `scripts.ignoring` announces
   each caught signal on stdout instead: a line written after delivery cannot come
   from a dead process.
+- **A parameter that is missing and unwanted is recorded, not added.**
+  `runInPty` hard-codes 80 × 24 and takes no size option, where `interactivePty`
+  takes `cols` and `rows`. The asymmetry is real and no row needs it. Adding the
+  option would create the exact thing this file's first rule is about — a
+  parameter with no caller, and so no test that it takes effect — so it is written
+  down here instead, where the next row that wants it will find it.
 - **A parameter with no observable effect is a finding, not a gap to skip.** It
   may mean the parameter should not exist yet. `measurable({ tick })` is
   observable through exactly one block kind — `steps` with an `active` step is

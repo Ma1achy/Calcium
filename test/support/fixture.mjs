@@ -532,7 +532,7 @@ switch (mode) {
     const { createTui } = await import("../../dist/shell/session.js");
     const { noticeDoc } = await import("../../dist/shell/documents.js");
     const { parseManifest } = await import("../../dist/data/manifest/index.js");
-    const { createFixtureTransport, createRouter } = await import(
+    const { createEmulatedTransport, createFixtureTransport, createRouter } = await import(
       "../../dist/data/transport/index.js"
     );
     const { mkdtempSync } = await import("node:fs");
@@ -558,6 +558,29 @@ switch (mode) {
     if (process.argv[3] === "no-ps") {
       document.tools = document.tools.filter((t) => t.name !== "ps");
     }
+
+    /**
+     * Which far side this session talks to (C06 I15).
+     *
+     * `fixture` is the default and every row written before this one uses it.
+     * The other three exist so the same session can be driven across all three
+     * transports and against no far side at all:
+     *
+     *   subprocess   `binary` is `farside.mjs`; **no `transport` is supplied**, so
+     *                `construct.ts`'s `defaultTransport` builds the subprocess
+     *                one itself — with `cwd: session.cwd` already threaded, which
+     *                is why a `cd` moves the next spawn without anything here.
+     *   emulated     a closure standing in for the far side, over a **fixed**
+     *                envelope. C06 I17 permits exactly this and no more: the
+     *                emulator is never a source of expected values, and C08's
+     *                world never appears in a test path.
+     *   no-farside   the same as `subprocess` with a binary that is not on PATH.
+     *                C06 T3.17 — a spawn failure is a result, not a throw — so the
+     *                session survives it and says so, which is what makes it a
+     *                *control* for the standalone-build row rather than a second
+     *                way of observing silence.
+     */
+    const farSide = process.argv[3] ?? "fixture";
 
     const parsed = parseManifest(document);
     if (!parsed.ok) {
@@ -612,8 +635,8 @@ switch (mode) {
       overflowed: false,
     });
 
-    const transport = createRouter({
-      default: createFixtureTransport([
+    /** Named, so the `mixed` arm routes over the same corpus rather than a second one. */
+    const corpus = [
         {
           // C05 T5.1's "validates" half needs a *positive* answer: a line that
           // cleared validation and reached the far side. Asserting the absence
@@ -687,18 +710,64 @@ switch (mode) {
             },
           ]),
         },
-      ]),
-    });
+    ];
+
+    const transport = createRouter({ default: createFixtureTransport(corpus) });
 
     /** A local handler's answer: one notice, carrying the command it ran. */
     const sessionNotice = (ctx, text) => noticeDoc(ctx.command, text, "info", { origin: "user" });
 
+    // **The emulated arm's fixed envelope**, built once and returned for every
+    // invocation. "Fixed" is the whole of what I17 permits, and it is also what
+    // makes the arm a parity check rather than a second fixture corpus: it
+    // cannot answer differently per verb, so nothing here can drift into being
+    // a source of truth about a far side.
+    const emulatedEnvelope = raw(["promote", "app.web:main"], [
+      { kind: "notice", id: "n1", tone: "info", text: "promoted app.web:main" },
+    ]);
+
+    // **`transport` is omitted, not set to undefined-with-a-key**, for the two
+    // spawning variants: `construct.ts` reads `config.transport ?? default…`, and
+    // the point of these arms is that the default path is the one under test.
+    //
+    // **`mixed` is the router doing the job it exists for** (C06 §6): one session
+    // whose `ps` reaches a real binary while every other verb answers from the
+    // corpus. It is the only arm where two transports are live at once, so it is
+    // the only one that can show the routing rather than the transports.
+    const transportFor = {
+      fixture: transport,
+      emulated: createRouter({ default: createEmulatedTransport(() => emulatedEnvelope) }),
+      mixed: createRouter({
+        default: createFixtureTransport(corpus),
+        overrides: {
+          ps: createSubprocessTransport({
+            binary: `${process.cwd()}/test/support/farside.mjs`,
+            runner: createProcessRunner({ env: process.env, stdin: process.stdin }),
+            clock: {
+              now: () => performance.now(),
+              schedule: () => ({ [Symbol.dispose]: () => {} }),
+            },
+            env: process.env,
+            cwd: () => process.cwd(),
+          }),
+        },
+      }),
+    }[farSide];
+
     const tui = createTui({
       name: "prism",
-      binary: "widget",
+      // `farside.mjs` is spawned as a single argv element, which is why it
+      // carries a shebang and the exec bit. `no-farside` names a program that
+      // does not exist, deliberately and by a name nobody will ever install.
+      binary:
+        farSide === "subprocess"
+          ? `${process.cwd()}/test/support/farside.mjs`
+          : farSide === "no-farside"
+            ? "tui-kit-no-such-far-side"
+            : "widget",
       manifest: parsed.value,
       theme: defaultTheme,
-      transport,
+      ...(transportFor === undefined ? {} : { transport: transportFor }),
       env: process.env,
       stateDir: mkdtempSync(join(tmpdir(), "tui-kit-session-")),
       // **The manifest's two app-local verbs** (C22 I3a). C23 I27 refuses a
