@@ -9,15 +9,34 @@
 //
 // **These are the first rows to drive the whole stack**, so a failure here is
 // as likely to be the harness as the component.
-import { describe, it } from "vitest";
+import { dirname } from "node:path";
+import { describe, expect, it } from "vitest";
 
 import { interactivePty, type InteractivePty } from "../support/pty.js";
 
 /** The prompt glyph reaching the PTY: the shell composed and painted a frame. */
 const PROMPT = /❯/;
 
+/** The identifier `farside.mjs` reports on `meta.resultId`, for `$_` (C18 §7). */
+const UUID = "018f2a7c-4d3e-7c1a-9b52-0e5a1f9c3d7b";
+
 const session = (): InteractivePty =>
   interactivePty("node test/support/fixture.mjs session", { cols: 100, rows: 24 });
+
+/**
+ * The subprocess arm, for the two rows whose claims are about a **spawn**.
+ *
+ * A `cwd` only exists if something was spawned, and a `resultId` only arrives if
+ * a far side reported one — so neither row can be written against the fixture
+ * corpus, which answers without either. The arm is asserted to take effect in
+ * `harness.test.ts`.
+ */
+const farSideSession = (): InteractivePty =>
+  interactivePty("node test/support/fixture.mjs session subprocess", { cols: 100, rows: 24 });
+
+/** Every directory the far side reported, in the order the frame shows them. */
+const cwdsIn = (frame: readonly string[]): string[] =>
+  [...frame.join("\n").matchAll(/cwd=(\S+)/g)].map((m) => m[1] ?? "");
 
 describe("C18 tier 5 — in a real session", () => {
   it("T5.1: a shell pipeline through jq lands in the transcript as raw text", async () => {
@@ -58,13 +77,88 @@ describe("C18 tier 5 — in a real session", () => {
     }
   }, 40_000);
 
-  it.todo(
-    "T5.4: cd .. then /ps → the verb spawns in the new directory — needs a subprocess-transport variant of the session fixture, so the spawn has a cwd to report",
-  );
-  it.todo(
-    // C20 landed, and the round trip it owes this is asserted in
-    // test/integration/history.test.ts T4.5: a stored command re-parses to what
-    // it was. The submit that produces the UUID is the shell's.
-    "T5.5: /promote $_ immediately after a submit → the UUID resolves and the line is reproducible in bash exactly as displayed — needs a fixture result carrying resultId, so $_ has something to resolve to",
-  );
+  it("T5.4: cd .. then /ps → the verb spawns in the new directory", async () => {
+    // **Nothing in the shell had to change for this**, and that is the finding
+    // rather than an aside. C06 commitment 14 says the transport reads `cwd` at
+    // spawn instead of capturing it, C22 I12 threads `session.cwd` as a function
+    // for the same reason, and `construct.ts`'s `defaultTransport` already wired
+    // the two together. What was missing was a far side that could *report*
+    // where it had been spawned — the property was live and unobservable.
+    //
+    // **What this row does not cover, learned from a mutation that failed
+    // nothing.** Making `farside.mjs` capture its own `cwd` at module load
+    // changes nothing here: it is a fresh process per invocation, so module load
+    // and answer time are the same instant, and no far side can hold a stale
+    // directory. The property is the *transport's*, and the mutation that fails
+    // this row is capturing `cwd` as a value in `defaultTransport` — which does
+    // fail it, at the second `/ps`.
+    const pty = farSideSession();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      // A control first: the directory before the `cd`, so the assertion below
+      // is about the move rather than about whatever directory the test runner
+      // happened to start in.
+      pty.type("/ps\r");
+      await pty.waitForFrame((f) => f.join("").includes(`cwd=${process.cwd()}`), 20_000);
+
+      pty.type("cd ..\r");
+      // C18 §8 — `cd` is a built-in, applied to session state.
+      await pty.waitForFrame((f) => !f.join("").includes("did not"), 15_000);
+
+      pty.type("/ps\r");
+      const parent = dirname(process.cwd());
+      await pty.waitForFrame((f) => cwdsIn(f).at(-1) === parent, 20_000);
+
+      // **The most recent report, matched whole.** Two weaker readings both pass
+      // against a captured `cwd`: the first entry is still on screen, so "the
+      // parent appears somewhere" is true from the start, and `/workspaces` is a
+      // prefix of `/workspaces/tui-kit`, so a substring test is true of the
+      // original path as well. Taking the last `cwd=` and comparing it exactly
+      // is the only reading neither can satisfy.
+      const seen = cwdsIn(pty.frame);
+      expect(seen.at(-1), "the second spawn").toBe(parent);
+      expect(seen.at(0), "and the first one is still where it was").toBe(process.cwd());
+    } finally {
+      pty.kill();
+    }
+  }, 60_000);
+
+  it("T5.5: $_ resolves after a submit, and the expansion is what reaches the far side — the *as displayed* half waits on a transcript that shows the command it ran", async () => {
+    // **The spec row named `/promote $_ --open-mr` and could not be written**:
+    // the fixture manifest gives `promote` no flags and an argument pattern of
+    // `^[\w.]+:[\w]+$`, which a UUID cannot satisfy, so C05 refused the line
+    // before `$_` could be shown to have resolved. C18 §11 T5.5 records the
+    // change. `ps` declares both parts, and `--search=$_` is the `--flag=$_`
+    // form — the reading §7's correction turned on, and the one a user is
+    // likeliest to type after a result.
+    const pty = farSideSession();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      // The submit that produces the identifier. `farside.mjs`'s `ps` carries
+      // `meta.resultId`, which C07 I13 passes through as one of its three
+      // carried fields and C23 stores as the session's last UUID.
+      pty.type("/ps\r");
+      await pty.waitForFrame((f) => f.join("").includes("far side pid="), 20_000);
+
+      pty.type("/ps --search=$_ --open-mr\r");
+      // **Asserted on the spawned argv, and that is a finding rather than a
+      // choice of instrument.** D24 and C23 I15 are about *the displayed
+      // command*, and nothing in the tree displays one: `entry.doc.command` is
+      // set on every entry and has no reader in the render path, so a transcript
+      // shows results with no record of what produced them. Until that is ruled
+      // on, the observable half of the correspondence is what reached the
+      // process — which is also the half a `$_` defect would break.
+      await pty.waitForFrame((f) => f.join("").includes(UUID), 20_000);
+
+      const frame = pty.frame.join("\n");
+      expect(frame, "expanded before the spawn, not passed through").toContain(
+        `--search=${UUID}`,
+      );
+      expect(frame, "and the literal never reached the far side").not.toContain("--search=$_");
+    } finally {
+      pty.kill();
+    }
+  }, 60_000);
 });

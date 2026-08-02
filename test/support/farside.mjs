@@ -159,7 +159,14 @@ switch (verb) {
           kind: "notice",
           id: "far-side",
           tone: "info",
-          text: `far side pid=${String(process.pid)} cwd=${process.cwd()}`,
+          // **The argv it was actually spawned with**, which is the only place
+          // a test can see what reached the process. C18 expands `$_` at parse
+          // time and D24 says the displayed command and the spawned argv
+          // correspond — and nothing renders the displayed command, so the
+          // spawned half is the observable one.
+          text:
+            `far side pid=${String(process.pid)} cwd=${process.cwd()} ` +
+            `argv=${[verb, ...rest].join(" ")}`,
         },
         {
           kind: "table",
@@ -170,7 +177,12 @@ switch (verb) {
           ],
           rows,
         },
-      ]),
+      ],
+      // **A result identifier, so `$_` has something to resolve to** (C18 §7).
+      // `resultId` is one of the three fields C07 I13 carries across from the
+      // far side's own `meta`; every other field here is overwritten. Without it
+      // `$_` is the *no previous result* error, which is a different row.
+      { resultId: "018f2a7c-4d3e-7c1a-9b52-0e5a1f9c3d7b" }),
     );
     break;
   }
@@ -195,11 +207,19 @@ switch (verb) {
   //
   // Lines before the signal are the ones C06 I7 says must survive it, so it
   // writes several immediately rather than waiting out its first interval.
+  //
+  // **The first patch carries the pid**, so a test can kill *this* child rather
+  // than pattern-matching a command line. `pkill -f "farside.mjs tail"` matches
+  // the shell that invoked the test as well — the pattern is in its own argv —
+  // so the first attempt at the external-kill row killed its own harness. A pid
+  // the far side reported is evidence nothing else can have produced.
   case "tail": {
     let n = 0;
     const write = () => {
       n += 1;
-      process.stdout.write(`${JSON.stringify({ line: n, text: `tail ${String(n)}` })}\n`);
+      process.stdout.write(
+        `${JSON.stringify({ line: n, pid: process.pid, text: `tail ${String(n)}` })}\n`,
+      );
     };
     write();
     write();

@@ -53,3 +53,33 @@ export const SCAN_BUDGET_MS = 15_000;
  * underneath the number the way a tree walk does.
  */
 export const CORPUS_BUDGET_MS = 10_000;
+
+/**
+ * For C06 T5.1 — a real binary emitting a large document, spawned, parsed,
+ * adapted, measured and drawn.
+ *
+ * **This one is a claim about the product, not a test timeout.** The others
+ * above bound how long a test may take before it is called stuck; this is the
+ * "within budget" in the row's own sentence, so it is asserted rather than
+ * merely configured, and it is the number that should move if the pipeline gets
+ * slower.
+ *
+ * Measured through a real PTY session against `farside.mjs`, from the keystroke
+ * that submits to the frame carrying the document, on an idle machine:
+ *
+ * | `ps --limit` | rows | measured |
+ * |---|---|---|
+ * | 500 | 500 | 0.2 s |
+ * | 2,000 | 2,000 | 1.3 s |
+ * | 5,000 | 5,000 | 2.0 s |
+ * | 10,000 | 10,000 | 2.6 s |
+ *
+ * Sub-linear, which is C14 virtualising: the cost is the parse and the measure,
+ * not the draw. The row uses 2,000 — large enough that a non-virtualised render
+ * would show, small enough that the number is not dominated by JSON parsing.
+ *
+ * Four times the measured 1.3 s. A smaller ratio than the scan budgets take,
+ * because this figure does not grow with the tree and a regression here is worth
+ * hearing about early.
+ */
+export const DOCUMENT_BUDGET_MS = 5_000;

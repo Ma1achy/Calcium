@@ -851,7 +851,11 @@ Six tiers. No state machine — C18 is pure.
 - **T5.2**: `ls *.md` → globbing works, because the shell does it. The `j22` reversal, tested.
 - **T5.3**: `echo {a,b,c}` → brace expansion works.
 - **T5.4**: `cd ..` then `/ps` → the verb spawns in the new directory.
-- **T5.5**: `/promote $_ --open-mr` immediately after a submit → the UUID resolves and the command is reproducible in bash exactly as displayed.
+- **T5.5**: `/ps --search=$_ --open-mr` immediately after a submit → the UUID resolves and the command is reproducible in bash exactly as displayed.
+
+  **This row named `/promote $_ --open-mr` and could not be written.** `promote` declares no flags and takes one argument matching `^[\w.]+:[\w]+$`, so `--open-mr` is refused and a UUID cannot satisfy the pattern — the line was refused by C05 before `$_` could be shown to have resolved, and a refusal notice is what the assertion would have been reading. The verb came from a real app's manifest and the fixture manifest is the one every session in the suite is built from.
+
+  `ps` carries both parts and is a better subject for the claim than the original: `--search=$_` is the `--flag=$_` form, which is exactly the reading §7's correction turned on, and `--open-mr` is one of its declared flags. The claim — expansion, and a displayed line reproducible in bash — is unchanged.
 - **T5.6**: `sleep 5 &` → refused with the documented message; the session is unaffected.
 
 ### Tier 6 — fail-on-revert
