@@ -441,6 +441,8 @@ describe("C22 §3 step 11 — the effect table", () => {
         submit: (line: string) => void submitted.push(line),
         seal: () => undefined,
         sealed: true,
+        liveStreams: 0,
+        cancelNewestStream: () => false,
         inFlight: null,
         cancel: () => undefined,
         register: () => undefined,

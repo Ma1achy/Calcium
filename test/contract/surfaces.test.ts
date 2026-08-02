@@ -134,6 +134,21 @@ describe("the S-series' illustrated heights", () => {
     const rows = frameRows(file, 0);
     const width = Math.max(...lines.map(displayCells));
 
+    // **`findIndex` — the first `❯`, and checked rather than assumed.** In a
+    // *rendered* frame the first one is a transcript echo, because C22 I33 draws
+    // each entry with the command that produced it; two e2e rows located the
+    // prompt that way and one of them stopped being able to fail. The figure is
+    // not a rendered frame: it draws its entries without their command lines and
+    // carries exactly one `❯`, on the prompt. So the first is the prompt here and
+    // the sweep's answer for this file is "correct as written".
+    //
+    // It is recorded rather than left, because the figure gaining an echo — S01
+    // §2 catching up with I33 — would break this silently in the direction that
+    // still passes: `promptRow` would move up, `drawnViewport` would shrink, and
+    // the arithmetic would be compared against the wrong boundary.
+    const prompts = lines.filter((l) => l.startsWith("❯"));
+    expect(prompts, "one ❯ in the figure, so the first is the prompt").toHaveLength(1);
+
     const promptRow = lines.findIndex((l) => l.startsWith("❯"));
     expect(promptRow, "the figure marks its prompt").toBeGreaterThan(0);
 

@@ -183,6 +183,9 @@ describe("C22 §3 — construction order", () => {
       return {
         submit: () => undefined,
         seal: () => void (sealed = true),
+        // C16's new low rung reads these (C23 §8a, the subscription rung).
+        liveStreams: 0,
+        cancelNewestStream: () => false,
         get sealed() {
           return sealed;
         },
@@ -298,6 +301,8 @@ describe("C22 §3 — construction order", () => {
             submit: () => undefined,
             seal: () => undefined,
             sealed: true,
+            liveStreams: 0,
+            cancelNewestStream: () => false,
             inFlight: null,
             cancel: () => undefined,
             register: () => undefined,
@@ -468,6 +473,8 @@ describe("C22 §3 — construction order", () => {
         submit: () => undefined,
         seal: () => undefined,
         sealed: true,
+        liveStreams: 0,
+        cancelNewestStream: () => false,
         get inFlight() {
           return route;
         },

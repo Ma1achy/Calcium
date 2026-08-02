@@ -18,21 +18,11 @@
 // found it, and both are here.
 import { describe, expect, it } from "vitest";
 
-import { interactivePty, type InteractivePty } from "../support/pty.js";
-
-const PROMPT = /❯/;
-
-/**
- * The prompt's row, which is the **last** one wearing the glyph.
- *
- * **It was `find`, and that was unambiguous only while nothing else drew a `❯`.**
- * C22 I33 now draws each entry with the command that produced it, above the
- * entry and above the prompt — so the first such row is a transcript echo, and a
- * row asserting the prompt no longer holds some text matched an echo that holds
- * it forever. The prompt is the bottom-most one by construction (S01 §3).
- */
-const promptRow = (frame: readonly string[]): string =>
-  [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
+// `PROMPT` and `promptRow` are the harness's (`test/support/pty.ts`). They were
+// declared here, and the second half of the pair was fixed here and nowhere
+// else — theme T5.4 kept its own `find` for a further commit and could no longer
+// fail. A helper that has gone wrong in two files belongs in neither.
+import { interactivePty, PROMPT, promptRow, type InteractivePty } from "../support/pty.js";
 
 const session = (cols = 100, rows = 24): InteractivePty =>
   interactivePty("node test/support/fixture.mjs session", { cols, rows });

@@ -246,6 +246,28 @@ export function control(): Promise<PtyRun> {
   return runInPty("true");
 }
 
+/** The glyph the prompt wears, and the one every e2e file waits on first. */
+export const PROMPT = /❯/;
+
+/**
+ * The prompt's row in a frame — the **last** one wearing the glyph.
+ *
+ * **It was `find`, and that was unambiguous only while nothing else drew a `❯`.**
+ * C22 I33 draws each entry with the command that produced it, above the entry and
+ * therefore above the prompt, so the *first* such row is a transcript echo. A row
+ * asserting the prompt holds some text then matched an echo that holds it forever,
+ * and the assertion could never fail again — which is A03 §2's vacuity class
+ * arriving in a predicate.
+ *
+ * It is here rather than in one test file because it went wrong twice: editor
+ * T5.4 found it, was fixed locally, and theme T5.4 kept its own copy of the
+ * defect for a further commit. The prompt is the bottom-most `❯` by construction
+ * (S01 §3 — the prompt region is the last thing above the footer).
+ */
+export function promptRow(frame: readonly string[]): string {
+  return [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
+}
+
 export type InteractivePty = {
   /** Send bytes as a user would — through the PTY, not through a back channel. */
   type(bytes: string): void;

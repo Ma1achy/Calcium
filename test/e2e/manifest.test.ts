@@ -8,9 +8,8 @@
 import { describe, expect, it } from "vitest";
 import { findTool, validateInvocation, visibleTools } from "../../src/data/manifest/index.js";
 import { fixture } from "../support/manifest.js";
-import { interactivePty, type InteractivePty } from "../support/pty.js";
+import { interactivePty, PROMPT, type InteractivePty } from "../support/pty.js";
 
-const PROMPT = /❯/;
 
 const session = (variant = ""): InteractivePty =>
   interactivePty(`node test/support/fixture.mjs session ${variant}`, { cols: 100, rows: 24 });

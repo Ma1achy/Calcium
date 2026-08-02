@@ -12,10 +12,9 @@
 // asserting nothing about a transport.
 import { describe, expect, it } from "vitest";
 import { DOCUMENT_BUDGET_MS } from "../support/budget.js";
-import { interactivePty, type InteractivePty, runInPty } from "../support/pty.js";
+import { interactivePty, PROMPT, type InteractivePty, runInPty } from "../support/pty.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
-const PROMPT = /❯/;
 
 const session = (variant: string): InteractivePty =>
   interactivePty(`${FIXTURE} session ${variant}`, { cols: 100, rows: 24 });

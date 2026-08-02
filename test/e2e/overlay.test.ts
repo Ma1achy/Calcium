@@ -48,6 +48,11 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
     liveEntry: () => null,
     entryAtRow: () => null,
     inFlight: () => null,
+    // C16's subscription rung (C23 §8a). Neither double runs a stream, so the
+    // rung must be unable to fire — a `0` that answered `1` would swallow the
+    // Ctrl-C these rows are about.
+    liveStreams: () => 0,
+    cancelNewestStream: () => false,
     cancel: () => undefined,
     signalShellChild: () => undefined,
     region: () => ({ top: 0, height: 24 }),

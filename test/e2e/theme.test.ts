@@ -8,7 +8,7 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
-import { interactivePty, type InteractivePty } from "../support/pty.js";
+import { interactivePty, promptRow, type InteractivePty } from "../support/pty.js";
 
 const DEPTHS = [24, 8, 4, 1] as const;
 const VARIANTS = [
@@ -184,14 +184,16 @@ describe("C10 e2e", () => {
 
       // **And the session still takes input**, which a frame snapshot cannot
       // tell you: a session that had wedged would leave the last frame on the
-      // screen looking exactly like a healthy one. Asserted at the prompt
-      // rather than through a command, because the transcript carries results
-      // and not the lines that produced them.
+      // screen looking exactly like a healthy one.
+      //
+      // **`promptRow`, not `find`** — and this row is why the helper is in the
+      // harness. Since C22 I33 the transcript draws each entry with the command
+      // that produced it, so the *first* `❯` on the screen is the topmost echo:
+      // fifty `/theme` submissions put `❯ /theme light` at row 2 and left it
+      // there, and a predicate asking whether it holds `still-here` could never
+      // be satisfied again. The frame was whole and 24 rows the whole time.
       pty.type("still-here");
-      await pty.waitForFrame(
-        (f) => (f.find((r) => r.startsWith("❯")) ?? "").includes("still-here"),
-        15_000,
-      );
+      await pty.waitForFrame((f) => promptRow(f).includes("still-here"), 15_000);
     } finally {
       pty.kill();
     }

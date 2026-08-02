@@ -13,9 +13,8 @@
 // carried the identical defect and nothing had called it with `env` either.
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { control, interactivePty, runInPty } from "../support/pty.js";
+import { control, interactivePty, PROMPT, runInPty } from "../support/pty.js";
 
-const PROMPT = /❯/;
 const FAR_SIDE = "./test/support/farside.mjs";
 
 const session = (variant: string): ReturnType<typeof interactivePty> =>

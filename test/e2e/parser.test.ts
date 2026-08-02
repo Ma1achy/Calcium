@@ -12,10 +12,9 @@
 import { dirname } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { interactivePty, type InteractivePty } from "../support/pty.js";
+import { interactivePty, PROMPT, type InteractivePty } from "../support/pty.js";
 
 /** The prompt glyph reaching the PTY: the shell composed and painted a frame. */
-const PROMPT = /❯/;
 
 /** The identifier `farside.mjs` reports on `meta.resultId`, for `$_` (C18 §7). */
 const UUID = "018f2a7c-4d3e-7c1a-9b52-0e5a1f9c3d7b";

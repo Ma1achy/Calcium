@@ -22,10 +22,9 @@
 //   - T5.5's one-invocation-then-two is T3.8 on a fake clock.
 import { describe, it } from "vitest";
 
-import { interactivePty, type InteractivePty } from "../support/pty.js";
+import { interactivePty, PROMPT, type InteractivePty } from "../support/pty.js";
 
 /** The prompt glyph reaching the PTY: the shell composed and painted a frame. */
-const PROMPT = /❯/;
 
 const session = (): InteractivePty =>
   interactivePty("node test/support/fixture.mjs session", { cols: 100, rows: 24 });
