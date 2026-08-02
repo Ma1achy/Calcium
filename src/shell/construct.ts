@@ -690,6 +690,22 @@ function scrollAmount(e: InputEvent): ((v: Scroller) => void) | null {
   if (e.kind === "key" && !e.key.ctrl && !e.key.meta) {
     if (e.key.name === "pageup") return (v) => void v.pageUp();
     if (e.key.name === "pagedown") return (v) => void v.pageDown();
+    // **These two rows are reachable by nothing, and the disagreement has no
+    // owner.** `keymap.ts` binds `home` and `end` to the *prompt* layer's cursor
+    // motions, and the prompt is dispatched before `global` at every moment it
+    // has focus — which is nearly always. So `scrollToTop` and `scrollToBottom`
+    // have exactly two callers in the tree, both here, both dead: two C14
+    // operations with no route from a keyboard.
+    //
+    // C14 §2 is not what is wrong — it lists them as *operations* and says the
+    // keys that invoke them are C16's. What is missing is a ruling: either the
+    // prompt yields these two when the buffer is empty, or the transcript gets
+    // its own keys (`⌃Home` / `⌃End` is the usual pair) and this table changes.
+    // Left as found and named rather than picked, because it is a keymap
+    // decision and C16 I21 makes the keymap the vocabulary.
+    //
+    // Found by C04 T5.1, which was written against `Home` and could not reach
+    // the top of a document.
     if (e.key.name === "home") return (v) => void v.scrollToTop();
     if (e.key.name === "end") return (v) => void v.scrollToBottom();
   }

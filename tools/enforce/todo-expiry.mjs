@@ -498,15 +498,15 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
    * **The two `execution.ts` keys, mid-stretch and shrinking.** L4 and C23 both
    * resolve to `src/shell/execution.ts`, and the rows naming them are the tier-5
    * ones still to be written or restated. They were 8 and 6; the transport,
-   * parser and harness groups took them to 7 and 2, and the TTY gate took the
-   * first to 6. The remaining groups take them to nothing.
+   * parser and harness groups took them to 7 and 2, the TTY gate to 6, and
+   * C04 T5.1 to 5. The remaining groups take them to nothing.
    *
    * **Listed rather than left failing**, because TD0 compares by equality and a
    * red suite mid-stretch is a suite nobody reads. The count is the progress
    * bar: each group that lands lowers it, and the day it reaches zero these two
    * lines are deleted rather than remembered.
    */
-  "TD2 src/shell/execution.ts (6)",
+  "TD2 src/shell/execution.ts (5)",
   "TD2 src/shell/execution.ts (2)",
 
   // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two
