@@ -126,6 +126,10 @@ export interface Pipeline {
    * rung 2.
    */
   readonly inFlight: "app" | "local" | "shell" | null;
+  /** How many `streams: true` subscriptions are live (C16 §5, C23 I6). */
+  readonly liveStreams: number;
+  /** Cancel the newest one; `false` when there is none. */
+  cancelNewestStream(): boolean;
   /** Cancel what is in flight, settling the entry `partial` (C23 I10). */
   cancel(): void;
   /**

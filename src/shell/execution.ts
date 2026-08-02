@@ -127,6 +127,26 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   let cancelInFlight: (() => void) | null = null;
 
   /**
+   * Live subscriptions, oldest first, so Ctrl-C can cancel the **newest**
+   * (C16 §5's subscription rung).
+   *
+   * **A list rather than `cancelInFlight`**, and the difference is reachable:
+   * a `streams: true` verb releases the guard (I6) precisely so another command
+   * can be submitted over it, and the next submission overwrites that single
+   * slot. One `--watch` was therefore cancellable and two were not — the older
+   * one had no handle left anywhere in the process.
+   *
+   * Entries are removed by the same closure that cancels them, so a stream that
+   * ended on its own does not leave a canceller for an entry that has settled.
+   */
+  const liveStreams: { id: string; cancel: () => void }[] = [];
+
+  const forgetStream = (id: string): void => {
+    const at = liveStreams.findIndex((s) => s.id === id);
+    if (at !== -1) liveStreams.splice(at, 1);
+  };
+
+  /**
    * §2's routes need C18's classification, and C18 needs the live session for
    * `$_` (`lastUuid`) and the manifest. Read per submission, never captured: a
    * `cd` between two verbs has to move the second one (C22 I12).
@@ -454,10 +474,23 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // orphan (C23 §3, T3.17).
     guard.take("app", verb);
 
+    /**
+     * **The displayed command: the user's line, with `$_` resolved** (I15,
+     * C22 I33, D24).
+     *
+     * Not the raw text — a transcript showing `/ps --search=$_` cannot
+     * correspond to the argv that was spawned, and `$_` means something else in
+     * bash, so the line is not reproducible where D24 says it must be. And not
+     * the spawned form either: no binary, no `--json`. C18 has already expanded
+     * `argv`, so the displayed line is that argv wearing the prefix the user
+     * typed, which is exactly D24's one-token mapping.
+     */
+    const displayed = `/${result.argv.join(" ")}`;
+
     // Step 3 — the pending entry. Before step 4. This is the ordering.
     const pendingId = deps.transcript.append(
       compose({
-        command: line,
+        command: displayed,
         blocks: [],
         meta: { origin: "user", verb, transport: "subprocess", argv: [...result.argv] },
       }),
@@ -469,7 +502,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     refresh.watch(pendingId);
 
     const controller = new AbortController();
-    cancelInFlight = () => {
+    const cancelThis = (): void => {
+      forgetStream(pendingId);
       controller.abort();
       deps.transcript.settle(pendingId);
       // I29 — the streaming route settles here rather than through
@@ -478,6 +512,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       deps.history.append(line, 130);
       deps.scheduler.commit("completion");
     };
+    cancelInFlight = cancelThis;
 
     try {
       const transport = deps.transport.for(verb);
@@ -498,14 +533,22 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // C23 I6 — a subscription does not hold the guard. Released before the
         // loop rather than after it, or one `--watch` blocks the session.
         guard.release();
-        await streamInto(pendingId, line, verb, transport.stream(invocation));
+        // **Registered before the loop is awaited**, because the loop does not
+        // return until the stream ends: a registration after it would only ever
+        // run for a subscription that had already finished.
+        liveStreams.push({ id: pendingId, cancel: cancelThis });
+        try {
+          await streamInto(pendingId, line, verb, transport.stream(invocation));
+        } finally {
+          forgetStream(pendingId);
+        }
         return;
       }
 
       // Steps 4 and 5 — invoke, then adapt.
       const raw = await transport.invoke(invocation);
       const doc = deps.adapters.adapt(raw, {
-        command: line,
+        command: displayed,
         verb,
         width: deps.lifecycle.size().columns,
         userRequestedJson: result.argv.includes("--json"),
@@ -865,6 +908,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // (C23 I10), then the guard.
       cancelInFlight?.();
       guard.release();
+    },
+
+    /** How many subscriptions are live — C16 §5's rung, and the exit arming. */
+    get liveStreams() {
+      return liveStreams.length;
+    },
+
+    /**
+     * Cancel the newest live subscription (C16 §5).
+     *
+     * **Newest, because it is the one the reader just started** and the only
+     * rule they can predict without looking at the transcript. `n` streams take
+     * `n` presses, and the exit confirm arms only once none are left.
+     */
+    cancelNewestStream: () => {
+      const newest = liveStreams.at(-1);
+      if (newest === undefined) return false;
+      newest.cancel();
+      return true;
     },
   };
 }

@@ -124,7 +124,7 @@ describe("C18 tier 5 — in a real session", () => {
     }
   }, 60_000);
 
-  it("T5.5: $_ resolves after a submit, and the expansion is what reaches the far side — the *as displayed* half waits on a transcript that shows the command it ran", async () => {
+  it("T5.5: /ps --search=$_ --open-mr → the UUID resolves and the line is reproducible in bash exactly as displayed", async () => {
     // **The spec row named `/promote $_ --open-mr` and could not be written**:
     // the fixture manifest gives `promote` no flags and an argument pattern of
     // `^[\w.]+:[\w]+$`, which a UUID cannot satisfy, so C05 refused the line
@@ -143,20 +143,38 @@ describe("C18 tier 5 — in a real session", () => {
       await pty.waitForFrame((f) => f.join("").includes("far side pid="), 20_000);
 
       pty.type("/ps --search=$_ --open-mr\r");
-      // **Asserted on the spawned argv, and that is a finding rather than a
-      // choice of instrument.** D24 and C23 I15 are about *the displayed
-      // command*, and nothing in the tree displays one: `entry.doc.command` is
-      // set on every entry and has no reader in the render path, so a transcript
-      // shows results with no record of what produced them. Until that is ruled
-      // on, the observable half of the correspondence is what reached the
-      // process — which is also the half a `$_` defect would break.
-      await pty.waitForFrame((f) => f.join("").includes(UUID), 20_000);
-
+      // **Waited on the far side's reply, not on the UUID.** The UUID now
+      // appears in the *displayed command* one row before the spawn answers, so
+      // a predicate matching it resolves on a frame that has the first half and
+      // not the second — which is this row asserting against a screen that is
+      // still being drawn. The reply's own marker is the honest signal.
+      await pty.waitForFrame((f) => f.join("").includes("argv=ps --search="), 20_000);
       const frame = pty.frame.join("\n");
-      expect(frame, "expanded before the spawn, not passed through").toContain(
-        `--search=${UUID}`,
+
+      // **Both halves of D24's correspondence, which is now checkable.** The
+      // transcript draws the command (C22 I33) and the far side reports the argv
+      // it was spawned with, so the one-token mapping is visible in one frame:
+      // the displayed line wears the `/` the user typed and carries neither the
+      // binary nor `--json`; the spawned argv carries both.
+      expect(frame, "displayed, with $_ resolved").toContain(
+        `❯ /ps --search=${UUID} --open-mr`,
       );
-      expect(frame, "and the literal never reached the far side").not.toContain("--search=$_");
+      // **Read from the rejoined rows, because the notice wraps** — and where it
+      // wraps depends on the pid's digit count, so a newline-joined frame splits
+      // this token on some runs and not others. Concatenating the rows
+      // reconstructs the logical line the far side wrote.
+      const unwrapped = pty.frame.map((l) => l.trimEnd()).join("");
+      expect(unwrapped, "spawned, with the flag D16 appends").toContain(
+        `argv=ps --search=${UUID}`,
+      );
+      expect(unwrapped, "and the binary and --json are the spawned half only").toContain("--json");
+
+      // **Reproducible in bash means the literal is gone.** A transcript showing
+      // `$_` is not reproducible — `$_` is a real variable in bash and means the
+      // previous command's last argument, so a pasted line would run something
+      // else. This is the assertion that distinguishes displaying the *typed*
+      // text from displaying the *submitted* command.
+      expect(frame, "no unexpanded literal anywhere on the screen").not.toContain("$_");
     } finally {
       pty.kill();
     }

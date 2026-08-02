@@ -74,6 +74,18 @@ export type RouterDeps = Readonly<{
   promptHasText: () => boolean;
   clearPrompt: () => void;
   raiseExitConfirm: () => void;
+  /**
+   * How many subscriptions are live, and how to stop the newest (§5).
+   *
+   * Separate from `inFlight` on purpose: C23 I6 releases the submission guard
+   * for a `streams: true` verb so the prompt stays usable, so `inFlight` is null
+   * throughout a `--watch` — and rungs 1 and 2 read it. A stream is a state the
+   * ladder had no rung for, not a state rung 1 should have been widened to
+   * cover; widening it would cancel a stream when the reader meant to clear a
+   * half-typed line.
+   */
+  liveStreams: () => number;
+  cancelNewestStream: () => boolean;
 }>;
 
 export type Handler = (e: InputEvent) => boolean;
@@ -138,7 +150,11 @@ export function createRouter(
     const atEmptyPrompt =
       focus.current.at === "prompt" && !deps.promptHasText() && deps.overlayTop() === null;
 
-    if (isExitKey && atEmptyPrompt && deps.inFlight() === null) {
+    // **A live subscription blocks the arming** (§5). Otherwise the key that
+    // stops a runaway `--watch` is also the key that arms the session's exit,
+    // which is the wrong pair to make adjacent — two presses to stop two
+    // streams would arm and then raise the confirm.
+    if (isExitKey && atEmptyPrompt && deps.inFlight() === null && deps.liveStreams() === 0) {
       if (armedAt !== null) {
         armedAt = null;
         return "raise";
@@ -181,6 +197,17 @@ export function createRouter(
     });
     register("prompt", (e) => {
       if (!isCtrlC(e) && !(e.kind === "key" && e.key.ctrl && e.key.name === "d")) return false;
+
+      // **The subscription rung, above the prompt's own and below every layer's**
+      // (§5). Its position needs no ordering of its own: `activeTarget` has
+      // already chosen `prompt`, so an overlay, copy mode, a pushed view or the
+      // live block took the key before this ran — and it sits ahead of clearing
+      // the input because a running stream outranks a half-typed line.
+      //
+      // Ctrl-C only. Ctrl-D on an empty prompt is the session's exit and has
+      // never been a cancel.
+      if (isCtrlC(e) && deps.cancelNewestStream()) return true;
+
       if (deps.promptHasText()) {
         // Ctrl-D with text is consumed and discarded — never EOF, never a
         // delete-forward (I16).

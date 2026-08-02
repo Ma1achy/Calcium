@@ -236,6 +236,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I17** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
 - **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
 - **I19** — `entryAtRow` is pure and total: it reads the index and the current scroll, stores nothing, and returns `null` for any row the transcript does not occupy. It is the **only** place a region row becomes an entry — C16 routes mouse events by position and does not recompute the mapping, because two components computing where a row is will agree until one of them learns about a height change and the other does not.
+- **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I18's live gutter is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
 
 ---
 
@@ -259,6 +260,7 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 16. `VisibleRange` marks the live entry; the frame draws the live gutter, and no measurement includes it (I18).
 17. An entry's height is `measureSequence`, so `gapBefore` is counted — never `Σ measure`, which is short by one row per gap (I1, C09 I17).
 18. A region row resolves to an entry and a row within it here, once, and C16 does not recompute the mapping (I19).
+19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the live gutter is the second (I20, I18).
 
 ---
 

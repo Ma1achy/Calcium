@@ -25,6 +25,7 @@
  */
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
+import { commandRows } from "./paint.js";
 import { createManifestStore, parseManifest } from "../data/manifest/index.js";
 import { FRAMEWORK_NAMES } from "../data/manifest/framework.js";
 import { createProcessRunner } from "../data/process/runner.js";
@@ -316,6 +317,11 @@ export async function constructGraph(
       width: size.columns,
       height: size.rows,
       measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
+      // C14 I20 / C22 I33 — the command line is chrome the composer draws, so
+      // it is part of the height the index virtualises against. **The same
+      // function that draws it**, or the two arithmetics part company and the
+      // viewport describes a document it is not showing.
+      chromeRows: (entry, width) => commandRows(entry.doc.command, width).length,
     });
     const overlays = createOverlayManager({ registry: built.blocks });
     const history = await openHistory({
@@ -725,6 +731,11 @@ function routerDeps(
     // runner-sourced answer says "idle" while a verb is in flight, and Ctrl-C
     // fell past every rung and cleared the prompt.
     inFlight: () => pipeline()?.inFlight ?? null,
+    // §5's subscription rung. Read through the same accessor as `inFlight`,
+    // because the pipeline is constructed after the router and a captured
+    // reference here would be the null one.
+    liveStreams: () => pipeline()?.liveStreams ?? 0,
+    cancelNewestStream: () => pipeline()?.cancelNewestStream() ?? false,
     // C23's, not `runner.killAll`: killing the child leaves the entry streaming
     // forever, and C23 I10 settles it `partial` with its output retained.
     cancel: () => void pipeline()?.cancel(),

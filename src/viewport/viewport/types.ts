@@ -9,7 +9,7 @@
  * commits, which is the same orchestration pattern C01 and C10 follow.
  */
 
-import type { Block, EntryId } from "./deps.js";
+import type { Block, EntryId, TranscriptEntry } from "./deps.js";
 
 export type ScrollState = Readonly<{
   topRow: number;
@@ -64,6 +64,20 @@ export type ViewportOptions = Readonly<{
    * form as the seam is what stops the summation being written here at all (I1).
    */
   measureSequence: (blocks: readonly Block[], width: number) => number;
+  /**
+   * Rows the composer draws *around* an entry, and which therefore belong to its
+   * height (I20).
+   *
+   * The command line is the one producer: it is chrome rather than a block, so
+   * no adapter made it and C13's cap never counts it — but it occupies a row and
+   * wraps, so an index that left it out would virtualise against a height the
+   * frame does not draw. That is the distinction I18's live gutter does *not*
+   * illustrate: the gutter costs columns.
+   *
+   * Optional, defaulting to none, so C14 still knows nothing about what the
+   * chrome says.
+   */
+  chromeRows?: (entry: TranscriptEntry, width: number) => number;
 }>;
 
 export interface Viewport {

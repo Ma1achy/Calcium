@@ -30,7 +30,7 @@
  */
 
 import { renderSequenceToLines } from "../testing/index.js";
-import { fitStyled } from "../presentation/text.js";
+import { fitStyled, hardWrapCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
 import { PROMPT, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
@@ -132,6 +132,31 @@ function region(
  * appears at a wrap boundary, a double-width glyph, or a line that exactly
  * fills its row (C17 I18, S01 §3).
  */
+/**
+ * The command an entry is drawn with (C22 I33, C14 I20).
+ *
+ * **Chrome, not a block.** No adapter produced it, `--json` must not contain it,
+ * and C13's cap must not count it — so it is drawn here and measured through
+ * C14's `chromeRows`, rather than being prepended to the document.
+ *
+ * **The typed command, never the spawned argv** (C23 I15). The transcript shows
+ * `/ps --search=… --open-mr`; `meta.argv` carries `widget ps … --json` and is
+ * `/debug`'s to show. That distinction is the one I15 was always about and had
+ * nothing to constrain until the command was drawn at all.
+ *
+ * Wrapped through `hardWrapCells`, which is C09's one implementation — this
+ * function is called from both the measurer and the composer, so a second wrap
+ * here is the drift C14 I1 exists to prevent, one layer up.
+ */
+export function commandRows(command: string, width: number): readonly string[] {
+  if (command === "") return [];
+  const body = Math.max(1, width - PROMPT_GUTTER.first);
+  const wrapped = hardWrapCells(command, body);
+  return wrapped.map((row, i) =>
+    (i === 0 ? PROMPT : " ".repeat(PROMPT_GUTTER.cont)) + row,
+  );
+}
+
 function promptWindow(frame: Composed, rows: readonly string[]): PromptWindow {
   const cap = frame.promptRows;
 

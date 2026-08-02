@@ -488,6 +488,21 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
    */
   "TD2 src/shell/session.ts (4)",
 
+  /**
+   * **The two `execution.ts` keys, mid-stretch and shrinking.** L4 and C23 both
+   * resolve to `src/shell/execution.ts`, and the rows naming them are the tier-5
+   * ones still to be written or restated. They were 8 and 6; the transport,
+   * parser and harness groups took them to 7 and 2, and the remaining groups
+   * take them to nothing.
+   *
+   * **Listed rather than left failing**, because TD0 compares by equality and a
+   * red suite mid-stretch is a suite nobody reads. The count is the progress
+   * bar: each group that lands lowers it, and the day it reaches zero these two
+   * lines are deleted rather than remembered.
+   */
+  "TD2 src/shell/execution.ts (7)",
+  "TD2 src/shell/execution.ts (2)",
+
   // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two
   // deferrals here — S01 §2's illustrated rows and C03 T5.4's edge drag — and
   // both are gone: T5.4 moved to C24, which is what a PTY needs to drive a

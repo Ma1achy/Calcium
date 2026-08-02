@@ -20,7 +20,7 @@ import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
 import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
 import { drawFallback, tooSmall } from "./fallback.js";
 import { compose, type Composed } from "./frame.js";
-import { cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
+import { commandRows, cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
 import { renderSequenceToLines } from "../testing/index.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
@@ -374,6 +374,10 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
   for (const ve of graph.viewport.visible().entries) {
     const entry = graph.transcript.entries.find((e) => e.id === ve.id);
     if (entry === undefined) continue;
+    // C22 I33 — the command that produced the entry, above it, as chrome. Its
+    // rows are part of the entry's height (C14 I20), which is why the slice
+    // below is taken over `chrome ++ blocks` rather than over the blocks alone.
+    const chrome = commandRows(entry.doc.command, width);
     const lines = renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
       theme: graph.theme.current,
       capabilities: graph.capabilities,
@@ -385,7 +389,8 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
       // references cannot see.
       focus: focusFor(graph, entry.id),
     });
-    out.push(...lines.slice(ve.skipRows, ve.skipRows + ve.takeRows));
+    const rows = [...chrome, ...lines];
+    out.push(...rows.slice(ve.skipRows, ve.skipRows + ve.takeRows));
   }
   return out;
 }

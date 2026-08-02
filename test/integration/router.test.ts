@@ -58,6 +58,12 @@ function world() {
     },
     entryAtRow: () => null,
     inFlight: () => null,
+    // §5's subscription rung. **Defaulted here rather than left out**: the
+    // ladder reads these on every Ctrl-C, so a double that omits them makes
+    // every arming row throw — which is how the five exit-confirm rows found
+    // the new dep before any of them was about a stream.
+    liveStreams: () => 0,
+    cancelNewestStream: () => false,
     cancel: () => undefined,
     signalShellChild: () => undefined,
     region: () => ({ top: 0, height: 10 }),

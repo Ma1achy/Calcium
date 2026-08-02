@@ -339,7 +339,7 @@ Per submission.
 - **I12** — A submission is refused once `session.stopping` is set, **and §3b's three mechanisms stop**, so nothing is appended or patched after shutdown begins. The second clause is not a widening: without it the rule covers submissions while its reason claims everything, and an identity notice or a stall patch lands in a transcript being torn down (§8b B1).
 - **I13** — Every cross-layer effect in §4 is sequenced here; no component causes its own.
 - **I14** — Local handlers are the only place several stores are reached at once, and only through C23.
-- **I15** — The displayed command and the spawned argv correspond exactly (D24).
+- **I15** — The displayed command and the spawned argv correspond exactly (D24). **The displayed command is now displayed** — C22 I33 draws it above each entry — which is what makes this invariant constrain anything: it was written about a `doc.command` no render path read, so it forbade nothing while reading as though it forbade the drift it names. The two forms stay distinct on purpose: the transcript shows `/ps --search=… --open-mr` as typed, and `meta.argv` carries `widget ps --search=… --open-mr --json` for `/debug`. D24's one-token mapping is the correspondence between them.
 - **I16** — C23 is the sole supplier of `onAction`.
 - **I17** — `open` actions go through the injected opener with an `http`/`https` scheme check, never through a shell.
 - **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over.

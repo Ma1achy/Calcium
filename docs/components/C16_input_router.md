@@ -222,6 +222,7 @@ Ctrl-C means "stop the most immediate thing", and what that is depends on contex
 | Copy mode | Exit copy mode |
 | A pushed view | Pop it |
 | Focus in the live block | Return focus to the prompt, keeping the input; a second Ctrl-C then takes the prompt rungs |
+| **A live subscription is running** | Cancel the **newest**; a second Ctrl-C cancels the next-newest |
 | Prompt with text | Clear the input |
 | Prompt empty | Arm the exit confirm; a second within 500 ms raises it |
 
@@ -240,6 +241,14 @@ The gap that leaves is not a corner. C23 I3 appends the pending entry **before**
 **This vindicates the rejected alternative below rather than reversing it.** Making `spawnShell` set `C06.busy` was refused because it puts a foreground shell command under C06's concurrency guard, and two guards over one condition drift. Correct — and the conclusion is not that C06 should answer differently but that C06 should not be asked. The fact is C23's; it was being read from whichever collaborator happened to have a related flag.
 
 **And it is rung 7's lesson through the other door.** There a constructible state had no rung and the ladder answered confidently with the next one down. Here both rungs exist and ask the wrong component whether their state holds — and a ladder always returns something, so it is a confident wrong answer either way. What distinguishes this one is that no state column could have caught it: rung 1's state *is* constructible and *is* tested. The disagreement is about who owns the fact, which a reachability table does not ask.
+
+**The subscription rung, and why it is here rather than at the top.** C23 I6 releases the submission guard for a `streams: true` verb so the prompt stays usable during a `--watch` — and rungs 1 and 2 read `C23.inFlight`, which *is* that guard. So a live stream made every rung decline: Ctrl-C cleared the prompt while the child ran on, and `/tail` reached line 171 after the interrupt. Both rules are correct on their own; the ladder had no rung for the state they produce together.
+
+**Widening rung 1 to take streams was the obvious repair and is the boolean-collapse defect again.** Rung 1 fires while the prompt is usable, so a Ctrl-C meant to clear a half-typed line would cancel the stream instead — one rung swallowing a case that wants its own, which is exactly what made `busy` become `inFlight` returning a route.
+
+So it sits **below the layer rungs and above the prompt rungs**. Below, because a confirm or a menu over a running stream is the more immediate thing — the same reasoning as the copy-mode order above. Above, because a running subscription outranks a half-typed line.
+
+**Newest first, and it is the only rule a reader can predict without looking.** With two streams live, the one they just started is the one they mean. A second Ctrl-C takes the next-newest rather than falling through, so `n` streams take `n` presses to stop and **the exit confirm arms only when nothing is running** — otherwise the key that stops a runaway `--watch` is also the key that closes the session, which is the wrong pair to make adjacent.
 
 **Both overlay rungs sit above copy mode, and the order is not this spec's to choose.** A02 §2 and C14 §6 both put `overlay` above `copyMode` — "a confirm raised over copy mode still wins" — and an earlier draft of this table had copy mode above both. A ladder that disagrees with focus priority is two answers to "what does this key mean now", and the one that loses is whichever the reader did not consult.
 

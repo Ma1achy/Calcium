@@ -37,6 +37,12 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
     liveEntry: () => ({ id: "e1" }),
     entryAtRow: (row) => (row < 5 ? { id: `row${String(row)}`, rowOffset: row } : null),
     inFlight: () => null,
+    // §5's subscription rung. **Defaulted here rather than left out**: the
+    // ladder reads these on every Ctrl-C, so a double that omits them makes
+    // every arming row throw — which is how the five exit-confirm rows found
+    // the new dep before any of them was about a stream.
+    liveStreams: () => 0,
+    cancelNewestStream: () => false,
     cancel: () => void calls.push("cancel"),
     signalShellChild: () => void calls.push("sigint"),
     region: () => ({ top: 1, height: 10 }),
@@ -125,6 +131,69 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
     expect(router.dispatch(ctrlC)).toBe(true);
     expect(calls, "not the confirm, not the view — the promote").toEqual(["cancel"]);
+  });
+
+  it("T1.11b (§5): a live subscription is cancelled below the layer rungs and above the prompt's", () => {
+    // **The rung the ladder had no state for.** C23 I6 releases the submission
+    // guard for a `streams: true` verb so the prompt stays usable, and rungs 1
+    // and 2 read `inFlight` — which *is* that guard. So a `--watch` left every
+    // rung declining: Ctrl-C cleared the prompt and the child ran on.
+    let live = 2;
+    const stream = {
+      inFlight: () => null,
+      liveStreams: () => live,
+      cancelNewestStream: (): boolean => {
+        if (live === 0) return false;
+        live -= 1;
+        return true;
+      },
+    };
+
+    // **Below the layer rungs**: a modal over a running stream still takes the
+    // key, which is the copy-mode ordering applied to the new rung.
+    const modal = harness({ ...stream, promptHasText: () => true });
+    modal.layer.top = { id: "confirm", kind: "overlay", dismissable: false };
+    expect(modal.router.dispatch(ctrlC)).toBe(true);
+    expect(modal.calls, "the confirm consumed it; nothing was cancelled").toEqual([]);
+
+    // **Above the prompt rungs**: a running stream outranks a half-typed line,
+    // so the input is *not* cleared while one is live.
+    const typed = harness({ ...stream, promptHasText: () => true });
+    expect(typed.router.dispatch(ctrlC)).toBe(true);
+    expect(typed.calls, "the stream, not the prompt").toEqual([]);
+    expect(live, "and the newest of the two is gone").toBe(1);
+
+    // **A second press takes the next-newest rather than falling through**, so
+    // `n` streams cost `n` presses and the count is the whole rule.
+    expect(typed.router.dispatch(ctrlC)).toBe(true);
+    expect(live).toBe(0);
+
+    // With none left, the ladder resumes: the prompt's own rung clears the text.
+    expect(typed.router.dispatch(ctrlC)).toBe(true);
+    expect(typed.calls, "and only now does the prompt get the key").toEqual(["clearPrompt"]);
+  });
+
+  it("T1.11c (§5): the exit confirm does not arm while a subscription is live", () => {
+    // Otherwise the key that stops a runaway `--watch` is also the key that
+    // closes the session — and two presses to stop two streams would arm and
+    // then raise. The arming machine is pre-dispatch, so this is its own guard
+    // rather than a consequence of the rung above.
+    let live = 1;
+    const h = harness({
+      liveStreams: () => live,
+      cancelNewestStream: (): boolean => (live > 0 ? ((live -= 1), true) : false),
+    });
+
+    expect(h.router.dispatch(ctrlC), "cancels, does not arm").toBe(true);
+    expect(h.router.dispatch(ctrlC), "nothing live now: this one arms").toBe(true);
+    expect(h.calls, "and no confirm has been raised").toEqual([]);
+
+    // The control: with nothing ever live, two Ctrl-Cs raise it. Without this
+    // the row passes against a ladder that can no longer arm at all.
+    const control = harness({});
+    control.router.dispatch(ctrlC);
+    control.router.dispatch(ctrlC);
+    expect(control.calls).toEqual(["exitConfirm"]);
   });
 
   it("T3.11: a piped shell child takes SIGINT when no verb is in flight", () => {

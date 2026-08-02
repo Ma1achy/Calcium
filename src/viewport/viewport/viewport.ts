@@ -30,6 +30,7 @@ import type { Change, EntryId, TranscriptEntry, TranscriptView } from "./deps.js
 class ViewportImpl implements Viewport {
   readonly #view: TranscriptView;
   readonly #measureSequence: ViewportOptions["measureSequence"];
+  readonly #chromeRows: NonNullable<ViewportOptions["chromeRows"]>;
   readonly #cache = new HeightCache();
   readonly #index = new HeightIndex();
   readonly #subscribers = new Set<(change: ViewportChange) => void>();
@@ -48,6 +49,7 @@ class ViewportImpl implements Viewport {
     this.#width = opts.width;
     this.#height = opts.height;
     this.#measureSequence = opts.measureSequence;
+    this.#chromeRows = opts.chromeRows ?? ((): number => 0);
 
     this.#rebuild();
     this.#unsubscribe = view.subscribe((c) => this.#onChange(c));
@@ -340,7 +342,12 @@ class ViewportImpl implements Viewport {
     const cached = this.#cache.get(entry.id, entry.rev, this.#width);
     if (cached !== undefined) return cached;
 
-    const height = this.#measureSequence(entry.doc.blocks, this.#width);
+    // I20 — row-occupying chrome is part of the height. The composer draws
+    // `chrome ++ blocks` and this must measure the same thing, or the index is
+    // self-consistent about a document the frame is not showing.
+    const height =
+      this.#chromeRows(entry, this.#width) +
+      this.#measureSequence(entry.doc.blocks, this.#width);
     this.#cache.set(entry.id, entry.rev, this.#width, height);
     return height;
   }

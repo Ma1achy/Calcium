@@ -273,6 +273,7 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I13** — The registry owns `meta`. An adapter's `meta` is overwritten from the `RawResult` and the context, `resultId`, `adapter` and `truncated` excepted — the three the registry cannot know. No adapter can produce a document with absent or wrong provenance, which is what makes I5 hold without every app author holding it up.
 - **I14** — `meta.exitCode` is finite on every path. `-1` means the process never started and means nothing else.
 - **I15** — `seq` is the patch's position within its stream, counted by the caller from `0` (§6a). It namespaces the generated block ids and its zero value is the per-stream reset, so a constant `seq` is an id collision *and* a reset that never stops firing.
+- **I16** — The registry owns `doc.command` as well as `meta`, on every route including identity. `AdapterContext.command` is the line the user typed, and it is what the transcript draws (C22 I33, C23 I15); a far side's own `command` field is overwritten rather than trusted, for I13's reason — provenance is the framework's to state. The identity route passed it through until C22 drew the command at all, and the symptom was a transcript showing `ps --json`, the spawned form carrying a flag D16 appends and the user never wrote.
 
 ---
 
@@ -295,6 +296,7 @@ The notice is muted rather than an error because the *command* may have succeede
 15. The registry owns `meta`, so no adapter states provenance and none can state it wrongly (I13).
 16. `meta.exitCode` is finite on every path, and `-1` has one documented cause (I14).
 17. `seq` is supplied by the caller and counts patches within one invocation; it is both the id namespace and the per-stream reset (I15, §6a).
+18. The registry owns `doc.command` as well as `meta`; the typed line is what is displayed, on every route (I16).
 
 ---
 

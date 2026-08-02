@@ -22,6 +22,18 @@ import { interactivePty, type InteractivePty } from "../support/pty.js";
 
 const PROMPT = /❯/;
 
+/**
+ * The prompt's row, which is the **last** one wearing the glyph.
+ *
+ * **It was `find`, and that was unambiguous only while nothing else drew a `❯`.**
+ * C22 I33 now draws each entry with the command that produced it, above the
+ * entry and above the prompt — so the first such row is a transcript echo, and a
+ * row asserting the prompt no longer holds some text matched an echo that holds
+ * it forever. The prompt is the bottom-most one by construction (S01 §3).
+ */
+const promptRow = (frame: readonly string[]): string =>
+  [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
+
 const session = (cols = 100, rows = 24): InteractivePty =>
   interactivePty("node test/support/fixture.mjs session", { cols, rows });
 
@@ -173,7 +185,7 @@ describe("C17 tier 5 — at a real prompt", () => {
       // command, and the redone paste is what it replaced.
       pty.type("\u001b[A");
       await pty.waitForFrame(
-        (f) => (f.find((r) => r.startsWith("❯")) ?? "").includes("--mine"),
+        (f) => promptRow(f).includes("--mine"),
         15_000,
       );
 
@@ -181,7 +193,7 @@ describe("C17 tier 5 — at a real prompt", () => {
       // round trip seen from outside.
       pty.type("\u001b[B");
       await pty.waitForFrame(
-        (f) => !(f.find((r) => r.startsWith("❯")) ?? "").includes("--mine"),
+        (f) => !promptRow(f).includes("--mine"),
         15_000,
       );
     } finally {

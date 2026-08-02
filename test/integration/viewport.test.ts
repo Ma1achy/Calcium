@@ -154,7 +154,16 @@ describe("C14 integration", () => {
     // The pending entry the app route appends: no blocks, streaming.
     const id = graph.transcript.append(rowsDoc(0, "pending"), { streaming: true });
 
-    expect(graph.viewport.scroll.totalRows, "an empty pending entry is zero rows").toBe(0);
+    // **One row, and it is the command** (C22 I33, C14 I20). This asserted zero
+    // and the zero was the defect it half-describes: an entry appended empty
+    // measured nothing, so C23 §3 step 3 — *the pending entry, so the user sees
+    // the command immediately* — showed the user nothing at all for the length
+    // of the spawn. The chrome is measured, so the row exists before any block
+    // does, which is what makes the step do what it says.
+    expect(
+      graph.viewport.scroll.totalRows,
+      "a pending entry is one row: the command, before any block",
+    ).toBe(1);
 
     graph.transcript.settle(id, rowsDoc(3, "settled"));
 

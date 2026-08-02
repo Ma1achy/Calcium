@@ -160,7 +160,13 @@ export function createAdapterRegistry(
 
   /** I5 — the single funnel. Nothing returns a document without passing here. */
   function finish(candidate: ViewDocument, raw: RawResult, ctx: AdapterContext): ViewDocument {
-    const validity = validateDocument(candidate);
+    // **The registry owns `command` too** (I16), for I13's reason and on every
+    // route. `AdapterContext.command` is documented *as typed, for doc.command*
+    // — and the identity route passed a far side's own `command` straight
+    // through, so once C22 I33 drew it the transcript showed `ps --json`, the
+    // spawned form with a flag the user never wrote, in place of the line they
+    // submitted. Invisible until something displayed it.
+    const validity = validateDocument({ ...candidate, command: ctx.command });
     if (validity.ok) return validity.value;
     return lastResortDocument(raw, ctx, validity.error.join("; "));
   }
