@@ -152,7 +152,7 @@ describe("C15 e2e — layers under real input", () => {
   // through a real keystroke, and the rung that must not fire is the one that
   // pops the dashboard out from under the confirm.
   it.todo(
-    "T5.3: a confirm inside the dashboard — drawn over it, esc does nothing, n resolves it and returns. The routing half is asserted in test/integration/router.test.ts T4.2; composing the session is what remains — waits on C23 — the dashboard the confirm sits inside is a pushed view produced by running a verb",
+    "T5.3: a confirm inside the dashboard — drawn over it, esc does nothing, n resolves it and returns. The routing half is asserted in test/integration/router.test.ts T4.2; composing the session is what remains — **not deferred on a component**, and the label is the correction: it named C23, which is built, and what is missing is not code in C23 but a *ruling*. Nothing in the tree pushes a `kind: \"view\"` layer. C15 supports them and `focus.ts` routes to `pushedView`; the shell pushes overlays only — the completion menu and reverse search. What is absent is the decision that makes a verb\'s result a pushed view rather than a transcript entry, which is a design question with no owner. Recorded in C22 §13",
   );
   // C01 already delivers the SIGWINCH snapshot this needs; what is missing is
   // the thing that composes a frame from it, so the blocker is L4 alone. Naming

@@ -6,6 +6,8 @@
 // that the table dispatch resolves and `/help` renders is the table that makes
 // multi-line input work (C16 §6, C17 I12).
 import { describe, expect, it } from "vitest";
+import { buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { createFocusStore } from "../../src/interaction/router/focus.js";
@@ -266,6 +268,65 @@ it("T4.6 (with C20, I2, I3): navigation replaces the buffer and the draft return
   store.resetNavigation();
   expect(store.previous(e.text)).toBe("/logs digit-42");
 });
-it.todo(
-  "T4.7: the prompt's rendered height equals displayRows, asserted on the frame rather than the editor — waits on C22 — the frame is `src/shell/frame.ts`, not the pipeline",
-);
+it("T4.7 (C17 §2, C22 I13): the prompt's rendered height equals displayRows, on the frame", async () => {
+  // **On the frame rather than on the editor**, which is the whole point of
+  // the row: `displayRows` answering N and the frame drawing N are two claims,
+  // and C22 already produced the defect where they disagreed — composed from
+  // one record and painted from another, a wrapped prompt drawing as a lone
+  // elision marker with every arithmetic check passing.
+  const stdin = fakeStdin();
+  const COLUMNS = 60;
+  const { stdout } = await buildSession(
+    { stdin: stdin as never },
+    { columns: COLUMNS, rows: 24 },
+  );
+
+  const frameRows = (): readonly string[] => {
+    const framed = stdout.chunks.filter((c) => c.includes("\u001b[H"));
+    const last = framed[framed.length - 1] ?? "";
+    const body = last.slice(last.indexOf("\u001b[H") + 3);
+    const end = body.indexOf("\u001b[?25l");
+    return (end === -1 ? body : body.slice(0, end))
+      .replaceAll(/\u001b\[[0-9;?]*[A-Za-z]/g, "")
+      .split("\r\n");
+  };
+
+  // The prompt is every row from the first wearing the glyph down to the
+  // footer — read off the frame, so the arithmetic under test is not also the
+  // arithmetic doing the reading.
+  const paintedRows = (): number => {
+    const frame = frameRows();
+    const first = frame.findIndex((r, i) => i > 0 && r.trimStart().startsWith("❯"));
+    return first === -1 ? 0 : frame.length - 1 - first;
+  };
+
+  // **Three heights, because one cannot tell the two readings apart.** A prompt
+  // that always painted one row satisfies any single-height assertion.
+  const seen = new Set<number>();
+  for (const typed of ["short", "y".repeat(120), "z".repeat(50)]) {
+    stdin.emit("\u0015"); // ⌃u — clear, so each pass starts from nothing
+    await Promise.resolve();
+    stdin.emit(typed);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const painted = paintedRows();
+    expect(painted, `${String(typed.length)}: the prompt is on the frame`).toBeGreaterThan(0);
+
+    // **The equality, against arithmetic this test does independently.** The
+    // gutter is two cells on the first row and two on continuations (C22 I13),
+    // so a line of N cells occupies ceil(N / (columns − 2)) rows. Computed here
+    // rather than read from `displayRows`, because taking the number from the
+    // code under test is the comparison this row exists to make, made with
+    // itself.
+    const body = COLUMNS - 2;
+    const expected = Math.max(1, Math.ceil(typed.length / body));
+    expect(painted, `${String(typed.length)}: rendered height is displayRows`).toBe(expected);
+
+    seen.add(painted);
+  }
+
+  expect(seen.size, `the prompt really did change height: ${[...seen].join(", ")}`).toBeGreaterThan(
+    1,
+  );
+});

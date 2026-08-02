@@ -873,3 +873,4 @@ One value, one file: `${stateDir}/theme`, holding the variant.
 | The auth flow itself | The far side; C22 displays and offers |
 | Prism's chrome content | `prism-tui` |
 | Multi-cluster sessions | Phase 2 |
+| **A verb whose result is a pushed view** | Undecided, and named here so it is findable. C15 supports `kind: "view"` layers, C16's `focus.ts` routes to `pushedView`, and nothing in the tree pushes one — the shell pushes overlays only. What is missing is not code but a ruling: what makes a result a view rather than a transcript entry, who decides, and what `Esc` from one does to the entry it came from. C15 T5.3 and T5.5 both wait on it, and neither can name a component, because none owns it |

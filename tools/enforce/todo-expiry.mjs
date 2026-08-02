@@ -498,76 +498,32 @@ export function backlogKey(violation) {
  * from nothing and every entry costs a sentence.
  */
 export const ACKNOWLEDGED_BACKLOG = Object.freeze([
-  /**
-   * **The three rows waiting on a feature of a component that exists.**
-   *
-   * TD's model is *waits on a component*, and these wait on work inside one that
-   * is already built — theme persistence and the non-TTY gate, both C22's, both
-   * unbuilt (C22 §12a). Naming C22 expires them the moment it is read, because
-   * C22 exists; naming C23 was the lie the C23 triage found. There is no third
-   * id to name, so this is the list doing the job it exists for.
-   *
-   * Not a widening. Each cost a sentence, each names an assigned owner, and TD0
-   * compares by equality — so the day C22 §12a is built, removing them is
-   * forced rather than remembered.
-   *
-   *   C17 T4.7         the prompt's height on the frame, which is `frame.ts`
-   *
-   * **C10 T4.5 and T4.6 left by being built.** They were here as *theme
-   * persistence: nothing writes a theme choice to disk*, which was true and was
-   * an entry in a backlog outliving the layer it was deferred within — the
-   * accumulation this equality exists to prevent. C22 I40 assigns it, and the
-   * two rows are written.
-   *
-   * **C02 T4.7 left this list by being read rather than by being written.** It
-   * was here as *the non-TTY gate, which `createTui` does not perform*; the gate
-   * exists now (C22 I36) and keys on `stdout.isTTY`, which is not the fact that
-   * row names. `altScreen: false` on a real terminal passes gate 1 and is
-   * refused by C01, whose T3.15 and T4.1b already cover it — so the row was
-   * restated to the ruling it actually needs, and the deferral it now carries
-   * names no component at all.
-   *
-   * **Two more, from the five-surface split**, and they are the same shape: work
-   * inside a component that exists, assigned in `docs/surfaces/HEIGHT_AUDIT.md`
-   * as C22 §12b. The row they came from named C23 while the audit named C22 for
-   * all five, and nothing compared the two records.
-   *
-   *
-   * S02 §2 and S12 §2 were both here and neither lasted a commit. S12's box was
-   * ruled a rendered `panel` and `panel` gained a `footer`; S02's tables got the
-   * column declarations only their author could write. **Entries argued rather
-   * than accumulated is the list working** — the alternative was two rows
-   * deferring a decision to a backlog while the decision-maker was in the
-   * conversation, which is a backlog used as somewhere to put a question.
-   */
-  "TD2 src/shell/session.ts (1)",
-
-  /**
-   * **One `execution.ts` key now, and it was two.** L4 and C23 both resolve to
-   * `src/shell/execution.ts`. L4's pair were C19's tier-5 spinner and TTL rows,
-   * and they are written — the spinner one having been *specified and unbuilt*
-   * rather than deferred, which is the shape the TTY gate had. So the L4 key is
-   * gone entirely and C23's two are what remain: a confirm inside a pushed view
-   * that nothing produces, and the session's children at exit.
-   *
-   * The counts were 8 and 6; the transport, parser and harness groups took them
-   * to 7 and 2, the TTY gate to 6, C04's three drift rows to 3, C03's two to 2,
-   * and C19's two removed the first key altogether.
-   *
-   * **Listed rather than left failing**, because TD0 compares by equality and a
-   * red suite mid-stretch is a suite nobody reads. The count is the progress
-   * bar: each group that lands lowers it, and the day it reaches zero these two
-   * lines are deleted rather than remembered.
-   */
-  "TD2 src/shell/execution.ts (2)",
-
-  // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two
-  // deferrals here — S01 §2's illustrated rows and C03 T5.4's edge drag — and
-  // both are gone: T5.4 moved to C24, which is what a PTY needs to drive a
-  // session, and S01 §2 became writable when the figure was ruled a diagram.
+  // **Empty, and this is the second time it has been.**
   //
-  // The count in the key is what kept the entry honest while it existed: it
-  // read `(2)`, and dropping to `(1)` failed TD0 rather than passing quietly.
+  // It held three keys through L4's last stretch — `session.ts (3)` and
+  // `execution.ts (2)` twice — and every one of them left by the work being
+  // done rather than by the entry being rewritten:
+  //
+  //   C10 T4.5, T4.6   theme persistence, unowned for four components and
+  //                    assigned by C22 I40. An entry outliving the layer it
+  //                    was deferred within is the accumulation this equality
+  //                    exists to prevent, which is what forced it.
+  //   C17 T4.7         the prompt's height on the frame — `frame.ts` and a
+  //                    session that paints, both of which exist
+  //   C19 T5.2, T5.5   the spinner and the TTL. T5.2 was *specified and
+  //                    unbuilt* rather than deferred: C19 answered `spinning`
+  //                    and nothing under `src/shell` read it (C22 I38).
+  //   C15 T5.3         restated. It named C23, which is built; what is
+  //                    missing is a ruling nobody owns, and it now says so.
+  //   C21 T5.5         the reaping, narrowed against C22's ordering claim
+  //                    rather than duplicating it, and asked of the operating
+  //                    system rather than of `runner.live`.
+  //
+  // TD6 landed in the same stretch and is why "restated" is now a checkable
+  // act: a deferral names a component id or says in as many words that it
+  // names none. A blocker phrased as a condition — *blocked on L4 drawing no
+  // overlays* — was invisible to every arm here and outlived what it described
+  // by four components.
 ]);
 
 /**
