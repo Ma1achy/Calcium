@@ -600,6 +600,11 @@ export const OWNERS = [
   { path: "tools/mutate/runs/c01", spec: "C01" },
   { path: "tools/mutate/runs/c22", spec: "C22" },
   { path: "src/testing", spec: "C09" },
+  // C24's builders sit under `src/shell/` because `b` is L4's surface and
+  // reuses `blockId` from `documents.ts` — so the C22 row above would claim
+  // them by prefix. Longest prefix wins, which is what makes this one line
+  // rather than a directory move.
+  { path: "src/shell/builders", spec: "C24" },
 ];
 
 /**
@@ -619,6 +624,7 @@ export const TOPICS = {
   history: "C20",
   adapters: "C07",
   blocks: "C09",
+  builders: "C24",
   capabilities: "C02",
   corpus: "C08",
   "fake-scheduler": "C03",

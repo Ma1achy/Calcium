@@ -654,6 +654,30 @@ export const SCANS = [
     scope: "src/", allow: [],
     why: "the app's entry point resolves its own variables; the framework reads none" },
 
+  // C24 I5 — nothing is inferred from a field name.
+  //
+  // A builder that guessed a tone from a key called `status` would work for
+  // four verbs and fail silently on the fifth, which is the failure mode that
+  // makes this a rule rather than a convention: the wrong tone renders.
+  //
+  // **The pattern is a tone or glyph literal used as an object-literal value**,
+  // which is the shape of the table T2.7 names — `{ status: "warn" }`, whether
+  // it is a standing map or built at a return. The trailing `[,}]` is what
+  // keeps a union *type* (`state?: "pending" | "done"`) out of it, so
+  // `types.ts` stays in scope rather than being allow-listed out.
+  //
+  // **What it does not catch**, recorded rather than hidden: the conditional
+  // form. `if (key === "status") return "warn"` infers exactly as hard and
+  // matches nothing here, because the tone never appears beside a colon. A
+  // regex can see a table and cannot see a decision. The by-hand read stays the
+  // backstop for that half, and `glyphFor` — which maps tone to glyph, not
+  // field name to tone, and is I6's ergonomics rather than inference — is the
+  // legitimate neighbour it must keep passing.
+  { id: "SS45", spec: "C24 I5 · C24 T2.7",
+    pattern: /:\s*"(?:ok|warn|error|info|dim|muted|accent|meta|identifier|pending|running|queued|cancelled|working|live|bullet|expand|collapse)"\s*[,}]/,
+    scope: "src/shell/builders/", allow: [],
+    why: "a builder inferring a tone or glyph from a field name works for four verbs and fails silently on the fifth (C24 I5)" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

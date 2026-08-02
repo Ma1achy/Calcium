@@ -1,0 +1,355 @@
+// C24 T2.11 (I17) — `b.seq` and the preference-versus-explicit distinction.
+//
+// **This file was written before the implementation it guards, and against a
+// deliberately naive `seq`.** The reason is T6.13: a `seq` that clears index 0
+// *unconditionally* passes every test anyone would naturally write, because the
+// common case is a first block that wanted no gap anyway. The property lives
+// only where an **explicit** `gapBefore: true` sits on the first block — the one
+// position where the builder's default and the caller's instruction can
+// disagree. So the boundary case is not an extra row here; it is the only row
+// that tests the rule.
+//
+// Proven the way `fix-the-fake-then-watch-it-fail` requires: the naive `seq`
+// passed "clears a defaulted gap" and "leaves index 1 alone", and failed
+// "an explicit gap on the first block survives". A test that had not been shown
+// to fail against the defect it names is a test about something else.
+import { describe, expect, it } from "vitest";
+import { block, validateBlock } from "../../src/data/viewmodel/index.js";
+import type { Block, BlockKind } from "../../src/data/viewmodel/index.js";
+import { b } from "../../src/shell/builders/index.js";
+import { defaulted, seq, wasDefaulted } from "../../src/shell/builders/seq.js";
+import { checkMeasurement, formatMeasurementReport } from "../../src/testing/index.js";
+import { renderSequenceToLines } from "../../src/testing/index.js";
+import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { patchDefinition } from "../../src/presentation/patch/index.js";
+import { DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+
+/** Every kind the builders produce, so nothing renders as `raw` by accident. */
+const kit = (): ReturnType<typeof measurable> =>
+  measurable({
+    definitions: [
+      tableDefinition,
+      plotDefinition as unknown as BlockDefinition<never>,
+      patchDefinition as unknown as BlockDefinition<never>,
+    ],
+  });
+
+/** A block whose gap is the builder's preference — what a gapping builder returns. */
+const preferred = (id: string): Block =>
+  defaulted(block({ kind: "raw", id, text: id, gapBefore: true }));
+
+/** A block whose gap the caller asked for. Never marked. */
+const asked = (id: string, gapBefore: boolean): Block =>
+  block({ kind: "raw", id, text: id, gapBefore });
+
+/** A block with no gap at all — what a non-gapping builder returns. */
+const plain = (id: string): Block => defaulted(block({ kind: "raw", id, text: id }));
+
+describe("C24 §4a — b.seq", () => {
+  it("T2.11 (I17): clears a defaulted gap on the first block and on no other", () => {
+    const out = seq([preferred("a"), preferred("b"), preferred("c")]);
+
+    expect(out[0]?.gapBefore).toBeUndefined();
+    expect(out[1]?.gapBefore).toBe(true);
+    expect(out[2]?.gapBefore).toBe(true);
+  });
+
+  // The half that can be wrong. Everything above passes for a `seq` that
+  // clears index 0 without consulting the marker at all.
+  it("T2.11 (I17): an EXPLICIT gapBefore: true on the first block survives", () => {
+    const out = seq([asked("a", true), preferred("b")]);
+
+    expect(out[0]?.gapBefore).toBe(true);
+    expect(out[1]?.gapBefore).toBe(true);
+  });
+
+  it("T2.11 (I17): an explicit gapBefore: false on the first block is left alone", () => {
+    const out = seq([asked("a", false), preferred("b")]);
+
+    expect(out[0]?.gapBefore).toBe(false);
+  });
+
+  it("T2.11: a first block with no gap is returned unchanged, identically", () => {
+    const head = plain("a");
+    const out = seq([head, preferred("b")]);
+
+    // Identity, not equality: nothing was rebuilt, so nothing could have been
+    // rebuilt wrongly.
+    expect(out[0]).toBe(head);
+  });
+
+  it("T2.11: the marker distinguishes a preference from an instruction", () => {
+    expect(wasDefaulted(preferred("a"))).toBe(true);
+    expect(wasDefaulted(asked("a", true))).toBe(false);
+    expect(wasDefaulted(asked("a", false))).toBe(false);
+  });
+
+  it("T2.11: the cleared block is still frozen, and the input is not mutated", () => {
+    const head = preferred("a");
+    const out = seq([head, preferred("b")]);
+
+    expect(Object.isFrozen(out[0])).toBe(true);
+    expect(head.gapBefore).toBe(true); // the original is untouched
+    expect(out[0]).not.toBe(head);
+  });
+
+  it("T2.11: an empty sequence is an empty sequence", () => {
+    expect(seq([])).toEqual([]);
+  });
+});
+
+// --- the nineteen ----------------------------------------------------------
+
+/**
+ * Every block-returning builder, its expected `gapBefore` default, and a call
+ * that produces a valid block.
+ *
+ * **The enumeration is the mechanism** (T2.9, T6.12). §4's prose listed fifteen
+ * builders and two of them — `b.keyValue` and `b.diff` — did not exist: the
+ * `comparison` rename reached §3, the renderer and the goldens, and not that
+ * paragraph. A prose list paired with a table that fails when a builder has no
+ * row is what makes that a failing test rather than a sentence nobody re-reads.
+ */
+const BUILDERS: readonly Readonly<{
+  name: string;
+  gaps: boolean;
+  kind: BlockKind;
+  make: (opts?: { id?: string; gapBefore?: boolean }) => Block;
+}>[] = [
+  { name: "rule", gaps: true, kind: "rule", make: (o) => b.rule("containers", undefined, o) },
+  { name: "notice", gaps: false, kind: "notice", make: (o) => b.notice("info", "nine running", undefined, o) },
+  { name: "kv", gaps: true, kind: "keyValue", make: (o) => b.kv({ image: "nginx" }, o) },
+  {
+    name: "table", gaps: true, kind: "table",
+    make: (o) => b.table({ ...o, columns: [b.col("name")], rows: [b.row("r1", { name: "web" })] }),
+  },
+  { name: "steps", gaps: true, kind: "steps", make: (o) => b.steps([{ label: "pull" }], o) },
+  { name: "logs", gaps: false, kind: "logs", make: (o) => b.logs([{ ts: "00:00:00", level: "info", message: "up" }], o) },
+  { name: "events", gaps: false, kind: "events", make: (o) => b.events([{ ts: "00:00:00", type: "start", message: "up" }], o) },
+  { name: "plot", gaps: true, kind: "plot", make: (o) => b.plot({ ...o, series: [{ values: [1, 2, 3] }], height: 4 }) },
+  { name: "spark", gaps: false, kind: "plot", make: (o) => b.spark([1, 2, 3], o) },
+  { name: "progress", gaps: false, kind: "progress", make: (o) => b.progress({ ...o, label: "pull", current: 3, total: 9 }) },
+  { name: "code", gaps: true, kind: "code", make: (o) => b.code("json", '{"a":1}', o) },
+  { name: "comparison", gaps: true, kind: "comparison", make: (o) => b.comparison([{ field: "cpu", a: "1", b: "2" }], o) },
+  {
+    name: "patch", gaps: true, kind: "patch",
+    make: (o) => b.patch({ ...o, path: "a.ts", language: "ts", hunks: [{ header: "@@", lines: [{ kind: "context", text: "x" }] }] }),
+  },
+  { name: "pills", gaps: false, kind: "pills", make: (o) => b.pills([{ label: "running" }], o) },
+  { name: "tip", gaps: true, kind: "tip", make: (o) => b.tip("press ? for help", undefined, o) },
+  { name: "panel", gaps: true, kind: "panel", make: (o) => b.panel("details", [b.raw("x")], o) },
+  { name: "group", gaps: false, kind: "group", make: (o) => b.group("column", [b.raw("x")], o) },
+  { name: "raw", gaps: false, kind: "raw", make: (o) => b.raw("plain text", o) },
+  { name: "spinner", gaps: false, kind: "steps", make: (o) => b.spinner("pulling", o) },
+];
+
+describe("C24 §4 — the nineteen builders", () => {
+  it("T2.9: the enumeration covers every block-returning builder, and nineteen is the count", () => {
+    // The count is asserted so that adding a builder without a row fails here
+    // rather than silently going untested — which is exactly how §4's paragraph
+    // came to name two builders that did not exist.
+    expect(BUILDERS).toHaveLength(19);
+    expect(BUILDERS.filter((x) => x.gaps)).toHaveLength(10);
+    expect(BUILDERS.filter((x) => !x.gaps)).toHaveLength(9);
+  });
+
+  it("T2.9 (I15): every builder sets its own gapBefore default", () => {
+    for (const { name, gaps, make } of BUILDERS) {
+      expect(make().gapBefore ?? false, `${name} default`).toBe(gaps);
+    }
+  });
+
+  it("T2.9 (I15): an explicit gapBefore of either polarity overrides the default", () => {
+    for (const { name, make } of BUILDERS) {
+      expect(make({ gapBefore: true }).gapBefore, `${name} explicit true`).toBe(true);
+      expect(make({ gapBefore: false }).gapBefore ?? false, `${name} explicit false`).toBe(false);
+      // And an explicit value is never a preference, whichever way it went.
+      expect(wasDefaulted(make({ gapBefore: true })), `${name} marked`).toBe(false);
+      expect(wasDefaulted(make({ gapBefore: false })), `${name} marked`).toBe(false);
+    }
+  });
+
+  it("T2.9 (I15): b.steps gaps and b.spinner does not, though both return Steps", () => {
+    // The row that shows the default belongs to the builder, not the kind. A
+    // default keyed on `block.kind` could not express it.
+    const steps = BUILDERS.find((x) => x.name === "steps");
+    const spinner = BUILDERS.find((x) => x.name === "spinner");
+    expect(steps?.kind).toBe(spinner?.kind);
+    expect(steps?.gaps).toBe(true);
+    expect(spinner?.gaps).toBe(false);
+  });
+
+  it("T1.1: every builder produces a block that passes validateBlock", () => {
+    for (const { name, make } of BUILDERS) {
+      const validity = validateBlock(make());
+      expect(validity.ok, `${name}: ${JSON.stringify(validity)}`).toBe(true);
+    }
+  });
+
+  it("T2.4 (I3): every builder returns a frozen block, never a description", () => {
+    for (const { name, make } of BUILDERS) {
+      expect(Object.isFrozen(make()), name).toBe(true);
+    }
+  });
+
+  it("T1.2 (I4): an omitted id is generated and unique; a supplied one is preserved", () => {
+    const ids = BUILDERS.map((x) => x.make().id);
+    expect(new Set(ids).size, "generated ids collide").toBe(ids.length);
+
+    for (const { name, make } of BUILDERS) {
+      expect(make({ id: "chosen" }).id, name).toBe("chosen");
+    }
+  });
+
+  it("T2.8: every block kind in C04's union has a builder", () => {
+    const kinds: readonly BlockKind[] = [
+      "rule", "notice", "keyValue", "table", "steps", "logs", "events", "plot",
+      "progress", "code", "comparison", "patch", "pills", "tip", "panel",
+      "group", "raw",
+    ];
+
+    // **Built, not declared.** This read `BUILDERS.map((x) => x.kind)` first,
+    // which compares one hand-written list against another and never calls a
+    // builder — so a `b.kv` emitting a `comparison` block left the assertion
+    // green. A03 §2's vacuity class, arriving as a coverage test.
+    const covered = new Set(BUILDERS.map((x) => x.make().kind));
+    expect([...kinds].filter((k) => !covered.has(k))).toEqual([]);
+
+    // And the table's own claim about each builder is checked against reality,
+    // so the two cannot drift apart silently.
+    for (const { name, kind, make } of BUILDERS) {
+      expect(make().kind, `${name} declares ${kind}`).toBe(kind);
+    }
+  });
+});
+
+// --- the round-trip control ------------------------------------------------
+
+describe("C24 T4.2 — build, render, assert the frame", () => {
+  // A builder producing the wrong shape passes an assertion written against the
+  // wrong shape. Asserting the *block* therefore proves nothing the builder
+  // could have got wrong; asserting what it renders to does.
+  it("T4.2: every builder's output measures correctly at seven widths", () => {
+    const r = kit();
+    const report = checkMeasurement(r, BUILDERS.map((x) => x.make()));
+    expect(report.failures, formatMeasurementReport(report)).toEqual([]);
+    expect(report.checked).toBeGreaterThan(0);
+  });
+
+  it("T4.2: every builder's output renders at least one row", () => {
+    const r = kit();
+    for (const { name, make } of BUILDERS) {
+      expect(r.renderToLines(make(), 80).length, `${name} rendered nothing`).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("C24 T4.2 — the two near-pairs, where only the frame separates them", () => {
+  const frame = (blk: Block, width = 40): string =>
+    kit().renderToLines(blk, width).map(visible).join("\n");
+
+  it("b.kv renders a key and a value; b.comparison renders two aligned values", () => {
+    // **Against the frame the block genuinely is**, not against a substring.
+    //
+    // The first version of this asserted that the keyValue frame contained
+    // "cpu" and "1" and not "2". A `b.kv` mutated to emit a *comparison* block
+    // with an empty second column renders `cpu  1` and satisfies all three —
+    // the assertion passed the exact defect it was written to catch. Absence of
+    // a string is not a structural claim, and the trap here is structural.
+    //
+    // The hand-authored block is the control: it is what a `keyValue` of this
+    // content looks like, written without the builder, so an equal frame means
+    // the builder produced that block and not something that resembles it. Ids
+    // are never rendered (I4), which is what makes the comparison legitimate.
+    const expectedKv = block({
+      kind: "keyValue", id: "control-kv", rows: [{ label: "cpu", value: "1" }],
+    });
+    const expectedCmp = block({
+      kind: "comparison", id: "control-cmp", rows: [{ field: "cpu", a: "1", b: "2" }],
+    });
+
+    expect(frame(b.kv({ cpu: "1" }, { gapBefore: false }))).toBe(frame(expectedKv));
+    expect(
+      frame(b.comparison([{ field: "cpu", a: "1", b: "2" }], { gapBefore: false })),
+    ).toBe(frame(expectedCmp));
+
+    // And the two are genuinely distinguishable at the frame — a key and a
+    // value against two aligned values. If these rendered alike, neither
+    // assertion above would mean anything.
+    expect(frame(expectedKv)).not.toBe(frame(expectedCmp));
+  });
+
+  it("b.steps gaps against what precedes it and b.spinner does not", () => {
+    // Both return `Steps`, and they differ *only* on the default. A gap is a
+    // blank row, so it is invisible in a single block's output — the separating
+    // assertion has to be a sequence.
+    const r = kit();
+    const rows = (blk: Block): readonly string[] =>
+      renderSequenceToLines(r.registry, seq([b.raw("above"), blk]), 40, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      });
+
+    const withSteps = rows(b.steps([{ label: "pull" }]));
+    const withSpinner = rows(b.spinner("pulling"));
+
+    expect(withSteps.length - withSpinner.length, "the gap is the whole difference").toBe(1);
+    expect(visible(withSteps[1] ?? "x").trim(), "row 1 should be the gap").toBe("");
+    expect(visible(withSpinner[1] ?? "").trim(), "a spinner gapped").not.toBe("");
+  });
+});
+
+describe("C24 §4 — the rulings that are not mechanical", () => {
+  it("T3.9 (C04 I5/I6): b.notice.error supplies a glyph with no glyph given", () => {
+    expect(b.notice.error("no such verb").glyph).toBe("error");
+    expect(b.notice.warn("degraded").glyph).toBe("warn");
+    // And a given glyph is never overridden.
+    expect(b.notice("error", "boom", "cancelled").glyph).toBe("cancelled");
+    // Tones that do not require one do not get one.
+    expect(b.notice.ok("done").glyph).toBeUndefined();
+  });
+
+  it("T1.3: a bare string and a toned cell in one row both produce valid cells", () => {
+    const r = b.row("r1", { family: "digit-classifier", status: b.warn("degraded") });
+    expect(r.cells["family"]).toEqual({ text: "digit-classifier" });
+    expect(r.cells["status"]?.tone).toBe("warn");
+    // The cell shorthand supplies the glyph C04 I6 requires, or `cell()` throws.
+    expect(r.cells["status"]?.glyph).toBe("warn");
+  });
+
+  it("T3.8: b.code defaults to wrap: false", () => {
+    expect(b.code("json", "{}").wrap).toBe(false);
+    expect(b.code("json", "{}", { wrap: true }).wrap).toBe(true);
+  });
+
+  it("§4: b.spark carries no height, because a sparkline's height is its form's", () => {
+    expect(b.spark([1, 2, 3]).height).toBeUndefined();
+    expect(b.spark([1, 2, 3]).form).toBe("sparkline");
+  });
+
+  it("§4: b.panel passes footer through to C04's field", () => {
+    expect(b.panel("details", [b.raw("x")], { footer: "j/k move" }).footer).toBe("j/k move");
+  });
+
+  it("T3.10: panel inside group inside panel is valid and measures", () => {
+    const nested = b.panel("outer", [b.group("column", [b.panel("inner", [b.raw("x")])])]);
+    expect(validateBlock(nested).ok).toBe(true);
+    expect(kit().measure(nested, 60)).toBeGreaterThan(0);
+  });
+
+  it("T3.1: b.table with zero columns is valid and renders its empty message", () => {
+    const t = b.table({ columns: [], rows: [], emptyMessage: "no containers" });
+    expect(validateBlock(t).ok).toBe(true);
+    expect(kit().renderToLines(t, 60).map(visible).join("\n")).toContain("no containers");
+  });
+
+  it("T3.3: b.kv with 200 rows is valid and measures linearly", () => {
+    const rows: Record<string, string> = {};
+    for (let i = 0; i < 200; i += 1) rows[`key${String(i)}`] = `value${String(i)}`;
+    const big = b.kv(rows);
+    expect(validateBlock(big).ok).toBe(true);
+    expect(kit().measure(big, 80)).toBe(200);
+  });
+});

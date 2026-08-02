@@ -342,6 +342,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS43 | A literal C0 control character (tab and newline excepted) | `src/` | C16 T2.10 |
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
+| SS45 | A tone or glyph literal as an object-literal value | `src/shell/builders/` | C24 I5, T2.7 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
@@ -376,6 +377,29 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 **SS38 is the hole SS31 leaves.** SS31 compares `package.json` against `DEPENDENCIES.md`, and both were clean while `src/` imported `highlight.js`, which was in neither: `lowlight` depends on it, npm hoisted it, the import resolved, and every gate passed. That is a **phantom dependency**, and its whole failure mode is that *it resolved, so it must be declared* is exactly the reasoning that does not hold. It breaks on someone else's release — the day the intermediate drops the dependency or a package manager stops hoisting — and in the meantime it is a package nobody reviewed, pinned or wrote a row for, executing in the product. Scoped to `src/`, which ships: a test may import `vitest`, and `src/` may not, because a consumer's install has no devDependencies.
 
 **SS39 is SS36's shape applied to glyphs.** C04 I6 closes `Glyph` to a vocabulary, and the type holds that inside the tree — but a `Notice` assembled with `as` is one cast away from compiling with a character in it, which is exactly how `colour: "#7faecf"` would have survived without SS36. The rule is what makes the untokenised form unwritable rather than merely discouraged. It matters more than the colour case in one respect: a wrong colour is visible to whoever wrote it, and a glyph that breaks the 1:1 rule is visible only under `LANG=C`, only to users who cannot easily say what they are seeing.
+
+**SS45 is C24 I5 reduced to the shape a table has.** C24 I5 says no builder infers a
+tone, glyph or action from a field name, and the failure it names is specific: a
+builder that guessed a tone from a key called `status` works for four verbs and
+fails silently on the fifth, rendering the wrong colour rather than throwing. The
+matched shape is a tone or glyph literal sitting where an object-literal value
+goes — `{ status: "warn" }` — whether that is a standing map or built at a
+return. The trailing `[,}]` keeps a union *type* out of it, so
+`builders/types.ts` stays in scope rather than being allow-listed out, which is
+the direction `allow-list-rather-than-narrow-scope` argues for.
+
+**What SS45 does not catch, stated rather than left to be inferred.** The line
+is finer than "tables yes, conditionals no", and the second fabricated violation
+is what draws it: `if (key === "status") return cell({ tone: "warn" })` *is*
+caught, because it constructs an object on its way out. What escapes is the
+branch that returns a bare tone — `if (key === "status") return "warn"` — which
+infers exactly as hard and never puts a tone beside a colon. So the rule matches
+**where a tone is written into a shape**, not where one is decided, and a builder
+that decided a tone and handed it to a caller to place would pass. No widening
+of this pattern closes that; the by-hand read is the backstop for it. The legitimate neighbour it
+must keep passing is `glyphFor`, which maps *tone* to glyph rather than field
+name to tone: that is C04 I6's ergonomics, and the distinction between the two
+is the whole content of the rule.
 
 **SS35 is SS30's shape applied to a type name.** C05's first draft declared its own `Result<T, E>` with `errors` plural where C04's has `error` singular — same name, same half of L0, and both compile. Nothing would have failed until a call site read `r.error` on the wrong one, which is a runtime `undefined` rather than a type error. One `Result` in the tree, declared in `data/viewmodel/types.ts`; a component wanting a plural puts it in the type argument.
 

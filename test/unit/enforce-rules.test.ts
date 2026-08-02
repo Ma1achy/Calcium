@@ -380,6 +380,23 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'const mode = process.env["PRISM_TUI_TRANSPORT"] ?? "subprocess";',
   },
   {
+    // C24 I5's table, in the form a builder would actually grow one. `b.row`
+    // takes a `Record<string, CellInput>` and the keys are the data's own field
+    // names, so a lookup from key to tone is one small step from where the
+    // ergonomics already are — and it renders the wrong colour rather than
+    // throwing, on whichever verb first uses a key nobody listed.
+    rule: "SS45",
+    file: "src/shell/builders/index.ts",
+    source: 'const TONE_BY_KEY = { status: "warn", health: "error" };',
+  },
+  {
+    // The same inference written inline, which is the form that makes the rule
+    // worth having: no standing table to notice in review.
+    rule: "SS45",
+    file: "src/shell/builders/index.ts",
+    source: 'if (key === "status") return cell({ text, tone: "warn" });',
+  },
+  {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
     // resolving its own variable, which reads as C22 owning the default rather
     // than as the framework reading the environment.
