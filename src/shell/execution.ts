@@ -545,7 +545,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // run for a subscription that had already finished.
         liveStreams.push({ id: pendingId, cancel: cancelThis });
         try {
-          await streamInto(pendingId, line, verb, transport.stream(invocation));
+          await streamInto(pendingId, displayed, verb, transport.stream(invocation));
         } finally {
           forgetStream(pendingId);
         }
@@ -606,7 +606,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    */
   const streamInto = async (
     id: string,
-    line: string,
+    /**
+     * **The displayed command, and the same one the settle path uses** (I15).
+     * It was `line` — the raw typed text — while step 5 passed `displayed`, so
+     * one entry carried the line while streaming and the normalised argv once it
+     * settled: the transcript changed what it said a command was, mid-stream,
+     * with no event. `meta.argv` carries the spawned form for `/debug`.
+     */
+    displayed: string,
     verb: string,
     patches: AsyncIterable<RawPatch>,
   ): Promise<void> => {
@@ -632,7 +639,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         }
 
         const view = deps.adapters.adaptPatch(patch, {
-          command: line,
+          command: displayed,
           verb,
           width: deps.lifecycle.size().columns,
           userRequestedJson: false,

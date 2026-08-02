@@ -50,6 +50,16 @@ function harness(script: Scripted = {}) {
   const recorded: { command: string; exitCode: number }[] = [];
   /** Every `seq` C23 handed C07, in order. */
   const seqs: number[] = [];
+  /**
+   * Every `command` C23 handed C07, per route.
+   *
+   * Added for the same reason `seq` was: the double read one field of the
+   * context and the field that was wrong was one of the others. `adaptPatch`
+   * took the raw typed line while `adapt` took the resolved argv, so an entry
+   * said one thing while streaming and another once settled — and no assertion
+   * anywhere touched either value.
+   */
+  const commands: { where: "patch" | "settle"; command: string }[] = [];
   /** A controllable clock and scheduler, so §3b's timers are driven not waited on. */
   let now = 0;
   const timers: (() => void)[] = [];
@@ -82,14 +92,18 @@ function harness(script: Scripted = {}) {
     },
     transport,
     adapters: {
-      adapt: () => (script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt()),
+      adapt: (_raw: unknown, ctx: { command: string }) => {
+        commands.push({ where: "settle", command: ctx.command });
+        return script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt();
+      },
       // **The context is read, not discarded.** This fake took no arguments at
       // all, which is why nothing here could see that C23 passed a literal
       // `seq: 0` — the parameter that was wrong was the one the double erased.
       // A fake narrower than the interface it stands for cannot fail on the
       // difference.
-      adaptPatch: (_patch: RawPatch, ctx: { seq: number }) => {
+      adaptPatch: (_patch: RawPatch, ctx: { seq: number; command: string }) => {
         seqs.push(ctx.seq);
+        commands.push({ where: "patch", command: ctx.command });
         return script.adaptPatch === undefined
           ? { op: "append" as const, block: { kind: "notice" as const, id: `s${String(ctx.seq)}`, tone: "info" as const, text: "tick" } }
           : script.adaptPatch();
@@ -174,6 +188,7 @@ function harness(script: Scripted = {}) {
     transcript,
     session,
     seqs,
+    commands,
     commits,
     resets,
     calls,
@@ -348,6 +363,41 @@ describe("C23 §3 — the app path", () => {
     // for, and the one that failed in a real session while every assertion about
     // the counter would still have been satisfiable by a well-behaved fake.
     expect(h.transcript.entries[0]?.doc.blocks.map((b) => b.id)).toEqual(["s0", "s1", "s2"]);
+  });
+
+  it("T1.7c (I15): one entry carries one displayed command, from first patch to settle", async () => {
+    // **The streaming route passed the raw typed line and step 5 the resolved
+    // argv**, so an entry said one thing while it streamed and another once it
+    // settled — the transcript changing what it said a command was, mid-stream,
+    // with no event to explain it. C22 I33 draws that value, so it is on the
+    // screen.
+    //
+    // **The typed line is deliberately not already normalised.** With `/tail`
+    // typed exactly as the argv rejoins it, both readings give the same string
+    // and the row passes against either — the convenient setup where the two
+    // agree. The runs of spaces are what make the two forms differ, and `tail`
+    // takes variadic paths so they survive as arguments rather than as a
+    // validation refusal.
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: { a: 1 } } as RawPatch;
+        yield { kind: "data", value: { a: 2 } } as RawPatch;
+      })(),
+    });
+
+    h.pipeline.submit("/tail   a.log    b.log");
+    await settled();
+
+    // Every hand-off, patches and settle alike, carried the same string — and
+    // it is the resolved argv, because that is what ran.
+    const seen = h.commands.filter((c) => c.where === "patch");
+    expect(seen.length, "the subject: patches were adapted").toBe(2);
+    expect(new Set(h.commands.map((c) => c.command)).size, "one command per entry").toBe(1);
+    expect(h.commands[0]?.command).toBe("/tail a.log b.log");
+
+    // And what the transcript ends up holding is the same thing, which is what
+    // the frame draws.
+    expect(h.transcript.entries[0]?.doc.command).toBe("/tail a.log b.log");
   });
 });
 
