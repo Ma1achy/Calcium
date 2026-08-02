@@ -11,7 +11,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SCAN_BUDGET_MS } from "../support/budget.js";
 
-import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../support/measurement-conformance.js";
+import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";

@@ -31,7 +31,7 @@ import {
   checkMeasurement,
   DEFAULT_WIDTHS,
   formatReport,
-} from "../support/measurement-conformance.js";
+} from "../../src/testing/measurement-conformance.js";
 import { ASCII_CAPS, measurable } from "../support/render.js";
 
 /**

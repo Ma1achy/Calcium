@@ -16,7 +16,7 @@ import {
   measurable,
   visible,
 } from "../support/render.js";
-import { checkMeasurement } from "../support/measurement-conformance.js";
+import { checkMeasurement } from "../../src/testing/measurement-conformance.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";

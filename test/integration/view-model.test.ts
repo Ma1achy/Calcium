@@ -31,7 +31,7 @@ import {
   checkMeasurement,
   formatReport,
   uncoveredKinds,
-} from "../support/measurement-conformance.js";
+} from "../../src/testing/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);

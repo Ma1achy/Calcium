@@ -15,7 +15,7 @@ import {
   type SurfaceColumn,
 } from "../support/surfaces.js";
 import { DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
-import { checkMeasurement, formatReport, uncoveredKinds } from "../support/measurement-conformance.js";
+import { checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { TABLE_CORPUS, psColumns, psTable } from "../support/blocks.js";
 import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 

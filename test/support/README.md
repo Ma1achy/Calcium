@@ -14,7 +14,21 @@ expectations, which is the same reason C02 takes its `env` by injection.
 | `fixture.mjs` | The program tier 5 runs inside a PTY. Imports `dist/`, not `src/` |
 
 | `world.ts` | `fakeWorld()`, `worldResult()`, `steppableClock()` — a constant `WorldDriver` double for C08's resolver, which is not "the world" for I14's purposes |
-| `boundary-conformance.ts` | A01 §6's B1–B8 suite, parameterised over a transport or a corpus |
+
+**Two files left this directory for `src/testing/`** — `measurement-conformance.ts`
+and `boundary-conformance.ts`. Both were written here under an explicit
+`DESTINATION:` header because C24 §7 exports them to consumers and an export
+nothing consumes is forbidden; C24 exists now, so they moved. They were written
+runner-free and parameterised for exactly that day, and it cost their import
+paths.
+
+**One thing to take from how that went.** A file waiting to move is a file
+outside the rules of the place it is going: two `src/`-scoped source scans fired
+the moment `measurement-conformance.ts` arrived, on a local width function whose
+own comment already said it must be replaced on arrival. The deferred instruction
+and the scan that enforces it met on the same commit by luck. If something here
+carries a `DESTINATION:` header, the scans at the destination are part of the
+move.
 
 ---
 

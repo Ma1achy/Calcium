@@ -1,11 +1,22 @@
 /**
- * C24 §7 — expectDocument, adaptFixture, fakes. Dev-only.
+ * `tui-kit/testing` — C24 §7. Dev-only, and never in a production bundle (I8).
  *
- * What is here so far is the half C09 needs: a registry rendered to the rows it
- * actually occupies, which is the other side of every measurement assertion. It
- * lives in `src/` rather than in `test/` because C24 §7 ships it — the
- * conformance suite is a thing consumers run against their own registered
- * kinds, not a thing this repo keeps to itself.
+ * Three things live here, and the reason they live here rather than in `test/`
+ * is the same for all three: **a consumer runs them.** The conformance suites
+ * are what an app checks its own registered kinds and its own far side against,
+ * not something this repo keeps to itself.
+ *
+ * **The two suites arrived by moving, not by rewriting.** Both were written in
+ * `test/support/` under an explicit `DESTINATION: src/testing/` header, deliberately
+ * runner-free and parameterised so that this day cost two import paths. A second
+ * implementation of a working thing is the duplication this project has removed
+ * four times, and the way to not do it a fifth is to write the first one where
+ * it can move.
+ *
+ * **The two `formatReport`s are re-exported under distinct names.** They format
+ * different reports — one a measurement disagreement, one a boundary assertion —
+ * and a name collision resolved by whichever export came last is how a caller
+ * gets the wrong formatter with no error at all.
  */
 import { Box, Text, renderToString } from "ink";
 import { createElement } from "react";
@@ -123,3 +134,25 @@ export function renderSequenceToLines(
   const lines = painted.split("\n");
   return lines.slice(0, Math.max(0, lines.length - 1));
 }
+
+// --- the conformance suites, C24 §7 -----------------------------------------
+
+export {
+  DEFAULT_WIDTHS,
+  checkAsciiParity,
+  checkMeasurement,
+  formatReport as formatMeasurementReport,
+  uncoveredKinds,
+  type Failure as MeasurementFailure,
+  type ConformanceReport as MeasurementReport,
+} from "./measurement-conformance.js";
+
+export {
+  EXIT_CODES,
+  checkCorpus,
+  checkResult,
+  formatReport as formatBoundaryReport,
+  type Assertion,
+  type Finding,
+  type ConformanceReport as BoundaryReport,
+} from "./boundary-conformance.js";

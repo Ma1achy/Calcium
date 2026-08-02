@@ -11,7 +11,7 @@ import { seriesRange } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
 import { PLOT_CORPUS, lossCurve } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
-import { checkAsciiParity, checkMeasurement, uncoveredKinds } from "../support/measurement-conformance.js";
+import { checkAsciiParity, checkMeasurement, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { readFileSync, readdirSync } from "node:fs";
 

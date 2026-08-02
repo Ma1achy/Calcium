@@ -871,11 +871,21 @@ export function checkSeamConsumers(
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
-  // --- public surface: consumed across an entry point, not within src/ ------
-  renderToLines:
-    "C24 §7 — `tui-kit/testing`. Its consumers are 37 test files and, in time, every " +
-    "app running the measurement conformance suite. The entry point is the seam and it " +
-    "is crossed; `src/` is simply not where the crossing happens",
+  // `renderToLines` was here and the equality arm removed it on the commit that
+  // moved the conformance suites into `src/testing/` — which is the arm working,
+  // and also **the rule's known false negative, shared with MG24.**
+  //
+  // It is not consumed. What happened is that `measurement-conformance.ts`
+  // declares `renderToLines(block, width)` as a member of the registry shape it
+  // needs — a different function of a different arity that happens to share a
+  // name — and a rule counting occurrences of a name cannot tell a coincidence
+  // from a call. Both rules match on names, so both have this hole, and neither
+  // can close it without resolving imports.
+  //
+  // The entry goes rather than being restored, because `expectDocument` consumes
+  // it for real one commit later. Recorded here rather than silently deleted:
+  // an allow-list maintained by acting on signals without reading them is the
+  // membership failure arriving through the other door.
 
   // --- specified and unbuilt: the class this rule exists for ----------------
   assignOffsets:

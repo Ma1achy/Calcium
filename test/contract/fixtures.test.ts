@@ -20,7 +20,7 @@ import {
 } from "../../src/data/fixtures/index.js";
 import { createFixtureTransport } from "../../src/data/transport/index.js";
 import type { Fixture, RawPatch, RawResult } from "../../src/data/transport/index.js";
-import { checkCorpus, checkResult, formatReport } from "../support/boundary-conformance.js";
+import { checkCorpus, checkResult, formatReport } from "../../src/testing/boundary-conformance.js";
 import { fixture as manifestFixture } from "../support/manifest.js";
 import { invocation, recorded, result } from "../support/transport.js";
 

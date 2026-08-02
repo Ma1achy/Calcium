@@ -14,7 +14,7 @@ import {
   checkMeasurement,
   DEFAULT_WIDTHS,
   formatReport,
-} from "../support/measurement-conformance.js";
+} from "../../src/testing/measurement-conformance.js";
 import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
