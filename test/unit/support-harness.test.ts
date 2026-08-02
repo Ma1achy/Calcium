@@ -127,6 +127,43 @@ describe("harness parameters — fake-terminal", () => {
     expect(fakeStdin({ tty: false }).isTTY).toBe(false);
   });
 
+  // **T1.16b (C01 I18a) — a property of the double, not a case of T1.16.**
+  //
+  // `pause` and `resume` were `() => stream` and `emit` delivered to any
+  // listener, so the double had no flowing state for the source to get wrong.
+  // T1.16 asserts that bytes arrive again after `resume()`, drove this fake,
+  // and passed for a whole stretch against a `lifecycle.ts` that re-attached
+  // its listener to a paused stream. The session drew frames and took no input.
+  //
+  // The three clauses below are the three that were no-ops, and the middle one
+  // is the one nobody would think to model: adding a `data` listener resumes a
+  // stream **only when `flowing` is not already false**, which is exactly the
+  // state `pause()` leaves behind.
+  it("fakeStdin(): models Node's flowing, so a paused stream can be got wrong", () => {
+    const stdin = fakeStdin();
+    const seen: string[] = [];
+    const listener = (chunk: Buffer): void => void seen.push(chunk.toString());
+
+    stdin.on("data", listener);
+    stdin.emit("a");
+    expect(seen, "a listener on a fresh stream flows").toEqual(["a"]);
+
+    stdin.pause();
+    stdin.emit("b");
+    expect(seen, "a paused stream delivers to nobody").toEqual(["a"]);
+    expect(stdin.isPaused()).toBe(true);
+
+    // The clause the source got wrong: re-attaching is not enough.
+    stdin.off("data", listener);
+    stdin.on("data", listener);
+    stdin.emit("c");
+    expect(seen, "re-adding a listener does not restart a paused stream").toEqual(["a"]);
+
+    stdin.resume();
+    stdin.emit("d");
+    expect(seen, "and resume() is what does").toEqual(["a", "d"]);
+  });
+
   it("fakeDebug(): lines are captured rather than discarded", () => {
     const debug = fakeDebug();
     debug("a line");

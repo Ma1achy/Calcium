@@ -212,6 +212,16 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     if (listening) return;
     listening = true;
     stdin.on("data", onData);
+    // I18a — **the attach is the inverse of the detach in both of its effects.**
+    // `detachInput` pauses as well as removing, and `pause()` sets Node's
+    // `flowing` to `false`, which is the one state in which adding a `data`
+    // listener does *not* resume the stream. Without this the listener after a
+    // handoff sits on a stream nothing feeds: the shell keeps drawing frames
+    // and never takes another key.
+    //
+    // Cheap on the first attach — `resume()` on an already-flowing stream is a
+    // no-op — and the one line that makes `suspend`/`resume` reversible.
+    stdin.resume();
   }
 
   function detachInput(): void {

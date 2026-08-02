@@ -13,7 +13,7 @@
 // a whole class of failure that reads as a defect in the component under test.
 
 import { describe, expect, it } from "vitest";
-import { interactivePty, runInPty } from "../support/pty.js";
+import { interactivePty, PROMPT, promptRow, runInPty } from "../support/pty.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
 const RESULT = /SCHEDULER_RESULT (\{[^\n]*\})/;
@@ -260,9 +260,7 @@ describe("C03 e2e", () => {
         expect(frame, "a full frame after resume").toHaveLength(24);
         expect(new Set(frame.map((r) => r.length)).size, "one width").toBe(1);
 
-        // **The keyboard does not come back, and that is the sixteenth gap.**
-        // See the deferral below this row: the screen half is asserted here and
-        // the input half is a defect, not a missing assertion.
+        // The screen half only. The keyboard is T5.5b's, below.
       } finally {
         pty.kill();
       }
@@ -270,30 +268,55 @@ describe("C03 e2e", () => {
     90_000,
   );
 
-  // **Sixteenth structural gap — a session that survives a handoff visually and
-  // not actually.** After `/tty <cmd>` the terminal is released, the child runs,
-  // the alternate screen is re-acquired and frames keep being drawn — T5.5 above
-  // asserts all of it — and **no keystroke reaches the session again**. Typing
-  // before the handoff works; the identical typing after it leaves the prompt
-  // empty, with or without a newline, and after an `Esc` to reset focus.
+  // **The sixteenth structural gap, and the row that closes it** (C01 I18a).
   //
-  // Ruled out, each by experiment rather than by reading:
-  //   - C01's input subscribers: `resume()` calls `acquire()` calls
-  //     `attachInput()`, and `onInput` subscribers live in a set that `suspend`
-  //     never clears.
-  //   - a paused stdin: adding `stdin.resume()` to `attachInput` changes nothing.
-  //   - raw mode: `suspend` → `unwind` → `setRawMode(false)` and `resume` →
-  //     `take("rawMode")` → `setRawMode(true)`, so the mode is cycled.
-  //   - the submission guard: `runHandoff` releases it in a `finally`.
-  //   - focus: an `Esc` before typing makes no difference.
+  // For a whole stretch this was a reproduced defect with no diagnosis: after
+  // `/tty <cmd>` the alternate screen came back, frames kept drawing, and no
+  // keystroke reached the session again. Five causes were ruled out by
+  // experiment and **one of them was ruled out wrongly** — "a paused stdin:
+  // adding `stdin.resume()` to `attachInput` changes nothing" was measured
+  // without a build, and tier 5 imports from `dist/`.
   //
-  // What has not been checked is what `stdio: "inherit"` does to the parent's
-  // tty read handle in Node once the child exits (C21 §handoff), which is the
-  // remaining candidate and the one that needs a reduction below the shell.
+  // It was found by reducing below the framework rather than instrumenting
+  // inside it: a thirty-line probe that reads stdin, spawns a `stdio: "inherit"`
+  // child and reads again. The child costs the parent nothing — not even raw
+  // mode — so the entire platform was eliminated in one run. The same probe
+  // wearing C01's attach/detach shape reproduced it, `paused=true listeners=1`,
+  // and went green with one `resume()`.
   //
-  // Not folded into T5.5: that row asserts a real property that holds, and a row
-  // failing for a second reason is one nobody can read.
-  it.todo(
-    "T5.5b (C22 §4 step 12, C16 I18): the session takes input again after a handoff — a *defect*, reproduced and not yet diagnosed. Typing before `/tty printf …` reaches the prompt and the identical typing after it does not, while frames continue to be drawn. Five causes ruled out by experiment (see the comment above); the open candidate is the parent's tty read handle after a `stdio: \"inherit\"` child exits, which needs a reduction below the shell to confirm",
+  // **This row is the outermost of three that must all be red on a revert**, and
+  // that is deliberate: the unit row failed only once the fake modelled
+  // `flowing`, so the source and the double are a pair (C01 T6.18).
+  it(
+    "T5.5b (C01 I18a, C22 §4 step 12): the session takes input again after a handoff",
+    async () => {
+      const pty = interactivePty(`${FIXTURE} session`, { cols: 100, rows: 24 });
+      try {
+        await pty.waitFor(PROMPT, 20_000);
+
+        // **The control, and it is what makes the second half a claim.** Typing
+        // that reaches the prompt *before* the handoff is what says the failure
+        // afterwards is the handoff's rather than the harness's. This is the
+        // half the defect always passed.
+        pty.type("before-it");
+        await pty.waitForFrame((f) => promptRow(f).includes("before-it"), 20_000);
+
+        // Clear it, so the assertion below cannot match what is already there.
+        pty.type(""); // Ctrl-U — killToStart
+        await pty.waitForFrame((f) => !promptRow(f).includes("before-it"), 20_000);
+
+        pty.type("/tty printf handed-over\r");
+        await pty.waitFor(/handed-over/, 20_000);
+        await pty.waitForFrame((f) => f.join("\n").includes("printf finished"), 20_000);
+
+        // The keystroke after the child exits. Identical to the one above, and
+        // for a whole stretch this was where it stopped.
+        pty.type("after-it");
+        await pty.waitForFrame((f) => promptRow(f).includes("after-it"), 20_000);
+      } finally {
+        pty.kill();
+      }
+    },
+    90_000,
   );
 });

@@ -129,6 +129,22 @@ export type FakeStdin = NodeJS.ReadStream & {
 export function fakeStdin({ tty = true } = {}): FakeStdin {
   const rawModeCalls: boolean[] = [];
   const data = new Set<(chunk: Buffer) => void>();
+  /**
+   * Node's `flowing`, modelled rather than ignored (C01 I18a, T1.16b).
+   *
+   * `null` is the initial "not yet decided" state, `false` is what `pause()`
+   * sets, and the rule that matters is the one below in `on`: adding a `data`
+   * listener resumes a stream **only when `flowing` is not already false**.
+   *
+   * **Every one of these three lines was a no-op, and that is what hid the
+   * sixteenth structural gap for a whole stretch.** T1.16 asserts that bytes
+   * arrive again after `resume()`, drove this double, and passed against a
+   * `lifecycle.ts` whose `attachInput` re-added the listener to a paused
+   * stream — a fake narrower than the interface it stands for cannot fail on
+   * the difference. The defect was in the source; the reason no row could see
+   * it was here.
+   */
+  let flowing: boolean | null = null;
   const stream: Record<string, unknown> = {
     isTTY: tty,
     get rawModeCalls() {
@@ -137,11 +153,17 @@ export function fakeStdin({ tty = true } = {}): FakeStdin {
     get listeners() {
       return data.size;
     },
+    /** The OS delivers to a flowing stream and to no other. */
     emit: (chunk: string): void => {
+      if (flowing !== true) return;
       for (const cb of [...data]) cb(Buffer.from(chunk, "utf8"));
     },
     on: (event: string, cb: (chunk: Buffer) => void): unknown => {
-      if (event === "data") data.add(cb);
+      if (event === "data") {
+        data.add(cb);
+        // `Readable.prototype.on`: `if (state.flowing !== false) this.resume()`.
+        if (flowing !== false) flowing = true;
+      }
       return stream;
     },
     once: () => stream,
@@ -150,8 +172,15 @@ export function fakeStdin({ tty = true } = {}): FakeStdin {
       return stream;
     },
     removeListener: () => stream,
-    resume: () => stream,
-    pause: () => stream,
+    resume: () => {
+      flowing = true;
+      return stream;
+    },
+    pause: () => {
+      flowing = false;
+      return stream;
+    },
+    isPaused: () => flowing === false,
   };
   if (tty) {
     stream["setRawMode"] = (on: boolean): unknown => {
