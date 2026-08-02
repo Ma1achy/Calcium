@@ -112,4 +112,35 @@ describe("C22 integration — the frame's viewport", () => {
       expect(displayCells(row)).toBe(100);
     }
   });
+
+  it("T4.9b (C16 I23): the scroll keys are in what /help renders", async () => {
+    // **The row that says the ruling changed something a user can see.** Before
+    // it, PageUp scrolled and `/help` could not mention it — the keys were read
+    // out of an `InputEvent` in a `switch`, and help renders from the keymap —
+    // while ⌃Home and ⌃End did not work at all. A row asserting the bindings
+    // exist is T2.16b's; this asserts they reach the screen.
+    //
+    // Driven through a real session rather than by calling `bindings()`,
+    // because the thunk agreeing with the keymap is not the claim: the claim is
+    // that the help a user reads contains them.
+    const stdin = fakeStdin();
+    const { stdout } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
+
+    stdin.emit("/help\r");
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const frame = lastFrame(stdout.chunks);
+    expect(frame, "a frame was written").toHaveLength(40);
+    const text = frame.join("\n");
+
+    // The control: help arrived at all. Without it every assertion below is
+    // about an empty screen and the row passes when nothing rendered.
+    expect(text, "the help document is on the frame").toContain("c+r");
+
+    for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
+      expect(text, `/help shows ${shown}`).toContain(shown);
+    }
+  });
 });

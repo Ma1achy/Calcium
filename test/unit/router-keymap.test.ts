@@ -254,6 +254,19 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt c+z": ["\u001a"],
       "prompt m+z": ["\u001bz"],
 
+      // Scrolling (I23). **This is the check the ruling asked for**, and it
+      // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the
+      // forms terminals send them in, so no decoder branch was widened and no
+      // candidate was dropped. `CSI 1;5H` lands in the letter table with
+      // `modifiersOf("5")` setting ctrl; `CSI 7;5~` lands in the tilde table at
+      // the same name with the same modifiers. Both are listed for the reason
+      // the arrows carry both — a rule satisfied by one form is satisfied on
+      // half the terminals.
+      "global pageup": ["\u001b[5~"],
+      "global pagedown": ["\u001b[6~"],
+      "global c+home": ["\u001b[1;5H", "\u001b[7;5~"],
+      "global c+end": ["\u001b[1;5F", "\u001b[8;5~"],
+
       // The live block (I22). `escape` needs the disambiguation window to
       // close, like `overlay escape` above.
       "liveBlock escape": ["\u001b"],
@@ -316,6 +329,47 @@ describe("§6 — the default table (C17 I12)", () => {
   });
 });
 
+describe("C16 I23 — the line's extremes and the document's", () => {
+  it("T2.16 (I23): Home and ⌃Home are different slots, on different targets", () => {
+    // **The claim is the discrimination, not the presence.** Both keys exist in
+    // the table and a row asserting each resolves would pass with `keyText`
+    // ignoring modifiers entirely — which is the one edit that breaks this, and
+    // it is one line. So the two are asserted against each other.
+    const map = createKeymap(defaultKeymap);
+
+    expect(map.resolve("prompt", k("home"))?.action, "the line's start").toBe("home");
+    expect(map.resolve("prompt", k("end"))?.action, "the line's end").toBe("end");
+
+    expect(map.resolve("global", k("home", { ctrl: true }))?.action, "the document's top").toBe(
+      "scrollTop",
+    );
+    expect(map.resolve("global", k("end", { ctrl: true }))?.action, "and its bottom").toBe(
+      "scrollBottom",
+    );
+
+    // **The half that makes the ruling work.** `global` is last in the ladder,
+    // so the prompt keeps an unmodified `Home` at every moment it has focus —
+    // and the modified pair is not bound on `prompt` at all, which is what lets
+    // it fall through. A binding here would take the scroll away silently.
+    expect(map.resolve("prompt", k("home", { ctrl: true })), "⌃Home is not the prompt's").toBeNull();
+    expect(map.resolve("prompt", k("end", { ctrl: true })), "nor ⌃End").toBeNull();
+    expect(map.resolve("global", k("home")), "and plain Home is not global's").toBeNull();
+  });
+
+  it("T2.16b (I23): every scroll operation C14 exposes as a key has a binding", () => {
+    // The row that would have caught the original defect. Two of the four had
+    // callers in L4 and no route from a keyboard, and nothing compared the set
+    // of operations with the set of bound actions — each was individually fine.
+    const bound = new Set(defaultKeymap.filter((b) => b.target === "global").map((b) => b.action));
+    expect([...bound].sort(), "C14's four, and nothing else on global").toEqual([
+      "scrollBottom",
+      "scrollPageDown",
+      "scrollPageUp",
+      "scrollTop",
+    ]);
+  });
+});
+
 describe("C16 I17 — the rule, over the half a table walk cannot reach", () => {
   it("T2.13b (I17): every `key.name` literal in src/ names a key the decoder emits", () => {
     // **T2.13 walks `defaultKeymap`; this walks the source.** The rule says "a
@@ -371,6 +425,7 @@ describe("C16 I17 — the rule, over the half a table walk cannot reach", () => 
     walk("src");
 
     const offenders: string[] = [];
+    const contributors = new Set<string>();
     let scanned = 0;
     // `key.name`, `e.key.name`, `k.name` — the comparison, not the assignment,
     // because the decoder itself is where these names are *made*.
@@ -381,15 +436,28 @@ describe("C16 I17 — the rule, over the half a table walk cannot reach", () => 
       for (const m of text.matchAll(literal)) {
         const name = m[1] ?? "";
         scanned += 1;
+        contributors.add(file);
         if (!produced.has(name)) offenders.push(`${file}: "${name}"`);
       }
     }
 
-    // **A floor, because zero literals passes exactly like zero offenders.**
-    // The comparisons are real and in two files — the scroll table and the
-    // Ctrl-C rungs — so a regex that stopped matching would otherwise report a
-    // clean tree. A03 §2's vacuity class, applied to this test.
-    expect(scanned, "the scan found the comparisons it exists to read").toBeGreaterThan(5);
+    // **A floor, because zero literals passes exactly like zero offenders** —
+    // a regex that stopped matching would report a clean tree. A03 §2's vacuity
+    // class, applied to this test.
+    //
+    // **The floor came down from 5 when the scroll table left `construct.ts`**
+    // (C16 I23), and a bare number is the wrong shape for that: it is lowered
+    // to match whatever the tree happens to hold, which is the assertion
+    // following the code rather than constraining it. So the files are named as
+    // well. Both still hold comparisons for reasons that are not going away —
+    // the Ctrl-C rungs discriminate on `d` and `c` in `router.ts`, and
+    // `construct.ts` tests `enter` for submission — and a rename that emptied
+    // either fails here rather than quietly halving the scan.
+    expect(scanned, "the scan found the comparisons it exists to read").toBeGreaterThan(2);
+    expect(
+      [...contributors].sort(),
+      "the two files that hold key-name comparisons, named so the floor cannot drift down alone",
+    ).toEqual(["src/interaction/router/router.ts", "src/shell/construct.ts"]);
     expect(offenders, "a key nothing can press").toEqual([]);
   });
 });

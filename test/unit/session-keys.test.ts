@@ -27,6 +27,30 @@ const key = (k: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean 
 
 const press = (k: Parameters<typeof key>[0]): InputEvent => ({ kind: "key", key: key(k) });
 
+/**
+ * C14's four scroll operations, recording which was called (C16 I23).
+ *
+ * Named methods rather than a `Proxy` over a real viewport: the claim is which
+ * *action* fired, and a real viewport clamps — `scrollToTop` on a document that
+ * already sits at the top is indistinguishable from nothing happening, which is
+ * the state a fresh graph is in.
+ */
+function recordingViewport(): {
+  calls: string[];
+  viewport: { pageUp(): void; pageDown(): void; scrollToTop(): void; scrollToBottom(): void };
+} {
+  const calls: string[] = [];
+  return {
+    calls,
+    viewport: {
+      pageUp: () => void calls.push("pageUp"),
+      pageDown: () => void calls.push("pageDown"),
+      scrollToTop: () => void calls.push("scrollToTop"),
+      scrollToBottom: () => void calls.push("scrollToBottom"),
+    },
+  };
+}
+
 /** A dismissable layer, so `activeTarget` resolves to `overlay` (C16 §3). */
 function openOverlay(graph: Graph): void {
   graph.overlays.push({
@@ -196,6 +220,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       overlays: graph.overlays,
       history: graph.history,
       manifest: null,
+      viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
       overlayRegion: () => ({ width: 80, height: 24 }),
       redraw: () => undefined,

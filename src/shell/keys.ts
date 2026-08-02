@@ -37,6 +37,20 @@ export type KeyDeps = Readonly<{
   completion: CompletionEngine;
   overlays: OverlayManager;
   history: HistoryStore;
+  /**
+   * C14, for the four scroll actions (C16 I23).
+   *
+   * Narrowed to what they call rather than taking the store: the effects move
+   * the viewport and commit nothing, and a wider type here would let one of
+   * them reach `resize`, whose height is the composed region's and the frame's
+   * to set (C22 I34).
+   */
+  viewport: Readonly<{
+    pageUp(): void;
+    pageDown(): void;
+    scrollToTop(): void;
+    scrollToBottom(): void;
+  }>;
   manifest: Manifest | null;
   /** Where the prompt sits, from the composed frame rather than a fresh read. */
   anchor: () => PromptAnchor;
@@ -275,6 +289,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     home: () => void deps.editor.move("lineStart"),
     end: () => void deps.editor.move("lineEnd"),
     left: () => void deps.editor.move("charLeft"),
+
+    // --- C14, through the keymap like everything else that is a key (C16 I23)
+    //
+    // **The commit is the read loop's, not these** (C22 I27). C14 moves and C22
+    // commits — a viewport committing its own frame would be L2 reaching into
+    // L0 — and two committers means one frame too many for a scroll and none
+    // for whichever handler forgets, of which only the second is invisible.
+    scrollPageUp: () => void deps.viewport.pageUp(),
+    scrollPageDown: () => void deps.viewport.pageDown(),
+    scrollTop: () => void deps.viewport.scrollToTop(),
+    scrollBottom: () => void deps.viewport.scrollToBottom(),
 
     reverseSearch: () => {
       deps.history.searchOpen(deps.editor.text);

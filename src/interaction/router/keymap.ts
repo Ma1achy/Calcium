@@ -219,6 +219,41 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // which is why the invariant holds entry, exit and the empty case together.
   //
   // `escape` is the route S01's footer already advertises as `esc prompt`.
+  // --- scrolling, and the first built-in rows that target `global` (I23) ---
+  //
+  // **They were in a `switch` in L4, and two of the four were dead.**
+  // `keymap.ts` binds `home` and `end` to the prompt's line motions, and the
+  // prompt is dispatched before `global` at every moment it has focus — which
+  // is nearly always — so `scrollToTop` and `scrollToBottom` had callers in the
+  // shell and no route from a keyboard. C04's tier-5 row found it by being
+  // written against `Home` and never reaching the top of a document.
+  //
+  // **The larger half is that none of them were bindings.** `/help` renders
+  // from this table (C23 I26), so a key handled in imperative code is one the
+  // shell cannot tell anyone about: PageUp has always scrolled and has never
+  // been discoverable. Fifteen unexecuted bindings is the defect this file
+  // already had; two executed ones outside it are its inverse.
+  //
+  // `Home`/`End` stay the line's and the document's extremes take the modified
+  // pair, which is the distinction every editor draws — borrowed rather than
+  // arbitrated. `g`/`G` cannot work here because the prompt takes letters; S12
+  // draws them for a pushed view, which has no prompt competing.
+  //
+  // **Both wire forms were pressed through the real decoder before these were
+  // written** (I17, T2.16), and neither needs a decoder change: xterm's
+  // `CSI 1;5H` reaches `CSI_LETTER_KEYS` with `modifiersOf("5")` setting ctrl,
+  // and rxvt's `CSI 7;5~` reaches `CSI_TILDE_KEYS` at the same name with the
+  // same modifiers. Recorded because it held — the ruling was to drop the
+  // binding rather than widen the decoder if it had not.
+  //
+  // **These newly occupy the `global` slots for four keys**, so `mergeBlock`
+  // now refuses a block binding PageUp instead of shadowing the scroll. That is
+  // the conflict rule working, and it is a change in behaviour.
+  { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
+  { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
+  { target: "global", key: { name: "home", ctrl: true }, action: "scrollTop" },
+  { target: "global", key: { name: "end", ctrl: true }, action: "scrollBottom" },
+
   { target: "liveBlock", key: { name: "escape" }, action: "focusPrompt" },
   { target: "liveBlock", key: { name: "down" }, action: "rowDown" },
   { target: "liveBlock", key: { name: "up" }, action: "rowUp" },

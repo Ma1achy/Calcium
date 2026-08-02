@@ -105,7 +105,23 @@ export type KeyAction =
   // and the movement between rows.
   | "focusPrompt"
   | "rowUp"
-  | "rowDown";
+  | "rowDown"
+  // --- scrolling (I23) -----------------------------------------------------
+  //
+  // C14's four operations, named here because every key that scrolls is a
+  // binding. They were read out of an `InputEvent` in a `switch` in L4, which
+  // is the inverse of the defect I19 prevents: a key that works and that
+  // `/help` cannot render, because `/help` renders from the table. Two of the
+  // four were reachable by nothing at all, and looked exactly like the two that
+  // were not.
+  //
+  // The wheel has no action here. It is not a key and has no `(target, key)` to
+  // resolve on, so it stays in the handler — the boundary rather than an
+  // exception to it.
+  | "scrollPageUp"
+  | "scrollPageDown"
+  | "scrollTop"
+  | "scrollBottom";
 
 export type Binding = Readonly<{
   target: FocusTarget;

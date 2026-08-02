@@ -23,20 +23,27 @@ import { interactivePty, PROMPT, promptRow, type InteractivePty } from "../suppo
 
 const FIXTURE = "node test/support/fixture.mjs session subprocess";
 
-// **`Home` and `End` are not here, and that is a finding rather than an
-// omission.** `construct.ts`'s `scrollAmount` maps them to `scrollToTop` and
-// `scrollToBottom`, and the keymap binds both to the *prompt* layer's cursor
-// motions (`keymap.ts`) — which is dispatched first, at every moment the prompt
-// has focus, which is nearly always. So those two arms are reachable by nothing
-// and the operations behind them have no route from a keyboard. C14 §2 is not
-// wrong: it says the keys that invoke its operations are C16's. What has no
-// owner is the disagreement between C16's table and the shell's.
-//
-// The row uses the keys that do arrive. Asserting `End` here would have been a
-// row that fails for a reason it is not about.
+// **This file found that `Home` and `End` could not reach a document's
+// extremes**, and the ruling that followed is C16 I23. `scrollToTop` and
+// `scrollToBottom` had callers in the shell and no route from a keyboard,
+// because the keymap binds both keys to the prompt's cursor motions and the
+// prompt is dispatched ahead of `global` at every moment it has focus. The
+// document's extremes are `⌃Home`/`⌃End` now, T5.1b drives them, and T5.1's
+// walk still pages to the top rather than jumping — a walk that starts where a
+// user's paging would start.
 const KEY = {
   pageDown: "\u001b[6~",
   pageUp: "\u001b[5~",
+  // C16 I23. `Home` and `End` are the prompt's line motions and resolve ahead
+  // of `global` at every moment the prompt has focus, so the document's
+  // extremes are the modified pair — the distinction every editor draws. This
+  // file is where the absence was found: T5.1 was written against `Home`, could
+  // not reach the top of a document, and the walk below pages there instead.
+  //
+  // xterm's form. rxvt sends `CSI 7;5~`/`CSI 8;5~`, which the decoder names as
+  // the same key; T2.16 covers both and a PTY row can only send one.
+  scrollTop: "\u001b[1;5H",
+  scrollBottom: "\u001b[1;5F",
 } as const;
 
 const COLS = 100;
@@ -160,6 +167,55 @@ describe("C04 e2e — the drift tests", () => {
       pty.type(KEY.pageDown);
       await new Promise((r) => setTimeout(r, 300));
       expect(region(pty.frame).at(-1), "the bottom is the bottom").toBe(lastRow);
+    } finally {
+      pty.kill();
+    }
+  }, 120_000);
+
+  it("T5.1b (C16 I23): ⌃Home and ⌃End reach the document's extremes, and Home still edits", async () => {
+    // **The keys the walk above had to page around.** `scrollToTop` and
+    // `scrollToBottom` had callers in the shell and no route from a keyboard,
+    // because `Home` and `End` are the prompt's and the prompt resolves first.
+    // Written here rather than beside the keymap because the unit rows can only
+    // assert what resolves — this is the row that says the viewport moves.
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 20_000);
+      pty.type("/ps --limit 400\r");
+      await pty.waitForFrame((f) => region(f).some((r) => r.includes("0000399")), 30_000);
+
+      const tail = region(pty.frame);
+      const lastRow = tail[tail.length - 1] ?? "";
+      expect(lastRow, "the tail is content, not padding").not.toBe("");
+
+      // One jump, where the walk needs a page per screenful.
+      pty.type(KEY.scrollTop);
+      await pty.waitForFrame((f) => region(f).join("\n") !== tail.join("\n"), 20_000);
+      // **The document's first row is the command echo, not the first data
+      // row** — C22 I33 draws each entry with the command that produced it, and
+      // the top of the transcript is the top of the *entry*. Asserting
+      // `0000000` here failed against a correct jump, which is the assertion
+      // being wrong rather than the key.
+      const top = region(pty.frame);
+      expect(top[0], "⌃Home reaches the transcript's first row").toContain("/ps --limit 400");
+      expect(top.join("\n"), "and the document's earliest data row is on it").toContain("0000000");
+
+      pty.type(KEY.scrollBottom);
+      await pty.waitForFrame((f) => region(f).at(-1) === lastRow, 20_000);
+      expect(region(pty.frame).at(-1), "⌃End reaches its last").toBe(lastRow);
+
+      // **The control, and it is what makes the ruling a ruling.** Unmodified
+      // `Home` must still be the *line's* start: it moves the cursor inside the
+      // prompt and does not scroll. Binding the extremes without the modifier
+      // would pass every assertion above and break this one.
+      pty.type(KEY.scrollTop);
+      await pty.waitForFrame((f) => region(f).join("\n").includes("0000000"), 20_000);
+
+      pty.type("second");
+      await pty.waitForFrame((f) => promptRow(f).includes("second"), 20_000);
+      pty.type("\u001b[Hfirst-"); // Home, then type at the line's start
+      await pty.waitForFrame((f) => promptRow(f).includes("first-second"), 20_000);
+      expect(region(pty.frame).join("\n"), "and the viewport did not move").toContain("0000000");
     } finally {
       pty.kill();
     }

@@ -503,6 +503,7 @@ export async function constructGraph(
     overlays: stores.overlays,
     history: stores.history,
     manifest: built.manifest.manifest,
+    viewport: stores.viewport,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
     focus,
@@ -595,8 +596,22 @@ export async function constructGraph(
     // **The commit is the loop's, not this handler's** (I27). Two committers
     // means one frame too many for a scroll and none for whichever handler
     // forgets, and only the second is invisible.
+    // **Everything that is a key resolves through the keymap** (C16 I23). The
+    // four scroll keys used to be a `switch` here, which is a second mechanism
+    // for one target's key handling and is why `/help` could not show them —
+    // help renders from the table, and they were not in it. Two of the four
+    // were reachable by nothing at all.
+    //
+    // The wheel stays, because a wheel event is not a key: it has no
+    // `(target, key)` to resolve on. That is the boundary rather than an
+    // exception to it.
     router.register("global", (e) => {
-      const move = scrollAmount(e);
+      const effect = bound("global", e);
+      if (effect !== null) {
+        effect();
+        return true;
+      }
+      const move = wheelAmount(e);
       if (move === null) return false;
       move(stores.viewport);
       return true;
@@ -675,40 +690,25 @@ export async function constructGraph(
 }
 
 /**
- * The scroll bindings, as a lookup from event to motion.
+ * The wheel, which is the only scroll input that is not a key.
  *
- * A table rather than a chain of `if`s for C01's transition-table reason: five
- * rows are checkable against C14's interface by reading, and a chain gets one
- * of them wrong. `null` means "not a scroll", which is what lets the handler
- * decline without consuming (C16 I5).
+ * **This function used to hold the keys too, and that was the defect** (C16
+ * I23). A key handled here is one `/help` cannot render, because help renders
+ * from the keymap — so PageUp has always scrolled and has never been
+ * discoverable — and two of the four arms, `home` and `end`, were reachable by
+ * nothing at all: the prompt binds both and resolves ahead of `global` at every
+ * moment it has focus. They are `global` bindings now, and the document's
+ * extremes are `⌃Home`/`⌃End`.
+ *
+ * A wheel event has no `(target, key)` to resolve on, so it stays. `null` means
+ * "not a scroll", which is what lets the handler decline without consuming
+ * (C16 I5).
  */
 type Scroller = ReturnType<typeof createViewport>;
 
 const WHEEL_ROWS = 3;
 
-function scrollAmount(e: InputEvent): ((v: Scroller) => void) | null {
-  if (e.kind === "key" && !e.key.ctrl && !e.key.meta) {
-    if (e.key.name === "pageup") return (v) => void v.pageUp();
-    if (e.key.name === "pagedown") return (v) => void v.pageDown();
-    // **These two rows are reachable by nothing, and the disagreement has no
-    // owner.** `keymap.ts` binds `home` and `end` to the *prompt* layer's cursor
-    // motions, and the prompt is dispatched before `global` at every moment it
-    // has focus — which is nearly always. So `scrollToTop` and `scrollToBottom`
-    // have exactly two callers in the tree, both here, both dead: two C14
-    // operations with no route from a keyboard.
-    //
-    // C14 §2 is not what is wrong — it lists them as *operations* and says the
-    // keys that invoke them are C16's. What is missing is a ruling: either the
-    // prompt yields these two when the buffer is empty, or the transcript gets
-    // its own keys (`⌃Home` / `⌃End` is the usual pair) and this table changes.
-    // Left as found and named rather than picked, because it is a keymap
-    // decision and C16 I21 makes the keymap the vocabulary.
-    //
-    // Found by C04 T5.1, which was written against `Home` and could not reach
-    // the top of a document.
-    if (e.key.name === "home") return (v) => void v.scrollToTop();
-    if (e.key.name === "end") return (v) => void v.scrollToBottom();
-  }
+function wheelAmount(e: InputEvent): ((v: Scroller) => void) | null {
   if (e.kind === "mouse" && e.press) {
     if (e.button === "wheelUp") return (v) => void v.scrollBy(-WHEEL_ROWS);
     if (e.button === "wheelDown") return (v) => void v.scrollBy(WHEEL_ROWS);
