@@ -259,7 +259,7 @@ PTY harness, real timers, real terminal.
 - **T5.2**: typing continuously during that stream → input-to-frame latency p95 under 16 ms.
 - **T5.3**: on a synchronised-update-capable terminal, a full-screen repaint shows no intermediate state — asserted by sampling the PTY mid-write and finding either the old frame or the new one, never a mixture.
 - **T5.4**: dragging the terminal edge continuously → every frame is correct, none is blank, no corruption.
-- **T5.5**: suspending to a child and returning → the first frame after resume is a full repaint, verified by byte volume rather than by inspection.
+- **T5.5**: suspending to a child and returning → the terminal is handed over and taken back, and the session draws a whole frame on the far side of it. **Not "verified by byte volume"**, which is what this row said and which names a distinction the shell does not have: C22 wires `render` and `repaint` to the same function (`session.ts`), because a frame here is always the whole screen — there is no partial-update path for a repaint to be larger than. So a full repaint and an ordinary frame are byte-identical by construction, and a row asserting the difference would pass whatever C03 did. What is observable from outside is the sequence: the alternate screen goes down before the child and comes back up after it, a complete frame follows, and the session still takes input. A02 §7's per-frame budget covers the volume claim where it is meaningful.
 - **T5.6**: idle for sixty seconds → zero writes and no measurable CPU. There is no polling render loop.
 
 ### Tier 6 — fail-on-revert
