@@ -69,6 +69,7 @@ function deps(
     overlays,
     promptCursor: () => ({ row: 0, col: 2 }),
     promptFocused: () => true,
+  spinning: () => false,
   };
 }
 

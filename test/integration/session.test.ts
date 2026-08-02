@@ -113,6 +113,77 @@ describe("C22 integration — the frame's viewport", () => {
     }
   });
 
+  it("T1.18 (C22 I38): the spinner is read at paint and armed at request", async () => {
+    // **Off the composed frame, never off the engine.** `completion.spinning`
+    // has been correct since C19 and no file under `src/shell` read it — an
+    // implementation on one side of the seam, which is what this row is about.
+    // Asking the engine would pass against exactly that state.
+    let resolveSource: ((c: readonly { value: string }[]) => void) | null = null;
+    const slow = {
+      id: "slow",
+      slots: ["verb"] as const,
+      dynamic: true,
+      complete: () =>
+        new Promise<readonly { value: string }[]>((r) => {
+          resolveSource = r;
+        }),
+    };
+
+    // **The wake is asserted by its effect, not by intercepting the scheduler.**
+    // Two reasons, and the second is the better one: `schedule` is ambient
+    // rather than a `TuiConfig` field, so it cannot be overridden here at all —
+    // and a row asserting *a timer was armed for 500* is an implementation
+    // detail a wrong implementation can satisfy while drawing nothing. What the
+    // invariant claims is that a frame carrying the spinner arrives **with no
+    // further input**, and that is what fails for both mutations.
+    const stdin = fakeStdin();
+    const { stdout, clock } = await buildSession(
+      { stdin: stdin as never, completionSources: [slow] } as never,
+      // 20 rows, not 12: below C22 §8b's 60×16 gate the session draws
+      // `Terminal too small` and every assertion here is about the fallback.
+      { columns: 80, rows: 20 },
+    );
+
+    const promptOf = (): string => {
+      const frame = lastFrame(stdout.chunks);
+      return [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
+    };
+
+    stdin.emit("/x");
+    await Promise.resolve();
+    await Promise.resolve();
+    const before = lastFrame(stdout.chunks);
+    const promptRowsBefore = before.length;
+    expect(promptOf(), "the line is typed").toContain("/x");
+    expect(promptOf(), "and no spinner before the threshold").not.toContain("⠋");
+
+    stdin.emit("\t");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Still nothing on the frame: the clock has not moved.
+    expect(promptOf(), "not yet").not.toContain("⠋");
+
+    // Time passes on the injected clock, and the wake fires on its own — **no
+    // further input**, which is the half the arming exists for.
+    clock.advance(600);
+    await new Promise((r) => setTimeout(r, 560));
+    await Promise.resolve();
+
+    expect(promptOf(), "the spinner is on the frame, drawn by nothing the user did")
+      .toContain("⠋");
+
+    // **Appearance, never geometry.** The prompt is the same height and the
+    // frame the same shape as before the request.
+    const during = lastFrame(stdout.chunks);
+    expect(during, "the frame is the same height").toHaveLength(promptRowsBefore);
+    expect(new Set(during.map((r) => displayCells(r))).size, "one width").toBe(1);
+    expect(promptOf(), "and the typed text is untouched").toContain("/x");
+
+    // Settle the source so the session has nothing outstanding at teardown.
+    (resolveSource as ((c: readonly { value: string }[]) => void) | null)?.([]);
+  });
+
   it("T4.9b (C16 I23): the scroll keys are in what /help renders", async () => {
     // **The row that says the ruling changed something a user can see.** Before
     // it, PageUp scrolled and `/help` could not mention it — the keys were read

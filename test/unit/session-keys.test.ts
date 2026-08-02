@@ -226,6 +226,10 @@ describe("C22 §3 step 11 — the effect table", () => {
       redraw: () => undefined,
       focus: createFocusStore(),
       liveRows: () => ["row-0", "row-1"],
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
     });
 
     // Every prompt binding, through the table dispatch uses.

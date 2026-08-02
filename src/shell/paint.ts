@@ -30,7 +30,7 @@
  */
 
 import { renderSequenceToLines } from "../testing/index.js";
-import { fitStyled, hardWrapCells } from "../presentation/text.js";
+import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { SGR_RESET } from "../terminal/escapes.js";
 import { PROMPT, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
@@ -63,10 +63,30 @@ export type PaintDeps = Readonly<{
   promptCursor: () => Cell;
   /** Whether the prompt is where keys are going — C16's derived focus. */
   promptFocused: () => boolean;
+  /**
+   * C19's `spinning`, read **fresh on every paint** (I38).
+   *
+   * A function rather than a value, and for a sharper reason than the three
+   * above: this one changes with the clock rather than with the frame. A value
+   * captured when the request started can never become true, which is one of
+   * the two wrong implementations I38 names — and it is the one that looks
+   * exactly like a correct read of a source that answered quickly.
+   */
+  spinning: () => boolean;
 }>;
 
 /** The elision marker S01 §3 puts on a windowed prompt's edges. */
 const ELISION = "⋯";
+
+/**
+ * The glyph C19 §7 draws while a completion is slow.
+ *
+ * One frame of it rather than an animation: C03 commits on events, not on a
+ * ticker, so a rotating spinner would need a timer this layer does not own and
+ * must not grow. The claim C19 §7 makes is that the wait is *visible*, and one
+ * glyph is that.
+ */
+const SPINNER = "⠋";
 
 export class FrameError extends Error {
   constructor(message: string) {
@@ -200,6 +220,20 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     const body = windowed[i] ?? "";
     const gutter = i === 0 ? PROMPT : " ".repeat(PROMPT_GUTTER.cont);
     out.push(exact(gutter + body, width));
+  }
+
+  // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on
+  // after the rows are squared off, into padding the prompt already has, so
+  // `measure` never sees it and `cap` is the same number whether a completion
+  // is in flight or not. Written into the *last* row because that is where the
+  // cursor is and where C19 §7 draws it: `❯ /ps --family=⠋`.
+  //
+  // Read here rather than passed in, so the value is the one true at paint.
+  const last = out.length - 1;
+  const row = out[last];
+  if (row !== undefined && deps.spinning()) {
+    const at = cells(row.trimEnd());
+    if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${SPINNER}`, width);
   }
   return out;
 }

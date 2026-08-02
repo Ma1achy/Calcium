@@ -19,7 +19,14 @@
  * implements does not compile, and neither does an implementation nobody binds.
  */
 
-import { accept, contextAt, menuLayer, remainderOf, MENU_ID } from "../interaction/completion/index.js";
+import {
+  accept,
+  contextAt,
+  menuLayer,
+  remainderOf,
+  MENU_ID,
+  SPINNER_MS,
+} from "../interaction/completion/index.js";
 import { SEARCH_ID } from "../interaction/history/index.js";
 import type { CompletionEngine } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
@@ -78,6 +85,14 @@ export type KeyDeps = Readonly<{
    * the next key happens to draw one.
    */
   redraw: () => void;
+  /**
+   * A one-shot wake, for the spinner's threshold (C22 I38).
+   *
+   * C22's injected scheduler rather than a timer of this file's own: A03 bans
+   * a clock outside `shell/session.ts` and C16's decoder already reports its
+   * deadlines rather than firing them. The same shape one layer up.
+   */
+  schedule: (fn: () => void, ms: number) => Disposable;
 }>;
 
 /** What a bound key does. Returns nothing: the loop commits (C22 I27). */
@@ -143,6 +158,23 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const ctx = contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
       seq += 1;
       const mine = seq;
+
+      // **The wake, and it is the half without which the spinner is invisible**
+      // (C22 I38, C19 §7). `spinning` becomes true 500 ms after the earliest
+      // call still in flight, and nothing draws a frame at that moment: the
+      // keystroke's own commit belongs to the batch that has already ended
+      // (I27), and the source's continuation only fires when it settles —
+      // which for a slow source is the thing being waited on. So without this,
+      // the spinner appears when the user next types, which is the *key that
+      // appears to do nothing until you press another one* (I32) reached
+      // through a different timer.
+      //
+      // Armed unconditionally and cheap: `spinning` is read at paint, so a
+      // request that settled first draws a frame with no spinner in it.
+      deps.schedule(() => {
+        if (mine === seq) deps.redraw();
+      }, SPINNER_MS);
+
       void deps.completion.request(ctx, mine).then((result) => {
         // A later request supersedes this one. The engine sequences its own
         // work; this guards the *menu*, which is state the engine has never

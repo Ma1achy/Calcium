@@ -182,6 +182,7 @@ describe("the S-series' illustrated heights", () => {
       overlays: () => [],
       promptCursor: () => ({ row: 0, col: 2 }),
       promptFocused: () => true,
+    spinning: () => false,
     });
     for (const [i, line] of painted.entries()) {
       expect(displayCells(line), `row ${String(i)}`).toBe(width);

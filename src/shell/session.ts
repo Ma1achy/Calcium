@@ -337,6 +337,14 @@ class Session implements TuiInstance {
       // whatever holds the keys, and a second record of that would drift from
       // the display exactly as a stored focus does (C16 §3, C15 I19).
       promptFocused: () => graph.router.target === "prompt",
+      // **Fresh on every paint, and that is the invariant rather than a style**
+      // (C22 I38). `spinning` changes with the clock, not with the frame, so a
+      // value captured when the request started can never become true — and
+      // that wrong implementation looks exactly like a correct read of a source
+      // that answered quickly. The other half is the wake `keys.ts` arms: this
+      // read is what a frame *shows*, and the wake is what causes a frame to
+      // exist 500 ms after a `Tab` that nothing else would have drawn.
+      spinning: () => graph.completion.spinning,
       // **The region comes from the frame, not from a fresh one** (C22 I28).
       // `#frameQueries` serves the same value to the router, and a second
       // computation here is the two-records defect S01 §3 already produced once

@@ -504,6 +504,7 @@ export async function constructGraph(
     history: stores.history,
     manifest: built.manifest.manifest,
     viewport: stores.viewport,
+    schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
     focus,

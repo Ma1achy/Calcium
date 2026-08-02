@@ -37,6 +37,7 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     capabilities: FULL_CAPS,
     transcriptRows: () => [],
     promptRows: () => [""],
+    spinning: () => false,
     overlays: () => [],
     promptCursor: () => ({ row: 0, col: 2 }),
     promptFocused: () => true,
