@@ -12,6 +12,11 @@ import {
 } from "../../src/interaction/completion/index.js";
 import type { CompletionSource } from "../../src/interaction/completion/index.js";
 import { at, deferredSource, fakeClock, fakeDirs, instantSource } from "../support/completion.js";
+import type { Candidate } from "../../src/interaction/completion/index.js";
+import { createBlockRegistry, type BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { renderSequenceToLines } from "../../src/testing/index.js";
+import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 
 const FLAG_SLOT = "/ps --status=‸";
 
@@ -188,6 +193,53 @@ describe("C19 §6 — the menu", () => {
     };
     expect(glyphs(first)).toEqual(["bullet", undefined]);
     expect(glyphs(second)).toEqual([undefined, "bullet"]);
+  });
+
+  it("T3.19 (I18): a candidate with a detail renders its label and its hint, at every width", () => {
+    // **Asserted on the rendered rows rather than on the block**, because the
+    // block was correct throughout. C11 hands residual width only to columns
+    // declaring `flex: true` (plan.ts step 8), the menu's table declared
+    // neither, and so every cell sat at `minWidth` and rendered `…` at any
+    // terminal width. Every statement on either side of that was true.
+    const registry = createBlockRegistry({ defaults: true });
+    registry.register(tableDefinition as unknown as BlockDefinition);
+
+    const detailed = [
+      { value: "/promote", detail: "Promote a build" },
+      { value: "/ps", detail: "List processes" },
+    ];
+    const plain = [{ value: "/serving" }];
+
+    const rowsAt = (candidates: readonly Candidate[], width: number): readonly string[] =>
+      renderSequenceToLines(registry, menuBlocks(candidates, 0, 0), width, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+        // eslint-disable-next-line no-control-regex
+      }).map((l) => l.replace(/\u001b\[[0-9;]*m/g, ""));
+
+    for (const width of [menuWidth(detailed), 60, 100]) {
+      const rows = rowsAt(detailed, width);
+      expect(rows, `${String(width)}: one row per candidate`).toHaveLength(2);
+      for (const [i, candidate] of detailed.entries()) {
+        expect(rows[i], `${String(width)}: ${candidate.value} is legible`).toContain(
+          candidate.value,
+        );
+        expect(rows[i], `${String(width)}: and so is its hint`).toContain(candidate.detail);
+      }
+    }
+
+    // **The selected row keeps its whole label.** The glyph is on whichever row
+    // is selected, so a floor derived from labels alone truncates exactly one
+    // row — a flicker rather than a width defect, and the half that would have
+    // been reported next.
+    expect(rowsAt(detailed, menuWidth(detailed))[0], "the glyph costs the column, not the label")
+      .toContain("/promote");
+
+    // **The control, and it is why this survived four components.** A candidate
+    // with no `detail` takes the pills path, which never had the defect — so a
+    // row asserting only that the menu appears passed against it.
+    expect(rowsAt(plain, menuWidth(plain))[0], "the pills path drew correctly all along")
+      .toContain("/serving");
   });
 
   it("menuWidth measures display cells, not code units", () => {

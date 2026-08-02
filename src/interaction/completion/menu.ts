@@ -31,6 +31,22 @@ const CHROME_CELLS = 4;
  * the region and this component knows the longest candidate, and neither can
  * supply the other's half.
  */
+/**
+ * The selection glyph and its separator, which the value column must also hold.
+ *
+ * The selected row carries a `bullet` and the others do not, so a floor derived
+ * from the label alone truncates whichever candidate is selected — and only
+ * that one, which reads as a rendering flicker rather than as a width defect.
+ */
+const GLYPH_CELLS = 2;
+
+/** The widest candidate label plus its glyph, in cells — the value column's floor. */
+function widestLabel(candidates: readonly Candidate[]): number {
+  let widest = 1;
+  for (const c of candidates) widest = Math.max(widest, cells(c.display ?? c.value));
+  return widest + GLYPH_CELLS;
+}
+
 export function menuWidth(candidates: readonly Candidate[]): number {
   let widest = 0;
   for (const c of candidates) {
@@ -38,7 +54,9 @@ export function menuWidth(candidates: readonly Candidate[]): number {
     const detail = c.detail === undefined ? 0 : cells(c.detail) + 2;
     widest = Math.max(widest, cells(label) + detail);
   }
-  return widest + CHROME_CELLS;
+  // The glyph is the selected row's and the column has to hold it whichever row
+  // that is, so it is part of the width rather than of one row.
+  return widest + GLYPH_CELLS + CHROME_CELLS;
 }
 
 /**
@@ -59,8 +77,23 @@ export function menuBlocks(
         kind: "table",
         id: `${MENU_ID}-table`,
         columns: [
-          { key: "value", label: "", align: "left", priority: 1, minWidth: 1, sortable: false },
-          { key: "detail", label: "", align: "right", priority: 2, minWidth: 0, sortable: false },
+          {
+            key: "value",
+            label: "",
+            align: "left",
+            priority: 1,
+            minWidth: widestLabel(candidates),
+            sortable: false,
+          },
+          {
+            key: "detail",
+            label: "",
+            align: "right",
+            priority: 2,
+            minWidth: 1,
+            flex: true,
+            sortable: false,
+          },
         ],
         // **The selection is a glyph on the row, not a field on it.** C04's
         // `TableRow` has no `selected`, and adding one would put a view-state
