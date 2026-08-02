@@ -511,9 +511,13 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
    * compares by equality — so the day C22 §12a is built, removing them is
    * forced rather than remembered.
    *
-   *   C10 T4.5, T4.6   theme persistence: nothing writes a theme choice to
-   *                    disk and §2 has no field for one
    *   C17 T4.7         the prompt's height on the frame, which is `frame.ts`
+   *
+   * **C10 T4.5 and T4.6 left by being built.** They were here as *theme
+   * persistence: nothing writes a theme choice to disk*, which was true and was
+   * an entry in a backlog outliving the layer it was deferred within — the
+   * accumulation this equality exists to prevent. C22 I40 assigns it, and the
+   * two rows are written.
    *
    * **C02 T4.7 left this list by being read rather than by being written.** It
    * was here as *the non-TTY gate, which `createTui` does not perform*; the gate
@@ -536,7 +540,7 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
    * deferring a decision to a backlog while the decision-maker was in the
    * conversation, which is a backlog used as somewhere to put a question.
    */
-  "TD2 src/shell/session.ts (3)",
+  "TD2 src/shell/session.ts (1)",
 
   /**
    * **One `execution.ts` key now, and it was two.** L4 and C23 both resolve to

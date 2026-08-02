@@ -194,6 +194,8 @@ export type PipelineDeps = Readonly<{
   editor: LineEditor;
   overlays: OverlayManager;
   theme: ThemeStore;
+  /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
+  persistTheme?: (variant: "dark" | "light") => void;
   history: HistoryStore;
   runner: ProcessRunner;
   lifecycle: TerminalLifecycle;

@@ -27,6 +27,13 @@ export type HandlerDeps = Readonly<{
   manifest: () => Manifest | null;
   transcript: TranscriptStore;
   theme: ThemeStore;
+  /**
+   * Persist the chosen variant (C22 I40).
+   *
+   * Optional, because this file is the local verbs and a harness driving them
+   * has no state directory. A session always supplies it.
+   */
+  persistTheme?: (variant: "dark" | "light") => void;
   history: () => readonly HistoryEntry[];
   /** Every binding C16 will dispatch, for `/help` (C23 I26). */
   bindings: () => readonly Readonly<{ keys: string; does: string }>[];
@@ -116,6 +123,16 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         ]);
       }
       deps.theme.setVariant(wanted);
+      // **Written on the change, not at exit** (C22 I40). A session killed by
+      // `SIGKILL` runs no shutdown path (C01 §5), and a preference that
+      // survives a clean exit and not a crash is one people stop trusting.
+      // `/theme` is rare enough that a write per invocation costs nothing.
+      //
+      // Fire-and-forget: the notice below is the answer to the command, and a
+      // handler that awaited a disk would block the frame on it. A failed write
+      // means the choice does not survive the session, which is what the state
+      // directory being unwritable already means for history (C20).
+      deps.persistTheme?.(wanted);
       return doc("/theme", [
         block({ kind: "notice", id: blockId("theme"), tone: "muted", text: `theme: ${wanted}` }),
       ]);

@@ -38,7 +38,23 @@ export const MANIFEST: TuiConfig["manifest"] = (() => {
 export function fakeFs(): FileSystem {
   const files = new Map<string, string>();
   return {
-    readFile: (p) => Promise.resolve(files.get(p) ?? ""),
+    // **Throws when absent, as `node:fs` does.** It used to answer `""`, which
+    // collapses *no file* into *an empty file* — and C22 I40 is the one caller
+    // that depends on the difference: an absent preference is every first run,
+    // and a corrupt one commits a notice. A fake narrower than the interface it
+    // stands for cannot fail on the difference, and this is where that would
+    // have bitten next.
+    readFile: (p) => {
+      const held = files.get(p);
+      if (held === undefined) {
+        return Promise.reject(
+          Object.assign(new Error(`ENOENT: no such file or directory, open '${p}'`), {
+            code: "ENOENT",
+          }),
+        );
+      }
+      return Promise.resolve(held);
+    },
     writeFile: (p, d) => {
       files.set(p, d);
       return Promise.resolve();

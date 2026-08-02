@@ -26,6 +26,7 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { commandRows } from "./paint.js";
+import { noticeDoc } from "./documents.js";
 import { initialRegionHeight } from "./frame.js";
 import { createManifestStore, parseManifest } from "../data/manifest/index.js";
 import { FRAMEWORK_NAMES } from "../data/manifest/framework.js";
@@ -64,6 +65,30 @@ import {
 import { makeBeforeRelease } from "./shutdown.js";
 import type { ResolvedConfig } from "./config.js";
 import { createSessionStore, type SessionStore } from "./state.js";
+
+/** Where the chosen variant lives (I40). One value, one file. */
+export function themePath(stateDir: string): string {
+  return `${stateDir}/theme`;
+}
+
+/**
+ * Read, or `null` when there is nothing to read.
+ *
+ * A missing preference file is the ordinary case — every first run — so it is
+ * not an error and does not reach the warning path. C20's `readOrEmpty` has the
+ * same shape and cannot be shared: it collapses "absent" into "", which is the
+ * one distinction I40's notice depends on.
+ */
+async function readOrAbsent(
+  fs: Readonly<{ readFile: (path: string) => Promise<string> }>,
+  path: string,
+): Promise<string | null> {
+  try {
+    return await fs.readFile(path);
+  } catch {
+    return null;
+  }
+}
 import type { Pipeline, StopReason } from "./types.js";
 
 /**
@@ -340,6 +365,36 @@ export async function constructGraph(
     const themed = loadTheme(config.theme);
     if (!themed.ok) throw new ConstructionError("stores", themed.error);
 
+    // **The persisted variant, repaired on read** (I40). C20's precedent one
+    // component up: history repairs a corrupt file at open rather than
+    // failing, and the reasoning transfers whole — a session that refuses to
+    // start because a preference file has a stray byte in it has made a
+    // preference into a dependency.
+    //
+    // Anything that is not one of the two variants is treated as absent, and
+    // `themeWarning` is what stops "absent" and "corrupt" looking the same to
+    // a user who chose light and got dark. The notice is committed at step 8,
+    // once there is a transcript to put it in.
+    const persisted = await readOrAbsent(config.fs, themePath(config.stateDir));
+    if (persisted !== null) {
+      const trimmed = persisted.trim();
+      if (trimmed === "dark" || trimmed === "light") themed.value.setVariant(trimmed);
+      else if (trimmed !== "") {
+        // Appended here rather than carried out to `start()`: the transcript
+        // exists at this point and a warning threaded through the graph is a
+        // second record of the same fact. `origin: "refresh"` because no user
+        // command produced it.
+        transcript.append(
+          noticeDoc(
+            "",
+            `theme preference ignored: \`${trimmed.slice(0, 40)}\` is not dark or light`,
+            "warn",
+            { origin: "refresh" },
+          ),
+        );
+      }
+    }
+
     return { transcript, viewport, overlays, history, editor, theme: themed.value };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("stores", cause);
@@ -462,6 +517,15 @@ export async function constructGraph(
       editor: stores.editor,
       overlays: stores.overlays,
       theme: stores.theme,
+      // **On the change, not at exit** (I40). Fire-and-forget for the same
+      // reason the handler does not await it: a failed write means the choice
+      // does not survive the session, which is already what an unwritable
+      // state directory means for history.
+      persistTheme: (variant) => {
+        void config.fs.writeFile(themePath(config.stateDir), `${variant}\n`).catch(() => {
+          // Best effort. A03 SS33 bans `console.*` and the debug sink is C01's.
+        });
+      },
       history: stores.history,
       runner,
       lifecycle,

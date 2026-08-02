@@ -110,6 +110,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       manifest: () => deps.manifest.manifest,
       transcript: deps.transcript,
       theme: deps.theme,
+      ...(deps.persistTheme === undefined ? {} : { persistTheme: deps.persistTheme }),
       history: () => deps.history.entries,
       bindings: () => deps.bindings(),
       stop: deps.stop,

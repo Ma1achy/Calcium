@@ -5,6 +5,8 @@
 // fails the day the blocker lands rather than the day someone remembers.
 import { describe, expect, it } from "vitest";
 import { pipelineHarness, settled } from "../support/execution.js";
+import { buildSession, fakeFs } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { resolveTone } from "../../src/presentation/theme/index.js";
 import { caps, store, TONES } from "../support/theme.js";
@@ -104,8 +106,64 @@ describe("C10 integration", () => {
     direct.theme.setVariant("light");
     expect(direct.calls, "C10 never invalidates").not.toContain("invalidate");
   });
-  it.todo("T4.5: /theme light persists to config and survives a restart — waits on C22 — theme persistence is unowned and unbuilt (C22 §2); nothing in the tree writes a theme choice to disk");
-  it.todo("T4.6: a corrupt override in config → base theme retained, notice committed — waits on C22 — the same unowned feature as T4.5; there is no config to corrupt");
+  it("T4.5 (C22 I40): /theme light persists and survives a restart", async () => {
+    // **Two real sessions over one filesystem**, and the second is constructed
+    // **without stopping the first** — which is the whole of T6.35. A write at
+    // exit satisfies every other assertion here and loses the preference to
+    // every crash, and a session killed by `SIGKILL` runs no shutdown path.
+    //
+    // Asserted on the frame's own colours rather than by reading the file: the
+    // file's contents are an implementation detail and the claim is that the
+    // choice survives.
+    const fs = fakeFs();
+    const stdin = fakeStdin();
+    const first = await buildSession({ fs, stdin: stdin as never, stateDir: "/state" });
+    expect(first.tui, "the first session started").toBeDefined();
+
+    stdin.emit("/theme light\r");
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The second session, over the same state directory and the same fs, while
+    // the first is still running.
+    const second = await buildSession({ fs, stdin: fakeStdin() as never, stateDir: "/state" });
+    expect(await fs.readFile("/state/theme"), "the choice reached the disk").toContain("light");
+
+    const frame = second.stdout.chunks.join("");
+    expect(frame.length, "the second session drew").toBeGreaterThan(0);
+
+    // The control: a session over a *fresh* state directory opens dark, so the
+    // assertion above is about persistence rather than about the default.
+    const fresh = await buildSession({ fs: fakeFs(), stdin: fakeStdin() as never });
+    expect(fresh.stdout.chunks.join("")).not.toBe(frame);
+  });
+
+  it("T4.6 (C22 I40): a corrupt persisted variant → base retained, notice committed, session opens", async () => {
+    // **Both halves, because either alone passes against the other's defect.**
+    // Retaining silently satisfies "the base theme stands"; a notice beside a
+    // switched theme satisfies "something was said". C20's repair-at-open is
+    // the precedent and the reasoning transfers whole — a session that refuses
+    // to start because a preference file has a stray byte in it has made a
+    // preference into a dependency.
+    const fs = fakeFs();
+    await fs.writeFile("/state/theme", "chartreuse\n");
+
+    const { stdout } = await buildSession({ fs, stdin: fakeStdin() as never, stateDir: "/state" });
+
+    const written = stdout.chunks.join("");
+    expect(written.length, "the session opened normally").toBeGreaterThan(0);
+    expect(written, "and said so").toContain("theme preference ignored");
+
+    // The control: a *valid* file produces no notice, so the assertion above is
+    // about the corruption rather than about a notice that always appears.
+    const good = fakeFs();
+    await good.writeFile("/state/theme", "light\n");
+    const ok = await buildSession({ fs: good, stdin: fakeStdin() as never, stateDir: "/state" });
+    expect(ok.stdout.chunks.join(""), "a valid preference is silent").not.toContain(
+      "theme preference ignored",
+    );
+  });
 
   it("(with C02): a detected capability record drives the ladder end to end", () => {
     // The half of T4.3 that does not need a renderer: C02 decides the depth from
