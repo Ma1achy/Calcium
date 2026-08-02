@@ -403,6 +403,23 @@ is deliberately absent**: it is already `acceptGhostOrForward`, which falls
 through to a character-right move when there is no ghost, so binding it again
 would be the duplicate `(target, key)` construction error below.
 
+**Scrolling is bound here too, and until now it was not bound anywhere** (I23). `pageUp`, `pageDown`, `scrollToTop` and `scrollToBottom` are C14's operations and C14 §2 says the keys that invoke them are C16's — and C16 had none of them. L4 read the four keys out of an `InputEvent` in a `switch` inside its `global` handler, which is a second mechanism for one target's key handling and has two consequences: `/help` cannot show a binding that is not in the table, so **the shell has never been able to tell a user that PageUp scrolls**, and two of the four arms were reachable by nothing at all. Fifteen unexecuted bindings is a defect this component already had; two executed ones outside the table is its inverse.
+
+| Key | Action | | Key | Action |
+|---|---|---|---|---|
+| `pageup` | `scrollPageUp` | | `pagedown` | `scrollPageDown` |
+| `⌃home` | `scrollTop` | | `⌃end` | `scrollBottom` |
+
+They target `global`, which is the first built-in use of that target and is what makes them work: `global` is last in the ladder, so a prompt that binds a key keeps it.
+
+**`Home` and `End` stay the line's; `⌃Home` and `⌃End` are the document's.** That is the distinction every editor draws and it is borrowed rather than arbitrated — the alternative rulings were the prompt yielding `Home`/`End` at an empty buffer, which makes one key mean two things depending on state, and `g`/`G`, which cannot work because the prompt takes letters. S12 draws `g`/`G` for a pushed view and that is consistent: a pushed view has no prompt competing for them.
+
+**Both wire forms were pressed through the real decoder before this was written** (I17, T2.13), and the result was that no decoder change is needed: xterm's `CSI 1;5H` reaches `CSI_LETTER_KEYS` with `modifiersOf("5")` setting the ctrl bit, and rxvt's `CSI 7;5~` reaches `CSI_TILDE_KEYS` at the same name with the same modifiers. Recorded as a positive result beside `⌃_`'s negative one, because a checked assumption that held is worth not checking twice — and the ruling that produced these keys said to drop the binding rather than widen the decoder if it had failed.
+
+**A wheel event is not a key and stays out of the table.** It has no `(target, key)` to resolve on, so the `global` handler is `bound("global", e)` falling through to the mouse arms. That is the boundary: everything that is a key resolves through the keymap, and the one thing that is not does not pretend to.
+
+**And this newly occupies the `global` slots for those four keys**, so a `BlockKeymap` binding `PageUp` is now refused at commit rather than shadowing the scroll. That is the conflict rule working as written, and it is named here because the refusal is new.
+
 The set is closed for **built-in** bindings only. A `BlockKeymap`'s action is a surface's string dispatched through C23's block-action route (C23 §3a), and it is open by design — the surface supplies both halves.
 
 **Surfaces contribute bindings through the block.** A surface is not a component and cannot register a handler, so an adapter may attach a `BlockKeymap` to the block it produces. C16 merges it into the `liveBlock` target **while that block is live**, and withdraws it when the block freezes — so `s` sorts a `/ps` table and does nothing once a newer entry arrives.
@@ -482,6 +499,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I20** — A mouse event's row is translated into a region row **once**, and both positional rungs use the result. The event carries a 0-based terminal row; a layer's box and C14's entry map are both relative to the viewport region (S01 §3a, C15 I6). Two rungs of one table in two coordinate systems is a click near a layer's edge resolving to the row above the one it landed on — a wrong answer that reads as a placement defect in the component that placed it correctly.
 - **I21** — **C17's public surface is the action vocabulary for editing.** Every editing operation the editor exposes is named by exactly one `KeyAction`, and every editing `KeyAction` names exactly one of them. Totality over the union is what makes `/help` honest (I19), and totality over an incomplete union is honest about nothing: the union held no editing action at all while C17 implemented word motion, kill, yank and undo, so backspace did nothing at a real prompt and every check in the chain passed. Derived from the interface rather than maintained beside it, so a method added to C17 with no action fails rather than going unbound in silence.
 - **I22** — `↓` enters the live block only from the bottom of history, `Esc` and `↑`-from-the-first-row leave it, and an entry with no focusable row cannot be entered at all. One binding with two effects in order rather than two bindings competing for a keystroke: C20's navigation has a defined bottom, so entering is what `↓` does after that end. The three halves are one invariant because any one alone is a defect — entry with no exit is a session whose prompt is unreachable, exit with no entry is what shipped, and entry into a block with no rows drops every key silently.
+- **I23** — **Every key that scrolls is a binding in the table.** The four scroll operations C14 exposes are named by `global` bindings — `pageup`, `pagedown`, `⌃home`, `⌃end` — rather than read out of an `InputEvent` in L4. Two mechanisms for one target's key handling is the inverse of the defect I19 exists to prevent: a binding outside the table is one `/help` cannot render, so a key that works is one no user can discover, and two of the four were reachable by nothing while looking exactly like the two that worked. A wheel event is not a key, has no `(target, key)` to resolve on, and stays out — that is the boundary rather than an exception to it. `Home` and `End` remain the line's, so the document's extremes take the modified pair every editor uses, and both of its wire forms were pressed through the real decoder before being written down (I17).
 
 ---
 
@@ -507,6 +525,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 18. Both positional rungs test a region row, translated once from the event's terminal row (I20).
 20. `↓` at the bottom of history enters the live block; `Esc` and `↑`-from-the-first-row return; a block with no focusable row is not entered (I22).
 19. C17's public surface is the editing action vocabulary, and the bindings are readline's; each was pressed through the real decoder before being written down, and a candidate the decoder does not produce is dropped rather than met by widening the decoder (I21, I17).
+21. Scrolling is bound in the table like everything else that is a key: `pageup`, `pagedown`, `⌃home`, `⌃end` on the `global` target, so `/help` can render them and a scroll key cannot exist outside the vocabulary. The wheel is not a key and stays out (I23).
 
 ---
 
@@ -556,6 +575,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T2.15** (I22): the three halves, driven as one sequence against a real focus store and a real table — `↓` at the prompt with history available navigates history; `↓` again at the bottom enters the live block; `↑` moves between rows and returns to the prompt from the first; `Esc` returns from anywhere. Written as a sequence rather than four cases because the defect it replaces was an entry with no exit, which every case-at-a-time test passes.
 - **T2.15b** (I22): `↓` at the bottom of history with a live entry that has no focusable row leaves focus at the prompt. The control is the same sequence against an entry that does have rows, because a clause that never fires and a clause that always no-ops are the same green.
 - **T2.14** (I21): every editing operation on C17's `LineEditor` is reached by some binding in `defaultKeymap`, driven through L4's effect table against a real editor that records which of its methods were called. The non-editing surface — layout, measurement, the diagnostic counters — is named as an explicit exception with its reason, so a method added to C17 joins the covered set or the exception list deliberately. A count would have passed against a union with no editing action in it, which is the state this row was written in.
+- **T2.16** (I23): `⌃Home` and `⌃End` in both wire forms — xterm's `CSI 1;5H`/`CSI 1;5F` and rxvt's `CSI 7;5~`/`CSI 8;5~` — decode to `{name, ctrl: true}` and resolve on `global`, while the unmodified `home` and `end` resolve on `prompt` to the line motions. Written as one row over both because the claim is the *discrimination*: the two are different slots, and `keyText` is one line away from making them the same. The check that produced this ruling, made mechanical so it cannot rot.
 - **T2.13b** (I17): every `key.name === "…"` literal under `src/` names a key the real decoder emits, against a set collected by pushing bytes through it rather than declared beside it. A declared set is a second table to drift from the decoder, which is the defect this rule is about. The fourth instance was a literal in a handler, which no walk of the keymap could reach.
 
 ### Tier 3 — edge cases
@@ -596,6 +616,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.7** (with C19): `Tab` reaches completion only when the prompt has focus.
 - **T4.8** (with C06): Ctrl-C during a real invocation triggers the escalation ladder.
 - **T4.9** (with L4): `/help` renders the keymap from the same table dispatch uses.
+- **T4.9b** (I23, with L4): the four scroll bindings appear in what `/help` renders. The row that says the ruling changed anything a user can see — before it, three of the four keys worked and none of them could be found, and the fourth pair did not work at all.
 
 ### Tier 5 — e2e
 
@@ -614,6 +635,8 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.4b** (I8): restoring copy mode above the overlay rungs, or moving only the dismissable one → T1.12b fails, and Ctrl-C on an unanswered confirm changes the screen behind it.
 - **T6.4c** (I8): running the `global` fallback under a non-dismissable layer → T1.12c fails, and every shortcut except Ctrl-C acts beneath an unanswered confirm.
 - **T6.4d** (I4, §5) — **structural guard, no failing test.** Reimplementing the Ctrl-C ladder as a list of conditions instead of handlers registered on their targets → nothing fails today, and the ladder is free to drift from `activeTarget` on the next edit touching one and not the other. Every other entry in this tier reads *change X → test Y fails*; this one names a change no assertion catches, and says so deliberately. Inventing an assertion that looked like a guard would be worse than pointing at the real one, which is **T2.5's exhaustiveness over `FocusTarget`**: while the rungs are handlers, a target with no binding is a compile-level gap, and the ladder cannot hold an order of its own to disagree with. Read this row as a signpost to that, not as an unfinished test (A02 §7).
+- **T6.22** (I23): binding the document's extremes to unmodified `home`/`end` → C04's tier-5 scroll row fails, because the prompt resolves first at every moment it has focus, which is nearly always. That is the state this ruling replaced: the arms existed, read correctly, and were reachable by nothing.
+- **T6.23** (I23): moving the four scroll keys back out of the table into L4's `switch` → T4.9b fails, and scrolling becomes undiscoverable again while continuing to work. The one regression in this tier whose whole symptom is that a user cannot find a key.
 - **T6.21** (I22): removing the `Esc` binding at `liveBlock` → T2.15 fails at the return. The regression is a session whose prompt cannot be reached again, and nothing else in the tree notices.
 - **T6.20** (I21): removing an editing binding from `defaultKeymap` → T2.14 names the C17 method nothing reaches. The regression is silent everywhere else: the effect table is still total, `/help` still renders, and the key simply stops working.
 - **T6.15** (I19) — **structural guard, no failing test.** Widening `KeyAction` to `string`, or making L4's table partial, → nothing fails, and every binding is free to become one `/help` lists and nothing dispatches. The protection is the total `Record`, which is why this row names the shape rather than an assertion: the fourteen bindings had no executor at all while every test here passed, because a table of names is satisfied by names.

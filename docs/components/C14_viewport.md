@@ -55,13 +55,17 @@ type VisibleRange = Readonly<{
 
 | Input | Effect |
 |---|---|
-| `↑` / `↓` | One row |
-| `PageUp` / `PageDown` | `viewportHeight − 1` rows, so one line of context carries over |
-| `Home` | `topRow = 0` |
-| `End` | Bottom, and `followTail` back on |
-| Wheel | Three rows, when mouse is enabled |
+| Input | Effect | Bound |
+|---|---|---|
+| `PageUp` / `PageDown` | `viewportHeight − 1` rows, so one line of context carries over | `global` |
+| `⌃Home` | `topRow = 0` | `global` |
+| `⌃End` | Bottom, and `followTail` back on | `global` |
+| Wheel | Three rows, when mouse is enabled | not a key |
+| `↑` / `↓` | One row | **nothing** — see below |
 
-C14 exposes these as operations; the keys that invoke them are C16's.
+C14 exposes these as operations; the keys that invoke them are C16's, and C16 I23 now names all of them. **This table said `Home` and `End` and it was wrong in a way nothing could see**: the prompt binds both to the line's start and end and resolves ahead of `global` at every moment it has focus, so the two operations had callers in L4 that no keystroke could reach. The document's extremes are `⌃Home` and `⌃End`, which is the distinction every editor draws.
+
+**`↑`/`↓` is the same shape and is left as found rather than picked.** They are the prompt's history bindings for exactly the reason `Home` was the prompt's, so a one-row scroll has no key. `⌃↑`/`⌃↓` is the consistent answer and nothing has ruled it, `scrollBy` has a live caller in the wheel so the operation is not dead, and inventing a binding while recording that inventing bindings is how this went wrong would be its own defect. Named here so the next ruling has a subject.
 
 ### A region row resolves to an entry here
 
