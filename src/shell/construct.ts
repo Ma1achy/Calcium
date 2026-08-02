@@ -560,12 +560,23 @@ export async function constructGraph(
 
       // A paste is one edit and one undo unit (C17 I5), which is why it is a
       // kind of its own here rather than a run of keys.
+      // **A keystroke supersedes a pending completion** (I39, C19 §7). C19
+      // holds the whole mechanism — `cancel()` invalidates the token and a
+      // superseded request resolves with no candidates (C19 I13) — and nothing
+      // in the shell was the caller, so typing after a `Tab` on a slow source
+      // opened a menu a second later for a prefix the user had moved past.
+      //
+      // Not covered by the effect table's `mine !== seq` guard, which is why
+      // that guard looked like the mechanism: it compares the shell's own
+      // sequence, and a printable keystroke does not advance it.
       if (e.kind === "paste") {
+        built.completion.cancel();
         stores.editor.insert(e.text, { atomic: true });
         return true;
       }
 
       if (e.kind === "key" && isPrintable(e.key)) {
+        built.completion.cancel();
         stores.editor.insert(e.key.sequence);
         return true;
       }

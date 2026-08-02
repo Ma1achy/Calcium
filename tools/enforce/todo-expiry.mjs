@@ -539,18 +539,22 @@ export const ACKNOWLEDGED_BACKLOG = Object.freeze([
   "TD2 src/shell/session.ts (3)",
 
   /**
-   * **The two `execution.ts` keys, mid-stretch and shrinking.** L4 and C23 both
-   * resolve to `src/shell/execution.ts`, and the rows naming them are the tier-5
-   * ones still to be written or restated. They were 8 and 6; the transport,
-   * parser and harness groups took them to 7 and 2, the TTY gate to 6, C04's three drift
-   * rows to 3, and C03's two to 2. The remaining groups take them to nothing.
+   * **One `execution.ts` key now, and it was two.** L4 and C23 both resolve to
+   * `src/shell/execution.ts`. L4's pair were C19's tier-5 spinner and TTL rows,
+   * and they are written — the spinner one having been *specified and unbuilt*
+   * rather than deferred, which is the shape the TTY gate had. So the L4 key is
+   * gone entirely and C23's two are what remain: a confirm inside a pushed view
+   * that nothing produces, and the session's children at exit.
+   *
+   * The counts were 8 and 6; the transport, parser and harness groups took them
+   * to 7 and 2, the TTY gate to 6, C04's three drift rows to 3, C03's two to 2,
+   * and C19's two removed the first key altogether.
    *
    * **Listed rather than left failing**, because TD0 compares by equality and a
    * red suite mid-stretch is a suite nobody reads. The count is the progress
    * bar: each group that lands lowers it, and the day it reaches zero these two
    * lines are deleted rather than remembered.
    */
-  "TD2 src/shell/execution.ts (2)",
   "TD2 src/shell/execution.ts (2)",
 
   // Empty until C23, and it has been non-empty exactly once before. C22's paint path put two

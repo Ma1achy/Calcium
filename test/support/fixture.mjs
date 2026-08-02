@@ -559,6 +559,38 @@ switch (mode) {
       document.tools = document.tools.filter((t) => t.name !== "ps");
     }
 
+    // **A dynamic completion source, and the count leaves the process in the
+    // candidate labels** (C19 T5.2, T5.5). `stdout` belongs to C01 from
+    // construction (I9), so a `console.log` of the invocation count goes to the
+    // debug sink and never reaches the PTY — the labels are the only channel a
+    // tier-5 row can read it on.
+    //
+    // **Keyed on the exact variant, not on the flag's presence.** A `--search`
+    // arm added earlier this stretch fired for any `--search` and answered a
+    // parser row spending the flag on a UUID; it was caught by the full tier
+    // run and not by the row that introduced it.
+    const completionSources = [];
+    let invocations = 0;
+    if (process.argv[3] === "slow-completion" || process.argv[3] === "ttl-completion") {
+      // The delay is what makes the spinner observable; the TTL is what makes a
+      // second invocation observable. One source, two variants, because the two
+      // rows need opposite things from the same knob — a row waiting 60 s for a
+      // TTL is a row nobody runs.
+      const slow = process.argv[3] === "slow-completion";
+      completionSources.push({
+        id: "slow-verbs",
+        slots: ["verb"],
+        dynamic: true,
+        ttlMs: slow ? 60_000 : 2_000,
+        complete: async () => {
+          invocations += 1;
+          const n = invocations;
+          if (slow) await new Promise((r) => setTimeout(r, 1_500));
+          return [{ value: `/invoked-${String(n)}-times`, detail: "from the slow source" }];
+        },
+      });
+    }
+
     /**
      * Which far side this session talks to (C06 I15).
      *
@@ -777,6 +809,7 @@ switch (mode) {
         guide: (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "the app's own local verb")),
         "debug dump": (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "internal state")),
       },
+      ...(completionSources.length === 0 ? {} : { completionSources }),
     });
 
     await tui.start();

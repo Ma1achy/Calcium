@@ -20,14 +20,14 @@
 //   - T5.4's filesystem candidates are the `pathSource` cases in tier 3, over
 //     the injected reader (I17). Tier 5 is where the reader is the real one.
 //   - T5.5's one-invocation-then-two is T3.8 on a fake clock.
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { interactivePty, PROMPT, type InteractivePty } from "../support/pty.js";
+import { interactivePty, PROMPT, promptRow, type InteractivePty } from "../support/pty.js";
 
 /** The prompt glyph reaching the PTY: the shell composed and painted a frame. */
 
-const session = (): InteractivePty =>
-  interactivePty("node test/support/fixture.mjs session", { cols: 100, rows: 24 });
+const session = (variant = ""): InteractivePty =>
+  interactivePty(`node test/support/fixture.mjs session ${variant}`, { cols: 100, rows: 24 });
 
 describe("C19 tier 5 — at a real prompt", () => {
   it("T5.1: typing `/ps --status=` and pressing Tab → the statuses appear, arrow-selectable, Enter inserts", async () => {
@@ -61,9 +61,43 @@ describe("C19 tier 5 — at a real prompt", () => {
       pty.kill();
     }
   }, 40_000);
-  it.todo(
-    "T5.2: a dynamic source with a 2-second delay → the spinner appears at 500 ms, typing continues freely, and the late result never touches the buffer — waits on L4",
-  );
+  it("T5.2 (C22 I38, §7): a slow source → the spinner appears, typing continues, the late result never touches the buffer", async () => {
+    // **The half that can only be seen from outside**, per this file's header:
+    // that the spinner is *visible* in the prompt while typing stays
+    // responsive. The threshold itself is T3.9b's, against the engine.
+    //
+    // It was deferred on L4 and L4 was only half the blocker. `spinning` has
+    // been right since C19 and nothing under `src/shell` read it — an
+    // implementation on one side of a seam, which C22 I38 is now.
+    const pty = session("slow-completion");
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      pty.type("/inv");
+      await pty.waitForFrame((f) => promptRow(f).includes("/inv"), 15_000);
+      pty.type("\t");
+
+      // The spinner, on the prompt's own row and drawn by nothing further the
+      // user did — the source takes 1.5 s and the threshold is 500 ms.
+      await pty.waitForFrame((f) => promptRow(f).includes("⠋"), 15_000);
+
+      // **Typing continues freely**, which is the claim the spinner exists
+      // beside: input is never blocked on a fetch (C22 I18). The character
+      // lands while the source is still outstanding.
+      pty.type("o");
+      await pty.waitForFrame((f) => promptRow(f).includes("/invo"), 15_000);
+
+      // **And the late result never touches the buffer.** The keystroke above
+      // superseded the request, so when the source finally answers its
+      // candidates are discarded — the prompt still holds exactly what was
+      // typed, and no menu appears.
+      await new Promise((r) => setTimeout(r, 2_000));
+      expect(promptRow(pty.frame).trim(), "the buffer is what the user typed").toBe("❯ /invo");
+      expect(pty.frame.join("\n"), "and nothing arrived late").not.toContain("invoked-1-times");
+    } finally {
+      pty.kill();
+    }
+  }, 60_000);
   it("T5.3: Tab near the bottom of the terminal → the menu flips above the prompt and shows every candidate", async () => {
     // **"Near the bottom" is every frame, and that is a finding about the row.**
     // It was written for a shell whose prompt moves with the content; in this
@@ -113,7 +147,48 @@ describe("C19 tier 5 — at a real prompt", () => {
       pty.kill();
     }
   }, 40_000);
-  it.todo(
-    "T5.5: sixty seconds of repeated Tab on one dynamic slot → one source invocation, then a second after expiry — waits on L4",
-  );
+  it("T5.5 (§5): repeated Tab on one dynamic slot is one invocation, then a second after the TTL expires", async () => {
+    // **The count leaves the process in the candidate labels**, because it
+    // cannot leave any other way: `stdout` belongs to C01 from construction
+    // (I9), so anything the source writes goes to the debug sink. The label is
+    // the channel.
+    //
+    // **Against the source's declared TTL rather than the 60-second default.**
+    // The deferral said "sixty seconds of repeated Tab", which is a row nobody
+    // runs; the property is the expiry, and the threshold is a source's to
+    // declare (C19 §3). The fixture declares 2 s.
+    const pty = session("ttl-completion");
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+
+      pty.type("/inv");
+      await pty.waitForFrame((f) => promptRow(f).includes("/inv"), 15_000);
+
+      // **Each Tab has to be a *request*, and the first draft's were not.**
+      // With the menu open, focus is the overlay and `Tab` is `menuNext` (C16
+      // §6) — so three Tabs in a row were one request and two selection moves,
+      // and the row would have asserted "one invocation" against a session that
+      // only ever asked once. The menu is dismissed between them.
+      const ask = async (expected: string): Promise<void> => {
+        pty.type("\t");
+        await pty.waitForFrame((f) => f.join("\n").includes(expected), 15_000);
+        pty.type("\u001b");
+        await pty.waitForFrame((f) => !f.join("\n").includes(expected), 15_000);
+      };
+
+      // Three genuine requests inside the window, one invocation.
+      for (let i = 0; i < 3; i += 1) await ask("invoked-1-times");
+
+      // Past the TTL, the next request reaches the source again — and the
+      // label is how the count leaves the process.
+      await new Promise((r) => setTimeout(r, 2_500));
+      pty.type("\t");
+      await pty.waitForFrame((f) => f.join("\n").includes("invoked-2-times"), 15_000);
+      expect(pty.frame.join("\n"), "the second invocation, not a third").not.toContain(
+        "invoked-3-times",
+      );
+    } finally {
+      pty.kill();
+    }
+  }, 60_000);
 });
