@@ -28,6 +28,7 @@ import {
   checkOneStorePerComponent,
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
+  checkSeamConsumers,
 } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
@@ -504,6 +505,12 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // here, on the commit that adds it.
     const covered = new Set([
       ...FABRICATED.map((f) => f.rule),
+      // MG24 is fabricated in its own row below rather than in `FABRICATED`:
+      // that table is one source line per rule, and this one needs a small
+      // file *set* — a member and the file that would consume it — because
+      // the property is about the absence of a consumer rather than about a
+      // line being present.
+      "MG24",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -512,6 +519,44 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       ...SPEC_RULES,
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
+  });
+
+  it("MG24 fires: a published interface member no other file in src/ names", () => {
+    // **Fabricated from the four real instances**, which is the only way to
+    // exercise it now that each is wired. Every one was a component complete on
+    // its own side of a seam with nothing on the other, and every one passed
+    // both suites: the producer tests it, and the consumer never mentions what
+    // it fails to consume.
+    const seam: Record<string, string> = {
+      "src/interaction/completion/engine.ts":
+        "export interface CompletionEngine {\n" +
+        "  request(ctx: unknown, seq: number): Promise<unknown>;\n" +
+        "  cancel(): void;\n" +
+        "  readonly spinning: boolean;\n" +
+        "}\n",
+      // The consumer that exists, so the fixture is not vacuous: `request` is
+      // named here and must not be reported.
+      "src/shell/keys.ts": "void 0; // request\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(seam), (f) => seam[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]).sort();
+
+    expect(named, "the two with no consumer, and not the one with").toEqual([
+      "CompletionEngine.cancel",
+      "CompletionEngine.spinning",
+    ]);
+    expect(violations[0]?.rule).toBe("MG24");
+    expect(violations[0]?.message).toContain("complete on its own side of a seam");
+
+    // **The allow-list is what keeps it honest**, and it must actually exempt:
+    // an entry with no effect is an exception list that reports compliance for
+    // the case it was written to permit.
+    const exempted = checkSeamConsumers(Object.keys(seam), (f) => seam[f] ?? "", {
+      "CompletionEngine.cancel": "why",
+      "CompletionEngine.spinning": "why",
+    });
+    expect(exempted, "a named member is exempt").toEqual([]);
   });
 
   it("every SP rule has a fabrication in the file that owns the parser", () => {

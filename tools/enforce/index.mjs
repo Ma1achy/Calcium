@@ -2,7 +2,7 @@
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
 import { readdirSync, statSync } from "node:fs";
-import { checkModuleGraph, checkOneStorePerComponent } from "./module-graph.mjs";
+import { checkModuleGraph, checkOneStorePerComponent, checkSeamConsumers } from "./module-graph.mjs";
 import { checkSourceScans } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import {
@@ -34,6 +34,7 @@ const violations = [
   // MG23 — one store per component above L0. SS29 folded here: as a source
   // scan its only in-scope file would have been its own exception.
   ...checkOneStorePerComponent(files),
+  ...checkSeamConsumers(files),
   ...checkSourceScans(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),

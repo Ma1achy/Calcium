@@ -231,6 +231,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG21 | `presentation/` imports nothing from `terminal/` but `escapes.js`; type-only imports are not edges | C09 I15, T2.17 |
 | MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
 | MG23 | A component in L1–L3 imports at most one **store**; several at once is L4's, through C23 | C23 §2, C23 I14, A02 Seam 4 |
+| MG24 | A member of an `export interface` under `src/` is named somewhere else under `src/` — a component complete on its own side of a seam, with nothing on the other | A02 Seam 4, C16 I23, C22 I38, I39 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
 
@@ -620,6 +621,28 @@ It reads as a deferral with a reason and it is one nothing can expire. L4 draws 
 **The legitimate case is real and stays legitimate.** Some work is deferred on no component because none is planned: an emulator honouring DECSET 2026, a 1-bit session that cannot exist, a quarantined flake. So the rule is not *every deferral names a component*. It is **name one, or say in as many words that there is none** — `not deferred on a component` — which makes the second something a person wrote rather than the default a missing clause falls into. That is the same shape as `UNSCAFFOLDED` and `ACKNOWLEDGED_BACKLOG`: the exemption exists, and it costs a sentence.
 
 Seven deferrals in the tree took the marker when the rule landed, and two of the seven were restatements it forced: one naming a component that is built with unbuilt work inside it, one naming a harness gap that no component owns.
+
+### MG24 — a published interface member with no consumer
+
+**The interior half of a rule this project already has.** CLAUDE.md carries *add no export nothing consumes* — the rule for the public API's edge, which stops the façade growing surface nobody asked for. This is the same rule one layer in, and either alone reads as arbitrary. It catches the opposite shape, which is not an excess but a **gap**: a component complete on its own side of a seam, with nothing on the other.
+
+**It is invisible from both suites by construction**, which is what makes it worth a mechanism rather than a habit. The producer has its tests — C19 asserts `spinning` at four tiers — and the consumer never mentions the thing it fails to consume, so there is no assertion to fail and no file that reads wrongly. That is structurally different from the eleven pre-code defects the by-hand walks found: those live where two correct statements overlap, and this one lives where a statement has no counterpart at all. It is also the one class where a mechanical check actually works, because the seam is a named thing in the source.
+
+Four instances landed in one stretch and none was found by review: the TTY gate (specified, no code), C22 I38 (C19 answered `spinning`, `src/shell` never read it), C22 I39 (C19 exposed `cancel()`, nothing called it), and C16 I23 (C14 exposed `scrollToTop`/`scrollToBottom` and no key reached them).
+
+**The obvious rule was measured first and cannot work.** An export no other module imports gives 55 hits in `src/`, dominated by constants deliberately exported so a test asserts against the constant rather than a literal — `ESC_DISAMBIGUATION_MS`, `UNDO_LIMIT`, `TAB_STOP`. Those are indistinguishable from a real gap by any import-graph test: both are imported by `test/` and not by `src/`. A member of a published interface is the discriminator and it is not a convenience — the interface **is** the seam. 248 members, five unconsumed.
+
+**It named three more on its first run**, each a commitment with no code on the consuming side:
+
+| Member | Committed by | What is missing |
+|---|---|---|
+| `Keymap.mergeBlock` | C16 §6, I10 | nothing commits a block keymap, so `s` does not sort a `/ps` table |
+| `ThemeStore.applyOverrides` | C10 §4 | `TuiConfig` has no field to carry overrides — a ruling, not code |
+| `ExecutionWrites.setRetained` | C22 I19 | `retained` has no writer *and* no reader; the feature is a field |
+
+They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, because deleting removes a capability the specs commit to, and rather than left failing, because a red suite is one nobody reads. The two diagnostics entries beside them — `LineEditor.killBuffer`, `IdentityLoop.warned` — are published to be read by a test and say so in their own declarations.
+
+**Run before C24 deliberately.** C24's whole job is exporting things for external consumption, so a rule landing after it would fire on every public export and need either an allow-list the size of the API or a scope carved around the façade. Run now, the baseline is meaningful and C24 lands into a tree where the rule already holds.
 
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
 

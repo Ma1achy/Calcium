@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -672,6 +672,146 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
         `A component above L0 may hold one; several at once is L4's, through C23 ` +
         `and its local handlers, never laterally`,
       spec: "C23 §2 · C23 I14 · A02 Seam 4",
+    });
+  }
+
+  return violations;
+}
+
+
+// --- MG24 — a published interface member with no consumer -------------------
+//
+// **The interior half of "add no export nothing consumes".** CLAUDE.md carries
+// that rule for the public API's edge; this is the same rule one layer in, and
+// either alone reads as arbitrary. The edge rule stops the façade growing
+// surface nobody asked for. This one catches the opposite shape, which is not
+// an excess but a *gap*:
+//
+//   **a component complete on its own side of a seam, with nothing on the
+//   other.**
+//
+// It is invisible from both suites by construction. The producer has its tests
+// — C19 asserts `spinning` at four tiers — and the consumer never mentions the
+// thing it fails to consume, so there is no assertion to fail and no file to
+// read that looks wrong. Structurally different from the defects the by-hand
+// walks catch, which live where two correct statements overlap; this one lives
+// where a statement has no counterpart at all.
+//
+// Four instances landed in one stretch and none was found by review:
+//
+//   the TTY gate     C22 §4 step 1 specified, no code
+//   C22 I38          C19 answered `spinning`, `src/shell` never read it
+//   C22 I39          C19 exposed `cancel()`, nothing called it
+//   C16 I23          C14 exposed `scrollToTop`/`scrollToBottom`, no key reached
+//
+// **Why interface members rather than exports.** The obvious rule — an export
+// no other module imports — was measured first and cannot work: 55 runtime
+// exports in `src/` have no importer, and they are dominated by constants
+// deliberately exported so a test asserts against the constant rather than a
+// literal (`ESC_DISAMBIGUATION_MS`, `UNDO_LIMIT`, `TAB_STOP`). Those are
+// indistinguishable from a real gap by any import-graph test, because both are
+// imported by `test/` and not by `src/`.
+//
+// A member of a published interface is the discriminator, and it is not a
+// convenience: the interface **is** the seam. 248 members, five unconsumed —
+// small enough to read, and it named three real gaps on its first run.
+//
+// Scoped to `export interface`, which is where a component states what it
+// offers. A type alias is structural and can be satisfied without being named.
+
+/** Members whose absence from the rest of `src/` is deliberate, each with why. */
+export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- diagnostics: published to be read by a test, never by a component ----
+  "LineEditor.killBuffer":
+    "diagnostics, and already an explicit exception in C16 T2.14's non-editing list",
+  "IdentityLoop.warned": "diagnostics; its own declaration says so and C22 T3.12 reads it",
+
+  // --- specified and unbuilt: the class this rule exists for ----------------
+  //
+  // **Three, on the rule's first run, and every one of them a commitment with
+  // no code on the consuming side.** They are listed rather than deleted
+  // because deleting them would remove a capability the specs commit to, and
+  // listed rather than left failing because a red suite is one nobody reads.
+  // Each names its owner, so the day it is wired the entry has to go.
+  //
+  // This is the same disposal `ACKNOWLEDGED_BACKLOG` uses and it costs a
+  // sentence apiece for the same reason.
+  "Keymap.mergeBlock":
+    "C16 §6, I10 — a surface's `BlockKeymap` merges into `liveBlock` while the block " +
+    "is live, so `s` sorts a `/ps` table. Nothing commits a block keymap, so `s` does " +
+    "not sort a `/ps` table. The producer is complete: `mergeBlock` refuses collisions " +
+    "and withdraws on freeze, all of it tested",
+  "ThemeStore.applyOverrides":
+    "C10 §4 — theme overrides. C10 validates and applies them and `TuiConfig` has no " +
+    "field to carry any, so nothing can reach it. Unspecified at the shell rather than " +
+    "unbuilt: a ruling is missing, not code, which is where theme *persistence* was " +
+    "before C22 I40",
+  "ExecutionWrites.setRetained":
+    "C22 I19 — expiry warns and offers inline re-login with the failed command retained. " +
+    "`retained` has no writer *and* no reader: `SessionSnapshot` carries the field, two " +
+    "files initialise it to null, and nothing else in `src/` names it. The whole feature " +
+    "is a field",
+});
+
+/** Every `export interface` member under `src/`, with its owner. */
+function interfaceMembers(files, readFile) {
+  const out = [];
+  for (const file of files) {
+    const src = readFile(file);
+    const head = /export\s+interface\s+([A-Za-z_$][\w$]*)\s*(?:extends[^{]*)?\{/g;
+    let m;
+    while ((m = head.exec(src))) {
+      let depth = 1;
+      let i = head.lastIndex;
+      while (i < src.length && depth > 0) {
+        if (src[i] === "{") depth += 1;
+        else if (src[i] === "}") depth -= 1;
+        i += 1;
+      }
+      const body = src.slice(head.lastIndex, i - 1);
+      const member = /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*(?:\??\s*[:(]|\()/gm;
+      let n;
+      while ((n = member.exec(body))) out.push({ owner: m[1], name: n[1], file });
+    }
+  }
+  return out;
+}
+
+/**
+ * MG24, as a pure function over its inputs so it can be run against fabricated
+ * files and shown to fire (A03 commitment 14).
+ */
+export function checkSeamConsumers(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  allowed = UNCONSUMED_MEMBERS,
+) {
+  const violations = [];
+  const sources = new Map(files.map((f) => [f, readFile(f)]));
+
+  for (const { owner, name, file } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
+    const key = `${owner}.${name}`;
+    if (allowed[key] !== undefined) continue;
+
+    let consumed = false;
+    for (const [other, src] of sources) {
+      if (other === file) continue;
+      if (new RegExp(`\\b${name}\\b`).test(src)) {
+        consumed = true;
+        break;
+      }
+    }
+    if (consumed) continue;
+
+    violations.push({
+      rule: "MG24",
+      file,
+      message:
+        `${key} is published and named nowhere else in src/ — a component complete on ` +
+        `its own side of a seam with nothing on the other. Both suites pass: the ` +
+        `producer tests it and the consumer never mentions what it fails to consume. ` +
+        `Wire it, remove it, or name it in UNCONSUMED_MEMBERS with a reason`,
+      spec: "A03 §3, MG24",
     });
   }
 
