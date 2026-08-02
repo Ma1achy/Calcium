@@ -36,6 +36,7 @@ type Scripted = Readonly<{
   stream?: () => AsyncIterable<RawPatch>;
   adapt?: () => ViewDocument;
   adaptPatch?: () => ViewPatch | null;
+
   spawnShell?: () => { stdout: AsyncIterable<string>; exited: Promise<{ code: number | null }>; overflowed: boolean };
 }>;
 
@@ -47,6 +48,8 @@ function harness(script: Scripted = {}) {
   const calls: string[] = [];
   const typed: string[] = [];
   const recorded: { command: string; exitCode: number }[] = [];
+  /** Every `seq` C23 handed C07, in order. */
+  const seqs: number[] = [];
   /** A controllable clock and scheduler, so §3b's timers are driven not waited on. */
   let now = 0;
   const timers: (() => void)[] = [];
@@ -80,10 +83,17 @@ function harness(script: Scripted = {}) {
     transport,
     adapters: {
       adapt: () => (script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt()),
-      adaptPatch: () =>
-        script.adaptPatch === undefined
-          ? { op: "append" as const, block: { kind: "notice" as const, id: `n${String(commits.length)}`, tone: "info" as const, text: "tick" } }
-          : script.adaptPatch(),
+      // **The context is read, not discarded.** This fake took no arguments at
+      // all, which is why nothing here could see that C23 passed a literal
+      // `seq: 0` — the parameter that was wrong was the one the double erased.
+      // A fake narrower than the interface it stands for cannot fail on the
+      // difference.
+      adaptPatch: (_patch: RawPatch, ctx: { seq: number }) => {
+        seqs.push(ctx.seq);
+        return script.adaptPatch === undefined
+          ? { op: "append" as const, block: { kind: "notice" as const, id: `s${String(ctx.seq)}`, tone: "info" as const, text: "tick" } }
+          : script.adaptPatch();
+      },
       register: () => undefined,
       seal: () => undefined,
       sealed: true,
@@ -163,6 +173,7 @@ function harness(script: Scripted = {}) {
     pipeline,
     transcript,
     session,
+    seqs,
     commits,
     resets,
     calls,
@@ -307,6 +318,36 @@ describe("C23 §3 — the app path", () => {
     h.pipeline.submit("/tail");
     await settled();
     expect(h.pipeline.inFlight, "released before the loop, not after it").toBeNull();
+  });
+
+  it("T1.7b (I30, C07 I15): every patch of a stream gets its own seq, counted from 0", async () => {
+    // **The literal was `seq: 0` and it was wrong twice.** C07 I15 spends the
+    // number as the block-id namespace *and* as the per-stream reset, so a
+    // constant makes the second patch of every stream collide under C04 I14 —
+    // no streaming verb can emit more than one block — while resetting the
+    // patch adapter continuously, which un-sticks C06 I12's degradation before
+    // a remainder can be composed.
+    //
+    // **Three patches, because two would pass against `seq = seq === 0 ? 1 : 0`.**
+    // The assertion is the sequence, not that the values differ.
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: { a: 1 } } as RawPatch;
+        yield { kind: "data", value: { a: 2 } } as RawPatch;
+        yield { kind: "data", value: { a: 3 } } as RawPatch;
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+
+    expect(h.seqs, "the patch's position in its stream").toEqual([0, 1, 2]);
+
+    // **And the consequence, not only the number.** The blocks the harness keys
+    // by `seq` all reached the entry — which is the property the number exists
+    // for, and the one that failed in a real session while every assertion about
+    // the counter would still have been satisfiable by a well-behaved fake.
+    expect(h.transcript.entries[0]?.doc.blocks.map((b) => b.id)).toEqual(["s0", "s1", "s2"]);
   });
 });
 

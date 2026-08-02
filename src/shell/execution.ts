@@ -560,6 +560,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     verb: string,
     patches: AsyncIterable<RawPatch>,
   ): Promise<void> => {
+    // **The stream's own counter** (I30, C07 I15). Not decoration: C07 spends it
+    // as the namespace for generated block ids *and* as the per-stream reset,
+    // because one `PatchAdapter` outlives many streams. This was the literal `0`,
+    // which is the only value that is wrong twice — every patch collided with the
+    // first under C04 I14, so no streaming verb could emit a second block, and the
+    // reset fired continuously, so C06 I12's sticky degradation never stuck and a
+    // degraded stream's remainder could not be composed. Neither is visible from
+    // here, and neither is reachable from a test that builds its own context.
+    let seq = 0;
+
     try {
       for await (const patch of patches) {
         if (patch.kind === "end") {
@@ -579,8 +589,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           transport: "subprocess",
           origin: "user",
           tool: null,
-          seq: 0,
+          seq,
         });
+        // Counted per patch adapted, not per patch applied: `seq` is a position
+        // in the stream, and a patch C07 mapped to `null` still occupied one.
+        // Counting only the applied ones would reuse a position after every
+        // dropped `malformed` line, which is the collision again with a rarer
+        // trigger.
+        seq += 1;
         if (view === null) continue;
 
         const outcome = deps.transcript.patch(id, view);
