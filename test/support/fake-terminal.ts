@@ -32,7 +32,13 @@ export type FakeStdout = NodeJS.WriteStream & {
   duringWrite(at: number, fn: () => void): void;
 };
 
-export function fakeStdout(size = { columns: 80, rows: 24 }): FakeStdout {
+/**
+ * `tty` defaults to true because every other row here is about a terminal.
+ * Gate 1 (C22 I36) is the one that needs the other value, and it needs a stream
+ * that is *otherwise identical* — a hand-rolled `{ write }` would refuse for
+ * reasons the gate does not own.
+ */
+export function fakeStdout(size = { columns: 80, rows: 24 }, { tty = true } = {}): FakeStdout {
   const chunks: string[] = [];
   const reads = { columns: 0, rows: 0 };
   let throwAt: number | null = null;
@@ -41,7 +47,7 @@ export function fakeStdout(size = { columns: 80, rows: 24 }): FakeStdout {
   let hook: (() => void) | null = null;
 
   const stream = {
-    isTTY: true,
+    isTTY: tty,
     write(chunk: unknown): boolean {
       if (hookAt === chunks.length && hook !== null) {
         const fn = hook;

@@ -19,6 +19,7 @@ import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
 import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
 import { drawFallback, tooSmall } from "./fallback.js";
+import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
 import { renderSequenceToLines } from "../testing/index.js";
@@ -114,6 +115,25 @@ class Session implements TuiInstance {
     // state — a second session constructs a new instance (I16).
     if (this.#state === "stopped") throw new SessionStateError("start", this.#state);
     if (this.#state === "running") return; // T3.2 — nothing constructed twice.
+
+    // **Gate 1** (§4 step 1, I36, I37) — above `constructGraph`, and that is the
+    // ruling rather than the ordering that fell out.
+    //
+    // Gate 4 defers: the graph is built, the fallback is drawn, and a resize
+    // continues from step 5 with session state intact (I8), because a terminal
+    // too small can become big enough while the session waits. **A pipe cannot
+    // become a terminal.** There is no event to wait for and nothing a
+    // constructed graph could do — it would open a history file and start an
+    // identity loop for a process about to exit.
+    //
+    // The state goes to `stopped` rather than staying `created`: this session is
+    // over, and `stopped` is terminal (I16), so a caller that retries constructs
+    // a new instance instead of finding a half-started one.
+    if (this.config.stdout.isTTY !== true) {
+      this.config.stdout.write(usageText(this.config.name, this.config.binary));
+      this.#state = "stopped";
+      return;
+    }
 
     this.#graph = await constructGraph(this.config, {
       stop: (reason) => this.stop(reason),

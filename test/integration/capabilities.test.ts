@@ -256,6 +256,6 @@ describe("C02 integration", () => {
     expect(wrapped).toContain(MODES.syncOff);
   });
   it.todo(
-    "T4.7: altScreen:false → the shell prints help and exits 0 without acquiring anything — waits on C22 — the non-TTY gate is §4 step 1 and `createTui` does not perform it",
+    "T4.7: altScreen:false → the shell prints help and exits 0 without acquiring anything — restated, because it named the wrong gate. C22 §4 step 1 exists now and keys on `stdout.isTTY`, which is a different fact: a `TERM=dumb` session on a real terminal passes gate 1 and is refused by C01, whose T3.15 says `acquire()` invokes `onFatal` without emitting anything and whose T4.1b asserts it against a real record. So the behaviour this row describes — *prints help and exits 0* — is not what the tree does, and nothing has ruled that it should. What is missing is a ruling: whether `altScreen: false` on a TTY should stay fatal, as `lifecycle.ts` makes it, or become a second graceful gate beside the TTY one — and C22 §4 has no such step. Until that is decided, T4.1b is the coverage and this row would duplicate it",
   );
 });
