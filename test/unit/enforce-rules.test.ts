@@ -28,6 +28,7 @@ import {
   checkOneStorePerComponent,
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
+  checkFunctionConsumers,
   checkSeamConsumers,
 } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
@@ -511,6 +512,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // the property is about the absence of a consumer rather than about a
       // line being present.
       "MG24",
+      // MG25 likewise, and for a second reason: half its property is about the
+      // allow-list rather than about the tree, and that half needs two runs of
+      // the same fixture with different lists.
+      "MG25",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -557,6 +562,61 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "CompletionEngine.spinning": "why",
     });
     expect(exempted, "a named member is exempt").toEqual([]);
+  });
+
+  it("MG25 fires: an exported function no other file in src/ names", () => {
+    // **Fabricated from the real first run**, where 7 of 281 came back and the
+    // two shapes below were both in it: a producer with no driver
+    // (`assignOffsets`) and a name that appears only inside a comment
+    // (`backoffOf`, described in four and called in none).
+    const tree: Record<string, string> = {
+      "src/shell/refresh.ts":
+        "export function assignOffsets(parts: unknown[]) { return parts; }\n" +
+        "export function backoffOf(ms: number) { return ms; }\n" +
+        "export function watchStall(id: string) { return id; }\n",
+      // The consumer that exists, so the fixture is not vacuous — and the
+      // comment that must not count as one, which is the discriminator MG24's
+      // header got wrong and this rule turns on.
+      "src/shell/execution.ts": "watchStall('e1');\n// backoffOf is the A02 §7 rule\n",
+    };
+    const files = Object.keys(tree);
+    const read = (f: string): string => tree[f] ?? "";
+
+    const violations = checkFunctionConsumers(files, read, {});
+    expect(
+      violations.map((v) => v.message.split(" ")[0]).sort(),
+      "the producer with no driver and the one named only in prose — not the wired one",
+    ).toEqual(["assignOffsets", "backoffOf"]);
+    expect(violations[0]?.rule).toBe("MG25");
+    expect(violations[0]?.message).toContain("a producer with no consumer");
+
+    // A constant is out of scope by construction, and that is the correction
+    // that makes the rule usable: MG24's header measured this rule over every
+    // export, found it dominated by constants a test asserts against, and
+    // rejected it. Narrowing to functions is what answers that, so it is
+    // asserted rather than assumed.
+    expect(
+      checkFunctionConsumers(["src/a.ts"], () => "export const UNDO_LIMIT = 100;\n", {}),
+      "a constant exported for a test to assert against is not this rule's business",
+    ).toEqual([]);
+
+    // The allow-list exempts...
+    expect(
+      checkFunctionConsumers(files, read, { assignOffsets: "why", backoffOf: "why" }),
+      "a named function is exempt",
+    ).toEqual([]);
+
+    // ...and is compared by **equality**, which is the arm that keeps it read.
+    // Membership alone is how SS40's scope, CP6's surfaces and MG24's own first
+    // form each became too permissive: the entry is judged once and everything
+    // after it inherits the judgement.
+    const stale = checkFunctionConsumers(files, read, {
+      assignOffsets: "why",
+      backoffOf: "why",
+      watchStall: "wired since this entry was written",
+    });
+    expect(stale, "an entry excusing nothing is itself a violation").toHaveLength(1);
+    expect(stale[0]?.message).toContain("no longer an unconsumed export");
   });
 
   it("every SP rule has a fabrication in the file that owns the parser", () => {

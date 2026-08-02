@@ -8,7 +8,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -812,6 +812,159 @@ export function checkSeamConsumers(
         `producer tests it and the consumer never mentions what it fails to consume. ` +
         `Wire it, remove it, or name it in UNCONSUMED_MEMBERS with a reason`,
       spec: "A03 §3, MG24",
+    });
+  }
+
+  return violations;
+}
+
+// --- MG25 — a free function with no consumer --------------------------------
+//
+// **MG24's blind spot, and MG24's own header is where it was written down.**
+//
+// That header records the obvious rule being measured and rejected: "an export
+// no other module imports ... cannot work: 55 runtime exports in `src/` have no
+// importer, and they are dominated by constants deliberately exported so a test
+// asserts against the constant rather than a literal". The rejection was right
+// about the form it measured and wrong about the rule, and two corrections make
+// it work:
+//
+//   1. **Functions and classes only.** A constant exported for a test to assert
+//      against is *the* noise MG24 named. A function is behaviour offered across
+//      a seam, and that is the thing that can have no consumer. 281 candidates
+//      rather than 376, and the 17 constants leave with the distinction rather
+//      than with an exception apiece.
+//   2. **Occurrences, not files, and comments stripped.** A function used inside
+//      its own module is consumed; `validateConfig` and `isFrozen` both look
+//      unconsumed to a file-counting scan and are called one screen below their
+//      declaration. Prose mentions run the other way: `assignOffsets` is named
+//      in four comments and called nowhere, and a scan that counts them agrees
+//      the seam is wired.
+//
+// **7 of 281 on the first run**, which is the number that made it a rule. What
+// it found that MG24 could not:
+//
+//   assignOffsets · backoffOf   C23 §3b's part refresh — a complete producer,
+//                               no driver. `b.live` (C24 §5) rests on it, and
+//                               this is why §5 says specified and not shipped.
+//   gutterMatchesPrompt         an assertion whose own comment said "asserted
+//                               here rather than only in a test", evaluated
+//                               nowhere. Now called from `paint`.
+//   promptPrefix                dead, and not even a test read it. Deleted.
+//   isUsable · plotAreaWidth    a rule expressed twice — C01 asks `!altScreen`
+//                               inline, C12 computes `areaWidth` inline, and
+//                               each has a helper stating the same rule that
+//                               nothing calls.
+//
+// Note the last pair is a *different* class from MG24's: not a seam with no
+// consumer but a rule with two expressions, one of which is unreachable. The
+// rule finds it because an unreachable expression and an unconsumed producer
+// look identical from the import graph, and both want disposal.
+//
+// **The allow-list is compared by equality, not by membership.** Every
+// too-permissive list in this repo got that way by membership — SS40's
+// directory scope, CP6's hand-written surfaces, MG24's constant-dominated first
+// form. A membership check makes each entry a judgement taken once and
+// inherited by everything that arrives after it; equality makes the eighth
+// candidate fail until someone rules on it. That is the whole difference
+// between a rule and a list of things that were true once.
+
+/** Functions whose absence from the rest of `src/` is deliberate, each with why. */
+export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // --- public surface: consumed across an entry point, not within src/ ------
+  renderToLines:
+    "C24 §7 — `tui-kit/testing`. Its consumers are 37 test files and, in time, every " +
+    "app running the measurement conformance suite. The entry point is the seam and it " +
+    "is crossed; `src/` is simply not where the crossing happens",
+
+  // --- specified and unbuilt: the class this rule exists for ----------------
+  assignOffsets:
+    "C23 §3b, I20 — part refresh. `createRefreshDriver` implements stall detection and " +
+    "the identity notice and not this; a declared part is staggered by nothing because " +
+    "no part can be declared. Ships with `b.live` (C24 §5), which is deferred for the " +
+    "same reason",
+  backoffOf:
+    "C23 §3b, I21 — the same gap, and the same landing. A02 §7's one backoff rule, " +
+    "correct and tested in a table, driving nothing",
+
+  // --- a rule expressed twice, the second expression unreachable ------------
+  isUsable:
+    "C02, D28 — alternate screen is the sole hard requirement. `lifecycle.ts` asks " +
+    "`!capabilities.altScreen` inline instead, so the rule holds and its statement is " +
+    "unreachable. Wiring C01 to it is C01's call, not C24's: the two would then agree " +
+    "by construction rather than by a reader noticing",
+  plotAreaWidth:
+    "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
+    "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
+    "and the helper is the one no renderer calls. C12's to reconcile",
+});
+
+/**
+ * MG25, as a pure function over its inputs so it can be run against fabricated
+ * files and shown to fire (A03 commitment 14).
+ *
+ * `strict` compares the allow-list against the candidates by equality: an entry
+ * naming a function that is now consumed, or was deleted, is itself a violation.
+ * Otherwise the list outlives what it excuses, which is how a list stops being
+ * read.
+ */
+export function checkFunctionConsumers(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  allowed = UNCONSUMED_FUNCTIONS,
+) {
+  const violations = [];
+  const raw = new Map(files.map((f) => [f, readFile(f)]));
+
+  // Comments carry the name of the thing they describe, and a producer with no
+  // consumer is described more often than most. Stripped before counting, or
+  // the rule reads its own documentation as evidence the seam is wired.
+  const stripped = new Map(
+    [...raw].map(([f, s]) => [f, s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1")]),
+  );
+
+  const declared = [];
+  for (const [file, src] of raw) {
+    const re = /^export (?:function\*? |async function |class )([A-Za-z_$][\w$]*)/gm;
+    let m;
+    while ((m = re.exec(src))) declared.push({ name: m[1], file });
+  }
+
+  const unconsumed = new Set();
+  for (const { name, file } of declared) {
+    const re = new RegExp(`\\b${name}\\b`, "g");
+    let uses = 0;
+    for (const src of stripped.values()) uses += (src.match(re) ?? []).length;
+    // One occurrence is the declaration itself.
+    if (uses > 1) continue;
+    unconsumed.add(name);
+
+    if (allowed[name] !== undefined) continue;
+    violations.push({
+      rule: "MG25",
+      file,
+      message:
+        `${name} is exported and named nowhere else in src/ — a producer with no ` +
+        `consumer, or a rule whose second expression is unreachable. Both suites ` +
+        `pass: its own tests exercise it and no caller exists to be wrong. Wire it, ` +
+        `delete it, or name it in UNCONSUMED_FUNCTIONS with a reason`,
+      spec: "A03 §3, MG25",
+    });
+  }
+
+  // The equality half. A named function that has since been consumed or deleted
+  // leaves an entry excusing nothing, and an allow-list whose entries are not
+  // all live is one nobody has read recently.
+  for (const name of Object.keys(allowed)) {
+    if (unconsumed.has(name)) continue;
+    violations.push({
+      rule: "MG25",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `UNCONSUMED_FUNCTIONS names ${name}, which is no longer an unconsumed export ` +
+        `— it is consumed, renamed or gone. The list is compared by equality on ` +
+        `purpose: an entry that excuses nothing is how the next one gets in unread`,
+      spec: "A03 §3, MG25",
     });
   }
 

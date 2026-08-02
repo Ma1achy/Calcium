@@ -34,7 +34,7 @@ import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/tex
 import { SGR_RESET } from "../terminal/escapes.js";
 import { PROMPT, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
-import { heightsSum, type Composed } from "./frame.js";
+import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell } from "../interaction/editor/index.js";
@@ -252,6 +252,25 @@ export function paint(frame: Composed, deps: PaintDeps): readonly string[] {
     throw new FrameError(
       `frame heights do not sum to ${String(frame.size.rows)} rows: ` +
         `header 1 + viewport ${String(frame.region.height)} + prompt ${String(frame.promptRows)} + footer 1`,
+    );
+  }
+
+  // **The sibling assertion, which was written and never called** (T4.9, MG25).
+  //
+  // `gutterMatchesPrompt` sits beside `heightsSum` in `frame.ts` and its own
+  // comment says "asserted here rather than only in a test" — and nothing in
+  // `src/` named it, so the sentence was false and the check ran nowhere. That
+  // is A03 §2's vacuity class in a function: an assertion that cannot fail
+  // because it is never evaluated reads exactly like one that holds.
+  //
+  // Constant-folded rather than frame-dependent, so it costs one comparison and
+  // could in principle be checked once. It is checked here because *here* is
+  // where its sibling is checked, and an invariant kept somewhere else is the
+  // one that gets dropped in the next refactor.
+  if (!gutterMatchesPrompt()) {
+    throw new FrameError(
+      "the prompt gutter does not match the prompt: `displayRows` will disagree " +
+        "with the rendered height by a row",
     );
   }
 

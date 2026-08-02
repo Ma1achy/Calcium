@@ -47,3 +47,18 @@ export declare function checkSeamConsumers(
   readFile?: (f: string) => string,
   allowed?: Readonly<Record<string, string>>,
 ): Violation[];
+
+/** Functions whose absence from the rest of `src/` is deliberate, each with why (MG25). */
+export declare const UNCONSUMED_FUNCTIONS: Readonly<Record<string, string>>;
+
+/**
+ * MG25 — an exported function or class under `src/` is named somewhere else
+ * under `src/`. MG24's blind spot: a producer expressed as free functions rather
+ * than as an interface. The allow-list is compared by equality, so an entry that
+ * no longer excuses anything is itself a violation.
+ */
+export declare function checkFunctionConsumers(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+  allowed?: Readonly<Record<string, string>>,
+): Violation[];

@@ -138,11 +138,6 @@ export function heightsSum(f: Composed): boolean {
   return HEADER_ROWS + f.region.height + f.promptRows + FOOTER_ROWS === f.size.rows;
 }
 
-/** The prompt's rendered first-row prefix. C17 holds no geometry (C17 I10). */
-export function promptPrefix(): string {
-  return PROMPT;
-}
-
 /**
  * The gutter C22 passes must match the prompt it draws, or `displayRows`
  * disagrees with the rendered height by a row (T4.9).

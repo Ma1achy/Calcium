@@ -232,6 +232,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG22 | `presentation/plot/` imports nothing from `presentation/table/` — the C11 → C12 edge is one-directional | A02 §1, C12 §2 |
 | MG23 | A component in L1–L3 imports at most one **store**; several at once is L4's, through C23 | C23 §2, C23 I14, A02 Seam 4 |
 | MG24 | A member of an `export interface` under `src/` is named somewhere else under `src/` — a component complete on its own side of a seam, with nothing on the other | A02 Seam 4, C16 I23, C22 I38, I39 |
+| MG25 | An exported **function or class** under `src/` is named somewhere else under `src/`, comments excluded. MG24's blind spot: a producer expressed as free functions rather than as an interface | A02 Seam 4, C23 §3b, C24 I16 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
 
@@ -645,6 +646,32 @@ They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, be
 **Run before C24 deliberately.** C24's whole job is exporting things for external consumption, so a rule landing after it would fire on every public export and need either an allow-list the size of the API or a scope carved around the façade. Run now, the baseline is meaningful and C24 lands into a tree where the rule already holds.
 
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
+
+### MG25 — a free function with no consumer
+
+**The paragraph above, "the obvious rule was measured first and cannot work", is where MG24's own blind spot is written down.** It is right about the form it measured and wrong about the rule. Two corrections make it work, and both were found by a case MG24 could not see.
+
+**The case.** `b.live` (C24 §5) rests on C23 §3b's *part refresh*, and §3b implements two of its three mechanisms. `assignOffsets` and `backoffOf` are a complete producer — the stagger rule and A02 §7's one backoff rule, correct, tested in a table, driving nothing. MG24 walks `export interface` members; this producer is a type alias and two free functions, so it sat in the tree through the whole of C22 and C23 with no rule able to see it. **The class MG24 exists for, one level below where MG24 looks.**
+
+**Correction 1 — functions and classes, not every export.** A constant exported so a test asserts against the constant rather than a literal is exactly the noise the 55-hit measurement found. A function is *behaviour offered across a seam*, and behaviour is the thing that can have no consumer. 281 candidates rather than 376, and the seventeen constants leave with the distinction rather than with an exception apiece.
+
+**Correction 2 — occurrences, not files, and comments stripped.** Both halves are load-bearing and each was found by a false result. A function used inside its own module is consumed: `validateConfig` and `isFrozen` look unconsumed to a file-counting scan and are called one screen below their own declarations. And prose runs the other way — `backoffOf` is named in four comments and called in none, so a scan that counts comment mentions **reads the rule's own documentation as evidence the seam is wired**. A producer with no consumer is described more often than most, which makes this the failure mode rather than an edge case.
+
+**7 of 281 on the first run**, and they fall into two classes rather than one:
+
+| Function | Class | Disposition |
+|---|---|---|
+| `assignOffsets`, `backoffOf` | producer, no driver | allow-listed; ships with `b.live` |
+| `gutterMatchesPrompt` | an assertion evaluated nowhere | wired into `paint` |
+| `promptPrefix` | dead, and no test read it either | deleted |
+| `isUsable`, `plotAreaWidth` | **a rule expressed twice, the second unreachable** | allow-listed against C02 and C12 |
+| `renderToLines` | public surface (C24 §7); its seam is an entry point | allow-listed |
+
+`gutterMatchesPrompt` is the one worth naming on its own. Its declaration says *"asserted here rather than only in a test, because the two are declared in one file and read in two"* — and nothing called it, so the sentence was false and the check ran nowhere. **A03 §2's vacuity class in a function**: an assertion that is never evaluated passes exactly like one that holds, and it sits three lines from `heightsSum`, which *is* called from `paint`. Review reads the pair as symmetric because on the page they are.
+
+The last pair is a class MG24 does not have a name for: not a seam with no consumer but a rule with two expressions, one unreachable. C01 asks `!capabilities.altScreen` inline while C02's `isUsable` states the same requirement; C12 computes `areaWidth` inline across a three-rung ladder while `plotAreaWidth` states the simple case. Both are found here because an unreachable expression and an unconsumed producer are indistinguishable from the import graph — and both want the same disposal.
+
+**The allow-list is compared by equality, not by membership** — the one arm this rule needs that MG24's does not, because this list starts at six rather than at five and will be reached for more often. Every too-permissive list in this repo got that way by membership: SS40's directory scope, CP6's hand-written surfaces, MG24's own constant-dominated first form. Membership makes each entry a judgement taken once and inherited by everything arriving after it; equality makes the seventh candidate fail until someone rules on it, and makes an entry that no longer excuses anything a violation in its own right. That is the difference between a rule and a list of things that were true once.
 
 ---
 
