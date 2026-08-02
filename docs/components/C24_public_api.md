@@ -124,7 +124,8 @@ export const b: {
   kv(rows: Record<string, string | CellInput>): KeyValue;
   table(spec: { columns: ColumnDef[]; rows: TableRow[]; showHeader?: boolean;
                 emptyMessage?: string; id?: string }): Table;
-  col(key: string, spec: Omit<ColumnDef, "key" | "label"> & { label?: string }): ColumnDef;
+  col(key: string, spec?: Partial<Omit<ColumnDef, "key">>): ColumnDef;
+  seq(blocks: readonly Block[]): readonly Block[];      // §4a
   row(id: string, cells: Record<string, string | CellInput>,
       opts?: { detail?: Block[]; actions?: Action[] }): TableRow;
   steps(steps: StepInput[]): Steps;
@@ -201,6 +202,49 @@ they have no default and T2.9 does not enumerate them.
 wins, and a document assembled without builders has whatever its author wrote.
 The defaults exist so that the common case matches what the S-series draws, not
 so that the framework owns a surface's rhythm.
+
+### 4a. `b.seq` — where "not the first block" lives
+
+This paragraph said the builders set `gapBefore` "when they are not the first
+block in the sequence they are built into", and **a builder cannot know its
+position**. Worse, C04 §3a has already ruled against position meaning anything:
+*"The first block's gap is a leading blank row, not a special case. Dropping it
+would make the field mean two things depending on position, and a document
+assembled by concatenating two others would render differently from either."*
+`sequenceHeight` implements exactly that, with no index test.
+
+Both statements are correct and they overlap, which is the class the by-hand
+walk exists for. **The resolution came from asking who holds the rule today, and
+the answer is nobody.** The whole of `src/` sets `gapBefore` in one file —
+`shell/local/handlers.ts`, three times, by hand, chosen per position — and
+`test/support/surfaces.ts` hand-authors the same pattern for every S-series
+figure. Nothing strips a first block's gap anywhere. The rule that S02's figure
+depends on ("every block after the logo carries `gapBefore`", six gaps for seven
+blocks) has been **discipline rather than mechanism** since it was written.
+
+So it gains one:
+
+```typescript
+seq(blocks: readonly Block[]): readonly Block[];
+```
+
+`b.seq` is the only point that sees a sequence. It clears the gap on the first
+block and leaves the rest, and that is the sole place position means anything —
+C04 §3a's ruling is untouched, because the blocks it returns are honest about
+themselves and measure identically wherever they are concatenated.
+
+**The default is a preference until `b.seq` resolves it.** A builder records that
+its gap was defaulted rather than asked for, so an explicit `gapBefore: true` on
+the first block survives — §4's "an explicit value always wins" has to hold at
+position 0 too, and it is the only position where the two can disagree. The
+marker is private to `b`; it is not a field on the block, because C04 owns block
+shapes and a builder inventing one would be the second enforcement point I15's
+own reasoning rejects.
+
+**`b.seq` is the convenience, never the only path.** A consumer who drops one
+builder's output into an array of their own has positions `b.seq` never sees, so
+`gapBefore` stays settable on every builder. A sequence assembler that made the
+field private would trade a hand-authored gap for an unreachable one.
 
 **Nothing is inferred from field names.** A builder that guessed a tone from a key called `status` would work for four verbs and fail silently on the fifth.
 
@@ -326,8 +370,9 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **I12** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.
 - **I13** — `tui-kit/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 - **I14** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
-- **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
+- **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 - **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
+- **I17** — `b.seq` is the only place a block's position changes what it carries, and it changes it at construction rather than at measurement (§4a). C04 §3a's ruling stands: a block measures the same wherever it is concatenated. Before this, no code anywhere stripped a first block's gap — the rule every S-series figure depends on was discipline, and the one file in `src/` that set `gapBefore` set it by hand, per position.
 
 ---
 
@@ -347,6 +392,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them (I14).
 13. Every block-returning builder sets a `gapBefore` default of its own, and an explicit value always wins (I15, §4).
 14. Nothing is exported that declares work no code performs; *available* is not an argument for *exported*, and neither is *specified* (I16, §3).
+15. `b.seq` holds the rule that a first block does not gap, and it is the only place a block's position changes what it carries (I17, §4a).
 
 ---
 
@@ -372,6 +418,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **T2.5** (I7): `Measure`'s signature does not include `tick` — a compile-level test.
 - **T2.6** (I10): a source scan finds no I/O in the runtime entry outside `createTui`.
 - **T2.9** (I15): every `b.*` builder is enumerated and asserted to set the §4 default for its kind; a builder added without a row fails. For each, an explicit `gapBefore: false` and `true` overrides the default.
+- **T2.11** (I17): `b.seq` clears a defaulted gap on the first block and on no other, and an **explicit** `gapBefore: true` on the first block survives it. The second half is the one that can be wrong: a `seq` that clears index 0 unconditionally passes every test written about the common case.
 - **T2.7** (I5): a source scan finds no field-name-keyed tone or glyph table in `builders/`.
 - **T2.8**: every block kind in C04's union has a builder — exhaustive over the type.
 - **T2.10** (I16): MG25 — every exported value in `src/` is referenced by another `src/` module, or named in an allow-list that is **compared by equality**. A new test-only export fails until it is named, which is the arm the rule needs rather than the list: an allow-list checked by membership is one where the thirty-fourth entry arrives behind the thirty-first unread. Shown to fire against fabricated files.
@@ -420,6 +467,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **T6.6** (I8): `testing` reachable from the runtime entry → T2.3 fails.
 - **T6.7** (I1): an export nothing consumes → T2.2 fails, and the surface starts accreting.
 - **T6.8** (§8): erroring on an adapter/manifest mismatch → T3.11 fails, and a shrunk manifest stops the app starting.
+- **T6.13** (I17): `b.seq` clearing the first block's gap unconditionally → T2.11's second half fails, and an author who asked for a leading blank row silently does not get one.
 - **T6.9** (I16): MG25's allow-list compared by membership rather than by equality → its fabricated-file test fails. Membership passes for every list that has ever been too permissive, which is the failure this project has now found four times — SS40's directory scope, CP6's hand-written surfaces, MG24's constant-dominated form, and this one, pre-empted.
 
 ---
