@@ -171,14 +171,24 @@ interface InputRouter {
 0  the exit-arming machine observes    → always, before anything (§7)
 1  in-flight verb + Ctrl-C            → cancel, consume         (§5)
 2  handlers for activeTarget()        → first consumer wins
-3  handlers for "global"              → shortcuts, unless a
-                                        non-dismissable layer is on top
+3  handlers for "global"              → shortcuts, unless the top layer
+                                        must be answered OR covers the region
 4  otherwise                          → dropped
 ```
 
-**Step 3 is skipped when the top layer is non-dismissable, and this is a rule rather than six special cases.** A layer that must be answered is modal, and a global shortcut firing beneath one acts on a surface the user cannot see — the same defect as a missing rung, one layer up.
+**Step 3 is skipped when the top layer must be answered or covers the region, and this is a rule rather than six special cases.** A layer that must be answered is modal, and a global shortcut firing beneath one acts on a surface the user cannot see — the same defect as a missing rung, one layer up.
 
 It is deliberately *not* "skipped whenever an overlay is on top". A completion menu is dismissable, and switching theme or scrolling beneath one costs nothing and surprises nobody. `dismissable: false` is the property that means must-be-answered, which is why C15 refuses to let it change mid-life (C15 §2): a modality gate that depended on *when* it looked would be the same defect this closes.
+
+#### The second condition, and why one clause was not enough
+
+**A layer that covers the whole region skips step 3 as well, and `dismissable` cannot express it.** A pushed view is dismissable — `Esc` pops it, and it must — so it takes the first clause's permissive branch, and `PgUp` over one falls through to `global` and scrolls the transcript **underneath the thing filling the screen**. That is word for word the defect this step exists to close: a global shortcut acting on a surface the user cannot see. The reason reached the case and the condition did not.
+
+Nothing had ever failed, because nothing in the tree had ever pushed a view (C22 §13). An invariant is vacuous until its subject exists, and this one was about to acquire one.
+
+**The property is coverage, not kind.** `top.kind === "view"` is the narrow fix and it is a proxy: a view skips step 3 because it *covers the region*, which C15 §4 already commits to — `top: 0`, `left: 0`, the region's full height and width — and any other full-region layer would want the same treatment while a kind test would miss it. The router already holds `placed()` and `region()`, so the box is asked about where the box is.
+
+The two clauses are different properties and both are needed. Must-be-answered is about **modality**: a confirm may be one row tall, and a shortcut beneath it acts on something perfectly visible — it is forbidden because the confirm has to be resolved first. Coverage is about **visibility**: a view is escapable at any moment, and a shortcut beneath it acts on something no one can see. Neither implies the other, which is why collapsing them into one test would drop a case whichever one survived.
 
 **I8 is an instance of this, not a rule of its own.** It was written about Ctrl-C, and Ctrl-C was simply the first key anyone traced past a confirm; every other global binding walked through the same door until this step existed.
 
@@ -416,6 +426,21 @@ They target `global`, which is the first built-in use of that target and is what
 
 **Both wire forms were pressed through the real decoder before this was written** (I17, T2.13), and the result was that no decoder change is needed: xterm's `CSI 1;5H` reaches `CSI_LETTER_KEYS` with `modifiersOf("5")` setting the ctrl bit, and rxvt's `CSI 7;5~` reaches `CSI_TILDE_KEYS` at the same name with the same modifiers. Recorded as a positive result beside `⌃_`'s negative one, because a checked assumption that held is worth not checking twice — and the ruling that produced these keys said to drop the binding rather than widen the decoder if it had failed.
 
+**The pushed view's keys are the third block, and the target had bindings for nothing** (I24). `pushedView` has been in the focus union since C16 was written and in `focus.ts` since it was built, and `defaultKeymap` has never had a row for it — so `activeTarget` would resolve to a target with an empty handler set and every key would fall to step 3. Nothing failed, because nothing pushed a view; the target was a name with no vocabulary behind it, which is `frameworkSources` and the editing bindings a third time.
+
+| Key | Action | | Key | Action |
+|---|---|---|---|---|
+| `n` | `viewNextHunk` | | `p` | `viewPrevHunk` |
+| `g` | `viewTop` | | `G` (`⇧g`) | `viewBottom` |
+| `pageup`, `↑` | `viewPageUp` | | `pagedown`, `↓` | `viewPageDown` |
+| `escape` | `viewPop` | | | |
+
+**`n`/`p` are the diff-specific pair and the rest are conventions a view inherits** (C25 §3b). Letters are available here for the reason §6 already gives two blocks up: a pushed view has no prompt competing for them, which is why `g`/`G` were rejected for the transcript and are correct here.
+
+**`pageup` and `pagedown` are bound at two targets deliberately, and that is not the duplicate the conflict rule refuses.** The rule refuses a duplicate `(target, key)`; these are one key at two targets, resolved by the ladder — with a view on top `activeTarget` is `pushedView` and the view's own row wins, and with no view the `global` row scrolls the transcript. That is the mechanism working, and it is worth stating because the coverage clause in §4 makes the two look like alternatives when they are a priority.
+
+**`escape` pops, and it is not the Ctrl-C rung wearing another name.** §5's `pushedView` rung already pops on Ctrl-C, and that rung is a *cancellation* — it is the ladder answering "what does interrupting mean here". `Esc` is the view's own dismissal (A01 D7): the transcript is untouched, nothing is appended, and the selection the reader left behind is intact. Two keys, one outcome, two reasons — and a single implementation shared between them would make the ladder's rung depend on the keymap, which §5 spends a section keeping apart.
+
 **A wheel event is not a key and stays out of the table.** It has no `(target, key)` to resolve on, so the `global` handler is `bound("global", e)` falling through to the mouse arms. That is the boundary: everything that is a key resolves through the keymap, and the one thing that is not does not pretend to.
 
 **And this newly occupies the `global` slots for those four keys**, so a `BlockKeymap` binding `PageUp` is now refused at commit rather than shadowing the scroll. That is the conflict rule working as written, and it is named here because the refusal is new.
@@ -480,7 +505,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I5** — Unconsumed events are dropped, never inserted into a lower target.
 - **I6** — A paste emits one `paste` event regardless of length on the bracketed path. On the heuristic path it emits one event per window: **the guarantee is bounded work, not a single event.** The purpose survives the qualification — I6 exists because ten thousand characters as ten thousand key events would each trigger a completion recompute and a frame commit, a hang rather than a slowdown, and one event per 30 ms window makes T3.1's 100,000 characters roughly twenty-five. It is the literal wording that does not hold. A window that extended while bytes kept arriving would restore the single event and could not terminate, which is the same close-condition problem the fixed window was forced to solve (§7).
 - **I7** — Cancellation of an in-flight verb outranks every other Ctrl-C meaning.
-- **I8** — **While a non-dismissable layer is on top, no event acts on anything beneath it.** It is never dismissed, no lower focus target is reached, and the `global` fallback does not run (§4 step 3). The invariant was originally about Ctrl-C alone, and Ctrl-C was only the first key traced past a confirm — forbidding the dismissal left every lower rung and every global shortcut reachable, so an unanswered confirm sat over a screen that had changed theme, scrolled, or entered copy mode. Not dismissing the confirm is small comfort when the thing under it moved.
+- **I8** — **While the top layer must be answered *or* covers the region, no event acts on anything beneath it.** It is never dismissed, no lower focus target is reached, and the `global` fallback does not run (§4 step 3). The invariant was originally about Ctrl-C alone, and Ctrl-C was only the first key traced past a confirm — forbidding the dismissal left every lower rung and every global shortcut reachable, so an unanswered confirm sat over a screen that had changed theme, scrolled, or entered copy mode. Not dismissing the confirm is small comfort when the thing under it moved. **The second clause is the same widening a second time, found the same way.** `dismissable` is modality, and a pushed view is dismissable — so a view, which fills the region by construction (C15 §4), let every global shortcut through to a transcript nobody could see. Coverage is asked of the layer's box rather than of its kind, because kind is a proxy for it and a proxy stops being true the moment a second full-region layer exists.
 - **I9** — C16 reads no ambient clock; timing is injected.
 - **I10** — The keymap is data; duplicate `(target, key)` bindings fail at construction.
 - **I11** — C16 never calls the frame scheduler. L4 commits.
@@ -500,6 +525,7 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 - **I21** — **C17's public surface is the action vocabulary for editing.** Every editing operation the editor exposes is named by exactly one `KeyAction`, and every editing `KeyAction` names exactly one of them. Totality over the union is what makes `/help` honest (I19), and totality over an incomplete union is honest about nothing: the union held no editing action at all while C17 implemented word motion, kill, yank and undo, so backspace did nothing at a real prompt and every check in the chain passed. Derived from the interface rather than maintained beside it, so a method added to C17 with no action fails rather than going unbound in silence.
 - **I22** — `↓` enters the live block only from the bottom of history, `Esc` and `↑`-from-the-first-row leave it, and an entry with no focusable row cannot be entered at all. One binding with two effects in order rather than two bindings competing for a keystroke: C20's navigation has a defined bottom, so entering is what `↓` does after that end. The three halves are one invariant because any one alone is a defect — entry with no exit is a session whose prompt is unreachable, exit with no entry is what shipped, and entry into a block with no rows drops every key silently.
 - **I23** — **Every key that scrolls is a binding in the table.** The four scroll operations C14 exposes are named by `global` bindings — `pageup`, `pagedown`, `⌃home`, `⌃end` — rather than read out of an `InputEvent` in L4. Two mechanisms for one target's key handling is the inverse of the defect I19 exists to prevent: a binding outside the table is one `/help` cannot render, so a key that works is one no user can discover, and two of the four were reachable by nothing while looking exactly like the two that worked. A wheel event is not a key, has no `(target, key)` to resolve on, and stays out — that is the boundary rather than an exception to it. `Home` and `End` remain the line's, so the document's extremes take the modified pair every editor uses, and both of its wire forms were pressed through the real decoder before being written down (I17).
+- **I24** — Every target in the focus union has bindings, and a target with none is a defect rather than a default. `pushedView` was in the union and in `focus.ts` from the start with no row anywhere in `defaultKeymap`, so every key at that target fell through step 3 — vacuous only for as long as nothing pushed a view. `Esc` at a view is the view's own dismissal and is not the Ctrl-C rung under another name (§5, A01 D7).
 
 ---
 
@@ -526,6 +552,8 @@ The guarantee I6 was written for survives: bounded work, not a single event. Twe
 20. `↓` at the bottom of history enters the live block; `Esc` and `↑`-from-the-first-row return; a block with no focusable row is not entered (I22).
 19. C17's public surface is the editing action vocabulary, and the bindings are readline's; each was pressed through the real decoder before being written down, and a candidate the decoder does not produce is dropped rather than met by widening the decoder (I21, I17).
 21. Scrolling is bound in the table like everything else that is a key: `pageup`, `pagedown`, `⌃home`, `⌃end` on the `global` target, so `/help` can render them and a scroll key cannot exist outside the vocabulary. The wheel is not a key and stays out (I23).
+22. Step 3 is skipped when the top layer must be answered **or covers the region**; the two are different properties and neither implies the other, and coverage is read from the layer's box rather than from its kind (I8).
+23. Every focus target has bindings. `pushedView` gets `n`/`p`, `g`/`G`, paging and `Esc`, and its `Esc` is the view's own dismissal rather than §5's cancellation rung (I24).
 
 ---
 
@@ -535,6 +563,10 @@ Six tiers. Every cell of both §7 tables is covered.
 
 ### Tier 1 — unit
 
+- **T1.30** (I8): with a full-region layer on top, `PgUp` is **dropped** rather than reaching `global`. The control is the same key under a one-row *dismissable* overlay, which does reach `global` — without it the assertion passes for a router that skips step 3 whenever any layer is open, which is the rule §4 spends a paragraph rejecting.
+- **T1.31** (I8): coverage is read from the box. A layer that is **not** a view but whose `Placed` spans the region also skips step 3, and a view whose box has been clamped smaller does not. Hand-built `Placed`, because the property is geometric and a kind test would pass the first case and fail the second.
+- **T1.32** (I24): every member of the `FocusTarget` union has at least one row in `defaultKeymap`. Derived from the union, not from a list written beside it — a coverage set built from the test's own table covers nothing.
+- **T1.33** (I24): at `pushedView`, `n`, `p`, `g`, `G`, `pageup`, `pagedown` and `escape` each resolve to their action, and `escape` resolves to `viewPop` rather than to `dismiss`.
 - **T1.1**: byte sequences decode to the documented keys — plain, ctrl, meta, arrows, function keys, `Esc`. Twenty cases.
 - **T1.2**: a lone `Esc` byte is distinguished from an escape sequence prefix by the documented disambiguation window.
 - **T1.3** (I15): `activeTarget` returns the documented target for each of the six conditions.
@@ -628,6 +660,9 @@ Six tiers. Every cell of both §7 tables is covered.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.30** (I8): step 3's condition back to `!dismissable` alone → T1.30 fails, and a pushed view stops holding the keys that page it. The revert that looks like a simplification, because the first clause reads as complete on its own.
+- **T6.31** (I8): coverage tested as `kind === "view"` → T1.31's second case fails. The proxy passes every test written about views and stops being true the day a second full-region layer exists.
+- **T6.32** (I24): the `pushedView` rows deleted → T1.32 fails, and the target reverts to the state it shipped in — a name in the union that nothing binds.
 - **T6.1** (I1): caching the focus target → T2.1 and T3.17 fail; keys go somewhere invisible.
 - **T6.2** (I6): dispatching paste bytes as key events → T3.1 fails and a large paste hangs the session.
 - **T6.3** (I7): letting an overlay consume Ctrl-C ahead of an in-flight verb → T1.11 fails.
