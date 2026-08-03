@@ -21,6 +21,10 @@
  * the public way to assert about a rendered document is `expectDocument` (§7).
  */
 
+// --- the document assertions, C24 §7 ----------------------------------------
+
+export { expectDocument, type DocumentAssertions } from "./expect-document.js";
+
 // --- the conformance suites, C24 §7 -----------------------------------------
 
 export {

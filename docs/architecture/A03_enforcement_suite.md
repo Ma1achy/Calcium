@@ -684,6 +684,42 @@ They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, be
 
 **That second half is not a refinement. It is what makes the rule correct at all**, and it generalises past this rule: **prose about a mechanism inflates every textual signal of its existence.** A producer with no consumer is documented *more* than a working one — it is the thing that needs explaining, so it accumulates comments in the exact proportion that it lacks calls. So the naïve count does not merely miss `backoffOf`; it reports it consumed **with the highest confidence in the tree**, and confidence and correctness point in opposite directions. Every grep-shaped tool counts comments by default, and every future rule here that counts textual occurrences inherits this.
 
+### MG24 gains what MG25 already had, twice over
+
+**Comments stripped before counting a consumer.** MG25 was corrected for this
+when it was written and MG24 was not, and the correction was never carried
+back — `close-the-class-not-the-instance` failing on the very pair of rules
+that taught it. The instance that found it is exact:
+`DocumentAssertions.measuresCorrectly` was reported consumed on the strength of
+one sentence in `measurement-conformance.ts` explaining that
+`expectDocument().measuresCorrectly(widths)` wraps it. Five sibling members of
+the same interface fired and that one did not, and the asymmetry is the only
+reason anybody looked.
+
+**Stripping found four more in shipped code on its first run** — 
+`FrameScheduler.contaminated`, `InputRouter.lastStages`, `Rng.fork` and
+`TerminalLifecycle.suspended`, each declared and referenced only inside its own
+file, each with a test as its sole outside reader. Comments had been hiding
+them for as long as the rule had existed. The same first-run yield MG25 had, on
+a rule that had been running the whole time and reporting clean.
+
+The direction is counter-intuitive and is why this cannot be left to review: **a
+seam with no consumer accumulates explanation in exactly the proportion that it
+lacks calls.** Confidence and correctness point opposite ways, and the naive
+count is most wrong about the members that most need finding.
+
+**And the allow-list is compared by equality.** MG25 shipped with that arm and
+MG24 did not, which left `UNCONSUMED_MEMBERS` checked by membership alone — the
+form in which an entry outlives its reason, the member gets wired, and the
+exemption stays while reading as deliberate. Every list this project has found
+too permissive failed exactly that way: SS40's directory scope, CP6's
+hand-written surfaces, MG25's own constant-dominated first draft. A name in the
+list that is no longer unconsumed is now itself a violation.
+
+It only means anything because the scan records what is unconsumed *before*
+consulting the list; checking membership first would make every entry
+permanently justified by its own presence.
+
 ### MG26 — the dev-only entry points stay out of the bundle
 
 C24 I8 says `tui-kit/testing` and `tui-kit/fixtures` are absent from a

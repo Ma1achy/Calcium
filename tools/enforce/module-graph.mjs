@@ -727,6 +727,52 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "diagnostics, and already an explicit exception in C16 T2.14's non-editing list",
   "IdentityLoop.warned": "diagnostics; its own declaration says so and C22 T3.12 reads it",
 
+  // **Four more, and comments were the only thing hiding them.** MG24 counted a
+  // name inside a comment as a consumer until the day it stopped; these four
+  // fired on the first run that stripped prose, in shipped code, alongside the
+  // instance that found the trap. Each is observable state a test asserts and
+  // no component reads — the same category as the two above, and each is used
+  // only inside its own declaring file.
+  "FrameScheduler.contaminated":
+    "C03 diagnostics — whether a frame was composed against a stale width. " +
+    "`frame-scheduler.ts` sets and reads it; `test/revert/frame-scheduler.test.ts` " +
+    "is the only outside reader, which is what a revert test is for",
+  "InputRouter.lastStages":
+    "C16 diagnostics — the dispatch trace for the last event, published so " +
+    "`test/unit/router-dispatch.test.ts` can assert the ladder was walked in order. " +
+    "A component reading it would be a second priority list, which C16 §8a rules out",
+  "Rng.fork":
+    "C08 — a child stream for a nested generator. The fixture recorder is the " +
+    "specified consumer and records linearly today, so `fork` is a capability the " +
+    "spec commits to with no caller; deleting it would remove the commitment",
+  "TerminalLifecycle.suspended":
+    "C01 diagnostics — whether the alternate screen is currently released for a " +
+    "handoff. `lifecycle.ts` drives it and C21's integration test asserts it across " +
+    "a real suspend, which is the only place the state is observable at all",
+
+  // --- published for a consumer outside this tree ---------------------------
+  //
+  // **C24 §7's document assertions, and this is the one category MG24 cannot
+  // reason about.** Their consumer is an application repository, so "named
+  // nowhere else in `src/`" is not evidence of an unwired seam — it is what a
+  // published surface looks like from inside the package that publishes it.
+  // C24 I11 already settles how that surface is measured: the unused-export
+  // scan runs against `prism-tui` plus the reference app's declared import
+  // manifest, and it is a reported signal rather than a build gate.
+  //
+  // The entries stay one-per-member rather than becoming a wildcard, because
+  // the judgement is per member and the equality arm below is what stops it
+  // being made once and inherited.
+  "DocumentAssertions.isValid": "C24 §7, I13 — published for a consumer's suite (I11)",
+  "DocumentAssertions.measuresCorrectly": "C24 §7, I13 — published for a consumer's suite (I11)",
+  "DocumentAssertions.rendersAt": "C24 §7, I13 — published for a consumer's suite (I11)",
+  "DocumentAssertions.degradesToAscii": "C24 §7, I13 — published for a consumer's suite (I11)",
+  "DocumentAssertions.degradesTo1Bit":
+    "C24 §7, I13 — B04's compliance sweep, and the method that earns the module. " +
+    "Published for a consumer's suite (I11)",
+  "DocumentAssertions.hasNoColourOnlyDistinction":
+    "C24 §7, D29 — published for a consumer's suite (I11)",
+
   // --- specified and unbuilt: the class this rule exists for ----------------
   //
   // **Three, on the rule's first run, and every one of them a commitment with
@@ -788,20 +834,48 @@ export function checkSeamConsumers(
   allowed = UNCONSUMED_MEMBERS,
 ) {
   const violations = [];
+  const unconsumed = new Set();
   const sources = new Map(files.map((f) => [f, readFile(f)]));
+
+  // **Comments stripped before counting a consumer, as MG25 does.**
+  //
+  // MG25 was corrected for this and MG24 was not, and the instance that found
+  // it is exact: `DocumentAssertions.measuresCorrectly` was reported consumed
+  // on the strength of one sentence in `measurement-conformance.ts` explaining
+  // that `expectDocument().measuresCorrectly(widths)` wraps it. Five sibling
+  // members of the same interface fired and that one did not, which is the only
+  // reason anybody looked.
+  //
+  // The trap is the same one MG25 records and it is worth restating here rather
+  // than cross-referencing, because it is counter-intuitive in the direction
+  // that matters: **a seam with no consumer is documented more than one that
+  // works.** It accumulates prose in exactly the proportion that it lacks
+  // calls, so a naive count reports the unwired member as consumed with the
+  // highest confidence in the tree.
+  const stripped = new Map(
+    [...sources].map(([f, src]) => [
+      f,
+      src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1"),
+    ]),
+  );
 
   for (const { owner, name, file } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
     const key = `${owner}.${name}`;
-    if (allowed[key] !== undefined) continue;
 
     let consumed = false;
-    for (const [other, src] of sources) {
+    for (const [other, src] of stripped) {
       if (other === file) continue;
       if (new RegExp(`\\b${name}\\b`).test(src)) {
         consumed = true;
         break;
       }
     }
+    // Recorded before the allow-list is consulted, so the equality arm below can
+    // see that a listed member is *still* unconsumed. Skipping early would make
+    // every entry permanently justified by its own presence.
+    if (!consumed) unconsumed.add(key);
+
+    if (allowed[key] !== undefined) continue;
     if (consumed) continue;
 
     violations.push({
@@ -812,6 +886,31 @@ export function checkSeamConsumers(
         `its own side of a seam with nothing on the other. Both suites pass: the ` +
         `producer tests it and the consumer never mentions what it fails to consume. ` +
         `Wire it, remove it, or name it in UNCONSUMED_MEMBERS with a reason`,
+      spec: "A03 §3, MG24",
+    });
+  }
+
+  // **The equality arm — MG25 had one and MG24 did not.**
+  //
+  // An allow-list checked by membership alone is one where an entry outlives
+  // its reason: the member gets wired, the exemption stays, and the list grows
+  // one incident at a time while reading as deliberate. Every list this project
+  // has found too permissive failed this way — SS40's directory scope, CP6's
+  // hand-written surfaces, MG25's constant-dominated first form. The entry that
+  // keeps it honest is the reverse direction: a name here that is no longer
+  // unconsumed is itself a violation.
+  //
+  // It only means anything because the loop above records `unconsumed` before
+  // consulting the list.
+  for (const key of Object.keys(allowed)) {
+    if (unconsumed.has(key)) continue;
+    violations.push({
+      rule: "MG24",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `UNCONSUMED_MEMBERS names ${key}, which is no longer an unconsumed published ` +
+        `member — it is either wired now or gone. Remove the entry: an exemption that ` +
+        `outlives its reason is how the list stops being read`,
       spec: "A03 §3, MG24",
     });
   }

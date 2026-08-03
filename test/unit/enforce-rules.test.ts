@@ -571,8 +571,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
         "  readonly spinning: boolean;\n" +
         "}\n",
       // The consumer that exists, so the fixture is not vacuous: `request` is
-      // named here and must not be reported.
-      "src/shell/keys.ts": "void 0; // request\n",
+      // called here and must not be reported.
+      //
+      // **This read `void 0; // request` and the fixture was the bug.** The
+      // only "consumption" was a comment, and the assertion below required MG24
+      // to treat it as one — encoding the defect as the expected behaviour.
+      // Comments are stripped now, so the consumer has to be code.
+      "src/shell/keys.ts": "engine.request();\n",
     };
 
     const violations = checkSeamConsumers(Object.keys(seam), (f) => seam[f] ?? "", {});
@@ -584,6 +589,27 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ]);
     expect(violations[0]?.rule).toBe("MG24");
     expect(violations[0]?.message).toContain("complete on its own side of a seam");
+
+    // **A mention in a comment is not a consumer**, and this is the arm that
+    // pins it. `DocumentAssertions.measuresCorrectly` was reported consumed on
+    // the strength of one sentence in `measurement-conformance.ts` saying that
+    // `expectDocument().measuresCorrectly(widths)` wraps it — five siblings of
+    // the same interface fired and it did not, which is the only reason anybody
+    // looked. Stripping prose then found four more in shipped code.
+    //
+    // The direction is counter-intuitive and worth stating: a seam with no
+    // consumer accumulates explanation in exactly the proportion that it lacks
+    // calls, so a naive count reports the unwired member as consumed with the
+    // highest confidence in the tree.
+    const commentOnly = checkSeamConsumers(
+      Object.keys(seam),
+      (f) => (f === "src/shell/keys.ts" ? "void 0; // request\n" : (seam[f] ?? "")),
+      {},
+    );
+    expect(
+      commentOnly.map((v) => v.message.split(" ")[0]).sort(),
+      "a name mentioned only in a comment is not a consumer",
+    ).toEqual(["CompletionEngine.cancel", "CompletionEngine.request", "CompletionEngine.spinning"]);
 
     // **The allow-list is what keeps it honest**, and it must actually exempt:
     // an entry with no effect is an exception list that reports compliance for
