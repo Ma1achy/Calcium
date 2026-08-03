@@ -227,6 +227,12 @@ inline expansion    offered when expanded rows ≤ maxExpandHeight
 
 Both are computable before either is offered, because `measure` is pure and takes the width. Nothing has to be rendered to know whether it would fit.
 
+**Neither is computable *here*, and that is not an omission in the build.** Both thresholds are multiples of the viewport height, and C25 cannot see a viewport: `measure` is `(block, width) → number` and `RenderContext` carries a width, a theme, capabilities, focus and a tick. There is no height in either, deliberately — the renderer is blind to the viewport so that `measure` stays pure and total (I1, I3, C09 I1), and threading a height in would make a block's geometry depend on the thing C14 derives *from* that geometry.
+
+So I14, I15 and I16 are **specified and unbuilt**, and the record matters more than the fact: whoever implements them next will reach for `measure` first, because that is where the arithmetic lives, and widening its signature is the one change that must not be made. `maxExpandHeight` appears nowhere in the tree as of this writing.
+
+**The likely owner is C22, at compose time.** It holds the region, and it already windows content to it. C14 is the alternative and is worse: it would make a block's *content* depend on the scroll position of the thing containing it, so the same block would measure differently depending on where it sat. Named here so it is not re-derived, and named as *likely* because the ruling has not been taken.
+
 ### What is a preference, and what is not
 
 `maxExpandHeight` is a multiple of viewport height, default 2 — someone reading diffs all day on a tall monitor wants 4 and someone on a laptop wants 1.5, and there is no right answer to hard-code.
@@ -244,6 +250,131 @@ A C15 pushed view, the third after S12 and S13, so the conventions come free: `e
 **The view owns that scroll, and C15 places the region's worth of it.** `Layer.content` is `Block[]` and this view's content is a single block, which the array carries with no special case; what it does not carry is a scroll offset, because C15 has none for views and should not grow one (C15 §4). Every motion above is this view recomputing which rows are visible and calling `update(id, { content })` — the same seam S12 uses for a fifty-thousand-line buffer. A second scroll model beside C14's is what A01 D3 spent a decision avoiding, and it would arrive here first.
 
 **Whole-file-with-changes is deferred to the editor, and they are the same component.** Both need the whole file, a scroll model independent of the transcript, and highlighting over a window rather than a fragment. Said explicitly because the alternative is two of them: a read-only file viewer with diff decoration is the smaller first target, it has its consumer in this feature, and it is the same component with editing turned off.
+
+---
+
+## 3c. The fullscreen view, walked by hand
+
+Before any code, and in both shapes. §3b decided *what* fullscreen shows; this
+section is what happens when that decision meets the ones already in the file.
+
+**Two artefacts, because this component has state and structure both.** A trace
+finds interactions mediated by an event — two rules that meet because something
+happened in between. A table finds structural ones — two rules that both hold at
+rest, with no event between them. C19 needed both and had one, and the half it was
+missing was the half its defect lived in. The windowing question here is entirely
+structural and the scroll-and-pop question is entirely event-mediated, so taking
+either alone would have left a whole class unexamined.
+
+Eleven rows produced **five findings**, and four of them changed a ruling rather
+than confirming one.
+
+---
+
+### The table — what a window boundary meets
+
+A fullscreen view shows a window of the patch, and §3b says the owner "recomputes
+which rows are visible and calls `update(id, { content })`". `Layer.content` is
+`Block[]`, so a window is not a list of rows — **it is a `Patch` rebuilt from a
+slice of the original's lines**, and every row below is a cell where that meets a
+rule this file already states.
+
+| The boundary meets | The two rules | Ruling |
+|---|---|---|
+| **the path header** | a window is a contiguous slice of the rendering (§3b) · `patchHeight` always counts one header row | **The path header is sticky, and it is forced rather than chosen.** No field suppresses it, so every window carries it and the content budget is one row less than the region |
+| **a hunk header** | the same · `hunkRows` always counts one header row | **Sticky per touched hunk.** A window opening mid-hunk still shows its `@@` line, and pays a row for it |
+| **`Hunk.header`'s counts** | the header is carried verbatim and C25 computes nothing from it (§4) · the visible lines are a slice | **Left verbatim.** The counts describe the whole hunk while the window shows part of it, and that disagreement is correct: rewriting the header to match the slice would make C25 compute from a field whose whole point is that it does not |
+| **`collapsedBefore`** | a collapsed region is one row wherever it sits (I5) · the slice | Carried **only when the window contains that row**. Re-emitted on every page it would claim the elision sits at the top of each one |
+| **`collapsedAfter`** | it is the patch's last row (T1.3a) · the slice | Carried **only on the last window**. The same rule as above and the opposite failure — a tail marker on page one says the file ends there |
+| **split pairing** | consecutive changed lines pair at `max(removes, adds)` (I2a) · the window cuts between lines | **The cut snaps to a run boundary.** See below — this one is measured, not reasoned |
+| **`truncated`** | C15 reports `truncated` rather than clipping (C15 §4, T4.9) · the window is built to fit | The window must measure **≤ the region**, so `truncated: false` becomes the assertion that windowing happened at all. A view that pushes the whole block reports `true`, which is what T4.9 asserts today against an owner that does not yet exist |
+| **a view already on the stack** | views do not nest (C15 I1) · a push is how a view arrives | C15 **throws**, and the caller is a renderer's callback. Refused by C23 instead (C23 I31) |
+| **a zero-height target** | a patch with no hunks is one row (T3.1) · a view fills the region | Legitimate, and mostly blank. Not the dispatcher's to refuse: a patch with nothing to show that carries a `view` action is a producer offering something it does not have, and the offer is the producer's to withhold |
+
+#### The pairing row is the finding, and it was measured rather than argued
+
+Slicing a patch's lines and measuring the halves does not, in split layout, add
+up to measuring the whole. The illustration's hunk — three context lines, one
+removed, two added, two context — is seven rows split. Cut at every position and
+sum the halves:
+
+```
+cut  0: 0 + 7 = 7      cut  5: 4 + 3 = 7
+cut  1: 1 + 6 = 7      cut  6: 5 + 2 = 7
+cut  2: 2 + 5 = 7      cut  7: 6 + 1 = 7
+cut  3: 3 + 4 = 7      cut  8: 7 + 0 = 7
+cut  4: 4 + 4 = 8   ← the run splits
+```
+
+Cut 4 falls between the removed line and the two added ones. Whole, that run is
+`max(1, 2) = 2` rows; cut, it is `max(1,0) + max(0,2) = 1 + 2 = 3`. **A window
+boundary inside a changed run invents a row**, so scrolling one row across it
+shifts the content by two and the same line can be drawn on both pages.
+
+Cut 5 — also inside the run — is fine, because `max(1,1) + max(0,1)` happens to
+equal `max(1,2)`. That coincidence is why the general rule is not "avoid the
+interior of a run" but the simpler one:
+
+> **In split layout the window cuts only at run boundaries** — at a context line,
+> or where a maximal run of changed lines begins or ends. A window may therefore
+> be a row shorter than the region; it is never taller.
+
+I2a and §3b were each correct and are jointly unsatisfiable at arbitrary cuts —
+the same shape as the original I2 against §3's pairing, which is the second time
+this component has produced that pattern and the reason §2 records the first.
+Neither statement is wrong and no row governed by one alone would have found it.
+
+---
+
+### The trace — the view holding focus, and what interrupts it
+
+| # | Sequence | Finding |
+|---|---|---|
+| **A1** | a view is open · `PgUp` | Fell through to `global` and scrolled the transcript beneath the view. C16 §4's guard tested modality for a question about visibility — ruled there |
+| **A2** | a view is open · `Esc` | Pops. The transcript is untouched, nothing is appended, and the selection is intact (A01 D7). C23 §4's pop row already argues it; a view does not nest, so `Esc` is unambiguous |
+| **A3** | at the last hunk · `n` | **Clamps, never wraps.** Wrapping to the top of a diff loses the reader's place silently, and the one motion a diff has that a list does not is the one where that costs most |
+| **A4** | `G` · then `n` | **Two cursors for one position.** See below |
+| **A5** | the entry is patched while its view is open | The view **rewindows from the live block**. A snapshot taken at push time would show a diff the entry no longer holds, and a patch is exactly what `expand` produces one keystroke earlier |
+| **A6** | the entry is **evicted** while its view is open | **Dismissed with `anchorEvicted`.** See below |
+| **A7** | a view is open · `Ctrl-C` | §5's `pushedView` rung pops it, and that is cancellation rather than dismissal. Two keys, one outcome, two reasons — and they must not share an implementation, or the ladder starts depending on the keymap |
+
+#### A4 — `g`/`G` move a row and `n`/`p` move a hunk, and holding both is the defect
+
+The obvious shape is a view holding an offset *and* a hunk index: `n` increments
+the index, `G` sets the offset to the bottom. They then disagree. `G` leaves the
+index pointing at whatever hunk the reader was on before, so `p` moves to the
+hunk before *that* — a jump upward from a position the reader has scrolled away
+from, with nothing on screen to explain it.
+
+**One piece of state: the row offset.** `n` and `p` compute the next and previous
+hunk's first row *from the current offset*; `g` and `G` set it directly. Nothing
+can disagree because there is nothing to disagree with. This is the deltas-read-
+as-state class arriving as two cursors instead of two deltas, and it is invisible
+to any test that drives one motion at a time.
+
+#### A6 — the evicted entry, and the mechanism that already exists
+
+`Esc` pops back to the entry the view came from. If that entry has been evicted
+while the view was open, there is nothing to pop back to and nothing to rewindow
+from — and the next `n` would ask a block that is gone.
+
+**C15 already has the answer and cannot reach it alone.** `DismissReason` has
+`anchorEvicted` precisely for a layer whose referent has gone, and C15 I10 says
+the caller supplies it because C15 subscribes to nothing and holds no entry ids.
+So the view's owner watches the transcript and dismisses on eviction; `Esc` never
+meets a dangling view, because the view is already gone.
+
+Worth stating that this was found by asking rather than discovered by running:
+the row exists because "a request is in flight and something else happens" is what
+a trace is indexed by, and eviction is the something else that C13 does on its own
+schedule.
+
+---
+
+**What the walk did not find, said so it is not assumed.** Nothing here decides
+what a *verb's result* being a view would mean — C22 §13's row, still open. And
+nothing here builds I14, I15 or I16; §3a records why they cannot live in this
+component and who most likely owns them.
 
 ---
 
@@ -276,10 +407,14 @@ Consequences that matter:
 - **I12** — Every row carries the gutter in the line's tone and the text in `syntax` slots, for all three line kinds. Only the gutter varies by kind; the text is code in every case. Two palettes on one row is the general case in a patch, not an exception on some rows (§2).
 - **I12a** — In split layout the background belongs to a **side**, not to a row. A paired row changed in two directions, so one colour across it asserts the wrong change on one half — and the blank facing an unpaired addition would claim the other side gained the line too. Found by looking at a frame; no assertion in the suite disagreed with it.
 - **I13** — The line background is the third signal and never the only one. At 1-bit it resolves to nothing (C10 §4's surface rule), and the marker and the toned gutter both survive — which is what makes losing it lossless under D29.
-- **I14** — The collapsed form admits hunks while the running total is within one viewport, cutting at hunk boundaries and never mid-hunk, and states how many hunks it dropped.
-- **I15** — Inline expansion is offered iff the expanded row count is within `maxExpandHeight`; above it, fullscreen is the only route. Both are computable before either is offered, `measure` being pure.
+- **I14** — The collapsed form admits hunks while the running total is within one viewport, cutting at hunk boundaries and never mid-hunk, and states how many hunks it dropped. **Not C25's to satisfy** — the cap is a function of the viewport and this component cannot see one (§3a).
+- **I15** — Inline expansion is offered iff the expanded row count is within `maxExpandHeight`; above it, fullscreen is the only route. Both are computable before either is offered, `measure` being pure — but not by this component, for the reason §3a gives.
 - **I16** — `maxExpandHeight` is the only configurable part. Whether expansion exists, and what happens above the threshold, are not — a patch's dropped content is always reachable (D38).
 - **I17** — The fullscreen view is every hunk of *this block*, uncollapsed. It never needs data the block does not carry, which is why whole-file-with-changes is a different component (§3b).
+- **I18** — A window of a patch is a `Patch` rebuilt from a slice of its lines, never a list of rows. **The path header and every touched hunk's header are sticky**, because no field suppresses either — so a window carries them and pays a row for each, and its content budget is smaller than the region by exactly that. Forced by the block shape rather than chosen (§3c).
+- **I19** — In split layout a window cuts **only at run boundaries** — at a context line, or where a maximal run of changed lines begins or ends. Cutting inside a run is not additive: a run of one removed and two added lines is two rows whole and three rows cut between them, so a one-row scroll shifts the content by two and a line is drawn twice. A window may be a row shorter than the region and is never taller (I2a, §3c).
+- **I20** — A collapse marker appears only on the window that contains its row: `collapsedBefore` when the window reaches the region before its hunk, `collapsedAfter` only on the last one. Carried unconditionally, the first claims an elision at the top of every page and the second says the file ends on page one (I5, §3c).
+- **I21** — `Hunk.header` is carried into a window verbatim, so its counts describe the whole hunk while the window shows part of it. Rewriting it to match the slice would make C25 compute from the one field it is defined not to read (§4, §3c).
 
 ---
 
@@ -330,6 +465,10 @@ Attributes are already spoken for: bold and dim are how 1-bit carries tone (C10 
 13. The collapsed form is capped at one viewport and cuts at hunk boundaries, stating how many hunks it dropped (I14).
 14. Inline expansion is offered when the expanded form fits `maxExpandHeight` and fullscreen otherwise; the number is configurable and the behaviour is not (I15, I16).
 15. Fullscreen is every hunk of this block uncollapsed, never the whole file — the whole file is the editor's, and it is one component rather than two (I17).
+16. A window is a rebuilt `Patch`, its path and hunk headers sticky because the shape forces them, and its collapse markers present only on the windows their rows fall in (I18, I20).
+17. A window cuts at run boundaries in split layout, because pairing is not additive across an arbitrary cut (I19).
+18. A window carries `Hunk.header` verbatim and never reconciles it with the lines it shows (I21).
+19. The collapsed cap and the expansion threshold are specified here and are **not this component's to satisfy**: both are functions of the viewport, and a renderer that could see one would be a renderer whose `measure` is no longer pure over `(block, width)` (I14, I15, §3a).
 
 ---
 
@@ -352,6 +491,10 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T1.6**: an explicit `layout: "unified"` at width 200 stays unified.
 - **T1.7** (I4): every `add` line renders `+` and every `remove` renders `-`, at all four colour depths.
 - **T1.8**: a line missing `oldNo` renders a blank number column, not a shifted gutter.
+- **T1.20** (I19): for the illustration's hunk at a split width, `measure` of the whole equals `measure` of the two halves summed **at every run boundary**, and differs at the one cut inside the run. Both directions asserted, because the equality alone passes for an implementation that never pairs.
+- **T1.21** (I18): a window opening mid-hunk measures one path-header row plus one hunk-header row plus its slice. The sticky rows counted, not assumed — a budget computed as `region.height` produces a window one row too tall and C15 reports `truncated`.
+- **T1.22** (I20): the same patch windowed at the top, the middle and the bottom — `collapsedBefore` appears once, `collapsedAfter` appears once, and neither appears on the middle window.
+- **T1.23** (I21): a window of three lines from a seven-line hunk carries the hunk's original `header` string unchanged.
 
 ### Tier 2 — contract / interface
 
@@ -405,6 +548,9 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T6.9** (I13): carrying the add/remove distinction on the background alone, dropping the marker → T4.2 fails at 1-bit, where the background is gone and nothing is left.
 - **T6.10** (I14): capping the collapsed form by row count rather than at hunk boundaries → T3.10 fails with a half-rendered hunk.
 - **T6.11** (I16): making expansion itself configurable → T3.12 fails, and a dropped hunk becomes unreachable (D38).
+- **T6.20** (I19): windowing at arbitrary line offsets in split layout → T1.20 fails, and a line is drawn on two consecutive pages. **The revert that looks like a simplification**, because snapping to a run boundary reads as an optimisation and the common case — a window landing in context — passes either way.
+- **T6.21** (I20): carrying `collapsedAfter` on every window → T1.22 fails, and every page claims to be the last.
+- **T6.22** (I21): recomputing `Hunk.header` from the window's lines → T1.23 fails, and C25 acquires a dependency on a field §4 says it never reads.
 - **T6.2** (I1): counting a collapsed region as its collapsed line count → T1.3 fails.
 - **T6.15** (→ C04 §3): moving `collapsedAfter` onto `Hunk` beside `collapsedBefore` → one region gains two fields. The revert that looks symmetrical: the gap between hunk 1 and hunk 2 becomes 1's *after* and 2's *before*, so a producer has to know which describes it and a renderer has to decide which to believe. Asserted as three regions, three markers, no region described twice.
 - **T6.16** (I5): counting the tail as its elided line count → T1.3a fails.
