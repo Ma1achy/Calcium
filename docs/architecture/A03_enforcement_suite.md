@@ -344,6 +344,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
 | SS45 | A tone or glyph literal as an object-literal value | `src/shell/builders/` | C24 I5, T2.7 |
+| SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
@@ -388,6 +389,30 @@ goes — `{ status: "warn" }` — whether that is a standing map or built at a
 return. The trailing `[,}]` keeps a union *type* out of it, so
 `builders/types.ts` stays in scope rather than being allow-listed out, which is
 the direction `allow-list-rather-than-narrow-scope` argues for.
+
+**SS46 is a sentence that was false, turned into a set.** C23 §3b said the
+identity notice was *the only path that sets* `origin: "refresh"`, and three
+others already did: C13's cap marker and two of C22's startup warnings. So the
+sentence read as a guarantee and constrained nothing — A03 §2's vacuity class,
+arriving in prose rather than in a rule, and the same shape as C19 §7's stamp.
+
+The repair was not to correct the count. §3a's row now says what the value
+*means* — **provenance, not mechanism**: a system notice with no user behind it,
+so `↑` recalls nothing and `/debug` has no argv to show. All four qualify under
+that reading, and the rule is the set. A fifth append is either a new one of
+those, in which case the row is added deliberately, or the word drifting.
+
+**Its blind spot, stated:** it finds the literal and nothing computed. A variable
+holding the string, or a `meta` spread from elsewhere, passes. That is the limit
+every textual rule here has; it is acceptable in this one case because all four
+sites are literals today and a computed origin would itself be a change worth
+seeing.
+
+**What SS46 does not settle, and is filed rather than fixed.** If `refresh` means
+provenance the four are right. If it means *a refreshed view of something*, then
+a cap marker and two startup warnings are mislabelled and the value they want
+does not exist. That is a C04 question about the origin vocabulary, and it is
+recorded because the false sentence is the only thread that reaches it.
 
 **What SS45 does not catch, stated rather than left to be inferred.** The line
 is finer than "tables yes, conditionals no", and the second fabricated violation

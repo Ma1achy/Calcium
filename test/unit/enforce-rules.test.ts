@@ -411,6 +411,15 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'if (key === "status") return cell({ text, tone: "warn" });',
   },
   {
+    // C23 §3b claimed one producer of `origin: "refresh"` and there were four,
+    // so the sentence read as a guarantee and constrained nothing. The value now
+    // means provenance rather than mechanism, and a set claimed in prose wants a
+    // check — or the next reader who greps one site re-makes the claim.
+    rule: "SS46",
+    file: "src/data/adapters/fallback.ts",
+    source: 'meta: { origin: "refresh", verb: null },',
+  },
+  {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
     // resolving its own variable, which reads as C22 owning the default rather
     // than as the framework reading the environment.

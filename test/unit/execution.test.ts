@@ -29,6 +29,7 @@ import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { assignOffsets, backoffOf, BACKOFF_CAP_MS } from "../../src/shell/refresh.js";
 import type { PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult, TransportRouter } from "../../src/data/transport/index.js";
+import { block } from "../../src/data/viewmodel/index.js";
 import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 
 type Scripted = Readonly<{
@@ -1020,10 +1021,19 @@ describe("C23 §3b — time-driven updates", () => {
     // Across the **smallest** interval rather than each part's own: two parts at
     // 30 s and 300 s collide every tenth tick if each is staggered within its own
     // period, and the smallest is the only window every part shares.
+    const part = (id: string, intervalMs: number) => ({
+      id,
+      title: id,
+      intervalMs,
+      staleAfterMs: intervalMs * 2,
+      fetch: () => Promise.reject(new Error("x")),
+      render: () => block({ kind: "raw", id: `${id}-c`, text: "" }),
+      renderError: () => block({ kind: "raw", id: `${id}-c`, text: "" }),
+    });
     const parts = assignOffsets([
-      { id: "a", intervalMs: 30_000, fetch: () => Promise.reject(new Error("x")) },
-      { id: "b", intervalMs: 300_000, fetch: () => Promise.reject(new Error("x")) },
-      { id: "c", intervalMs: 60_000, fetch: () => Promise.reject(new Error("x")) },
+      part("a", 30_000),
+      part("b", 300_000),
+      part("c", 60_000),
     ]);
 
     const offsets = parts.map((p) => p.offsetMs);

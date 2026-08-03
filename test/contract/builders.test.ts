@@ -353,3 +353,69 @@ describe("C24 §4 — the rulings that are not mechanical", () => {
     expect(kit().measure(big, 80)).toBe(200);
   });
 });
+
+describe("C24 §5 — b.live", () => {
+  const base = {
+    id: "activity",
+    title: "activity",
+    render: (d: unknown) => b.raw(String(d)),
+  };
+
+  it("T1.4 (C23 I34): it returns a panel whose child is the loading render", () => {
+    // **The panel is the point, not a wrapper.** `Panel` is the only kind with a
+    // `title`, and the title is where staleness and failure are said (C23 I35,
+    // A02 §7 rule 1). A part that rendered a bare table would have nowhere to put
+    // either, so the guarantees would hold for some consumers and not others.
+    const part = b.live({ ...base, every: 5_000, fetch: () => Promise.resolve(1) });
+    expect(part.kind).toBe("panel");
+    expect(part.title).toBe("activity");
+    expect(part.children).toHaveLength(1);
+    expect(part.children[0]?.kind, "the placeholder is there before anything fetches").toBe(
+      "notice",
+    );
+    expect(validateBlock(part).ok, "and it is a valid block").toBe(true);
+  });
+
+  it("T1.4b: renderLoading replaces the placeholder and nothing else", () => {
+    const part = b.live({
+      ...base,
+      every: 5_000,
+      fetch: () => Promise.resolve(1),
+      renderLoading: () => b.raw("warming up"),
+    });
+    expect(part.children[0]).toMatchObject({ kind: "raw", text: "warming up" });
+  });
+
+  it("T3.4, T3.5: fetch and stream are exclusive, and one is required", () => {
+    expect(() => b.live({ ...base, every: 1_000 })).toThrow(/needs a `fetch` or a `stream`/u);
+    expect(() =>
+      b.live({
+        ...base,
+        every: 1_000,
+        fetch: () => Promise.resolve(1),
+        stream: () => (async function* () {})(),
+      }),
+    ).toThrow(/not both/u);
+  });
+
+  it("T3.6: staleAfter below every throws, because a builder cannot warn", () => {
+    // The row said *warns*. A builder is pure and has no sink — SS33 bans
+    // `console.*`, C02's warnings are C22's channel, and a notice in place of the
+    // loading render would let a cosmetic mistake change the first frame. A part
+    // stale on every tick it ever runs is a broken declaration, like the two
+    // above it.
+    expect(() =>
+      b.live({ ...base, every: 30_000, staleAfter: 10_000, fetch: () => Promise.resolve(1) }),
+    ).toThrow(/stale on every tick/u);
+
+    // The control: equal is fine, and so is a one-shot with no interval to
+    // compare against. Without these the row passes for a builder that throws
+    // on any `staleAfter` at all.
+    expect(() =>
+      b.live({ ...base, every: 30_000, staleAfter: 30_000, fetch: () => Promise.resolve(1) }),
+    ).not.toThrow();
+    expect(() =>
+      b.live({ ...base, staleAfter: 10_000, fetch: () => Promise.resolve(1) }),
+    ).not.toThrow();
+  });
+});

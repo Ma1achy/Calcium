@@ -345,7 +345,7 @@ cap marker and two startup warnings are mislabelled, and the value they want doe
 not exist. That is a C04 question about the origin vocabulary rather than a C23
 one, and it is recorded because the false sentence is the only thread that reaches
 it. A claim of sole production also wants a check, or it is re-added by the next
-reader who greps one site: **SS44**.
+reader who greps one site: **SS46**.
 
 **It is the one case with no host to stop with.** The first two stop when the
 entry settles or the view pops; an identity notice is a standalone entry that
@@ -894,7 +894,7 @@ Fake transport, fake stores.
 - **T2.7** (I14): a source scan finds no multi-store access outside local handlers.
 - **T2.20** (I32): `release(host)` is reached on all five triggers of I33 — enumerated from the trigger list rather than written out, so a sixth trigger added later fails here.
 - **T2.21** (I33): a **frozen** host keeps receiving refresh patches, and a settled one does not. Both halves, because a driver that released on neither passes the first alone.
-- **T2.22** (I22, SS44): every append in `src/` carrying `origin: "refresh"` is one of the four §3a names, and every one of the four is reached. A count alone passes for a fifth site added beside an existing one.
+- **T2.22** (I22, SS46): every append in `src/` carrying `origin: "refresh"` is one of the four §3a names, and every one of the four is reached. A count alone passes for a fifth site added beside an existing one.
 
 ### Tier 3 — edge cases
 
