@@ -70,6 +70,7 @@ export { defaultTheme };
 // hooks
 export type { CompletionSource, CompletionContext, Candidate, Slot };
 export type { LiveSpec, ViewRefresh };
+export type { Identity };
 export type { CommandPolicy, Classification, ParseResult };
 export type { BlockDefinition, Measure, MeasureFn, RenderContext, BlockKeymap };
 export type { TransportRouter, VerbTransport, Invocation };
@@ -80,6 +81,12 @@ export { cells, truncate, planColumns };
 ```
 
 **`planColumns` is public** because a custom table-like kind needs it and it is pure. `cells` and `truncate` likewise — a kind that measured width itself would be wrong in a different way from every other kind.
+
+**`Identity` is exported for the same reason, and it was already owed.**
+`config.identity` is a hook the app supplies (C22 I43), so its return type has to
+be nameable — and `SessionSnapshot.identity` was already exported *structurally*,
+through a field whose type had no name on this list. A consumer could read it and
+could not annotate it, which is the omission below described from the other side.
 
 **The builder-argument types are exported because §4's signatures name them.** A list that exports `b.table` and not `ColumnDef` gives a consumer a function whose parameter they cannot annotate, and the workaround — `Parameters<typeof b.table>[0]["columns"][number]` — is the shape of an omission rather than a design. Six of the seven are introduced by the builders themselves and exist nowhere else; `ColumnDef` is C04's and was absent from this list while `TableRow`, `Series` and `Hunk` were on it, which is the same omission caught by consistency rather than by use.
 

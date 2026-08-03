@@ -892,6 +892,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     submit,
     onAction,
     identityNotice: (text) => void refresh.identityNotice(text),
+    dispose: () => void refresh.dispose(),
 
     /**
      * C22 I3's fourth seal (§3a step 10), and C23 I27's reconciliation.

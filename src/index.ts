@@ -42,6 +42,7 @@
 export { createTui } from "./shell/session.js";
 export type {
   ChromeFn,
+  Identity,
   SessionSnapshot,
   StopReason,
   TuiConfig,

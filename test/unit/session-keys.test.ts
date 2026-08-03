@@ -509,6 +509,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
+      dispose: () => undefined,
       }),
     });
     graph.lifecycle.acquire();

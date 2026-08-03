@@ -497,6 +497,22 @@ cursor rule has to move with it, and this is where to look.
 
 ## 7. Health and identity
 
+**Identity comes from the app, through `config.identity`.** C22 owns the cadence
+and the state; where the fact comes from is the far side's business (§13), so the
+source is a seam and not a mechanism here — the same shape and the same
+justification as `pipeline` (I22), and it defaults the same way, to a fetcher
+returning `null`.
+
+**It was a stub with no seam, and that is why the mechanism above could not
+fire.** The loop was constructed with `fetch: () => Promise.resolve(null)` and a
+comment saying *until the app supplies one*, and there was no field through which
+an app could. So the expiry notice had **two** things between it and a reader —
+the fetcher that could never return a token, and a `notify` that discarded the
+text — and either alone is enough to make the whole of §7's first transition
+unreachable. Two independent blockers on one path is the shape a single fix reads
+as closing and does not: removing one leaves the behaviour exactly as it was, and
+the commit that removes it looks like the one that fixed the bug.
+
 Identity is fetched at startup and refreshed on a five-minute cadence against the injected clock. **That loop covers identity only** — any live part in the banner or elsewhere is driven by C23 §3b, so there is one refresh mechanism rather than two (C24 §5). Two transitions commit a notice to the transcript rather than only changing the header:
 
 **Token under one day** — `Token expires in 14h — run /login to refresh`. **C22 signals and C23 appends it** (C23 §3b), with `origin: "refresh"`; the loop produces the fact and never reaches the transcript.
@@ -654,6 +670,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I40** — **The theme variant is persisted by C22 and repaired on read.** `/theme <variant>` writes it to `${stateDir}/theme` at the moment of the change rather than at exit, because a session killed by `SIGKILL` runs no shutdown path and a preference that survives a clean exit and not a crash is one people stop trusting. On construction the file is read; anything that is not one of the two variants is treated as absent, the base theme is retained, and **a notice is committed** — C20's precedent, where history repairs a corrupt file at open rather than failing. The notice is the half that matters: without it "absent" and "corrupt" look identical to a user who chose light and got dark. It is C22's and not C10's because C10 is a pure function over tokens and this is session state with a filesystem behind it; a store reaching a disk from L1 is MG23's neighbourhood.
 - **I41** — **A pushed view holds one piece of state: its row offset.** `n` and `p` compute a hunk's first row from the offset; `g` and `G` set it. A view holding an offset *and* a hunk index has two cursors for one position — `G` leaves the index pointing at the hunk the reader scrolled away from, so `p` jumps upward from a place nothing on screen explains — and no test that drives one motion at a time can see it (C25 §3c A4).
 - **I42** — **A pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes.** A snapshot taken at push time shows a diff the entry no longer holds, and `expand` produces exactly such a patch one keystroke earlier. C15 supplies the reason code and cannot detect the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so the owner watches the transcript, and `Esc` never meets a dangling view because the view is gone before it (C25 §3c A6).
+- **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
 
 ---
 
@@ -674,6 +691,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 9. `cwd` is exposed as a function so `cd` moves subsequent verbs (I12).
 10. Chrome is app-supplied and takes session, `now` and `columns`; the prompt gutter is C22's to pass, not C17's to assume (I13, I13a).
 11. Identity refreshes every five minutes; expiry warns and offers inline re-login with the failed command retained (I19).
+11a. The identity source is injected with a working default, and the notice it produces is handed to C23 rather than written here (I23).
 12. Cleanup is `beforeRelease` and all five callers reach it; the three explicit callers additionally run `stop`'s four ordered steps, and the signal and fault paths are C01's, which cannot be given more (I4, I4a, I5).
 12a. `beforeRelease` is synchronous and returns no thenable; `killAll()`'s promise is not awaited and `drain()` is used rather than `flush()` (I21, C01 I5, C20 I18).
 13. Release precedes diagnostics; history flushes on every path (I6, I7).
@@ -712,6 +730,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4** (I3): all four seals are closed before the input router accepts anything — C05's, C07's and C09's, and C23's local registry, which is the one a test counting only the construction-time ones would miss. C19's engine has no `seal`, and the test asserts that too: a count is the wrong assertion when one member of the set does not belong to it.
 - **T1.4b** (I3, commitment 3a): the submit handler is registered after the pipeline exists, and the pipeline holds the router. Asserted on the event log: no handler registration precedes step 10. The construction cycle §3a found fails here rather than at the first Enter.
 - **T1.4d** (I22): a config omitting `pipeline` still yields a graph carrying a sealed `Pipeline`, and an injected factory is still used. Both halves, because a default that ignored `config.pipeline` would satisfy the first and remove the seam.
+- **T1.4e** (I43): a session given an `identity` fetcher returning a token inside one day of expiry → **the notice reaches the transcript**, carrying `origin: "refresh"`. Asserted on the appended document rather than on `warned`, because `warned` flips whether or not anything is delivered — which is exactly the state this row was written against.
+- **T1.4f** (I43): a config omitting `identity` → the loop still runs, health settles, and nothing is appended. The default is a fetcher, not an absent loop.
 - **T1.4k** (I3b): a constructed graph's completion engine answers a bare prefix with the manifest's verbs, and a path prefix with what the injected `readDir` returns. Both, because a registration that wired only the manifest source satisfies the first — and the two filesystem sources are the ones with a dependency to forget.
 - **T1.4j** (I3a): a manifest declaring a local verb constructs when `localHandlers` supplies it, and fails naming the verb when it does not. Both halves: the failure alone is what shipped, and it read as the check working rather than as a route that did not exist.
 - **T1.4e** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
