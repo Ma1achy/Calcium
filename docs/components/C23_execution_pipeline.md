@@ -179,7 +179,7 @@ C23 is the only component that appends documents, so it is the only one that can
 |---|---|
 | `user` | A typed submission from the prompt |
 | `action` | An `exec` action dispatched from a block (§3a) |
-| `refresh` | An identity transition signalled by C22, appended here (§3b). **The only path that sets it** — the stall notice and a part refresh both *patch*, and a patch carries no `meta` |
+| `refresh` | **A system notice with no user behind it**: an identity transition signalled by C22 (§3b), C13's cap marker, and the two startup warnings C22 composes. Not the mechanism, the *provenance* — nothing the user typed produced it, so `↑` recalls nothing and `/debug` has no argv to show. It was written as *the identity notice is the only path that sets it*, and three others already did; the stall notice and a part refresh set it neither, because both *patch* and a patch carries no `meta` |
 | `agent` | Reserved. Nothing produces it in v1 |
 
 `origin` is not a debugging field. It is what makes a transcript legible once more than one thing is putting entries into it, and a provenance field that can be absent is one nobody trusts.
@@ -198,17 +198,103 @@ is what §3b was missing rather than a detail of it.
 **Part refresh.** A **transcript entry or a pushed view** may declare intervals — `b.live` (C24 §5) is the consumer-facing form, and both are driven by the same code here. An earlier split had C22's identity loop refreshing banner sections while C23 refreshed view panels; one mechanism replaces two, and C22's loop is now about identity alone.
 
 ```typescript
-type ViewRefresh = readonly Readonly<{
-  id:         string;              // which part of the view
+type ViewRefresh = Readonly<{
+  id:         string;              // which part — never which host
   intervalMs: number;
-  offsetMs:   number;              // stagger; see below
-  fetch:      () => Promise<ViewPatch>;
-}>[];
+  offsetMs:   number;              // stagger, assigned; see below
+  fetch:      () => Promise<unknown>;
+}>;
+
+type RefreshHost =
+  | { kind: "entry"; id: EntryId }
+  | { kind: "view";  id: string };
+
+declare(host: RefreshHost, parts: readonly Omit<ViewRefresh, "offsetMs">[]): void;
+release(host: RefreshHost): void;
 ```
 
-C23 drives each on the injected clock and applies the result as a patch to the layer. **Offsets are assigned so no two fire in the same tick** — synchronised refreshes produce a periodic load spike and a whole-screen flicker, and staggering costs nothing.
+**The declaration says which part; the registration says which host, and the split
+is not cosmetic.** `id` is the block a part patches, and the first sentence above
+says an entry *or* a pushed view may declare — so the host is a second coordinate
+the part cannot carry. Putting it on `ViewRefresh` would permit one declaration
+whose parts point at different hosts: a set no host can release as a unit, and a
+stagger computed across members that do not share a lifetime. On the registration
+it is one map key, and `release(host)` becomes **the single path every teardown
+trigger routes through**, which is what makes the list below checkable rather than
+five call sites agreeing by inspection.
+
+C23 drives each on the injected clock and patches its host. **Offsets are assigned so no two fire in the same tick** — synchronised refreshes produce a periodic load spike and a whole-screen flicker, and staggering costs nothing.
+
+### A part is one block, and the block is a `panel`
+
+`ViewPatch`'s only replacing arm is `{op: "replace", blockId, block}` — one id, one
+block. **So a part is one block**, and the ruling is the one `settle(id, doc)` took
+over inventing a fourth op: name the operation for the shape that exists. One
+`replace`, one `rev`, atomic. The alternative — a patch per rendered block — lands
+several revs for one logical refresh, makes C14 invalidate N times for one change,
+and leaves a frame composable between any two of them, which is C14's half-applied
+store arriving by design rather than by accident.
+
+**That ruling was under-determined, and staleness is what determined it.** It said a
+part is one block and not *which*; `Panel` is the only kind carrying a `title`
+(C04 §3), and every state a live part must announce is announced there —
+S13 §3's `· 14s ago`, S13 §4's `┌ activity · unavailable ─┐`. A part rendering a
+bare `table` has nowhere to put either. So a part is a **`panel`**, its `children`
+are what the consumer rendered, and the framework owns the title. A part wanting
+several blocks returns a `group`, which is one block with children — the same
+answer, one level down.
+
+This is also what makes A02 §7 rule 1 structural rather than aspirational: the
+panel border *is* the part's own size, so a failure rendered inside it cannot
+disturb a neighbour.
+
+### Staleness
+
+**Specified since S13 and never built, which is why C24 §5's table cited a
+mechanism this section did not have.** S13 commitment 4 is that a panel older than
+twice its interval shows its age, and S13 T6.3 is a fail-on-revert row against
+dropping it: *silent staleness is the failure this prevents — a frozen dashboard
+looks identical to a quiet cluster.* The citation was not a leftover; the feature
+was, and it lands here because this section owns the mechanism.
+
+Past `staleAfter` — default twice the interval — the driver **replaces the part's
+panel with the same panel, its title suffixed `· 14s ago`.** No new operation and
+no new field: `replace` exists, `Panel.title` exists, and the last successful
+render is already held for the backoff. It is a `replace` rather than a removal for
+§3b's standing reason — `ViewPatch` has no delete, and a transcript is a record.
+
+**Nothing about staleness stops a refresh.** A stale part is one still trying; it
+says so and keeps its interval, and the marker clears on the next success.
+
+### Failure, and what does not retry
 
 A refresh that throws is contained to its own declared part: the rest of the view is untouched, and backoff doubles from the interval to a 5-minute cap. Recovery resets it. This is A02 §7's one backoff rule, and C23 is its only implementation — no part rolls its own.
+
+**A03 §7 rule 2 draws the line and it is a line through this driver, not around
+it.** A failing `fetch` is transient and retries; a failing `render` is
+deterministic — same data, same throw — so it renders its error and does not. And
+rule 3: a part declaring no interval is one-shot, and **a one-shot failure never
+retries**, because silently re-attempting something the user asked for once is a
+surprise. Both distinctions live in the declaration rather than in the failure,
+which is what keeps them decidable at the moment the failure arrives.
+
+### What stops a refresh
+
+Five triggers, all through `release(host)`, and one that is deliberately absent:
+
+| trigger | why |
+|---|---|
+| the entry **settles** | the document is final; a patch to it would be a record of nothing |
+| the view **pops** | the host is gone |
+| the entry is **evicted**, or the transcript **cleared** | C13's cap removes on its own schedule and says so; a refresh that outlived it patches an id that no longer resolves, and `{ok:false, reason:"unknown"}` would read as a failure worth backing off. C25's pushed view listens for exactly this |
+| `session.stopping` | below |
+| ~~the entry **freezes**~~ | **no.** I9 is that a frozen entry keeps receiving patches until settled, and *frozen ≠ not updating* is the whole of what I9 protects: a `--watch` scrolled out of view is still running. C24 §5's table said *teardown on freeze, settle or pop* and is corrected — an invariant with a stated reason outranks a row inside a section marked not-shipped |
+
+**Eviction was in neither document.** §5's containment table had no refresh row and
+I9 speaks only of freezing, so the one trigger that removes a host without any
+component deciding to was covered by nothing. It is the same shape as C15's
+`anchorEvicted`, and it closes the same way — by listening rather than by checking
+on the next tick.
 
 **Identity notice.** C22's identity loop (C22 §7) reaches a transition worth
 saying out loud — a token inside one day of expiry, or one that has expired — and
@@ -218,12 +304,32 @@ component that appends (§1). The alternative reading, letting the identity loop
 reach the transcript itself, makes C22 an appender and undoes the single-appender
 rule for one notice: a large concession for a small case.
 
-**This is the sole producer of `origin: "refresh"`** (§3a), and until it was
-written that value had none. Both mechanisms above *patch* — the stall notice
-patches its streaming entry, a part refresh patches its layer — and `meta.origin`
-is a field on an appended document. So the origin table named two mechanisms
-neither of which could set it: a value that reads as reserved and was
-unreachable, which is A03 §2's vacuity class in a field rather than in a rule.
+**It was written here as the sole producer of `origin: "refresh"`, and it is not**
+(§3a). The correct half stands: both mechanisms above *patch* — the stall notice
+patches its streaming entry, a part refresh patches its host — and `meta.origin` is
+a field on an appended document, so the origin table once named two mechanisms
+neither of which could set it. What was wrong is the claim that fixing it left one
+path. **Three others already set it**, and each is a real append:
+
+| site | what it appends |
+|---|---|
+| `transcript/cap.ts` | C13's cap marker, when eviction drops entries |
+| `shell/construct.ts` | a persisted theme preference that is neither dark nor light |
+| `shell/construct.ts` | adapters registered for verbs the manifest does not declare |
+
+So the sentence read as a guarantee and constrained nothing — the same class as
+C19 §7's stamp, where a distinction that does not exist forbids nothing while
+reading as though it forbids the defect. §3a's row is rewritten to say what the
+value actually means: **provenance, not mechanism** — a system notice with no user
+behind it. All four qualify under that reading.
+
+**A separate finding, filed rather than fixed.** If `refresh` means provenance the
+four are right; if it means *this document is a refreshed view of something* then a
+cap marker and two startup warnings are mislabelled, and the value they want does
+not exist. That is a C04 question about the origin vocabulary rather than a C23
+one, and it is recorded because the false sentence is the only thread that reaches
+it. A claim of sole production also wants a check, or it is re-added by the next
+reader who greps one site: **SS44**.
 
 **It is the one case with no host to stop with.** The first two stop when the
 entry settles or the view pops; an identity notice is a standalone entry that
@@ -231,7 +337,8 @@ scrolls like any other, and nothing ends it because nothing is holding it. That
 asymmetry is the reason it is a third case and not a third instance of the
 second.
 
-The first two mechanisms stop when the entry settles or the view pops, and
+The first two mechanisms stop when the entry settles or the view pops — for part
+refresh that list is the table above, and eviction is on it — and
 **settlement replaces a stall notice that is present with a record of the gap**
 (§8a A4). Stopping the mechanism does not retract the block it already injected,
 so an entry that goes quiet and then settles would otherwise keep `no output for
@@ -242,6 +349,13 @@ settling because by then the mechanism has stopped and cannot do it.
 *submissions*, and none of these is one — so without this line an identity notice,
 a stall patch or a refresh tick lands in a transcript that is being torn down,
 which is precisely what I12's own sentence promises does not happen.
+
+**And stopping them is an ordered step, not a flag the ticks read.** A guard inside
+`tick` is checked when a tick begins; a `fetch` already in flight resolves *after*
+it and patches an entry mid-teardown. So the driver is released where `stopping` is
+set — C22 §8 step 1 — and not inside `beforeRelease`, which runs after it. C22 §8
+already orders `killAll()` ahead of `history.drain()` for the same reason: the
+signal that stops new work has to precede the work that assumes none is arriving.
 
 ---
 
@@ -256,7 +370,8 @@ The sequences A02 Seam 4 lists, owned here rather than by the components that wo
 | Pop a pushed view | `overlays.pop` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) |
 | History recall | `history.previous` → `editor.setText` → `commit("input")` |
 | Stall detected | inject notice patch → `commit("stream")` |
-| View refresh tick | `fetch()` → patch the layer → `commit("stream")` |
+| View refresh tick | `fetch()` → `render` → `replace` the part's panel on its host → `commit("stream")` |
+| Refresh teardown | entry settles, view pops, entry evicted, transcript cleared, or `stopping` set → `release(host)` |
 | Theme switch | `theme.setVariant` → `scheduler.invalidate` |
 | Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — **never pop-and-repush** (C19, C15 §2) |
 | History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` |
@@ -309,6 +424,8 @@ Every stage can fail, and none may kill the session (A02 §7).
 | Transport fails or times out | Error document from C07's mapping |
 | Adapter throws | C07 contains it; fallback rendering plus a muted notice |
 | Patch application fails | C13's `patch` returns one of three `{ok: false}` arms and never throws (C04 §4, I15), so the response is per arm (§8a A2). `"patch"` — settle with what it had, a notice carrying the `ErrorLike`'s message, **and cancel the subscription** (§8a A3): the entry is final, so a child still streaming into it spends a process on output nothing can consume. `"settled"` and `"unknown"` — drop it, no notice. Both mean the entry is already in its final state, and a notice would describe the transcript rather than the command |
+| A refresh part's `fetch` rejects | Contained to that part (I21): its panel renders the error at its own size, backoff doubles to the five-minute cap, siblings and the rest of the host are untouched. **A `render` that throws does not retry** — A02 §7 rule 2, and a one-shot part does not retry either, rule 3 |
+| A refresh patch returns `{ok:false}` | Not a failure and never a backoff. `"unknown"` means the host was evicted and `"settled"` that it finalised between arming and firing; both mean the part is over, so it is released. Treating either as a transport failure would back off against a host that is gone |
 | A local handler throws | Error document naming the verb |
 | `transcript.append` throws | The only stage whose failure loses the outcome. Logged as a defect, the frame still commits, and I1's second exception names it rather than leaving the invariant false. **The machine still returns to `idle`** (§8a A5) — I1's exception is about the entry, not a licence to keep the guard, and a stranded guard refuses every submission for the life of the session |
 | Commit throws | C03 contains it; contamination is flagged for the next frame |
@@ -345,7 +462,7 @@ Per submission.
 - **I9** — A frozen entry keeps receiving patches until settled.
 - **I10** — Cancellation settles as `partial` with output retained.
 - **I11** — Built-ins apply to session state before any delegation.
-- **I12** — A submission is refused once `session.stopping` is set, **and §3b's three mechanisms stop**, so nothing is appended or patched after shutdown begins. The second clause is not a widening: without it the rule covers submissions while its reason claims everything, and an identity notice or a stall patch lands in a transcript being torn down (§8b B1).
+- **I12** — A submission is refused once `session.stopping` is set, **and §3b's three mechanisms stop**, so nothing is appended or patched after shutdown begins. The second clause is not a widening: without it the rule covers submissions while its reason claims everything, and an identity notice or a stall patch lands in a transcript being torn down (§8b B1). **And they are stopped where `stopping` is set — C22 §8 step 1 — not inside `beforeRelease`**: a guard read at the top of a tick cannot see a `fetch` that is already in flight, and that one resolves into a transcript mid-teardown.
 - **I13** — Every cross-layer effect in §4 is sequenced here; no component causes its own.
 - **I14** — Local handlers are the only place several stores are reached at once, and only through C23.
 - **I15** — The displayed command and the spawned argv correspond exactly (D24). **The displayed command is now displayed** — C22 I33 draws it above each entry — which is what makes this invariant constrain anything: it was written about a `doc.command` no render path read, so it forbade nothing while reading as though it forbade the drift it names. The two forms stay distinct on purpose: the transcript shows `/ps --search=… --open-mr` as typed, and `meta.argv` carries `widget ps --search=… --open-mr --json` for `/debug`. D24's one-token mapping is the correspondence between them. **One entry carries one displayed command, from the first patch to the settle** — the streaming route passed the raw typed line while step 5 passed the resolved argv, so the transcript changed what it said a command was mid-stream, with no event to explain it. `$_` is resolved in both, because the resolved form is what ran.
@@ -354,7 +471,7 @@ Per submission.
 - **I18** — Actions originating from a frozen entry are refused, and **the refusal patches the source entry rather than appending**. An append would freeze the block the action came from, refusing the next action for a different reason and clearing the selection A01 D7 preserves — C23 §4's pop row, one section over.
 - **I19** — Stall detection, part refresh and the identity notice are C23's — the first two on C22's injected clock, the third on C22's signal. No adapter, view, layer or entry reads a clock, and no component but C23 appends.
 - **I20** — Refresh offsets are assigned so no two declared parts fire in the same tick.
-- **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success.
+- **I21** — A failing refresh is contained to its declared part, backs off to a 5-minute cap, and resets on success. **Two failures do not retry at all**: a `render` that throws is deterministic, so retrying burns cycles and flickers (A02 §7 rule 2), and a part declaring no interval is one-shot, so re-attempting it is a surprise the user did not ask for (rule 3). Both are decided from the declaration rather than from the failure, which is what makes them answerable at the moment one arrives. And a patch refused with `"unknown"` or `"settled"` is not a failure in this sense — the host is gone, so the part is released rather than backed off.
 - **I22** — Every appended document carries `meta.origin`. No path omits it, and no default supplies it silently.
 - **I23** — `/debug` never re-runs anything. It reads an entry's `meta` and appends a document; it reaches no transport.
 - **I24** — C23 inserts no vertical spacing of its own — not between top-level blocks, not before them, not after them. Rhythm is declared by `gapBefore` (C04 I25) and applied by the sequence (C09 I17). The rule has teeth in one direction only: C23 may not *add* rhythm.
@@ -365,6 +482,10 @@ Per submission.
 - **I29** — Every submitted line is recorded in C20 **at settlement, with the code the entry settled with**, on every terminal path — app, local, shell, handoff, refusal and parse error. At settlement because `append(command, exitCode)` requires a code and settlement is the only moment one exists; recording at acceptance would satisfy the signature by inventing a value, which is what a required field exists to prevent. **A refusal is a submission**: the user typed it and pressed Enter, and `↑` must recall it — history is not a log of successes. Five call sites is five chances to miss one, so the test is derived from `ParseResult`'s arms rather than from a list.
 - **I30** — C23 supplies `StreamContext.seq` as the patch's position within its invocation, counted from `0`. C07 I15 spends it as both the block-id namespace and the per-stream reset, so a constant value is an id collision *and* a reset that fires on every patch — two invariants in two other components, broken from one literal here.
 - **I31** — A `view` action's `target` is resolved against the blocks of the entry it fired from, and a target that does not resolve there is refused rather than ignored. A view raised onto a non-empty layer stack is refused for the same reason and by the same path: C15 throws on it (C15 I1), and a throw crossing a renderer's callback has nowhere to be reported (→ C04 I34).
+- **I32** — A refresh is registered against a **host** and never declares one: `declare(host, parts)` binds them and `release(host)` is the **only** teardown path, so every trigger routes through one call rather than five sites agreeing by inspection. A host on the part would admit one declaration spanning two hosts — a set nothing can release as a unit, staggered across members with no shared lifetime.
+- **I33** — A refresh stops on exactly five triggers — the entry settles, the view pops, the entry is evicted, the transcript is cleared, or `session.stopping` is set — and **not on freeze**. I9 is that a frozen entry keeps receiving patches until settled, and a `--watch` scrolled out of view is still running; C24 §5's *teardown on freeze* is corrected against it. Eviction and clear are the two no component decides, so they are heard from C13 rather than checked on the next tick.
+- **I34** — A refresh applies its result as **one `replace` of one block**, and that block is a `panel` whose children are what the consumer rendered. One op, one `rev`, atomic: several patches for one logical refresh would invalidate C14 N times and leave a frame composable half-applied. The kind is not free — `Panel` is the only one carrying a `title`, and every state a live part announces (I35, A02 §7 rule 1) is announced there.
+- **I35** — Past `staleAfter` — default twice the interval — a part's panel is replaced by the same panel with its age in the title, and **staleness never stops the refresh**: a stale part is one still trying, and the marker clears on the next success. S13 commitment 4 has required this since before the mechanism existed, and C24 §5 cited §3b for it while §3b had nothing to cite.
 
 ---
 
@@ -398,6 +519,9 @@ Per submission.
 25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 26. `seal()` reconciles the local registry against the manifest, both directions, and fails construction on a mismatch (I27).
 27. C23 counts stream patches and supplies `seq`; C07 spends it as an id namespace and a reset, so a constant breaks both (I30, C07 I15).
+29. A refresh names its part and is registered against its host, so one `release(host)` is every teardown path (I32).
+30. A refresh stops on settle, pop, evict, clear and `stopping`, and keeps running through a freeze (I33, I9).
+31. A refresh patches one `panel` in one op, and past `staleAfter` that panel's title carries its age rather than the screen going quietly wrong (I34, I35).
 28. A `view` action resolves its target within the source entry and refuses two things — an unresolvable target, and a view raised onto a non-empty stack — rather than ignoring the first or letting C15's throw cross a renderer's callback (I31).
 
 ---
@@ -733,6 +857,14 @@ Fake transport, fake stores.
 - **T1.16** (I17): a spy proves no `Action` path reaches `spawnShell`.
 - **T1.17** (I18): an action fired from a frozen entry → refused with a notice; from the live entry → executed.
 - **T1.18**: an `exec` action → enters §2's guard and produces an ordinary entry, indistinguishable from typing it.
+- **T1.30** (I19): the stall timer **re-arms**. Two silences separated by output produce two notices, driven on a scheduler that fires each armed callback **once**, as `setTimeout` does. Against a harness that re-fires unconditionally a one-shot mechanism and a periodic one are the same test, which is how this went two components unnoticed.
+- **T1.31** (I20): `assignOffsets` over the five cadences of S13 §3 → five distinct offsets, and no two parts share a tick across the smallest common window.
+- **T1.32** (I21): a part whose `fetch` rejects three times then succeeds → intervals double to the cap and reset, and its siblings patch on every one of their own ticks.
+- **T1.33** (I21, A02 §7 rule 2): a part whose `render` throws → the error renders in place and **the interval does not move**. The control is the same part failing in `fetch`, which does back off — without it the row passes for a driver that never backs off at all.
+- **T1.34** (I21, rule 3): a part declaring no interval, failing → rendered once, never retried.
+- **T1.35** (I34): one tick produces exactly one `replace` and one `rev` on the host, and the replaced block is a `panel` whose children are `render`'s output.
+- **T1.36** (I35): a part whose data is older than `staleAfter` → its panel's title carries the age; the next success clears it **and the part never stopped ticking**.
+- **T1.37** (I25): a stall notice is appended once per silence, not once per tick — the row that fails when the timer is armed inside the loop rather than around it.
 
 ### Tier 2 — contract / interface
 
@@ -744,6 +876,9 @@ Fake transport, fake stores.
 - **T2.5** (I15): for a corpus of inputs, the entry's `command` and the spawned argv correspond under D24's one-token mapping.
 - **T2.6**: every `ParseResult` variant has a route — exhaustive over the union.
 - **T2.7** (I14): a source scan finds no multi-store access outside local handlers.
+- **T2.20** (I32): `release(host)` is reached on all five triggers of I33 — enumerated from the trigger list rather than written out, so a sixth trigger added later fails here.
+- **T2.21** (I33): a **frozen** host keeps receiving refresh patches, and a settled one does not. Both halves, because a driver that released on neither passes the first alone.
+- **T2.22** (I22, SS44): every append in `src/` carrying `origin: "refresh"` is one of the four §3a names, and every one of the four is reached. A count alone passes for a fifth site added beside an existing one.
 
 ### Tier 3 — edge cases
 
@@ -767,6 +902,13 @@ Fake transport, fake stores.
 - **T3.16** (I5): `sleep 30` on the `shell` route → a second submission is refused, exactly as an app verb would be.
 - **T3.17** (I5): a refused submission → no pending entry is created and none is orphaned.
 - **T3.18**: an auth-envelope failure → the notice is appended **here**, and `session.retained` holds the failed command (C22 §7 from this side).
+- **T3.30** (I32): a tick whose host was **evicted between arming and firing** → the patch is refused `"unknown"`, the part is released, and the backoff does not move. A host gone is not a transport that failed.
+- **T3.31** (I33): a tick whose host **settled between arming and firing** → refused `"settled"`, released, no notice.
+- **T3.32** (I21): a tick firing while that part's previous `fetch` is still in flight → the second is not started. Without the guard a slow source stacks ticks until the interval is meaningless.
+- **T3.33** (I12): `stopping` set after a `fetch` resolves and before its patch → nothing lands.
+- **T3.34** (I20): more parts than the smallest interval has milliseconds → offsets remain distinct. `floor(smallest / n)` is zero here, which is I20 violated by the function written to satisfy it.
+- **T3.35** (I34): a `render` returning a block whose id differs from the part's → the mismatch is reported, not silently applied to nothing.
+- **T3.36** (I35): `staleAfter` below the interval → warned at declaration; staleness would otherwise fire on every tick.
 
 ### Tier 4 — integration
 
@@ -780,6 +922,9 @@ Fake transport, fake stores.
 - **T4.7b** (with C16, C13): a submission made while focus is in the live block calls `router.resetFocus` after `transcript.append` and before `commit` — asserted on the call order, since a reset issued before the append would be undone by nothing and a reset issued after the commit paints one frame with focus in a frozen block.
 - **T4.8** (with C22): `cd` updates session state and the next spawn lands there.
 - **T4.9** (with C14): appending while the viewport is detached does not move it (C14 I4, from this side).
+- **T4.20** (with C13, C24): a `b.live` part in a real entry ticks, patches, and stops when C13 evicts the entry — the eviction heard from the store rather than checked on the next tick.
+- **T4.21** (with C15, C24): the same part declared on a pushed view is driven by the same code path, and popping the view releases it (C24 I12, from this side).
+- **T4.22** (with C22): the driver is released at C22 §8 step 1, **before** `beforeRelease` — asserted on call order, since a release afterwards is invisible to any test that does not have a fetch in flight.
 
 ### Tier 5 — e2e
 
@@ -789,10 +934,11 @@ Fake transport, fake stores.
 - **T5.4**: Ctrl-C during a real streaming verb → partial output retained, prompt returns, no orphan.
 - **T5.5**: an app verb piped to `jq` → delegated whole, raw output rendered.
 - **T5.6**: `cd` into a directory, run a verb, `cd -`, run it again → each lands in the right place.
+- **T5.20**: a real session with a live part whose source fails and recovers → the placeholder, the data, the error with a visible countdown, and the data again, with the rest of the screen unmoved throughout.
 
 ### Tier 6 — fail-on-revert
 
-- **T6.20** (I31): resolving a `view` target against the whole transcript instead of the source entry → T3.20 fails. The revert that looks like a generalisation, and it is the one a reader reaches for when a target legitimately names a block they can see on screen.
+- **T6.21** (I31): resolving a `view` target against the whole transcript instead of the source entry → T3.20 fails. The revert that looks like a generalisation, and it is the one a reader reaches for when a target legitimately names a block they can see on screen.
 - **T6.1** (I3): invoking the transport before appending → T1.4 fails, and slow verbs look like dropped keystrokes.
 - **T6.14** (I24): inserting a blank row between top-level blocks → T2.11 fails. Without it the change is invisible: the height C14 virtualises against and the height the frame draws are computed by different code, and nothing compares them.
 - **T6.2** (I4): recomputing validation → T1.5 fails, and two answers can disagree.
@@ -809,6 +955,14 @@ Fake transport, fake stores.
 - **T6.11** (I1): appending twice for one submission → T2.2 fails.
 - **T6.12** (I15): rewriting the command shown after submission → T2.5 fails, and history stops reproducing what ran.
 - **T6.20** (I15): passing the raw typed line to `streamInto` instead of the resolved argv → T1.7c fails. The entry then says one thing while it streams and another once it settles, and C22 I33 draws that value — the transcript changing what it says a command was, mid-stream, with no event to explain it. Nothing failed when this was fixed, which is what said the row was owed.
+- **T6.30** (I19): removing the stall timer's re-arm → T1.30 fails. **This was the tree's state**: the timer was armed once against an ambient one-shot `setTimeout`, so stall detection fired thirty seconds after construction and never again, and a `--watch` that went quiet twice was told once. The revert is invisible under a scheduler that re-fires every callback, which is what the harness did — so the row is owed as much to the fake as to the source.
+- **T6.31** (I33): releasing on freeze as well → T2.21 fails, and a `--watch` scrolled out of view stops updating while still claiming to run.
+- **T6.32** (I33): dropping the eviction listener and checking the host on the next tick instead → T3.30 fails. The revert that reads as a simplification: the check is correct and it happens one tick too late, which is exactly long enough to patch an id that no longer resolves.
+- **T6.33** (I32): moving the host onto `ViewRefresh` → T2.20 fails, because a declaration spanning two hosts has no single release.
+- **T6.34** (I34): applying one patch per rendered block → T1.35 fails, and C14 invalidates N times for one refresh.
+- **T6.35** (I35): dropping the staleness marker → T1.36 fails, and a frozen panel is indistinguishable from a quiet cluster (S13 T6.3, from this side).
+- **T6.36** (I21): retrying a `render` throw → T1.33 fails; the screen flickers at the interval and the outcome never changes.
+- **T6.37** (I12): moving the driver's release into `beforeRelease` → T4.22 fails. The ordering C22 §8 already keeps for `killAll`, arriving for the mechanism that has a promise in flight.
 - **T6.13** (I30, C07 I15): pinning `seq` to a constant in `streamInto` → T1.7b fails on both halves. This was the tree's state: the second `data` patch of every stream collided with the first under C04 I14, so a streaming verb could render exactly one block, and the per-stream reset fired on every patch. Found by the first tier-5 row to drive a `streams: true` verb through a real session; the unit suite passed throughout, because its `adaptPatch` double took no arguments and so could not see the one that was wrong.
 
 ---

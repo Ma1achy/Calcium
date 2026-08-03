@@ -174,7 +174,8 @@ No component reaches sideways or upward to cause an effect in another. Where an 
 | Shutdown | `session.stopping = true` → `lifecycle.release()` (which runs `beforeRelease`) → diagnostics → exit (C22 §8) | C22 |
 | Pop a pushed view | `overlays.pop()` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) | C23 |
 | Stall detected | inject a notice patch → `commit("stream")` (C23 §3b, I25) | C23 |
-| View refresh tick | `fetch()` → patch the layer → `commit("stream")` (C23 §3b) | C23 |
+| View refresh tick | `fetch()` → `render` → `replace` the part's panel on its host → `commit("stream")` (C23 §3b) | C23 |
+| Refresh teardown | entry settles, view pops, entry evicted, transcript cleared, or `stopping` set → `release(host)` (C23 §3b, I33) | C23 |
 | Identity notice | C22's identity loop signals → compose → `transcript.append` with `origin: "refresh"` → `commit` (C22 §7, C23 §3b) | C23 |
 | `cd` / `export` | apply to `session` → `commit` | C23 |
 
