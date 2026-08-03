@@ -99,8 +99,22 @@ export interface RefreshDriver {
 }
 
 export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
-  /** Last patch time per streaming entry, and whether it carries a stall notice. */
-  const watched = new Map<EntryId, { last: number; stalled: boolean; stalledAt: number }>();
+  /**
+   * Last patch time per streaming entry, whether it is currently stalled, and
+   * **whether the entry has ever carried the notice block**.
+   *
+   * The third field is not bookkeeping. The notice is one block with a fixed id,
+   * and resumption *replaces* it rather than removing it (§8a A4) — so from the
+   * second silence onward the id is already taken, and an `append` is refused by
+   * C04 I14's uniqueness rule. Reported as `stalled` alone, a stream that went
+   * quiet, spoke, and went quiet again would be told once and then silently
+   * never again. Only reachable at all once the timer re-arms, which is why it
+   * arrived with T1.30 and not before.
+   */
+  const watched = new Map<
+    EntryId,
+    { last: number; stalled: boolean; stalledAt: number; hasNotice: boolean }
+  >();
   const timers: Disposable[] = [];
 
   /**
@@ -156,23 +170,53 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // state of a `--watch` on an idle cluster; reporting it as a failure
       // trains the reader to ignore the one time it is one.
       const quiet = Math.round((now - state.last) / 60_000);
-      deps.transcript.patch(id, {
-        op: "append",
-        block: block({
-          kind: "notice",
-          id: STALL_BLOCK,
-          tone: "muted",
-          text: `no output for ${String(quiet)}m`,
-        }),
-      }, "shell");
+      const notice = block({
+        kind: "notice",
+        id: STALL_BLOCK,
+        tone: "muted",
+        text: `no output for ${String(quiet)}m`,
+      });
+      // Append the first time and replace after: the row is the entry's one
+      // stall block for its whole life, and it says whichever thing is true now.
+      deps.transcript.patch(
+        id,
+        state.hasNotice
+          ? { op: "replace", blockId: STALL_BLOCK, block: notice }
+          : { op: "append", block: notice },
+        "shell",
+      );
+      state.hasNotice = true;
       deps.commit("stream");
     }
   };
 
-  timers.push(deps.schedule(tick, STALL_MS / 4));
+  /**
+   * **Re-armed, because `schedule` is a one-shot.** C22 supplies
+   * `setTimeout` (`session.ts`), so a single `schedule(tick, …)` outside a loop
+   * checks for silence exactly once — thirty seconds after construction — and
+   * never again. That was this file's state for the whole of C22 and C23: a
+   * `--watch` that went quiet twice was told once, and a stream that went quiet
+   * after the first half-minute was never told at all.
+   *
+   * It survived because the harnesses re-fired every scheduled callback on every
+   * `tick()`, under which a periodic mechanism and a one-shot one are the same
+   * test (C23 T1.30, T6.30). `identity.ts` arms the same way and does re-arm;
+   * the two were written apart and only one of them said so.
+   */
+  let stopped = false;
+  const arm = (): void => {
+    if (stopped) return;
+    timers.push(
+      deps.schedule(() => {
+        tick();
+        arm();
+      }, STALL_MS / 4),
+    );
+  };
+  arm();
 
   return {
-    watch: (id) => void watched.set(id, { last: deps.clock(), stalled: false, stalledAt: 0 }),
+    watch: (id) => void watched.set(id, { last: deps.clock(), stalled: false, stalledAt: 0, hasNotice: false }),
 
     sawPatch: (id) => {
       const state = watched.get(id);
@@ -196,6 +240,10 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     },
 
     dispose: () => {
+      // `stopped` first: a timer disposed while its callback is mid-flight would
+      // otherwise re-arm on the way out, and the driver would outlive the call
+      // that ended it.
+      stopped = true;
       for (const t of timers) t[Symbol.dispose]();
       timers.length = 0;
       watched.clear();

@@ -60,6 +60,16 @@ export type PipelineHarness = Readonly<{
   handed: string[][];
   /** `suspend` / `resume`, interleaved into `calls` and also counted here. */
   lifecycle: string[];
+  /**
+   * What reached C20 (C23 I29).
+   *
+   * It was declared, filled by the `history.append` double, and then returned
+   * from **`schedule`'s disposable** instead of from the harness — a stray edit
+   * that type-checks, because a `Disposable` with an extra property still is one.
+   * No consumer read it, so nothing failed: the field was collected for four
+   * components and reachable by nobody.
+   */
+  recorded: { command: string; exitCode: number }[];
   tick: (ms: number) => void;
 }>;
 
@@ -83,8 +93,22 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const spawned: { command: string; cwd: string }[] = [];
   const handed: string[][] = [];
   const lifecycleCalls: string[] = [];
-  const timers: (() => void)[] = [];
+  /**
+   * A controllable clock and scheduler, so §3b's timers are driven not waited on.
+   *
+   * **Each armed callback fires once**, as `setTimeout` does — the ambient
+   * `schedule` C22 supplies is a one-shot (`session.ts`), and a fake that re-fires
+   * every callback on every tick makes a periodic mechanism and a one-shot one the
+   * same test. Stall detection was armed once and never re-armed for the whole of
+   * C22 and C23 underneath a harness shaped that way; nothing failed, because
+   * nothing could (C23 T1.30, T6.30).
+   *
+   * A timer armed *during* a tick waits for the next one, so a self-re-arming
+   * chain advances one step per call rather than running away — the same barrier
+   * `fake-scheduler.ts` documents.
+   */
   let now = 0;
+  const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
   const deps = {
     session: () => session.snapshot,
@@ -186,11 +210,14 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
       return 0;
     },
     clock: () => now,
-    schedule: (fn: () => void) => {
-      timers.push(fn);
+    schedule: (fn: () => void, ms: number) => {
+      const t = { fn, at: now + ms, live: true };
+      timers.push(t);
       return {
-    recorded,
-[Symbol.dispose]: () => undefined };
+        [Symbol.dispose]: () => {
+          t.live = false;
+        },
+      };
     },
     openUrl: () => Promise.resolve(),
     bindings: () => [{ keys: "c+c", does: "global: cancel" }],
@@ -216,9 +243,15 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     spawned,
     handed,
     lifecycle: lifecycleCalls,
-    tick: (ms) => {
+    /** What reached C20 (C23 I29), for the rows that assert the record. */
+    recorded,
+    tick: (ms: number) => {
       now += ms;
-      for (const fn of [...timers]) fn();
+      const due = timers.filter((t) => t.live && t.at <= now);
+      for (const t of due) {
+        t.live = false;
+        t.fn();
+      }
     },
   };
 }
