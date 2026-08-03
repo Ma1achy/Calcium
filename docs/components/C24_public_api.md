@@ -384,7 +384,9 @@ export function withCapabilities(caps: Partial<TerminalCapabilities>): TestConte
 
 ## 8. Startup validation
 
-`createTui` checks the graph before the session opens, and the severity of each check is chosen deliberately.
+The severity of each check is chosen deliberately, and **six of the seven are enforced by the component that owns the condition** rather than by anything here — `validateConfig`, `checkSchema`, `validateTokens` twice over, `KeymapError`, and the block registry's shadow check. That is the layering working: C24 chose the severities and the owners implement them.
+
+**The moment is `start()`, not `createTui`.** This section opened by saying `createTui` checks the graph, and it does not: `createTui` runs `validateConfig` and returns, because step 3 may read a manifest from a path and a constructor cannot await (C22 §4, C22 I7a). Only a missing required field fails at the call site; the other six fire while the graph is built. The severities were right and the sentence was not — which is the shape T1.7's table exists to catch, since a table of severities agrees with itself whatever moment they fire in.
 
 | Condition | Severity |
 |---|---|
@@ -398,6 +400,8 @@ export function withCapabilities(caps: Partial<TerminalCapabilities>): TestConte
 
 The adapter/manifest mismatch is a warning rather than an error because a manifest can legitimately shrink between versions and an app that refuses to start when the far side drops a verb is worse than one that says so.
 
+**It is the only one of the seven that had no home, and the reason is structural: a warning cannot be expressed by anything that throws.** The other six are conditions some component already refuses, so each found an owner naturally; this one is a condition nothing refuses, so nothing said it. It is appended to the transcript as a `warn` notice at construction, beside the theme-preference warning that had already settled the same question — **not delivered through a `TuiConfig.onWarning` hook**, because inventing that field is exactly what §3 declined to do for theme overrides. A missing ruling at the shell is not a surface to widen.
+
 ---
 
 ## 9. Invariants
@@ -410,7 +414,7 @@ The adapter/manifest mismatch is a warning rather than an error because a manife
 - **I6** — `b.live`'s behaviour is not configurable; only its renderings are.
 - **I7** — `measure` never receives `tick`; animation cannot affect geometry.
 - **I8** — `testing` and `fixtures` are absent from the production bundle. MG26 is the mechanical form, and it was false on the day it could first be checked: `shell/paint.ts`, `shell/composite.ts` and `shell/session.ts` imported `renderSequenceToLines` from `../testing/index.js`, so the built runtime entry reached `dist/testing/index.js` and both conformance suites behind it. **Nothing was mislayered** — L4 importing L1 is downward whichever directory it lands in — so no existing rule was wrong to stay silent. The helper had been written where its first caller was, and its first caller was a test. It is `presentation/render-lines.ts` now.
-- **I9** — Startup validation severities are those of §8, and each cites the spec that set it.
+- **I9** — Startup validation severities are those of §8, and each cites the spec that set it. The severities are C24's and the enforcement is the owning component's for six of the seven; the seventh is a warning, which nothing that throws could express, and so nothing did until it was written. **The moment is `start()` for six of them** — `createTui` is eager about `validateConfig` alone, and §8's opening sentence said otherwise for as long as it existed.
 - **I10** — The runtime entry exports no function that performs I/O except `createTui`.
 - **I11** — The reference app lives in its own repository and consumes `tui-kit` as a published dependency, so the unused-export scan runs against `prism-tui` plus the app's declared import manifest, refreshed on each version bump. It is a reported signal, not a build gate.
 - **I12** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.

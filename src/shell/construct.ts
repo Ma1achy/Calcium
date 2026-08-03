@@ -395,6 +395,46 @@ export async function constructGraph(
       }
     }
 
+    // **§8's seventh severity, and the only one that had no home.** Six of the
+    // seven conditions throw inside the components that own them —
+    // `validateConfig` for a missing field, `checkSchema` for an unsupported
+    // adapter schema, `validateTokens` for contrast and for a `meaning` palette
+    // with no typographic fallback, `KeymapError` for a duplicate binding, the
+    // block registry for a shadowed kind. This one is a *warning*, so nothing
+    // that throws could express it and nothing did.
+    //
+    // **Appended rather than delivered through a config hook**, and the
+    // precedent is three commits old: C24 §3 declined to export
+    // `ThemeStore.applyOverrides` because overrides would arrive as a
+    // `TuiConfig` field and no such field is specified — a missing ruling at
+    // the shell rather than a surface to widen. A `TuiConfig.onWarning` here
+    // would be that same invention, so this goes where the theme-preference
+    // warning above already goes, for the reasons already written there.
+    //
+    // Checked against `config.adapters` rather than against the registry: the
+    // registry has no accessor listing what it holds, and the app's own map is
+    // the honest subject anyway — the question is which verbs *this app*
+    // registered for, not what the fallback can also route.
+    const tools = new Set((built.manifest.manifest?.tools ?? []).map((t) => t.name));
+    const orphans = Object.keys(config.adapters)
+      .filter((verb) => !tools.has(verb))
+      .sort();
+    if (orphans.length > 0) {
+      // A warning and not an error because a manifest legitimately shrinks
+      // between versions, and an app that refuses to start when the far side
+      // drops a verb is worse than one that says so (§8).
+      transcript.append(
+        noticeDoc(
+          "",
+          `adapter${orphans.length === 1 ? "" : "s"} registered for ` +
+            `${orphans.length === 1 ? "a verb" : "verbs"} the manifest does not declare: ` +
+            `${orphans.join(", ")} — dead code, and probably a typo`,
+          "warn",
+          { origin: "refresh" },
+        ),
+      );
+    }
+
     return { transcript, viewport, overlays, history, editor, theme: themed.value };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("stores", cause);
