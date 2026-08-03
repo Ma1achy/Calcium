@@ -378,6 +378,26 @@ export function withCapabilities(caps: Partial<TerminalCapabilities>): TestConte
 
 **`measuresCorrectly` is a wrapper, not an implementation.** The conformance suite it runs is written with C04 — parameterised over a registry and a corpus, and deliberately free of anything test-runner-specific, returning failures as data so the caller asserts. C09's registry-completeness test, this method, and the reference app all drive the same code. It lives in `test/support/` until C09 exists to consume it, then moves here unchanged.
 
+**`hasNoColourOnlyDistinction` checks a decidable rule, and the first consumer
+is what narrowed it.** It flagged every toned `keyValue` row and `pills` chip on
+the grounds that neither kind has a `glyph` field — which is true, and is a gap
+C04's constructor records and explicitly declines to enforce, calling it a gap
+in the vocabulary rather than a rule. Encoding a *schema* gap as a *document*
+violation made the method un-passable for any app that tones a pill, and the
+probe tripped it immediately with `b.pills([{ label: "2 running", tone: "ok" }])`
+— compliant, since the word carries the state. The rule is now uniform: a
+meaning tone with neither a glyph nor a word beside it.
+
+What that leaves unchecked is the interesting half and it is stated rather than
+implied: two chips reading `web` and `db`, toned `ok` and `error`, put the whole
+meaning in colour and pass, because "does this text carry the state" is not
+decidable from the text. Closing it means giving those two kinds a glyph field,
+which is a C04 change.
+
+**`matchesGolden` is specified and unbuilt.** It needs somewhere to keep frames
+and a policy for updating them, and §8a records the prerequisite the probe found
+independently: nothing in the surface lets a consumer obtain a frame at all.
+
 **`degradesTo1Bit` is the one that earns the module.** It is B04's compliance sweep — every distinction carried by a glyph or a word — and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 
 ---
@@ -401,6 +421,63 @@ The severity of each check is chosen deliberately, and **six of the seven are en
 The adapter/manifest mismatch is a warning rather than an error because a manifest can legitimately shrink between versions and an app that refuses to start when the far side drops a verb is worse than one that says so.
 
 **It is the only one of the seven that had no home, and the reason is structural: a warning cannot be expressed by anything that throws.** The other six are conditions some component already refuses, so each found an owner naturally; this one is a condition nothing refuses, so nothing said it. It is appended to the transcript as a `warn` notice at construction, beside the theme-preference warning that had already settled the same question — **not delivered through a `TuiConfig.onWarning` hook**, because inventing that field is exactly what §3 declined to do for theme overrides. A missing ruling at the shell is not a surface to widen.
+
+---
+
+## 8a. What the first consumer needed
+
+A `docker ps` adapter was built against `dist/` through the three entry points
+alone, as a consumer would — a hand-written manifest, an adapter turning
+`docker ps --format json` into a table with row detail and actions, and
+`expectDocument` asserting the result. **Everything it reached for and could not
+get is recorded here rather than folded into §3**, because the value of a real
+consumer over a test is that its needs are discovered instead of assumed, and a
+silent addition to the export list is the author's guess wearing a consumer's
+clothes.
+
+**It reached for none of the eleven.** That is the first time §3's absent list
+has been exercised from outside the package, and it held.
+
+**One thing was wrong and is fixed: every builder took mutable arrays.** `b.seq`
+returns `readonly Block[]`, and `b.panel`, `b.group` and a row's `detail` all
+took `Block[]` — so the sequence assembler could not feed the three builders
+that take children, which is exactly where vertical rhythm matters (C09 applies
+`gapBefore` inside a panel). `b.panel("details", b.seq([…]))` did not compile.
+The workaround a consumer writes is `[...b.seq([…])]`, a spread whose only
+purpose is to strip `readonly`. Every array parameter on `b` is `readonly` now.
+It was never only about `b.seq`: every field of every C04 block type is
+`readonly` and the framework hands consumers readonly data throughout —
+`RawResult.argv` among them.
+
+**Two are recorded and not built, because each wants a ruling this section
+cannot make on its own.**
+
+- **`RawResult.exitCode` is `number | null` and `DocumentMeta.exitCode` is
+  `number`.** Null means killed by a signal (C06), and every adapter must
+  therefore invent a number on that path. The probe wrote `?? -1`; another app
+  writes `?? 0` or `?? 137`, and `meta.exitCode` stops being comparable across
+  apps for the one case where comparison matters. The ruling belongs to C04 and
+  C07 together — either `meta.exitCode` becomes nullable, or the framework names
+  the sentinel — and nothing here should choose it silently.
+
+- **Nothing lets a consumer look at a frame.** `expectDocument().rendersAt()`
+  asserts and returns `this`; no export across the three entry points returns
+  rendered lines, and `createTui` needs a terminal. For an adapter author
+  iterating on a table this is the most useful thing there is, and it is also
+  what `matchesGolden` (§7) would be built on — which is why that method is
+  still unbuilt. `renderToLines` is not the answer: it takes a `BlockRegistry`,
+  one of the eleven. Something like `expectDocument(doc).frameAt(width)`
+  returning `readonly string[]` is, and it wants specifying rather than
+  inventing.
+
+**And one finding is about the assertions rather than the surface.**
+`degradesToAscii` caught a real defect in the probe's own adapter on its first
+run: an em-dash written as the empty-ports placeholder, which no capability
+substitution can reach, because substitution covers glyphs the framework chooses
+and not text an adapter supplies. That is the method doing exactly its job on
+consumer code. `hasNoColourOnlyDistinction` then over-fired on
+`b.pills([{ label: "2 running", tone: "ok" }])` — compliant, since the word
+carries the state — and §7 records what that changed.
 
 ---
 

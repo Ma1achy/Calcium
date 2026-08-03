@@ -236,43 +236,59 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
     },
 
     /**
-     * D29 — structural. Every element whose tone *means* something carries a
-     * glyph or a word as well.
+     * D29 — a distinction carried by colour and nothing else.
      *
-     * **`keyValue` rows and `pills` chips are where this bites**, and C04 says
-     * so in as many words: both carry a `tone` and neither has a `glyph` field,
-     * so a row toned `error` cannot satisfy D29 on any renderer. C04's
-     * constructor records that as a gap in the vocabulary rather than a rule it
-     * can enforce — `construct.ts` names it and declines to widen. This is the
-     * check that can see it, because it looks at a whole document rather than
-     * at one block's shape.
+     * **The rule is uniform: a meaning tone with no glyph and no word.** An
+     * element toned `ok` whose text reads `running` is compliant — the word
+     * carries it and the colour emphasises it, which is what tone is for.
+     *
+     * **This first flagged every toned `keyValue` row and `pills` chip**, on
+     * the grounds that neither kind has a `glyph` field, so D29 is
+     * unsatisfiable for them. C04's constructor records exactly that and
+     * declines to enforce it, calling it a gap in the vocabulary rather than a
+     * rule — and encoding a *schema* gap as a *document* violation made this
+     * method un-passable for any app that tones a pill. The first real consumer
+     * tripped it on its first document with
+     * `b.pills([{ label: "2 running", tone: "ok" }])`, which is compliant and
+     * is also the most natural thing anyone would write.
+     *
+     * **What is left unchecked, and it is the interesting half.** Two chips
+     * reading `web` and `db`, toned `ok` and `error`, put the whole meaning in
+     * colour and pass — because "does this text carry the state" is not
+     * decidable from the text. No widening of this method reaches it; closing
+     * it means giving those two kinds a glyph field, which is a C04 spec change
+     * and is recorded there as one.
      */
     hasNoColourOnlyDistinction() {
       const offences: string[] = [];
 
+      /** A meaning tone with neither a glyph nor a word beside it. */
+      const bare = (tone: Tone | undefined, glyph: string | undefined, text: string): boolean =>
+        tone !== undefined && MEANING_TONES.has(tone) && (glyph ?? "") === "" && text.trim() === "";
+
       const visit = (block: Block): void => {
         switch (block.kind) {
           case "notice":
-            if (MEANING_TONES.has(block.tone) && (block.glyph ?? "") === "" && block.text.trim() === "") {
+            if (bare(block.tone, block.glyph, block.text)) {
               offences.push(`notice "${block.id}" is toned ${block.tone} with no glyph and no text`);
             }
             break;
           case "keyValue":
             for (const r of block.rows) {
-              if (r.tone !== undefined && MEANING_TONES.has(r.tone)) {
+              if (bare(r.tone, undefined, r.value)) {
                 offences.push(
-                  `keyValue "${block.id}" row "${r.label}" is toned ${r.tone}, and a keyValue row ` +
-                    `has no glyph field — the meaning exists only in colour (C04 §3 records this gap)`,
+                  `keyValue "${block.id}" row "${r.label}" is toned ${String(r.tone)} and its value ` +
+                    `is empty — a keyValue row has no glyph field, so nothing else can carry it`,
                 );
               }
             }
             break;
           case "pills":
             for (const c of block.chips) {
-              if (c.tone !== undefined && MEANING_TONES.has(c.tone)) {
+              if (bare(c.tone, undefined, c.label)) {
                 offences.push(
-                  `pills "${block.id}" chip "${c.label}" is toned ${c.tone}, and a chip has no ` +
-                    `glyph field — the meaning exists only in colour`,
+                  `pills "${block.id}" has a chip toned ${String(c.tone)} with an empty label — ` +
+                    `a chip has no glyph field, so nothing else can carry it`,
                 );
               }
             }
@@ -280,15 +296,10 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
           case "table":
             for (const r of block.rows) {
               for (const [key, cell] of Object.entries(r.cells)) {
-                if (
-                  cell.tone !== undefined &&
-                  MEANING_TONES.has(cell.tone) &&
-                  (cell.glyph ?? "") === "" &&
-                  cell.text.trim() === ""
-                ) {
+                if (bare(cell.tone, cell.glyph, cell.text)) {
                   offences.push(
-                    `table "${block.id}" row "${r.id}" cell "${key}" is toned ${cell.tone} with ` +
-                      `no glyph and no text`,
+                    `table "${block.id}" row "${r.id}" cell "${key}" is toned ${String(cell.tone)} ` +
+                      `with no glyph and no text`,
                   );
                 }
               }

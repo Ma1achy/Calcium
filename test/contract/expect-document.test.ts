@@ -114,7 +114,7 @@ describe("C24 §7 — expectDocument", () => {
       block({
         kind: "keyValue",
         id: "kv1",
-        rows: [{ label: "status", value: "unhealthy", tone: "error" }],
+        rows: [{ label: "status", value: "", tone: "error" }],
       }),
     ]);
     expect(() => expectDocument(colourOnly).degradesTo1Bit()).toThrow(/colour/i);
@@ -140,29 +140,35 @@ describe("C24 §7 — expectDocument", () => {
     expect(() => expectDocument(plot).degradesTo1Bit()).not.toThrow();
   });
 
-  it("hasNoColourOnlyDistinction: a keyValue row toned `error` has nowhere to put a glyph", () => {
-    // C04's constructor records this as a gap in the vocabulary it cannot close
-    // — `keyValue` rows and `pills` chips carry a tone and have no glyph field,
-    // so `block()` accepts them and D29 is unsatisfiable. This is the check that
-    // can see it, because it reads a whole document rather than one block's shape.
-    const clean = docOf([b.kv({ image: "nginx" })]);
+  it("hasNoColourOnlyDistinction: a meaning tone with no glyph and no word", () => {
+    // **The rule is uniform, and it used to flag a whole schema.** This
+    // asserted that every toned `keyValue` row and `pills` chip fails, because
+    // neither kind has a glyph field. The first real consumer wrote
+    // `b.pills([{ label: "2 running", tone: "ok" }])` — compliant, since the
+    // word carries the state — and could not make the method pass. A schema gap
+    // encoded as a document violation, which C04 explicitly declines to do.
+    const clean = docOf([
+      b.kv({ image: "nginx" }),
+      block({ kind: "pills", id: "p1", chips: [{ label: "2 running", tone: "ok" }] }),
+    ]);
     expect(() => expectDocument(clean).hasNoColourOnlyDistinction()).not.toThrow();
 
-    const colourOnly = docOf([
+    // What does fail: a tone with nothing beside it at all.
+    const bareChip = docOf([
+      block({ kind: "pills", id: "p2", chips: [{ label: "", tone: "error" }] }),
+    ]);
+    expect(() => expectDocument(bareChip).hasNoColourOnlyDistinction()).toThrow(/empty label/);
+
+    const bareCell = docOf([
       block({
-        kind: "keyValue",
-        id: "kv1",
-        rows: [{ label: "status", value: "unhealthy", tone: "error" }],
+        kind: "table",
+        id: "t2",
+        columns: [{ key: "s", label: "s", align: "left", priority: 50, minWidth: 4, sortable: false }],
+        rows: [{ id: "r1", cells: { s: { text: "", tone: "error", glyph: "error" } } }],
       }),
     ]);
-    expect(() => expectDocument(colourOnly).hasNoColourOnlyDistinction()).toThrow(
-      /no glyph field/,
-    );
-
-    const chip = docOf([
-      block({ kind: "pills", id: "p1", chips: [{ label: "degraded", tone: "warn" }] }),
-    ]);
-    expect(() => expectDocument(chip).hasNoColourOnlyDistinction()).toThrow(/no glyph field/);
+    // A glyph is a word's equal here, so this one passes.
+    expect(() => expectDocument(bareCell).hasNoColourOnlyDistinction()).not.toThrow();
   });
 
   it("hasNoColourOnlyDistinction walks into panels, groups and expanded rows", () => {
@@ -178,7 +184,7 @@ describe("C24 §7 — expectDocument", () => {
           block({
             kind: "keyValue",
             id: "inner",
-            rows: [{ label: "status", value: "unhealthy", tone: "error" }],
+            rows: [{ label: "status", value: "", tone: "error" }],
           }),
         ],
       }),
@@ -198,7 +204,7 @@ describe("C24 §7 — expectDocument", () => {
               block({
                 kind: "pills",
                 id: "detail-pills",
-                chips: [{ label: "degraded", tone: "warn" }],
+                chips: [{ label: "", tone: "warn" }],
               }),
             ],
           },

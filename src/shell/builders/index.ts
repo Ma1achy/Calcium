@@ -17,6 +17,21 @@
  * into one object, the rule has nothing to fire on — and the shape is honest,
  * because the builders genuinely have exactly one consumer, which is `b`.
  *
+ * **Every array parameter is `readonly`, and a consumer is what settled it.**
+ *
+ * They were mutable, and `b.seq` returns `readonly Block[]` — so the sequence
+ * assembler could not feed `b.panel`, `b.group` or a row's `detail`, which are
+ * the three builders that take children and the exact place vertical rhythm
+ * matters most (C09 applies `gapBefore` inside a panel). The first real adapter
+ * wrote `b.panel("details", b.seq([…]))` and did not compile; the workaround is
+ * `[...b.seq([…])]`, a spread whose only purpose is to strip `readonly`, which
+ * is the shape of an omission rather than a design.
+ *
+ * It is not only `b.seq`. Every field on every C04 block type is `readonly`, and
+ * the framework hands consumers readonly data throughout — `RawResult.argv` is
+ * `readonly string[]`. A builder surface that accepts only mutable arrays is one
+ * a consumer has to copy into on the way in, everywhere, forever.
+ *
  * **`blockId` is imported, never reimplemented** (`../documents.js`). A second
  * block-id counter is drift MG20 exists to catch, and two counters would hand
  * out the same id from different modules.
@@ -163,7 +178,7 @@ const notice = Object.assign(noticeOf, {
   info: (text: string, opts?: BlockOpts): Notice => noticeOf("info", text, undefined, opts),
 });
 
-function kv(rows: Record<string, string | KeyValueInput>, opts?: BlockOpts): KeyValue {
+function kv(rows: Readonly<Record<string, string | KeyValueInput>>, opts?: BlockOpts): KeyValue {
   return finish<KeyValue>(
     {
       kind: "keyValue",
@@ -181,8 +196,8 @@ function kv(rows: Record<string, string | KeyValueInput>, opts?: BlockOpts): Key
 
 function table(
   spec: BlockOpts & {
-    columns: ColumnDef[];
-    rows: TableRow[];
+    columns: readonly ColumnDef[];
+    rows: readonly TableRow[];
     showHeader?: boolean;
     emptyMessage?: string;
   },
@@ -224,8 +239,8 @@ function col(key: string, spec?: Partial<Omit<ColumnDef, "key">>): ColumnDef {
 
 function row(
   id: string,
-  cells: Record<string, CellInput>,
-  opts?: { detail?: Block[]; actions?: Action[] },
+  cells: Readonly<Record<string, CellInput>>,
+  opts?: { detail?: readonly Block[]; actions?: readonly Action[] },
 ): TableRow {
   return Object.freeze({
     id,
@@ -235,7 +250,7 @@ function row(
   });
 }
 
-function steps(input: StepInput[], opts?: BlockOpts): Steps {
+function steps(input: readonly StepInput[], opts?: BlockOpts): Steps {
   return finish<Steps>(
     {
       kind: "steps",
@@ -251,11 +266,11 @@ function steps(input: StepInput[], opts?: BlockOpts): Steps {
   );
 }
 
-function logs(lines: LogLine[], opts?: BlockOpts): Logs {
+function logs(lines: readonly LogLine[], opts?: BlockOpts): Logs {
   return finish<Logs>({ kind: "logs", id: idOf(opts, "logs"), lines } as Logs, opts, false);
 }
 
-function events(input: EventLine[], opts?: BlockOpts): Events {
+function events(input: readonly EventLine[], opts?: BlockOpts): Events {
   return finish<Events>(
     { kind: "events", id: idOf(opts, "events"), events: input } as Events,
     opts,
@@ -263,7 +278,7 @@ function events(input: EventLine[], opts?: BlockOpts): Events {
   );
 }
 
-function plot(spec: BlockOpts & { series: Series[]; height: number; axes?: boolean }): Plot {
+function plot(spec: BlockOpts & { series: readonly Series[]; height: number; axes?: boolean }): Plot {
   const { series, height, axes } = spec;
   return finish<Plot>(
     {
@@ -287,7 +302,7 @@ function plot(spec: BlockOpts & { series: Series[]; height: number; axes?: boole
  * block's, so writing `height: 1` here would be a second place that number
  * lives.
  */
-function spark(values: number[], opts?: BlockOpts): Plot {
+function spark(values: readonly number[], opts?: BlockOpts): Plot {
   return finish<Plot>(
     { kind: "plot", id: idOf(opts, "spark"), form: "sparkline", series: [{ values }] } as Plot,
     opts,
@@ -315,7 +330,7 @@ function code(language: string, text: string, opts?: BlockOpts & { wrap?: boolea
   );
 }
 
-function comparison(rows: ComparisonRow[], opts?: BlockOpts): Comparison {
+function comparison(rows: readonly ComparisonRow[], opts?: BlockOpts): Comparison {
   return finish<Comparison>(
     { kind: "comparison", id: idOf(opts, "comparison"), rows } as Comparison,
     opts,
@@ -327,7 +342,7 @@ function patch(
   spec: BlockOpts & {
     path: string;
     language: string;
-    hunks: Hunk[];
+    hunks: readonly Hunk[];
     layout?: "unified" | "split";
   },
 ): Patch {
@@ -346,11 +361,11 @@ function patch(
   );
 }
 
-function pills(chips: ChipInput[], opts?: BlockOpts): Pills {
+function pills(chips: readonly ChipInput[], opts?: BlockOpts): Pills {
   return finish<Pills>({ kind: "pills", id: idOf(opts, "pills"), chips } as Pills, opts, false);
 }
 
-function tip(text: string, actions?: Action[], opts?: BlockOpts): Tip {
+function tip(text: string, actions?: readonly Action[], opts?: BlockOpts): Tip {
   return finish<Tip>(
     {
       kind: "tip",
@@ -365,7 +380,7 @@ function tip(text: string, actions?: Action[], opts?: BlockOpts): Tip {
 
 function panel(
   title: string,
-  children: Block[],
+  children: readonly Block[],
   opts?: BlockOpts & { footer?: string },
 ): Panel {
   return finish<Panel>(
@@ -387,7 +402,7 @@ function panel(
  * Gapping the group *and* the first child that carries its own default produces
  * two blank rows where the surfaces draw one.
  */
-function group(direction: "row" | "column", children: Block[], opts?: BlockOpts): Group {
+function group(direction: "row" | "column", children: readonly Block[], opts?: BlockOpts): Group {
   return finish<Group>(
     { kind: "group", id: idOf(opts, "group"), direction, children } as Group,
     opts,
