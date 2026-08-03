@@ -618,7 +618,11 @@ carries the state — and §7 records what that changed.
 - **T3.3**: `b.kv` with 200 rows → valid; measurement linear.
 - **T3.4**: `b.live` with both `fetch` and `stream` → construction throws; they are exclusive.
 - **T3.5**: `b.live` with neither → throws.
-- **T3.6**: `b.live` with `staleAfter` below `every` → warns; staleness would fire every tick.
+- **T3.6**: `b.live` with `staleAfter` below `every` → **throws**, like the other two declaration errors above.
+
+  It said *warns*, and a builder has no way to warn. `b.live` is a pure function with no sink: A03 SS33 bans `console.*` across `src/`, C02's `capabilityWarnings` is C22's channel and a builder cannot reach it, and returning a notice in place of the loading render would let a cosmetic mistake change what the first frame shows. **The row named an operation the layer does not have** — the same class as C23 §3b's *removed if output resumes*, and found the same way: by writing the code the row describes.
+
+  Throwing is the consistent answer rather than a fallback. The two rows above throw for declaration errors and this is one: the part would be marked stale on every tick it ever ran, so the marker is permanent and says nothing. That is a broken declaration, not a poor value.
 - **T3.7**: a custom `BlockDefinition` whose `measure` closes over a clock → caught by C09's scan, not here, but asserted end to end.
 - **T3.8**: `b.code` defaults to `wrap: false`; S10's usage sets true.
 - **T3.9**: `b.notice.error` with no glyph → a glyph is supplied automatically, satisfying D29 (C04 I5).
