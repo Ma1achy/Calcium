@@ -199,10 +199,14 @@ is what §3b was missing rather than a detail of it.
 
 ```typescript
 type ViewRefresh = Readonly<{
-  id:         string;              // which part — never which host
-  intervalMs: number;
-  offsetMs:   number;              // stagger, assigned; see below
-  fetch:      () => Promise<unknown>;
+  id:           string;            // which part — never which host
+  title:        string;            // the panel's; where state is said
+  intervalMs:   number;            // 0 → one-shot, no retry
+  offsetMs:     number;            // stagger, assigned; see below
+  staleAfterMs: number;
+  fetch:        () => Promise<unknown>;
+  render:       (data: unknown) => Block;
+  renderError:  (err: ErrorLike, retryInMs: number | null) => Block;
 }>;
 
 type RefreshHost =
@@ -212,6 +216,18 @@ type RefreshHost =
 declare(host: RefreshHost, parts: readonly Omit<ViewRefresh, "offsetMs">[]): void;
 release(host: RefreshHost): void;
 ```
+
+**`fetch` and `render` are separate fields and must be.** Composing them into one
+thunk is the obvious simplification and it erases A02 §7 rule 2: a `fetch` that
+rejects is transient and retries, a `render` that throws is deterministic and does
+not, and once they are one function C23 cannot tell which happened. The rule would
+still be written down and nothing would implement it.
+
+**`renderLoading` is not here, and its absence is the division working.** The first
+state is a block that already exists when the entry is appended — `b.live` builds
+the panel with the placeholder inside it — so C23 never renders it. C23 renders
+exactly the two states only C23 knows about: the result of a fetch it drove, and
+the failure of one, with the `retryInMs` only the backoff can supply.
 
 **The declaration says which part; the registration says which host, and the split
 is not cosmetic.** `id` is the block a part patches, and the first sentence above
