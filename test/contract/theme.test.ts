@@ -1,7 +1,9 @@
 // C10 tier 2 — contract. Purity, the properties a shipped theme must have, and
 // the source scans that keep a palette from leaking out of its two consumers.
 import { readdirSync, statSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
 import {
   defaultTheme,
   diffPairs,
@@ -14,6 +16,10 @@ import {
 } from "../../src/presentation/theme/index.js";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 const VARIANTS = ["dark", "light"] as const;
 

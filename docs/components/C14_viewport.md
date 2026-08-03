@@ -55,13 +55,33 @@ type VisibleRange = Readonly<{
 
 | Input | Effect |
 |---|---|
-| `↑` / `↓` | One row |
-| `PageUp` / `PageDown` | `viewportHeight − 1` rows, so one line of context carries over |
-| `Home` | `topRow = 0` |
-| `End` | Bottom, and `followTail` back on |
-| Wheel | Three rows, when mouse is enabled |
+| Input | Effect | Bound |
+|---|---|---|
+| `PageUp` / `PageDown` | `viewportHeight − 1` rows, so one line of context carries over | `global` |
+| `⌃Home` | `topRow = 0` | `global` |
+| `⌃End` | Bottom, and `followTail` back on | `global` |
+| Wheel | Three rows, when mouse is enabled | not a key |
+| `↑` / `↓` | One row | **nothing** — see below |
 
-C14 exposes these as operations; the keys that invoke them are C16's.
+C14 exposes these as operations; the keys that invoke them are C16's, and C16 I23 now names all of them. **This table said `Home` and `End` and it was wrong in a way nothing could see**: the prompt binds both to the line's start and end and resolves ahead of `global` at every moment it has focus, so the two operations had callers in L4 that no keystroke could reach. The document's extremes are `⌃Home` and `⌃End`, which is the distinction every editor draws.
+
+**`↑`/`↓` is the same shape and is left as found rather than picked.** They are the prompt's history bindings for exactly the reason `Home` was the prompt's, so a one-row scroll has no key. `⌃↑`/`⌃↓` is the consistent answer and nothing has ruled it, `scrollBy` has a live caller in the wheel so the operation is not dead, and inventing a binding while recording that inventing bindings is how this went wrong would be its own defect. Named here so the next ruling has a subject.
+
+### A region row resolves to an entry here
+
+```typescript
+entryAtRow(row: number): Readonly<{ id: EntryId; rowOffset: number }> | null;
+```
+
+A mouse click arrives as a position and has to become a target. C16 §4 routes mouse events by position rather than by focus, and the middle step — a region row becoming the entry drawn there — is scroll arithmetic, which §2 and §11 both place here.
+
+It was specified nowhere until C16's spec pass, while C16's dependency line already claimed to consume it. The alternative was C16 walking `visible()` and accumulating `takeRows` itself, which works and puts the viewport's arithmetic in the router: two components computing where a row is, agreeing until one of them learns about `gapBefore` or the live gutter and the other does not.
+
+**It returns `rowOffset` as well as `id`**, for the same reason `Anchor` carries one (I6). An entry alone answers "which block was clicked" and not "which row of it", and the row is what C11 needs to resolve a row action. Returning the id alone would push the second lookup back to the caller, which is where this started.
+
+`null` for a row outside the viewport's occupied rows — a short transcript leaves rows below the last entry, and a click there is not a click on the last entry.
+
+**Pure, and no cursor of its own.** `entryAtRow` reads the index and the current scroll, and stores nothing. Copy mode's row cursor is §6's; this is a query.
 
 ---
 
@@ -127,10 +147,14 @@ Invalidation:
 |---|---|
 | `append` | Measure one entry; push onto the index |
 | `patch` | `rev` changed → remeasure that entry, **overwrite its slot**, update the index by the delta |
-| `settle` | Nothing; settling does not change content |
+| `settle` | **Remeasure that entry, exactly as `patch` does.** A bare `settle(id)` changes nothing and its cached height is returned unchanged, so sharing the arm costs a lookup; `settle(id, doc)` replaces the document and moves `rev`, which is a content change by any reading |
 | `evict` | Delete those ids; advance the front offset, and rebuild if it now exceeds the live count |
 | `clear` | Drop everything |
 | Width change | Drop everything, rebuild the index |
+
+**The `settle` row said "Nothing" and was true when it was written.** C13's `settle(id)` ended a stream and left the document alone, so there was nothing to remeasure. `settle(id, doc)` arrived later — C13 §settle, ruled while C23 was being built — and it *replaces* the document and moves `rev`. The row was not re-read, and the consequence is the failure the paragraph below already describes: the app route appends a pending entry with no blocks, measures it at zero, settles it with the real document, and the height stays zero. `totalRows` of 0, an empty visible range, and a blank screen with an entry sitting in the store.
+
+**Found the same way as last time — by reading a frame.** Every unit test of every piece passed: C13 settles correctly, C14's cache invalidates on `rev` correctly, C09 measures correctly. Nothing compared the transition. That is the second instance of this exact symptom in this component, and the first is described immediately below.
 
 **The table reads as though each `Change` arrives at a store that changed only in that way, and C13 does not work like that.** One `transcript.append()` emits `append` **and then** `evict`, so when the `append` row above runs, the entry list has *already* lost its front and gained the eviction marker at its head. "Measure one entry; push onto the index" is correct only when nothing was evicted alongside, and the `evict` that follows is then repairing an index that desynchronised one row earlier.
 
@@ -150,6 +174,7 @@ Width changes invalidate every cached height, because wrapping changes. Height c
 
 ```
 on resize:
+  0  if neither width nor height changed: return, emitting nothing
   1  capture the anchor before anything else
   2  if width changed: drop the cache, rebuild the index
   3  recompute viewportHeight from the same snapshot (C01 SIGWINCH, D31)
@@ -158,13 +183,27 @@ on resize:
   6  if followTail: snap to the bottom instead
 ```
 
+**Step 0 is a property of `resize`, not an accommodation for a caller** (I21). A resize to the size already held has no work in it, and the steps below are not inert: 1 and 4 capture and restore an anchor, and the emit at the end tells L4 something moved. A caller that hands over the same size therefore gets a `Change` reporting a move that did not happen, and L4's answer to a change is to compose a frame — so an unchanging size becomes a frame per call.
+
+There is already a caller that does this without meaning to. **A `SIGWINCH` is a notification that the size *may* have changed**, and a terminal delivers one for events that leave the reported size identical — a font change, a pane re-layout that ends where it began, a multiplexer redrawing. C01 hands the snapshot on without comparing it to the last (C01 §Signals: C01 holds no viewport state to compare against), so the comparison has to be here, and it belongs here anyway: this is the component that knows what size it is.
+
+The guard is stated separately from anything that relies on it. A guard justified by its caller is removed when the caller changes, and this one is worth having with no caller at all.
+
 Step 1 before step 2 matters: the anchor is an entry id and a row offset within it, and after remeasuring at a new width that row offset may exceed the entry's new height. It clamps to the entry's last row rather than spilling into the next entry, so the anchor degrades gracefully rather than drifting.
+
+**The height C14 is given is the transcript region's, not the terminal's** (I22). They differ by the frame's chrome — a header row, a footer row, and a prompt whose height varies with what is typed (S01 §3) — and C14 cannot derive one from the other, because it holds no geometry above itself and the prompt's height is not a function of anything it knows. So the caller must hand over the region's height, and the caller that knows it is the one that composed the frame.
+
+Handing over the terminal's is the near-miss, and it is silent in both directions. `#maxTop()` is `totalRows − viewportHeight`, so a viewport that believes it is taller stops scrolling early by exactly the chrome: the last rows of the document are unreachable by `End`, `PageDown` or `↓`, all three stopping at the same row. And the surplus rows it selects are discarded by whoever paints, so nothing downstream ever sees a count it did not expect. Every invariant here still holds — `visible()` sums to `viewportHeight` exactly (I10) — because they all compare the viewport with itself.
 
 Dragging an edge continuously must produce continuously correct frames, never a blank one (C02 §5, D31).
 
 ---
 
 ## 6. Copy mode
+
+> **Unbuilt as of 2026-07-31, and this note exists because nothing else recorded that.** C14 landed with §6 specified and no implementation: `Viewport` carries no `enterCopy`/`exitCopy`, no clipboard injection, and **T1.13, T1.14, T1.15, T3.14 and T5.6 are absent from the suite rather than deferred**. Absent is not deferred — a deferral is tracked and expires (`tools/enforce/todo-expiry.mjs`), while an absent test is indistinguishable from a component that had nothing to say. The five now exist as deferrals against the file that will hold this section, so they fail the moment it is written.
+>
+> Until then, C16 takes `copyMode` as a boolean input and `exitCopyMode` as an injected call. That is a seam standing in for something **unbuilt**, which is legitimate, as distinct from a seam standing in for something unspecified — the distinction that put `entryAtRow` in §2 rather than in C16's constructor.
 
 Mouse is on by default (D34), which takes the terminal's own text selection — the way people copy a UUID today. Copy mode is therefore not optional (A01 S30).
 
@@ -211,6 +250,10 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 - **I16** — There is no overscan in v1. Rows outside the viewport are not measured or rendered ahead, and adding it is a measurable change against M-T3's baseline rather than a default nobody chose.
 - **I17** — A page movement is exactly `viewportHeight − 1` rows, in both directions. The overlap is the point: a full-height page turn leaves a reader with no anchor in what they just read, and the off-by-one is the difference between the two.
 - **I18** — `VisibleRange` carries `live` per entry; the gutter marker is frame chrome and never enters a block or a measurement.
+- **I19** — `entryAtRow` is pure and total: it reads the index and the current scroll, stores nothing, and returns `null` for any row the transcript does not occupy. It is the **only** place a region row becomes an entry — C16 routes mouse events by position and does not recompute the mapping, because two components computing where a row is will agree until one of them learns about a height change and the other does not.
+- **I20** — **Chrome that occupies rows enters the height; chrome that occupies columns does not.** I18's live gutter is the second kind, and that is *why* it may stay out of every measurement — not because it is chrome. The command line each entry is drawn with is the first kind: it is not a block, so it is never adapter output and never counts toward C13's cap, but it takes a row and may wrap, so an entry's height is `chromeRows(entry, width) + measureSequence(entry.doc.blocks, width)`. `chromeRows` is injected beside `measureSequence` and defaults to none, so C14 still knows nothing about what the chrome says. **Composing the two in different places is the whole hazard**: the composer draws `chrome ++ blocks` and the index measures `blocks`, and a viewport that is arithmetically self-consistent then describes a document it is not showing.
+- **I21** — `resize` to the size already held is a no-op: nothing is captured, nothing is restored, and **no `Change` is emitted**. The emit is the load-bearing half — a change reports that the view moved, and a view that did not move must not report one, whatever the caller intended by the call. C01 delivers a `SIGWINCH` whenever the size *may* have changed and holds no previous size to compare against, so this component is the first one that can tell.
+- **I22** — The height handed to `resize` is the **transcript region's**, not the terminal's. C14 holds no geometry above itself and cannot derive one from the other — the difference includes the prompt, whose height varies with what is typed — so the caller composing the frame owns the value (C22 I34). The failure is silent in both directions: too tall and `#maxTop()` leaves the document's last rows unreachable by any key, while the surplus rows `visible()` selects are discarded by the paint, so no count downstream is ever surprised. I10 holds throughout, because it compares the viewport with itself.
 
 ---
 
@@ -233,6 +276,10 @@ Copy mode remembers whether it was following, so leaving it resumes the tail rat
 15. The eviction marker is an ordinary entry and needs no special handling (I13).
 16. `VisibleRange` marks the live entry; the frame draws the live gutter, and no measurement includes it (I18).
 17. An entry's height is `measureSequence`, so `gapBefore` is counted — never `Σ measure`, which is short by one row per gap (I1, C09 I17).
+18. A region row resolves to an entry and a row within it here, once, and C16 does not recompute the mapping (I19).
+19. Row-occupying chrome is measured and column-occupying chrome is not; the command line is the first and the live gutter is the second (I20, I18).
+20. A resize to the size already held does nothing and emits nothing (I21).
+21. The height `resize` is given is the transcript region's, and the caller that composed the frame owns it (I22).
 
 ---
 
@@ -275,10 +322,14 @@ Fake heights, no rendering.
 - **T2.5** (I12): the module graph shows no import from `terminal/`.
 - **T2.6** (I1): a spy on the block registry proves `render` is never called during a visibility query.
 - **T2.7**: every `Change` variant from C13 has a documented cache effect — exhaustive over the union.
+- **T2.11** (I19): over the same fuzz corpus as T2.1, `entryAtRow` agrees with `visible()` for every occupied row — the entry it names is the one whose `skipRows`/`takeRows` span covers that row, and the `rowOffset` it returns lands inside that entry's height. Asserted against `visible()` rather than against a hand-rolled walk, or the test reimplements the thing it checks and the two agree by construction.
+- **T2.12** (I19): `entryAtRow` performs no mutation — a thousand calls leave `scroll`, `anchor` and `stats` identical.
 
 ### Tier 3 — edge cases
 
 - **T3.1**: empty transcript → empty range, `topRow` 0, no throw.
+- **T3.1b** (I19): `entryAtRow` on an empty transcript, on a negative row, and on a row below the last entry in a short transcript → `null` in all three, never the last entry. A click on blank space beneath the transcript is not a click on the thing above it.
+- **T3.1c** (I19): a row inside an entry that begins above the viewport's top edge → the entry is named and `rowOffset` accounts for the `skipRows` already scrolled past, rather than counting from the viewport's first row.
 - **T3.2**: scroll to bottom while already following → no-op.
 - **T3.3**: `viewportHeight` of 0 → empty range, no division by zero.
 - **T3.4**: `viewportHeight` of 1 → exactly one row visible.
@@ -290,6 +341,8 @@ Fake heights, no rendering.
 - **T3.10**: eviction while following → still at the bottom.
 - **T3.11**: rapid resize between two widths fifty times → final state is correct for the final width; no accumulated drift.
 - **T3.12** (I8): a height-only resize → no cache entry is invalidated.
+- **T3.12c** (§5 step 6): a viewport **following the tail**, resized shorter → it is still at the tail, and the transcript's last row is still the last visible row. Step 6 was written in §5 and had no mechanism: `resize` went to `#restoreFromAnchor`, which for a follower (`anchor === null`) only clamps `topRow` into the new bounds, so shrinking the region slid the tail off the bottom one row per row lost. Invisible while `resize` fired only on `SIGWINCH` — one event deep, and it reads as the terminal's doing.
+- **T3.12b** (I21): a resize to the width and height already held → **no `Change` is emitted**, and `scroll`, `anchor` and `stats` are identical afterwards. Asserted from a *detached* viewport with a captured anchor, because from a tail-following one at the top of a short transcript the capture-and-restore is a round trip to the same value and the row passes with the guard removed — the state that distinguishes the two readings is the one that has something to lose.
 - **T3.13**: a patch that shrinks an entry below the current `topRow`'s dependence → `topRow` clamps rather than exceeding `totalRows`.
 - **T3.14**: movement in copy mode moves the cursor and scrolls only when the cursor reaches an edge.
 - **T3.15**: yank with an empty selection → clipboard untouched, no throw.
@@ -306,7 +359,7 @@ Fake heights, no rendering.
 - **T4.5** (with C10): switching theme mid-scroll → no remeasure, no movement, only a repaint.
 - **T4.6** (with C02, C09): a `unicode: "ascii"` session measures identically to UTF-8 at every width.
 - **T4.7** (with C01): a `SIGWINCH` snapshot drives one resize; the anchor is captured before the cache is dropped.
-- **T4.8** (with C03, L4): a scroll causes **L4** to issue one `commit("input")` — immediate, never coalesced. A spy asserts C14 never calls the scheduler itself, matching the C01 and C10 orchestration pattern.
+- **T4.8** (with C03, L4): a scroll causes **L4** to issue one `commit("input")` — immediate, never coalesced. A spy asserts C14 never calls the scheduler itself, matching the C01 and C10 orchestration pattern. **Driven through L4's read loop rather than by dispatching to the handler**, because the commit is the loop's (C22 I27): a test that dispatched directly would assert the mechanism it happened to find, and it passed while the handler and the loop would both have committed.
 
 ### Tier 5 — e2e
 
@@ -316,6 +369,8 @@ Fake heights, no rendering.
 - **T5.4**: the same, then `End` → snaps to the bottom and resumes following.
 - **T5.5**: dragging the terminal edge from 160 to 60 and back while scrolled to the middle → the same content is on screen at both ends, no blank frames.
 - **T5.6**: copy mode selecting forty rows across three entries and yanking → the clipboard holds exactly those rows as plain text.
+
+- **T4.10** (with C13, §4): an entry appended empty and streaming, then settled with a document → `totalRows` covers its rows and `visible()` includes it. **The transition rather than either end**: `settle(id, doc)` is newer than this component's invalidation table, and both halves were separately correct while nothing measured the entry after the settle.
 
 ### Tier 6 — fail-on-revert
 
@@ -330,10 +385,14 @@ Fake heights, no rendering.
 - **T6.9** (I10): an off-by-one in the visible range → T2.1 fails across the corpus.
 - **T6.10** (I14): dropping the prior follow state on copy-mode exit → T1.14 fails and users are stranded detached.
 - **T6.11** (I11): shelling out to a clipboard binary → T2.4 fails.
+- **T6.13** (§4): restoring `settle` to "invalidates nothing" → T4.10 fails, and the app route's entry has zero height for the rest of the session: appended with no blocks, measured at zero, settled with the real document, never remeasured. The screen is blank with the entry in the store, and every assertion about anchors, clamping and the cache passes.
 - **T6.12** (I12): C14 calling `commit` directly → T4.8's spy fails, and L2 gains a dependency on L0-terminal.
 - **T6.13** (I13): special-casing the eviction marker → T4.3's cache-delta assertions fail on the marker entry.
 - **T6.14** (I3): reading `(entryId, rev, width)` as a composite map key → T2.3b fails, and a `--watch` at a thousand lines a second accumulates a slot per tick. T2.3 still passes, which is why T2.3b exists.
 - **T6.15** (I9): keeping the front offset and never rebuilding → T2.8 fails on a session that evicts without resizing, and the index outgrows the transcript it indexes.
+- **T6.19** (§5 step 6): removing the `followTail` branch from `resize` → T3.12c fails and the tail drifts off the bottom of the screen. `#afterContent` has the same two-branch shape ten lines away, which is what makes the omission read as a completed step.
+- **T6.17** (I21): removing the unchanged-size guard → T3.12b fails, and every frame L4 composes emits a `Change` back at L4, because L4 now hands the region's height over per frame (C22 I34).
+- **T6.18** (I22): handing `resize` the terminal's height instead of the region's → C04 T5.1 fails at the foot of the document, and `paint`'s transcript region refuses the over-long selection instead of silently keeping its first rows. **Neither half of that existed when the defect did**: the paint truncated and the drift test was deferred, so the last three rows of every tall entry were unreachable and nothing in six tiers could say so.
 - **T6.16** (I1): summing `measure(b, w)` instead of calling `measureSequence` → T2.9 fails, and every entry with a `gapBefore` is short by one row per gap. The most likely single defect in this component, because the summation is what a reader writes.
 
 ---

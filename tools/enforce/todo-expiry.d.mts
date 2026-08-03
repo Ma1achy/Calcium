@@ -9,19 +9,47 @@ export type Violation = {
   spec: string;
 };
 
-export type TodoEntry = {
-  file: string;
+export type TodoCall = {
   title: string;
+  /**
+   * Title assembled with `+` — TD5. Only the first fragment could be read.
+   *
+   * Optional so a fabricated entry may omit it and mean "not concatenated";
+   * `todoCalls` always sets it explicitly.
+   */
+  concatenated?: boolean;
+};
+
+export type TodoEntry = TodoCall & {
+  file: string;
 };
 
 export declare const COMPONENT_SOURCES: Readonly<Record<string, string>>;
 export declare const LAYER_SOURCES: Readonly<Record<string, string>>;
 export declare const ACKNOWLEDGED_BACKLOG: readonly string[];
+export declare function backlogKey(
+  violation: Readonly<{ rule: string; file: string; count?: number }>,
+): string;
 
 /** Component and layer ids in a title's blocker clause. `null` when it names none. */
 export declare function blockersIn(title: string): readonly string[] | null;
 
-export declare function todoTitles(source: string): string[];
+/** The clause, cut at an em dash, a period, or an unmatched closing paren. */
+export declare function blockerClause(text: string): string;
+
+/** Every `it`/`test`/`describe` `.todo`/`.skip` call, past comments (A03 §9a). */
+export declare function todoCalls(source: string): TodoCall[];
+
+/**
+ * The phrase a deferral writes when it waits on no component (TD6).
+ *
+ * Exported rather than repeated, so the rule and the tests that fabricate
+ * against it cannot come to disagree about the form.
+ */
+export declare const NO_COMPONENT_MARKER: string;
+
+/** Exists, and holds more than the scaffold's `export {}`. */
+export declare function defaultIsImplemented(path: string): boolean;
 
 export declare function checkTodoExpiry(
   entries: readonly TodoEntry[],

@@ -26,8 +26,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 40 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield       [39m  [38;2;138;138;138mbefore      [39m  [38;2;138;138;138mafter       [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield       [39m  [38;2;138;138;138ma           [39m  [38;2;138;138;138mb           [39m
 [38;2;98;98;98mp99         [39m  [38;2;212;212;212m120ms       [39m  [38;2;135;184;108m98ms        [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"~
@@ -73,8 +73,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 60 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield               [39m  [38;2;138;138;138mbefore            [39m  [38;2;138;138;138mafter             [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield               [39m  [38;2;138;138;138ma                 [39m  [38;2;138;138;138mb                 [39m
 [38;2;98;98;98mp99                 [39m  [38;2;212;212;212m120ms             [39m  [38;2;135;184;108m98ms              [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang~
@@ -120,8 +120,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 80 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield                     [39m  [38;2;138;138;138mbefore                   [39m  [38;2;138;138;138mafter                    [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield                     [39m  [38;2;138;138;138ma                        [39m  [38;2;138;138;138mb                        [39m
 [38;2;98;98;98mp99                       [39m  [38;2;212;212;212m120ms                    [39m  [38;2;135;184;108m98ms                     [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","~
@@ -167,8 +167,8 @@ exports[`C09 T2.10 — golden frames > dark-ascii at 120 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield                                   [39m  [38;2;138;138;138mbefore                                [39m  [38;2;138;138;138mafter                                 [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield                                   [39m  [38;2;138;138;138ma                                     [39m  [38;2;138;138;138mb                                     [39m
 [38;2;98;98;98mp99                                     [39m  [38;2;212;212;212m120ms                                 [39m  [38;2;135;184;108m98ms                                  [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l~
@@ -214,8 +214,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 40 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield       [39m  [38;2;138;138;138mbefore      [39m  [38;2;138;138;138mafter       [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield       [39m  [38;2;138;138;138ma           [39m  [38;2;138;138;138mb           [39m
 [38;2;98;98;98mp99         [39m  [38;2;212;212;212m120ms       [39m  [38;2;135;184;108m98ms        [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"…
@@ -261,8 +261,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 60 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield               [39m  [38;2;138;138;138mbefore            [39m  [38;2;138;138;138mafter             [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield               [39m  [38;2;138;138;138ma                 [39m  [38;2;138;138;138mb                 [39m
 [38;2;98;98;98mp99                 [39m  [38;2;212;212;212m120ms             [39m  [38;2;135;184;108m98ms              [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang…
@@ -308,8 +308,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 80 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield                     [39m  [38;2;138;138;138mbefore                   [39m  [38;2;138;138;138mafter                    [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield                     [39m  [38;2;138;138;138ma                        [39m  [38;2;138;138;138mb                        [39m
 [38;2;98;98;98mp99                       [39m  [38;2;212;212;212m120ms                    [39m  [38;2;135;184;108m98ms                     [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","…
@@ -355,8 +355,8 @@ exports[`C09 T2.10 — golden frames > dark-unicode at 120 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;224;108;117mname:[38;2;212;212;212m [38;2;152;195;121mapi[39m
 [38;2;224;108;117mreplicas:[38;2;212;212;212m [38;2;209;154;102m3[39m
-── diff · measured 2 · rendered 2
-[38;2;138;138;138mfield                                   [39m  [38;2;138;138;138mbefore                                [39m  [38;2;138;138;138mafter                                 [39m
+── comparison · measured 2 · rendered 2
+[38;2;138;138;138mfield                                   [39m  [38;2;138;138;138ma                                     [39m  [38;2;138;138;138mb                                     [39m
 [38;2;98;98;98mp99                                     [39m  [38;2;212;212;212m120ms                                 [39m  [38;2;135;184;108m98ms                                  [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l…
@@ -402,8 +402,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 40 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield       [39m  [38;2;105;108;119mbefore      [39m  [38;2;105;108;119mafter       [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield       [39m  [38;2;105;108;119ma           [39m  [38;2;105;108;119mb           [39m
 [38;2;148;149;156mp99         [39m  [38;2;56;58;66m120ms       [39m  [38;2;60;121;60m98ms        [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"~
@@ -449,8 +449,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 60 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield               [39m  [38;2;105;108;119mbefore            [39m  [38;2;105;108;119mafter             [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield               [39m  [38;2;105;108;119ma                 [39m  [38;2;105;108;119mb                 [39m
 [38;2;148;149;156mp99                 [39m  [38;2;56;58;66m120ms             [39m  [38;2;60;121;60m98ms              [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang~
@@ -496,8 +496,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 80 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield                     [39m  [38;2;105;108;119mbefore                   [39m  [38;2;105;108;119mafter                    [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield                     [39m  [38;2;105;108;119ma                        [39m  [38;2;105;108;119mb                        [39m
 [38;2;148;149;156mp99                       [39m  [38;2;56;58;66m120ms                    [39m  [38;2;60;121;60m98ms                     [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","~
@@ -543,8 +543,8 @@ exports[`C09 T2.10 — golden frames > light-ascii at 120 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield                                   [39m  [38;2;105;108;119mbefore                                [39m  [38;2;105;108;119mafter                                 [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield                                   [39m  [38;2;105;108;119ma                                     [39m  [38;2;105;108;119mb                                     [39m
 [38;2;148;149;156mp99                                     [39m  [38;2;56;58;66m120ms                                 [39m  [38;2;60;121;60m98ms                                  [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l~
@@ -590,8 +590,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 40 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield       [39m  [38;2;105;108;119mbefore      [39m  [38;2;105;108;119mafter       [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield       [39m  [38;2;105;108;119ma           [39m  [38;2;105;108;119mb           [39m
 [38;2;148;149;156mp99         [39m  [38;2;56;58;66m120ms       [39m  [38;2;60;121;60m98ms        [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"…
@@ -637,8 +637,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 60 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield               [39m  [38;2;105;108;119mbefore            [39m  [38;2;105;108;119mafter             [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield               [39m  [38;2;105;108;119ma                 [39m  [38;2;105;108;119mb                 [39m
 [38;2;148;149;156mp99                 [39m  [38;2;56;58;66m120ms             [39m  [38;2;60;121;60m98ms              [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","lang…
@@ -684,8 +684,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 80 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield                     [39m  [38;2;105;108;119mbefore                   [39m  [38;2;105;108;119mafter                    [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield                     [39m  [38;2;105;108;119ma                        [39m  [38;2;105;108;119mb                        [39m
 [38;2;148;149;156mp99                       [39m  [38;2;56;58;66m120ms                    [39m  [38;2;60;121;60m98ms                     [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","…
@@ -731,8 +731,8 @@ exports[`C09 T2.10 — golden frames > light-unicode at 120 1`] = `
 ── code · measured 2 · rendered 2
 [38;2;168;67;44mname:[38;2;56;58;66m [38;2;60;121;60mapi[39m
 [38;2;168;67;44mreplicas:[38;2;56;58;66m [38;2;145;99;1m3[39m
-── diff · measured 2 · rendered 2
-[38;2;105;108;119mfield                                   [39m  [38;2;105;108;119mbefore                                [39m  [38;2;105;108;119mafter                                 [39m
+── comparison · measured 2 · rendered 2
+[38;2;105;108;119mfield                                   [39m  [38;2;105;108;119ma                                     [39m  [38;2;105;108;119mb                                     [39m
 [38;2;148;149;156mp99                                     [39m  [38;2;56;58;66m120ms                                 [39m  [38;2;60;121;60m98ms                                  [39m
 ── patch · measured 1 · rendered 1
 {"kind":"patch","id":"patch-1","path":"src/server.ts","language":"typescript","hunks":[{"header":"@@ -18,7 +18,9 @@","l…

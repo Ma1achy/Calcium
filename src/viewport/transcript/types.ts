@@ -43,6 +43,9 @@ export type TranscriptEntry = Readonly<{
  * `rev` rides on success so C14 can invalidate its height cache from the return
  * value rather than re-reading `entries` to find the entry it just patched.
  */
+/** Which side of the boundary a patch came from (§6). */
+export type PatchOrigin = "farSide" | "shell";
+
 export type PatchOutcome =
   | Readonly<{ ok: true; rev: number }>
   | Readonly<{ ok: false; reason: "unknown" | "settled" }>
@@ -106,11 +109,37 @@ export interface TranscriptStore extends TranscriptView {
    */
   append(doc: ViewDocument, opts?: Readonly<{ streaming?: boolean; payload?: unknown }>): EntryId;
 
-  /** Applies a patch, or says why it could not. Never throws (§6, I8). */
-  patch(id: EntryId, patch: ViewPatch): PatchOutcome;
+  /**
+   * Applies a patch, or says why it could not. Never throws (§6, I8).
+   *
+   * **`origin` is who is writing, and the gate reads it.** A settled entry
+   * accepts nothing further from the *far side* — a patch after `settle` means
+   * the transport lied or a stale stream leaked, which is a real defect. The
+   * shell speaking about an entry it holds is a different claim and has nothing
+   * to do with whether the far side is still talking.
+   *
+   * Defaults to `"farSide"`, the conservative direction: an unmarked patch is
+   * gated, so a caller's mistake is a rejection rather than a leak.
+   *
+   * **Not `meta.origin`** (C04 I13), which is `user | action | agent | refresh`
+   * on a *document* and records who initiated a command. Similar word, different
+   * axis, and neither derives from the other.
+   */
+  patch(id: EntryId, patch: ViewPatch, origin?: PatchOrigin): PatchOutcome;
 
-  /** The stream ended; the entry stops accepting patches. Unknown ids are a no-op. */
-  settle(id: EntryId): void;
+  /**
+   * The entry is done, and `doc` is the final one if there is one.
+   *
+   * **Settling *is* the replacement** on C23's app route, where steps 6 and 7 are
+   * one call (C23 §3). They separate only for a stream. Returns the same
+   * `PatchOutcome` as `patch` so C14 invalidates from `rev` through one path,
+   * and `rev` moves **iff** a document is given (I13): a bare settle changes
+   * nothing about the document, and moving it would invalidate a height still
+   * correct on every stream that ends.
+   *
+   * Throws on an invalid document, as `append` does and for its reason (§3).
+   */
+  settle(id: EntryId, doc?: ViewDocument): PatchOutcome;
 
   /** Empties the transcript. Command history is C20's and is untouched (I16). */
   clear(): void;

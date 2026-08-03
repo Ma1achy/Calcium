@@ -31,7 +31,7 @@ import {
   checkMeasurement,
   DEFAULT_WIDTHS,
   formatReport,
-} from "../support/measurement-conformance.js";
+} from "../../src/testing/measurement-conformance.js";
 import { ASCII_CAPS, measurable } from "../support/render.js";
 
 /**
@@ -50,7 +50,7 @@ const EXPECTED_KINDS = [
   "plot",
   "progress",
   "code",
-  "diff",
+  "comparison",
   "patch",
   "pills",
   "tip",

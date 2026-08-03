@@ -118,6 +118,7 @@ export function place(
           // The owner windows a view's content (§4). Reported rather than
           // clipped, because C15 has no scroll and should not grow one.
           truncated: measured > region.height,
+          ...(layer.cursor !== undefined && { cursor: layer.cursor }),
         }),
       );
       continue;
@@ -157,7 +158,19 @@ export function place(
     left = Math.max(0, Math.min(left, Math.max(0, region.width - width)));
 
     if (height <= 0) continue;
-    out.push(Object.freeze({ layer, top, left, height, width, truncated }));
+    // The cursor is copied, never computed: both ends are relative to the
+    // layer's own origin, and C15 has no idea what a caret is (I19).
+    out.push(
+      Object.freeze({
+        layer,
+        top,
+        left,
+        height,
+        width,
+        truncated,
+        ...(layer.cursor !== undefined && { cursor: layer.cursor }),
+      }),
+    );
   }
 
   return Object.freeze(out);

@@ -17,6 +17,12 @@ import { spawn } from "node-pty";
 
 const MARKER = "__TERMIOS__";
 
+/** The frame's prefix, and the anchor `frame` slices from (C22 §6). */
+const HOME = "\u001b[H";
+
+/** Every escape, for reading a frame as the rows a user would see. */
+const CSI_ANY = /\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])/g;
+
 export type DecsetState = {
   altScreen: boolean;
   cursorVisible: boolean;
@@ -240,6 +246,28 @@ export function control(): Promise<PtyRun> {
   return runInPty("true");
 }
 
+/** The glyph the prompt wears, and the one every e2e file waits on first. */
+export const PROMPT = /❯/;
+
+/**
+ * The prompt's row in a frame — the **last** one wearing the glyph.
+ *
+ * **It was `find`, and that was unambiguous only while nothing else drew a `❯`.**
+ * C22 I33 draws each entry with the command that produced it, above the entry and
+ * therefore above the prompt, so the *first* such row is a transcript echo. A row
+ * asserting the prompt holds some text then matched an echo that holds it forever,
+ * and the assertion could never fail again — which is A03 §2's vacuity class
+ * arriving in a predicate.
+ *
+ * It is here rather than in one test file because it went wrong twice: editor
+ * T5.4 found it, was fixed locally, and theme T5.4 kept its own copy of the
+ * defect for a further commit. The prompt is the bottom-most `❯` by construction
+ * (S01 §3 — the prompt region is the last thing above the footer).
+ */
+export function promptRow(frame: readonly string[]): string {
+  return [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
+}
+
 export type InteractivePty = {
   /** Send bytes as a user would — through the PTY, not through a back channel. */
   type(bytes: string): void;
@@ -253,8 +281,36 @@ export type InteractivePty = {
   resize(cols: number, rows: number): void;
   /** Everything received so far. */
   readonly output: string;
+  /**
+   * The most recently written frame, as rows, with escapes removed.
+   *
+   * **`output` is cumulative and almost never what a row wants to assert
+   * against.** A shell repaints the whole screen on every keystroke, so text
+   * deleted three frames ago is still in `output` forever — an assertion that
+   * something is *gone* passes only by accident, and one about the frame's
+   * height counts every frame ever written. Four editor rows were written
+   * against `output` and three of them failed on exactly that.
+   *
+   * The reconstruction is the frame's own shape (S01 §3, C22 §6): one write per
+   * frame, beginning with a hide and `CSI H` and ending with the cursor's
+   * position. So the current frame is everything after the last `CSI H`, and
+   * this is the same slice C03's T4.9 takes in-process.
+   */
+  readonly frame: readonly string[];
   /** Resolve once `pattern` appears, or reject after `ms`. */
   waitFor(pattern: RegExp, ms?: number): Promise<RegExpExecArray>;
+  /**
+   * Resolve once the current frame satisfies `ok`, or reject after `ms`.
+   *
+   * **`waitFor` cannot express "the screen has changed".** It matches the
+   * accumulated stream, so a pattern already in it resolves synchronously —
+   * which is right for "this appeared" and silently wrong for anything about
+   * the *present* state. A row asserting text was deleted waited on a pattern
+   * that had been there since it was typed, so the assertion ran before the
+   * frame it was about had been written, and the key under test looked broken
+   * when it was not.
+   */
+  waitForFrame(ok: (frame: readonly string[]) => boolean, ms?: number): Promise<void>;
   done(): Promise<number>;
   kill(): void;
 };
@@ -282,15 +338,34 @@ export function interactivePty(
     cols: opts.cols ?? 80,
     rows: opts.rows ?? 24,
     env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
+    // Raw bytes rather than per-chunk strings — see `bytes` below.
+    encoding: null,
   });
 
   let output = "";
   let exited: number | null = null;
+  /**
+   * **A multi-byte character split across two reads is one character, not two
+   * replacements.** `node-pty` decodes each chunk it delivers independently, so
+   * a CJK glyph or an emoji straddling a read boundary arrives as `\uFFFD`
+   * twice — and the transcript then disagrees with the screen about content
+   * that is on it. C17 T5.3 saw `日本` followed by two replacement characters
+   * and the defect was here rather than in the decoder, which has held a
+   * partial sequence across chunks since it landed (C16 T3.14).
+   *
+   * `encoding: null` is what makes the fix possible: it stops node-pty decoding
+   * at all and hands over `Buffer`s, which one streaming decoder then turns
+   * into text for the life of the terminal. Taking the mangled string back
+   * apart would not work — by then the two halves are both `\uFFFD` and the
+   * original bytes are gone.
+   */
+  const bytes = new TextDecoder("utf-8");
   const waiters: { re: RegExp; resolve: (m: RegExpExecArray) => void }[] = [];
   const exitWaiters: ((code: number) => void)[] = [];
 
   term.onData((d) => {
-    output += d;
+    // Through the one streaming decoder — see `bytes`.
+    output += bytes.decode(d as unknown as Uint8Array, { stream: true });
     for (let i = waiters.length - 1; i >= 0; i -= 1) {
       const m = waiters[i]!.re.exec(output);
       if (m !== null) {
@@ -309,6 +384,39 @@ export function interactivePty(
     resize: (cols, rows) => term.resize(cols, rows),
     get output() {
       return output;
+    },
+    get frame() {
+      const at = output.lastIndexOf(HOME);
+      if (at === -1) return [];
+      return output
+        .slice(at + HOME.length)
+        .replaceAll(CSI_ANY, "")
+        // **`\r*\n`, not `\r\n`.** The frame joins its rows with `\r\n` and the
+        // PTY's ONLCR translates the `\n` again, so what arrives is `\r\r\n` —
+        // and splitting on the written separator leaves a stray `\r` on the end
+        // of every row, which breaks any assertion that touches a row's edge.
+        .split(/\r*\n/);
+    },
+    waitForFrame(ok, ms = 15_000) {
+      // Polled rather than driven by the data event: the frame is a derived
+      // view of everything received so far, and a predicate over it is not a
+      // function of any single chunk.
+      const deadline = Date.now() + ms;
+      const self = this as InteractivePty;
+      return new Promise<void>((resolve, reject) => {
+        const tick = (): void => {
+          if (ok(self.frame)) {
+            resolve();
+            return;
+          }
+          if (Date.now() > deadline) {
+            reject(new Error(`the frame never satisfied it:\n${self.frame.join("\n")}`));
+            return;
+          }
+          setTimeout(tick, 20);
+        };
+        tick();
+      });
     },
     waitFor(re, ms = 15_000) {
       const existing = re.exec(output);

@@ -8,6 +8,7 @@ import {
   ARG_TYPES,
   findTool,
   parseManifest,
+  suggestName,
   validateInvocation,
   type ArgType,
   type Manifest,
@@ -220,12 +221,34 @@ describe("C05 contract", () => {
   });
 
   it("T2.7: parseManifest accepts its own serialised output", () => {
+    // **Serialising emits `appTools`** (§3): what round-trips is what the app
+    // wrote, and parse re-derives the framework's six. So the property is
+    // *sharper* than round-tripping a flat list — it asserts the derivation is
+    // deterministic as well as that nothing is lost.
+    //
+    // Emitting `tools` instead is what makes it false, and instructively: the
+    // output then contains rows the parser added, and re-parsing them hits §3's
+    // collision check, which cannot tell an app declaring `clear` from a
+    // re-parse of output that already contains it.
     const first = fixture();
-    const round = parseManifest(JSON.parse(JSON.stringify(first)));
+    const serialised = { ...first, tools: first.appTools, appTools: undefined };
+    const round = parseManifest(JSON.parse(JSON.stringify(serialised)));
 
     expect(round.ok).toBe(true);
     if (!round.ok) return;
-    expect(round.value).toEqual(first);
+    expect(round.value, "equal, framework rows and all").toEqual(first);
+  });
+
+  it("T2.7b (§3): serialising `tools` rather than `appTools` is rejected, and says why", () => {
+    // The control for the test above. Without it, T2.7 passes on an
+    // implementation that never appends the framework's rows at all — the
+    // property would hold trivially and mean nothing.
+    const first = fixture();
+    const wrong = parseManifest(JSON.parse(JSON.stringify({ ...first, appTools: undefined })));
+
+    expect(wrong.ok, "the framework's own rows collide with themselves").toBe(false);
+    if (wrong.ok) return;
+    expect(wrong.error.map((e) => e.message).join("\n")).toContain("tui-kit ships");
   });
 
   it("T2.8 (I8): findTool caches by identity, and a second manifest does not observe the first's", () => {
@@ -258,6 +281,30 @@ describe("C05 contract", () => {
     // And the reverse direction: the original still answers as it did, so the
     // second manifest did not overwrite a shared entry.
     expect(findTool(m, ["serving"])?.tool.name).toBe("serving");
+  });
+
+  it("T2.9 (I18): the exported suggester is the one the flag path uses, tie-break included", () => {
+    // **Asserted on the tie, because that is the only case two implementations
+    // would disagree about.** Any distance-2 suggester agrees that `--open-mrr`
+    // means `--open-mr`; what varies is which of two equidistant candidates
+    // wins, and a test written against a manifest with no ties in it passes for
+    // both answers. C05's answer is declaration order — first at the minimum.
+    const tool = toolNamed("ps");
+    const names = tool.flags.map((f) => f.name);
+
+    // `limit` and `label` both sit at distance 2 from `labit`, and `limit` is
+    // declared first. The direct call and the validator must agree on that, not
+    // merely both return something.
+    expect(suggestName("labit", names)).toBe("limit");
+
+    const result = validateInvocation(tool, ["--labit=1"]);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const unknown = result.errors.find((e) => e.code === "unknown_flag");
+    expect(unknown?.details?.["suggestion"]).toBe(suggestName("labit", names));
+
+    // And the cutoff, from the other side: nothing within 2 of this.
+    expect(suggestName("zzzzzzz", names)).toBeUndefined();
   });
 
   it("T2.6b (SS35): one Result in the tree, and the rule that keeps it that way fires", () => {

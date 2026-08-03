@@ -78,13 +78,43 @@ export type ToolDef = Readonly<{
    * the entry is how a verb is deleted.
    */
   hidden?: boolean;
+  /**
+   * The verb takes the terminal — C23 §4's handoff row (C05 I19).
+   *
+   * **The app author is the only party who can know this.** Detection is not
+   * available: whether a child wants a TTY is not knowable before running it.
+   * A maintained list of TTY program names is wrong for every wrapper and
+   * alias and fails silently when it is wrong, which is the shape C23 I26
+   * forbids. So the declaration lives beside the other things only the author
+   * knows, and `parseTool` refuses it with `streams` and with `local`.
+   *
+   * C18 carries the whole `ToolDef` on an `app` result, so this reaches C23
+   * with no parser change — one fact with one home rather than a copy on the
+   * result and nothing reconciling the two.
+   */
+  interactive?: boolean;
 }>;
 
 export type Manifest = Readonly<{
   schema: typeof MANIFEST_SCHEMA;
   binary: string;
   version: string; // the far side's version, for skew reporting
+  /** Every tool, the app's and the framework's — what `findTool` reads. */
   tools: readonly ToolDef[];
+  /**
+   * What the app wrote (§3).
+   *
+   * **The partition is here rather than a `source` field on `ToolDef`**, which
+   * would be settable by an app writing a manifest by hand — meaningless from
+   * its side and a lie if set wrongly — and readable by every consumer, so one
+   * eventually branches on it. This makes the two legitimate uses available and
+   * the illegitimate ones awkward.
+   *
+   * Two consumers: `serialise` emits it, because what round-trips is what the
+   * app wrote; and `/help` groups by it, because `/clear` and `/exit` are
+   * different in kind from `/ps` and a flat list hides that.
+   */
+  appTools: readonly ToolDef[];
 }>;
 
 export type ToolMatch = Readonly<{

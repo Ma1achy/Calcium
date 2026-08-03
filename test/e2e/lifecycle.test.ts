@@ -213,7 +213,52 @@ describe("C01 e2e — the terminal is given back", () => {
     },
     60_000,
   );
-  it.todo(
-    "T5.6: piping the shell to `cat` emits no escape sequence at all — waits on the L4 shell's TTY gate",
+  it(
+    "T5.6 (C22 I36, C22 I37): piping the shell to `cat` emits no escape sequence at all",
+    async () => {
+      // **The gate from outside**, and the only tier where stdout is genuinely
+      // not a terminal: every other harness here hands the session a PTY, which
+      // is what `isTTY` is true of. The pipe is the subject.
+      //
+      // `sh -c '… | cat'` inside the PTY: the session's stdout is the pipe, and
+      // `cat`'s is the PTY, so whatever the session writes still reaches the
+      // capture — which is what makes an assertion about *absence* meaningful
+      // rather than an assertion that the plumbing swallowed it.
+      const piped = await runInPty(`${FIXTURE} session | cat`);
+
+      // **The subject before the claim.** A session that failed to start writes
+      // nothing, and "no escape sequence" is satisfied by no output at all —
+      // the inert-subject class, and the exact shape this row would take if the
+      // gate were replaced by an early `process.exit()`.
+      expect(piped.bytes.length, "the gate printed something").toBeGreaterThan(0);
+      expect(piped.bytes, "and it is usage, not a frame").toContain("not a TTY");
+
+      // Folded over every byte, which is stronger than a diff: it survives a
+      // harmless reordering and still fails on a mode left set.
+      expect(trackDecset(piped.bytes)).toEqual({
+        altScreen: false,
+        cursorVisible: true,
+        bracketedPaste: false,
+        mouse1002: false,
+        mouse1006: false,
+        scrollRegion: false,
+      });
+      // eslint-disable-next-line no-control-regex
+      expect(piped.bytes, "not one escape").not.toMatch(/\u001b/);
+
+      // **The control, and without it this row passes against a shell that
+      // failed to start.** The same fixture with the PTY as its stdout *does*
+      // acquire the alternate screen, so the absence above is the gate's doing
+      // and not the harness's. `interactivePty`, because a session with a
+      // terminal does not exit — which is itself the difference being asserted.
+      const direct = interactivePty(`${FIXTURE} session`);
+      try {
+        await direct.waitFor(/❯/, 20_000);
+        expect(direct.output, "a TTY run does emit them").toContain("\u001b[?1049h");
+      } finally {
+        direct.kill();
+      }
+    },
+    60_000,
   );
 });

@@ -32,7 +32,13 @@ export type FakeStdout = NodeJS.WriteStream & {
   duringWrite(at: number, fn: () => void): void;
 };
 
-export function fakeStdout(size = { columns: 80, rows: 24 }): FakeStdout {
+/**
+ * `tty` defaults to true because every other row here is about a terminal.
+ * Gate 1 (C22 I36) is the one that needs the other value, and it needs a stream
+ * that is *otherwise identical* — a hand-rolled `{ write }` would refuse for
+ * reasons the gate does not own.
+ */
+export function fakeStdout(size = { columns: 80, rows: 24 }, { tty = true } = {}): FakeStdout {
   const chunks: string[] = [];
   const reads = { columns: 0, rows: 0 };
   let throwAt: number | null = null;
@@ -41,7 +47,7 @@ export function fakeStdout(size = { columns: 80, rows: 24 }): FakeStdout {
   let hook: (() => void) | null = null;
 
   const stream = {
-    isTTY: true,
+    isTTY: tty,
     write(chunk: unknown): boolean {
       if (hookAt === chunks.length && hook !== null) {
         const fn = hook;
@@ -106,22 +112,75 @@ export function fakeStdout(size = { columns: 80, rows: 24 }): FakeStdout {
 
 export type FakeStdin = NodeJS.ReadStream & {
   readonly rawModeCalls: boolean[];
+  /**
+   * Deliver bytes as the OS would, to whoever is listening **now** (C01 I18).
+   *
+   * The listener registry is real rather than a no-op, because the subject of
+   * T1.16 is precisely whether anyone is attached at a given moment. A fake
+   * whose `on` discarded the callback would report "no bytes arrived" for every
+   * state, which is the assertion passing for the wrong reason.
+   */
+  emit(chunk: string): void;
+  /** How many `data` listeners are attached. */
+  readonly listeners: number;
 };
 
 /** `tty: false` drops `setRawMode` entirely — stdin is not a TTY (T3.9). */
 export function fakeStdin({ tty = true } = {}): FakeStdin {
   const rawModeCalls: boolean[] = [];
+  const data = new Set<(chunk: Buffer) => void>();
+  /**
+   * Node's `flowing`, modelled rather than ignored (C01 I18a, T1.16b).
+   *
+   * `null` is the initial "not yet decided" state, `false` is what `pause()`
+   * sets, and the rule that matters is the one below in `on`: adding a `data`
+   * listener resumes a stream **only when `flowing` is not already false**.
+   *
+   * **Every one of these three lines was a no-op, and that is what hid the
+   * sixteenth structural gap for a whole stretch.** T1.16 asserts that bytes
+   * arrive again after `resume()`, drove this double, and passed against a
+   * `lifecycle.ts` whose `attachInput` re-added the listener to a paused
+   * stream — a fake narrower than the interface it stands for cannot fail on
+   * the difference. The defect was in the source; the reason no row could see
+   * it was here.
+   */
+  let flowing: boolean | null = null;
   const stream: Record<string, unknown> = {
     isTTY: tty,
     get rawModeCalls() {
       return rawModeCalls;
     },
-    on: () => stream,
+    get listeners() {
+      return data.size;
+    },
+    /** The OS delivers to a flowing stream and to no other. */
+    emit: (chunk: string): void => {
+      if (flowing !== true) return;
+      for (const cb of [...data]) cb(Buffer.from(chunk, "utf8"));
+    },
+    on: (event: string, cb: (chunk: Buffer) => void): unknown => {
+      if (event === "data") {
+        data.add(cb);
+        // `Readable.prototype.on`: `if (state.flowing !== false) this.resume()`.
+        if (flowing !== false) flowing = true;
+      }
+      return stream;
+    },
     once: () => stream,
-    off: () => stream,
+    off: (event: string, cb: (chunk: Buffer) => void): unknown => {
+      if (event === "data") data.delete(cb);
+      return stream;
+    },
     removeListener: () => stream,
-    resume: () => stream,
-    pause: () => stream,
+    resume: () => {
+      flowing = true;
+      return stream;
+    },
+    pause: () => {
+      flowing = false;
+      return stream;
+    },
+    isPaused: () => flowing === false,
   };
   if (tty) {
     stream["setRawMode"] = (on: boolean): unknown => {

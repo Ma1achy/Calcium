@@ -31,6 +31,7 @@ import {
   type Result,
   type ToolDef,
 } from "./types.js";
+import { FRAMEWORK_NAMES, FRAMEWORK_TOOLS } from "./framework.js";
 
 const ARG_TYPE_SET: ReadonlySet<string> = new Set<string>(ARG_TYPES);
 
@@ -400,6 +401,31 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const streams = takeOptionalBoolean(raw, "streams", e, at);
   const oneShot = takeOptionalBoolean(raw, "oneShot", e, at);
   const hidden = takeOptionalBoolean(raw, "hidden", e, at);
+  const interactive = takeOptionalBoolean(raw, "interactive", e, at);
+
+  // I19 — the two combinations that describe a verb which cannot exist. Both
+  // are cross-field rules of I4's kind and sit where I4 sits, so the report
+  // reaches the author who wrote the manifest rather than the user watching a
+  // terminal misbehave. `interactive` alone is fine and is not checked here.
+  if (interactive === true) {
+    if (streams === true) {
+      fail(
+        e,
+        `${at}.interactive`,
+        `"${name}" declares both interactive and streams — a handoff gives the ` +
+          `terminal to the child and a stream reads its stdout into the transcript; ` +
+          `drop whichever one the verb does not do`,
+      );
+    }
+    if (local) {
+      fail(
+        e,
+        `${at}.interactive`,
+        `"${name}" is local and interactive — a local verb is handled in-process ` +
+          `and never spawned, so there is no child to hand the terminal to`,
+      );
+    }
+  }
 
   return {
     name,
@@ -410,6 +436,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     ...(streams === undefined ? {} : { streams }),
     ...(oneShot === undefined ? {} : { oneShot }),
     ...(hidden === undefined ? {} : { hidden }),
+    ...(interactive === undefined ? {} : { interactive }),
   };
 }
 
@@ -437,6 +464,12 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
     fail(e, "tools", `"tools" must be an array`);
   } else {
     const seen = new Map<string, number>();
+    // **Seeded with the framework's six** (C05 §3), so an app declaring its own
+    // `clear` collides at parse rather than silently overriding a verb
+    // `tui-kit`'s handlers depend on. I6 already refuses duplicates; this is
+    // that rule reaching the rows the app did not write.
+    const framework = new Set(FRAMEWORK_NAMES);
+
     rawTools.forEach((t, i) => {
       const parsed = parseTool(t, e, `tools[${i}]`);
       if (parsed === null) return;
@@ -444,6 +477,18 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
       // I6 — duplicates fail rather than last-wins. Last-wins is the version of
       // this that ships: the manifest still loads, and one of the two tools is
       // simply never reachable.
+      if (framework.has(parsed.name)) {
+        // By name, not by index: "already declared at tools[7]" is meaningless
+        // against a file the author wrote two entries in.
+        fail(
+          e,
+          `tools[${i}].name`,
+          `"${parsed.name}" is a verb tui-kit ships (C05 §3) — choose another name, ` +
+            `or the framework's handler for it becomes unreachable`,
+        );
+        return;
+      }
+
       const first = seen.get(parsed.name);
       if (first !== undefined) {
         fail(e, `tools[${i}].name`, `duplicate tool "${parsed.name}", already declared at tools[${first}]`);
@@ -460,6 +505,20 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
 
   return {
     ok: true,
-    value: deepFreeze({ schema: MANIFEST_SCHEMA, binary, version, tools }),
+    // **The framework's six, appended** (C05 §3). Appended rather than prepended
+    // so no index an app could read is shifted: `fail` reports `tools[3]`, and a
+    // parse error pointing at a row nobody wrote is worse than no path at all.
+    value: deepFreeze({
+      schema: MANIFEST_SCHEMA,
+      binary,
+      version,
+      // Appended rather than prepended so no index an app could read is shifted:
+      // `fail` reports `tools[3]`, and a parse error pointing at a row nobody
+      // wrote is worse than no path at all.
+      tools: [...tools, ...FRAMEWORK_TOOLS],
+      // What the app wrote (§3). `serialise` emits this, so the round-trip
+      // property holds exactly: parse re-derives the framework's six.
+      appTools: tools,
+    }),
   };
 }

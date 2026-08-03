@@ -22,6 +22,14 @@ It is where people spend the minutes after something fails, which sets the prior
 
 ## 2. The screen
 
+**The box is a `panel`, and it is rendered.** Title in the top border, keymap in the bottom, log lines and a status line between them — `panel` measures children + 2 and draws the border itself, and C09 §Seam-1 puts the title in the top border for this figure's sake.
+
+**This section used to open by saying the opposite**, and the sentence was S01's convention copied to a figure it does not describe. S01's box marks region boundaries and carries nothing; here two of the three regions §2 goes on to name — *"a title bar carrying the source and connection state"* and the keymap half of the footer — **are** the rails. The section contradicted itself four paragraphs apart, and `frameRows` strips exactly the two rows that carry content, which is why nothing composed. `HEIGHT_AUDIT` had it right on both counts: it calls this "S12's panel", counts eight inner rows, and files the ragged right edge as the drawing defect C09 names for a panel whose measurer and renderer disagree.
+
+The convention sentence is still correct where it belongs — S01 §2, and S13's *inner* panels are real panels there too. It is not a property of box-drawing in a fence.
+
+**The keymap needed a block that did not exist.** A pushed view leaves header and footer untouched (C15 T4.4) and C22's footer is one app-supplied row, so these keys cannot go in the frame's footer — they belong to the view. `panel` now carries `footer?: string` (C04 §3), which is text in a row that was drawn anyway. S13 §2's outer panel draws the same thing, and two consumers is what settled it: a keymap *below* the panel would have cost only a figure, and would have left both surfaces drawing a bottom rail with words in it that no block produces.
+
 ```
 ┌ logs · a3f9b21 · gpu-04.fmx.internal ─────────────────────── ● following ─┐
 │ 14:23:01.882  INFO   [trainer] epoch 17 started                           │
@@ -29,13 +37,15 @@ It is where people spend the minutes after something fails, which sets the prior
 │ 14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB host_mem=91GiB          │
 │ 14:23:02.551  WARN   [dataloader] slow batch (87ms · 95p)                 │
 │ 14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 · lr=3e-4          │
-│                                                                            │
-│ ─────────────────────────────────────────────────────────────────────────  │
-│ filter —    level ≥ DEBUG    1,284 lines    2 warnings                     │
+│                                                                           │
+│ ───────────────────────────────────────────────────────────────────────── │
+│ filter —    level ≥ DEBUG    1,284 lines    2 warnings                    │
 └ esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow ───┘
 ```
 
-Three regions: a title bar carrying the source and connection state, the lines, and a two-row footer — a status line and a keymap line.
+Three regions: a title bar carrying the source and connection state, the lines, and a two-row footer — a status line and a keymap line. **The title bar is the panel's top border and the keymap is its `footer`**; the status line is an ordinary child.
+
+**Blocks, in order**: `panel` with `title` *logs · a3f9b21 · gpu-04.fmx.internal ─ ● following* and `footer` *esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow*, wrapping `raw` (5 log lines), `rule` with `gapBefore`, and `keyValue` (the status line). Five inner rows, one join, one rule, one status — eight children in ten rows with the border.
 
 **The status line answers "am I seeing everything?"** Active filter, level threshold, total lines received, and a warning count. A filtered view that looks empty is indistinguishable from a quiet process unless the filter is stated.
 
@@ -149,7 +159,7 @@ A pod-specific view is `f` — filter by pod — rather than a separate flag.
 
 `w` exists because one line occasionally does need reading whole — a stack frame, a long URL — and toggling it for one line is cheaper than wrapping the whole view and losing fixed-height scrolling.
 
-`esc` pops and C23 appends the trace (A01 D7): `logs a3f9b21 — 1,284 lines, 2 warnings (esc 14:24:08)`.
+`esc` pops and nothing is appended (A01 D7, amended). An earlier draft had C23 write a one-line trace here — `logs a3f9b21 — 1,284 lines, 2 warnings (esc 14:24:08)` — and it could not be built: the trace is an entry, an entry freezes its predecessor, and the frozen block is the one D7 returns focus to. The excursion therefore leaves no transcript record, which is consistent with the push having left none either (B03 §3), and is the acknowledged cost of that amendment rather than a property this surface wanted.
 
 ---
 
@@ -166,7 +176,7 @@ A pod-specific view is `f` — filter by pod — rather than a separate flag.
 9. Multi-pod lines are inserted by timestamp, not appended.
 10. A dead or ended stream retains its buffer and its keys, and offers `r` rather than reconnecting silently.
 11. `w` wraps one line rather than the view; line focus exists only when detached, and defaults to the last line while following.
-12. `esc` leaves a trace naming the line and warning counts.
+12. `esc` pops and appends nothing; the block beneath stays live with its selection (A01 D7).
 
 ---
 
@@ -195,7 +205,7 @@ A pod-specific view is `f` — filter by pod — rather than a separate flag.
 - **T2.2**: rendered rows equal `min(height, filtered lines)` at seven widths.
 - **T2.3**: a spy proves C14 is never called — this view owns its own scroll.
 - **T2.4**: every key in §8 has a binding, and no key is bound twice.
-- **T2.5**: the `esc` trace text contains the line and warning counts.
+- **T2.5**: a spy proves `esc` reaches no transcript mutator — S12 writes nothing and causes no append.
 
 ### Tier 3 — edge cases
 
@@ -213,7 +223,7 @@ A pod-specific view is `f` — filter by pod — rather than a separate flag.
 - **T3.11**: two pods writing simultaneously with clock skew → ordering by timestamp, no duplication.
 - **T3.12**: a pod producing no output → absent from the view, not shown as an empty group.
 - **T3.13**: resize below minimum and back → the view is retained, scroll position preserved.
-- **T3.14**: `esc` immediately after opening, before any line arrives → trace reads `0 lines`.
+- **T3.14**: `esc` immediately after opening, before any line arrives → the view pops cleanly and the transcript is unchanged.
 
 ### Tier 4 — integration
 
@@ -221,7 +231,7 @@ A pod-specific view is `f` — filter by pod — rather than a separate flag.
 - **T4.2** (with C16): every key routes to `pushedView`; a confirm raised over it still wins (C16 §3).
 - **T4.3** (with C06): a 1,000 line/s stream is coalesced by C03, not by this surface.
 - **T4.4** (with C03): keystrokes remain immediate while the stream runs — the starvation property (C03 T4.6).
-- **T4.5** (with C23): `esc` pops and C23 appends the trace; S12 writes nothing to the transcript.
+- **T4.5** (with C23): `esc` pops and C23 appends nothing; the transcript's entry count and live id are identical before and after, so the block beneath is still live (A01 D7).
 - **T4.6** (with C09, C02): under ASCII the box drawing degrades 1:1; the row count is unchanged.
 
 ### Tier 5 — e2e
@@ -255,5 +265,5 @@ A pod-specific view is `f` — filter by pod — rather than a separate flag.
 | `--events` | A live block, not a view — S04's actions reach it |
 | Log storage and retention | The far side |
 | Stream transport and coalescing | C06, C03 |
-| The transcript trace | C23 |
+| Whether a pop records anything in the transcript | C23 — and under A01 D7 it does not |
 | Server-side log search | Phase 2 — filtering here is client-side by design |

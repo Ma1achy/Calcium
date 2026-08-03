@@ -9,7 +9,9 @@ import {
   validateInvocation,
   type ToolDef,
 } from "../../src/data/manifest/index.js";
+import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
 import { fixture, largeManifest, raw, toolNamed } from "../support/manifest.js";
+import { contextAt, verbSource } from "../../src/interaction/completion/index.js";
 
 function parsedOrThrow(source: unknown) {
   const result = parseManifest(source);
@@ -56,7 +58,12 @@ describe("C05 parse edges", () => {
     // The shell must still open. An app with no verbs is unusual, not malformed.
     const m = parsedOrThrow({ ...raw(), tools: [] });
 
-    expect(m.tools).toEqual([]);
+    // `appTools` is what the app wrote; `tools` is that plus the framework's
+    // six, which `parseManifest` appends to every manifest (C05 §3). Asserted
+    // on the partition rather than on `tools` being empty — the original read
+    // `tools` and went red the day the six landed, because nothing re-ran it.
+    expect(m.appTools).toEqual([]);
+    expect(m.tools.map((t) => t.name)).toEqual(FRAMEWORK_TOOLS.map((t) => t.name));
     expect(findTool(m, ["ps"])).toBeNull();
     expect(findTool(m, [])).toBeNull();
   });
@@ -110,7 +117,8 @@ describe("C05 parse edges", () => {
     const m = parsedOrThrow(source);
     const parseMs = Number(process.hrtime.bigint() - parseStart) / 1e6;
 
-    expect(m.tools).toHaveLength(5000);
+    expect(m.appTools).toHaveLength(5000);
+    expect(m.tools).toHaveLength(5000 + FRAMEWORK_TOOLS.length);
     expect(size, "the spec names 10 MB; a smaller document would test a budget nobody set").toBeGreaterThan(
       9_000_000,
     );
@@ -159,7 +167,31 @@ describe("C05 parse edges", () => {
     expect(validateInvocation(match!.tool, ["--größe=3"]).ok).toBe(true);
   });
 
-  it.todo("T3.17b: completion matches unicode names on grapheme boundaries — waits on C19");
+  it("T3.17b: completion matches unicode names on grapheme boundaries", () => {
+    // The prefix is matched in the tokeniser's coordinate system, so a match
+    // must still land on a cluster boundary. `ü` here is a combining sequence,
+    // which is where a naive code-unit prefix test cuts a character in half.
+    const source = raw();
+    const tools = source["tools"] as Record<string, unknown>[];
+    tools.push({
+      name: "au\u0308sfu\u0308hren",
+      local: false,
+      summary: "run, with combining marks",
+      args: [],
+      flags: [],
+    });
+    const m = parsedOrThrow(source);
+
+    const offered = verbSource(() => m).complete(
+      contextAt("/au\u0308s", 6, m),
+    ) as readonly { value: string }[];
+    expect(offered.map((c) => c.value)).toContain("/au\u0308sfu\u0308hren");
+
+    // And the negative control: a prefix cut mid-cluster matches nothing rather
+    // than matching by accident.
+    const cut = verbSource(() => m).complete(contextAt("/aus", 4, m)) as readonly { value: string }[];
+    expect(cut.map((c) => c.value)).not.toContain("/au\u0308sfu\u0308hren");
+  });
 });
 
 describe("C05 validation edges", () => {

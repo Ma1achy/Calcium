@@ -61,9 +61,15 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // The title lives in the top border — `┌ cluster ─────┐` (S13). That is why
     // the frame is drawn here rather than delegated to a box-drawing option:
     // no layout engine puts a title in a border.
-    const title = stripControl(block.title);
-    const shown = truncate(title, Math.max(0, inner - 3), ctx.capabilities);
-    const titlePart = shown === "" ? "" : ` ${shown} `;
+    // One helper for both rails, because they are the same construction
+    // mirrored — and two copies would be two places for the fill arithmetic to
+    // drift, which is the arithmetic a border that does not close reports.
+    const railPart = (text: string | undefined): string => {
+      const shown = truncate(stripControl(text ?? ""), Math.max(0, inner - 3), ctx.capabilities);
+      return shown === "" ? "" : ` ${shown} `;
+    };
+
+    const titlePart = railPart(block.title);
     const fill = Math.max(0, inner - cells(titlePart));
 
     const top = paint(
@@ -78,9 +84,20 @@ export const panelDefinition: BlockDefinition<Panel> = {
         ctx.capabilities,
       ),
     );
+    // **`footer` is text in a row that is drawn anyway** (C04 §3), which is why
+    // `measure` is untouched: a panel is children + 2 with or without it. S12 §2
+    // and S13 §2 both put a pushed view's keymap here, and neither can use the
+    // frame's footer — a pushed view leaves header and footer alone (C15 T4.4).
+    const footerPart = railPart(block.footer);
+    const footerFill = Math.max(0, inner - cells(footerPart));
     const bottom = paint(
       clampSpans(
-        [{ text: g.bottomLeft + g.horizontal.repeat(inner) + g.bottomRight, style: dim }],
+        [
+          { text: g.bottomLeft, style: dim },
+          { text: footerPart, style: tone("accent", ctx.theme, ctx.capabilities) },
+          { text: g.horizontal.repeat(footerFill), style: dim },
+          { text: g.bottomRight, style: dim },
+        ],
         width,
         ctx.capabilities,
       ),

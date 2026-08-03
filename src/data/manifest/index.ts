@@ -27,6 +27,6 @@ export { parseManifest } from "./parse.js";
 
 export { findTool, visibleTools } from "./find.js";
 
-export { validateInvocation } from "./validate.js";
+export { suggestName, validateInvocation } from "./validate.js";
 
 export { createManifestStore } from "./store.js";

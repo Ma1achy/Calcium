@@ -23,6 +23,7 @@ import { TranscriptError } from "./types.js";
 import type {
   Change,
   EntryId,
+  PatchOrigin,
   PatchOutcome,
   TranscriptEntry,
   TranscriptOptions,
@@ -119,13 +120,21 @@ class Store implements TranscriptStore {
     return id;
   }
 
-  patch(id: EntryId, patch: ViewPatch): PatchOutcome {
+  patch(id: EntryId, patch: ViewPatch, origin: PatchOrigin = "farSide"): PatchOutcome {
     const entry = this.#entries.find((e) => e.id === id);
     // A patch for an entry that was evicted or cleared. Ordinary, not a bug.
     if (entry === undefined || isMarker(entry)) return { ok: false, reason: "unknown" };
-    // A stream outlived its `settle` — a caller bug, surfaced rather than
-    // absorbed (I8). C13 reports; C23 §5 decides what it means.
-    if (!entry.streaming) return { ok: false, reason: "settled" };
+    // **The gate reads who is writing** (§6). A settled entry accepts nothing
+    // further from the far side — a patch after `settle` means the transport
+    // lied or a stale stream leaked, which is a real defect and rejecting it
+    // surfaces one (I8). The shell speaking about an entry it holds is a
+    // different claim entirely, and gating it on whether the far side is still
+    // talking inverted the rule: an app verb's result settles the moment it
+    // lands, so the entries a reader acts on were the ones the shell could not
+    // speak about.
+    if (!entry.streaming && origin === "farSide") {
+      return { ok: false, reason: "settled" };
+    }
 
     const r = applyPatch(entry.doc, patch);
     if (!r.ok) {
@@ -151,20 +160,61 @@ class Store implements TranscriptStore {
     return { ok: true, rev };
   }
 
-  settle(id: EntryId): void {
+  /**
+   * The entry is done, and `doc` is the final one if there is one.
+   *
+   * **On C23's app route steps 6 and 7 are one call**: the adapted document
+   * arrives, the entry becomes it, and the entry is done. They separate only for
+   * a stream, where patches arrive during and this ends it with what
+   * accumulated. One signature covers both, and all three endings the pipeline
+   * produces — a result, an error document, a stream's `end`.
+   *
+   * The shape matters more than the convenience. A fourth `ViewPatch` op would
+   * not be a patch: `applyPatch(doc, { op: "document", doc })` returns its own
+   * argument. A separate `replace` would land outside the `rev` and
+   * `PatchOutcome` discipline and need its own invalidation story — a second
+   * path into C14's cache, which is one slot per entry keyed on
+   * `(entryId, rev, width)`, and a second way in is a second way to get
+   * invalidation wrong.
+   */
+  settle(id: EntryId, doc?: ViewDocument): PatchOutcome {
     const entry = this.#entries.find((e) => e.id === id);
-    if (entry === undefined || isMarker(entry) || !entry.streaming) return;
+    if (entry === undefined || isMarker(entry)) return { ok: false, reason: "unknown" };
+    if (!entry.streaming) return { ok: false, reason: "settled" };
+
+    // Thrown, not returned, and the asymmetry with the two above is §3's: those
+    // are *conditions* a caller can meet legitimately, this is a caller bug.
+    // Three layers had to fail for an invalid document to arrive — C23 built it,
+    // C07 validated it, C04 froze it — so there is nothing to recover from.
+    const settled = doc === undefined ? undefined : validateDocument(doc);
+    if (settled !== undefined && !settled.ok) {
+      throw new TranscriptError(
+        `transcript.settle: invalid document (C13 I10) — ${settled.error.join("; ")}`,
+        settled.error,
+      );
+    }
+
+    // I13 — `rev` moves iff the document changed. A bare settle changes nothing
+    // about it, and moving `rev` there would invalidate a height that is still
+    // correct on every stream that ends, which is the common case.
+    const next =
+      settled === undefined
+        ? { rev: entry.rev }
+        : { doc: settled.value, rev: entry.rev + 1, blocks: countBlocks(settled.value) };
 
     // The sweep matters most here, and it is the one that was missing. A settled
     // entry is newly evictable, so the true overshoot is now *lower* than the
     // last reported figure — and L4 warning about an overshoot that no longer
     // exists is worse than not warning at all (I15).
     const evicted = this.#commit(
-      this.#entries.map((e) => (e.id === id ? Object.freeze({ ...e, streaming: false }) : e)),
+      this.#entries.map((e) =>
+        e.id === id ? Object.freeze({ ...e, ...next, streaming: false }) : e,
+      ),
     );
 
     this.#emit({ kind: "settle", id });
     if (evicted.length > 0) this.#emit({ kind: "evict", ids: evicted });
+    return { ok: true, rev: next.rev };
   }
 
   clear(): void {

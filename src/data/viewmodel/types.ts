@@ -284,8 +284,8 @@ export type Code = Readonly<{
   wrap?: boolean;
 }> & Gap;
 
-export type Diff = Readonly<{
-  kind: "diff";
+export type Comparison = Readonly<{
+  kind: "comparison";
   id: string;
   rows: readonly Readonly<{
     field: string;
@@ -351,6 +351,16 @@ export type Panel = Readonly<{
   kind: "panel";
   id: string;
   title: string;
+  /**
+   * Text in the **bottom** border, as `title` is text in the top (C04 §3).
+   *
+   * It changes no measurement: a panel is children + 2 either way, so this is
+   * a use for a row that is drawn anyway rather than a new one. S12 §2 and
+   * S13 §2 both draw a keymap there, and neither can use the frame's footer —
+   * a pushed view leaves header and footer untouched (C15 T4.4) and C22's
+   * footer is one app-supplied row. The keys belong to the view.
+   */
+  footer?: string;
   children: readonly Block[];
 }> & Gap;
 
@@ -375,7 +385,7 @@ export type Block =
   | Plot
   | Progress
   | Code
-  | Diff
+  | Comparison
   | Patch
   | Pills
   | Tip
@@ -391,7 +401,25 @@ export type ViewPatch =
   | Readonly<{ op: "append"; block: Block }>
   | Readonly<{ op: "replace"; blockId: string; block: Block }>
   | Readonly<{ op: "merge"; blockId: string; rows: readonly MergeRow[] }>
-  | Readonly<{ op: "status"; status: DocumentStatus }>;
+  | Readonly<{ op: "status"; status: DocumentStatus }>
+  /**
+   * View state, and the only arm that is (C04 §4).
+   *
+   * **The other four say something arrived or changed on the far side; this one
+   * says the reader opened a row.** C13 gates the first four on the entry still
+   * streaming — a settled stream can receive nothing more — and that gate is
+   * exactly inverted for this: an app verb's result is settled the moment it
+   * lands, so the entries a reader would expand are the ones a data patch is
+   * refused on, while a live `--watch` accepts it. The rule permitted the useless
+   * case and forbade the useful one.
+   *
+   * A named op rather than a `viewState: true` flag on `replace`, and the reason
+   * is unforgeability rather than tidiness: `replace` is the arm C25's patch
+   * expansion uses, so the flag would be set by C25's renderer *and* by adapters
+   * — "trust me" in two components, with the far side's adapter on one boundary.
+   * A named op cannot be forged. The same argument as glyphs becoming tokens.
+   */
+  | Readonly<{ op: "expand"; blockId: string; rowId: string; expanded: boolean }>;
 
 /**
  * Fallible in the type (I15). `applyPatch` runs on every stream tick in the

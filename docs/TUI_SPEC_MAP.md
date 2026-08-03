@@ -175,7 +175,6 @@ The four things that are genuinely narrative. These are where the product decisi
 | | Behaviour | Covers |
 |---|---|---|
 | B01 | Session lifecycle | The session's arc across eight components, and the cross-component failure table — the only place that picture exists |
-| B02 | Command execution | Typed → parsed → validated → routed → spawned → adapted → rendered → committed → frozen. Cancellation at every stage |
 | B03 | The drill chain | Live block → row focus → detail → pushed view → `Esc` → back with selection preserved |
 | B04 | Degradation | Offline cluster, expired token, terminal too small, no colour, no Unicode, Python absent |
 
@@ -246,7 +245,7 @@ Two phases. **The framework is built and proven before Prism goes on it.**
 |---|---|---|---|
 | **M-T1** | It opens and closes cleanly | C01 C02 C03 · frame structure · B01 · A01 · reference app skeleton | Fullscreen frame opens, resizes, degrades, exits leaving the shell byte-identical on all five paths. PTY-tested |
 | **M-T2** | It renders | C04 C05 C06 C07 C09 C10 C11 C12 · C08's harness half | Every block type renders from fixtures in both themes at four widths. Reference app renders `docker ps` |
-| **M-T3** | It takes input | C13 C14 C15 C16 C17 C18 C19 C20 C21 · **C22 C23** · B02 | 10,000 blocks stay responsive; commands parse, route, execute and commit; history and completion behave. Reference app is fully usable |
+| **M-T3** | It takes input | C13 C14 C15 C16 C17 C18 C19 C20 C21 · **C22 C23** | 10,000 blocks stay responsive; commands parse, route, execute and commit; history and completion behave. Reference app is fully usable |
 
 **Phase 1 is done when** the example app works and someone who is not its author can build a TUI from the README without asking a question.
 
@@ -304,7 +303,7 @@ C04 ─┬─ C05 ─ C06 ─ C07                                  M-T2
 C13 ─ C14 ─ C15                                          M-T3
 C16 ─ C17 ─ C18 ─┬─ C19
                  └─ C20
-C21 ───────────────────────────────── B02
+C21 ─────────────────── C22 ─ C23
 
 
 PHASE 2 — prism-tui

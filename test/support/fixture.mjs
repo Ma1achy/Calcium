@@ -10,7 +10,7 @@
 import { detectCapabilities, isUsable } from "../../dist/terminal/capabilities.js";
 import { createBlockRegistry } from "../../dist/presentation/blocks/index.js";
 import { defaultTheme, loadTheme } from "../../dist/presentation/theme/index.js";
-import { renderSequenceToLines } from "../../dist/testing/index.js";
+import { renderSequenceToLines } from "../../dist/presentation/render-lines.js";
 import { createTerminalLifecycle } from "../../dist/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../dist/terminal/frame-scheduler.js";
 import { createProcessRunner } from "../../dist/data/process/runner.js";
@@ -512,6 +512,307 @@ switch (mode) {
       process.stdout.write(`\nWROTE ${String(lines.length)} ${String(atWriteTime)}\n`);
       process.exit(0);
     });
+    break;
+  }
+
+  // The whole stack, for the tier-5 rows that need a real session (C22 §4).
+  //
+  // **One mode with variants rather than one per row.** Every mode above
+  // hand-composes from primitives; none built a session, because until steps 11
+  // and 12 landed there was nothing to drive one with. The variants arrive
+  // through `argv[3]` and the environment, so a row that needs `TERM=dumb` or a
+  // real far side changes what it launches rather than what runs.
+  //
+  // **Readiness is the first frame, not a sentinel.** C01 replaces
+  // `stdout.write` at construction (I9), so a `process.stdout.write("READY")`
+  // after `start()` goes to the debug sink and never leaves the process — which
+  // is the redirection working. The prompt glyph reaching the PTY is the honest
+  // signal that the shell painted, and it is what the test waits for.
+  case "session": {
+    const { createTui } = await import("../../dist/shell/session.js");
+    const { noticeDoc } = await import("../../dist/shell/documents.js");
+    const { parseManifest } = await import("../../dist/data/manifest/index.js");
+    const { createEmulatedTransport, createFixtureTransport, createRouter } = await import(
+      "../../dist/data/transport/index.js"
+    );
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    // **Parsed, never hand-built** (C22 I23). `parseManifest` is the only thing
+    // that appends the framework's own six verbs, so an object satisfying the
+    // type is one nobody parsed and construction refuses it.
+    //
+    // **The same JSON `test/support/manifest.ts` reads**, rather than a second
+    // manifest written here. Two copies drift, and the drift shows up as a
+    // tier-5 row asserting against a tool the rest of the suite does not have.
+    const { readFileSync } = await import("node:fs");
+    const document = JSON.parse(
+      readFileSync(new URL("./manifest.fixture.json", import.meta.url), "utf8"),
+    );
+
+    // **A variant, not a second manifest** (C05 T5.4). "A manifest omitting a
+    // tool the app previously had" is this document with one tool removed —
+    // written as a filter so the two manifests cannot differ in any other way,
+    // which is what makes the row about the omission.
+    if (process.argv[3] === "no-ps") {
+      document.tools = document.tools.filter((t) => t.name !== "ps");
+    }
+
+    // **A dynamic completion source, and the count leaves the process in the
+    // candidate labels** (C19 T5.2, T5.5). `stdout` belongs to C01 from
+    // construction (I9), so a `console.log` of the invocation count goes to the
+    // debug sink and never reaches the PTY — the labels are the only channel a
+    // tier-5 row can read it on.
+    //
+    // **Keyed on the exact variant, not on the flag's presence.** A `--search`
+    // arm added earlier this stretch fired for any `--search` and answered a
+    // parser row spending the flag on a UUID; it was caught by the full tier
+    // run and not by the row that introduced it.
+    const completionSources = [];
+    let invocations = 0;
+    if (process.argv[3] === "slow-completion" || process.argv[3] === "ttl-completion") {
+      // The delay is what makes the spinner observable; the TTL is what makes a
+      // second invocation observable. One source, two variants, because the two
+      // rows need opposite things from the same knob — a row waiting 60 s for a
+      // TTL is a row nobody runs.
+      const slow = process.argv[3] === "slow-completion";
+      completionSources.push({
+        id: "slow-verbs",
+        slots: ["verb"],
+        dynamic: true,
+        ttlMs: slow ? 60_000 : 2_000,
+        complete: async () => {
+          invocations += 1;
+          const n = invocations;
+          if (slow) await new Promise((r) => setTimeout(r, 1_500));
+          return [{ value: `/invoked-${String(n)}-times`, detail: "from the slow source" }];
+        },
+      });
+    }
+
+    /**
+     * Which far side this session talks to (C06 I15).
+     *
+     * `fixture` is the default and every row written before this one uses it.
+     * The other three exist so the same session can be driven across all three
+     * transports and against no far side at all:
+     *
+     *   subprocess   `binary` is `farside.mjs`; **no `transport` is supplied**, so
+     *                `construct.ts`'s `defaultTransport` builds the subprocess
+     *                one itself — with `cwd: session.cwd` already threaded, which
+     *                is why a `cd` moves the next spawn without anything here.
+     *   emulated     a closure standing in for the far side, over a **fixed**
+     *                envelope. C06 I17 permits exactly this and no more: the
+     *                emulator is never a source of expected values, and C08's
+     *                world never appears in a test path.
+     *   no-farside   the same as `subprocess` with a binary that is not on PATH.
+     *                C06 T3.17 — a spawn failure is a result, not a throw — so the
+     *                session survives it and says so, which is what makes it a
+     *                *control* for the standalone-build row rather than a second
+     *                way of observing silence.
+     */
+    const farSide = process.argv[3] ?? "fixture";
+
+    const parsed = parseManifest(document);
+    if (!parsed.ok) {
+      process.stderr.write(`manifest: ${JSON.stringify(parsed.error)}\n`);
+      process.exit(5);
+    }
+
+    /**
+     * A `RawResult`, in full.
+     *
+     * **Every field, because the missing ones are silent.** The first version
+     * wrote `{ stdout, stderr, code, signal, durationMs }` — plausible, and
+     * `code` is not the field's name, so `exitCode` was `undefined`, the
+     * adapter produced a document with a non-finite `meta.exitCode`, and
+     * `settle` refused it under C13 I10. The refusal is correct and it arrives
+     * three components from the fixture that caused it.
+     */
+    const raw = (argv, blocks) => ({
+      argv,
+      exitCode: 0,
+      signal: null,
+      // **A complete document, or C07's view adapter declines it** and the
+      // fallback renders the JSON as a table — which is correct behaviour and
+      // not what a `tui.view/1` fixture is for. `schema` and `blocks` alone
+      // looked like a document and was not one.
+      stdout: {
+        schema: "tui.view/1",
+        command: argv.join(" "),
+        status: "ok",
+        blocks,
+        // Every field C04 requires. `identityDocument` **validates** rather than
+        // sniffing (C07 I5), so a partial `meta` is not a partial document — it
+        // is a rejected one, and the fallback renders the JSON as a table.
+        meta: {
+          verb: argv[0],
+          adapter: "identity",
+          exitCode: 0,
+          durationMs: 1,
+          truncated: false,
+          argv,
+          stderr: "",
+          transport: "fixture",
+          origin: "user",
+        },
+      },
+      stdoutRaw: "",
+      stderr: "",
+      durationMs: 1,
+      parseError: null,
+      cancelled: false,
+      timedOut: false,
+      overflowed: false,
+    });
+
+    /** Named, so the `mixed` arm routes over the same corpus rather than a second one. */
+    const corpus = [
+        {
+          // C05 T5.1's "validates" half needs a *positive* answer: a line that
+          // cleared validation and reached the far side. Asserting the absence
+          // of a refusal would pass against a session that did nothing at all.
+          id: "promote-one",
+          verb: "promote",
+          argv: ["promote", "app.web:main"],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          result: raw(["promote", "app.web:main"], [
+            { kind: "notice", id: "n1", tone: "info", text: "promoted app.web:main" },
+          ]),
+        },
+        {
+          id: "ps-empty",
+          verb: "ps",
+          // **argv includes the verb** — `sameArgv` compares the whole invocation.
+          argv: ["ps"],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          // **A block, not an empty document.** The first version had
+          // `blocks: []`, which settles an entry that renders as nothing — a
+          // fixture indistinguishable from a route that never ran, which is the
+          // inert-subject class in the corpus rather than in the harness.
+          result: raw(["ps"], [{ kind: "notice", id: "ps1", tone: "info", text: "no processes" }]),
+        },
+        {
+          // **A table, because a notice has no rows to focus.** C02 T5.4b
+          // navigates a live block with the keyboard, and `enterLiveBlock` is a
+          // no-op over an entry with nothing focusable (C16 I22) — so a fixture
+          // whose only reply is a notice makes that row unwritable rather than
+          // failing. The two rows are the minimum that can show a selection
+          // moving.
+          id: "ps-mine",
+          verb: "ps",
+          argv: ["ps", "--mine"],
+          provenance: "authored",
+          capturedAt: null,
+          cliVersion: null,
+          note: "the far side is not the subject of these rows",
+          result: raw(["ps", "--mine"], [
+            {
+              kind: "table",
+              id: "ps-table",
+              columns: [
+                {
+                  key: "uuid",
+                  label: "uuid",
+                  align: "left",
+                  priority: 10,
+                  minWidth: 8,
+                  sortable: false,
+                },
+                {
+                  key: "status",
+                  label: "status",
+                  align: "left",
+                  priority: 5,
+                  minWidth: 6,
+                  sortable: false,
+                },
+              ],
+              rows: [
+                { id: "a3f9b21", cells: { uuid: { text: "a3f9b21" }, status: { text: "running" } } },
+                { id: "7c2d4e1", cells: { uuid: { text: "7c2d4e1" }, status: { text: "failed" } } },
+              ],
+            },
+          ]),
+        },
+    ];
+
+    const transport = createRouter({ default: createFixtureTransport(corpus) });
+
+    /** A local handler's answer: one notice, carrying the command it ran. */
+    const sessionNotice = (ctx, text) => noticeDoc(ctx.command, text, "info", { origin: "user" });
+
+    // **The emulated arm's fixed envelope**, built once and returned for every
+    // invocation. "Fixed" is the whole of what I17 permits, and it is also what
+    // makes the arm a parity check rather than a second fixture corpus: it
+    // cannot answer differently per verb, so nothing here can drift into being
+    // a source of truth about a far side.
+    const emulatedEnvelope = raw(["promote", "app.web:main"], [
+      { kind: "notice", id: "n1", tone: "info", text: "promoted app.web:main" },
+    ]);
+
+    // **`transport` is omitted, not set to undefined-with-a-key**, for the two
+    // spawning variants: `construct.ts` reads `config.transport ?? default…`, and
+    // the point of these arms is that the default path is the one under test.
+    //
+    // **`mixed` is the router doing the job it exists for** (C06 §6): one session
+    // whose `ps` reaches a real binary while every other verb answers from the
+    // corpus. It is the only arm where two transports are live at once, so it is
+    // the only one that can show the routing rather than the transports.
+    const transportFor = {
+      fixture: transport,
+      emulated: createRouter({ default: createEmulatedTransport(() => emulatedEnvelope) }),
+      mixed: createRouter({
+        default: createFixtureTransport(corpus),
+        overrides: {
+          ps: createSubprocessTransport({
+            binary: `${process.cwd()}/test/support/farside.mjs`,
+            runner: createProcessRunner({ env: process.env, stdin: process.stdin }),
+            clock: {
+              now: () => performance.now(),
+              schedule: () => ({ [Symbol.dispose]: () => {} }),
+            },
+            env: process.env,
+            cwd: () => process.cwd(),
+          }),
+        },
+      }),
+    }[farSide];
+
+    const tui = createTui({
+      name: "prism",
+      // `farside.mjs` is spawned as a single argv element, which is why it
+      // carries a shebang and the exec bit. `no-farside` names a program that
+      // does not exist, deliberately and by a name nobody will ever install.
+      binary:
+        farSide === "subprocess"
+          ? `${process.cwd()}/test/support/farside.mjs`
+          : farSide === "no-farside"
+            ? "tui-kit-no-such-far-side"
+            : "widget",
+      manifest: parsed.value,
+      theme: defaultTheme,
+      ...(transportFor === undefined ? {} : { transport: transportFor }),
+      env: process.env,
+      stateDir: mkdtempSync(join(tmpdir(), "tui-kit-session-")),
+      // **The manifest's two app-local verbs** (C22 I3a). C23 I27 refuses a
+      // manifest verb marked `local` with no handler, and this is the route
+      // that did not exist until the first session ran against this manifest.
+      localHandlers: {
+        guide: (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "the app's own local verb")),
+        "debug dump": (_argv, ctx) => Promise.resolve(sessionNotice(ctx, "internal state")),
+      },
+      ...(completionSources.length === 0 ? {} : { completionSources }),
+    });
+
+    await tui.start();
     break;
   }
 

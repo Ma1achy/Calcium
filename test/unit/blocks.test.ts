@@ -1,8 +1,9 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
 import { describe, expect, it } from "vitest";
+import { displayCells } from "../../src/presentation/text.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { renderToLines } from "../../src/testing/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
@@ -58,7 +59,7 @@ describe("C09 §6 — the registry's transition table", () => {
       events: 1, // events
       progress: 1, // label, bar, percentage
       code: 2, // lines
-      diff: 2, // rows + header
+      comparison: 2, // rows + header
       pills: 1, // one logical row
       tip: 1, // ceil(cells / w)
       panel: 4, // children + 2
@@ -68,6 +69,14 @@ describe("C09 §6 — the registry's transition table", () => {
 
     for (const [kind, height] of Object.entries(documented)) {
       const fixture = ONE_PER_KIND[kind as "raw"];
+
+      // **A missing fixture measures as 1, which seven of these entries
+      // document.** The `comparison` rename found it: the key here went stale,
+      // `ONE_PER_KIND["diff"]` became `undefined`, and `measure` answered 1
+      // rather than raising — so `rule`, `notice`, `events`, `progress`,
+      // `pills`, `tip` and `group` would each have passed against no fixture at
+      // all. Only `comparison` failed, and only because its height is 2.
+      expect(fixture, `${kind} has a fixture`).toBeDefined();
       expect(kit.measure(fixture, 80), `${kind} at width 80`).toBe(height);
     }
   });
@@ -152,6 +161,28 @@ describe("C09 §6 — kinds", () => {
     expect(kit.renderToLines(glyphed, 30)).toHaveLength(3);
   });
 
+  it("T1.8b (C04): a panel's footer is text in a row that is drawn anyway", () => {
+    const kit = measurable();
+    const children = [{ kind: "notice", id: "p-n", tone: "info", text: "hi" } as const];
+    const plain = block({ kind: "panel", id: "p", title: "logs", children });
+    const footed = block({ kind: "panel", id: "p", title: "logs", footer: "esc back", children });
+
+    // **The height is the assertion.** A footer that added a row would be a new
+    // row rather than a use of the existing one — and a panel whose measurer and
+    // renderer disagree is what C09 reports as a border that does not close.
+    expect(kit.measure(footed, 40)).toBe(kit.measure(plain, 40));
+    expect(kit.renderToLines(footed, 40)).toHaveLength(kit.measure(footed, 40));
+
+    const lines = kit.renderToLines(footed, 40);
+    const bottom = lines.at(-1) ?? "";
+    expect(bottom, "the text is in the bottom border").toContain("esc back");
+    expect(displayCells(bottom), "and the border still closes at the width").toBe(40);
+
+    // The control: without a footer the same rail is plain, so the assertion
+    // above is about the field rather than about panels having a bottom row.
+    expect(kit.renderToLines(plain, 40).at(-1) ?? "").not.toContain("esc back");
+  });
+
   it("T1.8: panel measures its children at w - 2", () => {
     const kit = measurable();
     const text = "z".repeat(40);
@@ -230,6 +261,25 @@ describe("C09 §6 — kinds", () => {
     expect(later[1]).not.toBe(first[1]);
     expect(later[0]).toBe(first[0]);
     expect(later, "and the height never changes").toHaveLength(first.length);
+  });
+
+  it("T1.4b (C04 §2): a comparison's columns are labelled `a` and `b`, never directional", () => {
+    // **The ruling the rename carried, and nothing covered it.** The type has
+    // said `a`/`b` since C04 and the renderer's header said `before`/`after` —
+    // directional names for a kind whose primary consumer, S07, compares two
+    // *runs*. There is no before-and-after there, and a label that is wrong for
+    // half a kind's consumers invites an adapter to swap the fields to make the
+    // naming true.
+    //
+    // Asserted on the rendered header rather than on the type, because the type
+    // was already right; the two disagreed, and only the screen showed it.
+    const kit = measurable();
+    const header = visible(kit.renderToLines(ONE_PER_KIND.comparison, 60)[0] ?? "");
+
+    expect(header, "positional labels").toMatch(/\ba\b/);
+    expect(header, "both of them").toMatch(/\bb\b/);
+    expect(header, "and not directional ones").not.toContain("before");
+    expect(header, "either of them").not.toContain("after");
   });
 
   it("T1.12b (I5): under ASCII every glyph is one cell and the row count is unchanged", () => {

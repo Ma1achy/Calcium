@@ -44,6 +44,45 @@ export function illustratedRows(file: string, fence: number): number {
   return found.replace(/\n$/, "").split("\n").length;
 }
 
+/**
+ * The rows a figure's *frame* has, with the diagram's boundary marks removed.
+ *
+ * **Two conventions, both unstated until C22 hit one.** S01 §2 separates its
+ * regions with bare horizontal rules; S12 and S13 draw a full box with the
+ * title in the top rail. Neither is rendered — `tui-kit` draws no frame around
+ * anything, and S01 §3's arithmetic is header, viewport, prompt, footer with
+ * nothing between them.
+ *
+ * Counting the marks costs two rows the terminal does not have, and for the
+ * boxed figures two cells on every row. That is a wrap, and a wrap scrolls the
+ * alternate screen.
+ *
+ * Mechanical rather than remembered, because remembering is what failed: S01's
+ * deferral sat unwritable for two commits while §2 and §3 disagreed and nothing
+ * said which was the artefact.
+ */
+export function frameRows(file: string, fence: number): number {
+  return frameLines(file, fence).length;
+}
+
+/** A bare separator: box-drawing and whitespace, nothing else. */
+const BARE_RULE = /^\s*[─━]{3,}\s*$/;
+/** The top or bottom of a box, wherever its title sits. */
+const BOX_EDGE = /^\s*[┌└╭╰]/;
+/** A side rail, and the two cells it costs. */
+const RAIL = /^(\s*)│(.*)│\s*$/;
+
+export function frameLines(file: string, fence: number): readonly string[] {
+  const found = fences(file)[fence];
+  if (found === undefined) throw new Error(`${file} has no fenced block ${fence}`);
+
+  return found
+    .replace(/\n$/, "")
+    .split("\n")
+    .filter((l) => !BARE_RULE.test(l) && !BOX_EDGE.test(l))
+    .map((l) => RAIL.exec(l)?.[2] ?? l);
+}
+
 // --- the S-series' column and drop tables (A03 CP6) ------------------------
 //
 // Read from the markdown for the same reason the row counts are. A fixture
@@ -167,9 +206,31 @@ export type SurfaceDrops = Readonly<{ width: number; dropped: readonly string[] 
  * `column` selects which table's drops when a surface states two — S06 draws
  * families and versions side by side in one table with two cells per row.
  */
+/**
+ * A surface's stated drop order, for one column table.
+ *
+ * **A `| Width |` header does not make a drop table**, and reading it as one was
+ * live. S02's is `| Width | Logo |` and S13's and S15's are `| Width | Layout |`
+ * — a logo form, a panel arrangement and where an expiry timestamp goes. The
+ * old predicate matched all three and read `▲ prism v1.0.0` as a dropped column.
+ * The header name cannot discriminate either: S09's real column drop is stated
+ * under `| Width | Layout |` too.
+ *
+ * So the table has to name something. **A drop table is one where at least one
+ * row names a declared column key**, which is the only property all four real
+ * ones share and none of the three imposters has. A row naming nothing then
+ * means nothing drops at that width, which is what those rows already mean.
+ *
+ * Found by deriving CP6's surface list instead of hand-writing it — the parser
+ * had only ever been pointed at four tables chosen because they worked.
+ */
 export function surfaceDrops(file: string, column = 1): readonly SurfaceDrops[] {
-  const table = tables(file).find(
+  const declared = new Set(surfaceColumns(file).flatMap((t) => t.map((c) => c.key)));
+  const candidates = tables(file).filter(
     (t) => t.header[0] === "Width" && (t.header[column] ?? "") !== "",
+  );
+  const table = candidates.find((t) =>
+    t.rows.some((row) => keysIn(row[column] ?? "").some((k) => declared.has(k))),
   );
   if (table === undefined) return [];
 
@@ -181,7 +242,7 @@ export function surfaceDrops(file: string, column = 1): readonly SurfaceDrops[] 
 // --- S07 diff --------------------------------------------------------------
 
 const S07_IDENTITY: Block = block({
-  kind: "diff",
+  kind: "comparison",
   id: "s07-identity",
   gapBefore: true,
   rows: [
@@ -196,7 +257,7 @@ const S07_IDENTITY: Block = block({
 });
 
 const S07_METRICS: Block = block({
-  kind: "diff",
+  kind: "comparison",
   id: "s07-metrics",
   gapBefore: true,
   rows: [
@@ -463,7 +524,205 @@ const S15_SECRETS: Block = block({
   ],
 });
 
+/**
+ * S11 §2 — `/run`, host-native. The block list is S11 §2's own, written down
+ * when this fixture was built: the figure implied a sequence and an implication
+ * is not a declaration, so composing it meant choosing where the spec was
+ * silent (S11 §2).
+ */
+const S11_RUN: readonly Block[] = [
+  block({ kind: "rule", id: "s11-rule", label: "run · fmx_models.jobs.training:job · host-native" }),
+  block({
+    kind: "steps",
+    id: "s11-steps",
+    gapBefore: true,
+    steps: [
+      { label: "importing target", state: "done", detail: "job resolved" },
+      { label: "resources resolved", state: "done", detail: "1×GPU · 8Gi  (satisfied)" },
+      { label: "secrets resolved", state: "done", detail: "3 · timescaledb-dsn · minio · mlflow" },
+      { label: "device", state: "done", detail: "cuda:0" },
+    ],
+  }),
+  block({
+    kind: "keyValue",
+    id: "s11-run",
+    gapBefore: true,
+    rows: [{ label: "run", value: "7f3a2c1  ·  ./prism-runs/7f3a2c1…/" }],
+  }),
+  block({ kind: "progress", id: "s11-progress", gapBefore: true, label: "epoch", current: 7, total: 10 }),
+  block({
+    kind: "plot",
+    id: "s11-loss",
+    gapBefore: true,
+    form: "line",
+    height: 3,
+    axes: true,
+    yFormat: "number",
+    xLabels: ["epoch 1", "epoch 5", "now"],
+    // Seven epochs, 0.82 down to the `train_loss 0.312` the metrics row states.
+    // `values`, not `points` — the first draft used the wrong field name and the
+    // plot rendered one row while measuring five, which read as a C09 I1
+    // violation in shipped code until the fixture was checked against S04's.
+    series: [{ label: "loss", values: [0.82, 0.71, 0.6, 0.5, 0.42, 0.36, 0.312] }],
+  }),
+  block({
+    kind: "keyValue",
+    id: "s11-metrics",
+    gapBefore: true,
+    rows: [{ label: "", value: "train_loss 0.312 ↓    val_loss 0.298 ↓    val_accuracy 0.871 ↑" }],
+  }),
+  block({
+    kind: "tip",
+    id: "s11-tip",
+    gapBefore: true,
+    text: "last checkpoint  epoch_7.pt                              ⌃c to stop",
+  }),
+];
+
+/**
+ * S12 §2 — the logs view, as the `panel` it is.
+ *
+ * **§2 used to open by saying its box was not rendered**, which was S01's
+ * convention copied to a figure it does not describe: two of the three regions
+ * §2 names — the title bar and the keymap — *are* the rails. `frameRows` strips
+ * exactly those two rows, which is why nothing composed. HEIGHT_AUDIT had it
+ * right from §1 onwards, calling this "S12's panel" and counting eight inner
+ * rows.
+ */
+const S12_LOGS: Block = block({
+  kind: "panel",
+  id: "s12",
+  title: "logs · a3f9b21 · gpu-04.fmx.internal ─────────────────────── ● following",
+  footer: "esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow",
+  children: [
+    block({
+      kind: "raw",
+      id: "s12-lines",
+      text: [
+        "14:23:01.882  INFO   [trainer] epoch 17 started",
+        "14:23:02.104  INFO   [dataloader] batch 41/256 loaded (148 samples)",
+        "14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB host_mem=91GiB",
+        "14:23:02.551  WARN   [dataloader] slow batch (87ms · 95p)",
+        "14:23:02.774  INFO   [trainer] step 2417 · loss=0.0372 · lr=3e-4",
+      ].join("\n"),
+    }),
+    block({ kind: "rule", id: "s12-rule", gapBefore: true, label: "" }),
+    block({
+      kind: "keyValue",
+      id: "s12-status",
+      rows: [{ label: "", value: "filter —    level ≥ DEBUG    1,284 lines    2 warnings" }],
+    }),
+  ],
+});
+
+/**
+ * S02 §2 — the welcome screen.
+ *
+ * **Two declarations were missing and only one was findable by reading.**
+ * `v1.0.0` was drawn and listed by nothing — five declared blocks against six
+ * visual groups. The other appeared only on trying to compose it: the two
+ * headerless tables declared no columns at all, and `cols()` reads them from
+ * the spec precisely so a fixture cannot invent priorities and minimums.
+ *
+ * **And there is no `action` column.** The figure drew `↗ open` at the right of
+ * each row; C11 renders row actions nowhere in a row, and §7 already declares
+ * them as row actions. The bar those labels belong in is a separate piece —
+ * `TableRow.actions` is read by nothing — and this figure gains one when every
+ * other surface's does.
+ */
+const S02_WELCOME: readonly Block[] = [
+  block({
+    kind: "raw",
+    id: "s02-logo",
+    text: fences("docs/surfaces/S02_the_welcome.md")[0]!.split("\n").slice(0, 8).join("\n"),
+  }),
+  block({ kind: "notice", id: "s02-version", gapBefore: true, tone: "muted", text: "v1.0.0" }),
+  block({
+    kind: "keyValue",
+    id: "s02-connection",
+    gapBefore: true,
+    rows: [
+      { label: "", value: "Connected to prism.fmx.io as malachy.doherty@fmx.io" },
+      { label: "Teams", value: "vision · ml-platform-readonly" },
+      { label: "Token", value: "expires in 30d" },
+    ],
+  }),
+  block({ kind: "rule", id: "s02-outstanding-rule", gapBefore: true, label: "Outstanding" }),
+  block({
+    kind: "table",
+    id: "s02-outstanding",
+    showHeader: false,
+    columns: cols("docs/surfaces/S02_the_welcome.md", 0),
+    rows: [
+      cellsOfRow("mr", { what: "1 promote MR awaiting review", detail: "digit-classifier v_b4f0c12" }),
+      cellsOfRow("runs", { what: "2 running experiments", detail: "" }),
+    ],
+  }),
+  block({ kind: "rule", id: "s02-recent-rule", gapBefore: true, label: "Recent" }),
+  block({
+    kind: "table",
+    id: "s02-recent",
+    showHeader: false,
+    columns: cols("docs/surfaces/S02_the_welcome.md", 1),
+    rows: [
+      cellsOfRow("a", { name: "digit-classifier-v_b4f0c12", status: "succeeded", age: "2h ago" }),
+      cellsOfRow("b", { name: "digit-classifier-test-r12", status: "failed", age: "3h ago" }),
+    ],
+  }),
+  block({
+    kind: "tip",
+    id: "s02-tip",
+    gapBefore: true,
+    text: "Type /help for commands · ? for context help",
+  }),
+];
+
+/**
+ * A table whose every row carries the surface's declared actions (C11 I17).
+ *
+ * **The bar was six `pills` blocks and belonged to none of them.** Every
+ * S-series figure drawing one draws it after the table, and the fixtures
+ * modelled it as a separate block because `TableRow.actions` was read by
+ * nothing — the field existed, C11 §5 said it surfaced them, and no code did.
+ * Now the table draws its own, so the fixture declares the actions where the
+ * surface declares them.
+ *
+ * Height-neutral by construction: a `pills` block with `gapBefore` was two rows
+ * and the bar is two rows, which is why these compositions did not move.
+ */
+function withActions(table: Block, labels: readonly string[]): Block {
+  if (table.kind !== "table") throw new Error("withActions expects a table");
+  return {
+    ...table,
+    rows: table.rows.map((r) => ({
+      ...r,
+      actions: labels.map((label) => ({ kind: "fill" as const, label, command: "/noop" })),
+    })),
+  };
+}
+
 export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
+  {
+    file: "docs/surfaces/S02_the_welcome.md",
+    fence: 0,
+    label: "S02 §2 — the welcome screen",
+    width: 80,
+    blocks: S02_WELCOME,
+  },
+  {
+    file: "docs/surfaces/S12_logs_view.md",
+    fence: 0,
+    label: "S12 §2 — the logs view",
+    width: 77,
+    blocks: [S12_LOGS],
+  },
+  {
+    file: "docs/surfaces/S11_local_execution.md",
+    fence: 0,
+    label: "S11 §2 — /run, host-native",
+    width: 76,
+    blocks: S11_RUN,
+  },
   {
     file: "docs/surfaces/S04_run_detail.md",
     fence: 1,
@@ -536,6 +795,13 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       S07_IDENTITY,
       block({ kind: "rule", id: "s07-metrics-rule", label: "metrics", gapBefore: true }),
       S07_METRICS,
+      // **Not converted: the bar follows a `diff`**, which is C25's kind and has
+      // no rows to carry actions. C11 I17's bar belongs to a table, so a surface
+      // whose last block is not one keeps a separate one.
+      //
+      // Two surfaces keep separate bars and the reasons are different — this
+      // one has no table, S15's has no row actions. Worth stating both, because
+      // "five converted and two did not" reads as unfinished otherwise.
       block({
         kind: "pills",
         id: "s07-actions",
@@ -651,13 +917,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
           { label: "○ queued ×1" },
         ],
       }),
-      S03_TABLE,
-      block({
-        kind: "pills",
-        id: "s03-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "≡ logs" }, { label: "⚡ events" }],
-      }),
+      withActions(S03_TABLE, ["⏎ detail", "␣ expand", "≡ logs", "⚡ events"]),
     ],
   },
   {
@@ -667,13 +927,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     width: 78,
     blocks: [
       block({ kind: "rule", id: "s05-rule", label: "serving · 7 healthy · 1 degraded" }),
-      S05_TABLE,
-      block({
-        kind: "pills",
-        id: "s05-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↻ restart" }],
-      }),
+      withActions(S05_TABLE, ["⏎ detail", "␣ expand", "↻ restart"]),
     ],
   },
   {
@@ -683,13 +937,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     width: 78,
     blocks: [
       block({ kind: "rule", id: "s06-rule", label: "models · 6 families · 14 versions" }),
-      S06_FAMILIES,
-      block({
-        kind: "pills",
-        id: "s06-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ versions" }, { label: "␣ expand" }, { label: "↑ promote" }],
-      }),
+      withActions(S06_FAMILIES, ["⏎ versions", "␣ expand", "↑ promote"]),
     ],
   },
   {
@@ -699,13 +947,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     width: 78,
     blocks: [
       block({ kind: "rule", id: "s06v-rule", label: "models · digit-classifier · 4 versions" }),
-      S06_VERSIONS,
-      block({
-        kind: "pills",
-        id: "s06v-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ detail" }, { label: "␣ expand" }, { label: "↑ promote" }],
-      }),
+      withActions(S06_VERSIONS, ["⏎ detail", "␣ expand", "↑ promote"]),
     ],
   },
   {
@@ -717,13 +959,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
       block({ kind: "rule", id: "s14-rule", label: "config · ~/.prism/config.toml" }),
       S14_KEYS,
       block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", gapBefore: true }),
-      S14_CONTEXTS,
-      block({
-        kind: "pills",
-        id: "s14-actions",
-        gapBefore: true,
-        chips: [{ label: "⏎ edit" }, { label: "␣ expand" }, { label: "↕ switch context" }, { label: "⊘ reset" }],
-      }),
+      withActions(S14_CONTEXTS, ["⏎ edit", "␣ expand", "↕ switch context", "⊘ reset"]),
     ],
   },
   {
@@ -741,6 +977,17 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
         tone: "muted",
         text: "Values are never shown by the CLI.",
       }),
+      // **Not converted: it is a hint, not row actions** (ruled).
+      //
+      // **The placeholder is the tell.** `≡ /secrets <target>` needs a target
+      // supplied, and a row action never would — the row *is* the target. A bar
+      // telling you to type a command with an argument is describing a command,
+      // not offering to run one on what you have selected.
+      //
+      // Three independent readings agree: §8 groups it with `↻ /login` and
+      // `≡ /config`, which are surface-level; §5's figure puts it after the
+      // notice, where a table's own bar cannot sit; and the label carries an
+      // argument no selection could fill.
       block({
         kind: "pills",
         id: "s15-actions",

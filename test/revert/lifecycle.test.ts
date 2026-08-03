@@ -83,7 +83,24 @@ describe("C01 fail-on-revert", () => {
   it("T6.3 (I1): an escape literal in another module → SS14 fails, naming the file", () => {
     const ss14 = SCANS.find((s) => s.id === "SS14");
     expect(ss14, "SS14 is gone from A03").toBeDefined();
-    expect(ss14!.allow).toEqual(["src/terminal/escapes.ts"]);
+    // **This asserted a singleton, and it fired on the commit that widened it.**
+    // That is the guard working: SS14's allow-list is the one place C01 I1 can be
+    // eroded quietly, so it is pinned exactly rather than checked for membership,
+    // and a third entry fails here whatever its justification.
+    //
+    // The second entry is C16's decoder. SS14 guards the **write** path — its
+    // sibling citation, C01 T2.5, is an output scan — and nothing may emit an
+    // escape sequence except `escapes.ts`, because a terminal left in a mode
+    // nobody owns is unrecoverable. Recognising bytes arriving *from* the
+    // terminal is the inverse direction: the decoder emits nothing, and C16 I13
+    // separately forbids it importing `terminal/`, so without the entry the
+    // component cannot be built as specified. The allowance is paired with C16
+    // T2.9, which asserts the decoder reaches no stream — because this entry is
+    // precisely what would hide it if it ever did.
+    expect(ss14!.allow).toEqual([
+      "src/terminal/escapes.ts",
+      "src/interaction/router/decode.ts",
+    ]);
     expect(ss14!.scope).toBe("src/");
     expect(ss14!.pattern.test("const x = \"\\x1b[0m\";")).toBe(true);
   });
@@ -128,14 +145,34 @@ describe("C01 fail-on-revert", () => {
     expect(members.has("contaminated")).toBe(false);
     // resume() does not repaint either: it emits acquisition sequences and
     // nothing else. C03 owns the flag, the L4 shell calls invalidate().
+    //
+    // **The exhaustive set is the point, and `size` had to be argued past it.**
+    // A `has("contaminated")` check alone would let any other member appear
+    // unremarked, which is how a lifecycle grows a second responsibility. The
+    // set failing on an addition is the mechanism working: `size` is C01 §5's
+    // deferred accessor, added on the commit where both of its conditions
+    // arrived — a caller that cannot work without it (C22's viewport, at
+    // construction step 5) and a rule requiring its use (SS42).
+    //
+    // **`onInput` is the second addition and was argued the same way.** C22 §4
+    // step 8 named "accept input" with no mechanism behind it: nothing in the
+    // tree read stdin, so C16's finished decoder was never handed a byte. The
+    // delivery is C01's because dropping the listener on `suspend()` is part of
+    // the transition — a listener the shell had to remember to remove races the
+    // child for the same descriptor (I18).
     expect(members).toEqual(
       new Set([
         "acquire",
+        // The frame's cursor: C01 owns the mode and yields the bytes, because
+        // they must land inside the frame's one write (I19).
+        "cursorSequence",
         "release",
         "suspend",
         "resume",
         "onResize",
         "onResume",
+        "onInput",
+        "size",
         "writer",
         "acquired",
         "suspended",

@@ -50,16 +50,78 @@ export const SCANS = [
     scope: "src/viewport/", allow: [],
     why: "C14 performs no I/O — the clipboard writer is injected, and a viewport that shells out cannot be unit-tested" },
 
+  // **SS9, built on the day C20 landed, and built rather than folded.**
+  //
+  // It is the last of the four pending rules A03 §2 tracks and the only one that
+  // survives the question that retired SS5, SS6, SS7 and SS8: could it fire on
+  // anything a broader rule misses? Its clock clause could not — SS1 bans clock
+  // reads across all of `src/` — so the clause is gone rather than carried, and
+  // C20 T2.4's clock half is SS1's coverage declared. What is left is `fs` and
+  // the `~/.prism` literal, and SS1 speaks for neither.
+  //
+  // The literal is the live half. C20 is the first component since C08 to write
+  // anything, and a hardcoded `~/.prism` means a standalone run appends to the
+  // developer's own history — which makes a clean clone neither clean nor
+  // repeatable, and does it silently, in a file nobody looks at until it is
+  // wrong (C20 I12, T6.12).
+  { id: "SS9", spec: "C20 I11 · C20 I12 · C20 T2.4",
+    pattern: /require\(["']fs["']\)|from\s+["']node:fs["']|~\/\.prism/,
+    scope: "src/interaction/history/", allow: [],
+    why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and a hardcoded `~/.prism` makes standalone development append to a real install" },
+
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,
     scope: "src/viewport/", allow: [],
     why: "L2 reads no clock at all — `seq` is logical, so golden frames and fixture-backed sessions are reproducible" },
 
   // --- forbidden literals --------------------------------------------------
+  // SS14 guards the **write** path, and its own citation says so: C01 T2.5 is an
+  // output scan. Nothing may *emit* an escape sequence except one module, because
+  // a terminal left in a mode nobody owns is unrecoverable.
+  //
+  // Recognition is the inverse direction and was never what it guarded. C16's
+  // decoder matches bytes arriving *from* the terminal: it emits nothing, and the
+  // sequences it matches are the terminal's input vocabulary rather than this
+  // application's output. C16 I13 separately forbids importing `terminal/`, so
+  // without this entry the component is unbuildable as specified - two rules each
+  // right and impossible together.
+  //
+  // MG21's precedent runs the other way: `presentation/` may import `escapes.js`
+  // for `sgr` and nothing else. Both are narrow legal edges, stated rather than
+  // assumed.
+  //
+  // **The entry names the decoder's file, and it is not a licence to emit.** A
+  // second table of the same constants was the alternative and is worse - an
+  // input sequence and an output sequence that stop agreeing look correct in both
+  // files, which is MG20's drift with nothing to catch it. If `decode.ts` ever
+  // writes a query or a mode set, that is the write path and this entry would
+  // hide it, so the decoder carries its own test that it reaches no stream
+  // (C16 T2.9). One file allowed, one file to check.
   { id: "SS14", spec: "C01 I1 · C01 T2.5",
     pattern: /\\x1b|\\u001b|\u001b/,
-    scope: "src/", allow: ["src/terminal/escapes.ts"],
-    why: "escape literals live in one module" },
+    scope: "src/", allow: ["src/terminal/escapes.ts", "src/interaction/router/decode.ts"],
+    why: "escape literals live in one module on the write path; recognising arriving bytes is the inverse direction" },
+
+  // A C0 control character written literally into source. An escape, or not at
+  // all.
+  //
+  // Two instances, and they are the two halves a rule wants. `decode.ts` holds a
+  // deliberate one inside a control-stripping character class — correct, and
+  // unreadable, which is why it is an escape now rather than an allow entry.
+  // `keymap.ts` held an accidental one as a *separator*: `slot` joined on NUL and
+  // `describe` split on NUL, both agreed, and ten tests passed.
+  //
+  // That second one is why the pattern is broad rather than aimed. It was found
+  // by SS40 firing on the string surgery beside it, and SS40's stated concern is
+  // `.length` in the editor. A scan targeted precisely at its own subject would
+  // have walked past a NUL masquerading as a space.
+  //
+  // Tabs and newlines are excluded because they are whitespace people write on
+  // purpose; everything else in C0 is invisible in every editor and diff.
+  { id: "SS43", spec: "C16 T2.10",
+    pattern: /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/,
+    scope: "src/", allow: [],
+    why: "a control character in source is invisible: write it as an escape, or a separator that reads as a space turns out to be a NUL" },
 
   // The digits, not the meaning. SS15 says where the literals may live; MG20
   // (module-graph.mjs) says which component may import each one. An earlier
@@ -201,10 +263,92 @@ export const SCANS = [
     scope: "src/presentation/", allow: ["src/presentation/theme/"],
     why: "display width comes from cells(), never .length" },
 
+  // SS40 is SS23's split repeated one directory over, and the third instance of
+  // A03 §2's directory-scope class.
+  //
+  // C17 indexes by grapheme because the cursor is a *position*. C16's decoder
+  // counts bytes and buffer offsets in a stream, where a code-unit count is the
+  // correct measure and a grapheme index would be wrong — `pending.length` is how
+  // many characters are left to parse, not how wide anything is.
+  //
+  // A shared rule would give the decoder the editor's advice at the moment
+  // someone reaches for the quick fix, which is exactly what SS23's comment above
+  // says about SS40 itself. A directory is a packaging decision, not a semantic
+  // one.
+  // **The annotation covers all three branches, and it did not.** The lookahead
+  // sat on the `.length` alternative alone, so `.charAt(` and `.slice(` had no
+  // escape hatch at all — and C17 needs one: slicing a *grapheme array* is the
+  // correct operation at the buffer, the kill buffer and the 200-unit undo
+  // bound, and index arithmetic over clusters is what this rule is asking for
+  // rather than what it forbids. A rule with no way to say "this is the right
+  // operation" is a rule people route around by renaming the variable.
+  //
+  // **`// graphemes-ok` is a claim, not a suppression.** It asserts that the
+  // expression operates on a grapheme array or a non-text value, where index
+  // arithmetic is correct. It does not mean "the scan complained here". The
+  // distinction is the whole value of the annotation: SS23's comment already
+  // records why sixteen `cells-ok` marks on colour arithmetic would have taught
+  // the mark to mean the wrong thing, and the same failure is one careless
+  // review away here. `test/support/README.md` carries it beside the fixture
+  // rules, because that is where someone reads about writing an exception.
   { id: "SS40", spec: "C17 I2 · C17 T2.4",
-    pattern: /\.length\b(?!.*\/\/ *graphemes-ok)|\.charAt\s*\(|\.slice\s*\(/,
-    scope: "src/interaction/", allow: [],
-    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position" },
+    pattern: /(?:\.length\b|\.charAt\s*\(|\.slice\s*\()(?![^\n]*\/\/ *graphemes-ok)/,
+    // **Two directory exceptions, and they are the same exception twice.** The
+    // rule is C17's: a cursor is a position and `.length` is a unit count, so
+    // the editor indexes by grapheme. C16's decoder and C18's tokeniser are
+    // both *lexers over a string*, where the code unit is the addressing
+    // scheme rather than a mistake about one — decode counts bytes off the
+    // wire, and the parser's spans are code-unit offsets by definition, spliced
+    // back into the same string they were measured in.
+    //
+    // Granted as directories rather than as annotations because the alternative
+    // was twenty-seven `// graphemes-ok` marks in one component, and an
+    // annotation that dense stops reading as a claim and starts reading as
+    // ceremony — which is how it becomes a way to silence the rule. Neither
+    // file measures display width, and MG16 now forbids C18 from importing the
+    // layer that would let it. C18 T3.23 demonstrates the claim on astral
+    // characters rather than asserting it.
+    //
+    // **C19's entries are files, and the near-miss is worth recording.** C19 §2
+    // first claimed `completion/` as a third directory, on the reasoning that it
+    // works in the tokeniser's coordinate system — true of `context.ts` and
+    // `sources.ts`, which slice C18's code-unit offsets and strip ASCII markers
+    // in that same space, and false of `menu.ts`, which measures candidate
+    // columns and must use `cells()`. The discriminator is the sentence above:
+    // no allowed file measures display width. Granting the directory would have
+    // given the one file in the minority the wrong advice at exactly the moment
+    // someone reached for a quick fix, which is the defect A03 §2 has now
+    // recorded three times.
+    //
+    // **Per file rather than per directory, and the direction is what makes it
+    // safe.** An allow-list denies by default, so a file added to `completion/`
+    // later is caught and has to be argued onto this list rather than inheriting
+    // an allowance nobody re-examined. That is the opposite of SS26's failure,
+    // where a narrow *scope* silently stopped seeing new files.
+    scope: "src/interaction/",
+    allow: [
+      "src/interaction/router/decode.ts",
+      "src/interaction/parser/",
+      "src/interaction/completion/context.ts",
+      "src/interaction/completion/sources.ts",
+      // **C20's six, and `layers.ts` is deliberately not among them** — the
+      // discriminator is the sentence above, held to for the second time. Two of
+      // the six are lexers in C18's coordinate system (`redact.ts` splices the
+      // tokeniser's spans back into the string they were measured in;
+      // `codec.ts` scans a line for escapes), and four count arrays — entries,
+      // rows, splices — where an index is a position in a list and not a claim
+      // about text at all. `layers.ts` is the one file that measures display
+      // width, and it uses `cells()`; granting the directory would have handed
+      // the file in the minority the wrong advice at the moment someone reached
+      // for a quick fix.
+      "src/interaction/history/codec.ts",
+      "src/interaction/history/navigate.ts",
+      "src/interaction/history/persist.ts",
+      "src/interaction/history/redact.ts",
+      "src/interaction/history/search.ts",
+      "src/interaction/history/store.ts",
+    ],
+    why: "the editor indexes by grapheme, never by code unit: `.length` is a unit count and the cursor is a position. `// graphemes-ok` claims the expression operates on a grapheme array or a non-text value, where index arithmetic is correct — it is a claim about the code, not a way to silence the rule. C16's decoder and C18's tokeniser are out of scope: both are lexers where a unit count is the correct measure" },
 
   // SS3 carried two of the four vacuity failures at once (A03 §2). It was
   // inventoried in A03 from the start and never written here, so it could not
@@ -274,10 +418,60 @@ export const SCANS = [
   // field rather than adding a second row with the same id closes the class: C18
   // needs the third scope, and a per-scope row is a shape the next reader has to
   // notice rather than a list they add to.
+  //
+  // **And the list then diverged from A03's row in both directions**: the code
+  // grew `patch/` for C25 and the row never heard, while the row named `parser/`
+  // and the code never did. 14b's inventory equality compares rule *ids*, so it
+  // saw neither. The scope-column equality in `test/unit/enforce-rules.test.ts`
+  // is 14b's equality one column over, and it fired on eight other rows.
   { id: "SS24", spec: "C11 I11 · C11 T2.6 · C12 T2.5 · C25 T2.4 · C18 T2.2",
     pattern: /^(?:export\s+)?(?:let|var)\s/m,
-    scope: ["src/presentation/table/", "src/presentation/plot/", "src/presentation/patch/"], allow: [],
+    scope: [
+      "src/presentation/table/",
+      "src/presentation/plot/",
+      "src/presentation/patch/",
+      "src/interaction/parser/",
+    ], allow: [],
     why: "C11, C12 and C25 own no state: a module-level binding is a cache two blocks share and only one of them invalidates" },
+
+  // C18 I11 and C05 I18, as one rule.
+  //
+  // **Its subject was always "a shared text primitive with one implementation";
+  // the row happened to name two.** Widening to three states what it meant —
+  // and a second row with an identical family is the shape A03 §2 says a reader
+  // has to *notice*, which is what a rule cannot rely on. SS24's `scope` list is
+  // the precedent: widen the field.
+  //
+  // The three:
+  //
+  //   - **Tokeniser.** C19 completes what C18 will parse. Two tokenisers
+  //     disagree at unbalanced quotes and escaped spaces, and the symptom is a
+  //     candidate that parses differently once accepted.
+  //   - **Quoter.** The same, one step later: a candidate quoted by one and
+  //     parsed by the other round-trips to something else.
+  //   - **Edit distance.** Two distance-2 cutoffs agree about the distance and
+  //     diverge about the tie-break, so they differ exactly where a suggestion
+  //     is *wrong* rather than absent — which A01 A.2 says costs more than none.
+  //
+  // The pattern names the declarations rather than the calls, so importing
+  // either owner is fine and writing a second is not.
+  { id: "SS30", spec: "C18 I11 · C18 T2.3 · C18 T2.10 · C19 T2.4 · C05 I18 · C05 T2.9",
+    pattern:
+      /^(?:export\s+)?(?:async\s+)?function\s+(?:tokenis[ez]e?|lex|shellSplit|quoteArg|shellQuote|quote|levenshtein|editDistance|distance)\b/m,
+    scope: "src/",
+    // **The third entry is a name collision and not a second implementation**,
+    // and it is granted rather than tolerated. C09's `code.ts` tokenises *source
+    // text into highlight slots* — a different primitive with a different input
+    // and a different output, shared with C25 for exactly the reason this rule
+    // exists. Widening the pattern to exclude it by name would make the rule
+    // depend on a spelling; naming the file says which exception was granted and
+    // by whom, and the scope-column equality keeps A03 saying the same thing.
+    allow: [
+      "src/interaction/parser/tokenise.ts",
+      "src/data/manifest/validate.ts",
+      "src/presentation/blocks/kinds/code.ts",
+    ],
+    why: "one tokeniser, one quoter, one distance-2 suggester — a second agrees today and diverges where it is least visible" },
 
   { id: "SS26", spec: "C21 T2.2",
     pattern: /process\.stdout\.write/,
@@ -338,9 +532,48 @@ export const SCANS = [
     scope: "src/", allow: [],
     why: "C01 owns stdout; a stray write is captured to the debug log, but it should not exist" },
 
+  // **SS22, the anti-drift check.** Inventoried from the start and unbuildable
+  // until `completion/` existed, which is C19's landing — the same "a rule
+  // waiting on the component that creates its scope" this file opens with.
+  //
+  // The whole value of C05 is that a flag added on the far side becomes
+  // completable with no TypeScript change (C19 T4.1). A hardcoded enum in
+  // completion is how that stops being true, and it looks entirely harmless in
+  // review: the list is *correct* on the day it is written.
+  //
+  // Two shapes, because there are two ways to write one. A `"--flagname"`
+  // literal is a flag by itself; three or more lowercase word strings in an
+  // array literal is a verb or enum list. `"--"` alone is not matched — the
+  // prefix test in `context.ts` is a question about syntax, not a flag name.
+  //
+  // `types.ts` is allowed by name: `SLOT_KINDS` is C19's own closed union,
+  // enumerated so T2.7 can be exhaustive over it, and it is not manifest data.
+  // The alternative is a rule that cannot see a list added to any other file.
+  { id: "SS22", spec: "C19 I4 · C19 T2.6 · C19 T4.1",
+    pattern: /"--[a-z][\w-]*"|\[\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"\s*,\s*"[a-z][\w -]*"/,
+    scope: "src/interaction/completion/", allow: ["src/interaction/completion/types.ts"],
+    why: "every candidate is a projection of the manifest (I4): a literal verb, flag or enum list here is how completion drifts from the far side, and it is correct on the day it is written" },
+
+  // **C20 owns a `flush` that has nothing to do with a frame**, and the
+  // collision is the rule's evidence rather than its intent: this scan reads a
+  // bare identifier, and `flush` is C03's scheduler method *and* the name C20 §4
+  // and C22 §8 both give to putting history on disk. Three files are allowed by
+  // name — the interface, the writer, and the store that delegates to it.
+  //
+  // What the allowance costs is visible and small: those three stop being
+  // scanned for `commit(` and `invalidate(` too. Two other things already cover
+  // that ground for C20 — MG18 forbids any import from `terminal/`, and the
+  // component's whole injected surface is `fs`, `clock` and `stateDir`, so a
+  // scheduler has no route in. Per file rather than per directory, so a file
+  // added to `history/` later is caught and has to be argued onto this list.
   { id: "SS28", spec: "C16 T2.6 · C17 T2.6 · C18 T2.4 · C19 T2.5 · C20 T2.6",
     pattern: /\b(?:commit|flush|invalidate)\s*\(/,
-    scope: "src/interaction/", allow: [],
+    scope: "src/interaction/",
+    allow: [
+      "src/interaction/history/types.ts",
+      "src/interaction/history/persist.ts",
+      "src/interaction/history/store.ts",
+    ],
     why: "L4 orchestrates; interaction never commits a frame" },
 
   // C05's first draft declared its own `Result<T, E>` with `errors` plural where
@@ -405,6 +638,45 @@ export const SCANS = [
     pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet)["'`])/,
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
+
+  // The third member of the injected-ambient family, after the clock and the
+  // environment record. `tui-kit` ships no binary, so a variable named for one
+  // consumer has no business inside a framework that claims to serve others —
+  // `prism-tui` reads its own and passes the value through `TuiConfig`.
+  //
+  // **Broad by name rather than by variable.** C06 I18 forbade
+  // `PRISM_TUI_TRANSPORT` and C22 I20 added `PRISM_TUI_STATE_DIR`; a rule per
+  // variable is a list that grows one incident at a time, and the third one
+  // would be added after it shipped. The prefix is the thing that means "the
+  // app's", so the prefix is what the rule matches.
+  { id: "SS44", spec: "C06 I18 · C22 I20 · C22 T2.9",
+    pattern: /PRISM_TUI_[A-Z_]+/,
+    scope: "src/", allow: [],
+    why: "the app's entry point resolves its own variables; the framework reads none" },
+
+  // C24 I5 — nothing is inferred from a field name.
+  //
+  // A builder that guessed a tone from a key called `status` would work for
+  // four verbs and fail silently on the fifth, which is the failure mode that
+  // makes this a rule rather than a convention: the wrong tone renders.
+  //
+  // **The pattern is a tone or glyph literal used as an object-literal value**,
+  // which is the shape of the table T2.7 names — `{ status: "warn" }`, whether
+  // it is a standing map or built at a return. The trailing `[,}]` is what
+  // keeps a union *type* (`state?: "pending" | "done"`) out of it, so
+  // `types.ts` stays in scope rather than being allow-listed out.
+  //
+  // **What it does not catch**, recorded rather than hidden: the conditional
+  // form. `if (key === "status") return "warn"` infers exactly as hard and
+  // matches nothing here, because the tone never appears beside a colon. A
+  // regex can see a table and cannot see a decision. The by-hand read stays the
+  // backstop for that half, and `glyphFor` — which maps tone to glyph, not
+  // field name to tone, and is I6's ergonomics rather than inference — is the
+  // legitimate neighbour it must keep passing.
+  { id: "SS45", spec: "C24 I5 · C24 T2.7",
+    pattern: /:\s*"(?:ok|warn|error|info|dim|muted|accent|meta|identifier|pending|running|queued|cancelled|working|live|bullet|expand|collapse)"\s*[,}]/,
+    scope: "src/shell/builders/", allow: [],
+    why: "a builder inferring a tone or glyph from a field name works for four verbs and fails silently on the fifth (C24 I5)" },
 
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,

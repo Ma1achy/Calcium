@@ -12,7 +12,8 @@
 // emits — not that the application wires detection to rendering. That wiring is
 // C22's own, and this file should not be read as covering it.
 import { describe, expect, it } from "vitest";
-import { runInPty, type PtyRun } from "../support/pty.js";
+import { interactivePty, runInPty, type PtyRun } from "../support/pty.js";
+import { displayCells } from "../../src/presentation/text.js";
 
 const FIXTURE = "node test/support/fixture.mjs caps";
 
@@ -148,13 +149,78 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
     45_000,
   );
 
-  // T5.4's second half — "keyboard navigation of a table still works end to
-  // end" — is not here. C11 now renders the table and exposes `focusableRowIds`,
-  // so the half that was waiting on C11 is done; what remains is the routing,
-  // which is C16's and is still a stub. Written now it would assert that a
-  // fixture I wrote navigates a structure I built, with nothing moving focus
-  // between them — weaker than the title, and it would read as covered.
-  it.todo(
-    "T5.4b: inside tmux, keyboard navigation of a table works end to end — waits on C16",
+  it(
+    "T5.4b: inside tmux, keyboard navigation of a table works end to end",
+    async () => {
+      // **Three gaps deep, and each was invisible until the one in front of it
+      // closed.** `enterLiveBlock` had no caller, so focus could never leave
+      // the prompt (C16 I22). `table` was registered by nobody, so the block
+      // drew as its own JSON through the fallback (C09 I13). And the frame
+      // supplied `{theme, capabilities}` and not `focus`, so a focused row
+      // rendered exactly like an unfocused one — every reference present, the
+      // seam still broken (C16 §3).
+      const pty = interactivePty("node test/support/fixture.mjs session", {
+        cols: 100,
+        rows: 24,
+        env: { TERM: "screen-256color", TMUX: "/tmp/tmux-1000/default,4242,0" },
+      });
+      try {
+        await pty.waitFor(/\u276f/, 15_000);
+
+        // `--mine`, because the bare verb answers with a notice and a notice
+        // has no rows: `↓` would correctly do nothing (C16 I22).
+        pty.type("/ps --mine\r");
+        await pty.waitForFrame((f) => f.join("").includes("a3f9b21"), 15_000);
+
+        // **The raw rows, escapes and all.** C11 renders focus as a *tone* and
+        // nothing else (C11 I14), so the stripped text of a focused row is
+        // identical to an unfocused one — comparing `pty.frame` would assert
+        // that focus is invisible, which is what it was.
+        const rawRows = (): string[] => {
+          const at = pty.output.lastIndexOf("\u001b[H");
+          if (at === -1) return [];
+          return pty.output
+            .slice(at)
+            .split(/\r*\n/)
+            .filter((r) => r.includes("a3f9b21") || r.includes("7c2d4e1"));
+        };
+
+        // A beat before the baseline: `waitForFrame` resolves on the first poll
+        // that satisfies it, which can be a frame still arriving, and a partial
+        // baseline makes the comparison below meaningless in whichever
+        // direction it happens to fall.
+        await new Promise((r) => setTimeout(r, 300));
+        const before = rawRows();
+        expect(before.length, "both rows are on the screen").toBe(2);
+
+        // `↓` at the prompt: history has nothing further to offer, so this is
+        // the keystroke's second effect (C16 I22).
+        pty.type("\u001b[B");
+        await pty.waitForFrame(() => rawRows().join("\n") !== before.join("\n"), 15_000);
+
+        // **The focused row looks different and nothing moved.** Focus is a
+        // tone — no marker, no extra row, no width (C11 I14) — so a width that
+        // changed here would be a defect in C11 rather than in the wiring.
+        const after = rawRows();
+        expect(after.length, "no row was added").toBe(before.length);
+        for (const [i, row] of after.entries()) {
+          expect(displayCells(row), `row ${String(i)} is the same width`).toBe(
+            displayCells(before[i] ?? ""),
+          );
+        }
+        expect(after.join("\n"), "and the focused row carries a tone").not.toBe(before.join("\n"));
+
+        // Back out by the route S01's footer advertises.
+        pty.type("\u001b");
+        await pty.waitForFrame(() => rawRows().join("\n") === before.join("\n"), 15_000);
+
+        // **Inside tmux throughout**, which is what makes this C02's row: the
+        // navigation is keyboard-only and no mouse mode was negotiated.
+        expect(pty.output, "no mouse mode under tmux").not.toContain("\u001b[?1002h");
+      } finally {
+        pty.kill();
+      }
+    },
+    60_000,
   );
 });

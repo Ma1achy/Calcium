@@ -93,20 +93,80 @@ export function invariantsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
  * boundary is the whole reason this parses rather than greps.
  */
 export function commitmentsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
-  const lines = readFile(file).split("\n");
   const out = [];
-  let inside = false;
 
-  for (const [i, line] of lines.entries()) {
-    if (/^##\s+.*Commitments\s*$/.test(line)) { inside = true; continue; }
-    if (!inside) continue;
-    if (/^---\s*$/.test(line) || /^##\s/.test(line)) break;
-
+  for (const { line, n } of sectionLines(file, /^##\s+.*Commitments\s*$/, readFile)) {
     const m = COMMITMENT.exec(line);
-    if (m !== null) out.push({ n: Number(m[1]), text: m[2], line: i + 1 });
+    if (m !== null) out.push({ n: Number(m[1]), text: m[2], line: n });
   }
 
   return out;
+}
+
+/**
+ * The lines inside one section — from its heading to the next `---` or heading
+ * at the same level or above.
+ *
+ * **One implementation, because the boundary is the whole difficulty.** A
+ * numbered list appears in §4's routes and in a wiring checklist as well as under
+ * Commitments; a markdown table appears in a dozen sections. Anything that greps
+ * for the row shape rather than bounding the section first finds all of them, and
+ * a second copy of the bounding logic is the duplication SP4 itself exists to
+ * catch. `commitmentsOf` and `tableColumn` both read through here.
+ *
+ * `depth` is how many `#` the heading has, so a `###` section ends at the next
+ * `###` or `##` and not at a `####` inside it.
+ */
+export function sectionLines(file, headingRe, readFile = (f) => readFileSync(f, "utf8")) {
+  const lines = readFile(file).split("\n");
+  const out = [];
+  let depth = 0;
+
+  for (const [i, line] of lines.entries()) {
+    if (depth === 0) {
+      if (!headingRe.test(line)) continue;
+      depth = (/^(#+)/.exec(line)?.[1] ?? "##").length;
+      continue;
+    }
+    if (/^---\s*$/.test(line)) break;
+    const here = /^(#+)\s/.exec(line);
+    if (here !== null && here[1].length <= depth) break;
+    out.push({ line, n: i + 1 });
+  }
+
+  return out;
+}
+
+/**
+ * One column of the first markdown table in a section, header and rule dropped.
+ *
+ * Normalised for comparison: emphasis, backticks and links stripped, whitespace
+ * collapsed, lowercased. Two tables that name the same row `Submit` and `Command
+ * submit` are drift a checker cannot see through, but `` `cd` / `export` `` and
+ * `cd / export` are the same row written by two hands, and failing on that would
+ * make the rule about markdown rather than about the architecture.
+ */
+export function tableColumn(file, headingRe, index = 0, readFile = (f) => readFileSync(f, "utf8")) {
+  const out = [];
+
+  for (const { line } of sectionLines(file, headingRe, readFile)) {
+    if (!line.startsWith("|")) continue;
+    const cells = line.split("|").slice(1, -1);
+    if (cells.length <= index) continue;
+    const cell = cells[index] ?? "";
+    if (/^\s*:?-{2,}:?\s*$/.test(cell)) continue; // the header rule
+
+    const key = cell
+      .replace(/`|\*\*|\*|_/g, "")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+    if (key !== "") out.push(key);
+  }
+
+  // The first row of a markdown table is its header.
+  return out.slice(1);
 }
 
 function citations(text) {
@@ -342,6 +402,126 @@ export function checkOrdering(files, readFile = (f) => readFileSync(f, "utf8")) 
   return violations;
 }
 
+// --- SP4 — Seam 4 and its owners agree, both directions --------------------
+//
+// **The only artefact several components write to and none owns.** A02 Seam 4
+// lists every cross-layer sequence and names an owner; each owner's spec lists
+// the same sequences in its own section. Two copies, and until this rule nothing
+// compared them.
+//
+// It had been wrong or incomplete at every component that touched it, in a
+// different way each time: six rows missing by C20, `resetFocus` recorded as a
+// subscription at C16, no owner column until C22, and at C23 a stale submit
+// order, `Scroll` with two owners, and three C23-owned rows absent while C23 I13
+// claims the table holds all of them. Six errors of six different kinds is not a
+// run of bad luck — it is the signature of a duplicated source of truth with no
+// reconciliation, the class SS30, SS35, C05 T1.7c and C22's `STEPS` each close in
+// their own corner.
+//
+// **Equality, both directions, and that is the whole design.** Containment in
+// either direction misses one of the two failures actually observed: C15–C20's
+// rows were missing *from the table*, and C23's were missing *from the spec*.
+// Writing the rule found four more of the second kind — `Pop a pushed view`,
+// `Stall detected`, `View refresh tick` and `cd` / `export` — which is TD0's
+// lesson arriving again, and ACKNOWLEDGED_BACKLOG's: a set compared by
+// containment only ever grows.
+//
+// The alternative was deriving Seam 4 from the component specs. Rejected: the
+// table sits inside an argument, and generated content in argued prose goes stale
+// in the other direction, where nothing is looking.
+
+/** Where each owner lists the sequences it owns. Both keyed by Seam 4's Effect. */
+export const SEAM_OWNERS = Object.freeze({
+  C22: Object.freeze({
+    file: "docs/components/C22_composition_root.md",
+    heading: /^###\s+3c\./,
+  }),
+  C23: Object.freeze({
+    file: "docs/components/C23_execution_pipeline.md",
+    heading: /^##\s+4\.\s+Orchestration/,
+  }),
+});
+
+export const SEAM_FILE = "docs/architecture/A02_tui_kit_architecture.md";
+const SEAM_HEADING = /^###\s+Seam 4/;
+
+/** Seam 4's rows as `{ effect, owner }`, normalised for comparison. */
+export function seamRows(readFile = (f) => readFileSync(f, "utf8")) {
+  const effects = tableColumn(SEAM_FILE, SEAM_HEADING, 0, readFile);
+  const owners = tableColumn(SEAM_FILE, SEAM_HEADING, 2, readFile);
+  return effects.map((effect, i) => ({ effect, owner: (owners[i] ?? "").toUpperCase() }));
+}
+
+export function checkSeamFour(
+  owners = SEAM_OWNERS,
+  readFile = (f) => readFileSync(f, "utf8"),
+  seam = undefined,
+) {
+  const violations = [];
+  const rows = seam ?? seamRows(readFile);
+
+  // The rule's own vacuity, closed the way SP2 closes its own: a heading that
+  // stopped matching would read as "no rows, nothing to disagree with" and pass
+  // for exactly the reason it cannot see the table. SS26's failure, and the one
+  // this family keeps rediscovering.
+  if (rows.length === 0) {
+    return [{
+      rule: "SP4",
+      file: SEAM_FILE,
+      spec: "A02 Seam 4 · A03 §7a",
+      message:
+        "Seam 4's table could not be read — no rows found under the heading. " +
+        "An unreadable table reports compliance for the reason it cannot be checked",
+    }];
+  }
+
+  for (const [id, { file, heading }] of Object.entries(owners)) {
+    const declared = new Set(tableColumn(file, heading, 0, readFile));
+    const owned = rows.filter((r) => r.owner === id).map((r) => r.effect);
+
+    if (owned.length > 0 && declared.size === 0) {
+      violations.push({
+        rule: "SP4",
+        file,
+        spec: "A02 Seam 4 · A03 §7a",
+        message:
+          `${id} owns ${owned.length} Seam 4 row(s) and declares no orchestration table — ` +
+          `half a table cannot be checked against half a convention`,
+      });
+      continue;
+    }
+
+    for (const effect of owned) {
+      if (!declared.has(effect)) {
+        violations.push({
+          rule: "SP4",
+          file,
+          spec: "A02 Seam 4 · A03 §7a",
+          message:
+            `Seam 4 gives "${effect}" to ${id}, which does not name it — ` +
+            `a row owned by a spec that never mentions it is owned by nobody`,
+        });
+      }
+    }
+
+    const ownedSet = new Set(owned);
+    for (const effect of declared) {
+      if (!ownedSet.has(effect)) {
+        violations.push({
+          rule: "SP4",
+          file: SEAM_FILE,
+          spec: "A02 Seam 4 · A03 §7a",
+          message:
+            `${id} orchestrates "${effect}" and Seam 4 does not list it — ` +
+            `the direction a subset check does not look, and where four rows were found`,
+        });
+      }
+    }
+  }
+
+  return violations;
+}
+
 // --- SP3 — every invariant reference resolves ------------------------------
 //
 // **SP1 governs the specs and nothing governed anything else.** SP1 resolves
@@ -401,7 +581,30 @@ export const OWNERS = [
   { path: "src/viewport/transcript", spec: "C13" },
   { path: "src/viewport/viewport", spec: "C14" },
   { path: "src/viewport/overlay", spec: "C15" },
+  { path: "src/interaction/router", spec: "C16" },
+  { path: "src/interaction/editor", spec: "C17" },
+  { path: "src/interaction/parser", spec: "C18" },
+  { path: "src/interaction/completion", spec: "C19" },
+  { path: "src/interaction/history", spec: "C20" },
+  // L4 is the one directory holding two components, so it is the one place the
+  // directory rule needs an exception rather than a second directory: C22 is
+  // the composition root and everything under `src/shell/` is its, except the
+  // execution pipeline. Longest prefix wins, so the second row governs
+  // `execution.ts` and the first governs every file added beside it — which is
+  // the direction that matters, since C22 is the one still growing files.
+  { path: "src/shell", spec: "C22" },
+  { path: "src/shell/execution", spec: "C23" },
+  // A mutation run is about one component and says so in its filename. Prefix
+  // rows rather than a `tools/mutate` row, because a run's bare `I1` means its
+  // own component's I1 and there is no single owner for the directory.
+  { path: "tools/mutate/runs/c01", spec: "C01" },
+  { path: "tools/mutate/runs/c22", spec: "C22" },
   { path: "src/testing", spec: "C09" },
+  // C24's builders sit under `src/shell/` because `b` is L4's surface and
+  // reuses `blockId` from `documents.ts` — so the C22 row above would claim
+  // them by prefix. Longest prefix wins, which is what makes this one line
+  // rather than a directory move.
+  { path: "src/shell/builders", spec: "C24" },
 ];
 
 /**
@@ -415,8 +618,16 @@ export const OWNERS = [
  */
 export const TOPICS = {
   "adapter-registry": "C07",
+  editor: "C17",
+  parser: "C18",
+  completion: "C19",
+  history: "C20",
   adapters: "C07",
   blocks: "C09",
+  builders: "C24",
+  "startup-validation": "C24",
+  "public-api": "C24",
+  "expect-document": "C24",
   capabilities: "C02",
   corpus: "C08",
   "fake-scheduler": "C03",
@@ -429,10 +640,25 @@ export const TOPICS = {
   manifest: "C05",
   "measurement-conformance": "C09",
   patch: "C25",
+  "router-decode": "C16",
+  execution: "C23",
+  "router-focus": "C16",
+  "router-keymap": "C16",
+  "router-dispatch": "C16",
+  router: "C16",
   text: "C09",
   plot: "C12",
   process: "C21",
   sequence: "C06",
+  session: "C22",
+  "session-config": "C22",
+  "session-construct": "C22",
+  "session-fallback": "C22",
+  "session-paint": "C22",
+  "session-frame": "C22",
+  "session-identity": "C22",
+  "session-state": "C22",
+  "session-chrome": "C22",
   sgr: "C01",
   "support-harness": "C09",
   table: "C11",
@@ -494,6 +720,7 @@ export function referenceFiles() {
   walk("test", /\.(tsx?|mjs|md)$/);
   walk("tools", /\.mjs$/);
   walk("docs/architecture", /\.md$/);
+  walk("docs/components", /\.md$/);
   walk("docs/surfaces", /\.md$/);
   walk("docs/behaviours", /\.md$/);
   walk("docs/notes", /\.md$/);
@@ -507,7 +734,26 @@ export function referenceFiles() {
   ].sort();
 }
 
+/**
+ * A component spec owns its own invariants, so a bare `I6` inside
+ * `docs/components/C14_viewport.md` means `C14 I6`.
+ *
+ * This is the rule that had never been needed, because `referenceFiles` did not
+ * walk `docs/components/`. Adding the directory without it reports 1052
+ * violations, nearly all of them a spec citing itself the way every spec in the
+ * corpus does — which would read as "the specs are riddled with dangling
+ * references" rather than "the resolver has never seen a self-referential file".
+ * A check whose first run is that wrong gets switched off, not fixed.
+ */
+function selfOwner(file) {
+  const m = /^docs\/components\/(C\d{2})_/.exec(file);
+  return m === null ? null : m[1];
+}
+
 function ownerOf(file) {
+  const self = selfOwner(file);
+  if (self !== null) return self;
+
   let best = null;
   for (const o of OWNERS) {
     if (file.startsWith(o.path) && (best === null || o.path.length > best.path.length)) best = o;
@@ -541,6 +787,7 @@ const TOKENS = /\b(C\d{2})\b|\b(I\d+[a-z]?)\b/g;
  *     > acquired, in reverse order" ↔ I2 (idempotence) + I6 (inverse, reverse).
  */
 const BREAK = /^\s*$|^#{1,6}\s|^---\s*$/;
+
 
 /**
  * What may sit between a spec id and the invariant it qualifies.
@@ -606,6 +853,7 @@ export function scanReferences(file, src, options = {}) {
   const code = options.code ?? !file.endsWith(".md");
   const out = [];
 
+
   let scope = owner;
   let fenced = false;
   let adjacent = null;
@@ -617,6 +865,7 @@ export function scanReferences(file, src, options = {}) {
 
     const text = code ? raw : mask(raw);
     if (BREAK.test(text)) { scope = owner; adjacent = null; }
+
 
     TOKENS.lastIndex = 0;
     let m;
@@ -734,4 +983,4 @@ export function checkReferences(
 }
 
 /** SP1, SP2, SP3 — the ids A03 §7a inventories, so 14b's equality can see them. */
-export const SPEC_RULES = ["SP1", "SP2", "SP3"];
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4"];

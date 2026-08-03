@@ -6,9 +6,12 @@
 // of SS26, which scoped itself to a directory that did not exist and reported
 // compliance for a day. A rule with nothing to be wrong about passes exactly
 // like a rule that is satisfied.
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ACKNOWLEDGED_BACKLOG,
+  backlogKey,
+  blockerClause,
   blockersIn,
   checkSourceMap,
   checkSurfaceDeferrals,
@@ -16,7 +19,9 @@ import {
   collectTodos,
   COMPONENT_SOURCES,
   KIND_OF_COMPONENT,
-  todoTitles,
+  LAYER_SOURCES,
+  NO_COMPONENT_MARKER,
+  todoCalls,
 } from "../../tools/enforce/todo-expiry.mjs";
 
 describe("todo expiry", () => {
@@ -31,7 +36,7 @@ describe("todo expiry", () => {
     const violations = checkTodoExpiry(
       collectTodos("test").filter((e) => !e.file.endsWith("todo-expiry.test.ts")),
     );
-    const seen = violations.map((v) => `${v.rule} ${v.file}`);
+    const seen = violations.map(backlogKey);
 
     // Equality, not superset. A new expiry fails because it is not in the list;
     // a resolved one fails because it still is. An exemption list that only
@@ -40,6 +45,41 @@ describe("todo expiry", () => {
       seen.sort(),
       violations.map((v) => v.message).join("\n"),
     ).toEqual([...ACKNOWLEDGED_BACKLOG].sort());
+  });
+
+  it("TD0's key sees a third deferral join two that were acknowledged", () => {
+    // **The case the old key could not see.** A row was `"<rule> <file>"`, so
+    // every deferral in one file collapsed into one string: two acknowledged
+    // and three produced the same key, and a third would have inherited an
+    // exemption argued for two. An exemption list that cannot see itself grow
+    // is the thing this list exists to prevent.
+    //
+    // Fabricated rather than waiting for it, because the failure mode is
+    // silence: nothing would have reported the third.
+    const twoInOneFile = [
+      { file: "test/a.test.ts", title: "T9.1: a — waits on C99" },
+      { file: "test/b.test.ts", title: "T9.2: b — waits on C99" },
+    ];
+    const map = { C99: "src/shell/session.ts" };
+    const built = () => true;
+
+    const two = checkTodoExpiry(twoInOneFile, map, built).map(backlogKey);
+    expect(two, "the count is in the key").toEqual(["TD2 src/shell/session.ts (2)"]);
+
+    const three = checkTodoExpiry(
+      [...twoInOneFile, { file: "test/c.test.ts", title: "T9.3: c — waits on C99" }],
+      map,
+      built,
+    ).map(backlogKey);
+
+    expect(three).toEqual(["TD2 src/shell/session.ts (3)"]);
+    expect(three, "so an equality against the acknowledged two fails").not.toEqual(two);
+  });
+
+  it("a rule with no count keeps the plain key", () => {
+    // TD1, TD3 and TD4 report per file and have no count, so their keys are
+    // unchanged — the count is TD2's identity, not a new format for everyone.
+    expect(backlogKey({ rule: "TD1", file: "test/x.test.ts" })).toBe("TD1 test/x.test.ts");
   });
 
   it("TD3: every path the map names exists", () => {
@@ -163,6 +203,66 @@ describe("todo expiry", () => {
     expect(blockersIn("T9.9: e — waits on the thing that does not exist yet")).toBeNull();
   });
 
+  it("the blocker clause ends at a sentence delimiter — one fabrication per form", () => {
+    // **Three incidents, and this is the mechanism replacing the workaround.**
+    // The clause read to end of line, so a sentence explaining a correction
+    // parsed as part of the claim, and the standing remedy was to write the
+    // explanation *before* the clause. A habit, in a project whose method is
+    // that habits become mechanisms.
+    //
+    // A fabrication per form, because a single one proves the form it used and
+    // the earlier parses each failed on a form nobody had written down.
+
+    // 1. Single blocker, then prose naming the component it no longer waits on.
+    //    This is the live incident: the restatement mentions C18 in order to
+    //    say the test does not wait for it.
+    expect(
+      blockersIn("T4.4: routing — waits on L4, which owns it. C18 produces both results now"),
+      "the sentence after the period is for the reader",
+    ).toEqual(["L4"]);
+
+    // 2. Multi-blocker, which the obvious fix — take the first identifier —
+    //    breaks. C17's tier 5 needs it and there is no delimiter inside it.
+    expect(blockersIn("T5.4: an undo sequence — waits on L4 and C20")).toEqual(["L4", "C20"]);
+
+    // 3. A parenthetical clause, terminated by its own closing paren.
+    expect(
+      blockersIn("T5.1: typing at a prompt (waits on L4) once the shell composes"),
+    ).toEqual(["L4"]);
+
+    // 4. And the qualification the corpus forced: a paren *opened inside* the
+    //    clause does not end it. Cutting at the first `)` would be harmless in
+    //    the first of these and would silently drop C20 in the second — which
+    //    is the exact defect this rule exists to prevent.
+    expect(
+      blockersIn("T5.3: c — waits on a real render tree (C09) and a terminal emulator"),
+    ).toEqual(["C09"]);
+    expect(blockersIn("T5.5: f — waits on L4 (the shell) and C20")).toEqual(["L4", "C20"]);
+
+    // 5. An em dash after the clause, which is how most of these are written.
+    expect(
+      blockersIn("T5.2: paste — waits on L4 — the frame is what shows it"),
+    ).toEqual(["L4"]);
+
+    // 6. A period that is not a sentence end does not truncate.
+    expect(blockersIn("T4.9: a — waits on C22 and src/shell/session.ts existing")).toEqual([
+      "C22",
+    ]);
+  });
+
+  it("the delimiter rule fires: the same title, read both ways", () => {
+    // The control. Under the old parse this title yielded ["L4", "C18"], which
+    // is what kept two deferrals waiting on a component that had landed — so
+    // the fabrication is the *real* title, and the assertion is that it no
+    // longer reads that way.
+    const restated = "T4.4: routing — waits on L4, which owns it. C18 produces both results now";
+
+    expect(blockerClause(restated.slice(restated.indexOf("waits on")))).toBe(
+      "waits on L4, which owns it",
+    );
+    expect(blockersIn(restated)).not.toContain("C18");
+  });
+
   it("extracts titles from every quoting style", () => {
     const source = `
       it.todo("double — waits on C09");
@@ -170,10 +270,206 @@ describe("todo expiry", () => {
       it.todo(\`backtick — waits on C11\`);
       it("not a todo — waits on C12", () => {});
     `;
-    const titles = todoTitles(source);
+    const titles = todoCalls(source).map((c) => c.title);
 
     expect(titles).toHaveLength(3);
     expect(titles.some((t) => t.includes("C12")), "a real `it` is not a deferral").toBe(false);
+  });
+
+  // --- the locator ---------------------------------------------------------
+  //
+  // **The other half of the parser, and the half that had never been tested.**
+  // A03 §9a records three incidents and all three are about the blocker clause.
+  // These are about reaching the title at all, which the old single regex did
+  // only when a quote sat immediately after `it.todo(`.
+  //
+  // A fabrication per form, for `blockerClause`'s reason: one proves the form it
+  // used, and each earlier parse failed on a form nobody had written down.
+
+  it("the locator reaches a title past every comment form", () => {
+    // **The live instance, and its shape is the finding.** A comment sits between
+    // `it.todo(` and its title exactly when someone has re-triaged that deferral
+    // and written down why — so the rule stopped seeing the five deferrals that
+    // had been read most carefully, `/clear`'s and `/help`'s among them.
+    const forms = {
+      "line comment": `it.todo(\n  // why it waits\n  "T9.1: a — waits on C23",\n);`,
+      "block comment": `it.todo(\n  /* why it waits */\n  "T9.2: b — waits on C23",\n);`,
+      "trailing comment": `it.todo( // why it waits\n  "T9.3: c — waits on C23",\n);`,
+      "several lines": `it.todo(\n  // one\n  // two\n  // three\n  "T9.4: d — waits on C23",\n);`,
+    };
+
+    for (const [form, source] of Object.entries(forms)) {
+      const calls = todoCalls(source);
+      expect(calls, form).toHaveLength(1);
+      expect(blockersIn(calls[0]!.title), form).toEqual(["C23"]);
+    }
+  });
+
+  it("the locator sees describe.todo, test.todo and a declaring it.skip", () => {
+    // **No instances in the tree today, and that is why they are here.** All
+    // three are legal vitest, and `describe.todo` is the worst version of
+    // invisible: one line defers a whole block.
+    //
+    // `it.skip` is a ruling rather than a discovery — a skip whose title declares
+    // a wait is a deferral wearing a different verb. The distinction it appears
+    // to draw (todo means unwritten, skip means written and not run) is one the
+    // blocker clause already makes moot.
+    const source = `
+      describe.todo("T9.5: a whole block — waits on C23");
+      test.todo("T9.6: the other verb — waits on C23");
+      it.skip("T9.7: written, not run — waits on C23", () => {});
+    `;
+
+    expect(todoCalls(source).map((c) => c.title.slice(0, 5))).toEqual([
+      "T9.5:",
+      "T9.6:",
+      "T9.7:",
+    ]);
+  });
+
+  it("TD6: a skip that declares no wait at all is a violation, not an exemption", () => {
+    // **This row asserted the hole, and TD6 is what closed it.** It used to say
+    // *a skip with no clause is not a deferral* — which was true of the
+    // mechanism and false of what the mechanism was for. A title carrying no
+    // `waits on` fell out through `blockersIn`'s empty array and was skipped by
+    // every other arm, so a blocker phrased as a condition — "blocked on L4
+    // drawing no overlays" — named nothing to watch and outlived what it
+    // described by four components.
+    const calls = todoCalls(`it.skip("T9.8: quarantined, flaky on CI", () => {});`);
+
+    expect(calls).toHaveLength(1);
+    expect(blockersIn(calls[0]!.title)).toEqual([]);
+    const raised = checkTodoExpiry([{ file: "test/x.test.ts", ...calls[0]! }]);
+    expect(raised.map((v) => v.rule)).toEqual(["TD6"]);
+  });
+
+  it("TD6: and the explicit-none form is what a quarantine writes instead", () => {
+    // **The legitimate case stays legitimate, and becomes an assertion.** Some
+    // work is deferred on no component because none is planned — an emulator
+    // honouring DECSET 2026, a 1-bit session that cannot exist, a quarantine.
+    // The arm is not "every deferral names a component"; it is *name one, or
+    // say there is none*, so the second is something someone wrote rather than
+    // the default a missing clause falls into.
+    const calls = todoCalls(
+      `it.skip("T9.8: quarantined, flaky on CI — ${NO_COMPONENT_MARKER}", () => {});`,
+    );
+
+    expect(checkTodoExpiry([{ file: "test/x.test.ts", ...calls[0]! }])).toEqual([]);
+  });
+
+  it("TD6: a condition is not a blocker, which is the shape it was written for", () => {
+    // The real title, verbatim from `manifest.test.ts` before it was restated.
+    // It reads as a deferral with a reason and it is one nothing can expire.
+    const title =
+      "T5.1: a session completes, validates and rejects for every tool, with no far side — " +
+      "blocked on L4 drawing no overlays, so C15's stack never reaches the frame";
+    const raised = checkTodoExpiry([{ file: "test/x.test.ts", title }]);
+    expect(raised.map((v) => v.rule), "names a condition, not an id").toEqual(["TD6"]);
+  });
+
+  it("a call with no literal title is not a deferral this rule can read", () => {
+    expect(todoCalls(`it.todo(someTitle);`)).toEqual([]);
+    expect(todoCalls(`it.skip(cases[0], () => {});`)).toEqual([]);
+  });
+
+  it("TD5 fires: a concatenated title, which a count check cannot see", () => {
+    // **The class the obvious verification misses.** A concatenated title *is*
+    // located, so `collectTodos().length` equals `grep -c` and the count agrees —
+    // while only the first fragment is read. That fragment rarely contains
+    // "waits on", so `blockersIn` returns `[]` and the deferral files as
+    // declaring no wait: exempt, and indistinguishable from a test that never
+    // claimed to be waiting.
+    const source = `it.todo(\n  "T9.9: a long one — " +\n  "waits on C23",\n);`;
+    const calls = todoCalls(source);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.concatenated, "the join is what is detected").toBe(true);
+    expect(
+      blockersIn(calls[0]!.title),
+      "and this is what the fragment answers, which is why reading it is not an option",
+    ).toEqual([]);
+
+    const violations = checkTodoExpiry([{ file: "test/x.test.ts", ...calls[0]! }]);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("TD5");
+    expect(violations[0]?.message).toContain("first fragment");
+  });
+
+  it("TD0's corpus is complete: every it.todo in the tree is collected", () => {
+    // **The control for the locator, and it is what would have caught the five.**
+    // TD0 asserts the expired set equals the backlog; it cannot assert anything
+    // about a deferral it never saw. This compares the collected count against a
+    // count taken a different way, which is the only form in which "the rule can
+    // see everything" is checkable.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const p = `${dir}/${name}`;
+        return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(p) ? [p] : [];
+      });
+
+    const raw = walk("test")
+      .filter((f) => !f.endsWith("todo-expiry.test.ts"))
+      .reduce(
+        (n, f) =>
+          n +
+          (readFileSync(f, "utf8").match(/\b(?:it|test|describe)\s*\.\s*todo\s*\(/g)?.length ?? 0),
+        0,
+      );
+    const collected = collectTodos("test").filter((e) => !e.file.endsWith("todo-expiry.test.ts"));
+
+    expect(collected.length, "a located deferral is a deferral the TD rules can expire").toBe(raw);
+
+    // And the half a count is blind to: nothing collected is a fragment.
+    //
+    // **This half has no live subject, and that is stated rather than assumed.**
+    // The mutation pass is what surfaced it: breaking the concatenation check
+    // fails TD5's fabrication and leaves this assertion green, because no
+    // deferral in the tree is currently written that way. Its evidence is the
+    // fabrication above; what this line adds is that the tree stays that way, and
+    // it fails on the day the first one is written — which is the day the count
+    // check above starts agreeing while a deferral goes exempt. TD4 half (b)
+    // carries the same shape and the same note.
+    expect(
+      collected.filter((e) => e.concatenated === true).map((e) => `${e.file}: ${e.title}`),
+      "TD5 — a fragment passes a count and fails to name its blocker",
+    ).toEqual([]);
+  });
+
+  it("two blocker ids share a path only where they genuinely arrive together", () => {
+    // **The C22 instance, closed as a class.** `L4` and `C22` both pointed at
+    // `src/shell/session.ts`, which is one file and two different waits: "the L4
+    // shell runs" means it can execute a command, and thirty-five of the
+    // thirty-five `L4` deferrals are tier-5 tests that launch a session and run
+    // something. Landing C22 would have expired all of them on a component that
+    // cannot run one, and the cheap repair is `ACKNOWLEDGED_BACKLOG` — the
+    // exemption list that only grows, which is what TD0 asserts equality to
+    // prevent.
+    //
+    // A collision is not wrong in itself. `L4` and `C23` share a path *because*
+    // the shell running and the pipeline existing are the same event. What is
+    // wrong is an undeclared one, so the permitted set is written out and
+    // compared by equality: a new collision fails because it is not here, and a
+    // resolved one fails because it still is.
+    const permitted = [["C23", "L4", "the L4 shell runs when it can execute a command, which is C23"]];
+
+    const all: Record<string, string> = { ...COMPONENT_SOURCES, ...LAYER_SOURCES };
+    const byPath = new Map<string, string[]>();
+    for (const [id, path] of Object.entries(all)) {
+      byPath.set(path, [...(byPath.get(path) ?? []), id]);
+    }
+    const collisions = [...byPath.values()]
+      .filter((ids) => ids.length > 1)
+      .map((ids) => [...ids].sort().join("+"))
+      .sort();
+
+    expect(collisions).toEqual(permitted.map(([a, b]) => `${a}+${b}`).sort());
+
+    // And the specific regression, stated rather than left to the set above:
+    // whatever else moves, these two must not become one moment again.
+    expect(
+      LAYER_SOURCES.L4,
+      "L4 and C22 mapping to one file collapses two different waits into one",
+    ).not.toBe(COMPONENT_SOURCES.C22);
   });
 
   it("every component in the map points at a path the repo actually uses", () => {

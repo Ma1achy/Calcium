@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { block, sequenceHeight, gapRows } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { renderSequenceToLines } from "../../src/testing/index.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 
 const line = (id: string, gapBefore?: boolean): Block =>

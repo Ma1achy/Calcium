@@ -13,6 +13,9 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
+import { buildGraph } from "../support/session.js";
+import { MODES } from "../support/fake-terminal.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import { createSubprocessTransport } from "../../src/data/transport/index.js";
 import { fakeClock } from "../support/fake-scheduler.js";
@@ -155,13 +158,142 @@ describe("C21 with C06", () => {
     expect(result.exitCode).toBe(0);
   }, 60_000);
 
-  it.todo(
-    "T4.4 (with C18, L4): a shell ParseResult routes to spawnShell and an app result to spawn — waits on C18 and L4",
-  );
-  it.todo(
-    "T4.5 (with C01, L4): the documented suspend → handoff → resume sequence runs in order, and T3.8's guard never fires on the correct path — waits on L4",
-  );
-  it.todo("T4.7 (with L4): session exit calls killAll before the terminal is released — waits on L4");
+  it("T4.4 (with C23, C18): a shell result routes to spawnShell and an app result does not", async () => {
+    // **C18 classifies, C23 routes** — and the pair is the assertion. A test
+    // that only checks the shell half passes on a pipeline that shells
+    // *everything*, which is D18's injection path opened for every verb.
+    const shell = pipelineHarness();
+    shell.pipeline.submit("echo hi");
+    await settled();
+    expect(shell.calls, "a shell command is delegated").toContain("spawnShell");
+    expect(shell.calls, "and never invoked as a verb").not.toContain("invoke");
+
+    const app = pipelineHarness();
+    app.pipeline.submit("/ps");
+    await settled();
+    expect(app.calls, "an app verb goes through the transport").toContain("invoke");
+    expect(app.calls, "and never through a shell — D18's whole claim").not.toContain("spawnShell");
+  });
+  it("T4.5 (with C01): the handoff sequence runs in order, on both opt-ins", async () => {
+    // A02 Seam 4's `Child process needing a TTY` row, from C21's side. The
+    // trigger it waited on is C05 I19's field and C18 §5a's marker, and the
+    // claim here is that C23 sequences all four calls around them.
+    const shell = pipelineHarness();
+    shell.pipeline.submit("/tty vim notes.md");
+    await settled();
+
+    expect(shell.calls.filter((c) => c !== "resetFocus")).toEqual([
+      "suspend",
+      "handoff",
+      "resume",
+      // **Between the resume and the repaint** (C22 I25). Whatever the decoder
+      // was holding belongs to a sequence the child interrupted; kept, the
+      // first keystroke back completes it wrongly.
+      "resetInput",
+      "invalidate",
+    ]);
+    // The marker is C18's and never reaches the child (C18 I26).
+    expect(shell.handed).toEqual([["sh", "-c", "vim notes.md"]]);
+    expect(shell.calls, "a handoff is not a spawn").not.toContain("spawnShell");
+
+    // The app opt-in reaches the same sequence by a different route, and
+    // **bypasses the transport**: the child owns the terminal, so there is no
+    // stdout to invoke for.
+    const app = pipelineHarness();
+    app.pipeline.submit("/edit config.yaml");
+    await settled();
+
+    expect(app.calls.filter((c) => c !== "resetFocus")).toEqual([
+      "suspend",
+      "handoff",
+      "resume",
+      // **Between the resume and the repaint** (C22 I25). Whatever the decoder
+      // was holding belongs to a sequence the child interrupted; kept, the
+      // first keystroke back completes it wrongly.
+      "resetInput",
+      "invalidate",
+    ]);
+    expect(app.handed).toEqual([["widget", "edit", "config.yaml"]]);
+    expect(app.calls, "an interactive verb never goes through the transport").not.toContain("invoke");
+
+    // The control: an ordinary app verb still does, so the branch is reading
+    // `interactive` rather than having replaced the app route.
+    const ordinary = pipelineHarness();
+    ordinary.pipeline.submit("/ps");
+    await settled();
+    expect(ordinary.calls).toContain("invoke");
+    expect(ordinary.lifecycle, "and never touches the terminal").toEqual([]);
+  });
+
+  it("T4.5b (C23 §8a A6.5): a rejected handoff still resumes the terminal", async () => {
+    // **C21 T3.8's guard, from the caller's side.** It rejects on a raw stdin —
+    // a precondition of *this* sequence, checked from inside its second step —
+    // so the rejection unwinds out of a sequence that has already suspended.
+    // Without the inner `finally` the session sits on the primary screen with
+    // no frame and no visible error, because diagnostics write to a released
+    // screen. Predicted by the walk rather than found, so it is asserted.
+    const h = pipelineHarness({
+      handoff: () =>
+        Promise.reject(
+          new Error("handoff() with stdin still in raw mode — the caller skipped lifecycle.suspend()"),
+        ),
+    });
+    h.pipeline.submit("/tty vim");
+    await settled();
+
+    expect(h.lifecycle, "suspended and resumed, in that order").toEqual(["suspend", "resume"]);
+    expect(h.pipeline.inFlight, "and the guard is not stranded").toBeNull();
+    // The reset is in the same `finally`, so the rejection path clears the
+    // decoder too. A reset placed after the `try` would leave a half-decoded
+    // sequence alive on exactly the path nobody drives by hand (C22 I25).
+    expect(h.calls, "and the decoder is cleared on the throw path as well").toContain("resetInput");
+
+    const entry = h.transcript.entries.at(-1);
+    expect(entry?.doc.status, "the failure is reported rather than swallowed").toBe("error");
+    expect(JSON.stringify(entry?.doc)).toMatch(/raw mode/);
+  });
+  it("T4.7 (with C22): session exit signals every child before the terminal is released", async () => {
+    // A02 Seam 4's `Shutdown` row, and the whole claim is the **order**: a
+    // child still running when the alternate screen is released writes onto the
+    // restored primary one, over whatever the user is looking at.
+    //
+    // `killAll` is not called from `stop` — it runs inside `beforeRelease`
+    // (C22 §8 step a), which C01 invokes once before the *first* release. That
+    // parenthesis in Seam 4's row is the step, and reading the row without
+    // reading `shutdown.ts` reads as a missing one.
+    const { graph, stdout } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    // A real child, through the graph's own runner. `beforeRelease` looks
+    // `killAll` up on the runner at call time, so recording over it is seen —
+    // and the child is real, so `live` emptying is a fact about processes
+    // rather than about a counter.
+    const child = graph.runner.spawnShell("sleep 30", { cwd: () => process.cwd() });
+    expect(graph.runner.live, "a child is running").toHaveLength(1);
+
+    let killedAt = -1;
+    const killAll = graph.runner.killAll.bind(graph.runner);
+    Object.defineProperty(graph.runner, "killAll", {
+      configurable: true,
+      value: () => {
+        killedAt = stdout.output.length;
+        return killAll();
+      },
+    });
+
+    expect(stdout.output.indexOf(MODES.altScreenOff), "the screen is still held").toBe(-1);
+    graph.lifecycle.release();
+
+    expect(killedAt, "killAll ran at all").toBeGreaterThanOrEqual(0);
+    expect(
+      killedAt,
+      "signalled before the first release byte — a child outliving the alternate " +
+        "screen writes over whatever the user is looking at",
+    ).toBeLessThanOrEqual(stdout.output.indexOf(MODES.altScreenOff));
+
+    await child.exited;
+    expect(graph.runner.live, "and nothing survives it").toHaveLength(0);
+  });
 });
 
 describe("C21 against the fake it replaced", () => {

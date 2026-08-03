@@ -1,0 +1,203 @@
+{
+  "schema": "tui.manifest/1",
+  "binary": "widget",
+  "version": "2.4.0",
+  "tools": [
+    {
+      "name": "ps",
+      "local": false,
+      "summary": "list processes",
+      "args": [],
+      "flags": [
+        {
+          "name": "status",
+          "type": "enum",
+          "values": [
+            "running",
+            "failed",
+            "queued"
+          ],
+          "summary": "filter by status"
+        },
+        {
+          "name": "mine",
+          "short": "m",
+          "type": "bool",
+          "summary": "only mine"
+        },
+        {
+          "name": "limit",
+          "short": "n",
+          "type": "int",
+          "summary": "how many"
+        },
+        {
+          "name": "search",
+          "short": "s",
+          "type": "string",
+          "summary": "substring match"
+        },
+        {
+          "name": "since",
+          "type": "duration",
+          "summary": "only newer than"
+        },
+        {
+          "name": "open-mr",
+          "type": "bool",
+          "summary": "open the merge request"
+        },
+        {
+          "name": "quiet",
+          "short": "q",
+          "type": "bool",
+          "summary": "less output"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "repeatable": true,
+          "summary": "repeatable label"
+        }
+      ]
+    },
+    {
+      "name": "serving",
+      "local": false,
+      "summary": "serving overview",
+      "args": [],
+      "flags": []
+    },
+    {
+      "name": "serving scale",
+      "local": false,
+      "summary": "scale a service",
+      "args": [
+        {
+          "name": "service",
+          "type": "string",
+          "required": true,
+          "summary": "which service"
+        },
+        {
+          "name": "replicas",
+          "type": "int",
+          "required": true,
+          "summary": "how many"
+        }
+      ],
+      "flags": [
+        {
+          "name": "to",
+          "type": "enum",
+          "values": [
+            "canary",
+            "stable"
+          ],
+          "summary": "which track"
+        },
+        {
+          "name": "traffic",
+          "type": "int",
+          "requires": [
+            "to"
+          ],
+          "summary": "percent of traffic"
+        },
+        {
+          "name": "side-by-side",
+          "type": "bool",
+          "conflicts": [
+            "overlay"
+          ],
+          "summary": "two columns"
+        },
+        {
+          "name": "overlay",
+          "type": "bool",
+          "summary": "one column"
+        },
+        {
+          "name": "config",
+          "type": "path",
+          "summary": "config file"
+        }
+      ]
+    },
+    {
+      "name": "promote",
+      "local": false,
+      "summary": "promote a candidate",
+      "args": [
+        {
+          "name": "target",
+          "type": "pattern",
+          "pattern": "^[\\w.]+:[\\w]+$",
+          "required": true,
+          "summary": "family:name"
+        }
+      ],
+      "flags": []
+    },
+    {
+      "name": "tail",
+      "local": false,
+      "streams": true,
+      "summary": "follow output",
+      "args": [
+        {
+          "name": "paths",
+          "type": "path",
+          "required": false,
+          "variadic": true,
+          "summary": "what to follow"
+        }
+      ],
+      "flags": []
+    },
+    {
+      "name": "dashboard",
+      "local": false,
+      "oneShot": true,
+      "summary": "one frame to stdout",
+      "args": [],
+      "flags": [
+        {
+          "name": "once",
+          "type": "bool",
+          "summary": "write one frame and exit"
+        }
+      ]
+    },
+    {
+      "name": "edit",
+      "local": false,
+      "interactive": true,
+      "summary": "open the config in $EDITOR",
+      "args": [
+        {
+          "name": "file",
+          "type": "path",
+          "required": false,
+          "summary": "what to open"
+        }
+      ],
+      "flags": []
+    },
+    {
+      "name": "guide",
+      "local": true,
+      "summary": "an app-supplied local verb",
+      "args": [],
+      "flags": []
+    },
+    {
+      "name": "debug dump",
+      "local": true,
+      "hidden": true,
+      "summary": "internal state",
+      "args": [],
+      "flags": []
+    }
+  ]
+}

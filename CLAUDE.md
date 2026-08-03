@@ -108,11 +108,117 @@ Each of these produces code that compiles, passes review, and is wrong.
   producing a blank screen that every assertion passed. **A citation resolving against
   the wrong invariant**, which no mechanism can catch — `docs/COMMITMENT_INVARIANT_AUDIT.md`
   §Fourth pass says why one should not be built.
+  **C16 is the measured case: seven defects from two artefacts on one component, six of
+  them invisible to a reader checking statements one at a time, and all seven found
+  before any code existed.** The Ctrl-C rung table found three — a rung no state could
+  construct, an order contradicting A02 §2, and a missing rung that made the ladder
+  answer wrongly and silently. The dispatch trace found three — the `global` fallback
+  ignoring modality, the ladder being a second priority list at all, and an arming
+  machine that answered for one event kind of three. The seventh fell out of applying
+  the first ruling. Every one would have been a rewrite if found after the build, which
+  is the argument for this being scheduled rather than diligent.
+  **Index the artefact by rule interaction, not by input coverage.** This is the method
+  behind all three walks and it is now four for four: C16's rung table takes the rows
+  where two rungs could both apply, C17's edit trace the sequences where two coalescing
+  clauses meet, C18's classification table the inputs where two classification rules
+  meet, C19's sequence trace the events where a request is in flight and something else
+  happens.
+
+  **Rule interactions come in two kinds, and the two artefact shapes catch different
+  ones.** This is the second half of the principle, and C19 is what forced it.
+
+  - A **sequence trace** finds *event-mediated* interactions: two rules that meet
+    because something happened in between. C16's rung table, C17's edit trace and
+    C19's §8a are all this shape.
+  - A **classification table** finds *structural* interactions: two rules that both
+    hold at rest, with no event between them. C18's §8a is this shape.
+
+  **C19 needed both and had one.** Its `--flag=value` defect is a structural
+  interaction — "the engine filters by prefix" meets "a flag value is half of a token"
+  — and a trace indexed by events cannot reach it however many rows it has. The menu
+  came back empty and no assertion about a source would have shown why. C18's table
+  would have caught it, and C18's table was already in the repo.
+
+  **An artefact can be correct about the interaction it found and wrong about a
+  mechanism it assumed existed.** C23 §8a A4 found that a stall notice outlives its
+  condition — a real interaction, and the trace's job. Its ruling said *settlement
+  removes the notice*, and `ViewPatch` has no delete and should not have one. The
+  assumption came from §3b's prose, which described one moment twice: *replaced on the
+  next real patch **and removed if output resumes**.* Only the first half was ever
+  expressible, and the walk inherited the second. No index by rule interaction surfaces
+  that, because the flaw is not between two rules — it is a verb the prose uses and the
+  layer below does not have. So when a ruling names an operation, check the operation
+  exists before the ruling is written down; the finding survives either way, and only
+  the remedy has to change.
+
+  **Two instances fitting a rule is not evidence for the rule — it is the minimum for
+  noticing one.** C13's patch gate was re-founded three times. `settle(id, doc)` and
+  `op: "expand"` both looked like *view state versus data*, and the classification held
+  because both happen to be view-state-ish. The third case broke it: a refusal notice
+  **is** data, so no partition of the operations could have covered it, and the axis was
+  wrong rather than the classification incomplete. The right axis was **who is writing**
+  — the far side, or the shell — which only became findable by stopping at the third
+  instance and asking instead of adding a second arm. A rule inferred from two cases has
+  been tested against one, and the cheapest moment to discover that is before the code
+  that assumes it.
+
+  **And when a ruling chooses to throw, the walk asks what the throw leaves behind.**
+  Both artefact shapes index rule interactions on the **accepted** paths — which rules
+  could both claim a cell, which sequences produce a contradiction. The rejection path
+  is where a decision leaves state, and neither shape asks about it. A throw mid-
+  operation abandons whatever the function had already mutated, and the invariant that
+  forbids the resulting state usually lives in a different component from the decision
+  that produced it. C13's `settle(id, doc)` is the measured case: ruling that an invalid
+  document throws rather than returning was correct, and it created a way to leave an
+  entry **unpatchable and unsettled** — a state C23 I9 says cannot exist, two components
+  away from the choice that could produce it. Nothing in the ruling implied it and no
+  row of either artefact covered it.
+
+  So the artefact's *shape* is a decision, not a consequence of the component looking
+  like a state machine. Ask which kinds of interaction the component has before
+  choosing: a component with state and structure needs a trace **and** a table, and
+  taking the trace alone because the state machine is the obvious thing is how the
+  structural half goes unexamined. A row governed by one rule is a restatement of that rule and finds nothing;
+  every one of the eleven pre-code defects across those three components lived in a
+  cell where two correct statements overlap. That is also why they were invisible to
+  review — a reader checks statements one at a time by construction, so a suite indexed
+  by inputs tests each rule against itself and agrees.
   Where the component composes a frame, **read the frame, not only the numbers**: an
   arithmetically self-consistent viewport can still be describing a different document
   than the one it holds. And a fixture must be shown to respond to the thing under test
   before it is asserted against — `test/support/README.md` carries that rule and the two
   instances that produced it.
+- **Mutate before trusting a green suite.** A test file is not verified by passing;
+  it is verified by breaking the thing it covers and watching it fail. Every module
+  in C16 was mutated on landing — the priority order swapped, the arming machine
+  moved into a handler, the paste window turned into a gap timer, `/help` given its
+  own copy of the table — and **four defects came out of it**, none visible from a
+  green run. Two of them were in tests that had just passed sixteen and ten
+  assertions respectively. A mutation that fails nothing is a finding about the
+  tests, not a licence.
+
+  **And sometimes about the spec — this is A03 §2's vacuity class arriving in prose.**
+  A03 §2 is written about rules: a rule with nothing to be wrong about passes exactly
+  like a rule that is satisfied. The same thing happens to a sentence. C19's §7 said
+  the spinner's stamp is taken "per source call, not per sequence", and swapping the
+  two fails nothing, because a source call begins synchronously inside `request`. The
+  sentence named a distinction that does not exist, so it forbade nothing while reading
+  as though it forbade the defect — and a reader could satisfy it exactly while holding
+  the single overwritten stamp it was written against.
+
+  Review cannot tell the two apart, because both read as correct. **The mutation pass
+  is the only thing that asks a sentence whether it can be violated.** So when a
+  mutation fails nothing, ask which artefact it indicts before rewriting the test, and
+  prefer wordings that name the observable mechanism ("the earliest call still in
+  flight") over ones that name where a value is computed.
+
+  The figure that argues for the whole discipline is C16's: **seven defects from the
+  by-hand walks before any code, four more from mutation during it, three
+  enforcement rules changed shape under the pressure, and one new rule that found
+  three further instances in shipped code on its first run.** Eight spec commits
+  before a line of implementation looked disproportionate at the time, and every one
+  of those seven pre-code defects would otherwise have been a rewrite.
+
 - **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
   initialise, serialise.
 

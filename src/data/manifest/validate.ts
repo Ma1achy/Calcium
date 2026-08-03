@@ -128,17 +128,47 @@ function distance(a: string, b: string, cap: number): number {
   return previous[b.length] ?? cap + 1;
 }
 
-function suggest(name: string, flags: readonly FlagDef[]): string | undefined {
+/**
+ * The one distance-2 suggester (I18).
+ *
+ * Exported because C18 needs the same cutoff for unknown *verbs* and a second
+ * implementation would agree about the distance and diverge about the tie-break
+ * — which is where a suggestion is wrong rather than absent, and a wrong
+ * suggestion is precisely what A01 A.2's cutoff exists to prevent. Same argument
+ * as the shared tokeniser and `cells()`, one primitive over.
+ *
+ * **The tie-break is declaration order, and it is the part worth naming.** `<`
+ * rather than `<=` means the first candidate at the minimum distance wins, so
+ * the answer depends on the order the manifest declares its tools. That is
+ * stable, cheap and arbitrary — and it is exactly the behaviour a second
+ * implementation would get subtly different while passing every test written
+ * against a manifest with no ties in it. T2.9 asserts it there.
+ */
+export function suggestName(
+  name: string,
+  candidates: readonly string[],
+): string | undefined {
   let best: string | undefined;
-  let bestDistance = 3; // ≤ 2 counts
-  for (const flag of flags) {
-    const d = distance(name, flag.name, 2);
+  // **This is the cutoff, and `distance`'s cap is not.** The cap prunes the
+  // matrix; raising it changes nothing observable, which a mutation pass
+  // demonstrated by surviving. The number that decides is here, and A01 A.2's
+  // "distance 2" means `d < 3`.
+  let bestDistance = 3;
+  for (const candidate of candidates) {
+    const d = distance(name, candidate, 2);
     if (d < bestDistance) {
       bestDistance = d;
-      best = flag.name;
+      best = candidate;
     }
   }
   return best;
+}
+
+function suggest(name: string, flags: readonly FlagDef[]): string | undefined {
+  return suggestName(
+    name,
+    flags.map((f) => f.name),
+  );
 }
 
 // --- the walk -------------------------------------------------------------
@@ -414,7 +444,7 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
       }
 
       for (const other of flag.conflicts ?? []) {
-        const pair = [flag.name, other].sort().join(" ");
+        const pair = [flag.name, other].sort().join("\u0000");
         if (counts.has(other) && !reportedConflicts.has(pair)) {
           reportedConflicts.add(pair);
           errors.push(

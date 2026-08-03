@@ -141,7 +141,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "language", e, at);
     requireString(b, "text", e, at);
   },
-  diff: (b, e, at) => requireArray(b, "rows", e, at),
+  comparison: (b, e, at) => requireArray(b, "rows", e, at),
   patch: (b, e, at) => {
     requireString(b, "path", e, at);
     requireString(b, "language", e, at);

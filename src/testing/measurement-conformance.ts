@@ -1,10 +1,20 @@
 // The measurement conformance suite (C04 T2.1).
 //
-// DESTINATION: `src/testing/`. C24 §7 specifies this as
-// `expectDocument().measuresCorrectly(widths)` in the *public* testing kit, so
-// this is written to be moved rather than rewritten. It lives in `test/support/`
-// only until C09 exists to consume it — an export nothing consumes is the thing
-// CLAUDE.md forbids, and today nothing does.
+// **Arrived.** It was written in `test/support/` under a `DESTINATION:
+// src/testing/` header, waiting on C24 §7 to have somewhere to export it from —
+// an export nothing consumes being the thing CLAUDE.md forbids. C24 exists now,
+// `expectDocument().measuresCorrectly(widths)` wraps this, and it moved rather
+// than being rewritten — runner-free and parameterised from the start, so no
+// second implementation of the suite was ever needed.
+//
+// **One change beyond the import paths, and the file asked for it itself.** It
+// carried a local width function, with a note saying it must use the real one
+// once it moved here or "the suite and the measurer it audits would disagree
+// about width — the exact class of bug it exists to find". Two source scans
+// fired the moment it arrived, because they are scoped to `src/` and could not
+// see it under `test/`. That is worth naming: **a file waiting to move is a file
+// outside the rules of the place it is going**, and the deferred instruction and
+// the scan that enforces it met on the same commit by luck rather than design.
 //
 // Two consequences for how it is written, both deliberate:
 //
@@ -20,16 +30,26 @@
 // by measured height without rendering, so a disagreement makes the viewport
 // drift, scroll positions land wrong, and content jump — and it is violated
 // silently, which is why this is a suite rather than an assertion.
-import type { Block, MeasureFn } from "../../src/data/viewmodel/index.js";
+import type { Block, MeasureFn } from "../data/viewmodel/index.js";
+import { displayCells } from "../presentation/text.js";
 
 /** C04 §8 T2.1's widths. */
 export const DEFAULT_WIDTHS: readonly number[] = [40, 60, 80, 100, 120, 160, 200];
 
 /**
- * What the suite needs from C09's registry, and nothing more. Declared
- * structurally so this file does not import C09 — which it could not do anyway
- * once it moves to `src/testing/`, and should not do from `test/support/` while
- * C09 is unbuilt.
+ * What the suite needs from C09's registry, and nothing more.
+ *
+ * Declared structurally, and the reason changed with the move rather than went
+ * away. It used to be *this file cannot import C09*; now it can, and it still
+ * must not — **a consumer's registry is not C09's.** C24 §7 ships this for an
+ * app to run against its own registered kinds, and a parameter typed as C09's
+ * concrete registry would accept only ours. The structural shape is the
+ * parameterisation, not a workaround for a layering problem that no longer
+ * exists.
+ *
+ * `renderToLines` here is a *member of that shape*, not the function of the
+ * same name in `./index.ts`, which takes a registry and has four parameters.
+ * The collision is why MG25 reads that function as consumed — see its note.
  */
 export interface MeasurableRegistry {
   measure: MeasureFn;
@@ -147,13 +167,13 @@ export function checkMeasurement(
       // renderer can agree on row count while the renderer overflows, and the
       // overflow is what the terminal wraps, silently adding a row on screen
       // that neither of them counted.
-      const over = rendered.findIndex((line) => visibleCells(line) > width);
+      const over = rendered.findIndex((line) => displayCells(line) > width);
       if (over !== -1) {
         failures.push({
           ...at,
           check: "within-width",
           expected: `≤ ${width} cells`,
-          actual: visibleCells(rendered[over] ?? ""),
+          actual: displayCells(rendered[over] ?? ""),
           detail: `line ${over} overflows; the terminal will wrap it into a row nobody counted`,
         });
       }
@@ -282,7 +302,7 @@ function withOneMoreItem(b: Block): Block | null {
       return { ...b, events: [...b.events, { ts: "00:00:00", type: "extra", message: "extra" }] };
     case "steps":
       return { ...b, steps: [...b.steps, { label: "extra", state: "pending" }] };
-    case "diff":
+    case "comparison":
       return { ...b, rows: [...b.rows, { field: "extra", a: "1", b: "2" }] };
     case "table":
       return { ...b, rows: [...b.rows, { id: `${b.id}-extra`, cells: {} }] };
@@ -295,46 +315,19 @@ function withOneMoreItem(b: Block): Block | null {
 }
 
 /**
- * Display cells, ignoring SGR sequences. A local implementation is wrong on
- * purpose here only in the sense that it is *provisional*: `cells()` in
- * `presentation/text.ts` is the single width implementation (C09 I6), and this
- * file must use that one once it moves to `src/testing/`, or the suite and the
+ * **The single width implementation, as this file's own comment scheduled.**
+ *
+ * It carried a local width function with its own SGR regex and its own
+ * combining and wide-character tables, and said in as many words: *this file
+ * must use `cells()` once it moves to `src/testing/`, or the suite and the
  * measurer it audits would disagree about width — which is the exact class of
- * bug it exists to find.
+ * bug it exists to find.* The move is the trigger, and two source scans fired
+ * on arrival, because a scan scoped to `src/` had never been able to see this
+ * file while it lived under `test/`.
+ *
+ * `displayCells` rather than `cells`: this measures rendered output, which
+ * already carries SGR, and `cells` strips the ESC byte as a control character
+ * and then counts `[38;5` as four visible cells (C09 §5a). The local version
+ * was right about that and it is one more thing that had to stay right in two
+ * places.
  */
-function visibleCells(line: string): number {
-  // eslint-disable-next-line no-control-regex
-  const bare = line.replace(/\[[0-9;]*m/g, "");
-  let n = 0;
-  for (const ch of bare) {
-    const cp = ch.codePointAt(0) ?? 0;
-    if (isCombining(cp)) continue;
-    n += isWide(cp) ? 2 : 1;
-  }
-  return n;
-}
-
-function isCombining(cp: number): boolean {
-  return (
-    (cp >= 0x0300 && cp <= 0x036f) ||
-    (cp >= 0x1ab0 && cp <= 0x1aff) ||
-    (cp >= 0x20d0 && cp <= 0x20ff) ||
-    cp === 0xfe0f ||
-    cp === 0x200d
-  );
-}
-
-function isWide(cp: number): boolean {
-  return (
-    (cp >= 0x1100 && cp <= 0x115f) ||
-    (cp >= 0x2e80 && cp <= 0xa4cf) ||
-    (cp >= 0xac00 && cp <= 0xd7a3) ||
-    (cp >= 0xf900 && cp <= 0xfaff) ||
-    (cp >= 0xfe30 && cp <= 0xfe6f) ||
-    (cp >= 0xff00 && cp <= 0xff60) ||
-    (cp >= 0xffe0 && cp <= 0xffe6) ||
-    (cp >= 0x1f300 && cp <= 0x1f64f) ||
-    (cp >= 0x1f900 && cp <= 0x1f9ff) ||
-    (cp >= 0x20000 && cp <= 0x3fffd)
-  );
-}

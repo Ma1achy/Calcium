@@ -39,6 +39,8 @@ type Layer = Readonly<{
   dismissable: boolean;                          // false = must be resolved, not escaped
   width?:      number;                            // cells; absent means the region's width
   maxHeightFraction?: number;                     // overlays; default 0.5
+  /** Where this layer wants the terminal cursor, relative to its own origin (I19). */
+  cursor?:     Readonly<{ row: number; col: number }>;
 }>;
 
 type Placed = Readonly<{
@@ -48,12 +50,14 @@ type Placed = Readonly<{
   height: number;
   width:  number;
   truncated: boolean;
+  /** Where this layer wants the terminal cursor, relative to its own origin (I19). */
+  cursor?: Readonly<{ row: number; col: number }>;
 }>;
 
 type DismissReason = "explicit" | "anchorEvicted";
 
 /** What `update` may change — deliberately not `dismissable`. See below. */
-type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width">>;
+type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor">>;
 
 type OverlayChange =
   | Readonly<{ kind: "push";    id: string; layerKind: "overlay" | "view" }>
@@ -124,13 +128,57 @@ A non-dismissable layer — a confirm awaiting y/N — must be resolved by `dism
 
 **`pop()` returning `null` covers two cases, and its caller has to tell them apart.** C16's Ctrl-C ladder is the consumer: it dismisses a dismissable overlay, no-ops on a non-dismissable one, and *falls through to the next rung* when there is no layer at all (C16 §5, I8). Those are three outcomes and `pop()` reports two, so the ladder reads `top` before calling — `top === null` is the fall-through, `top.dismissable === false` is the no-op. Said here because the obvious code branches on the return value, and the obvious code sends Ctrl-C nowhere while a confirm is open.
 
-Popping emits a change. **C15 does not write to the transcript** — the one-line trace a pushed view leaves behind (A01 D7) is composed by L4, which knows what the view was showing. Keeping C15 out of C13 preserves the layering and stops the overlay manager needing to understand what a dashboard is.
+Popping emits a change. **C15 does not write to the transcript**, and after A01 D7's amendment nothing else does on a pop either — a trace entry would freeze the block the pop returns to and clear the selection D7 preserves. The invariant is unchanged and its justification is now simpler: an overlay manager that could append would need to understand what a dashboard is, and keeping C15 out of C13 is what stops L2 depending on the transcript's contents (I9, MG13).
 
 ---
 
 ## 4. Placement
 
 Views fill the viewport region entirely: `top = 0`, `left = 0`, full height and width. Nothing to decide.
+
+### Drawing a layer is L4's, and nothing did it
+
+`layout(region)` returns `Placed` boxes and **no component draws them.** L4's paint composites header, transcript, prompt and footer, and calls `layout()` in exactly two places — C16's hit-testing, and the completion menu's own remainder count. So this component has never put a glyph on a screen: the completion menu, reverse search and the exit confirm are all invisible, and `raiseExitConfirm` stopping the session directly was a symptom of that rather than a simplification, because there was nowhere for a confirm to appear.
+
+**S01 §3's arithmetic is why nothing complained.** A layer floats above the four regions rather than taking rows from them, so the heights still sum to `rows` and the frame is internally consistent with every overlay missing. The check that catches a region wrong by one row cannot see a region that is not drawn at all.
+
+Three things follow, and they are decisions rather than details:
+
+**Clamping is C15's and drawing is L4's, and neither does the other's half.** `layout()` clamps the box to the region and reports `truncated` (§4 steps 3, 6, 7); the drawer composites exactly the box it is handed and never re-decides its extent. Two components with an opinion about a layer's extent is how a menu comes to be one row taller than the space computed for it. The corollary is that **the drawer must not exceed `height`**: C15 clips no *content* (below), so a layer whose blocks render taller than its box is cut by whoever draws it.
+
+**The region is the viewport's, and the offset to the terminal is the drawer's** (S01 §3a). Every number `layout()` returns is relative to the region it was handed, and the drawer adds the region's top before writing a row — one translation, in one place. Handing this component the whole terminal instead would spare the drawer that addition and cost C15 its shape: it would then have to know where the viewport sits, which is the header's height, which is S01's arithmetic arriving inside the one component built specifically not to hold any. That is why it imports neither C14 nor `terminal/` (I12), and why the region is a parameter rather than a property.
+
+**Width is clamped, and unlike height that is not optional.** A layer taller than its box loses rows the reader can scroll to; a layer wider than the region wraps, and a wrapped overlay row shifts every row below it — the failure S01 §3 and `docs/notes/resize-and-compositor.md` both name, arriving through a layer instead of through a frame.
+
+**The terminal cursor is placed by whatever holds focus, and hidden when that thing has none** (I19). C16's `activeTarget` already puts `overlay` above `prompt`, so the cursor belongs to the layer for the same reason the keys do — and leaving it blinking at the prompt under a menu that owns the keystrokes is precisely the *somewhere invisible* symptom derived focus exists to prevent.
+
+**The field originates on `Layer` and `layout()` copies it through.** The ruling
+first put it on `Placed` alone, which is a shape nothing can produce: `place()`
+computes geometry from a measured height and a region and has no idea where a
+search's caret is, so a cursor that existed only on its output could only be
+invented there. The producer states it — `searchLayer` knows the caret because
+it drew the line — and it survives placement unchanged, because both ends of the
+copy are relative to the same origin. `update` carries it for the same reason it
+carries `content`: the caret moves as the search is typed into, and a
+pop-and-repush is not how a layer changes.
+
+`Placed.cursor` is how the drawer reads it, **relative to the layer's own origin**, so the drawer never has to know what a prompt or a search field is. Absent means the layer has no cursor and the terminal's is hidden, which is the default and the case that matters: it is what a menu wants.
+
+The two live producers answer oppositely, which is what makes this a field rather than a constant. **Reverse search has a cursor** — text is being typed into it — and **the completion menu has none**; nothing is entered into a menu, the keys move a selection. C15's exit confirm has none either, for the same reason, and it now has somewhere to appear at all.
+
+**`cursorCell` stays exactly as it is** (C17 §2). C17 is a data structure with no notion of focus: it reports where its own cursor sits and always has. The *drawer* chooses — the focused layer's cursor if it has one, the prompt's if focus is `prompt`, hidden otherwise. A `cursorCell` that answered differently depending on focus would be C17 knowing about focus, which is what keeps it testable.
+
+#### Four things the drawer has to get right
+
+Written here before the build rather than after it, because each has a failure that looks like something else.
+
+**1 — A layer over the prompt is the case with two owners.** The prompt paints its rows and the layer composites over them, so those cells are written twice. That is correct, and it means **the layer must paint every cell in its box, background included**. A loop that writes only the glyphs its blocks produce leaves the prompt showing through the gaps, and the symptom is text bleeding through a menu rather than anything that reads as a layout error.
+
+**2 — Stacking order is push order, and the last layer wins each cell.** I1 and I2 settle it and nothing currently produces two overlapping layers, which is exactly why it is worth asserting rather than inheriting: "the last one wins" is obvious only once two of them overlap, and the first time that happens will be in front of a user.
+
+**3 — A pushed view occupies the viewport region rather than floating.** Header and footer are untouched (T4.4). The drawer treats it as a layer whose box *is* the viewport region rather than as a replacement for the transcript — one path for both kinds, and the alternative is a second compositing rule that only one layer kind takes. S12's composed frame is the one to check it against.
+
+**4 — Read the frame.** This will be the first time anything this component places appears on a screen, and every comparable first in this project was caught by looking rather than by an assertion: the glyph column rendering `…`, C12's y-label decimals, C25's five defects. Compose a menu over a prompt, a confirm over a view, and a search over a menu, and look at all three.
 
 **A view's content is already the region's worth, and C15 does not scroll it.** The owner windows it — S12 holds fifty thousand log lines and renders the visible ones, having committed to owning its own scroll and calling no C14 (S12 T2.3); C25 §3b's fullscreen patch does the same through `n`, `p`, `g` and `G`. Said explicitly because its absence invites C15 growing a scroll offset for views, and that is a second scroll model beside C14's — the thing A01 D3 spent a decision avoiding. C15 clips nothing vertically beyond reporting `truncated`.
 
@@ -218,6 +266,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I16** — An overlay's width is `min(layer.width ?? region.width, region.width)`, and its content is measured at that width rather than at the region's. `Placed.left` is derived from it.
 - **I17** — An anchored overlay never covers its anchor's own rows, `[row, row + rows − 1]`, **whenever either side has a row to offer**. A single-row anchor is the default and the special case, not the general one. The qualification is T3.8's: a one-row region with a one-row anchor has no room on either side, and an overlay covering its anchor is a better answer than one silently absent.
 - **I18** — The `maxHeightFraction` clamp is floored at one row. `floor(1 × 0.5)` is zero, and a region too short for the fraction must not swallow every overlay it holds.
+- **I19** — The terminal cursor is placed by whatever holds focus and hidden when that thing has none. A layer states its own through `Placed.cursor`, relative to its origin; absent means hidden. The choice is the drawer's and never C17's — a `cursorCell` that varied with focus would put focus inside a component that has no notion of it.
 
 ---
 
@@ -233,13 +282,14 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 8. No backdrop dimming — terminals render it as a fault, not as depth (I11).
 9. `layout()` is pure and needs no resize invalidation (I5).
 10. A dismissal records why it happened; C15 records the reason and never detects it (I10).
-11. C15 emits pop events; L4 composes the transcript trace (I9).
+11. C15 emits pop events and writes nothing to the transcript; a pop appends nothing at all (I9, A01 D7).
 12. Push returns a disposable equivalent to dismissal (I13).
 13. A layer changes in place through `update` — content, placement or width, never the stack's shape and never its escapability (I14).
 14. A zero-height overlay is omitted from the layout rather than dismissed by it (I15).
 15. An overlay's width is its owner's to declare, and its content is measured at that width; `left` follows from it (I16, I6).
 16. An anchor is a span rather than a row, and an overlay never covers it while either side has room (I17).
 17. Both clamps have a floor of one row, so a short region never silently swallows a layer (I18).
+18. The terminal cursor is placed by whatever holds focus and hidden when that thing has none; a layer states its own in `Placed`, and C17's `cursorCell` is unchanged because it has no notion of focus (I19).
 
 ---
 
@@ -248,6 +298,8 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 1 — unit
+
+- **T1.20** (I19): a layer carrying a cursor and a layer carrying none, placed → the first's `Placed.cursor` is relative to its own origin and survives the flip from `below` to `above`; the second's is absent. Both, because a field that is always present and always ignored passes any test of the first alone — and the two live producers answer oppositely, which is why this is a field.
 
 - **T1.1**: `push(overlay)` on empty → stack of one, `top` is it, `hasView` false.
 - **T1.2**: `push(view)` on empty → `hasView` true.
@@ -314,7 +366,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.7** (with C19): the completion menu pushes an anchored overlay and renders its own "N more" from `Placed.truncated`.
 - **T4.7b** (with C19, I14): typing narrows the candidate set through `update`, not through a pop and a push — asserted by the change log, which holds one `push`, N `content` and one `pop` rather than N of each.
 - **T4.9** (with C25): C25 §3b's fullscreen patch is a view whose content is a single block, carried by `Block[]` with no special case; paging through it with `n` and `p` is the owner calling `update`, and `Placed` never gains a scroll offset.
-- **T4.8** (with L4): popping a view emits a change from which L4 composes the transcript trace; C15 writes nothing.
+- **T4.8** (with L4): popping a view emits a `pop` change and the transcript is untouched — same entry count, same live id, before and after. C15 writes nothing and L4 appends nothing (A01 D7).
 
 ### Tier 5 — e2e
 
@@ -322,7 +374,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T5.2**: reverse-i-search raised over a completion menu → both stacked, keys go to the search, `Esc` returns to the menu.
 - **T5.3**: a confirm raised inside the dashboard → drawn over it, `Esc` does nothing, `n` resolves it and returns to the dashboard.
 - **T5.4**: resizing the terminal with three layers open → all reposition correctly, none escapes the region, no blank frames.
-- **T5.5**: `Esc` from the logs view → view pops, a one-line trace appears in the transcript, focus returns to the live block with selection preserved (A01 D7).
+- **T5.5**: `Esc` from the logs view → view pops, the transcript is untouched, and focus returns to the still-live block with selection preserved (A01 D7). The untouched transcript is what makes the preserved selection possible, not an incidental detail beside it.
 
 ### Tier 6 — fail-on-revert
 
@@ -331,7 +383,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.3** (I1): allowing nested views → T3.3 fails and the `Esc` chain becomes ambiguous.
 - **T6.4** (I3): letting `Esc` dismiss a confirm → T1.9 fails; a stray keypress answers a question the user did not read.
 - **T6.5** (I4): rendering an overlay with raw React → T2.3 fails, and the overlay stops being themed or measurable.
-- **T6.6** (I9): writing the pop trace from C15 → T2.5 fails and L2 gains a dependency on the transcript's contents.
+- **T6.6** (I9): writing to the transcript from C15 → T2.5 fails and L2 gains a dependency on the transcript's contents.
 - **T6.7** (I6): an off-by-one in clamping → T2.2 fails across the corpus.
 - **T6.8** (I8): rendering an overflow indicator inside C15 → T4.7 fails, since C15 cannot know what the remainder is.
 - **T6.9** (I5): caching layout results across regions → T2.1 fails after a resize.
@@ -353,7 +405,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 | What the completion menu contains | C19 |
 | Reverse-search behaviour | C20 |
 | The dashboard's panels and refresh | S13 |
-| The transcript trace left by a popped view | L4 |
+| Whether a popped view records anything in the transcript | L4 — and after A01 D7's amendment it records nothing |
 | Scroll state beneath an overlay | C14 |
 | Scrolling a view's own content | Its owner — S12, S13, C25 §3b. C15 places the region's worth and clips nothing |
 | Noticing that a layer's anchor row moved or was evicted | Its owner, through `update` and `dismiss(id, "anchorEvicted")` |

@@ -1,0 +1,100 @@
+/**
+ * The builders' argument types (C24 §3, §4).
+ *
+ * Six of these are named in §4's signatures and existed nowhere: a consumer
+ * could not write `const s: StepInput = …` against the surface as specified.
+ * They are declared here rather than in C04 because they are *inputs to the
+ * ergonomic layer*, not part of the view model — C04 owns what a block is, and
+ * a `StepInput` is what `b.steps` accepts before it becomes one.
+ *
+ * The distinction has a consequence worth stating: every one of these is looser
+ * than the block field it feeds. `StepInput.state` is optional and the block's
+ * is not; `LogLine` is the row shape exactly. Where a type here is *narrower*
+ * than the field — `KeyValueInput` — the narrowing is the ruling, not an
+ * oversight.
+ */
+
+import type { Action, Block, Cell, Glyph, Tone } from "../../data/viewmodel/index.js";
+
+/**
+ * What every block-returning builder accepts, and the only declaration of it
+ * (§4, I15).
+ *
+ * The seventeen positional builders take it last; the five that already take a
+ * spec object spread it in. Two declarations of one options shape is the drift
+ * a shared type prevents — the same argument that gives the tree one block-id
+ * counter rather than two.
+ *
+ * **`gapBefore` being present at all is the signal**, not its value. A builder
+ * that receives `gapBefore: false` has been told something; a builder that
+ * receives nothing has not, and `b.seq` resolves only the second (§4a). This is
+ * why the option is an argument rather than a post-modifier: a modifier applied
+ * after construction cannot distinguish the two, and `b.seq` needs to.
+ */
+export type BlockOpts = Readonly<{
+  /** Supplied when a `replace` or `merge` patch will address this block. */
+  id?: string;
+  /** An explicit value, which always wins over the builder's default. */
+  gapBefore?: boolean;
+}>;
+
+/**
+ * A cell, or the string that is one with default tone (§4).
+ *
+ * `{ family: "digit-classifier" }` and `{ status: b.warn("degraded") }` in the
+ * same object: most cells carry no tone, and paying `{ text: … }` for all of
+ * them is the noise this removes.
+ */
+export type CellInput = string | Cell;
+
+/**
+ * What `b.kv` accepts, and it is deliberately not `CellInput`.
+ *
+ * `KeyValue` rows are `{ label; value: string; tone? }` — no glyph, no spark —
+ * so a `Cell` carrying either has nowhere to put it. Taking `CellInput` here
+ * would give `b.kv` a parameter accepting what it cannot honour, and the field
+ * would vanish silently.
+ *
+ * The narrowing costs nothing a caller wants: the cell shorthands set only
+ * `text` and `tone`, so `b.warn("degraded")` still passes. A hand-written
+ * literal carrying a `glyph` is a compile error under excess property checking,
+ * which is where that mistake should be caught.
+ */
+export type KeyValueInput = Readonly<{ text: string; tone?: Tone }>;
+
+/**
+ * A step, with `state` defaulting to `"pending"` (§4).
+ *
+ * The block's `state` is required. Most callers building a checklist want every
+ * entry pending and would write it twenty times.
+ */
+export type StepInput = Readonly<{
+  label: string;
+  detail?: string;
+  state?: "pending" | "active" | "done" | "failed";
+}>;
+
+/** A log line, exactly as the block carries it (§4). */
+export type LogLine = Readonly<{ ts: string; level: string; message: string }>;
+
+/** An event line, exactly as the block carries it (§4). */
+export type EventLine = Readonly<{ ts: string; type: string; message: string }>;
+
+/** A chip for `b.pills` (§4). */
+export type ChipInput = Readonly<{
+  label: string;
+  tone?: Tone;
+  action?: Action;
+  active?: boolean;
+}>;
+
+/** A row for `b.comparison` (§4). */
+export type ComparisonRow = Readonly<{
+  field: string;
+  a: string;
+  b: string;
+  comparison?: "same" | "better" | "worse" | "changed";
+}>;
+
+/** Re-exported for the builders' own signatures; C04 owns them. */
+export type { Action, Block, Cell, Glyph, Tone };

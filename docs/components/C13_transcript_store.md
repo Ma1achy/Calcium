@@ -65,7 +65,8 @@ interface TranscriptView {
 interface TranscriptStore extends TranscriptView {
   append(doc: ViewDocument, opts?: { streaming?: boolean; payload?: unknown }): EntryId;
   patch(id: EntryId, patch: ViewPatch): PatchOutcome;
-  settle(id: EntryId): void;          // stream ended; entry stops accepting patches
+  patch(id: EntryId, p: ViewPatch, origin?: "farSide" | "shell"): PatchOutcome;
+  settle(id: EntryId, doc?: ViewDocument): PatchOutcome;   // the entry is done; the doc, if there is a final one
   clear(): void;
 
   readonly droppedBlocks: number;
@@ -155,6 +156,24 @@ Three rules make eviction safe:
 
 **Streaming entries are never evicted.** A long-running `--watch` scrolled far up is still receiving patches; dropping it would strand the stream with nowhere to write. If the cap cannot be met without evicting one, the cap is exceeded and the overshoot is reported rather than forcing the eviction.
 
+### `settle` carries the final document, because settling *is* the replacement
+
+`settle(id, doc?)` — and the optional argument is the whole of C23's step 6.
+
+**On the app route steps 6 and 7 are not two things.** The adapted document arrives, the entry becomes it, and the entry is done. On the streaming route they genuinely separate: patches arrive during, and `settle` ends it with whatever accumulated. One signature covers both, and it covers all three endings the pipeline produces — a result, an error document from a failed spawn, and a stream's `end` with nothing new to say.
+
+**Two shapes were considered and both are worse.** A fourth `ViewPatch` op is not a patch: `applyPatch(doc, { op: "document", doc })` returns its own argument, so the function has nothing to apply, and this project has just spent a session on `diff` versus `patch` naming for that exact reason. A separate `replace(id, doc)` lands **outside** the `rev` and `PatchOutcome` discipline and needs its own invalidation story — which means a second path into C14's cache, and C14's cache is one slot per entry keyed on `(entryId, rev, width)`. A second way in is a second way to get invalidation wrong.
+
+`settle` keeps the discipline whole: same return type, the same rejections, and `rev` moving exactly when the document changed, so C14 invalidates from the returned value as it already does for a patch.
+
+| Call | Outcome |
+|---|---|
+| unknown or evicted id | `{ ok: false, reason: "unknown" }`, store unchanged |
+| already settled | `{ ok: false, reason: "settled" }`, store unchanged |
+| `settle(id)` | `{ ok: true, rev }` — `rev` unchanged, nothing about the document did |
+| `settle(id, doc)` | `{ ok: true, rev }` — `rev` incremented (I13) |
+| `settle(id, invalidDoc)` | **throws**, exactly as `append` does and for its reason (§3): C23 built it, C07 validated it and C04 froze it, so three layers failed for it to arrive and there is no recovery a caller could perform |
+
 **Eviction is reported, never silent.** `droppedBlocks` accumulates, and C13 maintains a **synthetic marker entry** at the head of the transcript carrying a single `notice` block naming the count. It is a real entry — frozen, settled, never itself evicted — so `totalRows` and every visibility query account for it with no special case downstream. A session that quietly loses its beginning is worse than one that says so.
 
 **Cap overshoot is reported too.** When the cap cannot be met because every candidate is live or streaming, `overCap` holds the excess block count. L4 surfaces it; C13 does not decide what to do about it.
@@ -177,10 +196,32 @@ The payload arrives as `append`'s `opts.payload` and is discarded unread when re
 
 ## 6. Patching
 
+**A settled entry accepts nothing further from the far side.** That is the claim the gate was always making, and stating it as *settled entries reject patches* was the accident: it gated the shell on whether the far side was still talking.
+
+The reason the original is right, kept: a settled entry means the stream ended, so a further patch **from the far side** means the transport lied or a stale stream leaked. That is a real defect and rejecting it surfaces one (I8).
+
+The shell is a different writer with a different claim. C23 telling a reader something about an entry — a refusal, an expansion — has nothing to do with whether the far side is still speaking, and gating it on that inverted the rule exactly: an app verb's result settles the moment it lands, so the entries a reader acts on are the ones the shell could not speak about, while a live `--watch` accepted everything.
+
+```typescript
+patch(id: EntryId, p: ViewPatch, origin?: "farSide" | "shell"): PatchOutcome
 ```
-patch(id, p):
+
+Defaulting to `"farSide"`, which is the conservative direction: an unmarked patch is gated, so the mistake a caller can make is a rejection rather than a leak.
+
+**Three tries, and the first two were per-operation.** `settle(id, doc)` covered a result; `op: "expand"` covered view state; a refusal broke both, because a refusal notice *is* data. The distinction was never data-versus-view-state — it is **who is writing**, and that had been read off the operation because there was only ever one caller to ask.
+
+**The forgery argument does not apply, and that is what makes this different from glyphs and from a `viewState` flag.** Adapters never call `patch`: C07 returns documents and C23 applies them. There is exactly one caller and it knows which case it is in, so `origin` describes what C23 is doing rather than asserting something about bytes the far side supplied.
+
+**`op: "expand"` stays** and stops being the exception. It names a real operation readably at the call site; it is now an instance of a shell-origin patch rather than a carve-out in the gate.
+
+**This is not `meta.origin`.** That is `user | action | agent | refresh` on a *document*, recording who initiated a command (C04 I13, C23 §Setting origin). This records which side of the boundary a *patch* came from. Similar word, different axis, and they are never derived from one another.
+
+```
+patch(id, p, origin = "farSide"):
   entry unknown            → { ok: false, reason: "unknown" }, store unchanged
-  entry not streaming      → { ok: false, reason: "settled" }, store unchanged
+  entry not streaming
+    and origin "farSide"   → { ok: false, reason: "settled" }, store unchanged
+    and origin "shell"     → applied; the shell may always speak about an entry it holds
   otherwise                → r = applyPatch(doc, p)
                              r.ok  → doc = r.doc; rev++; sweep; notify
                                      → { ok: true, rev }
@@ -204,7 +245,7 @@ Per entry, over the two orthogonal flags.
 
 | From ↓ / call → | `append` (a newer one) | `patch` | `settle` |
 |---|---|---|---|
-| **live + streaming** | → frozen + streaming (T1.4) | applies (T1.7) | → live + settled (T1.9) |
+| **live + streaming** | → frozen + streaming (T1.4) | applies (T1.7) | → live + settled, `rev` moves iff a doc is given (T1.9) |
 | **live + settled** | → frozen + settled (T1.3) | rejected (T3.5) | no-op (T3.6) |
 | **frozen + streaming** | — already frozen | applies (T1.8) | → frozen + settled (T1.10) |
 | **frozen + settled** | — | rejected (T3.5) | no-op (T3.6) |
@@ -227,7 +268,7 @@ Store-level: at most one entry is `live` at any moment, and it is always the las
 - **I10** — Documents are validated on append; an invalid one raises `TranscriptError` and is not stored. It is a caller defect, not a recoverable condition: C23 built the document, C07 validated it and C04 froze it, so three layers failed for it to arrive, and C23 §5 already owns the containment.
 - **I11** — `entries` is immutable; every mutation produces new values.
 - **I12** — `Change` names what changed, so consumers can update incrementally.
-- **I13** — `rev` increments on every applied patch and never decreases. It is the staleness signal for C14's height cache; without it a cached height survives a patch that changed it.
+- **I13** — `rev` increments on every applied patch **and on a `settle` that carries a document**, and never decreases. It is the staleness signal for C14's height cache; without it a cached height survives a change. A bare `settle` moves nothing, because nothing about the document changed — and moving it there would invalidate a height that is still correct on every stream that ends.
 - **I14** — The eviction marker is a real entry, never a downstream special case, and is itself never evicted.
 - **I15** — Overshoot is exposed as `overCap`; C13 does not act on it. Stated as a post-condition, because a figure that is only true after one of the four methods is a figure L4 cannot act on: **after any public call, either `blockCount ≤ cap`, or `overCap = blockCount − cap` exactly and every entry above the cap is live, streaming or the marker.** The sweep therefore runs after `append`, `patch` and `settle`, and `clear()` returns `overCap` to zero with everything else.
 - **I16** — `clear()` empties the transcript and leaves command history untouched. They are separate stores with separate lifetimes: a reader clearing the screen has not asked to forget what they typed, and the two being one call away from each other is exactly why the boundary is stated.

@@ -41,6 +41,7 @@ const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 export { stripControl } from "../data/text.js";
 
 import { stripControl } from "../data/text.js";
+import { SGR_RESET, sgrPattern } from "../terminal/escapes.js";
 
 /** A tab stop, in cells. Fixed rather than configurable — see `expandTabs`. */
 export const TAB_STOP = 8;
@@ -89,6 +90,210 @@ export function cells(text: string): number {
     total += clusterCells(segment);
   }
   return total;
+}
+
+/**
+ * Display width of a string that already carries SGR, and the safe truncation
+ * that goes with it.
+ *
+ * **`cells()` is wrong for a rendered line, and wrong in a way that looks
+ * right.** `stripControl` drops the ESC byte because it is a control character
+ * and keeps `[38;5;241m`, which is ordinary printable text — so a themed row
+ * measures eleven cells too wide per colour change. C22's frame padded every
+ * chrome row to 80 *counted with the escapes*, which made the visible row about
+ * 38 cells and left the previous frame showing across the rest of it.
+ *
+ * Truncating with `cells()` is worse than measuring with it: the cut lands
+ * inside an escape, `[38;5` reaches the terminal as literal text, and the SGR
+ * is never terminated — so the colour bleeds down every row below.
+ *
+ * Here rather than in C22 because this is where display width is decided, and
+ * two answers to "how wide is this line" is C09 I1's divergence in the one
+ * place that moves the whole frame.
+ */
+export function displayCells(text: string): number {
+  return cells(text.replace(sgrPattern(), ""));
+}
+
+/**
+ * Pad or truncate to exactly `width` display cells, preserving escapes.
+ *
+ * Escapes are copied through and cost nothing; a grapheme that would straddle
+ * the boundary is dropped and the gap padded, rather than halved. A truncated
+ * line is closed with `SGR_RESET` **only if it was cut**, so an unstyled line
+ * gains no bytes and a cut one cannot bleed.
+ */
+export function fitStyled(text: string, width: number, reset: string): string {
+  if (displayCells(text) === width) return text;
+
+  const sgr = sgrPattern();
+  let out = "";
+  let used = 0;
+  let cut = false;
+  let styled = false;
+  let i = 0;
+
+  // `i` is a code-unit index into the string, not a measure of it — the walk
+  // needs a position and `cells()` answers a different question. Every width
+  // decision below goes through `cells`.
+  while (i < text.length) {   // cells-ok: a cursor, not a width
+    sgr.lastIndex = i;
+    const m = sgr.exec(text);
+    if (m !== null && m.index === i) {
+      out += m[0];
+      styled = true;
+      i = sgr.lastIndex;
+      continue;
+    }
+
+    const ch = [...text.slice(i)][0] ?? "";
+    if (ch === "") break;
+    const w = cells(ch);
+    if (used + w > width) {
+      cut = true;
+      break;
+    }
+    out += ch;
+    used += w;
+    i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+  }
+
+  // Only a cut that carried style needs closing. An unstyled truncation gaining
+  // a reset would put four bytes on every plain row of every frame, and a
+  // golden-frame test would then be asserting the reset rather than the row.
+  if (cut && styled) out += reset;
+  return out + " ".repeat(Math.max(0, width - used));
+}
+
+/**
+ * A window of display cells over a line that already carries SGR (C09 I20, §5a).
+ *
+ * `fitStyled` asked from the other end. Compositing a layer over a painted row
+ * keeps cells `[0, left)` of that row, writes the layer, and keeps cells
+ * `[left + width, columns)` — and the third has no expression as a `slice`. A
+ * cut by code unit lands inside an escape, `[38;5` reaches the terminal as
+ * literal text, the SGR is never terminated, and the colour bleeds down every
+ * row below. That is worse than the mis-measurement `displayCells` exists for,
+ * because it survives the frame.
+ *
+ * **Two rules, and they are the whole reason this is not a substring.**
+ *
+ * The skipped prefix's SGR is carried forward: a style opened before `from` is
+ * still in effect at `from`, and a tail that dropped it draws in the terminal's
+ * default colour — which reads as the layer having bled rather than as the base
+ * having lost its style. And a cluster straddling either boundary is dropped
+ * with its cell blanked, never halved, which is I9's rule over a window rather
+ * than over a cut: half a double-width glyph is a row one cell wide, and a row
+ * wider than it was measured wraps into a row nobody counted.
+ *
+ * The result is exactly `to - from` cells, or fewer only when the line itself
+ * ends first. Nothing is padded here — the caller knows whether a short tail
+ * should be filled, and `paint` does.
+ */
+export function sliceCells(text: string, from: number, to: number): string {
+  const start = Math.max(0, Math.floor(from));
+  const end = Math.max(start, Math.floor(to));
+  if (end === start) return "";
+
+  const sgr = sgrPattern();
+  // The style in effect at `start`, accumulated across everything skipped. A
+  // reset in the prefix clears it, so the tail opens with what the terminal
+  // would actually have been showing rather than with every escape ever seen.
+  let carried = "";
+  let out = "";
+  let used = 0;
+  let i = 0;
+  let started = false;
+  let styled = false;
+
+  while (i < text.length) {   // cells-ok: a cursor, not a width
+    sgr.lastIndex = i;
+    const m = sgr.exec(text);
+    if (m !== null && m.index === i) {
+      const esc = m[0];
+      if (started) {
+        out += esc;
+        styled = true;
+      } else {
+        carried = esc === SGR_RESET ? "" : carried + esc;
+      }
+      i = sgr.lastIndex;
+      continue;
+    }
+
+    const ch = [...text.slice(i)][0] ?? "";
+    if (ch === "") break;
+    const w = cells(ch);
+
+    // Straddling the left edge or the right: blanked in both directions, so the
+    // window measures `to - from` either way. The left case is a separate path
+    // and only the right one resembles `truncate` (C09 T1.13b).
+    if (used < start && used + w > start) {
+      if (!started) {
+        started = true;
+        out += carried;
+        if (carried !== "") styled = true;
+      }
+      out += " ".repeat(used + w - start);
+      used += w;
+      i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+      continue;
+    }
+
+    if (used >= start && !started) {
+      started = true;
+      out += carried;
+      if (carried !== "") styled = true;
+    }
+
+    if (used >= end) break;
+    if (used >= start && used + w > end) {
+      out += " ".repeat(end - used);
+      break;
+    }
+
+    if (started) out += ch;
+    used += w;
+    i += ch.length;   // cells-ok: advancing the cursor past what was consumed
+  }
+
+  // Only a window that carried style needs closing, for `fitStyled`'s reason:
+  // a reset on every plain piece would put four bytes on every row of every
+  // frame, and a golden-frame test would then be asserting the reset.
+  if (styled) out += SGR_RESET;
+  return out;
+}
+
+/**
+ * The cluster stream, for C17 (C09 §2, §5).
+ *
+ * The `cells()` argument one layer down. The editor's cursor is a grapheme
+ * index, so it needs where a cluster *ends* rather than how wide a string is —
+ * a different question with the same answer underneath, and a second
+ * `Intl.Segmenter` in `interaction/` would be two answers to it: agreeing
+ * today, parting on whichever ZWJ sequence two Unicode versions disagree
+ * about, and paying the construction cost this module exists to pay once.
+ *
+ * **Nothing is stripped here.** `cells()` strips because a control character
+ * has no width; C17 strips on insert (I9) and its buffer keeps `\n` as
+ * structure, so stripping again would delete the line breaks the layout walks.
+ */
+export function graphemes(text: string): readonly string[] {
+  const out: string[] = [];
+  for (const { segment } of GRAPHEMES.segment(text)) out.push(segment);
+  return out;
+}
+
+/**
+ * One cluster's width in cells.
+ *
+ * What `cells()` computes internally and cannot expose by returning a total.
+ * C17's layout walks clusters and asks each its width, which is the same walk
+ * `wrapCells` does — one implementation, so the prompt and every block break at
+ * the same place.
+ */
+export function clusterWidth(cluster: string): number {
+  return clusterCells(cluster);
 }
 
 /**
@@ -255,9 +460,9 @@ export function hardWrapCells(text: string, width: number): readonly string[] {
   let line = "";
   let used = 0;
 
-  for (const { segment } of GRAPHEMES.segment(text)) {
+  for (const raw of GRAPHEMES.segment(text)) {
+    const segment = placeable(raw.segment, limit);
     const w = clusterCells(segment);
-    if (w > limit) continue;
     if (used + w > limit && line !== "") {
       out.push(line);
       line = "";
@@ -293,15 +498,9 @@ export function wrapCells(text: string, width: number): readonly string[] {
 
     let line = "";
     let used = 0;
-    for (const { segment } of GRAPHEMES.segment(paragraph)) {
+    for (const raw of GRAPHEMES.segment(paragraph)) {
+      const segment = placeable(raw.segment, limit);
       const w = clusterCells(segment);
-
-      // A cluster wider than the whole line can never be placed. At width 1 a
-      // CJK glyph is exactly that, and drawing it anyway puts two cells in a
-      // one-cell row — which the terminal wraps into a row nobody counted.
-      // Dropping it is the only option that keeps the geometry honest, and both
-      // halves drop it, because both call this.
-      if (w > limit) continue;
 
       if (used + w > limit && line !== "") {
         const at = breakPoint(line);
@@ -321,6 +520,39 @@ export function wrapCells(text: string, width: number): readonly string[] {
   }
 
   return out;
+}
+
+/**
+ * A cluster that cannot fit the line at all, substituted rather than dropped (I19).
+ *
+ * A cluster is at most two cells, so this fires only at a usable width of 1 —
+ * and it fired silently for the whole life of both wrappers. Every CJK glyph
+ * and every emoji simply left the output there. **Both halves called the same
+ * function, so `measure` and `render` agreed and I1 held**: the frame was
+ * arithmetically consistent and describing content it did not hold, which is
+ * exactly what I1 cannot see.
+ *
+ * Three answers were available and two are worse. Placing it anyway overflows
+ * the row into one nobody counted — the alternate-screen scroll C09 exists to
+ * prevent. A blank keeps the geometry and loses the fact that anything was
+ * there. So a one-cell `?`, which is one cell in every capability mode: this
+ * runs inside `measure`, which receives no capabilities and so cannot pick a
+ * marker the way `truncate` does.
+ *
+ * **How narrow this has to be is a fact about child count, not terminal width.**
+ * A `row` group hands each child `floor((w - (n-1)) / n)`, floored to 1 by
+ * `normaliseWidth`, which is 1 whenever `w <= 2n - 1` — sixty children at 120
+ * columns. No in-tree adapter builds one, so it is latent rather than live, and
+ * it is reachable from C24's public `group()` at an ordinary size (C09 §5).
+ *
+ * C17 I20 answers the same question the other way: an editor overflows rather
+ * than substitutes, because a block renders someone's data and an editor holds
+ * what the user typed.
+ */
+const UNPLACEABLE = "?";
+
+function placeable(segment: string, limit: number): string {
+  return clusterCells(segment) > limit ? UNPLACEABLE : segment;
 }
 
 /**

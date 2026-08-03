@@ -81,7 +81,7 @@ Seventeen kinds ship as defaults. The union is **open** — an app registers add
 ```typescript
 type Block =
   | Rule | Notice | KeyValue | Table | Steps | Logs | Events
-  | Plot | Progress | Code | Diff | Patch | Pills | Tip | Panel | Group | Raw;
+  | Plot | Progress | Code | Comparison | Patch | Pills | Tip | Panel | Group | Raw;
 ```
 
 ```typescript
@@ -103,7 +103,7 @@ type Progress = Readonly<{ kind: "progress"; id: string; label: string;
                            current: number; total: number }> & Gap;
 type Code     = Readonly<{ kind: "code"; id: string; language: string; text: string;
                            wrap?: boolean }> & Gap;   // default false — truncate
-type Diff     = Readonly<{ kind: "diff"; id: string;
+type Comparison = Readonly<{ kind: "comparison"; id: string;
                            rows: readonly Readonly<{ field: string; a: string; b: string;
                              comparison?: "same" | "better" | "worse" | "changed" }>[] }> & Gap;
 type Patch    = Readonly<{ kind: "patch"; id: string;
@@ -125,6 +125,7 @@ type Pills    = Readonly<{ kind: "pills"; id: string;
 type Tip      = Readonly<{ kind: "tip"; id: string; text: string;
                            actions?: readonly Action[] }> & Gap;
 type Panel    = Readonly<{ kind: "panel"; id: string; title: string;
+                           footer?: string;                    // the bottom border
                            children: readonly Block[] }> & Gap;
 type Group    = Readonly<{ kind: "group"; id: string;
                            direction: "row" | "column"; children: readonly Block[] }> & Gap;
@@ -161,11 +162,11 @@ Both are optional and independent: pinning only `yMin` at 0 is the common case, 
 | `plot` | series, axis labels, `line \| sparkline` | `sparkline` → 1; `line` → declared `height`, or `height + 2` with `axes: true` (C12 §3) |
 | `progress` | label, current, total | 1 |
 | `code` | language, text, `wrap` | lines when truncating; `Σ ceil(len / w)` when wrapping |
-| `diff` | field / a / b rows | rows + header |
+| `comparison` | field / a / b rows | rows + header |
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
 | `pills` | chips with actions | `ceil(totalWidth / w)` — one logical row that may wrap |
 | `tip` | text with fill actions | `ceil(len / w)` |
-| `panel` | title, children | children measured at `w - 2`, + 2 |
+| `panel` | title, footer, children | children measured at `w - 2`, + 2 |
 | `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
 | `raw` | pre-formatted text | lines |
 
@@ -216,6 +217,15 @@ one that does not think about it gets the rhythm the surfaces already draw.
 The three container kinds pass a width to `measureChild`, and until this was written down it was the largest hole in §5: two of them narrow the width and one of them splits it, and a measurer that passes `w` through unchanged agrees with nothing that renders.
 
 - **`panel`** measures children at `w - 2` — the border takes a column each side.
+
+**`footer` is text in a row that is already drawn**, which is why it changes no
+measurement. `title` lives in the top border and `footer` in the bottom one, and a
+panel was always two rows taller than its children — so this is a use for a row that
+exists rather than a new one. Two surfaces draw it: S12 §2's keymap line and S13 §2's
+outer keymap, both pushed views whose keys belong to the view rather than to the
+shell. A pushed view cannot put them in the frame's footer — C15 T4.4 leaves header
+and footer untouched, and C22's footer is one app-supplied row — so without this the
+figures draw something no block produces.
 - **`table`** measures an expanded row's `detail` at `w - 2`, matching `panel`, and matching the indent C11 §2 already applies.
 - **`group`, `direction: "column"`** measures every child at `w` and sums.
 - **`group`, `direction: "row"`** splits equally: `floor((w - gaps) / n)` where `gaps` is `n - 1` cells of gutter, one between each pair. Children are measured at that width and the group takes the `max`.
@@ -230,9 +240,9 @@ This is a rule about a degenerate width rather than a layout feature: above `2n 
 
 A `pills` block is **one logical row**. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks, not one block that wraps — wrapping is overflow behaviour, not a layout choice.
 
-### `patch` and `diff` are not variants of each other
+### `patch` and `comparison` are not variants of each other
 
-They share a name and nothing else. `diff` is rows of `{field, a, b, comparison}` — a **structured** comparison, right for S07's metric table. `patch` is hunks of text with line numbers, two palettes and collapse. Merging them would produce a block whose measurement depends on which mode it is in, and C09 I1 is the invariant that cannot bend: a kind whose height rule branches on a mode flag is a kind whose measurer and renderer drift apart quietly.
+**They used to share a name, and that was the whole problem.** `comparison` is rows of `{field, a, b, comparison}` — a structured comparison of two values for one key, right for S07's metric table. `patch` is hunks of text with line numbers, two palettes and collapse. Merging them would produce a block whose measurement depends on which mode it is in, and C09 I1 is the invariant that cannot bend: a kind whose height rule branches on a mode flag is a kind whose measurer and renderer drift apart quietly.
 
 `patch` is declared here because C04 owns every block shape — settled when `plot` moved out to C12 — but it is **registered by C25**, exactly as `table` is by C11 and `plot` by C12. `collapsedBefore` is view state that affects height, so it lives in the block (commitment 4); expanding a collapsed region patches the document rather than mutating anything external, which is the same mechanism C11 uses for expanded rows and the reason it reaches a frozen entry when an action cannot.
 
@@ -379,12 +389,19 @@ type Action =
 
 ## 4. Patches
 
+**Four ops carry data and one carries view state, and that split is the whole reason the fifth exists.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
+
+Expressing it as `replace` was the first draft and it fails on that gate: an app verb's result is settled the moment it lands, so every entry worth expanding rejects the operation. C11 T4.7 and C25 I11 both say expansion reaches a *frozen* entry, which is true and insufficient — frozen and settled are different states, and only the first still accepts patches.
+
+A `viewState: true` flag on `replace` was the smaller change and is the worse one: it leaves one op meaning two things, and an adapter could set it to slip data past the gate. A named op is unambiguous at the call site and unforgeable at the boundary — the same argument as `settle(id, doc)` over a fourth patch op, one layer down.
+
 ```typescript
 type ViewPatch =
   | { op: "append";  block: Block }
   | { op: "replace"; blockId: string; block: Block }
   | { op: "merge";   blockId: string; rows: readonly MergeRow[] }
-  | { op: "status";  status: ViewDocument["status"] };
+  | { op: "status";  status: ViewDocument["status"] }
+  | { op: "expand";  blockId: string; rowId: string; expanded: boolean };
 
 type PatchResult =
   | Readonly<{ ok: true;  doc: ViewDocument }>
@@ -531,7 +548,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I30** — `truncateFrom` names the end characters are removed from, and defaults to `"end"`. A column that does not declare it truncates as prose does, keeping the start — the same behaviour as before the field existed, so adding it changed no rendering that had not asked to change.
 - **I31** — Row ids are unique within a table, checked by `validateDocument` alongside I14's block ids. Three things address a row by id — `merge` upserts by it (I9), C16's focus names it, and a rendered row is keyed by it — so a duplicate is ambiguous in three ways at once. It is a separate invariant from I14 because the namespaces are separate: two tables may each hold a row `r1`, and a row id never collides with a block id. Raised from C11, the first component to depend on it.
 - **I32** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
-- **I33** — `patch` and `diff` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
+- **I33** — `patch` and `comparison` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
 
 ---
 
@@ -560,7 +577,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 17. `meta` carries the invocation record — `argv`, `stderr`, `transport` — so any inspector can answer what actually ran without re-running it (I28a, D49).
 18. `meta.origin` is required and always set by C23. Provenance that can be absent is provenance nobody trusts (I13).
 19. `status: "proposed"` ships reserved and unused, and no adapter produces it. Deciding the shape now costs a field; deciding it later costs a `tui.view/2` bump (I12).
-20. `patch` and `diff` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag (I33, D50).
+20. `patch` and `comparison` are separate kinds. One is field rows, the other is text hunks, and merging them makes measurement depend on a mode flag (I33, D50).
 21. `applyPatch` returns a `PatchResult` and never throws. Four failure cases, each named, each leaving the input document untouched (I15).
 22. Block ids are unique within a document, and `validateDocument` is where that is established (I14).
 23. `merge` never deletes a row; `replace` is how a table sheds one, and the adapter decides which it means (I21).
@@ -651,7 +668,8 @@ The generic suite. **These run against every registered block kind, including ap
 
 - **T5.1**: a real session scrolls a 10,000-block transcript top to bottom; every block's on-screen row count matches its measured height, sampled at every screenful. The drift test.
 - **T5.2**: the same, at four terminal widths, with resize between passes.
-- **T5.3**: a `--watch` stream applying `merge` patches for sixty seconds → the viewport does not jump, and an expanded row stays expanded and stays put.
+- **T5.3a** (C14 I4): a live stream appending above a **detached** viewport does not move it. The control has to come *after* the claim: the lines that arrive while detached are never drawn — which is the property — so counting them in the captured bytes cannot work, and the stream's advance is read from the bottom once the view is re-attached.
+- **T5.3b**: the same with `merge` patches → an expanded row stays expanded and stays put. **Split from T5.3 rather than left bundled**, because the two halves have different blockers and the append half was reachable while waiting behind the other. What the merge half needs is a patch that is not an append: the default stream adapter maps every `data` patch to `op: "append"` (`src/data/adapters/stream.ts`), and `op: "merge"` is reachable only through an app adapter's `adaptPatch`. So two harness parameters — a registered adapter mapping a far-side line onto an existing table row, and a streaming verb that emits rows rather than notices.
 
 ### Tier 6 — fail-on-revert
 

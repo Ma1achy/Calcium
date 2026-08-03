@@ -6,9 +6,25 @@
 // as an ordinary error document is testable today — and a deferral naming a
 // component that exists is exactly what `tools/enforce/todo-expiry.mjs` fails.
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
+import { visibleTools } from "../../src/data/manifest/index.js";
 import { document, validateDocument, type ErrorLike, type ViewDocument } from "../../src/data/viewmodel/index.js";
 import { findTool, validateInvocation } from "../../src/data/manifest/index.js";
-import { fixture } from "../support/manifest.js";
+import { fixture, raw, toolNamed } from "../support/manifest.js";
+import {
+  contextAt,
+  flagNameSource,
+  flagValueSource,
+} from "../../src/interaction/completion/index.js";
+import { parseManifest, type Manifest } from "../../src/data/manifest/index.js";
+
+/** The fixture as a `Manifest`, or the parse error as a failure here. */
+const parsedOrThrow = (source: Record<string, unknown>): Manifest => {
+  const r = parseManifest(source);
+  if (!r.ok) throw new Error(`fixture does not parse: ${JSON.stringify(r.error)}`);
+  return r.value;
+};
+import { parse } from "../../src/interaction/parser/index.js";
 
 /**
  * The error path, as C23 will drive it: whatever produced the `ErrorLike` —
@@ -75,12 +91,85 @@ describe("C05 integration", () => {
     expect(doc.status).toBe("error");
   });
 
-  it.todo("T4.1: a classified /-prefixed input validates before any transport call — waits on C18");
-  it.todo("T4.2: completion candidates for --status= come from the manifest's values — waits on C19");
-  it.todo("T4.3: adding a flag to the fixture makes it completable with no TypeScript change — waits on C19");
+  it("T4.1 (with C18, D17): a classified input validates before any transport call", () => {
+    // D17's whole argument, asserted from C05's side: the structure is local,
+    // so a malformed invocation costs nothing rather than 300 ms of interpreter
+    // startup to be told the same thing. The spy is what makes "before" mean
+    // something — an assertion that the result is invalid would pass equally
+    // well if the transport had run first.
+    let invoked = 0;
+    const transport = {
+      invoke: () => {
+        invoked += 1;
+        throw new Error("the transport must not be reached during parsing");
+      },
+    };
+
+    const result = parse("/ps --status=nonsense", {
+      manifest: fixture(),
+      binary: "widget",
+      lastUuid: null,
+    });
+
+    expect(result.kind).toBe("app");
+    if (result.kind !== "app") return;
+    expect(result.validation.ok, "rejected locally").toBe(false);
+    expect(invoked, "and nothing was spawned to find that out").toBe(0);
+    void transport;
+  });
+  it("T4.2: completion candidates for --status= come from the manifest's values", async () => {
+    // C05's whole claim, asserted from the consuming side: the values are the
+    // manifest's, not a list completion keeps.
+    const flag = toolNamed("ps").flags.find((f) => f.name === "status");
+    const got = flagValueSource().complete(contextAt("/ps --status=", 13, fixture()));
+    expect((got as readonly { value: string }[]).map((c) => c.value)).toEqual(flag?.values);
+  });
+
+  it("T4.3: adding a flag to the fixture makes it completable with no TypeScript change", () => {
+    // The anti-drift test from C05's side. No code below changes; only data.
+    const source = raw();
+    const tools = source["tools"] as Record<string, unknown>[];
+    const ps = tools.find((t) => t["name"] === "ps");
+    if (ps === undefined) throw new Error("the fixture no longer has a `ps`");
+
+    const before = flagNameSource().complete(contextAt("/ps --zo", 8, parsedOrThrow(raw())));
+    expect((before as readonly unknown[]).length, "the fixture must not already have it").toBe(0);
+
+    (ps["flags"] as Record<string, unknown>[]).push({
+      name: "zone",
+      type: "string",
+      summary: "which zone",
+    });
+    const after = flagNameSource().complete(contextAt("/ps --zo", 8, parsedOrThrow(source)));
+    expect((after as readonly { value: string }[]).map((c) => c.value)).toEqual(["--zone"]);
+  });
   // T4.4 and T4.5 are written, in test/integration/transport.test.ts: the
   // routing decision is C06's to be driven by and C05's to supply, and it reads
   // better beside the transport than beside the loader. Named here so the pair
   // is findable from the spec that declares them.
-  it.todo("T4.7: help output is generated wholly from visibleTools — waits on the L4 shell");
+  it("T4.7 (with C23): help output is generated wholly from visibleTools", async () => {
+    // **C23 I26 — from the manifest and the keymap, never a maintained list.**
+    // The claim is `visibleTools`, not `tools`: a hidden verb stays invocable
+    // and leaves the help, which is the pair that field means. `/debug` is the
+    // live case, since the framework marks it hidden (C05 §3).
+    const h = pipelineHarness();
+    h.pipeline.submit("/help");
+    await settled();
+
+    const rendered = JSON.stringify(h.transcript.entries.at(-1)?.doc.blocks);
+    const manifest = fixture();
+
+    for (const t of visibleTools(manifest)) {
+      expect(rendered, `${t.name} is visible and must appear`).toContain(t.name);
+    }
+    const hidden = manifest.tools.filter((t) => t.hidden === true);
+    expect(hidden.length, "the fixture has a hidden verb, or this asserts nothing")
+      .toBeGreaterThan(0);
+    for (const t of hidden) {
+      expect(rendered, `${t.name} is hidden and must not`).not.toContain(`/${t.name}`);
+    }
+
+    // And the keymap half: every binding shown is one C16 will dispatch.
+    expect(rendered, "bindings come from the same table dispatch uses").toContain("c+c");
+  });
 });

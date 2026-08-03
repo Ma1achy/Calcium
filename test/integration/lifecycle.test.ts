@@ -7,10 +7,13 @@
 // grep is the manual half; `tools/enforce/todo-expiry.mjs` is the half that
 // fails on its own.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildGraph } from "../support/session.js";
+import { wrappingDoc } from "../support/viewport.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import type { FrameScheduler } from "../../src/terminal/frame-scheduler.js";
+import { createProcessRunner } from "../../src/data/process/runner.js";
 import { fakeStdin, fakeStdout, MODES } from "../support/fake-terminal.js";
 
 const live: TerminalLifecycle[] = [];
@@ -158,15 +161,102 @@ describe("C01 integration", () => {
       expect(render.mock.calls.length, phase).toBe(drawn);
     }
   });
-  it.todo(
-    "T4.4: the documented suspend → handoff → resume sequence runs in order, and the child receives an un-raw stdin on the primary screen — waits on L4",
-  );
-  it.todo(
-    "T4.5: startup ordering — the composition root's steps 6, 7, 8 execute in that order, asserted by an event log — waits on C22",
-  );
-  it.todo(
-    "T4.6: a SIGWINCH snapshot propagates to the viewport, which clamps scroll against it — waits on C22",
-  );
+  it("T4.4 (with C21): the child gets an un-raw stdin on the primary screen", async () => {
+    // A02 Seam 4's TTY row from C01's side. C21 T4.5 asserts the *order* of the
+    // four calls through C23; what this asserts is the terminal state at the
+    // moment the child starts, which is the half a call-order spy cannot see.
+    const stdout = fakeStdout();
+    const stdin = fakeStdin();
+    const lifecycle = createTerminalLifecycle({
+      stdout,
+      stdin,
+      capabilities: detectCapabilities({ TERM: "xterm-256color" }).capabilities,
+      onFatal: ((err: unknown) => {
+        throw err;
+      }) as (err: unknown) => never,
+    });
+    live.push(lifecycle);
+    const runner = createProcessRunner({ env: process.env, stdin });
+
+    lifecycle.acquire();
+    expect(stdin.rawModeCalls.at(-1), "acquired means raw").toBe(true);
+    expect(stdout.output).toContain(MODES.altScreenOn);
+
+    lifecycle.suspend();
+
+    // **The two things a child expects, and the ones C21 cannot check.** C21 §5
+    // probes `stdin.isRaw` and throws if the caller skipped `suspend()`; it
+    // cannot import C01, so it cannot see the screen at all.
+    expect(stdin.rawModeCalls.at(-1), "a child that expects a cooked terminal").toBe(false);
+    expect(stdout.output.endsWith(MODES.altScreenOff), "on the primary screen").toBe(true);
+
+    // And the guard does not fire on this path, which is the negative half of
+    // C21 T3.8 — `handoff` resolving is the proof, since the guard rejects.
+    const exit = await runner.handoff(["true"], { cwd: () => process.cwd() });
+    expect(exit.code, "the child ran rather than being refused").toBe(0);
+
+    lifecycle.resume();
+    expect(stdin.rawModeCalls.at(-1), "and the terminal comes back raw").toBe(true);
+    expect(stdout.output).toContain(MODES.altScreenOn);
+  });
+  it("T4.5 (with C22): handlers, then acquire, then paint — asserted as a sequence", async () => {
+    // A02 §3's 6 → 7 → 8, which is C22 §3's step 7 → acquire → first commit.
+    // **Asserted as an order, not as three facts**: each step happening is true
+    // under any permutation, and the invariant is about the sequence (A03 §2's
+    // ordered-structure class).
+    //
+    // 6 before 7 closes the window where terminal state is held with nothing
+    // registered to release it; 6 before 8 means a crash during first paint
+    // still restores.
+    const { graph, stdout, renders } = await buildGraph();
+
+    // 6 — the lifecycle exists, so its handlers are registered (C01 I3) …
+    expect(graph.log).toContain("lifecycle");
+    // … and 7 has not happened: nothing acquired, no byte, no frame.
+    expect([graph.lifecycle.acquired, stdout.output, renders()]).toEqual([false, "", 0]);
+
+    graph.lifecycle.acquire();
+    expect(stdout.output, "7 — the alternate screen").toContain(MODES.altScreenOn);
+
+    graph.scheduler.commit("input");
+    expect(renders(), "8 — and only now a frame").toBeGreaterThan(0);
+  });
+
+  it("T4.6 (with C22, C14): a SIGWINCH snapshot reaches the viewport", async () => {
+    // C01 states a fact and the shell decides what it means (A01 D53). The
+    // snapshot is coherent per signal (I12) and **C22 is what carries it across
+    // the layer** — C14 never reads a dimension and C01 never knows a viewport
+    // exists.
+    // **The two dimensions travel by different routes, and this row now covers
+    // one of them** (C22 I34). Width reaches C14 from the signal, because width
+    // is what invalidates every cached height (C14 I8) and C01's snapshot is
+    // where it is known. **Height reaches it from the composed frame** — the
+    // region is `rows − header − footer − promptRows` and the prompt's height is
+    // not a function of the terminal's, so no handler on a terminal event can
+    // compute it.
+    //
+    // The height half is therefore unobservable here *by construction*: this
+    // harness stubs `render` with a counter (`test/support/session.ts`), so no
+    // frame is ever composed and nothing pushes a height. It is asserted where a
+    // frame exists — C22 T4.12 against a spy, and C04 T5.2 through a real PTY
+    // resize. Stated rather than left, because a row that quietly stopped
+    // covering half its claim reads exactly like one that still does.
+    const { graph, resize } = await buildGraph({}, { columns: 200, rows: 30 });
+    // **`wrappingDoc`, not `rowsDoc`** — and the support file says why: a `raw`
+    // block measures one row at every width, so a resize assertion built on one
+    // passes without exercising anything. Written with `rowsDoc` first, and it
+    // reported an unchanged height at columns 6, which is the fixture agreeing
+    // with a broken product and a working one alike.
+    for (let i = 0; i < 6; i += 1) graph.transcript.append(wrappingDoc(`e${i}`));
+    graph.lifecycle.acquire();
+
+    const wide = graph.viewport.scroll.totalRows;
+    resize({ columns: 20, rows: 30 });
+
+    // The observable is that every height was remeasured, which happens only if
+    // the width arrived: C14 drops the whole cache on a width change (C14 I8).
+    expect(graph.viewport.scroll.totalRows, "remeasured at the new width").toBeGreaterThan(wide);
+  });
   it("T4.7 (with C03): SIGCONT fires onResume, the shell invalidates, the next commit repaints", () => {
     const { scheduler, lifecycle, render, repaint } = wireScheduler();
     lifecycle.acquire();

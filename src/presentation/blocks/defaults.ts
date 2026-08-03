@@ -10,7 +10,7 @@
 import { codeDefinition } from "./kinds/code.js";
 import { groupDefinition, panelDefinition } from "./kinds/containers.js";
 import {
-  diffDefinition,
+  comparisonDefinition,
   eventsDefinition,
   keyValueDefinition,
   logsDefinition,
@@ -35,7 +35,7 @@ export const DEFAULT_DEFINITIONS: readonly BlockDefinition[] = Object.freeze([
   eventsDefinition,
   progressDefinition,
   codeDefinition,
-  diffDefinition,
+  comparisonDefinition,
   pillsDefinition,
   tipDefinition,
   panelDefinition,

@@ -1,0 +1,17 @@
+#!/bin/sh
+# A04 §5 — the same target CI runs and a developer runs, run once more at the
+# moment it is cheapest to obey.
+#
+# It exists because the gate before it was an `&&` chain in whatever command
+# happened to be typed, and an `&&` chain is a habit rather than a mechanism. A
+# commit landed on a red `make enforce` because the chain ran past the failure.
+#
+# Five seconds against the alternative: a layer violation committed is a layer
+# violation that has had time to be depended upon, and the revert costs more than
+# every run of this hook put together.
+#
+# `--no-verify` still works, deliberately. A hook that cannot be bypassed gets
+# uninstalled; one that can be bypassed gets bypassed visibly, in a flag someone
+# has to type.
+set -e
+exec make enforce

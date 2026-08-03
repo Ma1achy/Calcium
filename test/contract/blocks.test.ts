@@ -8,8 +8,10 @@
 // The suite is generic on purpose. It runs over **every registered kind**, so a
 // consumer's custom block is held to the same contract as the defaults, and a
 // kind joins by being in the registry rather than by anyone extending a list.
-import { describe, expect, it } from "vitest";
-import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../support/measurement-conformance.js";
+import { describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
+import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
@@ -27,6 +29,10 @@ import {
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { readdirSync, readFileSync, statSync } from "node:fs";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 /**
  * The three kinds C09 does not ship. They are in the corpus because C04's union
@@ -180,7 +186,7 @@ describe("C09 contract — measurement", () => {
     expect([...kit.kinds].sort()).toEqual(
       [
         "code",
-        "diff",
+        "comparison",
         "events",
         "group",
         "keyValue",
@@ -230,7 +236,7 @@ describe("C09 contract — measurement", () => {
 
     expect([...kit.kinds].sort()).toEqual([
       "code",
-      "diff",
+      "comparison",
       "events",
       "group",
       "keyValue",

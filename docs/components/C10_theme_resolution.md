@@ -385,8 +385,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.2** (with C09, C02): at depth 1, a rendered status row remains distinguishable by glyph alone — the D29 property, tested end to end.
 - **T4.3** (with C09): at depth 4, `ok`, `warn` and `error` render as three visibly distinct ANSI colours in every shipped theme.
 - **T4.4** (with C03, L4): a theme switch causes **L4** to call `invalidate()`, producing a full repaint. A spy asserts C10 itself never calls the scheduler (I7).
-- **T4.5** (with L4): `/theme light` persists to config and survives a restart.
-- **T4.6** (with L4): a corrupt theme override in config → base theme retained, notice committed, session opens normally.
+- **T4.5** (with C22, → C22 I40): `/theme light` persists and survives a restart. **The persistence is C22's**, not C10's: this component is a pure function over tokens, and a store reaching a disk from L1 is A03 MG23's neighbourhood. The row lives here because the *behaviour* is a theme behaviour, and it is asserted against two real sessions over one `stateDir` (C22 T1.19).
+- **T4.6** (with C22, → C22 I40): a corrupt persisted variant → base theme retained, notice committed, session opens normally. C20's repair-at-open precedent one component up; the notice is the half that stops "absent" and "corrupt" looking the same (C22 T1.19b).
 
 ### Tier 5 — e2e
 

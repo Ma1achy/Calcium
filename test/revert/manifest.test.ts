@@ -5,6 +5,8 @@
 // that only asserts a behaviour tells the next person what broke, while one
 // that names the edit tells them what they did.
 import { describe, expect, it } from "vitest";
+
+import { SCANS } from "../../tools/enforce/source-scans.mjs";
 import {
   ARG_TYPES,
   createManifestStore,
@@ -126,7 +128,16 @@ describe("C05 fail-on-revert", () => {
     }
   });
 
-  it.todo("T6.6: hardcoding an enum in the completion module → T4.3 fails — waits on C19");
+  it("T6.6: hardcoding an enum in the completion module → T4.3 fails", () => {
+    // The mutation this names is a literal list in `completion/`, and the point
+    // is that nothing *else* would notice: T4.3 keeps passing while the fixture
+    // still holds the same values, so the check has to be the scan.
+    const ss22 = SCANS.find((r) => r.id === "SS22");
+    expect(ss22, "SS22 is what makes T4.3 more than a coincidence").toBeDefined();
+    if (ss22 === undefined) throw new Error("unreachable");
+    expect(ss22.pattern.test('const S = ["running", "failed", "queued"];')).toBe(true);
+    expect(ss22.scope).toBe("src/interaction/completion/");
+  });
   // T6.8 is written, in test/integration/transport.test.ts, beside the T4.4 it
   // names.
 });

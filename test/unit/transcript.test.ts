@@ -118,7 +118,9 @@ describe("C13 unit", () => {
     const unknown = s.patch("nosuch", appendPatch("x"));
     const bad = s.patch(streaming, { op: "merge", blockId: "b0", rows: [] });
     s.settle(streaming);
-    const settled = s.patch(streaming, appendPatch("y"));
+    // `farSide` explicitly: this arm is about the far side outliving its own
+    // settle, and the default is what an unmarked caller gets (§6).
+    const settled = s.patch(streaming, appendPatch("y"), "farSide");
 
     expect(unknown).toEqual({ ok: false, reason: "unknown" });
     expect(settled).toEqual({ ok: false, reason: "settled" });
@@ -212,5 +214,160 @@ describe("C13 unit", () => {
       [frozenStreaming, frozenSettled, liveStreaming].map((id) => JSON.stringify(at(id))),
     );
     expect(seen.size).toBe(3);
+  });
+
+  // --- settle carries the final document (C23 §3 step 6) -------------------
+  //
+  // **The operation C13 did not have, and nothing noticed for as long as nothing
+  // executed a command.** C23 §3 said "patch or replace the entry" and every
+  // `ViewPatch` op is block-level, so no caller could give an entry a different
+  // document — or, the part that mattered, a different `meta`. C23 I7 reads
+  // `$_` from the adapted document's `meta.resultId`, and `/debug` renders its
+  // `argv`, `exitCode` and `durationMs`.
+
+  it("T1.9b (I13): settle with a document replaces it and moves rev", () => {
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    const before = s.entries[0]?.rev;
+
+    const final = doc({ command: "settled" });
+    const outcome = s.settle(id, final);
+
+    expect(outcome).toMatchObject({ ok: true });
+    expect(s.entries[0]?.doc.command, "the entry became the document").toBe("settled");
+    expect(outcome.ok === true && outcome.rev, "and rev moved with it").toBe((before ?? 0) + 1);
+    expect(s.entries[0]).toMatchObject({ streaming: false });
+  });
+
+  it("T1.9c (I13): a bare settle moves nothing, because the document did not change", () => {
+    // **The common case, and the one a careless `rev` bump would cost.** Every
+    // stream that ends settles without a document; moving `rev` there would
+    // invalidate a C14 height that is still correct, silently and every time.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    const before = s.entries[0]?.rev ?? 0;
+
+    const outcome = s.settle(id);
+
+    expect(outcome).toEqual({ ok: true, rev: before });
+    expect(s.entries[0]?.rev).toBe(before);
+  });
+
+  it("T1.9d (I8): settle reports its two conditions rather than absorbing them", () => {
+    // The same two arms `patch` returns, for the same reason: an unknown id is a
+    // stale reference and a settled entry is a caller bug, and C23 §8a A2 turns
+    // on telling them apart — neither carries an error, and §5 read `.error` off
+    // one of them until the trace was walked.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+
+    expect(s.settle("nosuch"), "a stale reference").toEqual({ ok: false, reason: "unknown" });
+    expect(s.settle(id), "already final").toEqual({ ok: false, reason: "settled" });
+  });
+
+  it("T1.9e (I10): settle throws on an invalid document, as append does", () => {
+    // **Thrown, not returned, and the asymmetry is the point** (§3). The two
+    // above are conditions a caller meets legitimately; this is a caller bug —
+    // three layers had to fail for an invalid document to arrive, so there is
+    // nothing to recover from and returning would invite absorbing it.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+
+    expect(() => s.settle(id, INVALID_DOC)).toThrow(TranscriptError);
+    expect(s.entries[0], "and nothing was stored").toMatchObject({ streaming: true });
+  });
+
+  it("T1.9f: a settle that throws leaves the entry patchable", () => {
+    // The half a throw makes easy to get wrong: rejecting the document must not
+    // half-settle the entry, or a stream that emits one bad final document ends
+    // up unpatchable *and* unsettled — the state C23 I9 says cannot exist.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+
+    expect(() => s.settle(id, INVALID_DOC)).toThrow();
+    expect(s.patch(id, appendPatch("still going"))).toMatchObject({ ok: true });
+    expect(s.settle(id, doc({ command: "ok now" }))).toMatchObject({ ok: true });
+  });
+
+  // --- the gate reads who is writing (§6) ----------------------------------
+
+  it("T1.7d (I8): a settled entry rejects the far side and accepts the shell", () => {
+    // **The pair is what makes the distinction real rather than a widening.**
+    // Asserting only the acceptance would read as the gate having been relaxed;
+    // asserting only the rejection is the test that already existed. Both, on
+    // one entry, is the claim: *a settled entry accepts nothing further from the
+    // far side*, which is what the rule always meant.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+
+    expect(
+      s.patch(id, appendPatch("late"), "farSide"),
+      "the transport lied or a stale stream leaked — a real defect",
+    ).toEqual({ ok: false, reason: "settled" });
+
+    expect(
+      s.patch(id, appendPatch("refused"), "shell"),
+      "the shell may speak about an entry it holds",
+    ).toMatchObject({ ok: true });
+  });
+
+  it("T1.7e: the default is `farSide`, so an unmarked patch is gated", () => {
+    // The conservative direction, and worth asserting rather than reading off
+    // the signature: a caller's mistake should be a rejection, not a leak.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+
+    expect(s.patch(id, appendPatch("x"))).toEqual({ ok: false, reason: "settled" });
+  });
+
+  it("T1.7f: origin is not the operation — a shell `expand` and a shell notice both land", () => {
+    // `op: "expand"` stops being the exception it briefly was. It names a real
+    // operation readably; what gets it past a settled entry is the origin, and
+    // a plain notice at the same origin lands identically.
+    const s = createTranscriptStore();
+    const id = s.append(
+      doc({
+        blocks: [
+          {
+            kind: "table",
+            id: "t1",
+            columns: [
+              { key: "name", label: "Name", align: "left", priority: 10, minWidth: 8, sortable: true },
+            ],
+            rows: [{ id: "r1", cells: { name: { text: "one" } } }],
+          },
+        ],
+      }),
+      { streaming: true },
+    );
+    s.settle(id);
+
+    expect(
+      s.patch(id, { op: "expand", blockId: "t1", rowId: "r1", expanded: true }, "shell"),
+    ).toMatchObject({ ok: true });
+    const b = s.entries[0]?.doc.blocks[0];
+    expect(b?.kind === "table" && b.rows[0]?.expanded).toBe(true);
+
+    expect(s.patch(id, appendPatch("said"), "shell")).toMatchObject({ ok: true });
+  });
+
+  it("T1.7g (I13, C14): a shell patch on a settled entry still moves rev", () => {
+    // **The first time `rev` moves on a settled entry**, and C14's cache keys on
+    // `(entryId, rev, width)` and invalidates from the returned value. It should
+    // hold unchanged — this asserts it rather than assuming, because a fast path
+    // that treated settled as static would look like a correct optimisation
+    // until this op existed.
+    const s = createTranscriptStore();
+    const id = s.append(docOf(1), { streaming: true });
+    s.settle(id);
+    const before = s.entries[0]?.rev ?? 0;
+
+    const out = s.patch(id, appendPatch("said"), "shell");
+
+    expect(out).toMatchObject({ ok: true, rev: before + 1 });
+    expect(s.entries[0]?.rev, "and the entry carries it").toBe(before + 1);
   });
 });

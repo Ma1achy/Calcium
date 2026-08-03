@@ -18,7 +18,7 @@ export type {
   Cell,
   Code,
   ColumnDef,
-  Diff,
+  Comparison,
   DocumentMeta,
   DocumentStatus,
   ErrorLike,

@@ -25,12 +25,16 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   checkModuleGraph,
+  checkOneStorePerComponent,
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
+  checkFunctionConsumers,
+  checkSeamConsumers,
 } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
+import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
 
 /** A file that must fail `rule`, at a path inside its scope. */
 type Fabrication = { rule: string; file: string; source: string };
@@ -67,6 +71,16 @@ const FABRICATED: readonly Fabrication[] = [
     file: "src/viewport/transcript.ts",
     source: 'const style = resolve("spectrum.3", theme, caps);',
   },
+  {
+    // The anti-drift rule, and the fabrication is deliberately the *plausible*
+    // form rather than an obviously wrong one: a list that is correct on the day
+    // it is written, in a source file, next to code that uses it. That is what
+    // it looks like in review, and nothing else in the suite would notice it —
+    // T4.1 keeps passing because the fixture manifest still has those values.
+    rule: "SS22",
+    file: "src/interaction/completion/sources.ts",
+    source: 'const STATUSES = ["running", "failed", "queued"];',
+  },
   { rule: "SS23", file: "src/presentation/blocks/text.ts", source: "const w = label.length;" },
   {
     // SS40's own violation, and the reason it is not SS23 widened. The same
@@ -79,10 +93,26 @@ const FABRICATED: readonly Fabrication[] = [
     source: "const end = buffer.length;",
   },
   {
+    // Copied from the real call site, per the standing rule: C16's keymap built a
+    // slot with one function and split it with another, and the separator was a
+    // literal NUL. Ten tests passed because both halves agreed.
+    rule: "SS43",
+    file: "src/interaction/router/keymap.ts",
+    source: 'const key = `${target}\u0000${name}`;'.replace("\\u0000", "\u0000"),
+  },
+  {
     // The code-unit half, which `.length` alone does not cover.
     rule: "SS40",
     file: "src/interaction/editor.ts",
     source: "const ch = buffer.charAt(cursor);",
+  },
+  {
+    // The third branch, which had no fabricated violation and no escape hatch.
+    // Slicing the buffer by code unit is how an emoji gets cut in half, and it
+    // is the operation someone reaches for first.
+    rule: "SS40",
+    file: "src/interaction/editor/editor.ts",
+    source: "const head = this.text.slice(0, cursor);",
   },
   {
     // The shape an adapter author reaches for when a document wants a
@@ -227,6 +257,87 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import type { TerminalLifecycle } from "../../terminal/lifecycle.js";',
   },
   {
+    // MG15's, in the form someone would actually write it. Asking C01 for the
+    // width reads as *more* correct than reading `stdout.columns` — it is the
+    // component that owns the number — and it is the import that turns the
+    // editor into something nothing can measure at a width other than the
+    // terminal's, which is what T2.1's corpus at widths 20 to 200 needs.
+    rule: "MG15",
+    file: "src/interaction/editor/layout.ts",
+    source: 'import type { TerminalLifecycle } from "../../terminal/lifecycle.js";',
+  },
+  {
+    // MG14's, and it is the import someone would actually write: `decode.ts`
+    // matches CSI sequences, and `escapes.ts` is where the CSI vocabulary
+    // lives. SS14 already allows `decode.ts` its own escape literals, which is
+    // the exemption that exists precisely so C16 does not reach for C01's.
+    rule: "MG14",
+    file: "src/interaction/router/decode.ts",
+    source: 'import { CURSOR } from "../../terminal/escapes.js";',
+  },
+  {
+    // MG16's, and it fabricates the `presentation/` half rather than the
+    // `terminal/` one — the second target is the one that would be written, and
+    // a single fabrication against a two-target rule proves only the target it
+    // used. `errorBlock` is the shape someone reaches for to make an
+    // unknown-verb message render nicely.
+    rule: "MG16",
+    file: "src/interaction/parser/index.ts",
+    source: 'import { blocks } from "../../presentation/blocks/index.js";',
+  },
+  {
+    rule: "MG16",
+    file: "src/interaction/parser/index.ts",
+    source: 'import { escapes } from "../../terminal/escapes.js";',
+  },
+  {
+    // MG17's reachable form, and it is the menu rather than anything exotic.
+    // C19 declares how wide the menu wants to be, and "how wide" is one step
+    // from "how wide is the terminal" — which is `lifecycle`'s, handed down,
+    // and the one axis whose misuse wraps a line and scrolls the alternate
+    // screen. C15 I16 keeps the pair honest; this import collapses it.
+    rule: "MG17",
+    file: "src/interaction/completion/menu.ts",
+    source: 'import { size } from "../../terminal/lifecycle.js";',
+  },
+  {
+    // MG18's reachable form is the editor, not the terminal, and it is the
+    // import a reasonable person writes: `previous()` has produced a string and
+    // the buffer is one call away. What it costs is I1 — the store would then
+    // own where the cursor lands and whether the replacement is one undo unit,
+    // both of which are the prompt's answers, and both already given.
+    rule: "MG18",
+    file: "src/interaction/history/store.ts",
+    source: 'import type { LineEditor } from "../editor/index.js";',
+  },
+  {
+    // SS9's literal half, which is the live one. A default that reads
+    // `~/.prism` looks like a courtesy and makes a standalone run append to the
+    // developer's own history — silently, in a file nobody opens until it is
+    // wrong (C20 I12, T6.12).
+    rule: "SS9",
+    file: "src/interaction/history/store.ts",
+    source: 'const stateDir = deps.stateDir ?? "~/.prism";',
+  },
+  {
+    // SS30's three subjects, one fabrication each — a rule with three subjects
+    // and one fabrication proves the subject it used, which is SS24's scope
+    // list in a different column.
+    rule: "SS30",
+    file: "src/interaction/completion/context.ts",
+    source: "export function tokenise(line: string): readonly string[] {",
+  },
+  {
+    rule: "SS30",
+    file: "src/interaction/completion/insert.ts",
+    source: "function quote(candidate: string): string {",
+  },
+  {
+    rule: "SS30",
+    file: "src/interaction/parser/suggest.ts",
+    source: "function levenshtein(a: string, b: string): number {",
+  },
+  {
     rule: "MG20",
     file: "src/terminal/frame-scheduler.ts",
     source: 'import { ALT_SCREEN } from "./escapes.js";',
@@ -253,6 +364,72 @@ const FABRICATED: readonly Fabrication[] = [
     rule: "SS42",
     file: "src/presentation/blocks/paint.ts",
     source: "const width = stdout.columns;",
+  },
+  {
+    // **Copied from a real call site**, which A03 §2 makes the standing rule for
+    // any scan targeting a code idiom: a fabrication written fresh uses the same
+    // idiom the rule was written against, and SS20 is the instance that proved
+    // it — correct about a syntax nobody writes while the idiom in use walked
+    // past.
+    //
+    // This is C06's `createTransport` as it would look if the framework
+    // resolved its own mode, which is the plausible version: the value is right
+    // there in the environment and passing it through config is one more hop.
+    rule: "SS44",
+    file: "src/data/transport/factory.ts",
+    source: 'const mode = process.env["PRISM_TUI_TRANSPORT"] ?? "subprocess";',
+  },
+  {
+    // The edge that actually shipped, and the reason MG26 exists: a production
+    // module reaching into the dev-only entry for a render helper that was
+    // written there because a test called it first.
+    rule: "MG26",
+    file: "src/shell/paint.ts",
+    source: 'import { renderSequenceToLines } from "../testing/index.js";',
+  },
+  {
+    // The fixtures half, which never shipped but is the same claim.
+    rule: "MG26",
+    file: "src/shell/session.ts",
+    source: 'import { recordFixture } from "../fixtures/index.js";',
+  },
+  {
+    // C24 I5's table, in the form a builder would actually grow one. `b.row`
+    // takes a `Record<string, CellInput>` and the keys are the data's own field
+    // names, so a lookup from key to tone is one small step from where the
+    // ergonomics already are — and it renders the wrong colour rather than
+    // throwing, on whichever verb first uses a key nobody listed.
+    rule: "SS45",
+    file: "src/shell/builders/index.ts",
+    source: 'const TONE_BY_KEY = { status: "warn", health: "error" };',
+  },
+  {
+    // The same inference written inline, which is the form that makes the rule
+    // worth having: no standing table to notice in review.
+    rule: "SS45",
+    file: "src/shell/builders/index.ts",
+    source: 'if (key === "status") return cell({ text, tone: "warn" });',
+  },
+  {
+    // The C22 half, and the one that actually shipped in a draft: `stateDir`
+    // resolving its own variable, which reads as C22 owning the default rather
+    // than as the framework reading the environment.
+    rule: "SS44",
+    file: "src/shell/config.ts",
+    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? "~/.prism",',
+  },
+  {
+    // **The shape SS29 could not catch and MG23 does.** An overlay manager
+    // wanting the live entry's id to title a view is the reach a reader makes:
+    // both are L2, so no layer walk objects, and no per-component row names this
+    // pair. C15 holds one store already, so a second is L4's — through C23 and
+    // its local handlers, never laterally.
+    rule: "MG23",
+    file: "src/viewport/overlay/manager.ts",
+    source: [
+      'import type { TranscriptView } from "../transcript/index.js";',
+      'import { createBlockRegistry } from "../../presentation/blocks/index.js";',
+    ].join("\n"),
   },
   {
     // The edge a reader would reach for: a plot inside an expanded table row
@@ -360,6 +537,16 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // here, on the commit that adds it.
     const covered = new Set([
       ...FABRICATED.map((f) => f.rule),
+      // MG24 is fabricated in its own row below rather than in `FABRICATED`:
+      // that table is one source line per rule, and this one needs a small
+      // file *set* — a member and the file that would consume it — because
+      // the property is about the absence of a consumer rather than about a
+      // line being present.
+      "MG24",
+      // MG25 likewise, and for a second reason: half its property is about the
+      // allow-list rather than about the tree, and that half needs two runs of
+      // the same fixture with different lists.
+      "MG25",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -368,6 +555,125 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       ...SPEC_RULES,
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
+  });
+
+  it("MG24 fires: a published interface member no other file in src/ names", () => {
+    // **Fabricated from the four real instances**, which is the only way to
+    // exercise it now that each is wired. Every one was a component complete on
+    // its own side of a seam with nothing on the other, and every one passed
+    // both suites: the producer tests it, and the consumer never mentions what
+    // it fails to consume.
+    const seam: Record<string, string> = {
+      "src/interaction/completion/engine.ts":
+        "export interface CompletionEngine {\n" +
+        "  request(ctx: unknown, seq: number): Promise<unknown>;\n" +
+        "  cancel(): void;\n" +
+        "  readonly spinning: boolean;\n" +
+        "}\n",
+      // The consumer that exists, so the fixture is not vacuous: `request` is
+      // called here and must not be reported.
+      //
+      // **This read `void 0; // request` and the fixture was the bug.** The
+      // only "consumption" was a comment, and the assertion below required MG24
+      // to treat it as one — encoding the defect as the expected behaviour.
+      // Comments are stripped now, so the consumer has to be code.
+      "src/shell/keys.ts": "engine.request();\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(seam), (f) => seam[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]).sort();
+
+    expect(named, "the two with no consumer, and not the one with").toEqual([
+      "CompletionEngine.cancel",
+      "CompletionEngine.spinning",
+    ]);
+    expect(violations[0]?.rule).toBe("MG24");
+    expect(violations[0]?.message).toContain("complete on its own side of a seam");
+
+    // **A mention in a comment is not a consumer**, and this is the arm that
+    // pins it. `DocumentAssertions.measuresCorrectly` was reported consumed on
+    // the strength of one sentence in `measurement-conformance.ts` saying that
+    // `expectDocument().measuresCorrectly(widths)` wraps it — five siblings of
+    // the same interface fired and it did not, which is the only reason anybody
+    // looked. Stripping prose then found four more in shipped code.
+    //
+    // The direction is counter-intuitive and worth stating: a seam with no
+    // consumer accumulates explanation in exactly the proportion that it lacks
+    // calls, so a naive count reports the unwired member as consumed with the
+    // highest confidence in the tree.
+    const commentOnly = checkSeamConsumers(
+      Object.keys(seam),
+      (f) => (f === "src/shell/keys.ts" ? "void 0; // request\n" : (seam[f] ?? "")),
+      {},
+    );
+    expect(
+      commentOnly.map((v) => v.message.split(" ")[0]).sort(),
+      "a name mentioned only in a comment is not a consumer",
+    ).toEqual(["CompletionEngine.cancel", "CompletionEngine.request", "CompletionEngine.spinning"]);
+
+    // **The allow-list is what keeps it honest**, and it must actually exempt:
+    // an entry with no effect is an exception list that reports compliance for
+    // the case it was written to permit.
+    const exempted = checkSeamConsumers(Object.keys(seam), (f) => seam[f] ?? "", {
+      "CompletionEngine.cancel": "why",
+      "CompletionEngine.spinning": "why",
+    });
+    expect(exempted, "a named member is exempt").toEqual([]);
+  });
+
+  it("MG25 fires: an exported function no other file in src/ names", () => {
+    // **Fabricated from the real first run**, where 7 of 281 came back and the
+    // two shapes below were both in it: a producer with no driver
+    // (`assignOffsets`) and a name that appears only inside a comment
+    // (`backoffOf`, described in four and called in none).
+    const tree: Record<string, string> = {
+      "src/shell/refresh.ts":
+        "export function assignOffsets(parts: unknown[]) { return parts; }\n" +
+        "export function backoffOf(ms: number) { return ms; }\n" +
+        "export function watchStall(id: string) { return id; }\n",
+      // The consumer that exists, so the fixture is not vacuous — and the
+      // comment that must not count as one, which is the discriminator MG24's
+      // header got wrong and this rule turns on.
+      "src/shell/execution.ts": "watchStall('e1');\n// backoffOf is the A02 §7 rule\n",
+    };
+    const files = Object.keys(tree);
+    const read = (f: string): string => tree[f] ?? "";
+
+    const violations = checkFunctionConsumers(files, read, {});
+    expect(
+      violations.map((v) => v.message.split(" ")[0]).sort(),
+      "the producer with no driver and the one named only in prose — not the wired one",
+    ).toEqual(["assignOffsets", "backoffOf"]);
+    expect(violations[0]?.rule).toBe("MG25");
+    expect(violations[0]?.message).toContain("a producer with no consumer");
+
+    // A constant is out of scope by construction, and that is the correction
+    // that makes the rule usable: MG24's header measured this rule over every
+    // export, found it dominated by constants a test asserts against, and
+    // rejected it. Narrowing to functions is what answers that, so it is
+    // asserted rather than assumed.
+    expect(
+      checkFunctionConsumers(["src/a.ts"], () => "export const UNDO_LIMIT = 100;\n", {}),
+      "a constant exported for a test to assert against is not this rule's business",
+    ).toEqual([]);
+
+    // The allow-list exempts...
+    expect(
+      checkFunctionConsumers(files, read, { assignOffsets: "why", backoffOf: "why" }),
+      "a named function is exempt",
+    ).toEqual([]);
+
+    // ...and is compared by **equality**, which is the arm that keeps it read.
+    // Membership alone is how SS40's scope, CP6's surfaces and MG24's own first
+    // form each became too permissive: the entry is judged once and everything
+    // after it inherits the judgement.
+    const stale = checkFunctionConsumers(files, read, {
+      assignOffsets: "why",
+      backoffOf: "why",
+      watchStall: "wired since this entry was written",
+    });
+    expect(stale, "an entry excusing nothing is itself a violation").toHaveLength(1);
+    expect(stale[0]?.message).toContain("no longer an unconsumed export");
   });
 
   it("every SP rule has a fabrication in the file that owns the parser", () => {
@@ -387,13 +693,58 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
 
   it.each(FABRICATED)("$rule fires on a fabricated violation", ({ rule, file, source }) => {
     const read = (f: string): string => (f === file ? source : "");
-    const violations = rule.startsWith("MG")
-      ? checkModuleGraph([file], read)
-      : checkSourceScans([file], read);
+    const violations =
+      rule === "MG23"
+        ? checkOneStorePerComponent([file], read)
+        : rule.startsWith("MG")
+          ? checkModuleGraph([file], read)
+          : checkSourceScans([file], read);
 
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+  });
+
+  it("SS40's annotation is honoured on all three branches, and is a claim", () => {
+    // The lookahead sat on the `.length` alternative alone, so `.charAt(` and
+    // `.slice(` had no escape hatch — and C17 needs one, because slicing a
+    // *grapheme array* is the operation the rule is asking for rather than the
+    // one it forbids. A rule with no way to say "this is correct here" is a
+    // rule people route around by renaming the variable.
+    //
+    // Asserted per branch rather than once: the widening is a change to a
+    // regex, and a regex edit that silently covered two of three would leave
+    // exactly the branch nobody tested unannotated. `make enforce` would print
+    // `ok` either way.
+    const annotated: Record<string, string> = {
+      "src/interaction/editor/graphemes.ts": [
+        "const n = clusters.length; // graphemes-ok",
+        "const head = clusters.slice(0, at); // graphemes-ok",
+        "const first = row.charAt(0); // graphemes-ok",
+      ].join("\n"),
+    };
+
+    const clean = checkSourceScans(Object.keys(annotated), (f) => annotated[f] ?? "");
+
+    expect(
+      clean.filter((v) => v.rule === "SS40"),
+      "an annotated grapheme-array operation is the remedy, not a violation",
+    ).toHaveLength(0);
+
+    // And the annotation is a claim about the expression, not a licence for the
+    // line: the same three without it are three violations, one per branch.
+    const bare: Record<string, string> = {
+      "src/interaction/editor/graphemes.ts": [
+        "const n = clusters.length;",
+        "const head = clusters.slice(0, at);",
+        "const first = row.charAt(0);",
+      ].join("\n"),
+    };
+
+    expect(
+      checkSourceScans(Object.keys(bare), (f) => bare[f] ?? "").filter((v) => v.rule === "SS40"),
+      "each branch fires on its own",
+    ).toHaveLength(3);
   });
 
   it("MG21 permits escapes.js, and permits a type-only capability import", () => {
@@ -620,17 +971,63 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
    * the component that will make them implementable. An entry here is a rule
    * that is NOT being enforced, and saying so is the point.
    */
-  const PENDING_RULES: Record<string, string> = {
+  /**
+   * A pending entry is one of two things, and conflating them is what let MG14
+   * sit unenforced for two components.
+   *
+   * A **string** is a reason that will never come true on its own — a fold, or
+   * a condition no component's arrival satisfies. Nothing can expire it; A03 §2
+   * says the fold is the only exit and something has to take it deliberately.
+   *
+   * A **`waitsOn`** names a component, and it is a claim the suite can check:
+   * when that component lands, the rule is implementable and the entry is a
+   * lie. That is the other half of A03 §2's class — a reason false when it was
+   * written versus a reason that has since become false — and only the second
+   * half can be caught mechanically. It is, below.
+   */
+  type Pending = string | Readonly<{ waitsOn: string; why: string }>;
+
+  const PENDING_RULES: Record<string, Pending> = {
     SS5: "folded into SS4's scope — SS4 covers all of src/viewport/, so a second rule with the same pattern and a contained scope could never fire on anything SS4 misses. The SS12-into-SS11 precedent",
-    SS6: "C16",
-    SS7: "C17",
-    SS8: "C19",
-    SS9: "C20",
+    // **Folded, and it is the fourth instance of the class and the first the
+    // suite caught rather than a person.** SS6 forbids clock reads in `input/`;
+    // SS1 forbids them across all of `src/` with one named exception, so SS6
+    // could never fire on anything SS1 misses — the SS5-into-SS4,
+    // SS12-into-SS11 and SS7-into-SS1 precedent. Its reason was false when it
+    // was written and additionally named a directory that never existed: C16
+    // implements into `router/`.
+    //
+    // What is new is how it surfaced. It sat pending on C16, C16 landed, and
+    // nothing looked — until `waitsOn` made "the blocker has arrived" a thing
+    // the suite can ask.
+    SS6:
+      "folded into SS1's scope — SS1 bans clock reads across all of src/ with " +
+      "one named exception, so a rule scoped to `input/` could never fire on " +
+      "anything SS1 misses. Fourth instance of the pending-entry-false-at-birth " +
+      "class, and the first found by the `waitsOn` check rather than by hand",
+    SS7:
+      "folded into SS1's scope — SS1 bans clock reads across all of src/ with one " +
+      "named exception, so a rule scoped to `editor/` could never fire on anything " +
+      "SS1 misses. The SS5-into-SS4 and SS12-into-SS11 precedent, and the third " +
+      "instance of A03 §2's pending-entry-false-at-birth class: C17's arrival is " +
+      "what made it visible, because the component said to be blocking it is the " +
+      "one that proves it could not fire",
+    SS8:
+      "folded into SS1's scope — SS1 bans clock reads across all of src/ with one " +
+      "named exception, so a rule scoped to `completion/` could never fire on " +
+      "anything SS1 misses. The fourth instance of the fold, and the third whose " +
+      "blocking component turned out to be the proof it could not fire: C19's " +
+      "arrival is what made it visible",
     SS12: "C10 — folded into SS11's scope for now",
     SS18: "C10 — needs the block-producing module list",
-    SS22: "C19",
-    SS29: "C23",
-    SS30: "C18, C19",
+
+    // **SS29 is gone, folded into MG23.** It waited on C23, C23 landed, and the
+    // rule did not survive being written: as a source scan over `src/shell/` its
+    // only in-scope file is C23 itself, which reaches four stores by design and
+    // is the component the rule exists to permit. The sentence C23 §2 argues is
+    // about L1–L3, where reaching a store means importing one — a module-graph
+    // question. Fourth instance of the pending-entry-covered-at-birth class,
+    // after SS5, SS6, SS7 and SS8, and the second found by `waitsOn`.
 
     // SS31, SS32 and SS38 were here, each saying "implemented in
     // dependencies.mjs, not source-scans.mjs" — which is not a pending rule but
@@ -645,14 +1042,10 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     // difference between a rule not yet built and a rule nobody remembers.
     MG2: "nothing — implementable today, and the general form of MG13/MG18",
 
-    // The rest of the MG family, which this check could not see until it read
-    // more than `SS` rows. Each waits on the component whose directory it scopes
-    // to; none of these exists, so the rule would have nothing to match.
-    MG14: "C16",
-    MG15: "C17",
-    MG16: "C18",
-    MG17: "C19",
-    MG18: "C20",
+    // The rest of the MG family was here, waiting on the components whose
+    // directories they scope to. MG18 was the last of them and it went with
+    // C20: `src/interaction/history/` exists, so the rule has something to
+    // match and the entry became the lie this check exists to catch.
   };
 
   /**
@@ -769,6 +1162,31 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     },
   );
 
+  it("no pending rule waits on a component that has already landed", () => {
+    // **The half of A03 §2's pending class that a machine can see.** A reason
+    // false at birth cannot expire and needs the fold; a reason that *becomes*
+    // false has a moment, and this is it. Nothing was looking at that moment:
+    // MG14 waited on C16, C16 landed, C17 landed after it, and the rule sat
+    // unenforced through both while reporting exactly like a satisfied one.
+    //
+    // On its first run it found MG14 and SS6 — one rule to build and one to
+    // fold, both stranded by the same commit two components back.
+    const landed: string[] = [];
+    for (const [id, entry] of Object.entries(PENDING_RULES)) {
+      if (typeof entry === "string") continue;
+      const path = COMPONENT_SOURCES[entry.waitsOn];
+      if (path !== undefined && defaultIsImplemented(path)) {
+        landed.push(`${id} waits on ${entry.waitsOn}, which is built (${path})`);
+      }
+    }
+
+    expect(
+      landed,
+      `${landed.join("; ")} — implement the rule, or fold it and say what it folds into. ` +
+        `A pending entry whose blocker has arrived is indistinguishable from an enforced rule.`,
+    ).toEqual([]);
+  });
+
   it("nothing listed pending has quietly been implemented", () => {
     // The other direction, for the same reason the scope list checks its own
     // exemptions: a pending entry that outlives its reason is a rule everyone
@@ -793,6 +1211,80 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     );
 
     expect(phantom, `${phantom.join(", ")} is listed pending but A03 has no row`).toEqual([]);
+  });
+
+  /**
+   * The same equality, one column over — and the hole it closes was found by
+   * being told to look for it.
+   *
+   * 14b compares rule **ids**. A row can therefore name a scope the code does
+   * not have and omit one it does, forever, in both directions and silently:
+   * SS24's row said `table/`, `plot/`, `parser/` while the code said `table/`,
+   * `plot/`, `patch/` — one scope inventoried and unimplemented, one
+   * implemented and uninventoried, and every set comparison in this file
+   * satisfied by the id alone.
+   *
+   * **Both directions matter, and they fail differently.** A path in the row
+   * that the code does not have is a rule the reader believes covers ground it
+   * does not. A path in the code that the row does not have is worse when it is
+   * an *allow* entry: a granted exemption that no document records, which is
+   * indistinguishable from a rule that has no exemptions at all.
+   *
+   * On its first run it fired on eight rows besides SS24. Every one was the row
+   * being out of date rather than the code being wrong, which is the direction
+   * this was expected to find and is not the direction it was written for.
+   *
+   * The reading rules, because the column is prose and not a data structure:
+   *
+   *   - A backticked token containing `/` or ending `.ts` is a path.
+   *   - A component id resolves through `COMPONENT_SOURCES` — SS1's "outside
+   *     C22" names `src/shell/session.ts` as surely as writing the path would.
+   *   - "anywhere" or "outside" in the cell names the whole tree, so a `src/`
+   *     scope is accounted for.
+   *
+   * Matching is by suffix, so a row may write `plot/` where the code writes
+   * `src/presentation/plot/`. A row is free to be shorter; it is not free to be
+   * about a different directory.
+   */
+  it("every SS row's scope column names the paths the rule actually scans and allows", () => {
+    const doc = readFileSync("docs/architecture/A03_enforcement_suite.md", "utf8");
+    const cells = new Map<string, string>();
+    for (const line of doc.split("\n")) {
+      const row = /^\|\s*(SS\d+)\s*\|[^|]*\|([^|]*)\|/.exec(line);
+      if (row?.[1] !== undefined && row[2] !== undefined) cells.set(row[1], row[2].trim());
+    }
+
+    const sources: Record<string, string> = COMPONENT_SOURCES;
+    const problems: string[] = [];
+
+    for (const scan of SCANS) {
+      const cell = cells.get(scan.id);
+      if (cell === undefined) continue; // 14b already reports a rule with no row
+
+      const scopes = Array.isArray(scan.scope) ? scan.scope : [scan.scope];
+      const code = [...scopes, ...scan.allow];
+
+      const quoted = [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? "");
+      const prose = quoted.filter((t) => t.includes("/") || t.endsWith(".ts"));
+      const named = [
+        ...prose,
+        ...[...cell.matchAll(/\bC\d\d\b/g)].map((m) => sources[m[0]] ?? ""),
+        ...(/anywhere|outside/.test(cell) ? ["src/"] : []),
+      ].filter((p) => p !== "");
+
+      for (const p of prose) {
+        if (!code.some((c) => c.endsWith(p))) {
+          problems.push(`${scan.id}: the row names ${p}, which the rule neither scans nor allows`);
+        }
+      }
+      for (const c of code) {
+        if (!named.some((p) => c.endsWith(p))) {
+          problems.push(`${scan.id}: the rule reaches ${c}, which the row does not name`);
+        }
+      }
+    }
+
+    expect(problems, problems.join("\n")).toEqual([]);
   });
 
   it("every implemented rule is inventoried in A03", () => {

@@ -23,7 +23,7 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence, rowsDoc } from "../support/viewport.js";
-import { renderToLines } from "../../src/testing/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
 import type { RenderContext } from "../../src/presentation/blocks/index.js";
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
@@ -31,7 +31,7 @@ import {
   checkMeasurement,
   formatReport,
   uncoveredKinds,
-} from "../support/measurement-conformance.js";
+} from "../../src/testing/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);

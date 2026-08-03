@@ -82,6 +82,50 @@ export type SgrStyle = Readonly<{
 }>;
 
 /** Closes every attribute `sgr` can open. One reset, not five selective ones. */
+/**
+ * Cursor to row 1, column 1.
+ *
+ * Here rather than in the frame path because **every escape literal lives in
+ * this file** (A03 SS14, C01 I1) — the rule has no exception for "obvious" ones,
+ * and `\x1b[H` looks obvious in the same way `\x1b[2J` does, which is the one
+ * that would clear the scrollback.
+ *
+ * Not paired with a clear: the frame writes exactly `rows` full-width lines, so
+ * every cell is overwritten and a clear would only add a flash.
+ */
+export const CURSOR_HOME = "\x1b[H";
+
+/**
+ * Cursor to a 0-based row and column.
+ *
+ * `CURSOR_HOME` generalised, and here for its reason: every escape literal
+ * lives in this file. CUP is 1-based on the wire and every coordinate above
+ * this line is 0-based, so the conversion is here rather than at each call —
+ * one place to be off by one, and it is the place with the test.
+ *
+ * Clamped at the origin rather than trusting the caller: a negative row reaches
+ * the terminal as `\x1b[0;3H`, which most terminals read as row 1 and some read
+ * as an error, and the difference only shows on someone else's machine.
+ */
+export const cursorTo = (row: number, col: number): string =>
+  `\x1b[${String(Math.max(0, Math.floor(row)) + 1)};${String(Math.max(0, Math.floor(col)) + 1)}H`;
+
+/**
+ * Every SGR sequence, for measuring a line that already carries them.
+ *
+ * Here for SS14's reason and not as a convenience: the pattern contains the
+ * escape byte, so writing it in `presentation/text.ts` puts an escape literal
+ * in a second file — which is the rule C01 I1 exists to keep at one. C09 owns
+ * *what display width means*; this file owns *what an escape looks like*, and
+ * `displayCells` is the join.
+ *
+ * A fresh regex per call rather than a shared one: `g` carries `lastIndex`
+ * across calls, and a shared instance walked by two callers skips matches for
+ * whichever runs second. That is a defect that appears only under interleaving,
+ * which is the worst kind to find in a frame path.
+ */
+export const sgrPattern = (): RegExp => /\x1b\[[0-9;]*m/g;
+
 export const SGR_RESET = "\x1b[0m";
 
 /**

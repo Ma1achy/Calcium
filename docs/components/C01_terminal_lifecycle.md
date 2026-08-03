@@ -34,6 +34,9 @@ interface TerminalLifecycle {
   resume(): void;
   onResize(cb: (size: TerminalSize) => void): Disposable;
   onResume(cb: () => void): Disposable;   // fired after a SIGCONT re-acquisition
+  onInput(cb: (chunk: Uint8Array) => void): Disposable;   // raw bytes — I18
+  cursorSequence(at: Readonly<{ row: number; col: number }> | null): string;  // I19
+  size(): TerminalSize;                   // one frozen snapshot per call — I12a, §5
   readonly writer: NodeJS.WriteStream;    // the privileged handle — see I9
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -129,11 +132,15 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 - **I10** — A capability absent from the record is never acquired. No mouse in the record means no mouse sequence, ever.
 - **I11** — `released` is a terminal state. Every operation on a released instance throws except `release()` itself, which is a no-op (I2).
 - **I12** — `SIGWINCH` produces one coherent `{columns, rows}` snapshot per event (D31). Subscribers never see a mismatched pair. **Per signal, and not per frame** — `writer` is a live handle, so its `columns` is read by whoever holds it at the moment they read it, and nothing here guarantees a frame was composed against one width. §5 states the boundary; the frame path's snapshot belongs with whoever writes it.
+- **I12a** — `size()` reads `columns` and `rows` once, freezes them together and returns them. It is the only route to a dimension outside a `SIGWINCH`, and it is a method rather than a getter so that a caller wanting one snapshot writes one call — a getter reads like a property and invites two reads in one expression, which is the mismatched pair I12 exists to prevent. Unlike `onResize` it answers while `constructed`: C22 needs the size at construction step 5, before anything is acquired.
 - **I13** — `columns` and `rows` are read in this file and nowhere else in `src/`. Enforced by A03 SS42, and it is the fourth member of the same family as the clock, `process.env` and the escape literals: one place reads it, everything else is handed the value. Width is the axis that wraps, and a wrap scrolls the alternate screen.
 - **I14** — Failure to acquire the alternate screen is fatal and aborts before first paint. It is the only fatal case in the system (A02 §7).
 - **I15** — `SIGCONT` re-acquires terminal state and reports through `onResume`. It sets no flag: C01 states a fact about the terminal and L4 decides what it means, because a `contaminated` flag under two owners is the failure C01 exists to prevent, applied to itself (D53).
 - **I16** — `SIGTSTP` releases, removes its own handler, and re-raises with default disposition, so the shell's job control sees an ordinary stop rather than a process that swallowed it.
 - **I17** — Exit codes are `128 + signal`, per signal: 130 for `SIGINT`, 143 for `SIGTERM`, 129 for `SIGHUP`. One shutdown *path* is a property worth having; one shutdown *code* misreports a supervisor's signal as a user pressing Ctrl-C (D54).
+- **I18** — Raw stdin bytes reach subscribers only while the terminal is acquired. `acquire()` attaches the listener, `suspend()` **drops** it, `resume()` re-attaches, and `release()` drops it for good. The delivery is C01's rather than the shell's because the pause is a property of the transition: a listener the shell had to remember to remove would race the child for the same descriptor under `stdio: inherit`, and a forgotten removal shows up as a child dropping every other keystroke, with nothing in either component to point at. C21 I6 already refuses `handoff()` while raw mode is set; this is the same guarantee over the same window, made structural rather than conventional. **C01 delivers bytes and interprets none** — decoding is C16's (C16 §2), and a partially-decoded sequence spanning a suspension is the shell's to discard (C22 §4).
+- **I18a** — `attachInput()` resumes the stream as well as adding the listener, because `detachInput()` paused it. The pair is not symmetric on its own: `pause()` sets Node's `flowing` to `false`, and adding a `data` listener resumes a stream only when `flowing !== false` — so a re-attached listener sits on a stream nothing feeds, and every keystroke after the first handoff is lost with the session still drawing frames. Stated as its own invariant rather than folded into I18 because I18's subject is *who is attached when*, which is satisfiable in full while the terminal takes no input at all (§5).
+- **I19** — The cursor's visibility is C01's mode and its position is the frame's, so C01 returns the sequence and the frame writes it. `cursorSequence(at)` yields a move plus a show, or a hide when `at` is null; the drawer embeds it in the same `write` as the rows. Two reasons it is a string rather than a call, and the second is the one that decides it: the mode is C01's to hold and restore at release (I1), and the bytes must land inside the frame's single write — a separate call cannot be kept inside C03's synchronised-update window, and outside it the hide arrives after the rows on a terminal that honours the move immediately. **The order within the string is hide, move, show**, and the sync window does not make it moot: `synchronisedUpdate` is a capability, so the unwrapped path is real and on it a visible cursor is dragged across the frame by every row written.
 
 ---
 
@@ -219,7 +226,13 @@ Eight trappable handlers, registered by the constructor and named individually b
 
 Stated here rather than left to be inferred from the absence of an accessor, because the shape invites the wrong reading: I12 is a strong guarantee, `onResize` is the only route to a dimension, and the natural conclusion is that the width is handled. It is handled on the signal path only. `writer` is a `Proxy` over the real stdout whose `get` forwards to the target, so `columns` is not a value C01 hands out — it is a read performed by the consumer, at whatever moment the consumer performs it.
 
-**Not fixed here, deliberately.** An accessor with one caller and no rule requiring its use is worse than a documented gap: it looks like the problem is solved. What lands now is the boundary written down, and A03's rule that the width is read in this file and nowhere else — so a *second* live reader cannot appear quietly while the first is the one legitimate one.
+**Not fixed when this was written, deliberately.** An accessor with one caller and no rule requiring its use is worse than a documented gap: it looks like the problem is solved. What landed then was the boundary written down, and A03's rule that the width is read in this file and nowhere else — so a *second* live reader cannot appear quietly while the first is the one legitimate one.
+
+**Fixed now, because both conditions arrived together.** `size()` returns a frozen `TerminalSize` read once per call (I12a). C22 is the caller the paragraph above was waiting for, and it needs it twice over: the viewport takes `width` and `height` at construction (C14 §2), and the frame path needs one snapshot per frame. SS42 is the rule requiring its use — every other file in `src/` is already forbidden `.columns`, so the accessor is not an option beside a live read, it is the only legal route.
+
+**C22 is where the gap actually bit.** Two correct statements — *the viewport takes width and height* and *only this file reads them* — and the cell where they meet is C22's construction step 5, with no way to satisfy both. That is the structural shape C22 §3a is indexed for, and it was missed there because the table walks C22's own steps and this constraint lives in another component's invariant.
+
+`size()` is deliberately a method and not a getter: a getter reads like a property and invites being called twice in one expression, which is the two-widths failure this exists to prevent. A call site that wants one snapshot writes one call and passes the value down, as C22 §6 does with `now`.
 
 ### Suspend and resume
 
@@ -231,6 +244,14 @@ resume:   re-acquire from the same capability record
 `resume()` does not repaint and does not set a contamination flag — it has none. The L4 shell calls `scheduler.invalidate()` after `resume()` returns. C01 knows nothing about frames.
 
 **Release while suspended** (I8) is the case a signal creates: `SIGTERM` arrives while a child owns the terminal. C01 tears down its handlers and restores stdout, but emits no terminal sequence — the child owns the screen, and writing a reset into it would corrupt whatever the child is drawing. The child receives the signal from the process group independently.
+
+**Suspension drops the input listener rather than pausing it, and the bytes that arrive meanwhile are the child's** (I18). There is no queue behind a suspended terminal and there must not be one: between `suspend()` and `resume()` the child owns the terminal, every keystroke in that window was typed at the child, and delivering them to the shell afterwards would replay a `vim` session into the prompt. Losing them is the outcome, and it is the correct one — stated here because "lost input" reads as a defect wherever the reason is not beside it.
+
+**Re-attaching a listener is not enough to restart the flow, and this is I18a.** `detachInput()` pauses the stream as well as removing the listener, deliberately — a second subscriber elsewhere would otherwise keep the descriptor flowing and keep reading the child's keystrokes. But `pause()` sets Node's `flowing` to `false`, and `Readable.prototype.on("data")` resumes a stream only when `flowing !== false`. So the symmetric-looking pair is not symmetric: the drop has two effects and the re-attach had one, and after a handoff the listener is attached to a stream nothing feeds.
+
+**The measured symptom was a session that survives a handoff visually and not actually** — the alternate screen comes back, frames keep drawing, and no keystroke ever reaches the shell again. It was reproduced against the real shell for a whole stretch and diagnosed by a thirty-line probe below the framework: a `stdio: "inherit"` child costs the parent nothing, and the same probe with C01's own attach/detach shape around the spawn reproduces it exactly, reporting `paused=true listeners=1`. `resume()` on attach is the whole fix.
+
+**No test could have caught it, and that is the part worth recording.** T1.16 drives a fake stdin whose `pause` and `resume` are no-ops and whose `emit` delivers to any listener, so the double had no flowing state to get wrong — *a fake narrower than the interface it stands for cannot fail on the difference*, third instance. The remedy is the fake, not another assertion: it models `flowing` the way Node does, and T1.16 then fails against the unfixed source.
 
 Nested suspend is refused — `suspend()` while already suspended throws. There is no legitimate caller, and silently tolerating it would mask an orchestration bug in the shell.
 
@@ -259,6 +280,10 @@ Nested suspend is refused — `suspend()` while already suspended throws. There 
 17. `released` is terminal — a new instance is constructed per session; the transition table in §5 is exhaustive and every cell is tested (I11).
 18. Exit codes are 128 + signal, per signal: 130, 143, 129 (I17).
 19. The terminal's dimensions are read in one file, and I12's snapshot covers the signal path only. §5 states where the guarantee stops rather than leaving it inferred from the absence of an accessor, because the per-frame snapshot is the frame path's to make and a partial fix here would look like a whole one (I12, I13).
+19a. `size()` is that accessor, added when both of §5's conditions arrived — a caller that cannot work without it, and a rule requiring its use. It answers while `constructed`, because C22 takes the viewport's dimensions before anything is acquired (I12a).
+21. The cursor's visibility is C01's mode and its position the frame's; `cursorSequence` hands over the bytes so they land inside the frame's one write, hide before move before show (I19, C15 I19).
+20. Raw stdin bytes are delivered through `onInput` while acquired and not otherwise: `acquire()` attaches, `suspend()` drops, `resume()` re-attaches, `release()` drops. C01 delivers and never interprets, and the bytes typed at a suspended terminal belong to the child rather than to a queue (I18).
+20a. Re-attaching resumes: the attach is the inverse of the detach in both of its effects, not only in the listener. A shell that has suspended once otherwise draws frames forever and takes no input (I18a).
 
 ---
 
@@ -274,6 +299,10 @@ Fabricated `TerminalCapabilities`, a fake `WriteStream` capturing bytes. No real
   *Given* a record with every capability true. *When* `acquire()`. *Then* all six acquisitions occur exactly once; `1049h` is **first**; `setRawMode(true)` precedes any mouse or paste sequence. Relative order of `2004h`, `1002h` and `1006h` is unasserted — it is arbitrary, and pinning it would break on a harmless refactor.
 
 - **T1.2** (I6): release emits the exact inverse in reverse order.
+
+- **T1.17** (I19): `cursorSequence({row, col})` is a hide, then a move to that cell, then a show, **in that order within the one string**; `cursorSequence(null)` is a hide and no move. The order is the assertion, not the members: all three present in any order passes a set comparison and still drags a visible cursor across the frame on a terminal without synchronised update, which is a capability rather than a guarantee.
+- **T1.16** (I18, C20): bytes reach an `onInput` subscriber only while acquired. Written across the whole transition rather than as four cases, because the subject is the transition: before `acquire()` nothing arrives; after it, a chunk does; after `suspend()` the same chunk does not; after `resume()` it does again; after `release()` it does not. The chunk written during suspension is asserted **absent from the subscriber and not buffered**, which is the half a per-state test would pass while queueing.
+- **T1.16b** (I18a): the fake stdin models Node's `flowing`, so the resumption after `suspend()` is a claim about a stream that can be stopped. `pause()` sets it false, `resume()` true, adding a `data` listener resumes only when it is not already false, and `emit` delivers to nobody while paused. Written as a property of the double rather than as a fifth case of T1.16, because the defect it exposes is one T1.16 already claimed to cover and could not: the double had no state the source could get wrong (§5).
   *Given* an acquired instance. *When* `release()`. *Then* captured bytes are `1006l · 1002l · 2004l · 25h · 1049l` and `setRawMode(false)` was called once.
 
 - **T1.3** (I10, C8): absent capabilities emit nothing.
@@ -335,6 +364,8 @@ Where the real defects live.
 - **T3.16** (I8, C15): `SIGTERM` while suspended → handlers disposed, stdout restored, zero terminal bytes emitted, exit **143**. The child is untouched.
 - **T3.17** (I12): `SIGWINCH` fires → `columns` and `rows` are each read exactly once, and every subscriber receives the same frozen object. "Never sees a mismatched pair" is not directly observable; read-once-and-freeze is, and it is what makes the claim true. Asserted with a stream whose `columns` getter mutates `rows`.
 - **T3.18**: `SIGWINCH` arrives while suspended → no subscriber is notified; the dimensions belong to the child.
+- **T3.18b** (I12a): `size()` reads `columns` and `rows` exactly once per call and returns them frozen together — asserted with T3.17's stream, whose `columns` getter mutates `rows`, so a second read inside one call produces a pair that cannot have coexisted. A stable fake would pass whether the accessor read once or twice, which is the setup where both readings agree.
+- **T3.18c** (I12a): `size()` answers while `constructed`, before any acquire, because C22 takes the viewport's dimensions at construction step 5. It is the one dimension route that is not gated on state.
 - **T3.19**: `SIGWINCH` fires three times in one tick → three notifications, not one. C01 does not coalesce, and neither does C03: `resize` is immediate there and cannot be given a window (C03 §3, C03 I2). Nothing in the system debounces it (D31).
 - **T3.20**: `acquire()` while suspended → throws a named error. `resume()` is the intended call and the ambiguity is not tolerated.
 - **T3.21**: `acquire()` after `release()` → throws. `released` is terminal; the handlers are gone and a revived instance would hold state nothing releases.
@@ -351,6 +382,7 @@ Real components, still no real terminal.
 - **T4.2** (with C03, C7): the shell's `resume()` → `scheduler.invalidate()` sequence causes C03's next `commit()` to issue a full repaint. Asserted on the shell orchestration, since C01 has no contamination concept.
 - **T4.3** (with C03): C03 never writes while `acquired` is false.
 - **T4.4** (with the L4 shell): the documented `suspend → handoff → resume` sequence runs in order, and the child receives an un-raw stdin on the primary screen.
+- **T4.4b** (I18, with C23): the input listener is gone **before** `runner.handoff` is called, asserted on the order in one event log rather than on the outcome. The outcome — the child got its keystrokes — passes on a machine where the parent's listener happens to lose the race, and fails intermittently everywhere else; the same class as `killAll` before release, where only the ordering is checkable.
 - **T4.5**: startup ordering — the composition root's steps 6, 7, 8 execute in that order, asserted by an event log rather than by reading the code.
 - **T4.6** (with C14): a `SIGWINCH` snapshot propagates to the viewport, which clamps scroll against it. C01 supplies the pair; it does not clamp.
 - **T4.7** (with the L4 shell and C03): a `SIGCONT` fires `onResume`, the shell calls `scheduler.invalidate()`, and the next `commit()` is a full repaint. The half of Edit A's reasoning that lives above L0.
@@ -397,6 +429,11 @@ Tests whose only job is to fail loudly if a specific invariant is quietly undone
 - **T6.11** (I11): making `released` re-acquirable → T3.21 fails. A revived instance holds terminal state with no handler registered to release it — precisely the window I3 exists to close.
 - **T6.12** (I1): emitting a mode-setting sequence from C03, or a `2026` marker from C01 → T2.8 fails. The transactional exception stays exactly one sequence wide.
 - **T6.13** (I9): giving Ink `process.stdout` rather than `lifecycle.writer` → T1.7 fails, because the renderer's writes become indistinguishable from foreign ones and land in the debug sink. This is the regression that makes single-owner stdout a claim rather than a property.
+- **T6.15** (I12a): making `size` a getter rather than a method → nothing fails, and that is the finding. **Structural guard** (A02 17a): the protection is the call syntax, which makes `size()` read as work and `size` read as a field, so `{ w: size.columns, h: size.rows }` is the natural thing to write against a getter and two reads is what it does. T3.18b catches the two reads *inside* the accessor; nothing can catch two reads by a caller except the shape that makes one call the obvious spelling.
+- **T6.18** (I19): moving the show before the move, or the move before the hide → T1.17 fails, and on a terminal without synchronised update the cursor is drawn at its old position for a frame.
+- **T6.16** (I18): making `suspend()` pause the listener instead of dropping it, or buffering while suspended → T1.16 fails on the chunk that arrives during suspension, which a queue delivers late rather than never. The regression is a `vim` session replayed into the prompt on resume.
+- **T6.18** (I18a): dropping the `resume()` from `attachInput()` → T1.16 fails at its fourth case, and C22's tier-5 handoff row fails on the keystroke after the child exits. It failed neither for a whole stretch, because the fake's `pause` was a no-op — so the pair that matters is the source and the double, and reverting either alone must be red.
+- **T6.17** (I18, C20): moving the attach out of `acquire()` and into the constructor → T1.16's first case fails. Bytes would then reach a shell whose terminal is not acquired, which is the window I3 closes for handlers, arriving through the one subscription that was not one of them.
 - **T6.14** (I13): reading `stdout.columns` in a second module — the plausible version being a renderer that wants the width without being handed it → T2.10 fails, naming the file. The regression is not that the read is wrong on its own; it is that two readers at two moments in one frame is how a frame comes to be composed against two widths.
 
 ---

@@ -1,6 +1,7 @@
 // C05 tier 1 — unit. The loader's transition table, the parser's structural
 // rules, longest-match resolution, and every validation row in §3.
 import { describe, expect, it } from "vitest";
+import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
 import {
   ARG_TYPES,
   createManifestStore,
@@ -65,7 +66,13 @@ describe("C05 parse", () => {
 
     expect(Object.isFrozen(result.value)).toBe(true);
     expect(result.value.binary).toBe("widget");
-    expect(result.value.tools).toHaveLength(8);
+    // Nine from the fixture, plus the six `tui-kit` ships (C05 §3). Written as
+    // the sum rather than 15, so a change to either side names which moved.
+    expect(result.value.tools).toHaveLength(9 + FRAMEWORK_TOOLS.length);
+    expect(
+      result.value.tools.slice(-FRAMEWORK_TOOLS.length).map((t) => t.name),
+      "appended, so no index the app could read is shifted",
+    ).toEqual(FRAMEWORK_TOOLS.map((t) => t.name));
   });
 
   it("T1.5 (I3): unknown fields are ignored, at the top level and per tool", () => {
@@ -163,7 +170,7 @@ describe("C05 parse", () => {
     tools.push(structuredClone(tools[0]!));
 
     expect(errorsOf(parseManifest(source)).join("\n")).toMatch(
-      /tools\[8\]\.name: duplicate tool "ps", already declared at tools\[0\]/,
+      /tools\[9\]\.name: duplicate tool "ps", already declared at tools\[0\]/,
     );
   });
 });
@@ -289,6 +296,40 @@ describe("C05 validate", () => {
     const accepted = validateInvocation(ps(), ["--since=-1h"]);
     expect(accepted.ok, "--since=-1h is what the message recommends").toBe(true);
     if (accepted.ok) expect(accepted.args["since"]).toBe("-1h");
+  });
+
+  it("T1.19 (I19): interactive is refused with streams and with local, and accepted alone", () => {
+    // **The third half is the one that stops this being a blanket refusal.** A
+    // rule that rejected `interactive` outright satisfies the first two
+    // assertions exactly, and the field would then be unusable while both
+    // negative tests agreed it worked.
+    const findEdit = (source: Record<string, unknown>): Record<string, unknown> =>
+      (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "edit")!;
+
+    const withStreams = raw();
+    findEdit(withStreams)["streams"] = true;
+    expect(errorsOf(parseManifest(withStreams))).toContain(
+      'tools[6].interactive: "edit" declares both interactive and streams — a handoff gives ' +
+        "the terminal to the child and a stream reads its stdout into the transcript; " +
+        "drop whichever one the verb does not do",
+    );
+
+    const withLocal = raw();
+    findEdit(withLocal)["local"] = true;
+    expect(errorsOf(parseManifest(withLocal))).toContain(
+      'tools[6].interactive: "edit" is local and interactive — a local verb is handled ' +
+        "in-process and never spawned, so there is no child to hand the terminal to",
+    );
+
+    // And the field survives onto the `ToolDef`, which is what C23 reads.
+    const clean = parseManifest(raw());
+    expect(clean.ok, errorsOf(clean).join("\n")).toBe(true);
+    if (!clean.ok) return;
+    expect(clean.value.tools.find((t) => t.name === "edit")?.interactive).toBe(true);
+    // I3's leniency is not what carried it: an unknown field would be dropped,
+    // and a `takeOptionalBoolean` that was never added looks identical from
+    // outside unless something asserts the value arrived.
+    expect(clean.value.tools.find((t) => t.name === "ps")?.interactive).toBeUndefined();
   });
 
   it("T1.18 (I17): a conflict is reported once, whichever side declares it", () => {

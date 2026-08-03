@@ -11,7 +11,7 @@
  */
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Diff, Events, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
+import type { Comparison, Events, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphs, spinnerFrames } from "../glyphs.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
@@ -193,15 +193,15 @@ function comparisonTone(comparison: string | undefined): Tone {
   }
 }
 
-export const diffDefinition: BlockDefinition<Diff> = {
-  kind: "diff",
+export const comparisonDefinition: BlockDefinition<Comparison> = {
+  kind: "comparison",
 
   // Rows plus the header (§3). The header is not optional here, so the `+ 1` is
-  // unconditional — and `atLeastOne` never fires, which is correct: a diff with
-  // no rows is still a header.
-  measure: (block: Diff): number => atLeastOne(block.rows.length + 1), // cells-ok
+  // unconditional — and `atLeastOne` never fires, which is correct: a comparison
+  // with no rows is still a header.
+  measure: (block: Comparison): number => atLeastOne(block.rows.length + 1), // cells-ok
 
-  render(block: Diff, ctx: RenderContext): ReactElement {
+  render(block: Comparison, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
     // Three equal columns (§3), the residual going to the field name.
     const column = Math.max(1, Math.floor((width - COLUMN_GAP * 2) / 3));
@@ -213,9 +213,15 @@ export const diffDefinition: BlockDefinition<Diff> = {
         [
           { text: pad("field", fieldWidth), style: dim },
           { text: " ".repeat(COLUMN_GAP) },
-          { text: pad("before", column), style: dim },
+          // **`a` and `b`, not `before` and `after`** — the rename's ruling,
+          // which the renderer had never taken. Positional rather than
+          // directional, because S07's two runs have no before-and-after: it
+          // compares two runs, and calling one of them "before" is wrong for
+          // half this kind's consumers. Nothing asserted these labels, which is
+          // why the type carried `a`/`b` while the screen said otherwise.
+          { text: pad("a", column), style: dim },
           { text: " ".repeat(COLUMN_GAP) },
-          { text: pad("after", column), style: dim },
+          { text: pad("b", column), style: dim },
         ],
         width,
         ctx.capabilities,

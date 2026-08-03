@@ -5,6 +5,7 @@
 // waits on C16 and on L4 — assertions about focus and about `/clear`, neither of
 // which has a component yet.
 import { describe, expect, it } from "vitest";
+import { pipelineHarness, settled } from "../support/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { appendPatch, docOf, tableWithDetails } from "../support/transcript.js";
@@ -131,8 +132,73 @@ describe("C13 integration", () => {
     expect(viewport.visible().entries).toEqual(before.entries);
     expect(viewport.scroll.topRow).toBe(12);
   });
-  it.todo(
-    "T4.6 (with C16): only the live entry appears in the focusable set; frozen entries never do, streaming or not — waits on C16",
-  );
-  it.todo("T4.7 (with L4): /clear empties the transcript and leaves C20's history intact — waits on C22 and C20");
+  // T4.6 is resolved from C16's side, against real instances of both components:
+  // `test/integration/router.test.ts`. Kept as a pointer rather than duplicated,
+  // because the assertion needs a router to ask and this file has none.
+  it("T4.7 (with C23, C20): /clear empties the transcript and leaves history intact", async () => {
+    // **The two stores answer different questions** — what is on screen, and
+    // what was typed — and C13 I16 is that clearing one does not clear the
+    // other. Conflating them is how `/clear` destroys work.
+    //
+    // Asserted through the pipeline rather than by calling `clear()`, because
+    // the claim is about the *command*: `/clear` is a local handler and C23
+    // holds the registry, so C13 alone cannot show it.
+    const h = pipelineHarness({
+      history: [
+        { command: "/ps", ts: 1, exitCode: 0 },
+        { command: "/tail", ts: 2, exitCode: 0 },
+      ],
+    });
+
+    h.pipeline.submit("/ps");
+    await settled();
+    expect(h.transcript.entries.length, "something to clear").toBeGreaterThan(0);
+
+    h.pipeline.submit("/clear");
+    await settled();
+
+    // The `/clear` entry itself is what remains: the command ran and said so.
+    expect(
+      h.transcript.entries.map((e) => e.doc.command),
+      "emptied, then its own notice",
+    ).toEqual(["/clear"]);
+
+    h.pipeline.submit("/history");
+    await settled();
+    const listing = h.transcript.entries.at(-1);
+    expect(
+      JSON.stringify(listing?.doc.blocks),
+      "C20 is untouched — both commands are still there",
+    ).toContain("/tail");
+  });
+
+  it("T4.10 (C13 §6, C14 I-cache): a shell patch on a settled entry invalidates the cached height", () => {
+    // **The case the origin gate creates and nothing else could.** Before it, a
+    // settled entry could never change, so C14's cache slot for one was correct
+    // forever. Now the shell can patch it — a refusal notice, an expansion — and
+    // the height moves.
+    //
+    // C14 keys on `(entryId, rev, width)` and invalidates from the returned
+    // `rev`, so it should hold unchanged. **Asserted rather than assumed**,
+    // because a fast path treating settled as static would read as a correct
+    // optimisation until this op existed, and would be wrong silently: a stale
+    // height is a viewport describing a document it no longer holds.
+    const transcript = createTranscriptStore();
+    const viewport = createViewport(transcript, { width: W, height: 40, measureSequence });
+
+    const id = transcript.append(rowsDoc(3, "e"), { streaming: true });
+    transcript.settle(id);
+
+    // Measured and cached. `totalRows` is the sum C14 keeps per entry, so it is
+    // the value a stale slot would hold.
+    const before = viewport.scroll.totalRows;
+    expect(before, "the entry has a height").toBeGreaterThan(0);
+
+    // The shell says something about it. One block more, so the height moves.
+    const out = transcript.patch(id, appendPatch("refused"), "shell");
+    expect(out).toMatchObject({ ok: true });
+
+    expect(viewport.scroll.totalRows, "the cache did not serve a height for a document that changed")
+      .toBeGreaterThan(before);
+  });
 });

@@ -49,9 +49,9 @@ At 100 columns:
 ▌   ≡ a3f9b21   ≡ 7c2d4e1   { } json
 ```
 
-**Both regions are `diff` blocks, and a `diff` always carries a header.** The
+**Both regions are `comparison` blocks, and a `comparison` always carries a header.** The
 metrics region was drawn without one, which made it five rows where the block
-renders six — C04 §3 gives a `diff` `rows + header` and C09 §3 gives it `rows +
+renders six — C04 §3 gives a `comparison` `rows + header` and C09 §3 gives it `rows +
 1`, unconditionally in both. Making the header optional would give the kind a
 height rule that branches on a flag, which is what C04 §3 refuses in the
 paragraph explaining why `diff` and `patch` are separate kinds.

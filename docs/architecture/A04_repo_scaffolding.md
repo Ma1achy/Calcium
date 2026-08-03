@@ -135,9 +135,14 @@ Each declares its terminal as `xterm-256color` with a UTF-8 locale, and each als
 | `make golden` | Golden frames, four widths × two themes × two unicode modes | minutes |
 | `make e2e` | Tier 5, PTY harness | minutes |
 | `make audit` | `npm audit --audit-level=high`, dependency-manifest check | < 10 s |
+| `make hooks` | Points `core.hooksPath` at `.githooks`; run by `make install` | — |
 | `make all` | Everything above | — |
 | `make conformance` | `prism-tui` only — the boundary contract (A01 §6) | — |
 | `make record` | `prism-tui`, `docker-tui` — fixture recording and `--diff` | — |
+
+**A `pre-commit` hook runs `make enforce` too, and running it three times is the point.** CI catches it, the pre-MR habit catches it, and the hook catches it before either — because the two gates above it are discipline and discipline is what fails on the commit where someone is concentrating on something else. That is not hypothetical here: a commit landed on a red `make enforce` during C16's build, because the only gate was an `&&` chain in a typed command and the chain ran past the failure.
+
+A layer violation committed is a layer violation that has had time to be depended upon, and five seconds is cheaper than the revert. `--no-verify` still works deliberately: a hook that cannot be bypassed gets uninstalled, and one that can be bypassed gets bypassed visibly, in a flag someone has to type.
 
 `make enforce` is the target that makes A03 real. Seventy-one assertions specified and never executed are an honour system; a five-second target that fails an MR is a rule.
 

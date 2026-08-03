@@ -1,10 +1,10 @@
 // The boundary conformance suite (A01 §6). The wiring gate, and C08's T2.2.
 //
-// DESTINATION: `src/testing/`. A04 §5 gives `make conformance` to the apps, and
-// R01 §8 has the reference app running it in CI — so a consumer runs this, which
-// makes it public surface eventually. It lives in `test/support/` until C24
-// exists to export it, for the same reason `measurement-conformance.ts` does: an
-// export nothing consumes is what CLAUDE.md forbids, and today nothing does.
+// **Arrived**, alongside `measurement-conformance.ts` and for the same reason.
+// A04 §5 gives `make conformance` to the apps and R01 §8 has the reference app
+// running it in CI, so a consumer runs this and it is public surface; it waited
+// in `test/support/` only until C24 §7 had somewhere to export it from. Moved
+// **unchanged apart from its import paths**.
 //
 // Written the same way and for the same reasons: **no test runner** — it returns
 // failures as data and the caller asserts — and **parameterised**, over a
@@ -24,8 +24,8 @@
 // to deliver, a process to time — and are reported as SKIPPED rather than passed.
 // **A skip is recorded, not silent** (R01 §8, C08 T5.4): a suite that quietly
 // counts an unrunnable assertion as green is the vacuity failure A03 §2 names.
-import type { Manifest } from "../../src/data/manifest/index.js";
-import type { Fixture, RawPatch, RawResult } from "../../src/data/transport/index.js";
+import type { Manifest } from "../data/manifest/index.js";
+import type { Fixture, RawPatch, RawResult } from "../data/transport/index.js";
 
 /** A01 B4. Cancellation is 130 and renders as `partial`, never `error`. */
 export const EXIT_CODES: readonly number[] = [0, 1, 2, 130];

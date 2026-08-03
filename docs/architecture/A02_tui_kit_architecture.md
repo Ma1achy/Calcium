@@ -158,15 +158,56 @@ Array order **is** the priority. Focus is derived on every dispatch from what is
 
 No component reaches sideways or upward to cause an effect in another. Where an effect must cross, **L4 sequences it**:
 
-| Effect | Sequence |
-|---|---|
-| Child process needing a TTY | `lifecycle.suspend()` → `runner.handoff()` → `lifecycle.resume()` → `scheduler.invalidate()` |
-| Theme switch | `theme.setVariant()` → `scheduler.invalidate()` |
-| Scroll | `viewport.scroll()` → `scheduler.commit("input")` |
-| History recall | `history.previous()` → `editor.setText()` |
-| Command submit | `parser.parse()` → `transport` → `adapters` → `transcript.append()` → `scheduler.commit()` |
+| Effect | Sequence | Owner |
+|---|---|---|
+| Child process needing a TTY | `lifecycle.suspend()` → `runner.handoff()` → `lifecycle.resume()` → `scheduler.invalidate()` | C23 |
+| Theme switch | `theme.setVariant()` → `scheduler.invalidate()` | C23 |
+| Scroll | `viewport.pageUp()` etc → `scheduler.commit("input")` — C14 moves, C22 commits (C14 I12) | C22 |
+| Resize | C01's `onResize` snapshot → `viewport.resize()` → `scheduler.commit("resize")`; C14 captures its anchor before dropping the cache (C14 I8) | C22 |
+| History recall | `history.previous()` → `editor.setText()` → **not** `history.resetNavigation()` (C20 I3) | C23 |
+| Command submit | `parser.parse()` → `editor.clear()` → `transport` → `adapters` → `transcript.append()` → `router.resetFocus()` → `scheduler.commit()`, **then at settlement** `history.append(line, exitCode)` | C23 |
+| Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — never pop-and-repush (C19, C15 §2) | C23 |
+| History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` | C23 |
+| Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) | C23 |
+| Resume from `SIGCONT` | C01's `onResume` → `scheduler.invalidate()` — the same call an orchestrated `resume()` makes, because C01 sets no contamination flag (C01 §Signals) | C22 |
+| Terminal too small | size gate → C22's layout-engine-free fallback → `onResize` → resume the normal frame, state intact (C22 §4) | C22 |
+| Shutdown | `session.stopping = true` → `lifecycle.release()` (which runs `beforeRelease`) → diagnostics → exit (C22 §8) | C22 |
+| Pop a pushed view | `overlays.pop()` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) | C23 |
+| Stall detected | inject a notice patch → `commit("stream")` (C23 §3b, I25) | C23 |
+| View refresh tick | `fetch()` → patch the layer → `commit("stream")` (C23 §3b) | C23 |
+| Identity notice | C22's identity loop signals → compose → `transcript.append` with `origin: "refresh"` → `commit` (C22 §7, C23 §3b) | C23 |
+| `cd` / `export` | apply to `session` → `commit` | C23 |
 
 This is the rule that keeps L0's two halves unaware of each other and keeps L1 and L2 unaware of the terminal. It has caught four attempted violations during specification — contamination, invalidation, scroll commits and handoff — and it is the first thing to check when a component wants a dependency that feels awkward.
+
+**The owner column, and six rows that were missing.** The table listed five sequences when it was written, and every seam added since C15 landed went into the component spec that needed it and not into this table: `resetFocus()` on append (C16 I2), C19's menu push and `update`, C20's search layer and its three-way `searchEnd`, C20's suppressed `resetNavigation`, C25's fullscreen view, and C22's own three. Each is a real cross-layer effect and each was already specified somewhere; what was missing is the one place that says *all* of them are L4's, which is the only form in which the rule is checkable.
+
+The owner column exists because "L4" now means two components. A row owned by C23 is not C22's to implement, and without the column the difference is a judgement each reader makes again.
+
+**The submit row's order is `append → resetFocus → commit`, and it was wrong here until C23.** It read `append → commit → resetFocus`. C23 §4 and its T4.7b have the correct order and the reason: a reset issued *after* the commit paints one frame with focus in a block that has just been frozen, and a reset issued before the append is undone by nothing. The ordering is the whole content of that row, so the table was carrying a row that would have produced the defect it exists to prevent.
+
+### Seam 4 has no owner, and that is the finding
+
+This table has been wrong or incomplete at **every component that touched it**, in a different way each time:
+
+| Found at | What was wrong |
+|---|---|
+| C15 → C20 | Six rows missing entirely — every seam added since C15 went into the component spec that needed it and not into this table |
+| C16 | `resetFocus()` recorded as a subscription; it is a call |
+| C22 | No owner column, so "L4 owns it" named two components |
+| C23 | The submit row's order stale; `Scroll` listed with two owners; three C23-owned rows absent while C23 I13 claims the table holds all of them |
+
+Six independent errors of six different kinds is not a run of bad luck. It is the signature of a **duplicated source of truth with no reconciliation**: every row exists twice, once here and once in the owning component's own orchestration section, and nothing compares the copies. The project already names this class in four places — C05 T1.7c's list derived from the thing it checks, C22's `STEPS` against a test carrying its own copy of the order, SS30's second implementation of a shared primitive, SS35's second `Result`. Seam 4 is the same shape and is the **only artefact several components write to and none owns**. Everything else shared has a mechanism: A03's rules have implementations, `COMPONENT_SOURCES` has TD3, invariants have SP1 and SP2.
+
+So it is one structural problem, not six errors, and the fix is a mechanism rather than a seventh correction. **The shape is an equality check, both directions** — every row here names its sequence in its owner's spec, and every orchestrated sequence in a component's spec appears here. A subset check in either direction misses one of the two failures actually observed: C15–C20's rows were missing *from here*, and C23's three are missing *from there*. That is TD0's and commitment 14b's lesson — an exemption or an inventory compared by containment only ever grows.
+
+The alternative considered was deriving this table from the component specs entirely. It removes the hand-maintained copy, which is better in principle, and it is rejected for now: this table sits inside an argument, and a generated table inside argued prose goes stale in the other direction — the paragraphs around it stop matching and nothing notices. Keeping both copies and comparing them by equality is the arrangement A03 already uses for every other shared thing.
+
+**Writing the check found four more missing rows, in the direction a subset check would not look.** `Pop a pushed view`, `Stall detected`, `View refresh tick` and `cd` / `export` were all declared in C23 §4 and absent here — the second direction firing before the rule existed, which is the argument for equality made by the thing it was arguing about.
+
+**And it found the asymmetry underneath.** C23 has a §4 that lists what it orchestrates; C22 had nothing equivalent, so five of this table's rows had no counterpart to compare against at all. Half a table cannot be checked against half a convention. C22 §3c now lists its five, keyed by the same Effect names, and that keying is itself a requirement: "Submit" here and "Command submit" there is drift no cheap check can see through.
+
+The rule lands with its implementation, per A03 commitment 14b.
 
 ### Seam 5 — the five extension hooks
 
@@ -215,7 +256,9 @@ Order is load-bearing; three steps are not reorderable.
 
 ### Shutdown
 
-One function, five callers — `/exit`, Ctrl-D confirm, double Ctrl-C, signal, fault. Flush history → release terminal → print diagnostics if any → exit with the caller's code. Release precedes printing so faults land in the real scrollback.
+One function, five callers — `/exit`, Ctrl-D confirm, double Ctrl-C, signal, fault. Set `stopping` → release the terminal → print diagnostics if any → exit with the caller's code. Release precedes printing so faults land in the real scrollback.
+
+**Killing children and flushing history are inside `beforeRelease`, not steps of their own.** This line used to read "flush history → release terminal", which is the shape C22's earlier draft had and the reason it double-flushed: C01 runs `beforeRelease` once before the first release, so a flush written as a separate step runs beside it rather than instead of it, and a duplicated history entry is the result. C22 §8 is authoritative and this is the summary of it.
 
 ---
 
@@ -353,6 +396,10 @@ Six tiers per component: unit, contract, edge, integration, e2e, fail-on-revert.
 
 The rule earns its place by finding gaps: applied to C01 it surfaced four untested transitions and forced an undecided question — whether a released instance can be re-acquired.
 
+**A fail-on-revert entry whose revert nothing catches is a signpost, not a gap.** The tier's usual form is *change X → test Y fails*, and some guards are structural rather than asserted: the change is possible, it breaks no test, and what prevents it is a shape in the code — an exhaustive union, a handler registration, a type that will not construct. C16 T6.4d is the first written this way, where reimplementing a ladder as an independent list would pass everything and merely be free to drift again.
+
+Those entries **say which category they are in and name the structure that carries them**, because read cold they are indistinguishable from a test nobody finished. The alternative is worse: inventing an assertion that looks like a guard puts a green tick where the protection is not, which is A03 §2's family arriving in the one tier written to prevent it.
+
 **The reference app is the acceptance signal for the framework**, not Prism.
 
 ---
@@ -376,6 +423,7 @@ The rule earns its place by finding gaps: applied to C01 it surfaced four untest
 15. A failed terminal acquire is the only fatal case, because it is the only failure with no place to render itself.
 16. Performance budgets in §7 are measured in M-T3, not asserted.
 17. Six test tiers, not seven. Behaviour cross-cuts scope and is carried by the existing tiers.
+17a. A fail-on-revert entry with no failing test names itself as a structural guard and names the structure, rather than reading as an unfinished one.
 18. Every stateful component enumerates its transition table; invalid transitions are tier-3 tests.
-19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one.
+19. Cross-layer effects are sequenced by L4; no component reaches sideways or upward to cause one. Seam 4's table names **every** such sequence and which of the two L4 components owns it — a seam specified only in the component that needs it is not checkable as a rule.
 20. **Every commitment cites an invariant, several, or another spec's.** §1's two rules for whose claim a commitment is are mechanical, not advisory: A03 SP1 fails the build on a commitment with no marker, on a citation naming an invariant its spec does not declare, and on a cross-reference that does not resolve. Self-referential deliberately — this is the document that states the rule, so it is the document that commits to it.

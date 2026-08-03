@@ -471,8 +471,9 @@ to an architecture commitment (A02 1, 2, 20; A03 6, 15; A04 2, 3, 4).
 
 ## Fourth pass — citations that resolve against the wrong invariant
 
-**Five known instances as of 2026-07-30.** Not found by a pass; accumulated by
-people reading specs in order to implement against them.
+**Seven known instances as of 2026-07-31**, over six rows — the C22 pair is one
+row and two instances. Not found by a pass; accumulated by people reading specs
+in order to implement against them.
 
 | Where | Cites | Means |
 |---|---|---|
@@ -480,12 +481,44 @@ people reading specs in order to implement against them.
 | C13 T1.7b, T6.11 | I14 | I13 — `rev` bumps on every applied patch |
 | C13 T2.4 | I13 | I18 — C13 imports nothing from `terminal/` or `presentation/` |
 | C14 I13 | C13 I13 | C13 I14 — the eviction marker is a real entry |
+| B03 §3 | C16 I13 | C16 I2 — the stored focus location resets on append |
+| C19 commitment 7 | I5, and §4 | I16, and §5 — acceptance and its delimiter |
+
+**Seven for seven on one detection method.** Every instance was found while
+*applying* a decision, never while reviewing one — the sixth surfaced during C16's
+spec pass, when amending A01 D7 meant reading every document that depended on it,
+and the seventh during C19's, while working out where the second `Tab`'s state
+lived. That is the argument for the by-hand walk sitting in CLAUDE.md's Always list
+rather than being offered as a courtesy to components that look tricky.
+
+**The seventh is the first with two axes, and the second one has no invariant to
+resolve against.** C19 commitment 7 cited I5 — the tokeniser and quoter — for a
+claim about the acceptance algorithm, which is the class exactly: a resolving
+citation pointing at an unrelated invariant. It also cited **§4** for a sentence
+that lives in **§5**, and nothing checks section references at all. SP3 resolves
+invariant ids because they are ids; a `§` is prose, and the same wrongness in it is
+not merely unmechanised but unmechanisable by the tooling that exists. It is worth
+recording that the two travelled together in one clause, because the reading that
+produced one produced the other: the author knew what the commitment meant and was
+writing pointers from memory rather than resolving them.
+
+The remedy is the one this section already reaches — a qualified reference is
+immune, and the by-hand walk is the only pass either kind gets.
+
+**And a companion class the fourth pass had not named: dependants of a *clause*.**
+D7 carried two promises in one row and four documents cited it, one of which — B03's
+canonical drill path — was downstream of the clause that a ruling proposed to drop.
+SP3 resolves ids, so it can see that `A01 D7` exists; nothing can see that a *half*
+of D7 is load-bearing somewhere else. The practice that closes it is procedural
+rather than mechanical: **when a ruling amends a decision rather than a component,
+grep the decision id before taking the ruling, not after.** Taking it first cost one
+reversal here.
 
 **This is the third pass's third kind of A03 defect, arriving from the other
 side.** That pass found SS37 declaring C09 I4 for behaviour that is C09 I15, and
 MG21 declaring a § where an invariant now exists — rules pointing at the wrong
-invariant. These four rows are specs and tests doing the same thing. The class is
-one class; only the citing document differs.
+invariant. The rows above are specs, tests and now a commitment doing the same
+thing. The class is one class; only the citing document differs.
 
 **A dangling reference is not inert — it arms itself when the number gets used.**
 The C22 pair is the case with a date attached. C01 declared no I17 for months, so
@@ -500,7 +533,14 @@ the citing text and the invariant's — which is precisely the heuristic this au
 opens by rejecting, and for a reason that has not weakened: a commitment is the
 *readable* form of an invariant, so it deliberately shares few words with it, and
 the noise floor sits above the signal. Sixty false positives is the measured cost,
-and it is paid to find a defect whose whole population is four rows.
+and it is paid to find a defect whose whole population is six rows.
+
+**The population grows about one per component, which is the number to watch.**
+It read "four rows" while the table held five and then six, because the prose was
+written once and the table was appended to — the count is the kind of figure that
+goes stale silently, so it is stated in two places deliberately and both are
+updated together. If the rate ever climbs above one per component, the argument
+against a mechanism is worth reopening; at this rate it is not.
 
 **A qualified reference is immune.** `C01 I17` cannot silently become correct for a
 different spec, because the spec is named. Bare ids are fine where a file's owner

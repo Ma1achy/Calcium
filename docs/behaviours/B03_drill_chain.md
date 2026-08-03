@@ -30,6 +30,10 @@ There are exactly two, and confusing them is the mistake this document exists to
 | Costs | Vertical space, forever | Nothing; it is transient |
 | Owner | C23 §2 | C15 |
 
+**A pop appends nothing, and a drill-in appends the command it ran.** The dashboard's one-line "trace" is not a trace at all — it is `/ps <uuid>`, an ordinary entry from an ordinary command — which is why it survives A01 D7 dropping the trace and the logs `esc` does not need one. The two look like the same thing and are one step of each column: `⏎` on a run row is an **Append** step that happens to pop a layer on its way; `esc` from the logs view is a **Push** step reversed, and reversing a push touches the transcript exactly as much as making one did.
+
+That asymmetry is worth stating because the obvious reading is that both pops should record something, and the mechanism forbids it: a record is an entry, an entry freezes its predecessor, and the block a pop returns to is the one whose selection D7 preserves. **The cost is real and is not hidden here**: a logs excursion leaves no transcript record, because the push that opened it left none either.
+
 **Append is the default and push is the exception**, because appending keeps both things. Drilling from `/ps` into a run detail leaves the list above it, frozen, with the row you came from still visible. You have not swapped one view for another; you have accumulated two.
 
 Push exists only where the thing genuinely needs the whole screen and its own letter keys — logs and the dashboard, and nothing else (A01 D4).
@@ -51,7 +55,7 @@ Push exists only where the thing genuinely needs the whole screen and its own le
 
 Seven steps and three mechanisms. The properties that make it work are all about what *survives*:
 
-**Selection survives a push.** `esc` from the logs view returns to the detail with the same action focused. C16 stores focus as a location and resets it only on append (C16 I13) — a push preserves it, which is what A01 D7 requires and what makes `esc` feel like going back rather than starting over.
+**Selection survives a push.** `esc` from the logs view returns to the detail with the same action focused. C16 stores focus as a location and resets it only on append (C16 I2) — a push preserves it, and the pop appends nothing, which is what A01 D7 requires and what makes `esc` feel like going back rather than starting over.
 
 **The list survives the drill.** It is frozen, not replaced. Scrolling up shows it with the original row still rendered as it was.
 

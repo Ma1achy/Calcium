@@ -2,10 +2,16 @@
 // can be written against it.
 import { readdirSync, statSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SCAN_BUDGET_MS } from "../support/budget.js";
+
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { capabilities, fakeStdin, fakeStdout } from "../support/fake-terminal.js";
+
+// This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
+// default is not a margin. Re-measure before raising it.
+vi.setConfig({ testTimeout: SCAN_BUDGET_MS });
 
 const live: TerminalLifecycle[] = [];
 
@@ -46,7 +52,17 @@ describe("C01 contract", () => {
   it("T2.1: every member of TerminalLifecycle is present; the flags are getters", () => {
     const lifecycle = build();
 
-    for (const member of ["acquire", "release", "suspend", "resume", "onResize", "onResume"]) {
+    for (const member of [
+      "acquire",
+      "release",
+      "suspend",
+      "resume",
+      "onResize",
+      "onResume",
+      // A method, not a getter (I12a) — so it belongs in this list rather than
+      // beside `writer` below, and `typeof === "function"` is what says so.
+      "size",
+    ]) {
       expect(typeof (lifecycle as unknown as Record<string, unknown>)[member], member).toBe(
         "function",
       );

@@ -4,12 +4,16 @@
 // objects: a real capability record, a real lifecycle, and C01's own `writer`
 // as the injected `write`. The rest name their blocker in a greppable form.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildSession } from "../support/session.js";
+import { pipelineHarness, settled } from "../support/execution.js";
+import { displayCells } from "../../src/presentation/text.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { createTerminalLifecycle, type TerminalLifecycle } from "../../src/terminal/lifecycle.js";
 import { createFrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import type { FrameScheduler } from "../../src/terminal/frame-scheduler.js";
 import { fakeStdin, fakeStdout, MODES } from "../support/fake-terminal.js";
 import { fakeClock } from "../support/fake-scheduler.js";
+import { createEditor } from "../../src/interaction/editor/index.js";
 
 const live: TerminalLifecycle[] = [];
 
@@ -185,13 +189,158 @@ describe("C03 integration", () => {
   // The blocker clause is everything after "waits on", so the reasoning lives
   // here rather than in the title — a title reading "waits on C22. Neither C13
   // nor C14 …" names three blockers, two of which exist, and the rule fires.
-  it.todo(
-    "T4.4: a transcript append issues one commit(stream), and a burst inside one 16 ms window is one frame — waits on C22",
-  );
-  it.todo(
-    "T4.5: a keystroke issues commit(input) and the frame is drawn before the next keystroke is processed — waits on C17",
-  );
-  it.todo(
-    "T4.6: typing while a stream commits at 16 ms intervals — every keystroke frame immediate, none behind a stream frame — waits on C17. T3.23 asserts the same property deterministically and does not wait on it",
-  );
+  it("T4.4 (with C23, C13): a submission issues one commit, and a stream burst coalesces", async () => {
+    // **A02 §4 gives transcript writes to the pipeline**, so this is C03's claim
+    // from the side that actually appends. Two halves, and the second is the one
+    // C03 exists for: a thousand log lines a second must not be a thousand
+    // frames.
+    const h = pipelineHarness();
+
+    h.pipeline.submit("/ps");
+    await settled();
+    expect(
+      h.commits.filter((c: string) => c === "input"),
+      "one submission, one input commit — not one per block",
+    ).toHaveLength(1);
+
+    // A burst of stream patches: each commits `"stream"`, and coalescing is
+    // C03's to do from there. What C23 must not do is commit `"input"` per
+    // patch, which would bypass the window entirely.
+    const streamed = pipelineHarness({
+      stream: () =>
+        (async function* () {
+          for (let i = 0; i < 20; i += 1) yield { kind: "data", value: {} } as never;
+        })(),
+    });
+    streamed.pipeline.submit("/tail");
+    await settled();
+
+    expect(
+      streamed.commits.filter((c: string) => c === "input"),
+      "the pending append, and nothing else at input priority",
+    ).toHaveLength(1);
+    expect(
+      streamed.commits.every((c: string) => c === "input" || c === "stream" || c === "completion"),
+      "every commit names a documented class (C23 I8)",
+    ).toBe(true);
+  });
+  it("T4.9 (with C22): a resize mid-frame cannot produce a two-width frame", async () => {
+    // **The test `docs/notes/resize-and-compositor.md` specifies**, at the scope
+    // where the property lives. Compose at 100, let the terminal become 80
+    // before the next write, and assert that what was written is internally
+    // consistent — a too-long line is a wrong frame, but the wrap it causes
+    // scrolls the alternate screen, and that is unrecoverable.
+    //
+    // The subject that can tell the two apart is a size that changes between
+    // the compose and the read. If anything downstream re-read it, some rows
+    // would be 100 cells and some 80.
+    // **A real session, not `buildGraph`.** That harness stubs `render` with a
+    // counter, so nothing it builds ever paints — a test about what reaches the
+    // terminal would be measuring the harness.
+    // **Per frame, not per width, and the first draft of this test had it
+    // wrong.** A frame written *after* the resize is correctly at 80 — C03
+    // treats `resize` as an immediate commit, so the repaint composes at the
+    // new size. The property is not "every frame is 100"; it is that no single
+    // frame mixes two widths, which is what wraps.
+    const { stdout, resize } = await buildSession({}, { columns: 100, rows: 30 });
+
+    const before = stdout.chunks.length;
+    resize({ columns: 80, rows: 30 });
+
+    // Every frame written since, examined on its own.
+    // **A frame is no longer `HOME` and rows.** It is hide, `HOME`, the rows,
+    // then the cursor's position and show — one write, because the cursor's
+    // bytes have to land inside C03's synchronised-update window (C01 I19). So
+    // the rows are what sits between `HOME` and the cursor sequence closing the
+    // frame. The `startsWith` this replaced matched nothing after that change,
+    // and the guard below is what said so rather than the assertions passing
+    // vacuously over an empty set.
+    const HOME_SEQ = "\u001b[H";
+    const HIDE_SEQ = "\u001b[?25l";
+    const frames = stdout.chunks
+      .slice(before)
+      .filter((c) => c.includes(HOME_SEQ))
+      .map((c) => {
+        const body = c.slice(c.indexOf(HOME_SEQ) + HOME_SEQ.length);
+        const end = body.indexOf(HIDE_SEQ);
+        return (end === -1 ? body : body.slice(0, end)).split("\r\n");
+      });
+
+    // **The subject, before the claim.** A set of one is satisfied by a set of
+    // none, so a frame that was never written would pass — the inert-subject
+    // class this suite has now met five times.
+    expect(frames.length, "a frame was actually written").toBeGreaterThan(0);
+
+    for (const [i, rows] of frames.entries()) {
+      const widths = new Set(rows.map(displayCells));
+      expect(rows, `frame ${String(i)}: 30 rows`).toHaveLength(30);
+      expect(widths.size, `frame ${String(i)}: composed at ${[...widths].join(", ")}`).toBe(1);
+    }
+  });
+
+  it("T4.5 (with C17): a keystroke's frame is drawn before the next keystroke is processed", () => {
+    // Against a real editor, which is what the deferral was waiting for. The
+    // property is about *ordering*, not about the buffer, so the assertion is
+    // that the frame for keystroke n exists before keystroke n+1 reaches the
+    // editor — a scheduler that coalesced input would leave the user typing
+    // ahead of the screen, which is the one latency nobody tolerates.
+    const { scheduler, lifecycle, render } = wire();
+    lifecycle.acquire();
+
+    const editor = createEditor();
+    const drawn: string[] = [];
+    render.mockImplementation(() => drawn.push(editor.text));
+
+    for (const ch of [..."git push"]) {
+      const before = render.mock.calls.length;
+      editor.insert(ch);
+      scheduler.commit("input");
+      expect(
+        render.mock.calls.length,
+        `"${ch}" drew no frame before the next keystroke`,
+      ).toBe(before + 1);
+    }
+
+    // And each frame saw the buffer as it was at that keystroke, in order. The
+    // count alone passes for a scheduler that draws eight identical frames.
+    expect(drawn).toEqual(["g", "gi", "git", "git ", "git p", "git pu", "git pus", "git push"]);
+    expect(editor.text).toBe("git push");
+  });
+
+  it("T4.6 (with C17): a keystroke never queues behind a stream frame", () => {
+    // The interleaving the deferral names: a stream committing on its 33 ms
+    // window while someone types. `input` is immediate and `stream` is not
+    // (§3), so every keystroke draws on the spot and the stream's pending frame
+    // is what waits — not the other way round.
+    const { scheduler, lifecycle, clock, render } = wire();
+    lifecycle.acquire();
+
+    const editor = createEditor();
+    const reasons: string[] = [];
+    render.mockImplementation(() => reasons.push(editor.text === "" ? "stream" : "input"));
+
+    scheduler.commit("stream");
+    expect(render, "a stream frame waits for its window").not.toHaveBeenCalled();
+
+    // Typed inside the stream's window. Each draws immediately, and the stream's
+    // frame has still not been drawn.
+    for (const ch of [..."ls"]) {
+      editor.insert(ch);
+      scheduler.commit("input");
+    }
+    expect(reasons, "two keystrokes, two immediate frames").toEqual(["input", "input"]);
+
+    // And the stream's pending frame is **absorbed** rather than drawn late.
+    // I4's reason — the pending frame would draw the same state — so the
+    // keystroke's frame carries the stream's content and the timer is
+    // cancelled. Written this way because the first draft asserted a third
+    // frame after the window and there is none: typing during a stream costs
+    // the stream nothing and delays nobody.
+    clock.advance(50);
+    expect(
+      render.mock.calls.length,
+      "the keystroke's frame carried the stream's content; no late frame follows",
+    ).toBe(2);
+    expect(scheduler.pending).toBe(false);
+  });
 });

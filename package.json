@@ -35,7 +35,7 @@
     "enforce": "node tools/enforce/index.mjs",
     "test": "vitest run --dir test --exclude '{e2e,golden}/**'",
     "golden": "vitest run --dir test/golden",
-    "e2e": "npm run build && vitest run --dir test/e2e",
+    "e2e": "npm run build && vitest run --dir test/e2e --no-file-parallelism",
     "audit": "npm audit --audit-level=high"
   },
   "dependencies": {

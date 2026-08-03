@@ -24,7 +24,7 @@ import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";
 import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
-import { checkAsciiParity, formatReport } from "../support/measurement-conformance.js";
+import { checkAsciiParity, formatReport } from "../../src/testing/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);

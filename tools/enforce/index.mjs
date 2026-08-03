@@ -2,13 +2,19 @@
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
 import { readdirSync, statSync } from "node:fs";
-import { checkModuleGraph } from "./module-graph.mjs";
+import {
+  checkFunctionConsumers,
+  checkModuleGraph,
+  checkOneStorePerComponent,
+  checkSeamConsumers,
+} from "./module-graph.mjs";
 import { checkSourceScans } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import {
   checkCommitments,
   checkOrdering,
   checkReferences,
+  checkSeamFour,
   referenceFiles,
   specFiles,
 } from "./commitments.mjs";
@@ -30,6 +36,11 @@ const references = referenceFiles();
 const { violations: refViolations, resolved } = checkReferences(references);
 const violations = [
   ...checkModuleGraph(files),
+  // MG23 — one store per component above L0. SS29 folded here: as a source
+  // scan its only in-scope file would have been its own exception.
+  ...checkOneStorePerComponent(files),
+  ...checkSeamConsumers(files),
+  ...checkFunctionConsumers(files),
   ...checkSourceScans(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),
@@ -40,6 +51,10 @@ const violations = [
   // SP2 — the numbers locate what they name. SP3 — and everything that cites
   // one of them resolves, which for eleven hundred references nothing did.
   ...checkOrdering(specs),
+  // SP4 — Seam 4 and its owners agree, both directions. The only artefact
+  // several components write to and none owns, wrong at every one that touched
+  // it, because every row exists twice and nothing compared the copies.
+  ...checkSeamFour(),
   ...refViolations,
 ];
 

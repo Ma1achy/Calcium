@@ -275,8 +275,19 @@ export const scripts = {
     return [
       "node",
       "-e",
-      `process.stdout.end();const t=setInterval(()=>{},1000);` +
-        `process.stdin.on("end",()=>{clearInterval(t);process.exit(0)});process.stdin.resume()`,
+      // **One way to die inside the window under test, and a backstop far
+      // outside it.** This exited 0 on stdin ending, which gave the child two
+      // deaths racing: T3.5 signals `SIGKILL` and asserts the exit carries it,
+      // and under load stdin reached EOF first, so the child exited cleanly and
+      // the row failed as `{code: 0}` against `{signal: "SIGKILL"}` — a fixture
+      // race wearing the shape of a runner defect. Once in three full runs.
+      //
+      // The 30 s backstop exists so a test that fails before signalling cannot
+      // leave the interval holding the child open forever, and it exits 3 so
+      // that a backstop firing is legible rather than looking like the clean
+      // exit this used to race with.
+      `process.stdout.end();setInterval(()=>{},1000);` +
+        `setTimeout(()=>process.exit(3),30000);process.stdin.resume()`,
     ];
   },
 

@@ -14,7 +14,21 @@ expectations, which is the same reason C02 takes its `env` by injection.
 | `fixture.mjs` | The program tier 5 runs inside a PTY. Imports `dist/`, not `src/` |
 
 | `world.ts` | `fakeWorld()`, `worldResult()`, `steppableClock()` — a constant `WorldDriver` double for C08's resolver, which is not "the world" for I14's purposes |
-| `boundary-conformance.ts` | A01 §6's B1–B8 suite, parameterised over a transport or a corpus |
+
+**Two files left this directory for `src/testing/`** — `measurement-conformance.ts`
+and `boundary-conformance.ts`. Both were written here under an explicit
+`DESTINATION:` header because C24 §7 exports them to consumers and an export
+nothing consumes is forbidden; C24 exists now, so they moved. They were written
+runner-free and parameterised for exactly that day, and it cost their import
+paths.
+
+**One thing to take from how that went.** A file waiting to move is a file
+outside the rules of the place it is going: two `src/`-scoped source scans fired
+the moment `measurement-conformance.ts` arrived, on a local width function whose
+own comment already said it must be replaced on arrival. The deferred instruction
+and the scan that enforces it met on the same commit by luck. If something here
+carries a `DESTINATION:` header, the scans at the destination are part of the
+move.
 
 ---
 
@@ -56,6 +70,12 @@ Two things follow for anyone adding a helper here.
   `SIGTERM` passes identically when the child died. `scripts.ignoring` announces
   each caught signal on stdout instead: a line written after delivery cannot come
   from a dead process.
+- **A parameter that is missing and unwanted is recorded, not added.**
+  `runInPty` hard-codes 80 × 24 and takes no size option, where `interactivePty`
+  takes `cols` and `rows`. The asymmetry is real and no row needs it. Adding the
+  option would create the exact thing this file's first rule is about — a
+  parameter with no caller, and so no test that it takes effect — so it is written
+  down here instead, where the next row that wants it will find it.
 - **A parameter with no observable effect is a finding, not a gap to skip.** It
   may mean the parameter should not exist yet. `measurable({ tick })` is
   observable through exactly one block kind — `steps` with an `active` step is
@@ -128,6 +148,33 @@ move the content" and "there was no content that could have moved."
 
 ---
 
+## An exception annotation is a claim, not a suppression
+
+`// cells-ok` and `// graphemes-ok` exempt a line from SS23 and SS40. Neither
+means "the scan complained here". Each is an assertion about the expression it
+sits on, and it is read as one by the next person to touch the line:
+
+| Mark | What it claims |
+|---|---|
+| `// cells-ok` | this `.length` is not a display width — a count of rows, palette levels, children, errors |
+| `// graphemes-ok` | this operates on a **grapheme array** or a non-text value, where index arithmetic is correct |
+
+The distinction is most of what the annotation is worth. SS23's comment records
+why sixteen `cells-ok` marks on colour arithmetic were refused in favour of one
+allow-list entry: putting a claim about display width on lines that have nothing
+to do with display width teaches the mark to mean "the scan complained", and
+after that it silences a real violation without anyone noticing. SS40 is one
+careless review from the same place, and it is the newer of the two.
+
+So: if the honest comment would be "I know, but", the line is a violation and
+the fix is the remedy the rule's `why` names — `cells()` for a width, a grapheme
+index for a position. If the expression genuinely counts something else, the
+mark states which, and a reviewer can check it.
+
+This lives beside the fixture rules because both answer the same question —
+what a test or a mark is allowed to assert about itself — and because SS40's
+annotation is what an author reaches for while writing C17.
+
 ## Two decisions made here that later components inherit
 
 Both were forced by one component and will silently shape every test written
@@ -161,3 +208,65 @@ asserts nothing.
 
 Any later component whose claim is about *latency* rather than about *ordering*
 wants this one, for the same reason.
+
+## The rule covers fakes, not only fixtures
+
+A fixture must be shown to respond to the thing under test before it is asserted
+against. **So must a fake**, and the inert class has migrated there.
+
+Twice in one file: `test/unit/execution.test.ts` stubbed `editor: {} as never`
+and an action test failed with `setText is not a function` — a finding about the
+harness wearing the shape of a finding about actions. The same file's table
+fixture was invalid, so `append` threw, the entry id was `undefined`, and every
+action read as fired from a frozen entry.
+
+Neither is a subtle failure once seen, and both cost a diagnosis each. A stub
+that exists to satisfy a type is a stub that will be called eventually, and
+`as never` is the shape that makes the call site look checked.
+
+### The default is the real constructor
+
+**Build a double from the component's own constructor unless there is a reason
+you cannot.** Not "write a fake and prove it responds" — that is the fallback,
+for the cases where a real collaborator would reach a network, a clock or a
+disk. Where the constructor is pure and dependency-free, the object literal is
+never the cheaper option; it is the one that fails silently later.
+
+Six doubles in one session satisfied a type and could not do the thing they
+stood in for:
+
+| Double | What it could not do |
+|---|---|
+| `fakeStdin`'s `on` | returned the stream and discarded the callback, so it could never deliver a byte |
+| `{ isRaw: false } as ReadStream` × 4 | had no `on` at all; ten tests failed the moment C01 called it |
+| `{ setText, text }` editor × 2 | had no `clear`, which C23's submit path gained (C23 I28) |
+
+None was bad luck. **The common factor is that all six were written to satisfy a
+signature rather than to stand in for a component** — and a signature is exactly
+what a later edit widens. `createEditor()` was available the whole time and takes
+no arguments; the literal was easier to type and inert.
+
+Inverting the default is cheaper as well as safer: a real double gains new
+methods when its component does, so the failure mode becomes a compile error or
+a loud call rather than a stub that quietly answers wrongly.
+
+Where a real one genuinely will not do, the original rule stands: give the fake a
+working implementation, or make the harness assert it is unused.
+
+## A tier-4 fake is a tier-4 defect
+
+The fixture rule generalises from an input to a **collaborator**.
+
+**A tier-4 claim is that two components agree.** So a fake on either side tests
+that the fake agrees with itself — which is not a weaker version of the claim, it
+is a different claim that happens to pass.
+
+`test/support/execution.ts` exists for that reason rather than for thoroughness:
+it builds a C23 pipeline with a **real** transcript, a real theme and a real
+session store. The unit harness in `test/unit/execution.test.ts` fakes
+everything, which is correct — tier 1's claim is about one component, and a real
+collaborator there would make a failure ambiguous about which side broke.
+
+The two harnesses are not a duplication to be merged. They encode the difference
+between the tiers, and merging them would mean one of the tiers stopped asserting
+what it is for.

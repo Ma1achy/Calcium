@@ -12,7 +12,7 @@
 // the sequence itself can only show that the pieces work when composed, never
 // that the application composes them.
 import { describe, expect, it } from "vitest";
-import { interactivePty, quitVi, runInPty } from "../support/pty.js";
+import { interactivePty, PROMPT, promptRow, quitVi, runInPty } from "../support/pty.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
 
@@ -111,7 +111,73 @@ describe("C21 e2e", () => {
   // asserted in `test/e2e/transport.test.ts`. It is C06's T5.2 as well, that is
   // where the expired deferral was, and the claim runs through the transport;
   // one sixty-second test rather than two.
-  it.todo(
-    "T5.5: quitting the session with three children running reaps all of them before the terminal is released — waits on C22",
+  it(
+    "T5.5 (C21 §killAll, C22 I5): quitting with three children running leaves no orphan",
+    async () => {
+      // **Narrowed rather than duplicated.** C22 owns *signalled before the
+      // terminal is released*, which is an ordering assertion on one event log.
+      // What is left over for C21 is the reaping itself, and the only honest
+      // place to ask it is the operating system: after the session is gone, is
+      // anything still running?
+      //
+      // That is a fact a fake cannot have (`spawning-facts-a-fake-cannot-have`).
+      // An in-process check of `runner.live` asserts the bookkeeping; `ps`
+      // asserts the children.
+      const pty = interactivePty(`${FIXTURE} session subprocess`, { cols: 100, rows: 24 });
+      const survivors = async (): Promise<string[]> => {
+        const { execFileSync } = await import("node:child_process");
+        const out = execFileSync("ps", ["-eo", "pid,args"], { encoding: "utf8" });
+        return out
+          .split("\n")
+          .filter((l) => l.includes("farside.mjs") && !l.includes("grep"))
+          .map((l) => l.trim());
+      };
+
+      try {
+        await pty.waitFor(PROMPT, 20_000);
+
+        // Three, because one child is a claim about a child and three is a
+        // claim about the loop that reaps them. `tail` is `streams: true`, so
+        // C23 releases the guard and the prompt stays usable (C23 I6) — which
+        // is what makes three simultaneous children reachable at all.
+        for (let i = 0; i < 3; i += 1) {
+          pty.type(`/tail file-${String(i)}`);
+          await pty.waitForFrame((f) => promptRow(f).includes(`file-${String(i)}`), 20_000);
+          pty.type("\r");
+
+          // **Waited on the child, not on the frame.** `f.includes("file-N")`
+          // matches the command echo the transcript draws (C22 I33), so it is
+          // true before anything is spawned — the next `/tail` then went out
+          // while this one was still starting and the run held two children
+          // rather than three. The control caught it; the claim would not have.
+          const upTo = Date.now() + 20_000;
+          while ((await survivors()).length < i + 1 && Date.now() < upTo) {
+            await new Promise((r) => setTimeout(r, 50));
+          }
+        }
+
+        // The control, and without it the assertion below holds against a
+        // session that never spawned anything.
+        const running = await survivors();
+        expect(running.length, `three children, saw ${String(running.length)}`).toBeGreaterThanOrEqual(3);
+
+        pty.type("/exit");
+        await pty.waitForFrame((f) => promptRow(f).includes("/exit"), 20_000);
+        pty.type("\r");
+
+        // Poll rather than sleep: reaping is not instantaneous and a fixed wait
+        // is either flaky or slow.
+        const deadline = Date.now() + 20_000;
+        let left = await survivors();
+        while (left.length > 0 && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 100));
+          left = await survivors();
+        }
+        expect(left, `orphans survived the session: ${left.join(" | ")}`).toEqual([]);
+      } finally {
+        pty.kill();
+      }
+    },
+    90_000,
   );
 });

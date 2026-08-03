@@ -10,7 +10,7 @@
  * to stay acyclic (§2, A03 MG3).
  */
 
-import { ALT_SCREEN, BRACKET_PASTE, CURSOR, MOUSE } from "./escapes.js";
+import { ALT_SCREEN, BRACKET_PASTE, CURSOR, MOUSE, cursorTo } from "./escapes.js";
 import type { TerminalCapabilities } from "./capabilities.js";
 
 export type TerminalSize = Readonly<{ columns: number; rows: number }>;
@@ -22,6 +22,45 @@ export interface TerminalLifecycle {
   resume(): void;
   onResize(cb: (size: TerminalSize) => void): Disposable;
   onResume(cb: () => void): Disposable;
+  /**
+   * Raw stdin bytes, while acquired and not otherwise (I18).
+   *
+   * C01 delivers and interprets nothing — decoding is C16's. The attachment is
+   * part of `acquire()` and the removal part of `suspend()`, so the window in
+   * which a child owns the terminal is one the shell cannot forget to close.
+   */
+  onInput(cb: (chunk: Uint8Array) => void): Disposable;
+  /**
+   * The frame's cursor, as bytes for the frame to write (I19).
+   *
+   * **A string rather than a call, and the second reason decides it.** The
+   * cursor's visibility is a mode this component holds and restores at release
+   * (I1), so nothing else may write it — but the bytes have to land inside the
+   * frame's single `write`, and a separate call cannot be kept inside C03's
+   * synchronised-update window. So the owner yields the sequence and the drawer
+   * embeds it.
+   *
+   * **Hide, then move, then show**, and the sync window does not make the order
+   * moot: `synchronisedUpdate` is a capability, so the unwrapped path is real,
+   * and on it a visible cursor is dragged across the frame by every row written
+   * after it. `null` hides and does not move — there is nowhere to move to.
+   */
+  cursorSequence(at: Readonly<{ row: number; col: number }> | null): string;
+  /**
+   * One frozen snapshot per call (I12a) — the only route to a dimension outside
+   * a `SIGWINCH`, and the reason SS42 can keep its single-file scope while the
+   * frame path needs a width.
+   *
+   * **A method, not a getter.** A getter reads like a property, and
+   * `{ w: size.columns, h: size.rows }` is then the natural spelling — two
+   * reads, which is the mismatched pair I12 exists to prevent. `size()` makes
+   * one call the obvious thing to write and the value the obvious thing to pass
+   * down.
+   *
+   * Answers while `constructed`, unlike everything else here: C22 takes the
+   * viewport's dimensions at construction step 5, before anything is acquired.
+   */
+  size(): TerminalSize;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -121,6 +160,24 @@ const EXIT_CODES: Readonly<Record<string, number>> = Object.freeze({
   SIGHUP: 129,
 });
 
+/**
+ * I12a, and the reason it is a free function as well as a method.
+ *
+ * **I13 is a rule about a file, not about an object.** C22 needs the terminal's
+ * dimensions at construction step 5, for the viewport, and the lifecycle is
+ * step 7 — and it cannot move earlier, because `beforeRelease` closes over the
+ * history store and the runner (C22 I1) and C01 takes it at construction. A
+ * method alone would have forced one of the two invariants to give.
+ *
+ * So the read lives here, in the one file allowed to perform it, and is
+ * reachable without an instance. `size()` delegates to it: one implementation,
+ * so the signal path, the frame path and the construction path cannot come to
+ * disagree about what a snapshot is.
+ */
+export function terminalSize(stream: Readonly<{ columns: number; rows: number }>): TerminalSize {
+  return Object.freeze({ columns: stream.columns, rows: stream.rows });
+}
+
 export function createTerminalLifecycle(opts: TerminalLifecycleOptions): TerminalLifecycle {
   const { stdout, stdin, capabilities, onFatal } = opts;
   const debug = opts.debug ?? ((): void => {});
@@ -129,7 +186,55 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   const held = new Set<HeldKey>();
   const resizeSubscribers = new Set<(size: TerminalSize) => void>();
   const resumeSubscribers = new Set<() => void>();
+  const inputSubscribers = new Set<(chunk: Uint8Array) => void>();
   let beforeReleaseRan = false;
+
+  // --- raw input delivery (I18) --------------------------------------------
+  //
+  // **Attached by `acquire()`, dropped by `suspend()`, and that is the whole
+  // point of it living here.** Under `stdio: inherit` the child reads the same
+  // descriptor, so a listener the shell forgot to remove races it for every
+  // byte — and the symptom is a child dropping every other keystroke, with
+  // nothing in either component to point at. C21 I6 already refuses `handoff()`
+  // while raw mode is set; this is the same guarantee over the same window,
+  // made part of the transition rather than a rule someone has to remember.
+  //
+  // Dropped rather than paused, and the bytes in between are lost on purpose:
+  // they were typed at the child. A queue would replay a `vim` session into the
+  // prompt on resume.
+  function onData(chunk: Buffer): void {
+    for (const cb of inputSubscribers) cb(chunk);
+  }
+
+  let listening = false;
+
+  function attachInput(): void {
+    if (listening) return;
+    listening = true;
+    stdin.on("data", onData);
+    // I18a — **the attach is the inverse of the detach in both of its effects.**
+    // `detachInput` pauses as well as removing, and `pause()` sets Node's
+    // `flowing` to `false`, which is the one state in which adding a `data`
+    // listener does *not* resume the stream. Without this the listener after a
+    // handoff sits on a stream nothing feeds: the shell keeps drawing frames
+    // and never takes another key.
+    //
+    // Cheap on the first attach — `resume()` on an already-flowing stream is a
+    // no-op — and the one line that makes `suspend`/`resume` reversible.
+    stdin.resume();
+  }
+
+  function detachInput(): void {
+    if (!listening) return;
+    listening = false;
+    stdin.off("data", onData);
+    // Explicit, not incidental: removing the last `data` listener pauses the
+    // stream in Node's flowing mode, but that is a consequence of there being
+    // no listeners rather than a statement about who owns the descriptor. A
+    // second subscriber elsewhere would keep it flowing and keep reading the
+    // child's keystrokes.
+    stdin.pause();
+  }
 
   // --- stdout redirection (I9) ---------------------------------------------
   //
@@ -231,6 +336,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   function releaseInternal(emitSequences: boolean): void {
     if (state === "released") return; // I2
 
+    detachInput(); // I18 — dropped for good; `released` is terminal (I11).
+
     if (!beforeReleaseRan) {
       beforeReleaseRan = true;
       try {
@@ -300,16 +407,15 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     process.exit(EXIT_CODES[signal]);
   }
 
+  const snapshotSize = (): TerminalSize => terminalSize(stdout);
+
   function onWinch(): void {
     // T3.18 — while suspended the dimensions belong to the child.
     if (state !== "acquired") return;
 
     // I12 — read each once, freeze, hand the same object to every subscriber.
     // Two reads per subscriber is where a mismatched pair would come from.
-    const size: TerminalSize = Object.freeze({
-      columns: stdout.columns,
-      rows: stdout.rows,
-    });
+    const size = snapshotSize();
     for (const cb of resizeSubscribers) cb(size);
   }
 
@@ -403,10 +509,18 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     }
 
     state = "acquired";
+
+    // Last, and after the state: a subscriber that dispatched a keystroke into
+    // a shell whose terminal is half-acquired is the window I3 closes for
+    // handlers, arriving through the one subscription that is not one (I18).
+    attachInput();
   }
 
   /** Releases what is held without touching `state` or the handlers. */
   function unwind(): void {
+    // Before the sequences, because a child takes the terminal the moment the
+    // suspension completes and the ordering is what T4.4b asserts (I18).
+    detachInput();
     for (const key of [...held].reverse()) {
       if (key === "stdout") continue;
       try {
@@ -453,6 +567,14 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     resume,
     onResize: (cb) => subscribe(resizeSubscribers, cb),
     onResume: (cb) => subscribe(resumeSubscribers, cb),
+    onInput: (cb) => subscribe(inputSubscribers, cb),
+    cursorSequence: (at) =>
+      at === null ? CURSOR.enter : `${CURSOR.enter}${cursorTo(at.row, at.col)}${CURSOR.leave}`,
+    // Not gated on state, and that is the one difference from everything above
+    // it: C22 needs the viewport's dimensions at construction step 5, before
+    // any acquire. There is nothing to be wrong about — reading the size of a
+    // terminal nobody has entered is still the size of the terminal.
+    size: snapshotSize,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).

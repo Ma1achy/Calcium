@@ -26,6 +26,10 @@ It is also the demo. Someone asking "what does it look like" gets shown this fir
 
 At 120 × 36:
 
+**The fence is a diagram, and its box is not rendered.** The outer border marks where the region begins and ends; `tui-kit` draws no frame around anything (S01 §3 — header, viewport, prompt, footer, and nothing between them). Counting the border gives two rows the terminal does not have, and the side rails give two cells every row does not have.
+
+Stated because the same picture produced a live ambiguity in S01, where the deferral asserting it could not be written for two commits while the figure and the arithmetic disagreed. `frameRows` in `test/support/surfaces.ts` strips the marks, so the convention is mechanical rather than remembered.
+
 ```
 ┌ ▲ prism · fmx-prod ──────────────────────── ● live · 14:23:07 · updated 3s ─┐
 │                                                                             │

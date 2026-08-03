@@ -75,19 +75,22 @@ type ToolDef = Readonly<{
   streams?:  boolean;                 // emits NDJSON patches rather than one document
   oneShot?:  boolean;                 // writes one frame to stdout and exits; bypasses the TTY gate
   hidden?:   boolean;                 // omitted from help and completion, still invocable
+  interactive?: boolean;              // takes the terminal — C23 §4's handoff (I19)
 }>;
 
 type Manifest = Readonly<{
   schema: "tui.manifest/1";
   binary: string;
   version: string;                    // the far side's version, for skew reporting
-  tools: readonly ToolDef[];
+  tools: readonly ToolDef[];          // every tool — what findTool and validation read
+  appTools: readonly ToolDef[];       // what the app wrote — §3
 }>;
 
 function parseManifest(raw: unknown): Result<Manifest, readonly ManifestError[]>;
 function findTool(m: Manifest, tokens: readonly string[]): ToolMatch | null;
 function visibleTools(m: Manifest): readonly ToolDef[];
 function validateInvocation(tool: ToolDef, argv: readonly string[]): ValidationResult;
+function suggestName(name: string, candidates: readonly string[]): string | undefined;
 
 interface ManifestStore {
   load(m: Manifest): void;
@@ -110,6 +113,40 @@ The list is a runtime constant with the type derived from it, so a new member wi
 ### `hidden` — invocable, not offered
 
 `visibleTools` omits a hidden tool; `findTool` still resolves it. That pair *is* the meaning of the field, and it is what makes it useful for a deprecation or an internal escape hatch: the verb keeps working for whoever knows its name while it leaves the help. A `hidden` that also stopped resolving would be a weak form of deleting the entry, and deleting the entry is how you delete a verb. T1.15 asserts the pair in one test, because separately both halves pass while the intent disappears between them.
+
+### `interactive` — the app author is the only party who knows
+
+A verb that drops into a REPL or opens an editor needs the terminal, and C23 §4's
+handoff row gives it one. **Nothing can work out which verbs those are.** Detection is
+not available — whether a child wants a TTY is not knowable before running it — and a
+maintained list of TTY program names is the shape C23 I26 forbids, wrong for every wrapper
+and alias, and silent when it is wrong. The app author knows that `prism shell` is a
+REPL and nobody else does, so the declaration lives beside the other things only they
+know.
+
+It is a `ToolDef` field for the same reason `streams` is: it describes how the verb
+behaves when invoked, which is what this type is for. C18 carries the whole `ToolDef`
+on an `app` result, so the flag reaches C23 with no parser change at all — one fact
+with one home, rather than a copy on the result and no reconciliation between them.
+
+**Two combinations are refused at parse (I19), and both are refused because the
+alternative is silent.**
+
+- **`interactive` with `streams`.** A handoff gives the terminal to the child; a
+  stream reads its stdout into the transcript. Mutually exclusive at the level of who
+  owns the file descriptor, and there is no arbitration that is not a guess. Whichever
+  C23 picked, the other declaration would do nothing and say nothing.
+- **`interactive` with `local: true`.** A local verb is handled in-process and never
+  spawned (I12), so there is no child to hand the terminal to. The flag would be
+  inert — A03 §2's vacuity class arriving in a manifest rather than in a rule.
+
+Both are cross-field rules of I4's kind and are enforced where I4 is, so they fail at
+parse with a path rather than at the first invocation — which for an `interactive`
+verb is a user watching a terminal do the wrong thing.
+
+**C05 knows nothing about the `shell` route's marker.** That half of the opt-in is
+C18's (C18 §5), because a shell line has no flags C05 could describe: `sh` is what
+parses it. The asymmetry is in C23 §4 and is the reason there are two mechanisms.
 
 ---
 
@@ -166,6 +203,38 @@ The *report* is deduplicated on the unordered pair. One error for one mistake �
 
 ---
 
+## 3. The framework's own verbs
+
+**`parseManifest` returns the app's tools plus `tui-kit`'s six**, and this belongs here rather than in C22 because it is a statement about what a manifest *is*.
+
+`/help`, `/clear`, `/theme`, `/history`, `/debug` and `/exit` are verbs. They have names, they take arguments, they complete, they validate, and they appear in help. Everything the manifest exists to describe is true of them, and the only reason they were absent is that nobody wrote them down. C23 ships the handlers (C23 §2); C18 classifies `local` from the manifest; so without the rows, the handlers are registered for verbs nothing can ever classify to — which is precisely what C23 I27's reconciliation reports, and it is right to.
+
+**In C05 rather than C22.** Put the merge in session construction and `parseManifest` returns something that is not yet a manifest — the seam-shaped defect where a value is valid at one call site and incomplete at another. C05 already validates, rejects duplicates and seals; "the framework's verbs are present" is one more thing that is true of every parsed manifest.
+
+**Shadowing becomes a parse error for free**, which is the property worth more than the tidiness. I6 already refuses duplicate names, so an app declaring its own `clear` collides with the framework's and fails loudly at parse rather than silently overriding a verb the framework's own code depends on. No rule had to be added for that.
+
+Three consequences, each checked rather than assumed:
+
+- **`hidden` is the mechanism for anything an app should not see in completion**, and `/debug` uses it. `visibleTools` drops it and `findTool` still resolves it, which is exactly the pair that field means (§ToolDef). The other five are ordinary.
+- **The six need no eighth `ArgType`.** `/theme` takes an `enum`, `/history` and `/debug` an optional `int`. EX5 claims the union stays domain-free, and the framework's own verbs failing it would have been the strongest counterexample there could be. They do not.
+- **They are a `ToolDef[]`, not a `Manifest` fragment.** A fragment implies a schema version and a merge of two schemas; an array is just tools, and tools is all this is.
+
+### The partition lives on `Manifest`, not on `ToolDef`
+
+`tools` is every tool; `appTools` is what the app wrote. **`ToolDef` stays a description of a verb**, and that is the point of putting the split one level up.
+
+A `source: "app" | "framework"` field on each tool would be settable by an app writing a manifest by hand — meaningless from its side, and a lie if set wrongly. Worse, every consumer *could* read it, and eventually one branches on it: `findTool` treating framework verbs differently, `visibleTools` filtering by source instead of by `hidden`, a renderer badging them. The partition makes the legitimate uses available and the illegitimate ones awkward, which a field does the opposite of.
+
+**Two consumers, not one.** `serialise` emits `appTools`, because what round-trips is what the app wrote. And **`/help` groups by it**: `/clear` and `/exit` are different in kind from `/ps` and `/promote`, and a flat list hides that. The second consumer is why this is a partition rather than a filter at one call site.
+
+**And T2.7's property gets sharper rather than weaker.** *Parsing its own serialised output yields an equal manifest* still holds exactly — serialise emits `appTools`, parse re-derives the framework's six, and the two are equal. That is a stronger claim than round-tripping a flat list, because it asserts the derivation is deterministic as well as that nothing is lost.
+
+Without the partition the property is simply false: a parsed manifest contains rows the parser added, and re-parsing them hits §3's collision check. The check cannot tell an app declaring `clear` from a re-parse of output that already contains it, and nothing in the input distinguishes them — the same shape as C13's patch gate before it read `origin`.
+
+**Error paths keep naming what the app wrote.** `fail` indexes as `tools[3]`, so framework rows are appended after the app's and never shift an index. A collision reports the framework by name rather than by index, because "already declared at `tools[7]`" is meaningless against a file with two entries in it.
+
+---
+
 ## 3a. The match index
 
 `findTool` must stay sub-millisecond on a manifest of 5,000 tools (T3.14), and a linear scan comparing multi-token prefixes does not. Tools are indexed by name, with the longest token count tried first, so longest-match falls out of the walk order rather than out of a sort at the end.
@@ -203,7 +272,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I3** — Parsing is strict about structure and lenient about extension. Unknown *fields* are ignored; malformed *known* fields are errors. A newer far side can add fields without breaking an older TUI.
 - **I4** — `values` is present iff `type === "enum"`; `pattern` is present iff `type === "pattern"`. Enforced at parse.
 - **I5** — No `ArgType` encodes an app-domain concept. The union is closed and generic; app-specific shapes use `pattern`.
-- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins.
+- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins — **including against the framework's six** (§3), so an app shadowing `clear` fails at parse rather than silently overriding a verb `tui-kit`'s own handlers depend on.
 - **I7** — `findTool` returns the longest matching tool.
 - **I8** — `validateInvocation` is pure and performs no I/O.
 - **I9** — Validation failures are `ErrorLike`, rendering through the ordinary error path.
@@ -215,6 +284,8 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I15** — C05 imports nothing from `terminal/`, `presentation/` or above.
 - **I16** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
 - **I17** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
+- **I18** — There is exactly one distance-2 suggester in the tree, and it is C05's. A01 A.2's cutoff is a policy about *when a suggestion is worth making*, and two implementations agree about the distance and diverge about the tie-break — which is where a suggestion is wrong rather than absent, and a wrong suggestion is the thing the cutoff exists to prevent.
+- **I19** — `interactive` is refused with `streams` and refused with `local: true`. Enforced at parse, as I4 is. Both combinations describe a verb that cannot exist, and both would otherwise be discovered by a user watching a terminal misbehave rather than by the author who declared them.
 
 ---
 
@@ -234,6 +305,8 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 12. `ArgType` carries no app-domain concepts; `pattern` is the extension point (I5).
 13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I16).
 14. Conflicts are directional in the check and deduplicated in the report (I17).
+15. The distance-2 suggester is exported, so C18's unknown verbs and C05's unknown flags are one implementation (I18).
+16. `interactive` declares a verb that takes the terminal, and the two combinations that cannot exist are refused at parse (I19).
 
 ---
 
@@ -264,6 +337,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.16** (I16): `--status running` and `--status=running` produce the same `args`. Both forms, one result — the permissive rule as an equality rather than as two separate passes.
 - **T1.17** (I16, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
 - **T1.18** (I17): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
+- **T1.19** (I19): `interactive` with `streams` → parse error at the tool's path; `interactive` with `local: true` → parse error; `interactive` alone on a spawned tool → parses, and the field survives onto the `ToolDef`. The third half is what stops the rule from being a blanket refusal that passes the first two.
 
 ### Tier 2 — contract / interface
 
@@ -274,6 +348,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T2.5** (I12): every tool resolves to exactly one execution route; no tool is both local and spawnable.
 - **T2.6** (I15): the module graph shows no import from `terminal/` or above.
 - **T2.7**: `parseManifest` accepts its own serialised output — round-trip identity.
+- **T2.9** (I18): the exported `suggestName` is the one the flag path uses — an unknown flag's suggestion and the same call made directly agree, including the tie-break where two candidates sit at the same distance. Identity of behaviour asserted on the case where two implementations would differ, not on the case where they would agree.
 - **T2.8** (I8): `findTool` over the same manifest twice returns deeply equal results, **and** a second manifest object with identical content does not observe the first's results. `findTool` caches its match index (§3a) and this is the first cache in the tree, so purity is asserted rather than argued. The second half is the load-bearing one: a cache keyed on content rather than object identity passes every other test in this suite and breaks the moment two manifests differ only in a field the key ignores. Asserted by comparing results — the test does not know the cache exists.
 
 ### Tier 3 — edge cases
@@ -328,6 +403,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T6.10** (I16): rejecting `--flag value` pre-spawn → T1.16 fails, and the gate starts refusing invocations the far side would have run.
 - **T6.11** (§3): reverting the `-`-value remediation to a bare "missing value" → T1.17 fails on the message, leaving the user to discover `=` for themselves.
 - **T6.12** (I17): deduplicating conflicts by name order rather than by the unordered pair → T1.18 fails on the one-directional case, which is the ordinary way an app declares it.
+- **T6.13** (I19): accepting `interactive` alongside `streams` → T1.19 fails. A verb declaring both reaches C23, where whichever path loses does nothing and reports nothing — the failure the parse-time refusal exists to move to the author.
 
 ---
 

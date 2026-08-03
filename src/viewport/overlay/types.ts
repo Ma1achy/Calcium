@@ -59,6 +59,20 @@ export type Layer = Readonly<{
   width?: number;
   /** Overlays; default 0.5. */
   maxHeightFraction?: number;
+  /**
+   * Where this layer wants the terminal cursor, **relative to its own origin**
+   * (I19).
+   *
+   * On the layer rather than only on `Placed`, because `place()` computes
+   * geometry from a measured height and a region and has no idea where a
+   * search's caret is — a cursor that existed only on the output could only be
+   * invented there. The producer states it and placement copies it through;
+   * both ends are relative to the same origin, so nothing is adjusted.
+   *
+   * Absent means the layer has no cursor, which is the default and the case
+   * that matters: it is what a menu wants. Nothing is entered into a menu.
+   */
+  cursor?: Readonly<{ row: number; col: number }>;
 }>;
 
 export type Placed = Readonly<{
@@ -76,6 +90,8 @@ export type Placed = Readonly<{
   height: number;
   width: number;
   truncated: boolean;
+  /** The layer's own, copied through — see `Layer.cursor` (I19). */
+  cursor?: Readonly<{ row: number; col: number }>;
 }>;
 
 /**
@@ -96,7 +112,7 @@ export type DismissReason = "explicit" | "anchorEvicted";
  * keystrokes. A layer that needs to change what `Esc` means to it is two
  * layers (I14).
  */
-export type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width">>;
+export type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor">>;
 
 export type OverlayChange =
   | Readonly<{ kind: "push"; id: string; layerKind: "overlay" | "view" }>

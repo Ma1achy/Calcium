@@ -9,9 +9,16 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
+import { CORPUS_BUDGET_MS } from "../support/budget.js";
+
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import { createBoundedStream } from "../../src/data/process/stream.js";
 import { collect, groupMembers, openDescriptorCount, scripts, waitForGroupEmpty } from "../support/process.js";
+
+// This file spawns real processes and waits on real signals; `budget.ts`
+// carries the measurement and why the 5 s default is not a margin. Re-measure
+// before raising it.
+vi.setConfig({ testTimeout: CORPUS_BUDGET_MS });
 
 const here = (): string => process.cwd();
 const opts = { cwd: here };

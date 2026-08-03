@@ -10,7 +10,7 @@ import {
   type BlockRegistry,
 } from "../../src/presentation/blocks/index.js";
 import { defaultTheme, loadTheme, type ResolvedTheme } from "../../src/presentation/theme/index.js";
-import { renderToLines, type RenderOptions } from "../../src/testing/index.js";
+import { renderToLines, type RenderOptions } from "../../src/presentation/render-lines.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 

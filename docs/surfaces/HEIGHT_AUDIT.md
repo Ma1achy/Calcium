@@ -270,14 +270,14 @@ asserted on every run.
 
 ---
 
-## 3. `Diff` carries no header labels — **C04 gap, no height delta**
+## 3. `Comparison` carries no header labels — **C04 gap, no height delta**
 
 S07 heads its columns with the two run identifiers, `a3f9b21` and `7c2d4e1`.
-`Diff` is `{field, a, b, comparison}` and carries nothing to put there, so C09
+`Comparison` is `{field, a, b, comparison}` and carries nothing to put there, so C09
 renders `field · before · after`. One row either way, so nothing drifts — but the
 surface cannot say what it is comparing, which is most of the point of a diff.
 
-Left as a finding rather than a change: adding two optional labels to `Diff` is a
+Left as a finding rather than a change: adding two optional labels to `Comparison` is a
 C04 edit, and C04 is the schema every surface derives from. It should be made
 because a surface needs it, in the commit that needs it, not speculatively here.
 
@@ -332,7 +332,7 @@ surface's *composition*, not for a notice that indents to an arbitrary column.
 
 ---
 
-## 6. S12's panel does not close — **drawing defect**
+## 6. S12's panel does not close — **drawing defect, fixed**
 
 S12's illustration has its log rows ending one column short of the blank and rule
 rows below them, so the right border is ragged. Nothing measures wrong; the
@@ -340,6 +340,18 @@ drawing is inconsistent with itself. Worth fixing because a border that does not
 close is exactly the symptom C09's `panel` now produces when a child's measured
 and rendered heights disagree, and a surface that draws one by hand teaches
 readers to ignore it.
+
+**Fixed** when S12 §2 was composed: three rows were 78 cells against the border's
+77, and the figure now closes at 77 throughout. The composition test is what makes
+it stay closed — it renders the panel and compares, so a row drifting by one cell
+is a failure rather than a reading.
+
+**And the defect this section describes turned out to be the smaller half.** The
+same box was called a diagram by §2 and a `panel` by this file, so the figure was
+ten rows or eight depending on which document was read. That is settled: it is a
+`panel`, `panel` gained a `footer` for the keymap in its bottom rail (C04 §3), and
+the two records now agree because one of them was corrected rather than because
+both were left standing.
 
 ---
 
@@ -351,10 +363,63 @@ blocker is wrong is indistinguishable from one that is pending (A03 §9a).
 
 ## Deferred, by component
 
-| Surface | Waits on |
+Nothing. **Every S-series §2 with an illustration now composes** — S01 with C22,
+and S02, S11 and S12 on C23's branch, each after its own §2 gained what it was
+missing. S07 §3 and S10 §2 were deleted; they never had figures.
+
+**One thing is deferred and it is not a surface.** `TableRow.actions` is read by
+nothing — `grep '\.actions' src/` returns a single hit and it is `tip`. C11
+§Focus says it "renders it distinctly and **surfaces its actions**"; the first
+half is the tone change and the second half has no implementation. So the action
+bar at the foot of a table — `⏎ detail  ␣ expand  ≡ logs  ⚡ events` in S03 §2,
+and the equivalent in S05, S06 and S14 — is drawn by four figures and produced by
+nothing. **The fifth instance of specified, agreed and structurally absent**, and
+the worst hidden of the five: the field exists, so nothing looked.
+
+**The shape is forced by the measurement contract, not chosen.** `render` sees
+focus through `ctx` and `measure` does not, which is why C11 can tone the focused
+row. An actions row whose *presence* depended on focus would change a block's
+height without changing the document — `rev` would not move and C14's cache would
+return a stale height, breaking C09 I1 in the one way the cache cannot see. So
+the row is unconditional whenever any row declares actions, and only its
+*content* follows focus.
+
+| | |
 |---|---|
-| S13 dashboard | **C22** — see below |
-| S01, S02, S10, S11, S12 | **C22** — whole screens |
+| height | `rows + 1` when any row declares actions, independent of focus |
+| content | the focused row's actions; empty when no row is focused |
+| owner | C11 — a surface cannot compose it, because blocks have no focus |
+
+When it lands, S02, S03, S05, S06 and S14's figures and their compositions move
+together, which is what the composition test is for.
+
+## The five-surface row, split — and none of the five was C23's
+
+`test/contract/surfaces.test.ts` carried one deferral over S02, S10, S11, S12 and
+S13, waiting on C23. This table said C22 for all five, so the two records had
+already diverged and nothing compared them. Reading each against what it needs
+gives five different answers:
+
+| Surface | What it actually needed |
+|---|---|
+| S10 §2 | Nothing — §2 is a *shape listing*, six lines of `label description` prose, not a figure. **Deleted**, as S07 §3's was, and for the same reason |
+| S13 §2 | Nothing — this file already moved it to C22 and the test file's comment says so. **Deleted** as a stale label; its coverage sits with C22's frame row |
+| S11 §2 | A block list. §2 had none, so composing meant choosing where the spec was silent. Written down, and **composed** |
+| S02 §2 | Two declarations, both taken. `v1.0.0` was drawn and unlisted — the second verdict class. Its two headerless tables declared **no columns at all**, which `cols()` reads from the spec precisely so a fixture cannot invent them. And its figure drew `↗ open` at the right of every row: C11 renders row actions nowhere in a row, and §7 already declared them as row actions. **Composed** |
+| S12 §2 | A ruling, taken: **the box is a rendered `panel`** and this file was right from §1 onwards. §2 opened by saying it was not rendered and closed four paragraphs later naming a title bar and a keymap line as two of its three regions — both of them rails. S01's convention copied to a figure it does not describe. **Composed** |
+
+**A row over N surfaces with N different blockers cannot be triaged, only split.**
+The six-surface row was split during C22's triage on exactly this reasoning, and
+this is what was left of it — so the second instance makes it the rule rather
+than the observation. A bundled row comes due mostly unwritable, and
+mostly-unwritable is indistinguishable from correctly-expired at the moment it
+goes red.
+
+**And S11 §2's composition found the fixture rule again.** The first draft wrote
+its plot series as `{ id, label, points }` where C12 takes `{ label, values }`,
+so the plot rendered one row while measuring five — which reads as a C09 I1
+violation in shipped code. The fixture was inert and the failure it produced
+accused the component.
 
 Composed and asserted: S03, S05, S06, S14, S15 (with C11), and **S04 §3 and S09
 §2 (with C12)**.
