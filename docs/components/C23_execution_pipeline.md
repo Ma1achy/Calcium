@@ -149,6 +149,7 @@ C09's `RenderContext.onAction` is supplied by C23. Nothing else may supply it �
 | `exec` | Submitted through §2 exactly as if typed — same guard, same routes, same entry |
 | `open` | Handed to the injected `openUrl` (C22 §2); never spawned through a shell |
 | `expand` | An `op: "expand"` patch toggling the row's flag (C04 §4), at `"shell"` origin. The op names the operation readably; the origin is what gets it past a settled entry (C13 §6) |
+| `view` | `target` resolved against the **source entry's own blocks**, then pushed as a C15 `kind: "view"` layer whose owner is C22. An unresolved target, or a stack that already holds a layer, is a refusal |
 
 `fill` populating the prompt rather than running is A01 D8's default, and it is why `production cancel <uuid>` is readable before it happens. Only filter pills use `exec`, because a filter is reversible.
 
@@ -157,6 +158,14 @@ C09's `RenderContext.onAction` is supplied by C23. Nothing else may supply it �
 **A refusal patches a notice into the entry that was acted upon. It never appends.** This is C23 §4's pop row one section over, and the reasoning transfers whole: an append freezes the block the action came from, so a second action on it is refused as *frozen* rather than for its own reason, and the selection A01 D7 preserves is cleared. A refusal that changes the thing it declined to act on is worse than the refusal.
 
 The mechanism differs from the pop's, because a pop has nothing to say and a refusal does: `patch(id, notice, "shell")` on the source entry. The `origin` argument is what makes it possible — a refusal notice *is* data, so gating on the operation refused it on every settled entry, which is most of the ones a reader acts on. C13 §6 records the three tries and why the distinction is **who is writing** rather than what is written. No append, no freeze, no selection loss, and the message appears where the reader was looking rather than at the bottom of a transcript they have scrolled away from.
+
+#### `view` resolves its target, and refuses two things rather than one
+
+**The target is resolved against the source entry's blocks and nowhere wider** (C04 I34). `expand` needed no resolution — it names a row on the entry it came from, which the dispatcher already holds — and `view` is the first kind whose `target` names something the dispatcher has to *find*. A free string an adapter supplies, resolved against the whole transcript, would let one entry's action fill the screen with another entry's data; resolved against nothing at all, a stale block id becomes a key that does nothing and reports nothing.
+
+**The second refusal is the one the walk found, and it is a throw C15 already owns.** `OverlayManager.push` throws when a view is raised onto a non-empty stack — views do not nest (C15 I1) and there is no legitimate path to accommodate. That throw is correct where it lives and is reached from a *renderer's* callback here, so letting it escape would put an `OverlayError` inside a React event handler with no frame to report it in. The dispatcher checks the stack and refuses through §3a's notice path instead. This is the case a table indexed by accepted paths does not reach: neither rule is wrong, and the interaction is between a ruling that throws and a caller that cannot catch usefully.
+
+Both refusals patch the source entry, exactly as every other refusal here does.
 
 An action from a **frozen** entry is refused (A01 D5, C13 §2): frozen entries hold stale data and firing `↑ promote` from one is the footgun that rule exists to prevent. Actions from a frozen-but-streaming entry are refused for the same reason — it is not focusable, so an action on it can only have arrived by mistake.
 
@@ -355,6 +364,7 @@ Per submission.
 - **I28** — A submission clears the prompt, whatever becomes of it. The clear sits between the parse and the route, so a refusal, a parse error and a successful verb all leave the same empty prompt — bash's behaviour, and the only one that does not require the user to work out whether their line survived. Restoring it on refusal was the alternative and it is worse: the notice says what happened, and a line that sometimes stays is a prompt whose contents depend on a decision made after the keystroke.
 - **I29** — Every submitted line is recorded in C20 **at settlement, with the code the entry settled with**, on every terminal path — app, local, shell, handoff, refusal and parse error. At settlement because `append(command, exitCode)` requires a code and settlement is the only moment one exists; recording at acceptance would satisfy the signature by inventing a value, which is what a required field exists to prevent. **A refusal is a submission**: the user typed it and pressed Enter, and `↑` must recall it — history is not a log of successes. Five call sites is five chances to miss one, so the test is derived from `ParseResult`'s arms rather than from a list.
 - **I30** — C23 supplies `StreamContext.seq` as the patch's position within its invocation, counted from `0`. C07 I15 spends it as both the block-id namespace and the per-stream reset, so a constant value is an id collision *and* a reset that fires on every patch — two invariants in two other components, broken from one literal here.
+- **I31** — A `view` action's `target` is resolved against the blocks of the entry it fired from, and a target that does not resolve there is refused rather than ignored. A view raised onto a non-empty layer stack is refused for the same reason and by the same path: C15 throws on it (C15 I1), and a throw crossing a renderer's callback has nowhere to be reported (→ C04 I34).
 
 ---
 
@@ -388,6 +398,7 @@ Per submission.
 25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 26. `seal()` reconciles the local registry against the manifest, both directions, and fails construction on a mismatch (I27).
 27. C23 counts stream patches and supplies `seq`; C07 spends it as an id namespace and a reset, so a constant breaks both (I30, C07 I15).
+28. A `view` action resolves its target within the source entry and refuses two things — an unresolvable target, and a view raised onto a non-empty stack — rather than ignoring the first or letting C15's throw cross a renderer's callback (I31).
 
 ---
 
@@ -736,6 +747,8 @@ Fake transport, fake stores.
 
 ### Tier 3 — edge cases
 
+- **T3.20** (I31): a `view` action whose `target` names a block in a *different* entry → refused, patched into the source entry, and nothing is pushed. The control is the same action naming a block in its own entry, which pushes — without it the assertion passes for a dispatcher that refuses every view.
+- **T3.21** (I31): a `view` action dispatched while a layer is already open → refused through §3a's notice path, and **no `OverlayError` escapes**. Asserted as a `.not.toThrow()` around the dispatch *and* a refusal notice, because a dispatcher that swallowed the throw silently would pass the first half alone.
 - **T3.1**: submitting whitespace only → `empty`.
 - **T3.2**: a verb that exits immediately → the pending entry is replaced, never orphaned.
 - **T3.3**: a verb that produces no output and exits 0 → a notice, not a blank entry.
@@ -779,6 +792,7 @@ Fake transport, fake stores.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.20** (I31): resolving a `view` target against the whole transcript instead of the source entry → T3.20 fails. The revert that looks like a generalisation, and it is the one a reader reaches for when a target legitimately names a block they can see on screen.
 - **T6.1** (I3): invoking the transport before appending → T1.4 fails, and slow verbs look like dropped keystrokes.
 - **T6.14** (I24): inserting a blank row between top-level blocks → T2.11 fails. Without it the change is invisible: the height C14 virtualises against and the height the frame draws are computed by different code, and nothing compares them.
 - **T6.2** (I4): recomputing validation → T1.5 fails, and two answers can disagree.

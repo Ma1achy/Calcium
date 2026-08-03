@@ -111,6 +111,7 @@ type Patch    = Readonly<{ kind: "patch"; id: string;
                            language: string;           // syntax palette, per hunk line
                            hunks: readonly Hunk[];
                            collapsedAfter?: number;    // elided below the last hunk
+                           actions?: readonly Action[];
                            layout?: "unified" | "split" }> & Gap;   // default: width-derived
 type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@
                            lines: readonly Readonly<{
@@ -380,10 +381,42 @@ type Action =
   | { kind: "fill";   label: string; command: string }
   | { kind: "exec";   label: string; command: string }
   | { kind: "open";   label: string; url: string }
-  | { kind: "expand"; label: string; target: string };
+  | { kind: "expand"; label: string; target: string }
+  | { kind: "view";   label: string; target: string };
 ```
 
 `fill` is the default; `exec` is the exception. Populating the prompt lets the dev read and edit before running, which matters when the command is `production cancel <uuid>`. Only filter pills use `exec`, because a filter is trivially reversible (A01 D8).
+
+#### `view` is the fifth, and `target` is the half that needed a ruling
+
+`view` fills the screen with one block — C25 §3b's fullscreen patch is its first
+and so far only producer. It is the same category as `expand`: an affordance on a
+block that the *reader* invokes, not something the far side causes.
+
+**It is not the thing C22 §13 records as undecided, and the two must not be
+conflated.** That row asks what makes *a verb's result* a pushed view — who
+decides, and what `Esc` does to the entry it came from. This kind answers none of
+it. Something in the tree finally pushes a `kind: "view"` layer, which narrows the
+gap; the ruling C15 T5.5 waits on is untouched.
+
+**`target` names a block id, and it is resolved against the blocks of the entry the
+action fired from.** Never trusted, never searched across the transcript, and never
+permitted to name a block in another entry. The distinction from `expand` is that
+`expand` needs no resolution at all — it toggles a row on the entry it came from,
+and the entry is already in hand — whereas a view has to say *what* fills the
+screen, and `target` is a free string an adapter supplies. An unresolvable target
+is refused with a notice, not silently ignored: an adapter emitting a stale block
+id would otherwise produce a key that does nothing and reports nothing.
+
+**And the kind is `view` rather than `fullscreen`** because C15's layer kind is
+already `"view"`. Two words for one concept is what the vocabulary audits keep
+finding, and this is the moment it would have been introduced.
+
+**`actions` is on `Patch` for the same reason it is on `Tip` and `Notice`**: the
+affordance is data the producer supplies, so a patch that should not offer
+fullscreen simply does not carry the action. The alternative — a key binding that
+applies to every patch — makes the offer unconditional and gives the block no way
+to decline, which is the shape C09 I1's neighbours keep rejecting.
 
 ---
 
@@ -549,6 +582,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I31** — Row ids are unique within a table, checked by `validateDocument` alongside I14's block ids. Three things address a row by id — `merge` upserts by it (I9), C16's focus names it, and a rendered row is keyed by it — so a duplicate is ambiguous in three ways at once. It is a separate invariant from I14 because the namespaces are separate: two tables may each hold a row `r1`, and a row id never collides with a block id. Raised from C11, the first component to depend on it.
 - **I32** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
 - **I33** — `patch` and `comparison` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
+- **I34** — A `view` action's `target` denotes a block id **within the document the action fired from**, and denotes nothing else. The kind carries no content of its own, so a target resolved against a wider scope would let one entry's action fill the screen with another entry's data. C04 owns what the field means; C23 owns refusing one that does not resolve (C23 I31).
 
 ---
 
@@ -589,6 +623,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 29. C04's constructors enforce the shape invariants and C24's `b` delegates to them. One enforcement point for I1 (I1).
 30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set (I27).
 31. `Result` is declared once, in C04, and nowhere else in the tree (I26). Enforced by SS35, which existed before this commitment did — a build gate with no contract behind it, found by tracing the citation graph.
+32. A `view` action's `target` names a block within its own document and nothing wider; the refusal when it does not resolve is C23's (I34, → C23 I31).
 
 ---
 
@@ -632,6 +667,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.7** (I5): a source scan finds no hex literal, ANSI code or colour name in `viewmodel/`.
 - **T2.8** (I6): every fixture block toned `error` or `warn` carries a non-empty glyph; a lint rule fails construction otherwise.
 - **T2.9** (I11): the module graph shows no import from `terminal/` or above.
+- **T2.11** (I34): `validateBlock` accepts a `patch` carrying a `view` action whose `target` is one of the document's own block ids, and the `Action` union's five kinds are exhaustive over the validator — a sixth added without validation fails the build, exactly as T2.10 does for `Block`. The pairing is what makes the union closed rather than open with four entries written down.
 - **T2.10**: every member of the `Block` union is exhaustively handled by the validator — adding a kind without validation fails the build. *(Registry completeness — that every kind has a registered measurer and renderer — is C09's test, since C09 owns the registry.)*
 
 ### Tier 3 — edge cases
