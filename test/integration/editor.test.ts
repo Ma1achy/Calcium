@@ -45,6 +45,7 @@ function wire(editor: LineEditor): {
   const focus = createFocusStore();
   const deps: RouterDeps = {
     overlayTop: () => null,
+    overlayRegion: () => ({ width: 80, height: 24 }),
     placed: () => [],
     popLayer: () => {},
     copyMode: () => false,

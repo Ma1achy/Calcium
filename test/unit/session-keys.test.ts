@@ -52,6 +52,23 @@ function recordingViewport(): {
 }
 
 /** A dismissable layer, so `activeTarget` resolves to `overlay` (C16 §3). */
+/**
+ * A pushed view, so `activeTarget` resolves to `pushedView` (C16 I24).
+ *
+ * Pushed directly rather than through a `view` action: this suite is about the
+ * effect table being total, and driving an action would make the row depend on
+ * C23's dispatch as well. The view's own file drives it the real way.
+ */
+function openView(graph: Graph): void {
+  graph.overlays.push({
+    id: "probe-view",
+    kind: "view",
+    placement: { kind: "fill" },
+    content: [],
+    dismissable: true,
+  });
+}
+
 function openOverlay(graph: Graph): void {
   graph.overlays.push({
     id: "probe",
@@ -145,6 +162,12 @@ describe("C22 §3 step 11 — the effect table", () => {
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
       if (b.target === "liveBlock") enterLive(graph);
+      // **The target that had no way to be reached from here** (C16 I24). Until
+      // this line, `pushedView`'s rows would have been dispatched with no view
+      // open — `activeTarget` would answer `prompt`, `n` would be typed into
+      // the editor, and the row would have failed for a reason that has nothing
+      // to do with whether its effect exists.
+      if (b.target === "pushedView") openView(graph);
       const consumed = graph.router.dispatch(press(b.key));
       expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
@@ -219,6 +242,15 @@ describe("C22 §3 step 11 — the effect table", () => {
       completion: graph.completion,
       overlays: graph.overlays,
       history: graph.history,
+      // A stand-in: this suite drives the editing bindings, and the view's own
+      // seven have their own file. A double rather than the real one because
+      // `createPatchView` subscribes to a transcript, and a suite about `⌃w`
+      // should not be constructing one.
+      patchView: {
+        open: () => null,
+        move: () => false,
+        pop: () => false,
+      },
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),

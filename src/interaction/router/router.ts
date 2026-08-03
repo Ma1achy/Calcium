@@ -70,6 +70,15 @@ export type RouterDeps = Readonly<{
   signalShellChild: () => void;
   /** Where the transcript region sits, for mouse routing. */
   region: () => Readonly<{ top: number; height: number }>;
+  /**
+   * The region a layer is placed against (C22 `frame.overlayRegion`).
+   *
+   * Distinct from `region` above, which is the transcript's rows and exists for
+   * mouse translation. Needed here because step 3's second clause asks whether
+   * the top layer **covers** the region, and coverage is a comparison of two
+   * boxes — a question no single box can answer (I8).
+   */
+  overlayRegion: () => Readonly<{ width: number; height: number }>;
   mouseEnabled: () => boolean;
   promptHasText: () => boolean;
   clearPrompt: () => void;
@@ -262,6 +271,22 @@ export function createRouter(
     return run("global", e);
   }
 
+  /**
+   * Does the layer `id` fill the region it was placed in?
+   *
+   * **The property, not a proxy for it** (I8). `kind === "view"` is the narrow
+   * test and it passes every case written about views while missing any other
+   * full-region layer — and a view whose box was clamped smaller would be
+   * treated as covering when it does not. C15 §4 commits a view to `top: 0`,
+   * `left: 0` and the region's full extent, so the box is where the answer is.
+   */
+  function coversRegion(id: string): boolean {
+    const region = deps.overlayRegion();
+    const box = deps.placed().find((p) => p.layer.id === id);
+    if (box === undefined) return false;
+    return box.top === 0 && box.left === 0 && box.height >= region.height && box.width >= region.width;
+  }
+
   function run(target: FocusTarget, e: InputEvent): boolean {
     for (const h of handlers.get(target) ?? []) {
       // Contained: a throwing handler leaves the event unconsumed and the
@@ -310,7 +335,7 @@ export function createRouter(
     // be answered is modal, and a global shortcut firing beneath one acts on a
     // surface the user cannot see (I8).
     const top = deps.overlayTop();
-    if (top !== null && !top.dismissable) {
+    if (top !== null && (!top.dismissable || coversRegion(top.id))) {
       stages.push("modal-blocked");
       return false;
     }

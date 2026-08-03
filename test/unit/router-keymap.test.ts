@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { createKeymap, KeymapError, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
-import type { Binding, Key } from "../../src/interaction/router/types.js";
+import type { Binding, FocusTarget, Key } from "../../src/interaction/router/types.js";
 
 const k = (name: string, mods: Partial<Key> = {}): Key => ({
   name,
@@ -170,6 +170,54 @@ describe("§6 — the default table (C17 I12)", () => {
     ).toBe(true);
   });
 
+  it("T1.32 (I24): every focus target has bindings, derived from the union", () => {
+    // **The coverage set comes from the union, not from a list beside it.** A
+    // hand-written list of targets agrees with itself and never notices the one
+    // that was never bound — which is exactly how `pushedView` sat in
+    // `FocusTarget` from the day C16 was written with no row anywhere, so
+    // `activeTarget` resolved to it and every key fell through to step 3.
+    //
+    // `global` is included: it earned its rows when scrolling was bound (I23),
+    // and exempting it would be the exception that hides the next one.
+    //
+    // **`copyMode` is exempt, and this test is what made the exemption
+    // explicit.** The invariant was first written as "every target", and this
+    // row failed on `copyMode` as well as on the target it was written for.
+    // That one is legitimate: copy mode's only key is Ctrl-C, which §5's ladder
+    // owns by construction and the keymap deliberately does not, so a binding
+    // there would be the second mechanism I23 objects to. Named here with its
+    // reason rather than dropped from the list — an unrecorded exemption reads
+    // as coverage.
+    const TARGETS: readonly FocusTarget[] = [
+      "overlay",
+      "pushedView",
+      "prompt",
+      "liveBlock",
+      "global",
+    ];
+    const bound = new Set(defaultKeymap.map((b) => b.target));
+    for (const t of TARGETS) {
+      expect(bound.has(t), `${t} has no binding — a name in the union and nothing else`).toBe(true);
+    }
+    expect(bound.has("copyMode"), "copyMode's only key is the ladder's (§5)").toBe(false);
+  });
+
+  it("T1.33 (I24): the pushed view's seven keys resolve, and Esc is viewPop", () => {
+    const at = (name: string): string | undefined =>
+      defaultKeymap.find((b) => b.target === "pushedView" && b.key.name === name)?.action;
+
+    expect(at("n")).toBe("viewNextHunk");
+    expect(at("p")).toBe("viewPrevHunk");
+    expect(at("g")).toBe("viewTop");
+    expect(at("G")).toBe("viewBottom");
+    expect(at("pageup")).toBe("viewPageUp");
+    expect(at("pagedown")).toBe("viewPageDown");
+    // **`viewPop`, not `dismiss`.** `dismiss` pops whatever is on top; this one
+    // knows it is closing *its* view and drops the offset with it. And it is
+    // not §5's Ctrl-C rung under another name — that rung is cancellation.
+    expect(at("escape")).toBe("viewPop");
+  });
+
   it("T2.13 (I17): every default binding is a key the decoder can actually produce", () => {
     // **T2.12 constructs the Key from the binding, which is the shape that
     // hides this entirely**: a row saying `{name: "\r"}` resolves perfectly
@@ -253,6 +301,22 @@ describe("§6 — the default table (C17 I12)", () => {
       // is why this row exists rather than a reasoned assurance.
       "prompt c+z": ["\u001a"],
       "prompt m+z": ["\u001bz"],
+
+      // The pushed view (I24). **The plain letters are the interesting rows**,
+      // and they are only bindable at this target: a prompt takes `n` and `p`
+      // as text, and §6 rejected `g`/`G` for the transcript for exactly that
+      // reason. A pushed view has no prompt competing for them, so the bytes
+      // are the characters themselves — `G` is `⇧g`, which a terminal sends as
+      // the capital rather than as a modifier.
+      "pushedView n": ["n"],
+      "pushedView p": ["p"],
+      "pushedView g": ["g"],
+      "pushedView G": ["G"],
+      "pushedView pageup": ["\u001b[5~"],
+      "pushedView pagedown": ["\u001b[6~"],
+      "pushedView up": ["\u001b[A", "\u001bOA"],
+      "pushedView down": ["\u001b[B", "\u001bOB"],
+      "pushedView escape": ["\u001b"],
 
       // Scrolling (I23). **This is the check the ruling asked for**, and it
       // came out positive: `⌃Home` and `⌃End` reach the decoder in both of the

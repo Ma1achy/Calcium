@@ -835,6 +835,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     scheduler: deps.scheduler,
     openUrl: deps.openUrl,
     submit: (l) => void submit(l),
+    pushView: (from, target) => deps.patchView.open(from, target),
 
     // **Patched into the source entry, never appended** (C23 I18, §3a). An
     // append freezes the block the action came from, so the next action is

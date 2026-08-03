@@ -371,6 +371,41 @@ schedule.
 
 ---
 
+### Two rulings the build produced, and neither walk could have
+
+Recorded here rather than folded into the sections above, because the way each
+was found is the reason it is trustworthy.
+
+**The offset ceiling is not `total − height`, and a test said so.** That figure
+is arithmetic over the full rendering; a window is a slice *plus* sticky headers
+(I18), so those rows are counted once in the total and again in the window. A
+window opened at `total − height` stops short, and the last rows — including
+`collapsedAfter`, the marker that says how much file is below — are unreachable.
+A reader presses `G` and does not see the bottom. The ceiling is instead **the
+first offset whose window reaches the last row**, found by searching the same
+builder rather than by a second arithmetic that could disagree with it.
+
+Neither artefact reaches this. It is not an interaction between two rules — it is
+one rule applied to the wrong rendering, and both the table and the trace take the
+rendering as given.
+
+**A valid offset is a row a window may begin at, and that is a third ruling
+rather than a choice between two.** The first implementation snapped a mid-unit
+offset down inside the builder, and removing the snap failed nothing — including
+a sweep asserting every line is reachable from some offset, because both
+directions leave every line reachable from *somewhere*. Asking which direction
+was right showed the question was wrong: snapping down means `↓` from the row
+before a two-row run redraws the same window, a dead keystroke; snapping up means
+the offset the caller holds and the window it gets disagree, so two `PgDn`s do
+not move two pages. **The offset should never be mid-unit at all.** The snap
+belongs to the clamp, every motion lands on a valid row, and one press moves one
+unit — which is what `less` does with a wrapped line.
+
+That is the mutation pass indicting a design rather than a test, and it is the
+fourth thing CLAUDE.md's list says a mutation failing nothing can mean.
+
+---
+
 **What the walk did not find, said so it is not assumed.** Nothing here decides
 what a *verb's result* being a view would mean — C22 §13's row, still open. And
 nothing here builds I14, I15 or I16; §3a records why they cannot live in this
@@ -414,6 +449,8 @@ Consequences that matter:
 - **I18** — A window of a patch is a `Patch` rebuilt from a slice of its lines, never a list of rows. **The path header and every touched hunk's header are sticky**, because no field suppresses either — so a window carries them and pays a row for each, and its content budget is smaller than the region by exactly that. Forced by the block shape rather than chosen (§3c).
 - **I19** — In split layout a window cuts **only at run boundaries** — at a context line, or where a maximal run of changed lines begins or ends. Cutting inside a run is not additive: a run of one removed and two added lines is two rows whole and three rows cut between them, so a one-row scroll shifts the content by two and a line is drawn twice. A window may be a row shorter than the region and is never taller (I2a, §3c).
 - **I20** — A collapse marker appears only on the window that contains its row: `collapsedBefore` when the window reaches the region before its hunk, `collapsedAfter` only on the last one. Carried unconditionally, the first claims an elision at the top of every page and the second says the file ends on page one (I5, §3c).
+- **I20a** — The offset ceiling is the **first offset whose window reaches the last row**, not `total − height`. Sticky headers are counted once in the full rendering and again in every window that carries them, so the arithmetic ceiling stops short and the document's last rows — `collapsedAfter` among them — become unreachable. Computed from the same builder that makes the window, never from a second arithmetic (§3c).
+- **I20b** — A valid offset is a row a window may **begin** at, and every motion lands on one. Snapping inside the builder instead leaves the caller's offset and the window it produces disagreeing in one direction and produces a keystroke that redraws the same window in the other; neither is visible to a test that drives one motion, and neither is a defect the window itself can be blamed for (§3c).
 - **I21** — `Hunk.header` is carried into a window verbatim, so its counts describe the whole hunk while the window shows part of it. Rewriting it to match the slice would make C25 compute from the one field it is defined not to read (§4, §3c).
 
 ---
@@ -466,7 +503,7 @@ Attributes are already spoken for: bold and dim are how 1-bit carries tone (C10 
 14. Inline expansion is offered when the expanded form fits `maxExpandHeight` and fullscreen otherwise; the number is configurable and the behaviour is not (I15, I16).
 15. Fullscreen is every hunk of this block uncollapsed, never the whole file — the whole file is the editor's, and it is one component rather than two (I17).
 16. A window is a rebuilt `Patch`, its path and hunk headers sticky because the shape forces them, and its collapse markers present only on the windows their rows fall in (I18, I20).
-17. A window cuts at run boundaries in split layout, because pairing is not additive across an arbitrary cut (I19).
+17. A window cuts at run boundaries in split layout, because pairing is not additive across an arbitrary cut (I19). An offset is always such a boundary, and the ceiling is the first offset that reaches the end rather than `total − height` (I20a, I20b).
 18. A window carries `Hunk.header` verbatim and never reconciles it with the lines it shows (I21).
 19. The collapsed cap and the expansion threshold are specified here and are **not this component's to satisfy**: both are functions of the viewport, and a renderer that could see one would be a renderer whose `measure` is no longer pure over `(block, width)` (I14, I15, §3a).
 
@@ -548,6 +585,8 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T6.9** (I13): carrying the add/remove distinction on the background alone, dropping the marker → T4.2 fails at 1-bit, where the background is gone and nothing is left.
 - **T6.10** (I14): capping the collapsed form by row count rather than at hunk boundaries → T3.10 fails with a half-rendered hunk.
 - **T6.11** (I16): making expansion itself configurable → T3.12 fails, and a dropped hunk becomes unreachable (D38).
+- **T6.23** (I20a): the ceiling back to `total − height` → the bottom-of-document row fails, and `collapsedAfter` becomes unreachable. Three assertions fail; the one that names it is the tail marker.
+- **T6.24** (I20b): the snap moved from the clamp back into the builder, in either direction → the mid-run offset row fails. **The revert that passes a reachability sweep**, which is why that sweep is not the assertion.
 - **T6.20** (I19): windowing at arbitrary line offsets in split layout → T1.20 fails, and a line is drawn on two consecutive pages. **The revert that looks like a simplification**, because snapping to a run boundary reads as an optimisation and the common case — a window landing in context — passes either way.
 - **T6.21** (I20): carrying `collapsedAfter` on every window → T1.22 fails, and every page claims to be the last.
 - **T6.22** (I21): recomputing `Hunk.header` from the window's lines → T1.23 fails, and C25 acquires a dependency on a field §4 says it never reads.

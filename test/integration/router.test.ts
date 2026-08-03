@@ -35,6 +35,7 @@ function world() {
   const focus = createFocusStore();
 
   const deps: RouterDeps = {
+    overlayRegion: () => ({ width: 80, height: 24 }),
     overlayTop: () => {
       const top = overlays.top;
       return top === null
