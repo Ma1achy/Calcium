@@ -18,8 +18,10 @@ import {
   groupChildWidth,
   insetWidth,
   normaliseWidth,
+  ACTION_KINDS,
   validateBlock,
   validateDocument,
+  type Action,
   type Block,
   type BlockKind,
   type Group,
@@ -62,6 +64,52 @@ const _exhaustive: readonly BlockKind[] & { length: 17 } = EXPECTED_KINDS;
 void _exhaustive;
 
 describe("C04 contract", () => {
+  it("T2.11 (C04 I34): the five action kinds are exhaustive, and each is checked for its own field", () => {
+    // **`ACTION_KINDS` is derived from the union and `ACTION_FIELD` is a total
+    // `Record` over it**, so a sixth kind added without validation does not
+    // compile. This test asserts the half a type cannot: that the check runs at
+    // all. Until it existed, actions were never validated — an adapter could
+    // emit any object at all and every check passed.
+    expect([...ACTION_KINDS].sort()).toEqual(["exec", "expand", "fill", "open", "view"]);
+
+    const patchWith = (actions: readonly unknown[]): unknown => ({
+      kind: "patch",
+      id: "p1",
+      path: "a.yaml",
+      language: "yaml",
+      hunks: [],
+      actions,
+    });
+
+    const good: Action = { kind: "view", label: "fullscreen", target: "p1" };
+    expect(validateBlock(patchWith([good])).ok).toBe(true);
+
+    // The failing directions, one per way an action can be wrong. Asserted
+    // separately because a single "invalid" case passes for a check that only
+    // ever looks at `kind`.
+    const unknownKind = validateBlock(patchWith([{ kind: "viev", label: "x", target: "p1" }]));
+    expect(unknownKind.ok).toBe(false);
+    expect(unknownKind.ok ? [] : unknownKind.error.join(" ")).toMatch(/"kind" must be one of/);
+
+    const noTarget = validateBlock(patchWith([{ kind: "view", label: "fullscreen" }]));
+    expect(noTarget.ok).toBe(false);
+    expect(noTarget.ok ? [] : noTarget.error.join(" ")).toMatch(/"target" must be a string/);
+
+    const noLabel = validateBlock(patchWith([{ kind: "view", target: "p1" }]));
+    expect(noLabel.ok).toBe(false);
+    expect(noLabel.ok ? [] : noLabel.error.join(" ")).toMatch(/"label" must be a string/);
+
+    // `open` carries `url` and not `target` — the row that shows the field is
+    // the kind's rather than one name shared by all five.
+    const openWrongField = validateBlock(patchWith([{ kind: "open", label: "docs", target: "p1" }]));
+    expect(openWrongField.ok).toBe(false);
+    expect(openWrongField.ok ? [] : openWrongField.error.join(" ")).toMatch(/"url" must be a string/);
+
+    // Absent is legal, which is the control: without it every assertion above
+    // passes for a validator that rejects any patch carrying the field.
+    expect(validateBlock({ kind: "patch", id: "p2", path: "a", language: "", hunks: [] }).ok).toBe(true);
+  });
+
   it("T2.10: every member of the Block union is validated, and the corpus covers all 17", () => {
     // Seventeen kinds ship (commitment 2). The corpus is what T2.1 will run
     // over once C09 exists, so a kind missing from it is a kind the headline

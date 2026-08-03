@@ -14,7 +14,9 @@
  */
 
 import {
+  ACTION_KINDS,
   SCHEMA,
+  type Action,
   type Block,
   type BlockKind,
   type DocumentStatus,
@@ -36,6 +38,23 @@ const GLYPHS: ReadonlySet<Glyph> = new Set<Glyph>([
   "ok", "warn", "error", "info", "pending", "working", "running",
   "queued", "cancelled", "expand", "collapse", "live", "bullet",
 ]);
+
+/**
+ * The field each action kind carries beside `label`.
+ *
+ * A `Record` over the union rather than a switch, for the same reason
+ * `KIND_CHECKS` is one: **a sixth kind added without an entry stops compiling**
+ * (T2.11). Until this table existed, actions were not validated at all — an
+ * adapter could emit `{ kind: "nonsens" }` and every check passed, which is the
+ * vacuity class one level below where C04 usually finds it.
+ */
+const ACTION_FIELD: Readonly<Record<Action["kind"], string>> = Object.freeze({
+  fill: "command",
+  exec: "command",
+  open: "url",
+  expand: "target",
+  view: "target",
+});
 
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
 const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh"]);
@@ -68,6 +87,46 @@ function requireString(b: Record<string, unknown>, key: string, e: string[], at:
 
 function requireArray(b: Record<string, unknown>, key: string, e: string[], at: string): void {
   if (!isArray(b[key])) e.push(`${at}: "${key}" must be an array`);
+}
+
+/**
+ * `actions`, where a block carries them. Absent is legal; present and malformed
+ * is not.
+ *
+ * The kind is checked against `ACTION_KINDS` and the kind's own field against
+ * `ACTION_FIELD`, so an action naming a kind that does not exist and one missing
+ * the field its kind needs are two different messages rather than one silence.
+ *
+ * **Known limit, stated rather than left to be discovered**: this reaches the
+ * `actions` array on `patch` and `tip`, and not `TableRow.actions` or a `pills`
+ * chip's `action`. Those are nested inside collections this validator walks for
+ * other reasons, and widening it there is a separate change with its own row.
+ * What the table guarantees is that the *union* cannot gain a sixth member
+ * unnoticed; what it does not guarantee is that every site carrying an action is
+ * checked.
+ */
+function checkActions(b: Record<string, unknown>, e: string[], at: string): void {
+  const actions = b["actions"];
+  if (actions === undefined) return;
+  if (!isArray(actions)) {
+    e.push(`${at}: "actions" must be an array`);
+    return;
+  }
+  actions.forEach((raw, i) => {
+    const where = `${at}.actions[${String(i)}]`;
+    if (!isRecord(raw)) {
+      e.push(`${where}: must be an object`);
+      return;
+    }
+    const kind = raw["kind"];
+    if (!isString(kind) || !ACTION_KINDS.has(kind as Action["kind"])) {
+      e.push(`${where}: "kind" must be one of ${[...ACTION_KINDS].join(", ")}`);
+      return;
+    }
+    if (!isString(raw["label"])) e.push(`${where}: "label" must be a string`);
+    const field = ACTION_FIELD[kind as Action["kind"]];
+    if (!isString(raw[field])) e.push(`${where}: "${field}" must be a string`);
+  });
 }
 
 /**
@@ -146,6 +205,7 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     requireString(b, "path", e, at);
     requireString(b, "language", e, at);
     requireArray(b, "hunks", e, at);
+    checkActions(b, e, at);
     // A negative elision is not an elision, and it would render a marker claiming
     // there is content to reveal above what the block actually holds.
     const after = b["collapsedAfter"];
@@ -154,7 +214,10 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     }
   },
   pills: (b, e, at) => requireArray(b, "chips", e, at),
-  tip: (b, e, at) => requireString(b, "text", e, at),
+  tip: (b, e, at) => {
+    requireString(b, "text", e, at);
+    checkActions(b, e, at);
+  },
   panel: (b, e, at) => {
     requireString(b, "title", e, at);
     requireArray(b, "children", e, at);

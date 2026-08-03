@@ -50,7 +50,7 @@ export type {
   ViewPatch,
 } from "./types.js";
 
-export { GLYPH_REQUIRED_TONES, SCHEMA } from "./types.js";
+export { ACTION_KINDS, GLYPH_REQUIRED_TONES, SCHEMA } from "./types.js";
 
 export { BlockShapeError, block, cell, deepFreeze, descendants, document } from "./construct.js";
 

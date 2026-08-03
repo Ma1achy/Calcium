@@ -106,7 +106,28 @@ export type Action =
   | Readonly<{ kind: "fill"; label: string; command: string }>
   | Readonly<{ kind: "exec"; label: string; command: string }>
   | Readonly<{ kind: "open"; label: string; url: string }>
-  | Readonly<{ kind: "expand"; label: string; target: string }>;
+  | Readonly<{ kind: "expand"; label: string; target: string }>
+  /**
+   * Fill the screen with one block — C25 §3b's fullscreen patch is the first
+   * producer (I34).
+   *
+   * `target` names a block id **within the document the action fired from**, and
+   * denotes nothing else. Unlike `expand`, which toggles a row on an entry the
+   * dispatcher already holds, this is the first kind whose target the dispatcher
+   * has to *find* — and it is a free string an adapter supplies. Resolved
+   * against the whole transcript it would let one entry's action draw another
+   * entry's data; C23 I31 owns the refusal when it does not resolve.
+   */
+  | Readonly<{ kind: "view"; label: string; target: string }>;
+
+/** The five, for a validator that cannot silently take a sixth (T2.11). */
+export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>([
+  "fill",
+  "exec",
+  "open",
+  "expand",
+  "view",
+]);
 
 // --- table ----------------------------------------------------------------
 
@@ -326,6 +347,15 @@ export type Patch = Readonly<{
    * and 170 below.
    */
   collapsedAfter?: number;
+  /**
+   * The affordances this patch offers — `view` for fullscreen (C25 §3b).
+   *
+   * On the block rather than as an unconditional key binding: the offer is data
+   * the producer supplies, so a patch that should not offer fullscreen simply
+   * does not carry the action. A binding that applied to every patch would give
+   * the block no way to decline (C04 §3).
+   */
+  actions?: readonly Action[];
   layout?: "unified" | "split";
 }> & Gap;
 
