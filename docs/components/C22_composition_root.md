@@ -1119,21 +1119,34 @@ never drift. But `windowPatch` needed a dedicated file and a concept of indivisi
 to get right, and each further reducer is that work again. They are deferred until a
 consumer forces one, in the same way and for the same reason as everything else here.
 
-**The deferral is measured rather than assumed.** S3 filled measures **21 rows at 120 and at
+**The deferral is measured rather than assumed.** S3 filled measures **30 rows at 120 and at
 80**, and a view fills the region (C15 §4), so at any realistic terminal height nothing is
 out of view and the granularity is invisible for this surface:
 
 ```
-width 120: TOTAL 21  [panel#cpu=10  panel#memnet-panel=7  keyValue#ports=2]
-width  80: TOTAL 21  [panel#cpu=10  panel#memnet-panel=7  keyValue#ports=2]
+width 120: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
+width  80: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
 ```
 
-The first two attempts at that figure returned **13**, which is plausible and was measured
-against a registry holding no plot definition (`registry.ts` — *"`table`, `plot` and `patch`
-are not here"*) and a malformed `b.kv` call. A control asserting that a `height: 5` plot and
-a `height: 9` plot measure 7 and 11 is what caught it. A fixture must be shown to respond to
-the thing under test before it is asserted against, and a number that looks right is exactly
-how that rule gets skipped.
+**26 as declared, 30 once the parts fill**, and the difference is not slack: `details` is
+declared holding the framework's `loading…` placeholder and grows to four rows of key-values
+when its one-shot fetch returns. So the figure a measurer sees before anything ticks is not
+the figure the terminal shows, and for a surface near the region's height the safe one is
+the larger. Both are read from the built application — 26 through the same registry C15
+measures with, 30 counted off a replayed capture at each width.
+
+**The figure was 21 and named three blocks that were never built** (`memnet-panel`,
+`ports`). It was an estimate of the drawing, taken before S3 existed, and it survived into a
+sentence beginning *measured rather than assumed*. The built surface has four blocks, three
+of them bordered panels, and an eight-row plot. The conclusion is unchanged and the margin
+it had was half what this claimed.
+
+And the attempts before *that* returned **13**, measured against a registry holding no plot
+definition (`registry.ts` — *"`table`, `plot` and `patch` are not here"*). The same fault
+recurred while correcting this passage: a fresh probe answered **17**, because
+`createBlockRegistry()` alone still has no plot and the shell registers it separately at
+`construct.ts:297`. A probe built on the framework's defaults is measuring a different
+application than the one that runs, and the number it returns is plausible every time.
 
 ### The obligations a route carries, and the one that is not yet built
 

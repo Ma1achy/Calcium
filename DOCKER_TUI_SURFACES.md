@@ -241,7 +241,7 @@ drill-in + `b.live` + plot + the fullscreen view at once.
   │    50 ┤          ╭─╮   ╭───╯╰─╯    ╰──                                 │
   │    25 ┤────╮ ╭───╯ ╰───╯                                              │
   │     0 ┼────╰─╯                                                        │
-  │       └──────────────────────────────────────────  -60s ──── now      │
+  │       └───────────────  60 ticks · 2s each · 2 returned nothing        │
   │                                                                        │
   │  MEM   ████░░ 512M / 2G · 25%        NET   ↓1.2M ↑3.4M                 │  ← b.live part: bars + kv
   │  PIDS  24                            BLK   0 / 4.1M                     │
@@ -250,6 +250,14 @@ drill-in + `b.live` + plot + the fullscreen view at once.
   │                                                                        │
   └─ n/p scroll · L logs · d drift · esc back ──────────── updated 1s ago ─┘
 ```
+
+**The axis says ticks, not seconds, and the drawing used to say `-60s ──── now`.** There is
+no clock on this path — docker emits an instant with no timestamp and `AdapterContext`
+carries none (C07 I1) — so the ring is keyed by tick index, and a duration label would be a
+claim it cannot support. It is true while the driver ticks on schedule and quietly wrong
+across a stall, which is the exact period someone opens this view to look at. So the caption
+reports the tick count **and** how many returned nothing, and the reader does the
+multiplication knowing what it rests on. `S3_WALK.md` A2.
 
 **How it is built:** the view is pushed once. The CPU plot and the MEM/NET block are each
 `b.live` parts the refresh driver ticks; the ports/mounts block is static and does not

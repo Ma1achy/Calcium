@@ -16,6 +16,7 @@ import { createTui, defaultTheme } from "@fmx/calcium";
 import { BINARY, buildManifest } from "./manifest.ts";
 import { createPsAdapter } from "./ps.ts";
 import { createDashboardHandler } from "./dashboard.ts";
+import { createContainerAdapter } from "./container.ts";
 
 const run = promisify(execFile);
 
@@ -65,7 +66,9 @@ const tui = createTui({
   // `altScreen` is false, and `acquire()` refuses to open the shell. The spec
   // says omitting it degrades to ASCII with no colour; it does not degrade.
   env: process.env,
-  adapters: { ps: createPsAdapter() },
+  // Keyed by the verb, and a sub-verb's key is its whole name — the space is
+  // part of it, not a separator this side of C18.
+  adapters: { ps: createPsAdapter(), "container stats": createContainerAdapter() },
   localHandlers: { dashboard: createDashboardHandler(engine, width) },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).

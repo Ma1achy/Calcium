@@ -976,6 +976,173 @@ rule.
 
 ---
 
+## F23 — `view: true` on a local tool is accepted and does nothing
+
+| | |
+|---|---|
+| **Surface** | S3, while choosing its route |
+| **Reached for** | a local verb that pushes a view |
+| **Verdict** | **a real Calcium finding**, filed rather than fixed |
+
+`asView` is computed in `runApp` (`execution.ts:596`) and nowhere else. `runLocal` (`:408`)
+never consults it, so a `local: true` tool declaring `view: true` parses, seals, validates,
+runs — and appends a transcript entry, silently, exactly as if the field were absent.
+
+C05 I20 refuses `view` with `interactive` and with `oneShot`, both because the flag would be
+inert and A03 §2's vacuity class in a manifest is what I19 exists to prevent. `view` with
+`local` is inert in the same way and is refused by nothing.
+
+**Filed, not fixed, and the reason is not cost.** The repair is to extend the local route,
+because `/dashboard` is local and S6/S7 will want views; refusing the combination would
+foreclose them to close a hole. What this app can prove today is that the combination is
+reachable and silent, and it proves it by having had to route around it.
+
+---
+
+## F24 — a live part re-renders with no width ★★
+
+| | |
+|---|---|
+| **Surface** | S3's plot, whose window length is a display decision |
+| **Reached for** | a sample count that suits the terminal |
+| **Verdict** | **a real Calcium finding** |
+
+`LiveSpec.render` is `(data: unknown) => Block` (`builders/types.ts:126`). Data, and nothing
+else — no width, no context. So anything width-dependent inside a live part is fixed when
+the document is built and cannot follow a resize.
+
+S3's plot is the concrete case. `form: "line"` does no windowing, so the ring's length *is*
+the window, and one sample per column is the density that neither downsamples nor stretches.
+The cap is taken from `AdapterContext.width` when the view opens and is wrong from the first
+resize afterwards: a view opened at 120 and read at 80 draws two samples per column.
+
+**F14's shape, one layer over, and worth separating from it.** F14 is the *local* route
+lacking width. This is the *refresh* route lacking it, and it bites the adapter route too —
+`ctx.width` is available at build and gone by the first tick. The app cannot compensate: the
+only other source is `process.stdout.columns`, which would be a second place the terminal's
+width lives, and C01 I13 exists to prevent exactly that.
+
+---
+
+## F25 — the dashboard takes a width it never reads
+
+`dashboard(snap, width, engine)` (`dashboard.ts:368`) accepts a width and uses it nowhere.
+`createDashboardHandler` threads it in from `main.ts`'s `width()`, which is F14's workaround
+reading `process.stdout.columns` — so the app pays F14's cost for a parameter no code
+consumes. Found while looking for whether the width reached a live part at all (F24).
+
+Small, and left in place rather than removed: the day a local handler is handed a width, the
+parameter is the seam it arrives on. Recorded so its uselessness is a decision.
+
+---
+
+## F26 — `docker stats` streams by default, and a request/response transport cannot consume it
+
+The same class as F1, and the second line the shim carries. `docker container stats` without
+`--no-stream` redraws a region forever and never exits; C06 invokes and waits for the
+process to end, so the verb would hang rather than fail. `bin/docker-json` supplies the flag
+for that verb only.
+
+**A translation, not a workaround, and the boundary matters.** The shim adds a flag docker
+has; it does not rewrite a verb. The shim earning its keep on a second far-side mismatch is
+evidence for F1's argument rather than against it — the framework's contract and the far
+side's defaults disagree in more than one place, and an app is where they are reconciled.
+
+One thing the shell found: `[ … ] && …` as the script's last command is a non-zero exit under
+`set -e`, so the short form of the guard would have made the shim fail for every verb that is
+not `stats`, after docker's output had already been written. Covered by S2.4.
+
+---
+
+## F27 — `b.plot` cannot pin an axis or label one ★★
+
+| | |
+|---|---|
+| **Surface** | S3's CPU plot |
+| **Reached for** | `yMin`, `yMax`, `xLabels` |
+| **Verdict** | **a real Calcium finding**, and the frame is the evidence |
+
+The `Plot` block carries `yMin`, `yMax`, `yFormat`, `xLabels` and `emptyMessage`. The builder
+passes `series`, `height` and `axes` (`builders/index.ts:283`) and nothing else, so an app
+using the public surface cannot reach any of them.
+
+**The consequence is not cosmetic, and only the frame showed it.** A container pinned at 100%
+CPU renders like this:
+
+```
+│100.21 │⠑⠢⢄⡀                                                    ⣀⠤⠒⠑⠢⢄⡀
+│       │   ⠈⠑⠢⢄⡀                                            ⢀⡠⠔⠊      ⠈⠒⠤⣀
+│100.02 │                          ⠈⠑⠒⠒⠒⠒⠒⠢⠤⠤⠤⠤⠤⠤⠤⠤⠤⢄⣀⣀⣀⡠⠔⠊⠁              ⠈⠑⠢⢄
+```
+
+The axis auto-ranges to the data, so **a 0.2% wobble is drawn as a mountain range**. A reader
+sees a load swinging violently; the load is flat at 100%. `yMin: 0, yMax: 100` would say the
+truth in one line and cannot be written. The block type has had the field the whole time.
+
+Second half, smaller: with no `xLabels`, the horizontal unit has to be a separate notice
+block — which is why S3's caption exists and why walk B1 had to rule on where it lives.
+
+---
+
+## F28 — an app cannot reach the live parts it just declared
+
+`b.live` records its `LiveSpec` in a `WeakMap` beside the document (`builders/live.ts:30`),
+and neither the map nor `liveDeclarations` is exported. So an app that builds a document
+holding live parts cannot get at the `fetch` or `render` it supplied — the declaration is
+write-only from the app's side.
+
+The cost is to testing, and it is the cost that matters here: a `fetch` can only be exercised
+by running the whole refresh driver, which needs a shell, a transport and a clock. S3 works
+around it by exporting `createCpuTick` so the tick has a seam, which is honest but is the app
+building a testing affordance the framework withheld.
+
+**And that shape is the one this branch already paid for.** Four defects in the previous
+stretch survived a green suite because every row called a mechanism directly and nothing
+called the wiring. A framework that makes the mechanism unreachable pushes every consumer
+toward whole-stack tests or none.
+
+---
+
+## F29 — the framework's own default `renderError` could not be constructed ★★★
+
+| | |
+|---|---|
+| **Surface** | S3, during an induced stall |
+| **Reached for** | nothing — this is what runs when a live fetch fails |
+| **Verdict** | **a real Calcium defect, fixed**, with this app as the consumer proving it |
+
+`partOf` builds the default error notice with `block()` rather than `b.notice`
+(`execution.ts:1030`), so it skipped `glyphFor` and produced `tone: "error"` with **no
+glyph** — which C04 I6 refuses and `block()` enforces. The one thing that runs when a live
+part's fetch fails could not be constructed at all:
+
+```
+BlockShapeError: notice "cpu-error": tone "error" requires a non-empty glyph (C04 I6, D29)
+    at requireGlyph (dist/data/viewmodel/construct.js:64:11)
+    at Object.renderError (dist/shell/execution.js:870:34)
+    at dist/shell/refresh.js:197:43
+```
+
+Thrown out of a `.then` inside the refresh driver: **unhandled, one tick after any fetch
+failure, on any part whose declarer did not override `renderError`.** The frame showed a view
+frozen mid-tick with the exception on stderr behind it — and a frozen live panel is exactly
+what a slow far side looks like, so nothing in the frame said *defect*.
+
+**A03 §2's vacuity class, in a default.** Every existing test either succeeds or supplies its
+own `renderError`, so the branch had never run — and a branch that has never run passes
+exactly like one that works. Forty lines above, the *stream*-failure path constructs the same
+notice **with** the glyph, so the pattern was known and missed in one place.
+
+Fixed, with `T1.40` driving a rejecting fetch through the pipeline and asserting the notice
+is rendered rather than thrown. Reverting the glyph kills that row and only that row.
+
+**It took inducing a stall to find, which is the part worth keeping.** Two frame-reads of a
+healthy container at two widths saw nothing — the path only runs when a fetch fails, and
+nothing about a working view suggests it exists. `docker rm -f` on the watched container,
+mid-capture, is what produced it.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that

@@ -27,9 +27,17 @@
  * scroll is not on the path, and a comment promising it would be describing
  * something C12 I1 forbids.
  *
- * Measured rather than assumed: S3, the surface this was built for, is 21 rows
- * at 120 and at 80 against a region a view fills, so nothing of it is out of
- * view and the granularity is invisible. Per-kind reducers for `table`,
+ * Measured rather than assumed: S3, the surface this was built for, is **30
+ * rows at 120 and 30 at 80** against a region a view fills, so nothing of it is
+ * out of view and the granularity is invisible.
+ *
+ * **The figure was 21 and that was an estimate of a different composition.** It
+ * was taken before S3 existed, from a drawing with three blocks and no axis
+ * caption; the built surface has four blocks, three of them live panels with
+ * borders, and an eight-row plot. Corrected from a replayed capture at both
+ * widths rather than recomputed, because the point of the number is what a
+ * terminal shows. The conclusion is unchanged — 30 still fits a view region on a
+ * 40-row terminal — and the margin it had was half what the comment claimed. Per-kind reducers for `table`,
  * `keyValue` and `panel` need no mid-row slicing and no measurer change, and
  * they are unwritten — `windowPatch` needed a dedicated file and a concept of
  * indivisible units, and each further reducer is that work again. They wait for
