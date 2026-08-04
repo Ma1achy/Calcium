@@ -27,16 +27,19 @@ import { doc } from "../support/blocks.js";
 import { result } from "../support/transport.js";
 import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { assignOffsets, backoffOf, BACKOFF_CAP_MS } from "../../src/shell/refresh.js";
+import { b } from "../../src/shell/builders/index.js";
 import type { PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult, TransportRouter } from "../../src/data/transport/index.js";
 import { block } from "../../src/data/viewmodel/index.js";
-import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
+import type { Block, ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 
 type Scripted = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
   adapt?: () => ViewDocument;
   adaptPatch?: () => ViewPatch | null;
+  /** A live part returned by the `/guide` local handler — T1.38's control arm. */
+  localLive?: () => Block;
 
   spawnShell?: () => { stdout: AsyncIterable<string>; exited: Promise<{ code: number | null }>; overflowed: boolean };
 }>;
@@ -196,7 +199,11 @@ function harness(script: Scripted = {}) {
   const pipeline = createExecutionPipeline(deps);
   // The app's own local verbs. The framework's six register themselves; these
   // are the fixture manifest's, and `seal()` reconciles both (C23 I27).
-  pipeline.register("guide", () => doc({ command: "/guide" }));
+  pipeline.register("guide", () =>
+    script.localLive === undefined
+      ? doc({ command: "/guide" })
+      : doc({ command: "/guide", blocks: [script.localLive()] }),
+  );
   pipeline.register("debug dump", () => doc({ command: "/debug dump" }));
   
   
@@ -1219,6 +1226,55 @@ describe("C23 §4 — the submit row's two other steps", () => {
       ]);
       expect(typeof h.recorded[0]?.exitCode, `${kind} recorded no code`).toBe("number");
     }
+  });
+
+  it("T1.38 (I33a): a live part is driven on the adapter route as well as the local one", async () => {
+    // **Both routes in one row, and that is the whole design of it.** A test
+    // exercising only `append` passes against the defect — which is exactly how
+    // the defect survived: `declareLive` was reached only inside
+    // `appendAndCommit`, the app route reaches the transcript through
+    // `settle(id, doc)`, and every existing assertion declared its parts from a
+    // local handler.
+    //
+    // The local arm is the **control**, and it runs first: if it does not tick,
+    // the adapter arm failing says nothing about routes.
+    const ticks = { local: 0, adapter: 0 };
+    const live = (id: string, count: () => void): Block =>
+      b.live({
+        id,
+        title: id,
+        every: 1000,
+        fetch: () => {
+          count();
+          return Promise.resolve(null);
+        },
+        render: () => block({ kind: "raw", id: `${id}-body`, text: "x" }),
+      });
+
+    const h = harness({
+      localLive: () => live("local-part", () => (ticks.local += 1)),
+      adapt: () =>
+        doc({
+          command: "/ps",
+          blocks: [live("adapter-part", () => (ticks.adapter += 1))],
+        }),
+    });
+
+    // Control: the local route, which was never broken.
+    h.pipeline.submit("/guide");
+    await settled();
+    h.tick(1500);
+    await settled();
+    expect(ticks.local, "the control must tick, or the row below proves nothing").toBeGreaterThan(
+      0,
+    );
+
+    // The route the document reaches by settling rather than by appending.
+    h.pipeline.submit("/ps");
+    await settled();
+    h.tick(1500);
+    await settled();
+    expect(ticks.adapter, "an adapter's b.live must be driven too (I33a)").toBeGreaterThan(0);
   });
 
   it("T1.21b (I29): a refusal is a submission and is recorded", async () => {
