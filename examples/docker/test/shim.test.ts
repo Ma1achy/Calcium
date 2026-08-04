@@ -1,0 +1,96 @@
+/**
+ * F1's shim — `--json` in, `--format json` out.
+ *
+ * The shim exists because Calcium's transport appends a flag docker rejects
+ * (see `bin/docker-json` and FINDINGS.md F1). It sits between the framework and
+ * the far side on every single invocation, so a defect in it is a defect in
+ * every verb the app will ever have.
+ *
+ * **A fake `docker` on PATH, not the real one.** What is under test is the
+ * translation, and the real docker answers `--format json` correctly whether or
+ * not the shim built the argv properly — an assertion against real output would
+ * pass on a shim that dropped an argument, provided the argument did not happen
+ * to matter for `ps`. The fake prints its argv and nothing else, so the
+ * assertion is about the exact list docker was handed.
+ */
+
+import { execFileSync } from "node:child_process";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { beforeAll, describe, expect, it } from "vitest";
+
+const SHIM = fileURLToPath(new URL("../bin/docker-json", import.meta.url));
+
+let fakeBin: string;
+
+beforeAll(() => {
+  fakeBin = mkdtempSync(join(tmpdir(), "docker-tui-fake-"));
+  const fake = join(fakeBin, "docker");
+  // One argument per line, so an argument containing a space is distinguishable
+  // from two arguments — which is the whole class of defect a rebuilt argv has.
+  writeFileSync(fake, '#!/bin/sh\nfor a in "$@"; do printf "%s\\n" "$a"; done\n');
+  chmodSync(fake, 0o755);
+});
+
+/** What docker was actually handed, one argument per element. */
+function argvOf(...args: string[]): string[] {
+  const out = execFileSync(SHIM, args, {
+    encoding: "utf8",
+    env: { ...process.env, PATH: fakeBin },
+  });
+  return out.split("\n").slice(0, -1);
+}
+
+describe("F1: the shim translates Calcium's --json into docker's --format json", () => {
+  it("S1.1: --json becomes --format json", () => {
+    expect(argvOf("ps", "--json")).toEqual(["ps", "--format", "json"]);
+  });
+
+  it("S1.2: --format json arrives as two arguments, not one", () => {
+    // The failure this rules out is `--format json` emitted as a single word,
+    // which docker reads as an unknown flag and the shell hides in a quoted
+    // string. Only a per-argument fake can tell them apart.
+    const argv = argvOf("ps", "--json");
+    expect(argv).not.toContain("--format json");
+    expect(argv[1]).toBe("--format");
+    expect(argv[2]).toBe("json");
+  });
+
+  it("S1.3: an argv with no --json is passed through byte-identical", () => {
+    const argv = ["images", "--all", "--filter", "dangling=true"];
+    expect(argvOf(...argv)).toEqual(argv);
+  });
+
+  it("S1.4: a user's own --format wins, and --json is dropped rather than appended", () => {
+    // Docker takes the last --format it is given, so emitting both would work
+    // by accident today and break the day that changes.
+    expect(argvOf("ps", "--format", "{{.Names}}", "--json")).toEqual([
+      "ps",
+      "--format",
+      "{{.Names}}",
+    ]);
+    expect(argvOf("ps", "--format={{.ID}}", "--json")).toEqual(["ps", "--format={{.ID}}"]);
+  });
+
+  it("S1.5: --json is translated once, however many times it arrives", () => {
+    // C06's `withJson` dedupes, so a doubled flag should not reach here — but
+    // the shim must not be the thing relying on that.
+    expect(argvOf("ps", "--json", "--json")).toEqual(["ps", "--format", "json"]);
+  });
+
+  it("S1.6: arguments containing spaces survive as single arguments", () => {
+    expect(argvOf("ps", "--filter", "label=a b", "--json")).toEqual([
+      "ps",
+      "--filter",
+      "label=a b",
+      "--format",
+      "json",
+    ]);
+  });
+
+  it("S1.7: the position of --json does not matter", () => {
+    expect(argvOf("ps", "--json", "--all")).toEqual(["ps", "--format", "json", "--all"]);
+  });
+});

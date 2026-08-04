@@ -85,6 +85,15 @@ Six problems, all real:
 | `State` is the machine-readable one | Derive the glyph and tone from `State`, never from `Status` |
 | `Ports` is a formatted string | Render as-is; a parser would be wrong within a release |
 | Everything is a string, including numbers | Coerce explicitly at the boundary |
+| `Platform` is an **object** — `{"architecture":"arm64","os":"linux"}` | The row above is no longer true of docker 29. The coercion boundary meets a shape it was not written for |
+| Docker **pre-truncates**, with U+2026 — `"Mounts": "/host_mnt/User…"` | Do not truncate it again. `cells()` measures `…` as one cell, so a second pass double-elides a value the far side already shortened |
+| `Image` can be 85 characters — `vsc-tui-kit-07d4a92…-features` | The mock drew `nginx:1.25` in an 18-wide column. Real generated names are five times that |
+
+**Three of those six rows were added after running `docker ps` for the first time**, and
+they are the argument for the whole exercise. The first three came from reading docker's
+documentation; these came from its output. `Platform` falsifies the row directly above it,
+which had been true when it was written and stopped being true without anything noticing —
+"docker will never change for us" cuts both ways, and the spec is the side that went stale.
 
 **An adapter over tidy JSON teaches nothing.** This is the real job, and it proves C07's claim that adapters absorb an awkward far side rather than requiring it to change — because docker will never change for us.
 
@@ -114,7 +123,7 @@ The `Status`/`State` split is the instructive one: the human-readable field and 
 | state | 85 | 10 | — | `State` |
 | status | 70 | 18 | — | `Status`, verbatim |
 | image | 60 | 20 | — | `Image` |
-| ports | 40 | 20 | — | `Ports`, condensed |
+| ports | 40 | 20 | — | `Ports`, verbatim; whitespace only |
 
 State glyphs follow the framework's vocabulary: `running` → `●` ok, `restarting` → `▲` warn, `paused` → `▪` warn, `exited` → `✗` error, `created` → `○` muted.
 
@@ -228,7 +237,7 @@ Each row is a claim the framework makes and this app tests.
 - **R1.1**: each of the five adapters produces a document passing `validateDocument`.
 - **R1.2**: `State` drives the glyph — five states, five glyphs; a container whose `Status` says "Up" while `State` says `restarting` renders `▲`.
 - **R1.3**: `Names` with three comma-joined values → first in the column, all three in the expand row.
-- **R1.4**: `Ports` empty → `—`; populated → verbatim, condensed only by whitespace.
+- **R1.4**: `Ports` empty → `—`; populated → verbatim, condensed only by whitespace. Docker sends `0.0.0.0:8080->80/tcp, [::]:8080->80/tcp` — an IPv6 twin per IPv4 entry, forty characters for one published port. Dropping the twin is parsing, and so is the `80→8080` form S2 was drawn with.
 - **R1.5**: numeric-looking strings are coerced explicitly; none reaches a block as a raw string where a number was intended.
 - **R1.6**: the empty state names `--all`.
 
@@ -246,7 +255,7 @@ Each row is a claim the framework makes and this app tests.
 - **R3.1**: zero containers → empty state, no table.
 - **R3.2**: 500 containers → renders within budget; C14 virtualises.
 - **R3.3**: a container name of 200 characters → truncated; state and status unaffected.
-- **R3.4**: a `Ports` string of 300 characters → truncated from the left, keeping the host port.
+- **R3.4**: a `Ports` string of 300 characters → truncated **from the end**, keeping the host port. The direction was inverted here and in S2, both times because the rule was reasoned against `80→8080`, which docker does not emit. In `0.0.0.0:8080->80/tcp` the host port is on the **left**, so "truncated from the left, keeping the host port" is not a thing that can be done. The rule is that a column keeps the field's identifying end; for this field it is the head.
 - **R3.5**: malformed JSON on one NDJSON line → that line degrades, the rest render (C06 §5).
 - **R3.6**: docker not installed → a clear error naming the binary, not a stack trace.
 - **R3.7**: the daemon down → all three `/stats` parts degrade independently, each with its own countdown.

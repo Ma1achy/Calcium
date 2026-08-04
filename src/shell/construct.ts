@@ -29,7 +29,8 @@ import { commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
 import { initialRegionHeight } from "./frame.js";
 import { createManifestStore, parseManifest } from "../data/manifest/index.js";
-import { FRAMEWORK_NAMES } from "../data/manifest/framework.js";
+import type { ManifestError } from "../data/manifest/index.js";
+import type { Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
   createTransport,
@@ -91,6 +92,33 @@ async function readOrAbsent(
   }
 }
 import type { Pipeline, StopReason } from "./types.js";
+
+/**
+ * The manifest file, read and decoded — the step that was missing (C22 I23).
+ *
+ * **A malformed document is reported, never thrown.** `JSON.parse` on a file the
+ * author wrote is a user error, and a bare `SyntaxError` escaping `start()`
+ * names a position in a string nobody can see. It becomes a `ManifestError`
+ * carrying the path, on the same channel as every other thing wrong with a
+ * manifest, so one handler covers both.
+ */
+async function readDocument(
+  config: Readonly<{ manifest: string | object; fs: Readonly<{ readFile: (p: string) => Promise<string> }> }>,
+): Promise<Result<unknown, readonly ManifestError[]>> {
+  const path = config.manifest as string;
+  let text: string;
+  try {
+    text = await config.fs.readFile(path);
+  } catch (err) {
+    return { ok: false, error: [{ path, message: `cannot be read: ${String(err)}` }] };
+  }
+  try {
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch (err) {
+    return { ok: false, error: [{ path, message: `is not valid JSON: ${String(err)}` }] };
+  }
+}
+
 
 /**
  * Every step, named. The log is compared against this rather than against a
@@ -198,12 +226,34 @@ export type Graph = Readonly<{
   log: readonly Step[];
 }>;
 
+/**
+ * A cause a reader can act on.
+ *
+ * `String(cause)` on a `ManifestError[]` is `[object Object],[object Object],…`,
+ * and until C22 I23 that was unreachable: the object arm threw a hand-written
+ * `Error` and the path arm never ran, so **no manifest error had ever been
+ * formatted**. The first one to arrive said nothing at all — which is the
+ * failure mode of a message on a path nothing exercises.
+ */
+function describe(cause: unknown): string {
+  if (Array.isArray(cause)) {
+    return cause
+      .map((e: unknown) =>
+        typeof e === "object" && e !== null && "message" in e
+          ? `${String((e as { path?: unknown }).path ?? "")}: ${String((e as { message: unknown }).message)}`
+          : String(e),
+      )
+      .join("; ");
+  }
+  return String(cause);
+}
+
 export class ConstructionError extends Error {
   constructor(
     readonly step: Step,
     cause: unknown,
   ) {
-    super(`construction failed at step \`${step}\`: ${String(cause)}`, { cause });
+    super(`construction failed at step \`${step}\`: ${describe(cause)}`, { cause });
     this.name = "ConstructionError";
   }
 }
@@ -252,35 +302,30 @@ export async function constructGraph(
     const adapters = createAdapterRegistry(config.adapters);
 
     const manifest = createManifestStore();
-    const parsed =
-      typeof config.manifest === "string"
-        ? parseManifest(await config.fs.readFile(config.manifest))
-        : { ok: true as const, value: config.manifest };
-    if (!parsed.ok) throw new ConstructionError("registries", parsed.error);
 
-    // **A `Manifest` handed over as an object is one nobody parsed** (C22 §3a).
-    // `parseManifest` appends `tui-kit`'s six verbs and is the only thing that
-    // does (C05 §3), so an object literal satisfying the type reaches here
-    // without them — and C23 registers their handlers regardless, so `/help`
-    // and `/clear` are installed and unclassifiable.
+    // **Both arms are parsed here, and that is the whole of I23** (C22 §3a).
     //
-    // C23 I27's reconciliation is what reports it, and it reported it only once
-    // `pipeline` had a default: until then the graph's pipeline was `null` and
-    // the two records were never compared. Checked here as well as there
-    // because the message from a registry mismatch names the symptom and this
-    // one names the cause.
-    const missing = FRAMEWORK_NAMES.filter(
-      (name) => !parsed.value.tools.some((t) => t.name === name),
-    );
-    if (missing.length > 0) {
-      throw new ConstructionError(
-        "registries",
-        new Error(
-          `the manifest is missing tui-kit's own verbs (${missing.join(", ")}) — ` +
-            `pass the raw document, or the result of parseManifest, rather than a hand-built Manifest`,
-        ),
-      );
-    }
+    // The object arm used to be taken as already-parsed and refused when it
+    // lacked `tui-kit`'s six verbs — which no author could supply, because
+    // `parseManifest` derives them and is exported from no entry point. The path
+    // arm handed `readFile`'s **string** to a function that requires a record,
+    // with no `JSON.parse` between them, so it had never run. `createTui` could
+    // not be called from the public surface by either route, and every harness
+    // in this repository reaches through the package boundary for
+    // `parseManifest`, so nothing inside the package could see it. The reference
+    // app found it on its first start.
+    //
+    // Construction still appends nothing and derives nothing — it *parses*. The
+    // single-producer argument that refused an append here is untouched; what
+    // changes is that the object arm stops demanding the parser's own output.
+    const document: Result<unknown, readonly ManifestError[]> =
+      typeof config.manifest === "string"
+        ? await readDocument(config)
+        : { ok: true, value: config.manifest };
+    if (!document.ok) throw new ConstructionError("registries", document.error);
+
+    const parsed = parseManifest(document.value);
+    if (!parsed.ok) throw new ConstructionError("registries", parsed.error);
 
     manifest.load(parsed.value);
 

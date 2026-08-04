@@ -270,12 +270,56 @@ exactly what C23 I27's reconciliation reports. **It could not report it while
 with no default was also hiding the defect that the seam's own consumer exists to
 catch.
 
-Construction refuses that manifest by name (I23) rather than appending the six
-here. Appending would put a second producer beside `parseManifest` and make
-`appTools` wrong, and C05 §3's whole argument is that a `parseManifest` returning
-something not yet a manifest is the seam-shaped defect — *valid at one call site
-and incomplete at another*. This is that defect arriving through the object
-literal rather than through the function.
+**Refusing it was right about the danger and wrong about the remedy, and the
+first consumer is what showed the difference.** Construction refused such a
+manifest by name (I23) rather than appending the six here, reasoning that
+appending would put a second producer beside `parseManifest` and make `appTools`
+wrong — and that reasoning still holds. What it missed is that **the refusal
+left no accepted input at all.** `parseManifest` is exported from none of the
+three entry points, so the advice in the refusal names a function the reader
+cannot reach; and the `string` arm, which was supposed to be the working path,
+passed `readFile`'s string straight into a function that requires a record, with
+no `JSON.parse` between them. It had never run. `createTui` could not be called
+from the public surface by either route, and every one of C22's own harnesses
+reached through the package boundary for `parseManifest` to construct at all —
+so nothing inside the package could see it. docker-tui found it on its first
+start (R01; `examples/docker/FINDINGS.md` F7).
+
+**Both arms now go through `parseManifest`, which is the resolution rather than
+a compromise.** The single-producer argument is untouched: construction appends
+nothing and derives nothing, it *parses*, and the one function that may add the
+six is still the only one that does. What changes is that the object arm stops
+demanding a value only that function can produce.
+
+    const raw = typeof config.manifest === "string"
+      ? JSON.parse(await config.fs.readFile(config.manifest))   // the missing step
+      : config.manifest;
+    const parsed = parseManifest(raw);
+
+An author writes `{ schema, binary, version, tools }` — their own verbs, which is
+all they know — and that document is a valid input to `parseManifest` already,
+because the parser reads `raw["tools"]` as the app's tools and *derives*
+`appTools` from them. **`TuiConfig.manifest` is therefore typed
+`ManifestDocument | string`, not `Manifest | string`** (I23a): a `Manifest` is
+the parser's *output*, and asking an author to supply one was asking for the
+result before the call.
+
+Handing back an already-parsed `Manifest` now fails loudly instead of silently,
+and for free: its `tools` carries the framework's six, I6 refuses duplicate
+names, and the parse error says so. C05 §3 called that property "worth more than
+the tidiness" about apps shadowing `clear`, and it covers this case with no rule
+added.
+
+**I23's refusal is deleted rather than kept beside the parse.** With both arms
+parsed it can no longer fire — a guard whose condition has become unreachable is
+A03 §2's vacuity class, and one that reads as a second line of defence is worse
+than none, because the next reader trusts it. C23 I27's reconciliation is the
+real check and is unaffected.
+
+**A malformed document is reported, not thrown.** `JSON.parse` on a file the
+author wrote is a *user* error, and a raw `SyntaxError` escaping construction
+names a position in a string nobody can see. It becomes a `ManifestError` with
+the path, on the same channel as every other thing wrong with a manifest.
 
 **And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
 
@@ -647,7 +691,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I20** — `tui-kit` reads no environment, variable or record. `PRISM_TUI_STATE_DIR` arrives as `TuiConfig.stateDir`, `PRISM_TUI_TRANSPORT` as `TuiConfig.transport` (C06 I18), and the process environment itself as `TuiConfig.env`, which C22 hands to C02 and C21. A03 SS10's allow-list names one file and that file does not use it — no module under `src/` touches `process.env`.
 - **I21** — `beforeRelease` is synchronous and returns `undefined`, never a thenable. `killAll()`'s promise is deliberately not awaited: its signals are delivered synchronously and only the reaping is deferred, and awaiting it would make the handler `async`, which C01 I5 forbids because a signal handler cannot await.
 - **I22** — `pipeline` has a working default, as every other optional field does (I17). `config.pipeline` remains the injection point C22's own tests construct a graph through, and a graph always carries a `Pipeline` — an injection seam with no default is a missing wire that only the tests hold together.
-- **I23** — A `Manifest` reaching construction carries `tui-kit`'s own six verbs, or construction fails naming them. `parseManifest` is the only thing that appends them (C05 §3); an object satisfying the type is one nobody parsed, and C23 would register handlers for verbs nothing can classify to.
+- **I23** — Every manifest reaching the stores has been through `parseManifest`, whichever arm of `config.manifest` supplied it. Restated: it previously said construction *refuses* a manifest lacking `tui-kit`'s six verbs, which was right about the danger and left no accepted input — `parseManifest` is exported nowhere, and the path arm handed `readFile`'s string to a function requiring a record. Construction still appends nothing and derives nothing; it parses, and the one function that may add the six remains the only one that does. An already-parsed `Manifest` handed back now fails on I6's duplicate check, loudly and for free.
+- **I23a** — `TuiConfig.manifest` is `ManifestDocument | string`. A `Manifest` is the parser's *output* — it carries `appTools`, which the parser derives — so requiring one from an author was requiring the result before the call. An author supplies `{ schema, binary, version, tools }`: their own verbs, which is all they can know.
 - **I24** — Raw bytes reach the decoder through `lifecycle.onInput` and through nothing else, and the decoder's deadlines are polled on C22's injected schedule. C22 is the only file that may read stdin, for the reason it is the only one that may read the clock: two readers of one stream is two half-decoded sequences, and the second reader is invisible to the first. The wake-ups are here because C16 owns no timer and C01 owns no clock, so a decoder without them delivers a lone `Esc` on the next keystroke rather than after its window (§3 step 12).
 - **I25** — A suspension is bracketed by `suspend()` before the handoff and `resume()` then `decoder.reset()` after it. The listener's removal is C01's, in the transition; the reset is C22's, because only this file knows both that the terminal came back and that a decoder is holding a sequence the child interrupted (C01 I18, C16 I18).
 - **I26** — Step 11 registers a handler for every focus target that has bindings, and the effect table in `keys.ts` is total over C16's `KeyAction` union. A binding `/help` renders is therefore one dispatch executes, by construction rather than by agreement (C16 I19).
@@ -738,6 +783,9 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4f** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
 - **T1.4h** (I26): every `defaultKeymap` binding, pressed through a real decoder into a constructed graph, produces its documented effect — fourteen cases, driven from the table rather than listed. A hand-written list is the shape that let fourteen bindings go unexecuted while every test passed.
 - **T1.4i** (I27): a paste of two hundred lines → exactly one `commit("input")`; a scroll key → exactly one, issued by the loop and not by the handler. Both halves, because a handler that also commits passes the first.
+- **T1.4m** (I23, I23a): a session constructed from **the public entry point only** — `import { createTui } from "@fmx/calcium"`, a `ManifestDocument` literal of the app's own verbs, no deep import anywhere in the test — starts, and `/help` lists the framework's six alongside it. The constraint is the test: every existing construction harness reaches through the package boundary for `parseManifest`, so each tests a route no consumer has, and that is why both arms of `config.manifest` could be broken with the suite green. The row fails if either the `JSON.parse` or the object-arm parse is removed.
+- **T1.4n** (I23): the path arm — a `manifest.json` on the fake filesystem — constructs, and a file containing malformed JSON produces a `ManifestError` naming the file rather than a `SyntaxError` escaping `start()`.
+- **T1.4l** (I23): an already-parsed `Manifest` handed back to `createTui` fails on I6's duplicate-name check, naming a framework verb. The refusal that used to be C22's is C05's now, and this is the row that says it still happens.
 - **T1.4g** (I24): a lone `Esc` with no following byte → the key is dispatched when its window elapses on the injected schedule, not when the next key arrives. A decoder wired without wake-ups passes T1.4f and delivers `Esc` on the next keystroke, which is a key that appears to do nothing until you press another one.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
 - **T1.6** (I10): a fake clock and filesystem reach every component that takes one — asserted per component.

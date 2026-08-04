@@ -13,27 +13,27 @@ import { constructGraph, type FrameQueries, type Graph } from "../../src/shell/c
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { createTui } from "../../src/shell/session.js";
 import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
-import { parseManifest } from "../../src/data/manifest/index.js";
 import { fakeStdin, fakeStdout, type FakeStdin, type FakeStdout } from "./fake-terminal.js";
 
 /**
- * **Parsed, not hand-built.** `parseManifest` is the only thing that appends
- * `tui-kit`'s own six verbs (C05 §3), so an object literal satisfying the
- * `Manifest` type reaches construction without them — and C23 registers their
- * handlers regardless, so `/help` and `/clear` end up installed and
- * unclassifiable. Construction now refuses that manifest; this is what a
- * consumer is supposed to pass.
+ * **What an author writes, and nothing more** (C22 I23a).
+ *
+ * This used to call `parseManifest` — imported through a deep path — and hand
+ * construction the result. That is what made both arms of `config.manifest`
+ * broken while the suite stayed green: every harness tested a route no consumer
+ * has, and a package cannot reach through its own boundary and notice. The
+ * reference app found it on its first start (R01, FINDINGS F7).
+ *
+ * So this is a `ManifestDocument`: the app's own verbs, which is all an author
+ * knows. Construction parses it. **The deep import is gone, and its absence is
+ * the point** — the harness now exercises the same path a consumer does.
  */
-export const MANIFEST: TuiConfig["manifest"] = (() => {
-  const parsed = parseManifest({
-    schema: "tui.manifest/1",
-    binary: "prism",
-    version: "1.0.0",
-    tools: [],
-  });
-  if (!parsed.ok) throw new Error("the test manifest must parse");
-  return parsed.value;
-})();
+export const MANIFEST: TuiConfig["manifest"] = {
+  schema: "tui.manifest/1",
+  binary: "prism",
+  version: "1.0.0",
+  tools: [],
+};
 
 export function fakeFs(): FileSystem {
   const files = new Map<string, string>();

@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# docker, with Calcium's `--json` translated into docker's `--format json`.
+#
+# ---------------------------------------------------------------------------
+# THIS FILE IS A FINDING. See FINDINGS.md, F1.
+#
+# Calcium's subprocess transport appends `--json` to every invocation and offers
+# no way to change it (`src/data/transport/argv.ts`, C06 I4). Docker does not
+# have that flag:
+#
+#     $ docker ps --json
+#     unknown flag: --json
+#
+# It is not one line to change, which is why nothing is changed. `withJson` is
+# imported by the subprocess, emulated and fixture transports; C23 reads
+# `argv.includes("--json")` to decide `userRequestedJson`; C07 §4 and C06 §3 both
+# document the flag as the contract. *The far side speaks `--json`* is a premise
+# the framework is built on, and R01 §2 chose docker precisely because it is not
+# Prism-shaped — this is that choice paying off on first contact.
+#
+# So the app absorbs it, which is what an adapter layer is for, and the framework
+# is left alone until a change to it can be argued with this as evidence.
+#
+# DELETE THIS FILE when Calcium can express the far side's JSON flag — then set
+# `binary` back to "docker" in src/manifest.ts and the app is one file smaller.
+# The deletion is the finding closing; nothing else needs to happen.
+# ---------------------------------------------------------------------------
+
+set -eu
+
+# An explicit `--format` from the user wins, and `--json` is then dropped rather
+# than appended after it. Docker takes the last `--format` it is given, so
+# emitting both would work by accident and break the day that changes.
+has_format=0
+for arg in "$@"; do
+  case "$arg" in
+    --format | --format=*) has_format=1 ;;
+  esac
+done
+
+# Rebuild the argument list: append the translated form, then shift the original
+# arguments off the front. `for arg in "$@"` fixes its word list before the loop
+# body runs, so `set --` inside it is safe.
+original=$#
+for arg in "$@"; do
+  if [ "$arg" = "--json" ]; then
+    if [ "$has_format" -eq 0 ]; then
+      set -- "$@" --format json
+      has_format=1
+    fi
+  else
+    set -- "$@" "$arg"
+  fi
+done
+shift "$original"
+
+# `exec`, so signals and the exit code reach docker directly. C21 sends SIGTERM
+# and escalates; an intermediate shell would absorb the first one and Calcium
+# would report a timeout for a process that was told to stop.
+exec docker "$@"

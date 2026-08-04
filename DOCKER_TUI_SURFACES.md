@@ -79,23 +79,62 @@ The full table, and where responsive columns are shown. A bare table entry — t
 ```
 ❯ /ps
 
-  NAME          IMAGE              STATUS        PORTS              CPU     MEM
-  api-gateway   nginx:1.25         ● Up 3 days   80→8080, 443→8443  84%    512M
-  postgres      postgres:16        ● Up 12 days  5432→5432          8%     1.1G
-  redis         redis:7-alpine     ● Up 12 days  6379               2%     40M
-  worker-1      myco/worker:v4     ● Up 3 days   —                  41%    256M
-  migrate       myco/migrate:v4    ○ Exited (0)  —                  —      —
+  NAME          IMAGE              STATUS        PORTS                   CPU     MEM
+  api-gateway   nginx:1.25         ● Up 3 days   0.0.0.0:8080->80/tcp,…  84%    512M
+  postgres      postgres:16        ● Up 12 days  0.0.0.0:5432->5432/tcp  8%     1.1G
+  redis         redis:7-alpine     ● Up 12 days  6379/tcp                2%     40M
+  worker-1      myco/worker:v4     ● Up 3 days   —                       41%    256M
+  migrate       myco/migrate:v4    ○ Exited (0)  —                       —      —
 
   9 running · 5 stopped · /ps -a shown
 ```
 
+**The `PORTS` column above is what docker emits, not a tidied version of it**, and the
+earlier drawing here was the tidied version. It showed `80→8080, 443→8443`; docker sends
+`0.0.0.0:8080->80/tcp, [::]:8080->80/tcp` — forty characters for one published port, with
+an IPv6 twin for every IPv4 entry. Reaching the old drawing from the real string means
+parsing it, which R01 commitment 5, R1.4 and R5.2 forbid outright: *a parser would be
+wrong within a release*, and R5.2 is the fail-on-revert test that says so.
+
+A drawing is a claim about output, and this one was a claim no adapter obeying R01 could
+satisfy. It is corrected rather than annotated, because the next reader builds against the
+picture.
 **At 80 columns:** `PORTS` drops first (low priority), then `MEM`, then `CPU`; `NAME` and
 `STATUS` never drop. Narrow the terminal live and the columns shed in priority order.
 **CP6 shown rather than tested** — the single clearest demonstration of a Calcium
 capability no other tool has.
 
 `STATUS` never truncates (a half-word reads as a different word); `PORTS` truncates from
-the end; `→` is the ASCII-degradable arrow.
+the **end**; `→` is the ASCII-degradable arrow.
+
+### The `PORTS` ruling, and the thing it got wrong first
+
+**The rule is: a column keeps the field's identifying end**, and which end that is belongs
+to the field rather than to the table. `ColumnDef.truncateFrom` is named for the operation for
+exactly this reason (C04 I30) — `"end"` and `"start"` say which side characters are
+*removed* from, so every column answers separately. For a name the head identifies and the
+tail is a hash; for a path the leaf does.
+
+**For `PORTS` the identifying end is the head, and establishing that took two attempts.**
+
+The first ruling said *start*, reasoning that a mapping is `80→8080` and the host port is
+the tail — the thing a reader would act on. Every step of that is sound and the premise is
+false: `80→8080` is a drawing in this document, not a string docker emits. Docker sends
+`0.0.0.0:8080->80/tcp`, where the host port sits near the **left**, and R01 forbids
+reformatting it. Under verbatim rendering `truncate: "end"` yields `0.0.0.0:8080…` and
+keeps the host port; `"start"` yields `…80->80/tcp` and loses it.
+
+R01 R3.4 makes the same mistake from the other direction — *"truncated from the left,
+keeping the host port"* is not satisfiable against this format, because the host port is
+what is on the left. It is corrected there too.
+
+**This is the class where an artefact is correct about the interaction it found and wrong
+about a mechanism it assumed existed.** The interaction was real — two specs disagreeing
+about one column — and the remedy rested on a format nobody had checked the far side
+against. The finding survived; only the answer changed. It is also the reason a
+classification table is written against **captured output** rather than against the
+drawings in the spec it is testing: the row `Ports` long meets `truncate` cannot be
+decided from a document that shows a string the far side never sends.
 
 Row actions (focused row) — the **drill-in surface** into S3:
 

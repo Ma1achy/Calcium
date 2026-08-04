@@ -117,6 +117,19 @@ export type Manifest = Readonly<{
   appTools: readonly ToolDef[];
 }>;
 
+/**
+ * What an app author writes, as against what `parseManifest` returns (C22 I23a).
+ *
+ * A `Manifest` carries `appTools`, and the parser *derives* it — along with the
+ * framework's own six verbs (§3). Requiring one of those from an author was
+ * requiring the result before the call, and it made `TuiConfig.manifest`'s
+ * object arm impossible to satisfy: the only way to obtain a `Manifest` is to
+ * call a function that is exported from no entry point.
+ *
+ * So this is the input shape: the app's own verbs, which is all an author knows.
+ */
+export type ManifestDocument = Omit<Manifest, "appTools">;
+
 export type ToolMatch = Readonly<{
   tool: ToolDef;
   consumed: number; // tokens the tool name consumed

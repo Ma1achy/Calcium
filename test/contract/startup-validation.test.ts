@@ -22,7 +22,6 @@
 import { describe, expect, it } from "vitest";
 import { createTui, defaultTheme } from "../../src/index.js";
 import { MANIFEST, buildGraph } from "../support/session.js";
-import { parseManifest } from "../../src/data/manifest/index.js";
 
 describe("C24 §8 — the seventh severity", () => {
   it("T3.11 (§8): an adapter for a verb the manifest does not declare warns, and the session opens", async () => {
@@ -61,14 +60,15 @@ describe("C24 §8 — the seventh severity", () => {
     // control has to supply one: asserting "no warning" against a manifest that
     // could not have declared anything would pass for an implementation that
     // never warns.
-    const parsed = parseManifest({
+    // A `ManifestDocument` — the app's own verb and nothing else (C22 I23a).
+    // This used to call `parseManifest` through a deep path and pass its output,
+    // which is the bypass that let both arms of `config.manifest` stay broken.
+    const manifest = {
       schema: "tui.manifest/1",
       binary: "prism",
       version: "1.0.0",
       tools: [{ name: "ps", local: false, summary: "list containers", args: [], flags: [] }],
-    });
-    if (!parsed.ok) throw new Error(`fixture manifest does not parse: ${JSON.stringify(parsed.error)}`);
-    const manifest = parsed.value;
+    } as const;
     const declared = "ps";
 
     const { graph } = await buildGraph({

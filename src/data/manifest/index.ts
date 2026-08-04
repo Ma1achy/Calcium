@@ -16,6 +16,7 @@ export {
   type ArgType,
   type FlagDef,
   type Manifest,
+  type ManifestDocument,
   type ManifestError,
   type ManifestStore,
   type ToolDef,
