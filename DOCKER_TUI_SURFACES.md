@@ -41,8 +41,26 @@ the confirm         S2 stop/start                   ~   forces the open ruling
 ## S1 — the landing dashboard (no command)
 
 The home screen and the opening shot. **Not** a pushed view — it is the **live block on
-launch**: `b.live` parts composed with static panels, refreshing in place. Typing a
-command freezes it into the transcript, exactly the transcript model.
+launch**: `b.live` parts composed with static panels, refreshing in place. It is an
+ordinary transcript entry, so `/clear` removes it and it scrolls away as the session fills.
+
+**It does not stop refreshing when a command is typed, and the earlier drawing said it
+did.** *"Typing a command freezes it into the transcript"* was a claim about a mechanism
+that does not exist and must not: C23 I9 is that a frozen entry keeps receiving patches
+until settled, I33 lists five teardown triggers **and not freeze**, and C24 §5 records its
+own *teardown on freeze* row being deleted against I9 — *"freezing is not stopping; a
+`--watch` scrolled out of view is still running, which is the whole of what I9 protects."*
+
+Freezing in C13's sense (I2) is a **display** property: the newest entry is `live`, and
+appending a later one makes the previous one not-live. That is what the transcript model
+says and all it says. A landing block you can scroll back to and find still current is the
+better behaviour anyway; the cost is that it polls until eviction, and that cost is the
+price I9 knowingly pays.
+
+**F11's class, fifth instance** — a drawing asserting behaviour, this time contradicting a
+settled invariant rather than the far side's output. It was caught because the fix it
+implied was checked against I9 *before* being built; building it would have re-introduced a
+row that had already been deleted for cause. FINDINGS F17.
 
 **This is a real frame now**, captured from the running application at 120 columns and
 replayed through a terminal emulator — not a drawing. It is kept in preference to the
@@ -99,10 +117,12 @@ two orders — conflating them is invisible until a frame has an outlier in it.
 
 **`no command` is aspirational, and the gap has a number.** There is no seam for a first
 entry: `TuiConfig` has no field for one and none of C22's construction steps appends
-anything, so this surface is reached with `/dashboard` today. F9. And when the seam is
-built it needs a second decision, because **a live entry does not freeze when a command is
-typed** — it keeps polling for the life of the session, as does every other dashboard
-entry above it. F17.
+anything, so this surface is reached with `/dashboard` today. F9.
+
+The seam declares a part that **ticks until the entry is evicted or the transcript is
+cleared** — not until the first command. If launch cheapness matters more than a live
+landing screen, the part is declared one-shot by omitting `every`, which is a decision the
+seam makes rather than a behaviour it has to build.
 
 ### What the far side actually supplies, and the two corrections it forced
 

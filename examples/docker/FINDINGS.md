@@ -639,53 +639,82 @@ hint that it is the one part of a live block that is not live.
 
 ---
 
-## F17 — a live entry never stops, and nothing freezes it ★★
+## F17 — an adapter's `b.live` is never driven ★★
 
 | | |
 |---|---|
-| **Surface** | S1's central claim — *typing a command freezes it into the transcript* |
-| **Reached for** | the freeze. There is not one |
-| **Verdict** | **a real Calcium finding**, and the answer F9's seam could not be designed without |
+| **Surface** | S1's running panel, and every live part S3 and S4 will want |
+| **Reached for** | `b.live` from an adapter, as `b.live` from a local handler already worked |
+| **Verdict** | **a real Calcium finding**, fixed — C23 I33a, T1.38, T6.38 |
 
-Measured, not reasoned. `/dashboard`, four ticks, then `/ps` submitted over it, replaying
-prefixes of one capture:
+**Measured before it was written up, and the measurement is the entry.** A probe declaring
+the same one-field live part on each route, run against the real shell and replayed through
+the terminal emulator, twelve seconds at a one-second interval:
 
-| prefix | the dashboard entry's rows |
+| | 55% | 70% | 85% | 100% |
+|---|---|---|---|---|
+| adapter route | `tick 0` | `tick 0` | `tick 0` | `tick 0` |
+| local route | `tick 4` | `tick 7` | `tick 9` | `tick 13` |
+
+`declareLive` was reached only inside `appendAndCommit`. The app route appends a **pending**
+entry and reaches the transcript through `settle(id, doc)`, so the document carrying the
+blocks arrived at a call that did not register anything. An adapter's live part rendered its
+loading state and stayed there for the life of the session, with nothing anywhere reporting
+a fault.
+
+**The comment was the tell.** *"Called from the one place a document reaches the transcript,
+so a part declared on any route is driven and no route has to remember to."* There are two
+such places. A sentence claiming total coverage of a set it had miscounted — and no test in
+the repository could contradict it, because none of them declared a live part from an
+adapter. Fixed by making the sentence true rather than softer: **declared on any route is
+driven; stopped on settle, pop, eviction, clear or shutdown, never on freeze.**
+
+After the fix, the same probe: `tick 3 · tick 6 · tick 9 · tick 12`.
+
+**It gates step 3, which is why it was fixed before it.** S4's `/stats` is adapter-driven
+and would have refreshed never; S3 puts a part in a pushed *view*, and gap 7's answer would
+have been contaminated by an entry-route defect leaking into it.
+
+---
+
+## F17a — the half that is not a defect, and the instruction that would have broken it ★★
+
+| | |
 |---|---|
-| 0.86 — after `/ps` has rendered below it | `reverent_proskuriakova  █░░░░░░░ 13.2%` · `CPU 114%` |
-| 1.00 | `reverent_proskuriakova  ░░░░░░░░ 0.2%` · `CPU 101%` |
+| **Surface** | S1's *"typing a command freezes it into the transcript"* |
+| **Reached for** | a release trigger on `append`, so a landing dashboard stops polling |
+| **Verdict** | **not a defect** — the specs considered this and ruled against it |
 
-It is still ticking, several entries down the transcript. And with two dashboards open, both
-tick independently and out of step:
+The app's measurement was real: a `/dashboard` entry keeps ticking after `/ps` renders
+below it, and two dashboards tick independently and out of step — so every dashboard ever
+opened polls docker until eviction. From the consumer's side that reads exactly like the
+other half of F17.
 
-| prefix | first entry | second entry |
-|---|---|---|
-| 0.85 | 235.3 MiB | 235.6 MiB |
-| 0.90 | **255 MiB** | 235.6 MiB |
+It is not. Three documents already settle it:
 
-So **every `/dashboard` ever run keeps polling for the life of the session** — here, two
-`docker` subprocesses every two seconds, per entry, forever. Ten dashboards is twenty
-subprocesses a tick against a daemon, from a transcript the reader has scrolled past.
+- **C23 I9** — *a frozen entry keeps receiving patches until settled.*
+- **C23 I33** — a refresh stops on five triggers, *"and **not on freeze**"*.
+- **C24 §5** — its own *teardown on freeze* row was **deleted** against I9: *"freezing is
+  not stopping — a `--watch` scrolled out of view is still running, which is the whole of
+  what I9 protects."*
 
-**This is defensible and it is not what anything says.** C23 I33's five release triggers are
-about an entry ceasing to exist — eviction, `/clear`, teardown — and by that rule a live
-part in a live entry should keep living. But S1, S02 and S13 all describe a landing block
-that *settles* when work begins, and R01's whole model is that a transcript entry is a
-record of a moment. A block that keeps rewriting itself after the reader has moved on is
-neither.
+So "wire release to append" would have re-introduced a row removed for cause, and broken
+the case it was removed for: a long-running `--watch` would die the moment the user typed
+anything.
 
-**Why it had to be answered before F9's seam is designed.** The seam is not "append a first
-document" — S1's first entry is a *live* one, and the interesting half of the feature is what
-happens to it when the user types. That question has an answer now, from a working consumer,
-and it is *nothing happens*. So the seam has to bring a policy with it: either a release
-trigger for "an entry stopped being the newest", or an explicit statement that live entries
-run until evicted and a landing dashboard must therefore be cheap. Designing the config
-field first and discovering this after would have been F4 on a fail-on-revert-protected
-seam.
+**The finding is that the instruction to build it came from the design authority and was
+wrong, and that checking it against the invariant before building is what caught it.**
+That is the by-hand walk applied to a kickoff rather than to a component — *when a ruling
+names an operation, check the operation exists before the ruling is written down*, with
+"exists" reading here as "is not already forbidden". The cost of the check was one grep;
+the cost of skipping it would have been a spec commit, a code commit, a fail-on-revert row
+and a regression in the behaviour I9 exists to protect.
 
-C22 §8a's anticipation lands exactly here: *"if anything ever appends earlier — a startup
-notice, a restored session — that is the day I7 and I5 genuinely conflict."* A live first
-entry is that restored session, and it arrives with a timer attached.
+**What changes instead is S1.** The drawing claimed a mechanism that contradicts a settled
+invariant, which is F11's class one step further in: not a drawing wrong about the far
+side's output, but a drawing wrong about the framework's own rules. `DOCKER_TUI_SURFACES.md`
+now says the landing block ticks until evicted or cleared, and the launch seam declares its
+part one-shot if launch cheapness matters more than a live landing screen.
 
 ---
 
@@ -794,6 +823,17 @@ needs it is built.
   | 6 | the collapse-the-tail decision | *Show N, then say how many are hidden* is a density decision every live list makes, and each one will get the `N = 1` boundary wrong on its own |
   | 2 | `width()` in `main.ts` | F14. C01 already knows this number and a local handler is not told it |
   | **50** | | |
+
+  **As a prioritised list of what the consumer surface lacks**, which is what the budget is
+  a proxy for. Ordered by what a second app would hit first, not by line count:
+
+  | # | the affordance | who needs it | shape of the fix |
+  |---|---|---|---|
+  | 1 | **an NDJSON-aware transport** | every far side that speaks `--format json`, which is most modern CLIs | C06 already retains `stdoutRaw` when the whole-document parse fails (I6). One step further — a per-line parse behind a flag on the tool, or an exported helper — and no adapter writes this again. It is also 22 of the 50 lines |
+  | 2 | **`compose` on the public surface** (F13) | every local handler, which is every app-owned verb | Export it, or overwrite `meta` on the local route as C07 I13 already does on the adapter route. The argument is C07 I13's own: *a provenance an app author supplies once per verb is a provenance that is wrong somewhere* |
+  | 3 | **a value bar** (gap 3) | anything rendering a quantity — CPU, disk, progress toward a limit | `b.progress` is a labelled progress bar and tones are severity slots, so a load bar borrows `warn`/`error` and means neither. Needs either a value-scale primitive or a documented ruling that severity is the only axis |
+  | 4 | **width for a local handler** (F14) | every app-owned verb that lays anything out | Two lines in the app and wrong across a resize. `AdapterContext` already carries `width`; `LocalContext` carries `command` and nothing else, and nothing argues a local verb needs less |
+  | 5 | **a density helper** | any live list longer than the panel | *Show N, then say how many are hidden*, with the `N = 1` boundary decided once. Six lines here, and every app will get that boundary wrong independently |
 
   354 − 50 = **304**, against a budget of 300. That is close enough to the line that the
   arithmetic should not be leaned on — the point is not that the budget is exactly right,

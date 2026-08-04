@@ -189,7 +189,7 @@ So it is asked of the working `/dashboard`, by reading frames across the submit 
 **before** the seam is specified. Whatever the answer, it goes in `FINDINGS.md` and the
 seam is designed on top of it.
 
-### The answer: it does not freeze, and nothing was ever going to make it
+### The answer, and the half of it that was a wrong question
 
 Measured across one capture — `/dashboard`, four ticks, `/ps` over the top:
 
@@ -201,13 +201,27 @@ Measured across one capture — `/dashboard`, four ticks, `/ps` over the top:
 Still ticking, several entries down. Two dashboards tick independently and out of step.
 FINDINGS F17 carries the figures.
 
-**What this changes about the seam.** It cannot be a config field alone. The interesting
-half of S1 is what happens to the landing block when work begins, and the answer today is
-*nothing* — so the seam must arrive with either a release trigger for "an entry stopped
-being the newest" or an explicit ruling that live entries run until evicted and a landing
-dashboard is therefore obliged to be cheap. That is a design decision, and it is now being
-taken against a measurement rather than against a picture. Which was the point of the
-ordering.
+**And the measurement was right while the conclusion drawn from it was wrong.** *It does not
+freeze* reads as a defect and is the specified behaviour: C23 I9 says a frozen entry keeps
+receiving patches until settled, I33 lists five triggers *"and not on freeze"*, and C24 §5
+records deleting its own *teardown on freeze* row against I9 — a `--watch` scrolled out of
+view is still running. Wiring release to append would have re-introduced a row removed for
+cause.
+
+So **S1's drawing is what changes**, not the driver: the landing block ticks until the
+entry is evicted or the transcript is cleared. FINDINGS F17a.
+
+**What this leaves for the seam.** A config field, and a decision about the part's
+interval — one-shot if launch cheapness matters more than a landing screen that is still
+current when you scroll back to it. No freeze mechanism, because there is not one and
+there must not be.
+
+**The row that did turn out to be a defect was the other one.** Driving the probe on the
+*adapter* route showed `tick 0` for twelve seconds: `declareLive` was reached only from
+`appendAndCommit`, and the app route reaches the transcript through `settle(id, doc)`. That
+is C23 I33a now, and it is the reason this section exists before the seam rather than after
+— S4 and S3 are both adapter-driven, and gap 7's answer would have been contaminated by an
+entry-route defect leaking into it.
 
 ---
 
