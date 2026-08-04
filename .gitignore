@@ -4,3 +4,4 @@ coverage/
 *.log
 .DS_Store
 test/golden/__received__/
+__pycache__/
