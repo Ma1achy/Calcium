@@ -139,5 +139,11 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // transitions and the commit all still run, and an app that supplies one
     // changes where the fact comes from and nothing else (C22 I43).
     identity: config.identity ?? ((): Promise<null> => Promise.resolve(null)),
+    // **No default, and that is the difference from `identity` above.** An
+    // absent identity fetcher has a working answer — nobody is logged in — and
+    // an absent greeting has none: a stub returning an empty document would
+    // append an empty entry at every launch. `undefined` means step 7 fires
+    // nothing (I44), which is what a session without a welcome should do.
+    ...(config.greeting === undefined ? {} : { greeting: config.greeting }),
   });
 }

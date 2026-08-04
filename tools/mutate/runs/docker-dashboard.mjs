@@ -176,4 +176,15 @@ const results = runPass({
 });
 
 console.log(report(results));
-process.exit(results.every((r) => r.caught) ? 0 : 1);
+// **`killed`, not `caught`** — the field this harness sets. Written as
+// `r.caught` it read `undefined` on every result and exited 1 unconditionally,
+// so the exit code carried no information at all: a clean pass and a survivor
+// were the same number. The survivor this pass did find (C4, comparing
+// `minWidth` against a string padded to the same constant) was caught by
+// reading the report text, which is the only channel that ever worked here.
+//
+// Third instance today of one class — a result read through a channel that
+// cannot express it. The others were `make all | tail` reporting tail's status,
+// and a `@ts-expect-error` satisfied by a `null` rather than by the type under
+// test. `examples/docker/VERIFYING.md` carries the rule.
+process.exit(results.some((r) => !r.killed) ? 1 : 0);

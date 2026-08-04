@@ -67,6 +67,19 @@ const tui = createTui({
   env: process.env,
   adapters: { ps: createPsAdapter() },
   localHandlers: { dashboard: createDashboardHandler(engine, width) },
+  /**
+   * S1's whole point: the dashboard is there before you type anything (C22 I44).
+   *
+   * The same handler, so there is one dashboard rather than a launch copy that
+   * drifts from the command's. `/dashboard` stays registered because it is how
+   * the frame is re-read without restarting, and it costs one line.
+   *
+   * **It keeps refreshing after the first command**, which is C23 I9 and not an
+   * oversight — a frozen entry keeps receiving patches, because a `--watch`
+   * scrolled out of view is still running. S1's drawing said it froze; the
+   * drawing was wrong about Calcium's own rules (FINDINGS F17a).
+   */
+  greeting: () => createDashboardHandler(engine, width)([], { command: "" }),
 });
 
 await tui.start();

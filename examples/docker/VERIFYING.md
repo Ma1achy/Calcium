@@ -33,6 +33,25 @@ passing, quote the exit code and name the command that produced it.**
 
 ---
 
+### The same class, three times in one session
+
+The pipe is one instance of something more general: **a result read through a channel that
+cannot express it.** All three passed as green.
+
+| what was read | what it actually reported |
+|---|---|
+| `make all \| tail; echo $?` | `tail`'s exit status. Two false green reports, one merged |
+| `@ts-expect-error` on `graph.manifest.manifest` | an error from the field being `Manifest \| null`, not from the type under test — so the row passed identically against the broken type |
+| `results.every((r) => r.caught)` in a mutation runner | `undefined` on every result, because the harness sets `killed`. Exit 1 unconditionally, so a clean pass and a survivor were the same number |
+
+None of the three is a hard problem. Each was invisible because the channel returned a
+plausible value rather than an error, and each was found by **making the thing under test
+wrong on purpose and watching the report not change**. That is the mutation pass applied to
+the instrument instead of to the code, and it is the only method that has worked on any of
+them.
+
+---
+
 ## 1. `tools/screen.py` — a stripped capture is not a frame
 
 A terminal application redraws by moving the cursor and overwriting, so stripping escape

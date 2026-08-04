@@ -313,7 +313,7 @@ the thing that exercises them is a consumer that supplies only what it was told 
 
 ---
 
-## F9 — the session's first entry cannot be appended ★★
+## F9 — startup step 7 named the effect and had no mechanism ★★ · **closed**
 
 | | |
 |---|---|
@@ -351,12 +351,38 @@ gap: C23 §2 said an app registers its own handlers, C23 I27 failed construction
 framework refused a configuration it gave no way to complete. Same shape, same file, found
 the same way: by a consumer trying to use what the spec promised.
 
-**Not fixed here, and the ordering is deliberate.** S1's claim is not "append a first
-document" — it is *live block on launch, frozen into the transcript by the first command*.
-So the first entry is a **live** entry, and the seam is "append a first document that may
-be live, and freeze it on first submit like any other". Designing that against S02's
-drawing would repeat F4 on a permanent, fail-on-revert-protected seam. The dashboard is
-built behind a local handler first, and the seam is designed against a body that works.
+**And the entry above was wrong about the shape of the gap, which is worth keeping.** It
+said no seam was specified. One was: **§4 step 7, *"fire banner fetches, non-blocking"***,
+present since the document was written — with prose about its timing, and with T3.10 and
+T3.11 testing it. Nothing in `src/` fired anything, `TuiConfig` had no field, and neither
+T-row had ever been written, because there was nothing to write them against.
+
+So the gap is not *unspecified* but **a step with a name and no mechanism** — and C22 §3a
+already records that happening once, to step 12: *"accept input" was a step with a name and
+no mechanism, and a session built from this document decoded nothing while every component
+it needed was finished and tested.* Twice in one twelve-item list is a property of how the
+list was written rather than two accidents: a step is a name until something calls it, and
+nothing distinguishes the two by reading.
+
+Finding it required looking for the *mechanism* rather than for the *field*. The first pass
+grepped `TuiConfig` and the construction steps, found nothing, and concluded correctly from
+incomplete evidence.
+
+**Closed by C22 I44.** `config.greeting: () => ViewDocument | Promise<ViewDocument>`, fired
+at step 7 and not awaited; C23 appends it, which is A02 Seam 4 and what makes a `b.live`
+part inside it driven (C23 I33a). T3.10 and T3.11 are rewritten and written. The app's
+launch frame is the dashboard, with nothing typed:
+
+```
+┌ docker-tui · engine 29.4.1 · 8 containers ───────────────────────────────┐
+│┌ RUNNING ────────────────────────────────────────────────────────────────┐│
+││3 running   CPU 1% · MEM 3%                                              ││
+││● g2                      ░░░░░░░░ 0.9%  …    →  1.1% one capture later  ││
+```
+
+**The ordering was still right.** The seam was designed after the dashboard worked, and it
+is why the seam has no freeze mechanism in it: building it first would have meant building
+S1's drawn *freeze on first command*, which C23 I9 forbids. See F17a.
 
 ---
 

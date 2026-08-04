@@ -320,3 +320,73 @@ describe("C23 §3b — the driver is stopped where `stopping` is set", () => {
     expect(outputAtDispose ?? "", "and reached before the release").not.toContain(LEAVE_ALT);
   });
 });
+
+describe("C22 §4 step 7 — the greeting (I44)", () => {
+  const doc = (text: string) => ({
+    schema: "tui.view/1" as const,
+    command: "",
+    status: "ok" as const,
+    blocks: [{ kind: "raw" as const, id: "greet", text }],
+    meta: {
+      verb: null,
+      adapter: "greeting",
+      exitCode: 0,
+      durationMs: 0,
+      truncated: false,
+      argv: [] as readonly string[],
+      stderr: "",
+      transport: "local" as const,
+      origin: "user" as const,
+    },
+  });
+
+  it("T3.9b (I44): the greeting becomes the session's first entry", async () => {
+    // The control for the two rows below: they assert an *absence*, and an
+    // absence proves nothing unless the presence is shown first. Step 7 named
+    // this for the whole life of the document and fired nothing, so "no entry
+    // appeared" was true of every session ever built.
+    const { stdout } = await buildSession({
+      greeting: () => Promise.resolve(doc("welcome aboard")),
+    });
+    await settle();
+
+    expect(stdout.chunks.join(""), "the greeting is on the screen").toContain("welcome aboard");
+  });
+
+  it("T3.10 (I44): a greeting that never resolves leaves the prompt usable", async () => {
+    // **Rewritten from a row that could not be written.** The old wording —
+    // "the section renders as unavailable at its timeout" — described a
+    // section-level banner renderer C22 does not have and never did. The row
+    // had drifted from the design, not the code from the row.
+    const { stdout, tui } = await buildSession({
+      greeting: () => new Promise<never>(() => undefined),
+    });
+    await settle();
+
+    // **The claim is that `await tui.start()` above resolved at all**, and the
+    // assertions below are almost decoration. `buildSession` awaits `start()`,
+    // so a startup that waited on the greeting hangs here and the row times out.
+    //
+    // Which took two mutations to establish. Making `#open()` async and
+    // awaiting the greeting inside it leaves this **green** — `start()` calls
+    // `#open()` without awaiting, so the hang never reaches the test, and the
+    // row was vacuous against the obvious mutation. It fails only when `start()`
+    // awaits `#open()` too. The subject is the whole chain from `start()` to the
+    // fetch, not the one `void` that happens to be nearest the fetch.
+    expect(tui.session.stopping, "the session is running").toBe(false);
+    expect(stdout.chunks.join(""), "the shell painted").toContain(HOME_SEQ);
+  });
+
+  it("T3.11 (I44): a greeting that rejects is contained and the session continues", async () => {
+    const { stdout, tui } = await buildSession({
+      greeting: () => Promise.reject(new Error("the far side is down")),
+    });
+    await settle();
+
+    expect(tui.session.stopping, "the session survived").toBe(false);
+    expect(stdout.chunks.join(""), "the shell painted").toContain(HOME_SEQ);
+    // Contained, not swallowed into the frame: a welcome that could not reach
+    // its far side is not a startup fault and must not become an error entry.
+    expect(stdout.chunks.join(""), "and said nothing about it").not.toContain("far side is down");
+  });
+});

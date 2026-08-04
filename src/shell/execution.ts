@@ -988,6 +988,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     submit,
     onAction,
     identityNotice: (text) => void refresh.identityNotice(text),
+
+    // C22 §4 step 7 (C22 I44). Through `appendAndCommit` like everything else,
+    // which is what drives a live part in it and what lets `/clear` remove it.
+    // No `line`: nothing was typed, so nothing enters history (I29).
+    greeting: (doc) => void appendAndCommit(doc),
     dispose: () => void refresh.dispose(),
 
     /**

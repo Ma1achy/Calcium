@@ -14,7 +14,7 @@ import type { Adapter, AdapterRegistry } from "../data/adapters/index.js";
 import type { Manifest, ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
-import type { Action, Block } from "../data/viewmodel/index.js";
+import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { PatchView } from "./patch-view.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
@@ -159,6 +159,17 @@ export interface Pipeline {
    * `meta`.
    */
   identityNotice(text: string): void;
+  /**
+   * §4 step 7's greeting, appended (I44).
+   *
+   * **C22 fires and C23 appends**, which is A02 Seam 4 and the same division
+   * `identityNotice` above makes: the loop produces a fact, and C23 is the only
+   * component that appends. A whole document rather than a line of text, because
+   * S02 §1 is explicit that the welcome is an ordinary `ViewDocument` and not
+   * chrome — so `/clear` removes it, it scrolls away, and a `b.live` part inside
+   * it is driven because it took the route every other document takes (C23 I33a).
+   */
+  greeting(doc: ViewDocument): void;
   /**
    * Stops §3b's timers. Called at C22 §8 **step 1**, where `stopping` is set.
    *
@@ -328,6 +339,26 @@ export type TuiConfig = Readonly<{
    * reader, and why removing either alone changed no behaviour at all.
    */
   identity?: () => Promise<Identity | null>;
+
+  /**
+   * The session's first entry (§4 step 7, I44, C24 §2).
+   *
+   * **Step 7 said "fire banner fetches, non-blocking" and nothing fired
+   * anything.** S02 specifies this entry in detail and cites the step; T3.10 and
+   * T3.11 test it and were never written. Three documents agreed about a thing
+   * no code did, and the consumer that respected the package boundary went
+   * looking for the field and found none — step 12's shape, a second time in the
+   * same list.
+   *
+   * **Not awaited.** Input is accepted at step 8 whatever this does: a greeting
+   * that hangs leaves the prompt usable and produces no entry, and one that
+   * rejects is contained and the session continues.
+   *
+   * A `b.live` part inside it ticks until the entry is evicted or the transcript
+   * is cleared — **not** until the first command (C23 I9, C23 I33). An app that
+   * wants launch cheap omits `every` and gets a one-shot.
+   */
+  greeting?: () => ViewDocument | Promise<ViewDocument>;
 }>;
 
 export interface TuiInstance {

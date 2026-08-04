@@ -115,14 +115,14 @@ name-ordered list hid the busiest container on the machine behind `… 3 more`. 
 by significance; display order is alphabetical so rows do not move between ticks. Two jobs,
 two orders — conflating them is invisible until a frame has an outlier in it.
 
-**`no command` is aspirational, and the gap has a number.** There is no seam for a first
-entry: `TuiConfig` has no field for one and none of C22's construction steps appends
-anything, so this surface is reached with `/dashboard` today. F9.
+**`no command` is real now.** The frame above is what launch draws with nothing typed —
+`config.greeting` fired at C22 §4 step 7, appended by C23 like any other document, so
+`/clear` removes it and it scrolls away. F9, closed.
 
-The seam declares a part that **ticks until the entry is evicted or the transcript is
-cleared** — not until the first command. If launch cheapness matters more than a live
-landing screen, the part is declared one-shot by omitting `every`, which is a decision the
-seam makes rather than a behaviour it has to build.
+The part **ticks until the entry is evicted or the transcript is cleared**, not until the
+first command. An app that wants launch cheap omits `every` and gets a one-shot; that is
+the app's decision rather than a lifecycle the framework implements, and the alternative is
+the row C24 §5 deleted against C23 I9.
 
 ### What the far side actually supplies, and the two corrections it forced
 

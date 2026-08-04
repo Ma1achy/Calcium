@@ -197,6 +197,7 @@ describe("C22 §3 — construction order", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
+    greeting: () => undefined,
       dispose: () => undefined,
       };
     };
@@ -311,6 +312,7 @@ describe("C22 §3 — construction order", () => {
             register: () => undefined,
             onAction: () => undefined,
             identityNotice: () => undefined,
+    greeting: () => undefined,
       dispose: () => undefined,
           };
         },
@@ -539,6 +541,7 @@ describe("C22 §3 — construction order", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
+    greeting: () => undefined,
       dispose: () => undefined,
       }),
     });
