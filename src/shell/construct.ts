@@ -54,6 +54,7 @@ import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keym
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
+import { createDocumentView } from "./document-view.js";
 import { createPatchView } from "./patch-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory } from "../interaction/history/index.js";
@@ -600,6 +601,25 @@ export async function constructGraph(
     redraw: () => void scheduler.commit("input"),
   });
 
+  /**
+   * The document view — C22 §13a's producer, and `patchView`'s sibling.
+   *
+   * Built here for the same reason and one line later: C23 raises it when a
+   * verb's declaration says its result is a view (C05 I20), so it must exist
+   * before the pipeline that closes over it.
+   *
+   * `measure` comes from the sealed registry rather than from a second
+   * measurer, because the window it computes has to agree with the one C15 uses
+   * to place what it is handed — a window measured by anything else is C09 I1's
+   * divergence with a whole view behind it.
+   */
+  const documentView = createDocumentView({
+    overlays: stores.overlays,
+    measure: (block, width) => built.blocks.measure(block, width),
+    region: deps.frame.overlayRegion,
+    redraw: () => void scheduler.commit("input"),
+  });
+
   const pipeline = at("pipeline", () => {
     const p = config.pipeline({
       // A function, not a snapshot: the store freezes a fresh object per write,
@@ -617,6 +637,7 @@ export async function constructGraph(
       editor: stores.editor,
       overlays: stores.overlays,
       patchView,
+      documentView,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same
       // reason the handler does not await it: a failed write means the choice
@@ -673,6 +694,8 @@ export async function constructGraph(
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
     patchView,
+    documentView,
+    releaseView: () => void pipeline.releaseView(),
     focus,
     // **Answered from the block** (C16 I22, C11 I14). C16 takes row ids as data
     // and holds no opinion about what a row is, so this is the one place that

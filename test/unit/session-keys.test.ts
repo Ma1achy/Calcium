@@ -251,6 +251,20 @@ describe("C22 §3 step 11 — the effect table", () => {
         move: () => false,
         pop: () => false,
       },
+      // The same stand-in reason, and `openFor: null` is load-bearing rather
+      // than filler: it is what `onView` reads to decide which view owns a
+      // motion, so a double reporting a view open would silently route this
+      // suite's bindings to the wrong one.
+      documentView: {
+        open: () => null,
+        fill: () => false,
+        putBlock: () => false,
+        blockAt: () => null,
+        move: () => false,
+        pop: () => false,
+        openFor: null,
+      },
+      releaseView: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
@@ -509,6 +523,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
+        releaseView: () => undefined,
     greeting: () => undefined,
       dispose: () => undefined,
       }),

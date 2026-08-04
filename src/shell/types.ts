@@ -16,6 +16,7 @@ import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
+import type { DocumentView } from "./document-view.js";
 import type { PatchView } from "./patch-view.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
@@ -150,6 +151,15 @@ export interface Pipeline {
    */
   onAction(action: Action, from?: EntryId | null): void;
   /**
+   * The document view was popped — stop its parts now (C22 I46).
+   *
+   * **At the pop, not a tick later.** Without this the driver only discovers a
+   * gone host when a fetch resolves into it and `putBlock` returns false, so one
+   * more request runs against a view nobody is looking at. That lazy path stays
+   * as the backstop it was; this is the trigger C23 I33's set was missing.
+   */
+  releaseView(): void;
+  /**
    * C22's identity loop signalling a transition worth saying out loud (C23 §3b).
    *
    * **C22 signals, C23 appends** — the loop produces a *fact* and not an entry,
@@ -228,6 +238,8 @@ export type PipelineDeps = Readonly<{
    * check that produces it is the view owner's (C23 I31).
    */
   patchView: PatchView;
+  /** C22 §13a — raised when a verb's declaration says its result is a view. */
+  documentView: DocumentView;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (variant: "dark" | "light") => void;

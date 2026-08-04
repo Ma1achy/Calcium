@@ -35,7 +35,8 @@ import type { KeyAction } from "../interaction/router/types.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
-import type { PatchView } from "./patch-view.js";
+import type { DocumentView, DocumentViewMotion } from "./document-view.js";
+import type { PatchView, PatchViewMotion } from "./patch-view.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
 export type PromptAnchor = Readonly<{ row: number; rows: number }>;
@@ -75,6 +76,13 @@ export type KeyDeps = Readonly<{
    * with a vocabulary rather than a name in a union.
    */
   patchView: PatchView;
+  /**
+   * C22 §13a's view. One target, two owners — C15 I1 allows one view at a time,
+   * so at most one of these is open and the keymap needs no third target.
+   */
+  documentView: DocumentView;
+  /** C22 I46 — the pop releases the view's parts, rather than a later fetch doing it. */
+  releaseView: () => void;
   /**
    * The live entry's focusable rows, or empty (C16 I22).
    *
@@ -348,16 +356,35 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // Every one is the same call with a different motion, which is the point:
     // the view holds one offset and computes each destination from it, so there
     // is no per-motion state here to fall out of step (C22 I41).
-    viewNextHunk: () => void deps.patchView.move("nextHunk"),
-    viewPrevHunk: () => void deps.patchView.move("prevHunk"),
-    viewTop: () => void deps.patchView.move("top"),
-    viewBottom: () => void deps.patchView.move("bottom"),
-    viewPageUp: () => void deps.patchView.move("pageUp"),
-    viewPageDown: () => void deps.patchView.move("pageDown"),
+    // **One target, two owners** (C22 §13a). C15 I1 permits one view at a time,
+    // so `onView` asks which is open rather than the keymap growing a second
+    // `pushedView` target — a target per producer would put the same seven keys
+    // in two tables, and the day they disagreed nothing would say so.
+    //
+    // `n`/`p` are the hunk motions on a patch and one block on a document,
+    // which is S3's footer read literally: *n/p scroll*. The two are the same
+    // gesture over each view's own unit, which is what makes one binding right
+    // rather than a compromise.
+    viewNextHunk: () => void onView("nextHunk", "down"),
+    viewPrevHunk: () => void onView("prevHunk", "up"),
+    viewTop: () => void onView("top", "top"),
+    viewBottom: () => void onView("bottom", "bottom"),
+    viewPageUp: () => void onView("pageUp", "pageUp"),
+    viewPageDown: () => void onView("pageDown", "pageDown"),
     // `Esc` is the view's own dismissal and deliberately not `dismiss`, which
     // pops whatever layer is on top: this one knows it is closing *its* view and
     // drops its offset with it (A01 D7).
-    viewPop: () => void deps.patchView.pop(),
+    viewPop: () => {
+      // **Released here, which is the trigger C23 I33's set did not have** (I46).
+      // The order matters: release first, so a fetch that resolves during the
+      // pop finds no registration rather than a half-dismissed view.
+      if (deps.documentView.openFor !== null) {
+        deps.releaseView();
+        void deps.documentView.pop();
+        return;
+      }
+      void deps.patchView.pop();
+    },
 
     reverseSearch: () => {
       deps.history.searchOpen(deps.editor.text);
@@ -378,6 +405,21 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       });
     },
   });
+
+  /**
+   * Send a motion to whichever view is open (C22 §13a).
+   *
+   * Two motions per binding because the vocabularies differ where the units
+   * differ: a patch moves by hunk, a document by block. Anything the two share
+   * — `top`, `bottom`, the pages — passes the same name twice, and that
+   * repetition is deliberate: it keeps the mapping visible at the call site
+   * rather than hidden in a table that would have to be read to know whether a
+   * key does the same thing in both.
+   */
+  const onView = (patch: PatchViewMotion, document: DocumentViewMotion): boolean =>
+    deps.documentView.openFor !== null
+      ? deps.documentView.move(document)
+      : deps.patchView.move(patch);
 
   return {
     table,
