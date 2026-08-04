@@ -36,7 +36,9 @@ That asymmetry is worth stating because the obvious reading is that both pops sh
 
 **Append is the default and push is the exception**, because appending keeps both things. Drilling from `/ps` into a run detail leaves the list above it, frozen, with the row you came from still visible. You have not swapped one view for another; you have accumulated two.
 
-Push exists only where the thing genuinely needs the whole screen and its own letter keys — logs and the dashboard, and nothing else (A01 D4).
+Push exists only where the thing genuinely needs the whole screen and its own letter keys — **and A01 D4's test is the limit, not the list.** This sentence used to end "logs and the dashboard, and nothing else", which read as an enumeration and was treated as one; docker-tui's S3 is a third, and it qualifies on exactly the terms D4 states — a live single-container view binding `n`/`p`, `L` and `d`, with no room for a prompt beside them.
+
+An enumeration that has to be extended each time a surface passes the test is the wrong form for a rule that already has one. What decides is D4; what the list was for is showing how rare the answer is, and two examples do that without claiming to be exhaustive. C22 §13a settles who applies the test and when: the manifest declares it, on the tool or on a flag, and it is read before the verb runs (C05 I20).
 
 ---
 
