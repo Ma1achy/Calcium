@@ -2,7 +2,23 @@
   "name": "tui-kit",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+
+    // The docker CLI plus the host's socket, for `examples/docker` (R01).
+    //
+    // **Outside-of-docker, not in-docker.** The reference app's far side is the
+    // machine's own daemon: a nested daemon would give it an empty container
+    // list, which reads as a working app with nothing to show rather than as a
+    // misconfiguration. The containers the frames are read against must be the
+    // real ones.
+    //
+    // This is what keeps CLAUDE.md's rule whole. The app cannot be exercised
+    // without a daemon, the daemon is on the host, and the alternative was one
+    // documented exception to "never on the host" — in a rule whose entire value
+    // is having none. Calcium itself gains nothing from this feature and must
+    // not: A04 §4 says the container is never the supported path, and nothing
+    // under `src/` may come to need a socket.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
 
   // A04 §4 — required for development, never required for consumption.
