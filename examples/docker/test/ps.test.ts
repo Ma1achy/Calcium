@@ -187,12 +187,43 @@ describe("walk B: the columns", () => {
     expect(COLUMNS.find((c) => c.key === "image")?.truncateFrom).toBe("start");
   });
 
-  it("B1: STATUS's minWidth fits the longest real status, so it never truncates", () => {
+  it("B1: STATUS's minWidth fits the longest status AND the glyph beside it", () => {
+    // **This assertion used to be the defect restated.** It compared `minWidth`
+    // against `cells(Status)` alone and passed at 22 — while every stopped
+    // container rendered `✗ Exited (0) 2 days a…`, because walk C2 puts the
+    // glyph *inside* this cell and walk B1 sized the column from the text. Two
+    // correct rulings, and neither owns the gap between them.
+    //
+    // Found by reading the frame, which is the only thing that could have: the
+    // numbers were self-consistent and describing a table that truncated.
+    const GLYPH = cells("✗ "); // the mark and its separator, in cells
     const longest = Math.max(
       ...parseNdjson(CORPUS).rows.map((r) => cells(String(r["Status"] ?? ""))),
+      cells("Exited (0) 5 weeks ago"),
     );
     const status = COLUMNS.find((c) => c.key === "status");
-    expect(status?.minWidth).toBeGreaterThanOrEqual(longest);
+    expect(status?.minWidth, "the text alone").toBeGreaterThanOrEqual(longest);
+    expect(status?.minWidth, "and the glyph").toBeGreaterThanOrEqual(longest + GLYPH);
+  });
+
+  it("B1b: NAME does not flex, or it eats the width PORTS needs", () => {
+    // At width 120 with `flex: true`, NAME took 54 columns and PORTS truncated on
+    // a terminal wide enough for it twice over. Container names are short; the
+    // slack belongs to the column whose content is long.
+    const name = COLUMNS.find((c) => c.key === "name");
+    expect(name?.flex ?? false).toBe(false);
+    expect(name?.maxWidth).toBeDefined();
+    expect(COLUMNS.find((c) => c.key === "ports")?.flex).toBe(true);
+  });
+
+  it("B1c: the summary reads as English, not as a pluralised template", () => {
+    // `2 runnings · 0 stoppeds` shipped and every test passed: they asserted the
+    // counts and the unreadable-line clause, and none of them read the sentence.
+    const summary = adapt().blocks.find((bl) => bl.kind === "notice");
+    const text = summary && "text" in summary ? summary.text : "";
+    expect(text).toMatch(/^\d+ running · \d+ stopped/);
+    expect(text).not.toContain("runnings");
+    expect(text).not.toContain("stoppeds");
   });
 
   it("B4: an empty Ports is an em dash in the cell, not a dropped column", () => {

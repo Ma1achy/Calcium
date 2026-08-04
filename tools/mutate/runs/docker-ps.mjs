@@ -52,15 +52,15 @@ const results = runPass({
     {
       name: "PORTS truncates from the start, losing the host port",
       file: "src/ps.ts",
-      from: '  b.col("ports", { label: "PORTS", priority: 40, minWidth: 20, truncateFrom: "end" }),',
-      to: '  b.col("ports", { label: "PORTS", priority: 40, minWidth: 20, truncateFrom: "start" }),',
+      from: '  b.col("ports", { label: "PORTS", priority: 40, minWidth: 20, flex: true, truncateFrom: "end" }),',
+      to: '  b.col("ports", { label: "PORTS", priority: 40, minWidth: 20, flex: true, truncateFrom: "start" }),',
       expect: "B2b (R3.4)",
     },
     {
       name: "the column priorities are flattened",
       file: "src/ps.ts",
-      from: '  b.col("name", { label: "NAME", priority: 95, minWidth: 16, flex: true, sortable: true }),',
-      to: '  b.col("name", { label: "NAME", priority: 40, minWidth: 16, flex: true, sortable: true }),',
+      from: '  b.col("name", { label: "NAME", priority: 95, minWidth: 16, maxWidth: 24, sortable: true }),',
+      to: '  b.col("name", { label: "NAME", priority: 40, minWidth: 16, maxWidth: 24, sortable: true }),',
       expect: "B2b (R3.4)",
     },
 
@@ -85,6 +85,29 @@ const results = runPass({
       from: "      const failed = result.exitCode !== 0;",
       to: "      const failed = result.exitCode !== 0 || result.parseError !== null;",
       expect: "A1: a set parseError",
+    },
+
+    // --- the three the frame found, and no assertion did ---------------------
+    {
+      name: "STATUS is sized from its text, ignoring the glyph in the same cell",
+      file: "src/ps.ts",
+      from: '  b.col("status", { label: "STATUS", priority: 85, minWidth: 24 }),',
+      to: '  b.col("status", { label: "STATUS", priority: 85, minWidth: 22 }),',
+      expect: "B1: STATUS's minWidth",
+    },
+    {
+      name: "NAME flexes again and eats the width PORTS needs",
+      file: "src/ps.ts",
+      from: '  b.col("name", { label: "NAME", priority: 95, minWidth: 16, maxWidth: 24, sortable: true }),',
+      to: '  b.col("name", { label: "NAME", priority: 95, minWidth: 16, flex: true, sortable: true }),',
+      expect: "B1b: NAME does not flex",
+    },
+    {
+      name: "the summary pluralises its adjectives",
+      file: "src/ps.ts",
+      from: 'const count = (n: number, word: string): string => `${String(n)} ${word}`;',
+      to: 'const count = (n: number, word: string): string => `${String(n)} ${word}${n === 1 ? "" : "s"}`;',
+      expect: "B1c: the summary reads as English",
     },
 
     // --- the far side's own values ------------------------------------------

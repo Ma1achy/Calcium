@@ -154,6 +154,46 @@ columns are what the reader learns from, and an empty frame teaches nothing.
 
 ---
 
+## What the frame found that the table did not
+
+Four defects, none caught by 29 tests, all visible on first look. Recorded here because
+**the gaps between rows are where they lived** — and a table cannot have a row for the
+space between two of its own rows.
+
+**1. `STATUS` truncated, and "STATUS never truncates" was false on every stopped
+container.** B1 sized the column from `cells(Status)` — 22 for `Exited (0) 5 weeks ago` —
+and C2 put the glyph *inside* that cell. `✗ ` is two more cells, so 22 was two short and
+the frame read `✗ Exited (0) 2 days a…`. **Both rulings are right and neither owns the
+consequence.** The test was worse than absent: it asserted `minWidth >= max(cells(Status))`,
+which is the defect restated as an assertion, and it passed against a truncating table.
+
+This is the ceiling-is-not-the-arithmetic shape. A bound computed over one part is wrong
+when another part of the same cell spends width, and no rule-interaction row reaches it,
+because the two rules are in *different sections* of this document and each is locally
+correct.
+
+**2. `NAME` took every spare column.** `flex: true` gave it 54 of 120, and `PORTS`
+truncated on a terminal wide enough for it twice over. Every width assertion passed while
+the table was mostly whitespace — arithmetically self-consistent, describing a layout
+nobody would choose.
+
+**3. `2 runnings · 0 stoppeds`.** The summary pluralised adjectives. Tests asserted the
+counts and the unreadable-line clause; none read the sentence.
+
+**4. The submit path looked broken and was not.** `/ps` and `/help` both appeared to
+render nothing for an hour of diagnosis. The cause was the *harness*: input written as one
+burst falls inside C16's paste window, where a carriage return inserts rather than submits
+— which is correct behaviour, correctly implemented. **A fake must not supply the
+behaviour, and this one suppressed it.** Typing and Enter now go in separately, two seconds
+apart.
+
+It also took a real screen emulator (`tools/screen.py`) to see any of this. Stripping
+escape sequences from a capture concatenates every frame the application ever drew, so a
+redraw is indistinguishable from nothing happening — which is exactly the ambiguity that
+made 4 look like a product defect. **Stripping escapes is not reading a frame.**
+
+---
+
 ## What this table does not cover, and why
 
 The rejection paths. Both artefact shapes index the **accepted** paths, and a decision

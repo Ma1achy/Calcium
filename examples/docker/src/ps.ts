@@ -59,20 +59,33 @@ export const stateOf = (state: string): { glyph: Glyph; tone: Tone } =>
  * land with S4, the verb that has them.
  */
 export const COLUMNS: readonly ColumnDef[] = [
-  b.col("name", { label: "NAME", priority: 95, minWidth: 16, flex: true, sortable: true }),
+  // **No `flex`, and a `maxWidth`.** With `flex: true` NAME absorbed every spare
+  // column — 54 of them at width 120 — and PORTS truncated on a terminal wide
+  // enough for it twice over. Container names are short; the slack belongs to the
+  // column whose content is long. Read off the frame, not off the arithmetic:
+  // every width assertion passed while the table was mostly whitespace.
+  b.col("name", { label: "NAME", priority: 95, minWidth: 16, maxWidth: 24, sortable: true }),
   // `truncate: "start"` keeps `…app:v4` — an image reference is hierarchical with
   // the leaf last, which is the case C04 I30 names for `"start"`. Blind spot,
   // stated in walk B3: a flat generated name degrades to `…-features`, and a
   // screen of devcontainers all look alike.
   b.col("image", { label: "IMAGE", priority: 60, minWidth: 20, truncateFrom: "start" }),
-  // 22 is the measured maximum (`Exited (0) 5 weeks ago`), so the column never
-  // truncates — which is the whole of "never truncates": a `minWidth` that fits
-  // the longest real value. Walk B1 on what that trades against.
-  b.col("status", { label: "STATUS", priority: 85, minWidth: 22 }),
+  // **24, not 22, and the two extra cells are the glyph's.**
+  //
+  // The longest real status is `Exited (0) 5 weeks ago` — 22 cells — and a
+  // `minWidth` of 22 still truncated it in the frame, because walk C2 put the
+  // glyph *inside* this cell (`✗ `, two cells) while walk B1 computed the width
+  // from the text alone. Both rulings are right and neither owns the gap between
+  // them; "STATUS never truncates" was false on every stopped container.
+  //
+  // Found by reading the frame. The test that covered it asserted
+  // `minWidth >= max(cells(Status))`, which is the defect restated as an
+  // assertion — it passed against a table that truncated.
+  b.col("status", { label: "STATUS", priority: 85, minWidth: 24 }),
   // From the end, keeping `0.0.0.0:8080…`. The host port is on the left in the
   // string docker sends — FINDINGS F4 is where the opposite ruling came from and
   // why it was wrong.
-  b.col("ports", { label: "PORTS", priority: 40, minWidth: 20, truncateFrom: "end" }),
+  b.col("ports", { label: "PORTS", priority: 40, minWidth: 20, flex: true, truncateFrom: "end" }),
 ];
 
 function rowOf(raw: Row, index: number): TableRow {
@@ -132,7 +145,14 @@ export function parseNdjson(raw: string): { rows: Row[]; skipped: number } {
   return { rows, skipped };
 }
 
-const plural = (n: number, one: string): string => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
+/**
+ * `2 running · 0 stopped` — the words do not pluralise.
+ *
+ * The first version added an `s` and produced "2 runnings · 0 stoppeds", which
+ * every test passed: they asserted the *counts* and the unreadable-line clause,
+ * and none of them read the sentence. Found by looking at the frame.
+ */
+const count = (n: number, word: string): string => `${String(n)} ${word}`;
 
 export function createPsAdapter(): Adapter {
   return {
@@ -145,9 +165,10 @@ export function createPsAdapter(): Adapter {
       const { rows, skipped } = failed ? { rows: [], skipped: 0 } : parseNdjson(result.stdoutRaw);
       const running = rows.filter((r) => str(r, "State") === "running").length;
 
+      const skippedNote =
+        skipped === 0 ? "" : ` · ${String(skipped)} unreadable line${skipped === 1 ? "" : "s"}`;
       const summary =
-        `${plural(running, "running")} · ${plural(rows.length - running, "stopped")}` +
-        (skipped === 0 ? "" : ` · ${plural(skipped, "unreadable line")}`);
+        `${count(running, "running")} · ${count(rows.length - running, "stopped")}${skippedNote}`;
 
       return {
         schema: "tui.view/1",
