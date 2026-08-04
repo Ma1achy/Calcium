@@ -15,8 +15,23 @@ import { promisify } from "node:util";
 import { createTui, defaultTheme } from "@fmx/calcium";
 import { BINARY, buildManifest } from "./manifest.ts";
 import { createPsAdapter } from "./ps.ts";
+import { createDashboardHandler } from "./dashboard.ts";
 
 const run = promisify(execFile);
+
+/**
+ * The terminal's width, read by the app because nothing hands it to a local
+ * handler (FINDINGS F14).
+ *
+ * `AdapterContext` carries `width` — C11 needs it and C07 gets it. `LocalContext`
+ * carries `command` and nothing else, so the one route an app writes entirely
+ * itself is the one that cannot know how wide the screen is. Reading
+ * `process.stdout.columns` here is the app doing what C01 does for everything
+ * else in the tree, which is exactly the duplication C01 I13 exists to prevent —
+ * and it is wrong across a resize, because it is read once per command rather
+ * than handed down.
+ */
+const width = (): number => process.stdout.columns || 80;
 
 /**
  * The daemon's version, for the manifest's skew field.
@@ -36,11 +51,13 @@ async function engineVersion(): Promise<string> {
   }
 }
 
+const engine = await engineVersion();
+
 const tui = createTui({
   name: "docker-tui",
   // F1's shim rather than `docker` itself.
   binary: BINARY,
-  manifest: buildManifest(await engineVersion()),
+  manifest: buildManifest(engine),
   theme: defaultTheme,
   // **Required in practice, though the type says optional** (FINDINGS F8).
   // C22 I20 has the app supply the environment and no file under `src/` reads
@@ -49,6 +66,7 @@ const tui = createTui({
   // says omitting it degrades to ASCII with no colour; it does not degrade.
   env: process.env,
   adapters: { ps: createPsAdapter() },
+  localHandlers: { dashboard: createDashboardHandler(engine, width) },
 });
 
 await tui.start();

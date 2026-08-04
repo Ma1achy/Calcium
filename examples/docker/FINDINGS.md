@@ -400,10 +400,31 @@ Four smaller facts from the same probe, each of which changes a design:
 
 | probe | result | consequence |
 |---|---|---|
-| `--no-stream` default scope | running only | the stopped pills come from `ps -a`; **the panel joins two sources** |
+| `--no-stream` default scope | everything `docker ps` shows — **running *and paused*** | the stopped pills come from `ps -a`; **the panel joins two sources** |
 | a stopped container named explicitly | a zero row, not an omission | absent and zero are different, and only one of them is a fact |
 | an unknown container | `exit=1`, message on stderr | `/ps`'s error path transfers unchanged (R3.6) |
 | a timestamp field | **none** | history is stamped app-side, and `AdapterContext` carries no clock (gap 1) |
+| row order across five ticks | stable, matching `ps` | stable **in observation**, guaranteed nowhere — see below |
+
+**The scope row is a correction to this entry, made the day after it was written**, and the
+way it happened is worth more than the fact. The first probe ran against a machine with one
+container running and none paused, and "running only" is a perfectly good reading of that
+output — it is also what the docker docs imply. It is wrong: `stats` shows what `docker ps`
+shows, which includes **paused**. The moment there was a paused container the panel headed
+`RUNNING (n)` had a paused one in it.
+
+A rule inferred from a single observation had been tested against nothing, and it went into
+a findings entry as a fact with a table row of its own. That is the same shape as *two
+instances fitting a rule is not evidence for the rule* one instance further down, and the
+cost of finding it here was a second probe.
+
+**Row order is the other thing the multi-container probe made askable.** Five consecutive
+ticks returned the same order, matching `docker ps`. That is an observation and not a
+contract: `stats` fans out per container, nothing documents an ordering, and a **live**
+block re-rendering in daemon order would let rows swap places under the reader between
+ticks — a defect that cannot exist in a static table and so has never been met. The panel
+sorts explicitly. A stable order that nothing promises is the most expensive kind to rely
+on, because it is right in every test.
 
 ---
 
@@ -491,6 +512,206 @@ worth having.
 
 ---
 
+## F13 — a local handler must hand-write nine `meta` fields, seven of them fiction
+
+| | |
+|---|---|
+| **Surface** | S1's `/dashboard`, the first local handler this app writes |
+| **Reached for** | a way to build a `ViewDocument` |
+| **Verdict** | **a real Calcium finding**, small but structural |
+
+`LocalHandler` returns a `ViewDocument`, whose `meta` is required and has nine members:
+`verb`, `adapter`, `exitCode`, `durationMs`, `truncated`, `argv`, `stderr`, `transport`,
+`origin`. On the adapter route the registry overwrites six of them (C07 I13) precisely
+because *a provenance an app author supplies once per verb is a provenance that is wrong
+somewhere*. On the local route **nothing overwrites anything but `command`**.
+
+So an app author writing a local handler declares an `exitCode` for a process that never
+ran, a `durationMs` of a subprocess that does not exist, an empty `stderr`, and an `argv`
+they have to invent. `compose()` exists inside `shell/documents.ts` and fills exactly these
+defaults — and it is not exported.
+
+The same argument C07 I13 makes applies here unchanged: the framework knows the route is
+local, knows nothing ran, and knows the origin. The author knows none of it better.
+
+---
+
+## F14 — a local handler cannot find out how wide the terminal is
+
+| | |
+|---|---|
+| **Surface** | S1's panel title and column plan |
+| **Reached for** | the width, to decide what the header can hold |
+| **Verdict** | **a real Calcium finding**, and the app's workaround is the thing CLAUDE.md forbids |
+
+`AdapterContext` carries `width`, with the comment *"some adapters choose column sets by
+width"*. `LocalContext` is `Readonly<{ command: string }>`.
+
+So the one route an app writes entirely itself is the one that cannot know the width, and
+the app ends up calling `process.stdout.columns` — which is C01's job, done a second time,
+in the one place C01 I13 exists to prevent. It is also **wrong across a resize**, because it
+is read once per command rather than handed down, and nothing tells a local handler the
+terminal changed.
+
+Two records of one number, and the app's copy is the stale one. The asymmetry looks like an
+oversight rather than a decision: nothing in C23 §2 argues that a local verb needs less
+context than an adapted one.
+
+---
+
+## F15 — a rejected document produces no entry, no error, and no clue ★★
+
+| | |
+|---|---|
+| **Surface** | S1's `/dashboard`, on its first run |
+| **Reached for** | nothing. The document was invalid and the shell said nothing at all |
+| **Verdict** | **a real Calcium finding** — the diagnostic exists and is discarded |
+
+`/dashboard` rendered an empty transcript. The prompt cleared, so the line was submitted;
+no entry appeared, no error, nothing on stderr. `/ps` and `/help` worked, so routing worked.
+
+The document had two blocks with the id `running` — the live panel and the table inside it —
+which C04 I14 forbids because `ViewPatch` addresses blocks by id. That is my bug, and C13
+raises it with a sentence that says exactly what is wrong:
+
+```
+blocks: id "running" appears 2 times (C04 I14) — ViewPatch addresses blocks
+by id, so a duplicate has no correct target
+```
+
+**`appendAndCommit` catches it and throws it away.**
+
+```ts
+} catch {
+  deps.scheduler.commit("input");
+  return null;
+}
+```
+
+A bare `catch` with no binding, then a frame committed as though nothing happened. C23 I1 —
+*every submission produces exactly one outcome* — names this as its second exception, so the
+behaviour is deliberate and the invariant is honest about it. What is not deliberate is that
+**the reason is destroyed**. There is a `TranscriptError` in hand, carrying the precise
+violation, and it is discarded rather than appended as the error entry every other
+containment path in C23 produces.
+
+The cost is not theoretical: this took a long time to find, and the route was suspicion of
+the PTY harness, then of `screen.py`, then of the paste window, then of local routing —
+four wrong turns against a framework that had the answer in one sentence the whole time.
+
+**And it is the exact class C23's own history records.** `documents.ts` carries a comment
+about every containment path building a `warn` notice with no glyph, throwing inside
+`appendAndCommit`, and producing no entry — *"C23 I1 says every submission produces exactly
+one outcome, and the paths that exist to guarantee it produced none"*. That was found and
+fixed at the call sites. The swallow that made it invisible is still here, waiting for the
+next invalid document, which for a framework means waiting for its first app author.
+
+The fix is small and does not touch I1's exception: append a notice naming the validation
+error, or at minimum let it reach the fault handler. A silent no-op is the one outcome that
+teaches the author nothing.
+
+---
+
+## F16 — a live part's title cannot carry live data
+
+| | |
+|---|---|
+| **Surface** | S1's panel header — `RUNNING (9) · CPU 34% MEM 61%` |
+| **Reached for** | a title recomputed each tick, as S1 draws it |
+| **Verdict** | **adapter-side** (the summary moved into the body), plus an S1 correction |
+
+`LiveSpec.title` is a string captured at declaration. The driver's `titleOf(part)` returns
+`part.spec.title`, plus its own `· 14s ago` when stale; `render` returns the part's **child**
+and nothing else. So the title is fixed for the life of the part.
+
+S1 puts the counts and the totals in the title, which is where they belong visually. They
+froze at the first fetch and stayed there while every row beneath them ticked — a header
+describing a moment that had passed, which is worse than no header at all.
+
+**Invisible in a frame, and invisible in the tests.** One frame cannot show that a line is
+stale; the tests asserted the title was *right*, which it was, once. It was found by
+replaying prefixes of a single capture and noticing the one line that never moved.
+
+Adapter-side, because C23 I34 and I35 have a good reason to own the title — it is where
+staleness and failure are said, and a title the app rewrote each tick would race with them.
+The finding is that **nothing says so**, and `b.live`'s own field is called `title` with no
+hint that it is the one part of a live block that is not live.
+
+---
+
+## F17 — a live entry never stops, and nothing freezes it ★★
+
+| | |
+|---|---|
+| **Surface** | S1's central claim — *typing a command freezes it into the transcript* |
+| **Reached for** | the freeze. There is not one |
+| **Verdict** | **a real Calcium finding**, and the answer F9's seam could not be designed without |
+
+Measured, not reasoned. `/dashboard`, four ticks, then `/ps` submitted over it, replaying
+prefixes of one capture:
+
+| prefix | the dashboard entry's rows |
+|---|---|
+| 0.86 — after `/ps` has rendered below it | `reverent_proskuriakova  █░░░░░░░ 13.2%` · `CPU 114%` |
+| 1.00 | `reverent_proskuriakova  ░░░░░░░░ 0.2%` · `CPU 101%` |
+
+It is still ticking, several entries down the transcript. And with two dashboards open, both
+tick independently and out of step:
+
+| prefix | first entry | second entry |
+|---|---|---|
+| 0.85 | 235.3 MiB | 235.6 MiB |
+| 0.90 | **255 MiB** | 235.6 MiB |
+
+So **every `/dashboard` ever run keeps polling for the life of the session** — here, two
+`docker` subprocesses every two seconds, per entry, forever. Ten dashboards is twenty
+subprocesses a tick against a daemon, from a transcript the reader has scrolled past.
+
+**This is defensible and it is not what anything says.** C23 I33's five release triggers are
+about an entry ceasing to exist — eviction, `/clear`, teardown — and by that rule a live
+part in a live entry should keep living. But S1, S02 and S13 all describe a landing block
+that *settles* when work begins, and R01's whole model is that a transcript entry is a
+record of a moment. A block that keeps rewriting itself after the reader has moved on is
+neither.
+
+**Why it had to be answered before F9's seam is designed.** The seam is not "append a first
+document" — S1's first entry is a *live* one, and the interesting half of the feature is what
+happens to it when the user types. That question has an answer now, from a working consumer,
+and it is *nothing happens*. So the seam has to bring a policy with it: either a release
+trigger for "an entry stopped being the newest", or an explicit statement that live entries
+run until evicted and a landing dashboard must therefore be cheap. Designing the config
+field first and discovering this after would have been F4 on a fail-on-revert-protected
+seam.
+
+C22 §8a's anticipation lands exactly here: *"if anything ever appends earlier — a startup
+notice, a restored session — that is the day I7 and I5 genuinely conflict."* A live first
+entry is that restored session, and it arrives with a timer attached.
+
+---
+
+## F18 — a live part looks exactly like a static one
+
+| | |
+|---|---|
+| **Surface** | S1's `▌` gutter, drawn on the running panel |
+| **Reached for** | any mark distinguishing the refreshing panel from the static chrome |
+| **Verdict** | **a real Calcium finding**, small, and the app must not work around it |
+
+S1 and S13 both draw `▌` down the side of the live region, and C09's glyph table has a
+`live` slot for exactly that (`▌` unicode, `|` ascii). The driver's `livePanel` builds
+`{ kind: "panel", id, title, children }` — a plain panel. Nothing renders the slot, so in a
+frame the live panel is a box with a title, indistinguishable from the static one wrapping
+it until something happens to change.
+
+The app cannot fix it. `Panel` has no glyph field, and putting `▌` in the title means writing
+a character instead of naming a slot — which is F6's mistake made deliberately, and it would
+not degrade to `|` on an ASCII terminal.
+
+So the vocabulary has the slot, two surfaces draw it, and nothing connects them: a slot
+reserved and unreachable, which is A03 §2's class in the glyph table.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
@@ -512,6 +733,22 @@ needs it is built.
 - **`b.live`'s `stream` arm.** F10 rules this app onto `fetch`, so `stream` stays in the
   position `RefreshHost`'s `view` arm held before step 3 — specified, implemented, unreached
   by any consumer.
-- **The line budget.** R01 commitment 1 caps app code at 300 lines. Exceeding it is a
-  finding *about Calcium* — it means the app had to write something generic itself — so if
-  it goes over, the lines that pushed it over get named here rather than the budget raised.
+- **The line budget — over, at 354 of 300** (comments and blanks stripped; `src/*.ts` plus
+  `bin/docker-json`). R01 commitment 1's rule is that exceeding it is a finding about
+  Calcium rather than app bloat, so here are the lines that did it:
+
+  | lines | what | why it is generic |
+  |---|---|---|
+  | 22 | `src/ndjson.ts` | C06 parses the whole of stdout as one document and hands adapters the raw string when that fails. Every `--format json` far side is NDJSON. DEPENDENCIES.md already argues an NDJSON parser is not a dependency because `node:readline` exists — true, and neither is reachable from an adapter |
+  | 11 | the `meta` block in `createDashboardHandler` | F13. `compose()` fills all nine fields and is not exported; seven of them describe a subprocess that never ran |
+  | 9 | `bar()` and its width arithmetic | Gap 3. A value-coloured bar with a reserved glyph slot, because tones are severity and `b.progress` is a labelled progress bar |
+  | 6 | the collapse-the-tail decision | *Show N, then say how many are hidden* is a density decision every live list makes, and each one will get the `N = 1` boundary wrong on its own |
+  | 2 | `width()` in `main.ts` | F14. C01 already knows this number and a local handler is not told it |
+  | **50** | | |
+
+  354 − 50 = **304**, against a budget of 300. That is close enough to the line that the
+  arithmetic should not be leaned on — the point is not that the budget is exactly right,
+  it is that **every line of the overrun has a name and an owner**, and none of them is
+  docker. R01's claim was that an app over 300 lines has been made to write something
+  generic; five things, and the largest is a parser for the format the framework's own
+  transport could not read.

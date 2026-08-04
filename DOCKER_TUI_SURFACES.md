@@ -44,30 +44,65 @@ The home screen and the opening shot. **Not** a pushed view — it is the **live
 launch**: `b.live` parts composed with static panels, refreshing in place. Typing a
 command freezes it into the transcript, exactly the transcript model.
 
+**This is a real frame now**, captured from the running application at 120 columns and
+replayed through a terminal emulator — not a drawing. It is kept in preference to the
+sketch that was here because three of the sketch's claims were things Calcium does not do,
+and the differences are listed underneath.
+
 ```
-  ┌─ docker-tui ──────────────────────────── engine 27.3 · 14 containers ─┐  ← panel, keyValue header
-  │                                                                        │
-  ▌ RUNNING (9)                                       CPU 340%  MEM 61%   │  ← b.live, whole panel refreshes
-  ▌ ● api-gateway     ▂▄▆█ 84%   512M/2G    1.2M/3.4M    up 3d            │
-  ▌ ● postgres        ▁▁▂▁  8%   1.1G/2G    880k/12M     up 12d           │  ● = running (ok tone)
-  ▌ ● redis           ▁▁▁▁  2%   40M/512M   120k/4M      up 12d           │
-  ▌ ● worker-1        ▃▅▃▄ 41%   256M/1G    2M/8M        up 3d            │
-  ▌ ● worker-2        ▄▄▅▄ 38%   248M/1G    2M/8M        up 3d            │
-  ▌   … 4 more running                                                    │  ← density: collapse the tail
-  │                                                                        │
-  │  STOPPED (5)   ○ migrate ○ seed ○ backup-cron ○ old-api ○ test-runner │  ← pills, exited (dim/error tone)
-  │                                                                        │
-  └────────────────────────────────────────────────────────────────────  ┘
-     tab a container · ⏎ watch · l logs · d drift · / for a command          ← footer keymap
+┌ docker-tui · engine 29.4.1 · 14 containers ──────────────────────────────────────────┐
+│┌ RUNNING ───────────────────────────────────────────────────────────────────────────┐│
+││7 running · 1 paused   CPU 101% · MEM 4%                                            ││
+││                                                                                    ││
+││NAME                      CPU                MEM                USAGE               ││
+││● dtui-api                ░░░░░░░░ 0.0%      ░░░░░░░░ 0.1%      9.434MiB / 7.75GiB  ││
+││◌ dtui-busy               ░░░░░░░░ 0.0%      ░░░░░░░░ 0.1%      9.438MiB / 7.75GiB  ││
+││● dtui-cache              ░░░░░░░░ 0.3%      ░░░░░░░░ 0.2%      17.43MiB / 7.75GiB  ││
+││● dtui-extra3             ▲ ████████ 100.5%  ░░░░░░░░ 0.1%      9.293MiB / 7.75GiB  ││
+││● reverent_proskuriakova  ░░░░░░░░ 0.2%      ░░░░░░░░ 3.0%      216.5MiB / 7.75GiB  ││
+││… 3 more                                                                            ││
+│└────────────────────────────────────────────────────────────────────────────────────┘│
+│                                                                                      │
+│beautiful_booth  condescending_cohen  dazzling_wozniak  distracted_davinci  dtui-gone │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Exercises in one frame:** panel, `b.live` (the running block), keyValue (the header
-totals), pills with tone (stopped), sparkline bars, tone (running/stopped), the footer,
-and the collapse-the-tail density decision. **The screencast's first five seconds**, doing
-almost everything Calcium does at once.
+At 80, `USAGE` drops and the pills wrap; `NAME`, `CPU` and `MEM` hold.
 
-`system info` = the engine version + container counts in the panel title, one line. A
-welcome screen that is mostly chrome is the thing density is chosen against.
+**Four differences from the sketch, each a finding rather than a compromise.**
+
+1. **There is no `▌`.** `b.live` returns a panel and the driver rebuilds it as a panel, so
+   a live region is a box with a title — visually identical to a static one until it
+   changes. C09's glyph table has a `live` slot (`▌` / `|`) and nothing renders it, and the
+   app must not write the character itself or it will not degrade. FINDINGS F18.
+2. **The counts and totals are in the body, not the title.** A live part's title is
+   captured once at declaration and never re-rendered, so anything that varies freezes
+   there while the rows tick. F16.
+3. **The panel nests, costing two borders.** The live part is a panel inside the outer
+   panel; the sketch drew one box with a gutter.
+4. **Everything that ticks is a poll**, not a stream, and the app runs `docker` itself:
+   `b.live`'s `fetch` has no adapter or transport between it and the far side. F10.
+
+**Exercises in one frame:** panel, `b.live` (the running block), the summary line, pills
+with tone (stopped), value bars, tone and glyph (running/paused/hot), and the
+collapse-the-tail density decision. **The screencast's first five seconds**, doing almost
+everything Calcium does at once.
+
+`system info` = the engine version + container counts in the outer panel's title, one
+line — and that title is static, which is the only reason it may hold them. A welcome
+screen that is mostly chrome is the thing density is chosen against.
+
+**And the collapse chooses by load, not by name.** Showing the first five of a
+name-ordered list hid the busiest container on the machine behind `… 3 more`. Selection is
+by significance; display order is alphabetical so rows do not move between ticks. Two jobs,
+two orders — conflating them is invisible until a frame has an outlier in it.
+
+**`no command` is aspirational, and the gap has a number.** There is no seam for a first
+entry: `TuiConfig` has no field for one and none of C22's construction steps appends
+anything, so this surface is reached with `/dashboard` today. F9. And when the seam is
+built it needs a second decision, because **a live entry does not freeze when a command is
+typed** — it keeps polling for the life of the session, as does every other dashboard
+entry above it. F17.
 
 ### What the far side actually supplies, and the two corrections it forced
 

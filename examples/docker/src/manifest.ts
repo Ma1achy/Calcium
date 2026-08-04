@@ -44,6 +44,22 @@ const ps: ToolDef = {
 };
 
 /**
+ * The landing dashboard, as a **local** verb (S1, behind `/dashboard` — F9).
+ *
+ * `local: true` is what makes C23's `seal()` accept the handler: the registry and
+ * the manifest are two records of the same fact and the seal compares them, so a
+ * handler with no row here is unreachable while looking installed, and a row here
+ * with no handler refuses construction outright (C23 I27).
+ */
+const dashboard: ToolDef = {
+  name: "dashboard",
+  local: true,
+  summary: "The running containers, refreshing in place",
+  args: [],
+  flags: [],
+};
+
+/**
  * `engineVersion` is the daemon's, read at startup rather than written down: the
  * field exists for skew reporting, and a manifest claiming a version the daemon
  * does not have reports the wrong skew — which is worse than reporting none.
@@ -57,6 +73,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps],
+    tools: [ps, dashboard],
   };
 }
