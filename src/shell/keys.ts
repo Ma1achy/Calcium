@@ -35,6 +35,7 @@ import type { KeyAction } from "../interaction/router/types.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
+import type { PatchView } from "./patch-view.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
 export type PromptAnchor = Readonly<{ row: number; rows: number }>;
@@ -65,6 +66,15 @@ export type KeyDeps = Readonly<{
   overlayRegion: () => Readonly<{ width: number; height: number }>;
   /** C16's stored focus — the one piece of it in the system (C16 §3). */
   focus: FocusStore;
+  /**
+   * The fullscreen patch view (C25 §3b, C22 I41).
+   *
+   * Named here rather than reached through `overlays`, because the motions are
+   * the view's own arithmetic over one offset and C16 executes no action itself
+   * (I19). The seven `view*` entries below are what makes `pushedView` a target
+   * with a vocabulary rather than a name in a union.
+   */
+  patchView: PatchView;
   /**
    * The live entry's focusable rows, or empty (C16 I22).
    *
@@ -332,6 +342,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     scrollPageDown: () => void deps.viewport.pageDown(),
     scrollTop: () => void deps.viewport.scrollToTop(),
     scrollBottom: () => void deps.viewport.scrollToBottom(),
+
+    // --- the pushed view (C16 I24) -----------------------------------------
+    //
+    // Every one is the same call with a different motion, which is the point:
+    // the view holds one offset and computes each destination from it, so there
+    // is no per-motion state here to fall out of step (C22 I41).
+    viewNextHunk: () => void deps.patchView.move("nextHunk"),
+    viewPrevHunk: () => void deps.patchView.move("prevHunk"),
+    viewTop: () => void deps.patchView.move("top"),
+    viewBottom: () => void deps.patchView.move("bottom"),
+    viewPageUp: () => void deps.patchView.move("pageUp"),
+    viewPageDown: () => void deps.patchView.move("pageDown"),
+    // `Esc` is the view's own dismissal and deliberately not `dismiss`, which
+    // pops whatever layer is on top: this one knows it is closing *its* view and
+    // drops its offset with it (A01 D7).
+    viewPop: () => void deps.patchView.pop(),
 
     reverseSearch: () => {
       deps.history.searchOpen(deps.editor.text);

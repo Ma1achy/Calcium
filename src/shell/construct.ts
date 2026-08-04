@@ -53,6 +53,7 @@ import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keym
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
+import { createPatchView } from "./patch-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
 import { openHistory } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
@@ -540,6 +541,20 @@ export async function constructGraph(
   // --- 10. the execution pipeline -------------------------------------------
   // Takes the router, because C23's submit row ends `resetFocus()` (Seam 4).
   // Seals its own registry here, which is I3's fifth.
+  /**
+   * The fullscreen patch view — the first producer of a `kind: "view"` layer.
+   *
+   * Built before the pipeline because C23's action dispatcher calls into it and
+   * the pipeline closes over that dispatcher; the same ordering argument step
+   * 11 makes about the router, one dependency earlier.
+   */
+  const patchView = createPatchView({
+    overlays: stores.overlays,
+    transcript: stores.transcript,
+    region: deps.frame.overlayRegion,
+    redraw: () => void scheduler.commit("input"),
+  });
+
   const pipeline = at("pipeline", () => {
     const p = config.pipeline({
       // A function, not a snapshot: the store freezes a fresh object per write,
@@ -556,6 +571,7 @@ export async function constructGraph(
       blocks: built.blocks,
       editor: stores.editor,
       overlays: stores.overlays,
+      patchView,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same
       // reason the handler does not await it: a failed write means the choice
@@ -611,6 +627,7 @@ export async function constructGraph(
     schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
+    patchView,
     focus,
     // **Answered from the block** (C16 I22, C11 I14). C16 takes row ids as data
     // and holds no opinion about what a row is, so this is the one place that
@@ -701,6 +718,18 @@ export async function constructGraph(
     // focus goes here.
     router.register("liveBlock", (e) => {
       const effect = bound("liveBlock", e);
+      if (effect === null) return false;
+      effect();
+      return true;
+    });
+
+    // **The target that had a name and no vocabulary** (C16 I24). `pushedView`
+    // has been in the focus union since C16 was written; `activeTarget` resolved
+    // to it and there was neither a binding nor a handler, so every key fell
+    // through to step 3 — which is also why a `PgUp` over a view scrolled the
+    // transcript underneath it. Vacuous only while nothing pushed a view.
+    router.register("pushedView", (e) => {
+      const effect = bound("pushedView", e);
       if (effect === null) return false;
       effect();
       return true;
@@ -861,6 +890,7 @@ function routerDeps(
 
   return {
     overlayTop: top,
+    overlayRegion: frame.overlayRegion,
     placed: () => stores.overlays.layout(frame.overlayRegion()),
     popLayer: () => void stores.overlays.pop(),
     copyMode: frame.copyMode,

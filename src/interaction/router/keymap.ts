@@ -249,6 +249,27 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // **These newly occupy the `global` slots for four keys**, so `mergeBlock`
   // now refuses a block binding PageUp instead of shadowing the scroll. That is
   // the conflict rule working, and it is a change in behaviour.
+  // --- the pushed view (I24) -----------------------------------------------
+  //
+  // Letters are available here for the reason §6 gives about `g`/`G`: a pushed
+  // view has no prompt competing for them. `pageup`/`pagedown` appear at two
+  // targets deliberately — that is one key at two targets resolved by the
+  // ladder, not the duplicate `(target, key)` the conflict rule refuses.
+  { target: "pushedView", key: { name: "n" }, action: "viewNextHunk" },
+  { target: "pushedView", key: { name: "p" }, action: "viewPrevHunk" },
+  { target: "pushedView", key: { name: "g" }, action: "viewTop" },
+  // **`G`, not `{name: "g", shift: true}`** (I17). The decoder gives a plain
+  // printable its own character as its name and never sets `shift` — a capital
+  // arrives as `G`, so the modifier form is a row nothing can produce. T2.13
+  // caught it, which is the third time that check has found an unreachable
+  // binding and the first where the binding looked more correct than the fix.
+  { target: "pushedView", key: { name: "G" }, action: "viewBottom" },
+  { target: "pushedView", key: { name: "pageup" }, action: "viewPageUp" },
+  { target: "pushedView", key: { name: "pagedown" }, action: "viewPageDown" },
+  { target: "pushedView", key: { name: "up" }, action: "viewPageUp" },
+  { target: "pushedView", key: { name: "down" }, action: "viewPageDown" },
+  { target: "pushedView", key: { name: "escape" }, action: "viewPop" },
+
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
   { target: "global", key: { name: "home", ctrl: true }, action: "scrollTop" },

@@ -121,7 +121,25 @@ export type KeyAction =
   | "scrollPageUp"
   | "scrollPageDown"
   | "scrollTop"
-  | "scrollBottom";
+  | "scrollBottom"
+  // --- the pushed view (I24) -----------------------------------------------
+  //
+  // `pushedView` has been in `FocusTarget` since C16 was written and had no
+  // binding anywhere: `activeTarget` resolved to a target with an empty handler
+  // set and every key fell through to step 3. Vacuous only for as long as
+  // nothing pushed a view, which is the same shape as `frameworkSources` and as
+  // the editing bindings above.
+  //
+  // `viewPop` is `Esc`, and it is **not** §5's Ctrl-C rung under another name:
+  // that rung is cancellation and this is the view's own dismissal (A01 D7).
+  //
+  | "viewNextHunk"
+  | "viewPrevHunk"
+  | "viewTop"
+  | "viewBottom"
+  | "viewPageUp"
+  | "viewPageDown"
+  | "viewPop";
 
 export type Binding = Readonly<{
   target: FocusTarget;

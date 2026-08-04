@@ -30,6 +30,7 @@ const escape = (): InputEvent => ({
 /** The shell's half of the router, reduced to what a stack of two layers needs. */
 function routerDeps(overlays: OverlayManager): RouterDeps {
   return {
+    overlayRegion: () => ({ width: 80, height: 24 }),
     overlayTop: () => {
       const top = overlays.top;
       return top === null ? null : { kind: top.kind, id: top.id, dismissable: top.dismissable };

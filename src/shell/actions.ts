@@ -46,6 +46,16 @@ export type ActionDeps = Readonly<{
   refuse: (from: EntryId | null, text: string) => void;
   /** For a refusal with no entry to patch — a malformed URL from a chrome action. */
   notify: (text: string) => void;
+  /**
+   * Raise the fullscreen view over `target` (C23 I31, C25 §3b).
+   *
+   * Returns a refusal string, or `null` when the view opened. **A string rather
+   * than a throw**, and that is the second half of the ruling: C15's `push`
+   * throws when a view is raised onto a non-empty stack (C15 I1), and this
+   * dispatcher runs inside a renderer's callback where an `OverlayError` has no
+   * frame to be reported in. The owner checks and answers instead.
+   */
+  pushView: (from: EntryId | null, target: string) => string | null;
 }>;
 
 /**
@@ -100,6 +110,19 @@ export function createActionDispatcher(deps: ActionDeps) {
         void deps.openUrl(url).catch((cause: unknown) => {
           deps.notify(`could not open ${url.href}: ${String(cause)}`);
         });
+        return;
+      }
+
+      case "view": {
+        // **The target is resolved against the source entry and nowhere wider**
+        // (C04 I34, C23 I31). `expand` needs no resolution — it names a row on
+        // the entry already in hand — and this is the first kind whose target is
+        // a free string an adapter supplies. Resolved against the transcript it
+        // would let one entry's action fill the screen with another's data;
+        // resolved against nothing it is a key that does nothing and says
+        // nothing. The owner does the lookup because it holds the entry.
+        const refusal = deps.pushView(from, action.target);
+        if (refusal !== null) deps.refuse(from, refusal);
         return;
       }
 

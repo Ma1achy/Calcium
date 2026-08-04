@@ -16,6 +16,7 @@ import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
+import type { PatchView } from "./patch-view.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
@@ -193,6 +194,14 @@ export type PipelineDeps = Readonly<{
   blocks: BlockRegistry;
   editor: LineEditor;
   overlays: OverlayManager;
+  /**
+   * The fullscreen patch view (C25 §3b), for the `view` action's arm.
+   *
+   * On the pipeline's deps rather than reached through `overlays`, because the
+   * refusal it returns is C23's to patch into the source entry and the stack
+   * check that produces it is the view owner's (C23 I31).
+   */
+  patchView: PatchView;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (variant: "dark" | "light") => void;

@@ -24,12 +24,22 @@ const click = (row: number, col = 0, button = "button0"): InputEvent => ({
   press: true,
 });
 
+/** A `Placed` box, for the rows that ask whether a layer covers the region. */
+const box = (
+  id: string,
+  at: Readonly<{ top: number; left: number; height: number; width: number }>,
+): Placed => ({
+  layer: { id, kind: "overlay", dismissable: true },
+  ...at,
+});
+
 function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
   let t = start;
   const calls: string[] = [];
   const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[] };
   const deps: RouterDeps = {
     overlayTop: () => layer.top,
+    overlayRegion: () => ({ width: 80, height: 24 }),
     placed: () => layer.placed,
     popLayer: () => void calls.push("pop"),
     copyMode: () => false,
@@ -208,6 +218,52 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
     expect(router.dispatch(ctrlC), "consumed").toBe(true);
     expect(calls, "copy mode is untouched and no layer popped").toEqual([]);
+  });
+
+  it("T1.30 (I8): a full-region layer blocks step 3; a one-row dismissable overlay does not", () => {
+    // **The defect this clause closes, and its control.** `PgUp` over a pushed
+    // view fell through to `global` and scrolled the transcript underneath the
+    // thing filling the screen — word for word what §4 says step 3 exists to
+    // prevent. The guard tested `dismissable`, which is modality; a view is
+    // dismissable, because `Esc` pops it.
+    //
+    // The control is the row above it in the same table: a completion menu is
+    // dismissable *and* small, and scrolling beneath one costs nothing. Without
+    // the control this passes for a router that skips step 3 whenever any layer
+    // is open, which is the rule §4 spends a paragraph rejecting.
+    const { router, calls, layer } = harness();
+    const globalKey = key("pageup");
+    router.register("global", () => (calls.push("global"), true));
+
+    layer.top = { id: "menu", kind: "overlay", dismissable: true };
+    layer.placed = [box("menu", { top: 4, left: 10, height: 6, width: 30 })];
+    expect(router.dispatch(globalKey)).toBe(true);
+    expect(calls).toEqual(["global"]);
+
+    calls.length = 0;
+    layer.top = { id: "dash", kind: "view", dismissable: true };
+    layer.placed = [box("dash", { top: 0, left: 0, height: 24, width: 80 })];
+    expect(router.dispatch(globalKey)).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it("T1.31 (I8): coverage is read from the box, not from the kind", () => {
+    // **The proxy passes every test written about views.** A layer that is not a
+    // view but spans the region blocks step 3, and a view whose box was clamped
+    // smaller does not — neither case is expressible by a kind test, and the
+    // second is the one that would be silently wrong.
+    const { router, calls, layer } = harness();
+    router.register("global", () => (calls.push("global"), true));
+
+    layer.top = { id: "wide", kind: "overlay", dismissable: true };
+    layer.placed = [box("wide", { top: 0, left: 0, height: 24, width: 80 })];
+    expect(router.dispatch(key("pageup"))).toBe(false);
+
+    calls.length = 0;
+    layer.top = { id: "small-view", kind: "view", dismissable: true };
+    layer.placed = [box("small-view", { top: 0, left: 0, height: 8, width: 80 })];
+    expect(router.dispatch(key("pageup"))).toBe(true);
+    expect(calls).toEqual(["global"]);
   });
 
   it("a dismissable overlay pops; a view beneath is reached only when it is the top", () => {
