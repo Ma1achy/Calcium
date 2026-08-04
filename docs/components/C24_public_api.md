@@ -69,6 +69,8 @@ export { defaultTheme };
 
 // hooks
 export type { CompletionSource, CompletionContext, Candidate, Slot };
+export type { LiveSpec, ViewRefresh };
+export type { Identity };
 export type { CommandPolicy, Classification, ParseResult };
 export type { BlockDefinition, Measure, MeasureFn, RenderContext, BlockKeymap };
 export type { TransportRouter, VerbTransport, Invocation };
@@ -79,6 +81,12 @@ export { cells, truncate, planColumns };
 ```
 
 **`planColumns` is public** because a custom table-like kind needs it and it is pure. `cells` and `truncate` likewise — a kind that measured width itself would be wrong in a different way from every other kind.
+
+**`Identity` is exported for the same reason, and it was already owed.**
+`config.identity` is a hook the app supplies (C22 I43), so its return type has to
+be nameable — and `SessionSnapshot.identity` was already exported *structurally*,
+through a field whose type had no name on this list. A consumer could read it and
+could not annotate it, which is the omission below described from the other side.
 
 **The builder-argument types are exported because §4's signatures name them.** A list that exports `b.table` and not `ColumnDef` gives a consumer a function whose parameter they cannot annotate, and the workaround — `Parameters<typeof b.table>[0]["columns"][number]` — is the shape of an omission rather than a design. Six of the seven are introduced by the builders themselves and exist nowhere else; `ColumnDef` is C04's and was absent from this list while `TableRow`, `Series` and `Hunk` were on it, which is the same omission caught by consistency rather than by use.
 
@@ -98,7 +106,10 @@ A consumer never constructs, inspects or drives any of them. If one is ever need
 
 None of the three moves the export list, and all three stay in `UNCONSUMED_MEMBERS` naming their owner — this ruling says they are not public, not that they are finished.
 
-**`ViewRefresh` is off the hooks list until C23 drives it.** It is the declaration type for C23 §3b's part refresh, and §3b implements two of its three mechanisms: stall detection and the identity notice have drivers, and part refresh does not. `ViewRefresh`, `assignOffsets` and `backoffOf` are a complete producer whose only consumer is a unit test. Exporting the declaration type of a mechanism nothing runs is A03 §2's vacuity class arriving as an export — a consumer declares a refreshing part, everything type-checks, and nothing ever fires. It returns with `b.live` (§5) and not before.
+**`ViewRefresh` was off the hooks list until C23 drove it, and it is on now.** It is the declaration type for C23 §3b's part refresh, and for the whole of C22 and C23 that section implemented two of its three mechanisms: stall detection and the identity notice had drivers, part refresh had none. `ViewRefresh`, `assignOffsets` and `backoffOf` were a complete producer whose only consumer was a unit test, and exporting the declaration type of a mechanism nothing runs is A03 §2's vacuity class arriving as an export — a consumer declares a refreshing part, everything type-checks, and nothing ever fires. **The condition was the driver, not a release date**, which is why the sentence named one; C23 I32, C23 I33, C23 I34 and C23 I35 satisfied it and the type crossed with
+`b.live` (§5).
+
+**What the wait produced is worth keeping.** Held off the list, the type sat where MG25 could find it, and the two functions beneath it became that rule's founding case. Had it shipped on the first pass, the vacuity would have been a published surface with a consumer's suite compiling against it — and the rule that catches this class would have been written, if at all, against something cheaper to fix.
 
 **No `b.hunk`, and no diff parser.** `Patch` is exported as a block shape, but nothing here turns two texts into hunks. That is the app's problem — hunks arrive from a diff tool or already structured from the far side, and the framework renders them.
 
@@ -219,7 +230,9 @@ when they are not the first block in the sequence they are built into; `b.pills`
 notices is a list rather than a set of sections.
 
 **Nineteen builders return blocks, and this paragraph names nineteen** — `b.live`
-is the twentieth and is deferred with §5, so it takes its default when it lands.
+is the twentieth. It was deferred with §5 and has landed; it takes `gapBefore`'s
+default like every other block-returning builder, and it is the one whose return
+kind is fixed rather than chosen (a `panel`, C23 I34).
 It named fifteen, and two of those — `b.keyValue` and `b.diff` — are builders that do not
 exist: the `comparison` rename reached §3, the renderer and the goldens and not
 this sentence, and `b.kv` never had the name it was listed under. A prose list
@@ -296,29 +309,49 @@ field private would trade a hand-authored gap for an unreachable one.
 
 ## 5. `b.live` — failure isolation as a primitive
 
-> **Specified, not shipped.** `b.live` is not in the first release of this
-> surface, and neither is `ViewRefresh` (§3). The mechanism it rests on is C23
-> §3b's *part refresh*, and C23 implements two of §3b's three: stall detection
-> and the identity notice have drivers, part refresh has none. `assignOffsets`
-> and `backoffOf` are a complete producer with no consumer in `src/` — the class
-> MG24 exists for, arriving one level below where MG24 looks. So this section
-> describes work, not code, and a reader should not take the table below as a
-> list of things that currently happen. It ships when the driver does.
+> **This section was *specified, not shipped* for the whole of C22 and C23**, and
+> the note is kept rather than deleted because what it recorded is the reason the
+> rule that found it exists. `assignOffsets` and `backoffOf` were a complete
+> producer with no consumer in `src/` — MG25's founding case, one level below
+> where MG24 looks — and this section described the work they were waiting for.
+> The driver landed with C23 I32, C23 I33, C23 I34 and C23 I35, the two
+> allow-list rows went with it, and
+> `ViewRefresh` returned to §3's list. **Two rows of the table below were wrong
+> while nothing consumed them**, which is the other half of the lesson: a
+> specification nothing runs is not merely unfinished, it is unchecked.
 
 A02 §7 specifies the pattern precisely; assembling one by hand means wiring an interval, backoff, staleness, error rendering and teardown. Nobody does that five times correctly, so the isolation would be specified and not shipped.
 
 ```typescript
 type LiveSpec = Readonly<{
   id:     string;
+  title:  string;                                  // the panel's, and where state is said
   every?: number;                                  // omit → one-shot, no retry
   fetch?: () => Promise<unknown>;
   stream?: () => AsyncIterable<unknown>;           // → stall detection
-  render: (data: unknown) => readonly Block[];
-  renderError?:   (err: ErrorLike, retryInMs: number | null) => readonly Block[];
-  renderLoading?: () => readonly Block[];
+  render: (data: unknown) => Block;
+  renderError?:   (err: ErrorLike, retryInMs: number | null) => Block;
+  renderLoading?: () => Block;
   staleAfter?: number;                             // default 2 × every
 }>;
 ```
+
+**`b.live` returns a `panel`, and the three renderings supply its child.** Both
+halves were forced rather than chosen, and by different things.
+
+*One block, because `ViewPatch` has one replacing arm* — `{op:"replace", blockId,
+block}`. A part rendering three blocks needs three patches, which is three `rev`s
+for one logical refresh, C14 invalidated three times, and a frame composable
+half-way through. C23 I34 is the ruling and it is the one `settle(id, doc)` already
+took: name the operation for the shape that exists. A part wanting several blocks
+returns a `group`, which is one block with children.
+
+*A `panel`, because `Panel` is the only kind with a `title`* — and the title is
+where a live part says what state it is in. `· 14s ago` when stale, `· unavailable`
+when failing, both drawn that way by S13 §3 and §4 already. A part rendering a bare
+`table` has nowhere to put either, so the guarantee below would hold for some
+consumers and not others, which is not a guarantee. Hence `title` on the spec: the
+framework owns that row, the consumer owns the children.
 
 Everything in A02 §7 comes free:
 
@@ -327,12 +360,40 @@ Everything in A02 §7 comes free:
 | Independent failure — siblings unaffected | A02 §7 rule 1 |
 | Error rendered in place at the part's own size | rule 1 |
 | Backoff doubling from `every`, capped at 5 min | the one backoff rule |
-| Staleness marker past `staleAfter` | C23 §3b |
+| Staleness marker past `staleAfter`, in the panel's title | C23 I35 |
 | Stagger offset so no two parts tick together | C23 I20 |
-| Teardown on freeze, settle or pop | C23 §3b |
+| Teardown on settle, pop, eviction, clear or shutdown — **not freeze** | C23 I33 |
 | Muted placeholder while first loading | S02's pattern |
 
+**Two of those rows were wrong until the driver was built, and both in the way an
+unconsumed specification goes wrong: they cited something that was not there.**
+
+*Staleness* cited C23 §3b, and §3b said nothing about staleness — no marker, no
+`staleAfter`, not the word. The feature was real (S13 commitment 4 and T6.3 have
+required it since before this section existed) and the mechanism was missing, so
+the citation pointed at a section that had never been asked to carry it. It now
+cites C23 I35, which exists.
+
+*Teardown* said **freeze**, and C23 I9 says a frozen entry keeps receiving patches
+until settled. Freezing is not stopping — a `--watch` scrolled out of view is still
+running, which is the whole of what I9 protects — so this row asked for the one
+behaviour the invariant forbids. I9 wins. And the trigger neither document had was
+**eviction**: C13's cap removes a host on its own schedule, and a refresh outliving
+it patches an id that no longer resolves. That is now on the list.
+
+Neither is a slip of the pen. A row nothing consumes is a row nothing checks, and
+both survived every reading this project gave them because reading is what they
+were consistent with.
+
 **Behaviour is fixed; rendering is overridable.** `renderError` and `renderLoading` are replaceable so an app can match its own voice. Backoff, isolation and teardown are not — a guarantee you can switch off is not one.
+
+**And two things do not retry, which is A02 §7 read exactly rather than
+generously.** A `render` that throws is deterministic — same data, same throw — so
+it renders its error and keeps its interval (rule 2); retrying it flickers at the
+cadence and changes nothing. A part with no `every` is one-shot and never retries
+at all (rule 3), because silently re-attempting something the user asked for once
+is a surprise. Both are decided from the declaration, so both are answerable at the
+moment a failure arrives rather than after a heuristic.
 
 **`b.live` works wherever a block does**, in a transcript entry or a pushed view, and C23 drives both. That replaces two mechanisms with one: S02's banner sections and S13's panels now run on the same code, and C22's identity loop goes back to being about identity.
 
@@ -557,7 +618,11 @@ carries the state — and §7 records what that changed.
 - **T3.3**: `b.kv` with 200 rows → valid; measurement linear.
 - **T3.4**: `b.live` with both `fetch` and `stream` → construction throws; they are exclusive.
 - **T3.5**: `b.live` with neither → throws.
-- **T3.6**: `b.live` with `staleAfter` below `every` → warns; staleness would fire every tick.
+- **T3.6**: `b.live` with `staleAfter` below `every` → **throws**, like the other two declaration errors above.
+
+  It said *warns*, and a builder has no way to warn. `b.live` is a pure function with no sink: A03 SS33 bans `console.*` across `src/`, C02's `capabilityWarnings` is C22's channel and a builder cannot reach it, and returning a notice in place of the loading render would let a cosmetic mistake change what the first frame shows. **The row named an operation the layer does not have** — the same class as C23 §3b's *removed if output resumes*, and found the same way: by writing the code the row describes.
+
+  Throwing is the consistent answer rather than a fallback. The two rows above throw for declaration errors and this is one: the part would be marked stale on every tick it ever ran, so the marker is permanent and says nothing. That is a broken declaration, not a poor value.
 - **T3.7**: a custom `BlockDefinition` whose `measure` closes over a clock → caught by C09's scan, not here, but asserted end to end.
 - **T3.8**: `b.code` defaults to `wrap: false`; S10's usage sets true.
 - **T3.9**: `b.notice.error` with no glyph → a glyph is supplied automatically, satisfying D29 (C04 I5).

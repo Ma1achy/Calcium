@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, Glyph, Tone } from "../../data/viewmodel/index.js";
+import type { Action, Block, Cell, ErrorLike, Glyph, Tone } from "../../data/viewmodel/index.js";
 
 /**
  * What every block-returning builder accepts, and the only declaration of it
@@ -98,3 +98,34 @@ export type ComparisonRow = Readonly<{
 
 /** Re-exported for the builders' own signatures; C04 owns them. */
 export type { Action, Block, Cell, Glyph, Tone };
+
+/**
+ * C24 §5 — what `b.live` declares.
+ *
+ * Looser than what C23 drives, in the way every type here is looser than the
+ * field it feeds: `every` and `staleAfter` are optional and the drivers
+
+/**
+ * C24 §5 — what `b.live` declares.
+ *
+ * Looser than what C23 drives, in the way every type here is looser than the
+ * field it feeds: `every` and `staleAfter` are optional and the driver's are not,
+ * because the defaults are the framework's to choose — one-shot, and twice the
+ * interval. `render` returns **one** block (C23 I34), and `title` is required
+ * because the panel wrapping it needs one and because that title is where
+ * staleness and failure get said.
+ */
+export type LiveSpec = BlockOpts &
+  Readonly<{
+    id: string;
+    title: string;
+    /** Omitted -> one-shot: rendered once, never retried (A02 §7 rule 3). */
+    every?: number;
+    fetch?: () => Promise<unknown>;
+    stream?: () => AsyncIterable<unknown>;
+    render: (data: unknown) => Block;
+    renderError?: (err: ErrorLike, retryInMs: number | null) => Block;
+    renderLoading?: () => Block;
+    /** Default: twice `every`. Below it, construction throws (C24 T3.6). */
+    staleAfter?: number;
+  }>;

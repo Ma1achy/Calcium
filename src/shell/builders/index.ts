@@ -75,9 +75,11 @@ import type {
   ComparisonRow,
   EventLine,
   KeyValueInput,
+  LiveSpec,
   LogLine,
   StepInput,
 } from "./types.js";
+import { rememberLive } from "./live.js";
 
 // --- the two shared decisions ---------------------------------------------
 
@@ -456,11 +458,72 @@ export type {
   ComparisonRow,
   EventLine,
   KeyValueInput,
+  LiveSpec,
   LogLine,
   StepInput,
 } from "./types.js";
 
+
+/**
+ * C24 §5 — failure isolation as a primitive, and the twentieth builder.
+ *
+ * **It returns a `panel`, and both halves of that were forced.**
+ *
+ * *One block*, because `ViewPatch` has one replacing arm: `{op, blockId, block}`
+ * is one id and one block, so a part rendering three needs three patches, three
+ * `rev`s for one logical refresh, and a frame composable half-way through
+ * (C23 I34). A part wanting several returns a `group`.
+ *
+ * *A `panel`*, because `Panel` is the only kind with a `title` — and the title is
+ * where a live part says what state it is in: `· 14s ago` stale, `· unavailable`
+ * failing, both drawn that way by S13 §3 and §4 already. A part rendering a bare
+ * `table` has nowhere to put either, so the guarantees would hold for some
+ * consumers and not others, which is not a guarantee.
+ *
+ * **What this returns is the loading state**, and that is why C23 has no
+ * `renderLoading`: the first block exists before the driver runs. C23 renders the
+ * two states only C23 knows about — a fetch's result, and its failure with the
+ * `retryInMs` only the backoff can supply.
+ */
+function live(spec: LiveSpec): Panel {
+  if (spec.fetch === undefined && spec.stream === undefined) {
+    throw new Error("b.live needs a `fetch` or a `stream`");
+  }
+  if (spec.fetch !== undefined && spec.stream !== undefined) {
+    throw new Error("b.live takes `fetch` or `stream`, not both — they are exclusive");
+  }
+  // **Thrown, not warned** (C24 T3.6). The row said *warns* and a builder has no
+  // sink: SS33 bans `console.*`, C02's warnings are C22's channel, and putting a
+  // notice where the loading render goes lets a cosmetic mistake change the first
+  // frame. A part stale on every tick it ever runs is a broken declaration, which
+  // is what the two throws above are for.
+  if (spec.every !== undefined && spec.staleAfter !== undefined && spec.staleAfter < spec.every) {
+    throw new Error(
+      `b.live "${spec.id}": staleAfter (${String(spec.staleAfter)}ms) is below ` +
+        `every (${String(spec.every)}ms), so the part would be stale on every tick`,
+    );
+  }
+  // Through `noticeOf`, like every other notice this file makes. The tone is a
+  // fact from S02's pattern rather than a builder's inference — but SS45 cannot
+  // see the difference between a constant and a lookup table, which its own
+  // comment says, and the positional form is the shape the rule was written
+  // around rather than a way past it.
+  const loading =
+    spec.renderLoading?.() ??
+    noticeOf("muted", "loading…", undefined, { id: `${spec.id}-loading` });
+  const panel = finish<Panel>(
+    { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
+    spec,
+    true,
+  );
+  // The behaviour cannot ride on the block — `live.ts` says why the association
+  // is held beside the document rather than inside it.
+  rememberLive(panel, spec);
+  return panel;
+}
+
 export const b = {
+  live,
   rule,
   notice,
   kv,

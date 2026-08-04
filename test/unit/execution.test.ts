@@ -29,6 +29,7 @@ import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { assignOffsets, backoffOf, BACKOFF_CAP_MS } from "../../src/shell/refresh.js";
 import type { PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult, TransportRouter } from "../../src/data/transport/index.js";
+import { block } from "../../src/data/viewmodel/index.js";
 import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 
 type Scripted = Readonly<{
@@ -60,9 +61,22 @@ function harness(script: Scripted = {}) {
    * anywhere touched either value.
    */
   const commands: { where: "patch" | "settle"; command: string }[] = [];
-  /** A controllable clock and scheduler, so §3b's timers are driven not waited on. */
+  /**
+   * A controllable clock and scheduler, so §3b's timers are driven not waited on.
+   *
+   * **Each armed callback fires once**, as `setTimeout` does — the ambient
+   * `schedule` C22 supplies is a one-shot (`session.ts`), and a fake that re-fires
+   * every callback on every tick makes a periodic mechanism and a one-shot one the
+   * same test. Stall detection was armed once and never re-armed for the whole of
+   * C22 and C23 underneath a harness shaped that way; nothing failed, because
+   * nothing could (C23 T1.30, T6.30).
+   *
+   * A timer armed *during* a tick waits for the next one, so a self-re-arming
+   * chain advances one step per call rather than running away — the same barrier
+   * `fake-scheduler.ts` documents.
+   */
   let now = 0;
-  const timers: (() => void)[] = [];
+  const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
   const transport = {
     for: () => ({
@@ -164,9 +178,14 @@ function harness(script: Scripted = {}) {
     resetFocus: () => void resets.push(1),
     stop: () => Promise.resolve(0),
     clock: () => now,
-    schedule: (fn: () => void) => {
-      timers.push(fn);
-      return { [Symbol.dispose]: () => undefined };
+    schedule: (fn: () => void, ms: number) => {
+      const t = { fn, at: now + ms, live: true };
+      timers.push(t);
+      return {
+        [Symbol.dispose]: () => {
+          t.live = false;
+        },
+      };
     },
     openUrl: () => Promise.resolve(),
     bindings: () => [{ keys: "c+c", does: "global: cancel" }],
@@ -196,10 +215,14 @@ function harness(script: Scripted = {}) {
     /** What reached C20 (I29), and the prompt (I28). */
     recorded,
     editor: deps.editor,
-    /** Advance the injected clock and fire §3b's timers. */
+    /** Advance the injected clock and fire §3b's timers that are due. */
     tick: (ms: number) => {
       now += ms;
-      for (const fn of [...timers]) fn();
+      const due = timers.filter((t) => t.live && t.at <= now);
+      for (const t of due) {
+        t.live = false;
+        t.fn();
+      }
     },
   };
 }
@@ -998,10 +1021,19 @@ describe("C23 §3b — time-driven updates", () => {
     // Across the **smallest** interval rather than each part's own: two parts at
     // 30 s and 300 s collide every tenth tick if each is staggered within its own
     // period, and the smallest is the only window every part shares.
+    const part = (id: string, intervalMs: number) => ({
+      id,
+      title: id,
+      intervalMs,
+      staleAfterMs: intervalMs * 2,
+      fetch: () => Promise.reject(new Error("x")),
+      render: () => block({ kind: "raw", id: `${id}-c`, text: "" }),
+      renderError: () => block({ kind: "raw", id: `${id}-c`, text: "" }),
+    });
     const parts = assignOffsets([
-      { id: "a", intervalMs: 30_000, fetch: () => Promise.reject(new Error("x")) },
-      { id: "b", intervalMs: 300_000, fetch: () => Promise.reject(new Error("x")) },
-      { id: "c", intervalMs: 60_000, fetch: () => Promise.reject(new Error("x")) },
+      part("a", 30_000),
+      part("b", 300_000),
+      part("c", 60_000),
     ]);
 
     const offsets = parts.map((p) => p.offsetMs);
@@ -1019,6 +1051,71 @@ describe("C23 §3b — time-driven updates", () => {
     expect(backoffOf(30_000, 4), "capped").toBe(BACKOFF_CAP_MS);
     expect(backoffOf(30_000, 40), "and stays capped").toBe(BACKOFF_CAP_MS);
     expect(backoffOf(30_000, 0), "recovery resets it").toBe(30_000);
+  });
+
+  it("T1.30 (I19): the stall timer re-arms — two silences produce two notices", async () => {
+    // **The row the harness could not hold until it told the truth about time.**
+    // `schedule` is a one-shot (`session.ts` supplies `setTimeout`), so a driver
+    // that arms outside a loop checks for silence once, thirty seconds after
+    // construction, and never again. Every assertion about the *first* silence
+    // passes for that driver — which is why this row needs a second one, and why
+    // it is driven in steps rather than in a single long tick.
+    //
+    // The old harness re-fired every scheduled callback on every `tick()`, under
+    // which the re-armed and the armed-once driver are the same test.
+    let resume: (() => void) | undefined;
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise<void>((r) => { resume = r; });
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise(() => undefined);
+      })(),
+    });
+
+    h.pipeline.submit("/tail");
+    await settled();
+
+    // First silence: stepped, so the check at 60 s finds nothing and the check
+    // that matters is a later firing of the same timer.
+    h.tick(60_000);
+    h.tick(70_000);
+    const texts = () =>
+      (h.transcript.entries[0]?.doc.blocks ?? [])
+        .filter((b) => b.id === "stall-notice")
+        .map((b) => (b.kind === "notice" ? b.text : ""));
+    expect(texts(), "the first silence is reported").toEqual([expect.stringMatching(/no output for/)]);
+
+    // Speak, then go quiet again. The second notice can only arrive from a timer
+    // that armed itself after the first one fired.
+    resume?.();
+    await settled();
+    expect(texts(), "resumption spends the row").toEqual([expect.stringMatching(/resumed after/)]);
+
+    h.tick(60_000);
+    h.tick(70_000);
+    expect(texts(), "and the second silence is reported too").toEqual([
+      expect.stringMatching(/no output for/),
+    ]);
+  });
+
+  it("T1.37 (I25): one notice per silence, not one per tick", async () => {
+    // The mutation this catches is arming inside the sweep rather than around it:
+    // every tick then reports the same unbroken silence again, and a `--watch` on
+    // an idle cluster accumulates a notice every thirty seconds.
+    const h = harness({
+      stream: () => (async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        await new Promise(() => undefined);
+      })(),
+    });
+    h.pipeline.submit("/tail");
+    await settled();
+
+    for (let i = 0; i < 8; i += 1) h.tick(60_000);
+
+    const stall = (h.transcript.entries[0]?.doc.blocks ?? []).filter((b) => b.id === "stall-notice");
+    expect(stall, "eight ticks, one notice").toHaveLength(1);
   });
 
   it("T1.20b (I25, §8a A4): resumption replaces the notice, and the row says something true", async () => {

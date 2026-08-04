@@ -28,9 +28,12 @@ import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
+import type { Block } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
+import { liveDeclarations } from "./builders/live.js";
+import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
 import {
   createLocalRegistry,
@@ -185,6 +188,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   ): string | null => {
     try {
       const id = deps.transcript.append(doc);
+      declareLive(id, doc.blocks);
       if (line !== undefined) recordHistory(line, doc);
       deps.resetFocus();
       deps.scheduler.commit("input");
@@ -873,6 +877,48 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   });
 
   /**
+   * A `LiveSpec` as C23 drives it (C23 §3b).
+   *
+   * **The defaults are the framework's, not the declarer's**, which is what
+   * C24 §5's *behaviour is fixed* means in practice: one-shot when `every` is
+   * omitted, staleness at twice the interval, and A02 §7's error shape when no
+   * `renderError` is given. A consumer overrides how those look and never
+   * whether they happen.
+   */
+  const partOf = (spec: LiveSpec): Parameters<typeof refresh.declare>[1][number] => ({
+    id: spec.id,
+    title: spec.title,
+    intervalMs: spec.every ?? 0,
+    staleAfterMs: spec.staleAfter ?? (spec.every ?? 0) * 2,
+    fetch: spec.fetch ?? ((): Promise<unknown> => Promise.resolve(null)),
+    render: spec.render,
+    renderError:
+      spec.renderError ??
+      ((err, retryInMs) =>
+        block({
+          kind: "notice",
+          id: `${spec.id}-error`,
+          tone: "error",
+          text:
+            retryInMs === null
+              ? err.message
+              : `${err.message} — retrying in ${String(Math.round(retryInMs / 1000))}s`,
+        })),
+  });
+
+  /**
+   * Register every live part an appended document declares, against the entry
+   * that now holds it (C23 §3b, I32).
+   *
+   * Called from the one place a document reaches the transcript, so a part
+   * declared on any route is driven and no route has to remember to.
+   */
+  const declareLive = (id: string, blocks: readonly Block[]): void => {
+    const parts = liveDeclarations(blocks).map((d) => partOf(d.spec));
+    if (parts.length > 0) refresh.declare({ kind: "entry", id }, parts);
+  };
+
+  /**
    * C23 §3b. Constructed last because the identity notice appends through the
    * same path a submission does — it is C23 speaking, on C22's signal.
    */
@@ -886,12 +932,28 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     append: (text) =>
       void appendAndCommit(noticeDoc("", text, "info", { origin: "refresh" })),
     stopping: () => deps.session().stopping,
+    // **A second seam, because the two hosts are different components.** §3b
+    // commits that an entry and a pushed view are driven by *the same code*,
+    // not that they are the same store: C13 patches, C15 updates, and the
+    // driver holds one loop over both.
+    updateView: (id, blockId, next) => {
+      const layer = deps.overlays.stack.find((l) => l.id === id);
+      if (layer === undefined) return false;
+      const content = layer.content.map((b) => (b.id === blockId ? next : b));
+      return deps.overlays.update(id, { content });
+    },
+    viewBlock: (id, blockId) => {
+      const layer = deps.overlays.stack.find((l) => l.id === id);
+      const found = layer?.content.find((b) => b.id === blockId);
+      return found !== undefined && found.kind === "panel" ? (found.children[0] ?? null) : null;
+    },
   });
 
   return {
     submit,
     onAction,
     identityNotice: (text) => void refresh.identityNotice(text),
+    dispose: () => void refresh.dispose(),
 
     /**
      * C22 I3's fourth seal (§3a step 10), and C23 I27's reconciliation.

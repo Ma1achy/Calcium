@@ -135,5 +135,9 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // `config.pipeline`), and a test seam with no default is not a seam — it is
     // a missing wire that only the tests were holding together.
     pipeline: config.pipeline ?? createExecutionPipeline,
+    // The default is a *fetcher*, not an absent loop: the cadence, the health
+    // transitions and the commit all still run, and an app that supplies one
+    // changes where the fact comes from and nothing else (C22 I43).
+    identity: config.identity ?? ((): Promise<null> => Promise.resolve(null)),
   });
 }

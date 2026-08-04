@@ -7,8 +7,15 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSession } from "../support/session.js";
+import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { displayCells } from "../../src/presentation/text.js";
+
+/** Two macrotask turns, so an ambient `setTimeout(0)` has run. */
+const settle = async (): Promise<void> => {
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+};
 
 const HOME_SEQ = "[H";
 const HIDE_SEQ = "[?25l";
@@ -213,5 +220,103 @@ describe("C22 integration — the frame's viewport", () => {
     for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
       expect(text, `/help shows ${shown}`).toContain(shown);
     }
+  });
+});
+
+describe("C22 §7 — identity, from the app through C23", () => {
+  // **The clock is passed explicitly rather than read from the harness.**
+  // `buildSession` installs its own, starting at a real epoch — and there are
+  // two `fakeClock`s under `test/support/` with different shapes, so a token
+  // written against "zero" expires seventeen hundred billion milliseconds ago
+  // and takes the `remaining <= 0` arm, which sets the same health as the arm
+  // this row is about. Health cannot tell them apart; only the notice can.
+  const NOW = 1_000_000;
+  const nearlyExpired = () => ({
+    user: "m",
+    email: "m@fmx.io",
+    groups: [] as readonly string[],
+    // Inside the one-day warning window, and comfortably not expired.
+    expiresAt: NOW + 14 * 60 * 60 * 1000,
+  });
+
+  it("T1.4e (I43): a supplied identity reaches the transcript as a notice", async () => {
+    // **Asserted on the appended document, not on `warned`.** `warned` flips the
+    // first time §7 decides a notice is due, whether or not anything is
+    // delivered — which is exactly the state this row was written against: the
+    // loop composed its text, marked itself as having warned so it would never
+    // compose it again, and handed it to `notify: () => undefined`.
+    //
+    // Two things stood between the mechanism and a reader, and this row needs
+    // both gone. The other was the fetcher: a stub returning `null` with no
+    // config field behind it, so no token could arrive to be nearly expired.
+    // Either alone leaves the behaviour identical, which is why neither was
+    // visible as a defect on its own.
+    const { stdout } = await buildSession({
+      clock: () => NOW,
+      identity: () => Promise.resolve(nearlyExpired()),
+    });
+
+    // **Macrotasks, not microtasks.** `config.schedule` is always the ambient
+    // `setTimeout` even when the clock is faked, so C03's commit window is a
+    // real timer and no number of `Promise.resolve()`s reaches it.
+    await settle();
+
+    const text = lastFrame(stdout.chunks).join("\n");
+    expect(text, "the expiry notice is on the frame").toContain("Token expires in 14h");
+  });
+
+  it("T1.4f (I43): omitting `identity` still runs the loop and appends nothing", async () => {
+    // The default is a *fetcher*, not an absent loop. Without this half, a
+    // "default" that skipped construction entirely would pass T1.4e — and the
+    // session would have no health transitions at all.
+    const { stdout, tui } = await buildSession({ clock: () => NOW });
+
+    await settle();
+
+    expect(lastFrame(stdout.chunks).join("\n")).not.toContain("Token expires");
+    expect(tui.session.identity, "no identity, and no throw getting there").toBeNull();
+    expect(tui.session.health, "the loop ran and settled").toBe("live");
+  });
+});
+
+describe("C23 §3b — the driver is stopped where `stopping` is set", () => {
+  it("T4.22 (C23 I12): dispose runs at §8 step 1, before the terminal is released", async () => {
+    // **Ordering, not occurrence.** A `dispose` called anywhere in shutdown
+    // satisfies "the timers stop"; what I12 requires is that it precede the
+    // teardown, because `stopping()` is read at the top of a tick and cannot see
+    // a `fetch` already in flight. Called from inside `beforeRelease` it would
+    // still be called, still pass a `toHaveBeenCalled`, and still let a resolving
+    // fetch patch a transcript being torn down.
+    //
+    // Asserted against the alternate-screen exit rather than against a spy on
+    // `killAll`: the release byte is the observable boundary between step 1 and
+    // step 2, and it is on the same stream the frames go to. C22 §8 keeps the
+    // same ordering for `killAll()` against `history.drain()`.
+    const LEAVE_ALT = "\u001b[?1049l";
+    let outputAtDispose: string | null = null;
+
+    const { stdout, tui } = await buildSession({
+      pipeline: (deps) => {
+        const p = createExecutionPipeline(deps);
+        return Object.create(p, {
+          dispose: {
+            value: () => {
+              outputAtDispose = stdout.chunks.join("");
+              p.dispose();
+            },
+          },
+        }) as typeof p;
+      },
+    });
+    await settle();
+
+    await tui.stop("exit");
+
+    // The control: the session really did leave the alternate screen, so the
+    // assertion below is about ordering rather than about a sequence that was
+    // never written at all.
+    expect(stdout.chunks.join(""), "the terminal was released").toContain(LEAVE_ALT);
+    expect(outputAtDispose, "dispose was reached").not.toBeNull();
+    expect(outputAtDispose ?? "", "and reached before the release").not.toContain(LEAVE_ALT);
   });
 });

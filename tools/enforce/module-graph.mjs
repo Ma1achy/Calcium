@@ -1014,14 +1014,14 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // membership failure arriving through the other door.
 
   // --- specified and unbuilt: the class this rule exists for ----------------
-  assignOffsets:
-    "C23 §3b, I20 — part refresh. `createRefreshDriver` implements stall detection and " +
-    "the identity notice and not this; a declared part is staggered by nothing because " +
-    "no part can be declared. Ships with `b.live` (C24 §5), which is deferred for the " +
-    "same reason",
-  backoffOf:
-    "C23 §3b, I21 — the same gap, and the same landing. A02 §7's one backoff rule, " +
-    "correct and tested in a table, driving nothing",
+  //
+  // **Empty, and that is the rule finishing what it started.** `assignOffsets`
+  // and `backoffOf` were this section's founding entries and its whole argument:
+  // a complete producer with no consumer, held here because deleting it would
+  // remove a capability the specs commit to. The entries said *ships with
+  // `b.live`*, and the equality arm below is what made that a promise rather
+  // than a note — the day the driver called them, `make enforce` refused the
+  // commit until the rows went. Neither had to be remembered.
 
   // --- a rule expressed twice, the second expression unreachable ------------
   isUsable:
