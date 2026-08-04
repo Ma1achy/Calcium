@@ -195,6 +195,32 @@ is what §3b was missing rather than a detail of it.
 
 **Stall detection.** A streaming entry that has received no patch for **120 s** gets a synthetic notice patch — `no output for 2m` in muted tone — **replaced, on resumption, by a record of the gap**. The earlier wording said *replaced on the next real patch and removed if output resumes*, which is one event described twice and only the first half is expressible: `ViewPatch` has no delete, and it should not. **A transcript is a record.** C13 has exactly one path that removes anything — the cap — and it leaves a marker so the removal is visible (C13 §5). A patch that made a block vanish would leave a document whose earlier state cannot be reconstructed from its own history, and `rev` is a counter rather than a log, so nothing would say a block had ever been there. What resumption wants is not removal anyway: the notice said *this stream has gone quiet*, and then the stream spoke. That is a state change on a thing that still exists. **So the row is spent, and it says something true** — `resumed after 2m` rather than a blank. The entry did go quiet, and that is part of its record. A zero-height replacement is not available and should not be: C09's floor is one row for any block that is present, which is the constraint that makes measurement honest. It is not an error: a build pulling a large base layer is silent for minutes, and the honest reading of a motionless block is usually "working". Saying how long it has been quiet is better than implying a fault or saying nothing.
 
+**A part is declared wherever a document reaches the transcript, which is two
+calls and not one** (I33a). A document arrives by `append(doc)` on the local and
+notice routes, and by `settle(id, doc)` on the app route — where §3's steps 6 and
+7 are one call, so the entry is appended *pending* and the document that carries
+the blocks arrives only at settlement. Registration hung off `append` alone, so
+**an adapter returning a `b.live` block was never driven at all**: it rendered its
+loading state and stayed there for the life of the session.
+
+Nothing said so, which is why it survived. I32 and I33 are about *hosts* and
+*triggers* and neither mentions a route; the code carried the guarantee in a
+comment — *"called from the one place a document reaches the transcript, so a
+part declared on any route is driven and no route has to remember to"* — and
+there are two such places. A sentence claiming total coverage of a set it had
+miscounted, which is A03 §2's class in a comment rather than in a rule.
+
+It was found by a consumer building the part on each route and looking at the
+frames: the adapter's read `tick 0` for twelve seconds at a one-second interval.
+No assertion in this repository could have failed, because none of them declared
+a live part from an adapter.
+
+**Declaration is release-then-declare at settlement**, in that order, and C13
+emits its `settle` change synchronously — so the driver's I33 teardown runs
+inside the `settle()` call and the declaration follows it. The order is a
+consequence of the call rather than of subscriber registration, which is what
+makes it safe to state.
+
 **Part refresh.** A **transcript entry or a pushed view** may declare intervals — `b.live` (C24 §5) is the consumer-facing form, and both are driven by the same code here. An earlier split had C22's identity loop refreshing banner sections while C23 refreshed view panels; one mechanism replaces two, and C22's loop is now about identity alone.
 
 ```typescript
@@ -500,6 +526,7 @@ Per submission.
 - **I31** — A `view` action's `target` is resolved against the blocks of the entry it fired from, and a target that does not resolve there is refused rather than ignored. A view raised onto a non-empty layer stack is refused for the same reason and by the same path: C15 throws on it (C15 I1), and a throw crossing a renderer's callback has nowhere to be reported (→ C04 I34).
 - **I32** — A refresh is registered against a **host** and never declares one: `declare(host, parts)` binds them and `release(host)` is the **only** teardown path, so every trigger routes through one call rather than five sites agreeing by inspection. A host on the part would admit one declaration spanning two hosts — a set nothing can release as a unit, staggered across members with no shared lifetime.
 - **I33** — A refresh stops on exactly five triggers — the entry settles, the view pops, the entry is evicted, the transcript is cleared, or `session.stopping` is set — and **not on freeze**. I9 is that a frozen entry keeps receiving patches until settled, and a `--watch` scrolled out of view is still running; C24 §5's *teardown on freeze* is corrected against it. Eviction and clear are the two no component decides, so they are heard from C13 rather than checked on the next tick.
+- **I33a** — A live part is declared wherever a document reaches the transcript, and that is **both** `append(doc)` and `settle(id, doc)` — declaration is route-independent, so an adapter's `b.live` is driven exactly as a local handler's is. Registration hung off `append` alone and the app route appends a *pending* entry and settles with the document, so every adapter-declared part rendered its loading state and never ticked. I32 and I33 govern hosts and triggers and neither mentions a route; the guarantee lived only in a comment that had miscounted the places a document arrives. **This does not weaken I33**: settlement still releases what the entry had declared, and then declares what the settled document declares — one rule, both behaviours, and freeze still stops nothing (I9).
 - **I34** — A refresh applies its result as **one `replace` of one block**, and that block is a `panel` whose children are what the consumer rendered. One op, one `rev`, atomic: several patches for one logical refresh would invalidate C14 N times and leave a frame composable half-applied. The kind is not free — `Panel` is the only one carrying a `title`, and every state a live part announces (I35, A02 §7 rule 1) is announced there.
 - **I35** — Past `staleAfter` — default twice the interval — a part's panel is replaced by the same panel with its age in the title, and **staleness never stops the refresh**: a stale part is one still trying, and the marker clears on the next success. S13 commitment 4 has required this since before the mechanism existed, and C24 §5 cited §3b for it while §3b had nothing to cite.
 
@@ -880,6 +907,7 @@ Fake transport, fake stores.
 - **T1.34** (I21, rule 3): a part declaring no interval, failing → rendered once, never retried.
 - **T1.35** (I34): one tick produces exactly one `replace` and one `rev` on the host, and the replaced block is a `panel` whose children are `render`'s output.
 - **T1.36** (I35): a part whose data is older than `staleAfter` → its panel's title carries the age; the next success clears it **and the part never stopped ticking**.
+- **T1.38** (I33a): a `b.live` part returned by an **adapter** is driven — the document reaches the transcript through `settle(id, doc)`, and the part ticks. Asserted on both routes in one row, because a test exercising only `append` passes against the defect: that is the whole of how it survived. The local-route half is the control, and it must be shown to tick before the adapter half's failure means anything.
 - **T1.37** (I25): a stall notice is appended once per silence, not once per tick — the row that fails when the timer is armed inside the loop rather than around it.
 
 ### Tier 2 — contract / interface
@@ -975,6 +1003,7 @@ Fake transport, fake stores.
 - **T6.31** (I33): releasing on freeze as well → T2.21 fails, and a `--watch` scrolled out of view stops updating while still claiming to run.
 - **T6.32** (I33): dropping the eviction listener and checking the host on the next tick instead → T3.30 fails. The revert that reads as a simplification: the check is correct and it happens one tick too late, which is exactly long enough to patch an id that no longer resolves.
 - **T6.33** (I32): moving the host onto `ViewRefresh` → T2.20 fails, because a declaration spanning two hosts has no single release.
+- **T6.38** (I33a): declaring only from `append` and not from `settle(id, doc)` → T1.38 fails, and an adapter's `b.live` renders its loading state for ever. The revert that reads as the whole mechanism: every local-route part still ticks, every frame still refreshes, and the route with no coverage is silently dead. There is **no matching release-on-freeze mutation**, because there is no release on freeze — T6.31 already holds that direction, and I9 is why.
 - **T6.34** (I34): applying one patch per rendered block → T1.35 fails, and C14 invalidates N times for one refresh.
 - **T6.35** (I35): dropping the staleness marker → T1.36 fails, and a frozen panel is indistinguishable from a quiet cluster (S13 T6.3, from this side).
 - **T6.36** (I21): retrying a `render` throw → T1.33 fails; the screen flickers at the interval and the outcome never changes.
