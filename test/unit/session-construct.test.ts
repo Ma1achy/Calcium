@@ -16,11 +16,12 @@ import { constructGraph, STEPS, type FrameQueries } from "../../src/shell/constr
 import type { FileSystem, Pipeline, PipelineDeps, TuiConfig } from "../../src/shell/types.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
-// The parsed one, shared: a second hand-built copy is a second thing that can
-// drift from what `parseManifest` produces, and that drift is what the
-// framework-verb check now refuses.
+// The shared `ManifestDocument` — what an author writes. Construction parses it
+// (C22 I23). This file deliberately imports no manifest internals: every
+// construction harness used to reach through the package boundary for
+// `parseManifest`, which is why both arms of `config.manifest` could be broken
+// with the suite green.
 import { MANIFEST } from "../support/session.js";
-import { parseManifest } from "../../src/data/manifest/index.js";
 import { contextAt } from "../../src/interaction/completion/index.js";
 import { noticeDoc } from "../../src/shell/documents.js";
 import { block } from "../../src/data/viewmodel/index.js";
@@ -377,23 +378,39 @@ describe("C22 §3 — construction order", () => {
     expect(withOwn.pipeline).toBe(injected);
   });
 
-  it("T1.4e (I23): a hand-built Manifest is refused, naming the verbs it lacks", async () => {
-    // `parseManifest` is the only thing that appends `tui-kit`'s six (C05 §3),
-    // so an object satisfying the type is one nobody parsed — and C23 registers
-    // their handlers regardless, leaving `/help` installed and unclassifiable.
-    const handBuilt = {
+  it("T1.4e (I23, I23a): an author's own document constructs, and gains the six", async () => {
+    // **Inverted.** This row used to assert the opposite — that a hand-built
+    // manifest is *refused*, naming the verbs it lacks. The refusal was right
+    // about the danger and left no accepted input: an author cannot produce a
+    // `Manifest`, because `appTools` and the framework's six are both derived by
+    // `parseManifest`, which is exported from no entry point. Construction now
+    // parses whichever arm arrives, so the document below is what an author
+    // writes and it works.
+    const authored = {
       schema: "tui.manifest/1",
       binary: "prism",
       version: "1.0.0",
       tools: [],
     } as unknown as TuiConfig["manifest"];
 
-    await expect(build({ manifest: handBuilt })).rejects.toThrow(
-      /missing tui-kit's own verbs \(help, clear, theme, history, debug, exit\)/,
+    const { graph } = await build({ manifest: authored });
+    const names = graph.manifest.manifest?.tools.map((t) => t.name) ?? [];
+    expect(names).toEqual(
+      expect.arrayContaining(["help", "clear", "theme", "history", "debug", "exit"]),
     );
+    // Derived, not supplied: the author wrote none of them.
+    expect(graph.manifest.manifest?.appTools).toEqual([]);
+  });
 
-    // And the parsed one is accepted, or the check is refusing everything.
-    await expect(build()).resolves.toBeDefined();
+  it("T1.4l (C22 I23): an already-parsed Manifest fails on the duplicate check", async () => {
+    // The refusal that used to live in C22 is C05's now, and this is the row
+    // that says it still happens. Handing back the parser's own output means the
+    // framework's verbs arrive twice, and I6 refuses duplicate names — loudly,
+    // and for free, with no rule added for the case.
+    const { graph } = await build();
+    const alreadyParsed = graph.manifest.manifest as unknown as TuiConfig["manifest"];
+
+    await expect(build({ manifest: alreadyParsed })).rejects.toThrow(/help/);
   });
 
   it("an app-supplied transport is passed through untouched", () => {
@@ -511,14 +528,11 @@ describe("C22 §2a — the app's local handlers", () => {
       binary: "widget",
       version: "1.0.0",
       tools: [{ name: "guide", local: true, summary: "an app verb", args: [], flags: [] }],
-    };
-    const parsed = parseManifest(local);
-    if (!parsed.ok) throw new Error("the fixture manifest must parse");
-
-    await expect(build({ manifest: parsed.value })).rejects.toThrow(/guide/);
+    } as const;
+    await expect(build({ manifest: local })).rejects.toThrow(/guide/);
 
     const { graph } = await build({
-      manifest: parsed.value,
+      manifest: local,
       localHandlers: {
         guide: () => Promise.resolve(noticeDoc("guide", "the app's own verb", "info", { origin: "user" })),
       },

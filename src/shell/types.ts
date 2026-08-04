@@ -11,7 +11,7 @@
  */
 
 import type { Adapter, AdapterRegistry } from "../data/adapters/index.js";
-import type { Manifest, ManifestStore } from "../data/manifest/index.js";
+import type { Manifest, ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block } from "../data/viewmodel/index.js";
@@ -260,7 +260,16 @@ export type PipelineDeps = Readonly<{
 export type TuiConfig = Readonly<{
   name: string;
   binary: string;
-  manifest: Manifest | string;
+  /**
+   * The app's own verbs, or a path to a JSON document containing them.
+   *
+   * **A `ManifestDocument`, not a `Manifest`** (C22 I23a). A `Manifest` is what
+   * `parseManifest` returns — it carries `appTools` and the framework's six
+   * verbs, both derived — so asking for one was asking for the parser's output
+   * before the call, and the only function that produces it is exported nowhere.
+   * Construction parses whichever arm arrives.
+   */
+  manifest: ManifestDocument | string;
   theme: ThemeSet;
 
   adapters?: Readonly<Record<string, Adapter>>;

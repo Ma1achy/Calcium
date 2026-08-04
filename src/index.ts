@@ -116,6 +116,7 @@ export type {
   ArgType,
   FlagDef,
   Manifest,
+  ManifestDocument,
   ToolDef,
   ValidationResult,
 } from "./data/manifest/index.js";
