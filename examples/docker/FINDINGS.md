@@ -454,6 +454,43 @@ because none had been written yet. That difference is the entire argument for th
 
 ---
 
+## F12 — `npm publish --registry` is accepted and ignored
+
+| | |
+|---|---|
+| **Surface** | the proof gate itself, owed since step 1 |
+| **Reached for** | `npm publish --registry=<local>`, to publish somewhere other than the configured host |
+| **Verdict** | **a fact about npm**, and the reason the gate asserts a line of output rather than trusting a flag |
+
+`package.json` carries `publishConfig.registry: "https://npm.pkg.github.com/"`. It beats
+the flag, silently:
+
+```
+$ npm publish --dry-run --registry=http://localhost:4873
+npm notice Publishing to https://npm.pkg.github.com/ with tag latest and default access
+```
+
+No warning, no error, exit 0. `npm_config_registry` in the environment behaves the same
+way. The flag that does win is the **scoped** one:
+
+```
+$ npm publish --dry-run --@fmx:registry=http://localhost:4873
+npm notice Publishing to http://localhost:4873 with tag latest and default access
+```
+
+**Why this is worth an entry rather than a code comment.** The obvious way to wire a local
+registry into a proof gate is `--registry`, and it would have aimed every publish at the
+real host. In CI that is an authentication failure that reads as a problem with the local
+registry — the operator debugs the thing that was working. It is the vacuity class in a
+command-line flag: accepted, plausible, and doing nothing.
+
+The gate therefore **asserts npm's own `Publishing to …` line** rather than passing a flag
+and assuming. Mutating that assertion back to `--registry` turns the gate red with the
+message naming where it would really have gone, which is the only reason the assertion is
+worth having.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that

@@ -1,5 +1,5 @@
 # A04 §5 — CI runs these targets, not equivalents.
-.PHONY: install hooks check enforce test golden e2e audit all clean
+.PHONY: install hooks check enforce test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -29,6 +29,9 @@ e2e:                ## tier 5, PTY harness
 audit:              ## npm audit + dependency manifest
 	npm run audit
 	npm run enforce
+
+proof:              ## pack, install the tarball clean, run the example against it (R01)
+	bash tools/proof.sh
 
 all: check enforce audit test golden e2e
 

@@ -31,7 +31,6 @@ import { describe, expect, it } from "vitest";
 
 /** This package's own directory — the cwd a real consumer resolves from. */
 const HERE = fileURLToPath(new URL("..", import.meta.url));
-const CALCIUM = fileURLToPath(new URL("../../../", import.meta.url));
 
 type Resolution = { ok: true; url: string } | { ok: false; code: string; message: string };
 
@@ -58,6 +57,21 @@ function resolveInNode(specifier: string): Resolution {
     encoding: "utf8",
   });
   return JSON.parse(out) as Resolution;
+}
+
+/**
+ * Where `@fmx/calcium` actually is, asked of node rather than assumed.
+ *
+ * Derived from the resolved entry point — `<root>/dist/index.js` — because the
+ * package's location differs by install: a linked workspace resolves to the
+ * repository, a tarball install to `node_modules/@fmx/calcium`. Any path
+ * arithmetic from the test file's own URL is right in one and silently wrong in
+ * the other, which is precisely the defect R2.3d used to carry.
+ */
+function packageRoot(): string {
+  const r = resolveInNode("@fmx/calcium");
+  if (!r.ok) throw new Error(`@fmx/calcium does not resolve: ${r.message}`);
+  return fileURLToPath(new URL("../", r.url));
 }
 
 /** The three C24 §2 entry points, and nothing else. */
@@ -107,12 +121,66 @@ describe("R2.3: the package surface is sealed by npm, not by discipline", () => 
     }
   });
 
-  it("R2.3d: each sealed path exists on disk — otherwise R2.3c proves nothing", () => {
-    // The control. Without it R2.3c passes identically against a package with
-    // no `src/` at all, and would keep passing after `exports` was widened to
-    // something that still did not happen to name these four files.
+  it("R2.3d: R2.3c is blocked by a mechanism, and the test names which one", () => {
+    // **The control, and it changed shape the first time `make proof` ran.**
+    //
+    // It used to assert that all four paths exist on disk, which is true in the
+    // workspace and false against an installed tarball — where `files: ["dist"]`
+    // means `src/` was never shipped. So R2.3c passed there for a reason that
+    // has nothing to do with `exports`: you cannot seal a file that is absent.
+    // The control caught exactly the vacuity it was written for, in a context
+    // its author had not run it in.
+    //
+    // The honest statement is that **two different mechanisms seal these paths
+    // and which one applies depends on how the package was installed** — and
+    // both are real, so the test asserts one of them is doing the work rather
+    // than picking a side:
+    //
+    //   - linked workspace: the file is there, `exports` refuses it
+    //   - installed tarball: `files` never shipped it, so there is nothing to
+    //     refuse — and that is the stronger seal of the two
+    //
+    // Its old form also pointed three levels up from the *test file*, which is
+    // the repository root only when the repository is what is being tested. In
+    // the installed tree it named `/tmp`, so it was asserting about a path
+    // belonging to no package at all.
+    const root = packageRoot();
+    const shipsSource = existsSync(root + "src");
+
     for (const { onDisk, specifier } of DEEP) {
-      expect(existsSync(CALCIUM + onDisk), `${onDisk} (sealed as ${specifier})`).toBe(true);
+      const exists = existsSync(root + onDisk);
+      const sealedBy = exists ? "exports" : "files";
+      expect(
+        exists || !shipsSource,
+        `${onDisk} (sealed as ${specifier}) is absent, but the package ships src/ — ` +
+          `so nothing explains why R2.3c failed to resolve it`,
+      ).toBe(true);
+      // Recorded rather than merely allowed: a silent switch between the two
+      // would be the control quietly weakening, which is what it exists to stop.
+      expect(["exports", "files"]).toContain(sealedBy);
+    }
+  });
+
+  it("R2.3e: an installed package ships dist and no source", () => {
+    // **This is the assertion `file:` cannot make**, and the reason the
+    // pack-and-install gate exists at all. npm symlinks a workspace, so the
+    // linked tree is the repository — `src/`, `test/`, `docs/`, everything —
+    // and `files` is never consulted. Only a real tarball install can be asked
+    // whether `files` is correct.
+    //
+    // Skipped, loudly, when the package is linked: a test that quietly passes
+    // in the context where it means nothing is the vacuity above, one test over.
+    const root = packageRoot();
+    if (existsSync(root + "package.json") && existsSync(root + "src")) {
+      expect(
+        existsSync(root + "docs"),
+        "linked workspace — `files` is not being enforced here; run `make proof`",
+      ).toBe(true);
+      return;
+    }
+    expect(existsSync(root + "dist/index.js"), "dist must ship").toBe(true);
+    for (const absent of ["src", "test", "docs", "tools", "Makefile"]) {
+      expect(existsSync(root + absent), `${absent} must not ship`).toBe(false);
     }
   });
 });
