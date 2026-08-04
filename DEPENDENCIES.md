@@ -41,6 +41,43 @@ Each of these is the kind of thing a project normally installs. The specs make e
 | An NDJSON parser | `node:readline` | Built in (C06) |
 | A TypeScript linter (typescript-eslint) | `tsc --strict`, plus A03 scans | 87 packages, and every rule it would give us over strict TypeScript is replaceable by a source scan — `no-console` moved to A03 SS33 and got stronger, catching `console.error` and `console.warn` too. **The one exception is `no-floating-promises`, and it is not replaceable by a regex.** C02 has no async at all, so deciding this at C02 decides it at the wrong moment. **Reopen at C06**: cancellation and streaming are where a floating promise is a real bug rather than a style one, and if the answer is still no there, it is no for good reasons rather than for want of a case. Until then `src/` is not linted — see `eslint.config.js`. **The trigger passed unnoticed at C06, and again at C21 and C23** — a deferral with a named trigger and no mechanism, which is the class `waitsOn` closes for enforcement rules and `TD2` closes for tests, arriving in a dependency row where nothing was watching. **And the rule now has a demonstrated catch rather than a hypothetical one.** C23 routes are started as `void runRoute(...)`, and an async route that throws *before* its own `try` rejects with nobody awaiting: no entry, no commit, nothing reported. The containment paths had a window with no containment, and C23 I1 — every submission produces exactly one outcome — was violated silently while the suite was green. A real defect lived in that window (every `warn` and `error` notice threw at construction for want of a glyph, C04 I6) and was invisible because of it. Fixed in the code by wrapping each route, which is the mitigation a rule would have made unnecessary. So the question is now 87 dev packages against one rule with a measured catch, which is a different trade from 87 against a style preference — and it has a real answer either way. Decide after C23 lands; mid-component is the wrong moment, which was the original argument |
 
+## An advisory against something we did not install
+
+`make all` runs `npm audit --audit-level=high`, so an advisory published against
+anything in the tree turns the build red without a commit having been made. The
+first one was `brace-expansion`, reached only as
+`eslint → minimatch → brace-expansion`.
+
+**A transitive bump does not get a row, and the reason is the same one the rows
+exist for.** A row is an argument that a *choice* was correct — what it does, why
+internal is worse, its transitive count, its maintenance signal, an owner. Nothing
+was chosen here: the package arrived under one we did chose, and the fix restores
+the version that dependency already permitted. A row would be an argument for a
+decision nobody made, and `make enforce` (SS31) compares this file against
+`package.json`, which a lockfile bump does not touch — so a row would also make
+the two disagree.
+
+**What the commit must show instead**, because a lockfile change is invisible to
+review otherwise:
+
+- **The path.** `npm ls <package>` — which declared dependency reaches it, and
+  whether it is `dev`. A dev-only transitive does not ship, and saying so is the
+  difference between an urgent commit and a tidy one.
+- **The diff is one package.** `npm audit fix` may bump more than the advisory
+  names, and may edit `package.json`. Read `git diff --name-only` before
+  committing: if `package.json` moved, this is no longer a transitive bump and it
+  needs the section above.
+- **That it was pre-existing.** An advisory arriving during a feature branch is
+  not that branch's, and the way to know is to stash and re-run rather than to
+  assume. Fixing it in passing hides both the advisory and the feature.
+- **`make all`, not `npm audit`.** The point of the bump is that nothing else
+  moved.
+
+**What is not acceptable**: `--audit-level` raised, the package pinned by
+`overrides` without saying why, or the advisory suppressed. Each turns a red build
+into a quiet one, which is the failure mode A03 §2 is about, arriving through the
+supply chain.
+
 ## Adding one
 
 Open an MR containing: what it does, why the internal alternative is worse, its own
