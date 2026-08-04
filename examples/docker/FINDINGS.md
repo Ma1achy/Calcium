@@ -188,6 +188,100 @@ room, and will meet the boundary properly.
 
 ---
 
+## F6 — R01 names a glyph the vocabulary does not have
+
+| | |
+|---|---|
+| **Surface** | S2 `/ps` — the `paused` state |
+| **Reached for** | `▪`, as R01 §5 specifies |
+| **Verdict** | **adapter-side**, plus an R01 correction |
+
+R01 §5: *"State glyphs follow the framework's vocabulary: `running` → `●` ok, `restarting`
+→ `▲` warn, `paused` → `▪` warn, `exited` → `✗` error, `created` → `○` muted."*
+
+Four of the five exist. `▪` is not in C09's `GLYPH_TABLE`, and the sentence claims to be
+following the vocabulary while naming a character outside it — which is the tell: the
+vocabulary is **slots**, not characters (C04 I6, and CLAUDE.md's *a block names a palette
+slot*). Writing the character down at all is how the mismatch got in.
+
+**Ruled:** `paused` → `pending` (`◌`), tone `warn`. Suspended, not progressing, and visibly
+distinct from `restarting`'s `▲`. The unknown-state arm takes `bullet` (`•`) rather than
+`queued` (`○`), so an unrecognised state does not render identically to `created` — a real
+state wearing an unknown one's mark is worse than an unknown one looking unfamiliar.
+
+Small, and the same class as F4 one size down: a spec written in the far side's terms, or in
+a drawing's terms, rather than in the terms of the layer that has to satisfy it.
+
+---
+
+## F7 — `createTui` could not be called from the public surface at all ★★
+
+| | |
+|---|---|
+| **Surface** | S2 `/ps` — starting the application |
+| **Reached for** | `createTui({ manifest })`, either arm |
+| **Verdict** | **a real Calcium finding, and a blocking one.** Fixed in Calcium, with this app as the consumer proving it |
+
+`TuiConfig.manifest` is typed `Manifest | string`. **Neither arm worked.**
+
+**The object arm** throws at construction: *"the manifest is missing tui-kit's own verbs
+(help, clear, theme, history, debug, exit) — pass the raw document, or the result of
+parseManifest, rather than a hand-built Manifest"*. `parseManifest` is the only thing that
+appends them — `construct.ts:261` says so in a comment — and it was exported from **none**
+of the three entry points. So the advice in the error names a function the reader cannot
+reach.
+
+**The string arm** is a file path. `FileSystem.readFile` returns a `string`;
+`parseManifest(raw: unknown)` rejects anything that is not a record; `construct.ts:257`
+passed one directly to the other with **no `JSON.parse` between them**. Every call took
+`"a manifest must be an object"`. That arm had never run.
+
+**Why nothing caught it, which is the finding under the finding.** Calcium's own harnesses
+build a session like this:
+
+```ts
+// test/support/session.ts:16
+import { parseManifest } from "../../src/data/manifest/index.js";
+// test/support/fixture.mjs:534
+const { parseManifest } = await import("../../dist/data/manifest/index.js");
+```
+
+Both **reach through the package boundary** and hand `createTui` an already-parsed object.
+Every test of construction therefore exercises a path no consumer has. This is the
+producer testing itself, and it is precisely the thing R01 exists to detect — the
+`exports` seal is what makes the deep import visible, and the seal only bites on a
+consumer, because a package cannot reach through its own boundary and notice.
+
+C24 §1 states the test the component serves: *"Phase 1 is done when someone who is not its
+author builds a working TUI from the README without asking a question."* It has never been
+satisfiable. The README carries no runnable `createTui` example, so nothing was there to
+fail either.
+
+**Fixed rather than absorbed**, because there is no app-side version of "the entry point
+works". The alternative was fabricating six framework `ToolDef`s in app code — inventing
+summaries and flags the app cannot know, against a reconciliation (C23 I27) that compares
+them with the real handlers — which would have hidden the finding behind something that
+looked like ordinary app code, and made the reference app a liar about what Calcium can do.
+
+**The ruling, and it is about the axis rather than the arm.** The object arm's real defect
+is that it *requires the output of a function the author cannot reach*. Two remedies were
+available — export `parseManifest` and tell the author to call it, or have construction
+append the framework's verbs itself — and the second is right for the same reason C05
+appends them during parse: **the framework's own verbs are the framework's to add, not the
+author's to know.** Exporting `parseManifest` would leave `TuiConfig.manifest: Manifest`
+still misleading, because a bare `Manifest` would remain the one thing that does not work.
+So the object arm now accepts what an author can actually write — their own tools — and
+the string arm gains the missing `JSON.parse`, with a malformed document reported as a
+manifest error rather than thrown.
+
+**And the seal test is what would have caught it.** R2.3 was written first, before any app
+code, on the argument that a source scan tests the app's habits while only a real
+resolution tests the boundary. F7 is the payment: the surface the harnesses reached around
+turns out not to work, and it could only be discovered by something that respected the
+boundary. A package cannot reach through its own edge and notice.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that

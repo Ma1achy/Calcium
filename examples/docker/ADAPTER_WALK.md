@@ -72,7 +72,7 @@ terminal, not a defect. **Recorded in FINDINGS as an open question rather than a
 silently** — a spec sentence the framework cannot express is exactly the kind of thing this
 app exists to find.
 
-**B2. `Ports` long meets `truncate`.**
+**B2. `Ports` long meets `truncateFrom`.**
 Ruled in S2 and R01 R3.4, at the second attempt: **from the end**, keeping
 `0.0.0.0:8080…`. The host port is on the left in the string docker sends. See F4.
 
@@ -80,7 +80,7 @@ Ruled in S2 and R01 R3.4, at the second attempt: **from the end**, keeping
 `ghcr.io/org/app:v4` identifies by its tail (`app:v4`); the registry prefix repeats down
 every row. `vsc-tui-kit-07d4a92…-features` identifies by its head, and its tail is a build
 hash plus a constant suffix.
-**Ruling: `truncate: "start"`, keeping the tail.** An image reference is hierarchical with
+**Ruling: `truncateFrom: "start"`, keeping the tail.** An image reference is hierarchical with
 the leaf last, which is precisely the case C04 I30 names for `"start"` ("a path's
 filename, a hierarchical key's leaf"). **Its blind spot, stated:** a flat generated name
 degrades to `…f94199f1-features`, and a screen of devcontainers all show the same suffix.
@@ -94,7 +94,7 @@ tells the reader nothing about the container.
 **Ruling:** `—` in the cell (R1.4), tone `muted`. Emptiness never influences admission;
 `planColumns` reads `minWidth`, not content.
 
-**B5. Docker's own `…` meets `truncate` — F3, and the row to assert hardest.**
+**B5. Docker's own `…` meets `truncateFrom` — F3, and the row to assert hardest.**
 `"Mounts": "/host_mnt/User…"` arrives already shortened, and `cells()` measures U+2026 as
 **one** cell. A column narrower than the arrived value truncates it a second time and the
 result carries two ellipses for one value.
@@ -117,8 +117,16 @@ docker-shaped pre-elided value, which is honest about being synthetic and still 
 never read for meaning. R01 commitment 4, R5.1. This is the row where using the wrong field
 produces a table that looks right.
 
-`running` ● ok · `restarting` ▲ warn · `paused` ▪ warn · `exited` ✗ error · `created` ○ muted
-· anything else ○ muted, because docker may add a state and an unknown one must not throw.
+`running` ● ok · `restarting` ▲ warn · `paused` ◌ warn · `exited` ✗ error · `dead` ✗ error
+· `created` ○ muted · anything else • muted, because docker may add a state and an unknown
+one must not throw or borrow another state's colour.
+
+**`paused` is `◌` and R01 §5 asks for `▪`** — a character C09's glyph table does not have.
+R01 said it was following the framework's vocabulary while naming something outside it, and
+the vocabulary is *slots*, not characters (C04 I6). `pending` is the honest neighbour:
+suspended, not progressing, and distinct from `restarting`'s `▲`. Recorded as F6. The
+unknown arm takes `bullet` rather than `queued` so that an unrecognised state does not
+render identically to `created`, which would be a real state wearing an unknown one's mark.
 
 **C2. The glyph's home: S2 puts it in `STATUS`, R01 §5 gives it a column.**
 Both are consistent with "the glyph comes from `State`" and they are different tables.

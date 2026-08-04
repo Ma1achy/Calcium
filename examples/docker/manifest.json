@@ -1,0 +1,21 @@
+{
+  "schema": "tui.manifest/1",
+  "binary": "docker",
+  "version": "",
+  "tools": [
+    {
+      "name": "ps",
+      "local": false,
+      "summary": "List containers",
+      "args": [],
+      "flags": [
+        {
+          "name": "all",
+          "short": "a",
+          "type": "bool",
+          "summary": "Show stopped containers as well as running ones"
+        }
+      ]
+    }
+  ]
+}
