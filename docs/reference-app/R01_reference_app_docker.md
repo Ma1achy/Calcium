@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Reference application |
-| **Package** | `docker-tui` — **its own repository**, consuming `tui-kit` as a published dependency |
+| **Package** | `docker-tui` at `Calcium/examples/docker/` — a monorepo example consuming `@fmx/calcium` as a packaged dependency (sealed `exports` + pack-and-install CI), not through `../../src` |
 | **Depends on** | `tui-kit` only, through its public entry points (C24) |
 | **Consumed by** | Nothing. It is a proof, not a library |
 | **Source** | Scratchpad 4 · A02 §6 forcing function · C24 |
@@ -106,17 +106,15 @@ The `Status`/`State` split is the instructive one: the human-readable field and 
 ▌   ⏎ inspect   ␣ expand   ≡ logs
 ```
 
-| Column | Priority | Min | Align | Trunc | Flex | From |
-|---|---|---|---|---|---|---|
-| expand · glyph | 100 | 1 · 1 | left | end | — | `State` |
-| id | 90 | 12 | left | end | — | `ID`, 12 chars |
-| name | 95 | 16 | left | end | yes | `Names`, first only |
-| state | 85 | 10 | left | end | — | `State` |
-| status | 70 | 18 | left | end | — | `Status`, verbatim |
-| image | 60 | 20 | left | **start** | — | `Image`, tag survives |
-| ports | 40 | 20 | left | **start** | — | `Ports`, host port survives |
-
-`Trunc` is `truncateFrom` (C04 I30) — the end characters are removed from, so `start` keeps the tail. `image` keeps its tag, because `ghcr.io/acme/api:2.4.1` truncated the other way reads as every other image from that registry; `ports` keeps the host port, which R3.4 already asserted while nothing could express it. `align` is stated because `ColumnDef` requires it (C04 §3). Nothing docker returns is a number — every field is a string, which R01 §4 lists as the sixth problem — so every column is left, and the adapter's job is not to make any of them look otherwise.
+| Column | Priority | Min | Flex | From |
+|---|---|---|---|---|
+| expand · glyph | 100 | 1 · 1 | — | `State` |
+| id | 90 | 12 | — | `ID`, 12 chars |
+| name | 95 | 16 | yes | `Names`, first only |
+| state | 85 | 10 | — | `State` |
+| status | 70 | 18 | — | `Status`, verbatim |
+| image | 60 | 20 | — | `Image` |
+| ports | 40 | 20 | — | `Ports`, condensed |
 
 State glyphs follow the framework's vocabulary: `running` → `●` ok, `restarting` → `▲` warn, `paused` → `▪` warn, `exited` → `✗` error, `created` → `○` muted.
 
@@ -156,17 +154,36 @@ Recorded via `tui-kit/fixtures`, provenance-marked, with the authored ratio repo
 
 ## 8. Repository and CI
 
-**Its own repository**, consuming `tui-kit` as a published dependency.
+**Resolved for the monorepo, without losing the proof.** The original intent — "its own
+repository, consuming the package as a published dependency" — existed to guarantee one
+thing: the example builds against the *packaged* artefact, not the working tree. An in-repo
+example that builds through a path alias into `src/` proves nothing, because missing files
+in `files`, a wrong `exports` map, unresolvable type declarations, or a peer dependency
+that is really a hard one are all invisible from inside the workspace.
 
-An in-repo example builds against the working tree through a path alias and proves nothing about the package being a package. Missing files in `files`, a wrong `exports` map, unresolvable type declarations, a peer dependency that is really a hard one — all invisible from inside the workspace, all immediately visible from outside it.
+That guarantee is preserved in a monorepo by two mechanisms rather than by separation:
+
+**The seal (dev loop).** The example lives at `Calcium/examples/docker/` and depends on
+`"@fmx/calcium": "file:../.."`. Calcium's `package.json` locks `exports` to the three
+entry points and sets `"files": ["dist"]`. With that in place `import "@fmx/calcium/src/..."`
+is a resolution error — the app can only see the public surface, enforced by npm. **Verify
+the seal before writing app code**; if `exports` does not seal it, that is a real Calcium
+finding (C24's surface is not sealed), fixed first.
+
+**The proof (CI gate).** A job spins up a local registry (Verdaccio), `npm publish`es
+Calcium to it, installs the *real tarball* into a clean checkout, and runs the example's
+tests against the installed package. This is what a separate repo bought — the packing
+bugs `file:` cannot catch — obtained without the separation.
 
 | CI job | Runs |
 |---|---|
+| Verify `exports` seal (`import ".../src"` must fail) | Always, first |
 | Type-check | Always |
 | Golden frames against fixtures | Always |
 | `expectDocument` assertions | Always |
+| **Pack-and-install via local registry**, tests against the tarball | Always — the "it is a package" proof |
 | Against real docker | Only where the runner has it; **the skip is recorded, not silent** |
-| Import manifest | Published on each release, for C24 T2.2's unused-export scan |
+| Import manifest | For C24 T2.2's unused-export scan |
 
 ---
 
@@ -197,7 +214,7 @@ Each row is a claim the framework makes and this app tests.
 6. `/stats` polls via `b.live`; `/logs` covers streaming.
 7. One `b.live` part failing leaves the others rendering.
 8. A recorded fixture corpus ships, giving C08's tooling a second consumer.
-9. Its own repository, consuming `tui-kit` as a published dependency.
+9. A monorepo example at `examples/docker/` that consumes the packaged `@fmx/calcium` — sealed `exports` for the dev loop, a local-registry pack-and-install for the proof — never `../../src`.
 10. Its own CI; a skipped real-docker run is recorded, never silent.
 11. It imports only from `tui-kit`'s public entry points, never a deep path.
 12. It publishes an import manifest on each release, for C24's unused-export scan.
