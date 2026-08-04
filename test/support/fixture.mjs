@@ -539,9 +539,21 @@ switch (mode) {
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
 
-    // **Parsed, never hand-built** (C22 I23). `parseManifest` is the only thing
-    // that appends the framework's own six verbs, so an object satisfying the
-    // type is one nobody parsed and construction refuses it.
+    // **A document, handed over unparsed** (C22 I23, C22 I23a).
+    //
+    // This comment used to say the opposite — *parsed, never hand-built* — and
+    // it was right until FINDINGS F7 made `createTui` run both arms of
+    // `TuiConfig.manifest` through `parseManifest` itself. Appending the
+    // framework's six verbs is the framework's job, so handing it a manifest
+    // that already has them is now the thing construction refuses: C05 §3 reads
+    // `help`, `clear`, `theme`, `history`, `debug` and `exit` as an app trying
+    // to shadow verbs it does not own.
+    //
+    // **Tier 5 was the only consumer that noticed, and it noticed late.** Three
+    // harnesses were converted with the fix and this is the fourth; it imports
+    // from `dist/` in `.mjs`, so the grep that found the others could not see
+    // it, and `npm test` excludes tier 5. Forty-four rows failed on a suite
+    // reported green.
     //
     // **The same JSON `test/support/manifest.ts` reads**, rather than a second
     // manifest written here. Two copies drift, and the drift shows up as a
@@ -614,6 +626,10 @@ switch (mode) {
      */
     const farSide = process.argv[3] ?? "fixture";
 
+    // Parsed here **only to report a bad fixture clearly**. `createTui` parses
+    // the document itself and throws a `ConstructionError`; this turns a
+    // malformed `manifest.fixture.json` into one line on stderr and exit 5,
+    // which is what the rows that assert on a broken manifest read.
     const parsed = parseManifest(document);
     if (!parsed.ok) {
       process.stderr.write(`manifest: ${JSON.stringify(parsed.error)}\n`);
@@ -797,7 +813,7 @@ switch (mode) {
           : farSide === "no-farside"
             ? "tui-kit-no-such-far-side"
             : "widget",
-      manifest: parsed.value,
+      manifest: document,
       theme: defaultTheme,
       ...(transportFor === undefined ? {} : { transport: transportFor }),
       env: process.env,

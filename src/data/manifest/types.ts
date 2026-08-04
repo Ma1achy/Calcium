@@ -127,8 +127,26 @@ export type Manifest = Readonly<{
  * call a function that is exported from no entry point.
  *
  * So this is the input shape: the app's own verbs, which is all an author knows.
+ *
+ * **`appTools?: never` is the whole enforcement, and `Omit` alone was not**
+ * (C22 I23b). A `Manifest` has every member of `Omit<Manifest, "appTools">` and
+ * one more, so it is structurally assignable to it — the type accepted exactly
+ * the value construction throws on, and this comment described a distinction it
+ * did not impose. `test/support/fixture.mjs` made that call, forty-four tier-5
+ * rows failed, and the branch merged green.
+ *
+ * The optional `never` refuses it at the call site: a hand-written document
+ * omits the member and satisfies this unchanged, while a parsed `Manifest`
+ * carries `readonly ToolDef[]` where `undefined` is required and does not
+ * compile.
+ *
+ * **The general form, because this is not the only such pair.** A derived type
+ * related to its source by *one field fewer* is assignable from that source, so
+ * `Omit` never expresses *input, not output* on its own.
  */
-export type ManifestDocument = Omit<Manifest, "appTools">;
+export type ManifestDocument = Omit<Manifest, "appTools"> & {
+  readonly appTools?: never;
+};
 
 export type ToolMatch = Readonly<{
   tool: ToolDef;

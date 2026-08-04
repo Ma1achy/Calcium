@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { resolveConfig, type Ambient } from "../../src/shell/config.js";
 import { constructGraph, STEPS, type FrameQueries } from "../../src/shell/construct.js";
 import type { FileSystem, Pipeline, PipelineDeps, TuiConfig } from "../../src/shell/types.js";
+import type { Manifest } from "../../src/data/manifest/types.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { fakeStdin, fakeStdout } from "../support/fake-terminal.js";
 // The shared `ManifestDocument` — what an author writes. Construction parses it
@@ -411,6 +412,43 @@ describe("C22 §3 — construction order", () => {
     const alreadyParsed = graph.manifest.manifest as unknown as TuiConfig["manifest"];
 
     await expect(build({ manifest: alreadyParsed })).rejects.toThrow(/help/);
+  });
+
+  it("T1.4o (C22 I23b): a parsed Manifest does not type-check as config.manifest", async () => {
+    // **A type-level row, and it has to be.** The defect this holds is a call
+    // that *compiles* — `manifest: parseManifest(doc).value` — so there is no
+    // runtime assertion that can see it. T1.4l above proves construction throws,
+    // and it needed `as unknown as` to make the call at all, which is exactly
+    // how a runtime row hides a type that permits the mistake.
+    //
+    // `@ts-expect-error` inverts the usual direction: `tsc` fails if the line
+    // below ever stops being an error. So the day `ManifestDocument` loses its
+    // `appTools?: never` and goes back to a bare `Omit`, `npm run check` breaks
+    // on an unused directive — the only mechanism that fails when a *type* gets
+    // weaker.
+    //
+    // It merged once already: tier 5's session harness made this call, forty-four
+    // rows failed, and `make all` was reported green off a piped exit code.
+    //
+    // **The value is a `Manifest` literal, not `graph.manifest.manifest`**, and
+    // the first draft used the latter. That field is `Manifest | null`, so the
+    // assignment failed on the `null` and `@ts-expect-error` was satisfied
+    // whether or not `appTools` was excluded — the row passed identically
+    // against the broken type. Caught by mutating the type and watching nothing
+    // happen, which is the only thing that asks a type-level assertion whether
+    // it can be violated. The convenient setup was the one where both readings
+    // agree.
+    const parsed: Manifest = {
+      schema: "tui.manifest/1",
+      binary: "prism",
+      version: "1.0.0",
+      tools: [],
+      appTools: [],
+    };
+
+    // @ts-expect-error a parsed Manifest carries `appTools` and is not a document
+    const asConfig: TuiConfig["manifest"] = parsed;
+    expect(asConfig).toBeDefined();
   });
 
   it("an app-supplied transport is passed through untouched", () => {
