@@ -18,7 +18,14 @@
     // is having none. Calcium itself gains nothing from this feature and must
     // not: A04 §4 says the container is never the supported path, and nothing
     // under `src/` may come to need a socket.
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    //
+    // `moby: false` is required, not a preference. The feature defaults to the
+    // Moby packages, and `typescript-node:22` now resolves to Debian trixie,
+    // where `moby-cli` does not exist — the build fails outright. Docker CE's
+    // own CLI is what installs there. Landing the feature without this was a
+    // config committed unrun, which the commit that added it said it was and
+    // is the reason it is being corrected rather than discovered later.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false }
   },
 
   // A04 §4 — required for development, never required for consumption.
@@ -26,7 +33,26 @@
 
   // node-pty needs a toolchain for C01-C03's tier-5 PTY tests.
   "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++",
-  "postCreateCommand": "node --version && npm ci --ignore-scripts",
+
+  // **The toolchain was installed and nothing ever used it.** `.npmrc` sets
+  // `ignore-scripts=true` (A04 §3 — install scripts are the primary npm attack
+  // vector), so `npm ci --ignore-scripts` never built `pty.node`, and node-pty
+  // publishes prebuilds for darwin and win32 only: on linux-arm64 it must
+  // compile or it does not exist. A rebuilt container therefore failed
+  // `test/edge/session-gate.test.ts` at load — one failed suite, zero failed
+  // tests — which is precisely the shape CLAUDE.md warns about, a missing
+  // dependency wearing a failing test's clothes.
+  //
+  // The rebuild is **named, single and explicit** rather than `ignore-scripts`
+  // being relaxed. One package is granted the exception, in the open, where a
+  // reader can see which one; turning scripts on for the whole install would
+  // buy the same result and give every transitive dependency a shell.
+  //
+  // `--ignore-scripts=false` is load-bearing: `npm rebuild node-pty` alone
+  // prints "rebuilt dependencies successfully" and compiles nothing, because
+  // the `.npmrc` setting reaches `rebuild` too. A script that reports success
+  // having changed nothing is a failure, and this one reported it twice.
+  "postCreateCommand": "node --version && npm ci --ignore-scripts && npm rebuild node-pty --ignore-scripts=false && node -e \"require('node-pty')\"",
 
   "containerEnv": {
     "TERM": "xterm-256color",
