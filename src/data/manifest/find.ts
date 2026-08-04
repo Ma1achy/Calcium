@@ -76,3 +76,30 @@ export function findTool(m: Manifest, tokens: readonly string[]): ToolMatch | nu
 export function visibleTools(m: Manifest): readonly ToolDef[] {
   return Object.freeze(m.tools.filter((t) => t.hidden !== true));
 }
+
+/**
+ * Whether an invocation's result is a pushed view — C22 §13a, C05 I20.
+ *
+ * **One definition, for the same reason `visibleTools` is one.** The tier is
+ * read at two moments that must not disagree — C23 decides where the result goes,
+ * and the shell decides who owns input — and two implementations of *"is this a
+ * view"* would drift on exactly the case that matters: a tool that appends
+ * except when a flag is present.
+ *
+ * **A tool or a flag may declare it, and either is enough.** `/dashboard` is a
+ * verb; S12's `--logs` and S3's `--watch` are flags on a `ps` that otherwise
+ * appends. A tool-level field alone would need `ps` split in two to express that,
+ * which puts one verb's flags in two places.
+ *
+ * `args` is the *validated* set, so a flag the user typed but the parser rejected
+ * cannot promote a result to a view. That ordering is the point: the tier is
+ * settled before C23's step 3 appends anything, and a refused line never reaches
+ * step 3 at all.
+ */
+export function isViewInvocation(
+  tool: ToolDef,
+  args: Readonly<Record<string, unknown>>,
+): boolean {
+  if (tool.view === true) return true;
+  return tool.flags.some((f) => f.view === true && Object.hasOwn(args, f.name));
+}

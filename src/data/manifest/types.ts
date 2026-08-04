@@ -48,6 +48,16 @@ export type FlagDef = Readonly<{
   repeatable?: boolean;
   requires?: readonly string[]; // other flags that must accompany it
   conflicts?: readonly string[];
+  /**
+   * This flag makes the invocation a pushed view — C22 §13a, C05 I20.
+   *
+   * On a flag as well as on the tool because a verb's tier can depend on how it
+   * was invoked: S12's logs view is `ps <uuid> --logs` and S3's is
+   * `ps <uuid> --watch`, both flags on a `ps` that otherwise appends. A
+   * tool-level field alone would need `ps` split into two tools to express it,
+   * putting one verb's flags in two places.
+   */
+  view?: boolean;
   summary: string;
 }>;
 
@@ -93,6 +103,26 @@ export type ToolDef = Readonly<{
    * result and nothing reconciling the two.
    */
   interactive?: boolean;
+  /**
+   * The verb's result is a pushed view rather than a transcript entry —
+   * C22 §13a, C05 I20.
+   *
+   * **Declared, because it must be known before the verb runs.** C23 I3 appends
+   * the pending entry *before* the transport is invoked, and C13 has no delete
+   * (C23 §8a A4 ruled it must not gain one). An adapter deciding the tier on
+   * seeing its result would produce a view *and* the entry B03 §2 says a push
+   * does not leave, with nothing able to withdraw it. So the decision precedes
+   * step 3, and the only thing known before a verb runs is its declaration.
+   *
+   * The party is the one `interactive` names, for the same reason: a view is a
+   * handoff of input ownership, and A01 D4 is the test — it takes letter keys
+   * while the prompt would otherwise hold focus, so the prompt must go.
+   *
+   * `FlagDef` carries it too, and an invocation is a view if either says so.
+   * Refused with `interactive` and with `oneShot`; permitted with `streams`,
+   * because S12's logs view is exactly that pair.
+   */
+  view?: boolean;
 }>;
 
 export type Manifest = Readonly<{
