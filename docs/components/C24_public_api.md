@@ -61,7 +61,7 @@ export type {
 export type { Adapter, AdapterContext, StreamContext, RawResult, RawPatch };
 
 // manifest — written by hand
-export type { Manifest, ToolDef, FlagDef, ArgDef, ArgType, ValidationResult };
+export type { Manifest, ManifestDocument, ToolDef, FlagDef, ArgDef, ArgType, ValidationResult };
 
 // theming
 export type { ThemeTokens, ThemeSet, PaletteSpec, ColourRef, Style };
@@ -79,6 +79,29 @@ export type { WorldDriver };
 // utilities a custom block kind needs
 export { cells, truncate, planColumns };
 ```
+
+**`ManifestDocument` is what an author writes; `Manifest` is what the parser
+returns.** The distinction is new and it is C24's most expensive omission to date.
+`TuiConfig.manifest` was typed `Manifest | string` and **neither arm could be
+used**: an author cannot produce a `Manifest`, because `appTools` and the
+framework's six verbs are both derived by `parseManifest` (C05 §3), and the
+string arm passed a file's contents to a function requiring a record with no
+`JSON.parse` between them, so it had never run.
+
+§1 states the test this component serves — *"Phase 1 is done when someone who is
+not its author builds a working TUI from the README without asking a question"* —
+and it was not satisfiable. What hid it is worth more than the defect: every
+harness that constructs a session imports `parseManifest` through a deep path
+(`test/support/session.ts`, `test/support/fixture.mjs`), so each one tests a
+route no consumer has. **A package cannot reach through its own boundary and
+notice.** It took a consumer that respected the boundary — docker-tui, whose
+first act was a test asserting a deep import is a resolution error — and it
+failed on that app's first start. See `examples/docker/FINDINGS.md` F7.
+
+`parseManifest` is deliberately **still not exported**. Exporting it would make
+the working path *"call this first"*, which leaves `TuiConfig.manifest: Manifest`
+exactly as misleading as it was. The framework's own verbs are the framework's to
+add, and construction now parses both arms itself (C22 §3a, C22 I23).
 
 **`planColumns` is public** because a custom table-like kind needs it and it is pure. `cells` and `truncate` likewise — a kind that measured width itself would be wrong in a different way from every other kind.
 
