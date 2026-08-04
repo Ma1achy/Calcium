@@ -1366,6 +1366,53 @@ describe("C23 §4 — the submit row's two other steps", () => {
     expect(ticks.view, "a live part inside a pushed view is driven (gap 7)").toBeGreaterThan(0);
   });
 
+  it("T1.40 (C04 I6, C23 §3b): the default renderError can be constructed at all", async () => {
+    // **The framework's own fallback threw, and nothing could see it.**
+    //
+    // `partOf` builds the default error notice with `block()` rather than
+    // `b.notice`, so it skipped `glyphFor` and produced a `tone: "error"` notice
+    // with no glyph — which C04 I6 refuses. The one thing that runs when a live
+    // part's fetch fails could not be constructed, so it threw out of a `.then`
+    // inside the refresh driver: unhandled, one tick after a failure, on any
+    // part whose declarer did not override `renderError`.
+    //
+    // **A03 §2's vacuity class in a default.** Every existing row either
+    // succeeds or supplies its own `renderError`, so the path had never run —
+    // and a branch that has never run passes exactly like one that works. Found
+    // by a consumer inducing a stall and reading the frame (docker-tui F29),
+    // which is the only instrument that was ever going to reach it.
+    const h = harness({
+      adapt: (ctx) =>
+        doc({
+          command: ctx.command,
+          blocks: [
+            b.live({
+              id: "failing",
+              title: "FAILING",
+              every: 1000,
+              // No `renderError` — the whole subject of the row is the default.
+              fetch: () => Promise.reject(new Error("the far side is gone")),
+              render: () => block({ kind: "raw", id: "failing-body", text: "x" }),
+            }),
+          ],
+        }),
+    });
+
+    h.pipeline.submit("/ps");
+    await settled();
+    h.tick(1500);
+    await settled();
+
+    const panel = h.transcript.entries
+      .flatMap((e) => e.doc.blocks)
+      .find((bl) => bl.id === "failing");
+    const child = panel?.kind === "panel" ? panel.children[0] : undefined;
+
+    expect(child?.kind, "the failure is rendered rather than thrown").toBe("notice");
+    expect(child).toMatchObject({ tone: "error", glyph: "error" });
+    expect((child as { text: string }).text).toContain("the far side is gone");
+  });
+
   it("T1.21b (I29): a refusal is a submission and is recorded", async () => {
     // History is not a log of successes — the user typed it and pressed Enter,
     // so `↑` recalls it. Driven through the guard, which is the refusal a

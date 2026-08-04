@@ -1031,6 +1031,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           kind: "notice",
           id: `${spec.id}-error`,
           tone: "error",
+          /**
+           * **Without this the framework's own default throws** (C04 I6, D29).
+           *
+           * An `error` notice requires a non-empty glyph — colour alone survives
+           * neither 1-bit nor a colour-blind reader — and `block()` enforces it.
+           * `b.notice` fills the glyph in through `glyphFor`; this path
+           * constructs the block directly and skipped its own convenience, so
+           * the one thing that runs when a live part's fetch fails could not be
+           * constructed at all.
+           *
+           * A `BlockShapeError` out of a `.then` inside the refresh driver:
+           * unhandled, one tick after a fetch failed, on any part whose declarer
+           * did not supply a `renderError`. **A03 §2's vacuity class in a
+           * default** — never exercised, because no test had ever failed a fetch
+           * on a part that did not override this. Found by inducing a stall and
+           * looking at the frame (FINDINGS F29); the frame showed a view frozen
+           * mid-tick with the exception on stderr behind it.
+           */
+          glyph: "error",
           text:
             retryInMs === null
               ? err.message
