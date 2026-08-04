@@ -761,7 +761,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
 - **I44** — §4 step 7 fires `config.greeting` and does not await it, and C23 appends what it returns through the ordinary append path. A rejection or a hang leaves the prompt usable and produces no entry; nothing about startup waits on it. The step existed in the list, in T3.10 and T3.11, and in S02's `Source` row, and **no code fired anything** — step 12's shape a second time in the same list, and the reason S02's welcome could be specified in detail by three documents and reachable by none. Appending through C23 rather than rendering here is A02 Seam 4: C22 produces a fact, C23 is the only component that appends, and a live part in the greeting is driven because it took the same route every other document takes (C23 I33a).
 - **I45** — **A verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.** Pushed before the transport is invoked and filled after it, so the ordering C23 I3 protects is unchanged and a slow verb is not a blank screen; a failure renders into the view rather than into a transcript that has nothing to show. Read from the manifest at step 2, never from the document the adapter returns: C23 I3 appends the pending entry before the transport runs and C13 has no delete, so an adapter-side decision could only produce a view *and* the entry B03 §2 says a push does not leave. The party is the one `ToolDef.interactive` already names — the app author — because a view is a handoff of input ownership and detection is not available for either.
-- **I46** — **A pushed view is owned by a shell-side component holding one row offset, and C15 holds none.** C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
+- **I46** — **A pushed view is owned by a shell-side component holding one offset, and C15 holds none.** The owner windows at **block boundaries** and hands C15 a smaller sequence, which is C25 I18's shape generalised: C15 measures the result through the same registry as everything else, so there is no second height codepath and `Placed` gains no scroll offset. A plot is atomic within that window and always will be — C12 I1 puts its series out of the height's reach, so *granular where the kind divides, atomic where it does not* is the ceiling, and row-granular scroll is not on the path. C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
 
 ---
 
@@ -1089,6 +1089,52 @@ Three things follow, and each closes a hole the pending entry used to cover:
   and wrong for the same reason step 3 precedes step 4 — feedback that waits for the work
   is feedback the slow case never gets, and the slow case is the only one that needs it.
 
+### How a view windows what it holds
+
+**C25 I18's shape, already ruled — cited rather than invented.** *"A window is a `Patch`,
+not a list of rows. `Layer.content` is `Block[]`, so the owner of a pushed view cannot hand
+C15 a slice of rendered output — it hands back a smaller block, and C15 measures and draws
+it through the same registry as everything else."* The document view is that sentence with
+`Patch` replaced by a block sequence: the owner holds the whole document and an offset, and
+puts on the layer the blocks that fit.
+
+**The window falls on block boundaries.** A block is included or it is not, and I46's one
+piece of state indexes blocks rather than rows.
+
+**The plot is atomic for windowing, permanently.** C12 I1 makes a plot's height a function
+of the block alone and puts the series deliberately out of reach — *"a 200-epoch run's block
+is the same height as a 10-epoch one"* — so reducing a plot's data changes nothing about its
+height, and reducing its `height` **rescales the curve** rather than windowing it. There is
+no version of this that yields the top half of a plot.
+
+So the upgrade path is **granular where the kind divides, atomic where it does not**, and it
+is written that way on purpose: *row-granular scroll* is a promise C12 I1 forbids for the one
+block S3 leads with, and a spec that offered it would be describing something no
+implementation can deliver.
+
+**Per-kind reducers are shape-available and unwritten.** `table`, `keyValue` and `panel`
+divide at rows and children with no mid-row slicing and no measurer change — which is why
+this is not the mid-row option, whose cost lands on the measurer, the one thing that must
+never drift. But `windowPatch` needed a dedicated file and a concept of indivisible *units*
+to get right, and each further reducer is that work again. They are deferred until a
+consumer forces one, in the same way and for the same reason as everything else here.
+
+**The deferral is measured rather than assumed.** S3 filled measures **21 rows at 120 and at
+80**, and a view fills the region (C15 §4), so at any realistic terminal height nothing is
+out of view and the granularity is invisible for this surface:
+
+```
+width 120: TOTAL 21  [panel#cpu=10  panel#memnet-panel=7  keyValue#ports=2]
+width  80: TOTAL 21  [panel#cpu=10  panel#memnet-panel=7  keyValue#ports=2]
+```
+
+The first two attempts at that figure returned **13**, which is plausible and was measured
+against a registry holding no plot definition (`registry.ts` — *"`table`, `plot` and `patch`
+are not here"*) and a malformed `b.kv` call. A control asserting that a `height: 5` plot and
+a `height: 9` plot measure 7 and 11 is what caught it. A fixture must be shown to respond to
+the thing under test before it is asserted against, and a number that looks right is exactly
+how that rule gets skipped.
+
 ### What the decision leaves behind when it throws
 
 Asked because a ruling's rejection path is where it leaves state, and neither a trace nor a
@@ -1100,6 +1146,7 @@ table indexes it (C13's `settle(id, doc)` is the measured case).
   that makes the ruling safe rather than merely tidy: the failure mode of an adapter-side
   decision would have been an orphaned pending entry that nothing could settle or remove —
   C23 I9's forbidden state, two components from the decision that produced it.
+- **The owner's `putBlock` is total.** It patches the held document and reprojects the window, and a reprojection that threw after the document had been updated would leave the owner holding a document no frame ever displayed — the same two-step hazard as C13's `settle(id, doc)`, in a component two removed from the driver that called it. So it reprojects into a local, assigns both, and returns `false` rather than throwing; the driver's existing `false → release(host)` covers the other side.
 - **A pop while parts are in flight** is the one real hazard, and it belongs to the producer
   rather than to this ruling: release must happen at the pop and not one tick later, or a
   fetch resolves into a layer that has gone. C23 I33's teardown set gains the trigger.
