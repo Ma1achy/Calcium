@@ -426,6 +426,14 @@ Gates 1, 2 and 4 are `t01`'s. **Gate 4 does not block construction** — the gra
 
 Step 7 is non-blocking, so the banner completes visibly over the first second rather than delaying the prompt. Input is accepted at 8, not after 7 — a dev can type while the banner is still filling in.
 
+**Step 7 had a name and no mechanism, which is step 12's shape in the same list** (I44). §3a records that happening once already — *"accept input" was a step with a name and no mechanism, and a session built from this document decoded nothing while every component it needed was finished and tested* — and it happened twice. Nothing in `src/` fired anything at step 7; `TuiConfig` had no field to fire; T3.10 and T3.11 describe a banner fetch degrading and **were never written**, because there was nothing to write them against. S02 specifies the entry in detail and cites this step; a consumer that reached for it found three documents agreeing about a thing no code did.
+
+**The seam is a document, not a banner renderer** — S02 §1 is explicit that the welcome is an ordinary `ViewDocument` appended like any command's output, so `/clear` removes it and it scrolls away. So `config.greeting` is `() => ViewDocument | Promise<ViewDocument>`, C22 fires it at step 7 and does not await it, and **C23 appends it**: A02 Seam 4's row again, the same shape as the identity loop, where C22 produces a fact and C23 is the only component that appends.
+
+It goes through C23's ordinary append, which is what makes a live part in it driven (C23 I33a) and what makes the entry an entry rather than chrome. **A greeting that never resolves leaves the prompt usable and no entry appears; one that throws is contained and the session continues** — T3.10 and T3.11, writable at last.
+
+**A live greeting ticks until the entry is evicted or the transcript is cleared, and not until the first command** (C23 I9, I33). An app that wants launch to be cheap omits `every` and gets a one-shot; that is the app's decision, not a lifecycle this must implement. The alternative — releasing a part when a newer entry freezes it — is the row C24 §5 deleted against I9, and re-introducing it here would kill a `--watch` the moment anyone typed.
+
 **Step 8 is `lifecycle.acquire()` plus construction step 12, and nothing else.** C01 attaches the stdin listener as part of acquiring (C01 I18), so there is no separate "start listening" call to forget or to make twice; the shell's part is the decoder, the dispatch and the wake-ups.
 
 **The suspension sequence, in order** (A02 Seam 4, C01 I18, C16 I18):
@@ -751,6 +759,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I41** — **A pushed view holds one piece of state: its row offset.** `n` and `p` compute a hunk's first row from the offset; `g` and `G` set it. A view holding an offset *and* a hunk index has two cursors for one position — `G` leaves the index pointing at the hunk the reader scrolled away from, so `p` jumps upward from a place nothing on screen explains — and no test that drives one motion at a time can see it (C25 §3c A4).
 - **I42** — **A pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes.** A snapshot taken at push time shows a diff the entry no longer holds, and `expand` produces exactly such a patch one keystroke earlier. C15 supplies the reason code and cannot detect the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so the owner watches the transcript, and `Esc` never meets a dangling view because the view is gone before it (C25 §3c A6).
 - **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
+- **I44** — §4 step 7 fires `config.greeting` and does not await it, and C23 appends what it returns through the ordinary append path. A rejection or a hang leaves the prompt usable and produces no entry; nothing about startup waits on it. The step existed in the list, in T3.10 and T3.11, and in S02's `Source` row, and **no code fired anything** — step 12's shape a second time in the same list, and the reason S02's welcome could be specified in detail by three documents and reachable by none. Appending through C23 rather than rendering here is A02 Seam 4: C22 produces a fact, C23 is the only component that appends, and a live part in the greeting is driven because it took the same route every other document takes (C23 I33a).
 
 ---
 
@@ -875,8 +884,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.7** (I8): terminal 44 × 12 at launch → fallback drawn, graph constructed; resizing to 100 × 30 continues to a normal frame with state intact.
 - **T3.8** (I9): the fallback renders with no call into the block registry or layout — asserted by a spy.
 - **T3.9**: shrinking below minimum mid-session → fallback replaces the frame; scrollback and history survive.
-- **T3.10**: a banner fetch that never resolves → the prompt is usable; the section renders as unavailable at its timeout.
-- **T3.11**: a banner fetch that throws → that section degrades; the others still render.
+- **T3.10** (I44): a greeting that never resolves → the prompt is usable and input is accepted; no entry appears. **Rewritten from "a banner fetch … renders as unavailable at its timeout"**, which described a section-level renderer C22 does not have and never did — the row was unwritable for as long as the step it tested had no mechanism, and it was the *row* that had drifted, not the code.
+- **T3.11** (I44): a greeting that rejects → the session continues, the prompt is usable, and no entry appears. The failure this rules out is a startup that dies because an app's welcome could not reach its far side.
 - **T3.12** (I14): an expired token → a notice with an inline re-login offer; no browser opens.
 - **T3.13**: `retry` after a successful re-login → the retained command re-runs unchanged.
 - **T3.14** (I15): cluster unreachable at startup → `health: "offline"`, session opens, a system command still runs.
