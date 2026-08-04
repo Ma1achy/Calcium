@@ -261,8 +261,16 @@ sixth instance, and the first about the framework's own model rather than the fa
 `B03_drill_chain.md` §2 is explicit that there are exactly two ways down and that confusing
 them is what it exists to prevent: **`⏎` on a row appends**, and push is reached by a verb.
 Its canonical path shows the real gesture in two steps — an action `fill`s the prompt with
-`/ps <uuid> --watch`, and the *next* `⏎` submits it and pushes. S3 is reached exactly as the
-logs view is. What S3 does have is A01 D4's qualification for *being* a pushed view: it
+`/container stats <uuid>`, and the *next* `⏎` submits it and pushes. S3 is reached exactly
+as the logs view is.
+
+**And the verb is not `ps <uuid> --watch`, which is what this said and what C05's own doc
+comment said.** `docker ps` takes no positional argument, `--watch` is not a docker flag,
+and C06 I4 sends argv to the far side verbatim — three facts that make the drawing's verb
+unspawnable, none of which was checked when it was written. `docker container stats <id>`
+is real, takes the id, and leaves `/stats` free for S4, which S02 reserves for a **transcript
+entry**: a tool-level `view` on `stats` would have pushed S4 as well. Corrected in place
+rather than noted, because the next reader builds against the picture. What S3 does have is A01 D4's qualification for *being* a pushed view: it
 needs the whole screen and its own letter keys (`n`/`p`, `L`, `d`), so the prompt must go.
 FINDINGS F21b.
 

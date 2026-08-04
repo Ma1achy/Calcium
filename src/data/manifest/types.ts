@@ -52,10 +52,18 @@ export type FlagDef = Readonly<{
    * This flag makes the invocation a pushed view — C22 §13a, C05 I20.
    *
    * On a flag as well as on the tool because a verb's tier can depend on how it
-   * was invoked: S12's logs view is `ps <uuid> --logs` and S3's is
-   * `ps <uuid> --watch`, both flags on a `ps` that otherwise appends. A
-   * tool-level field alone would need `ps` split into two tools to express it,
-   * putting one verb's flags in two places.
+   * was invoked: S12's logs view is `ps <uuid> --logs`, a flag on a `ps` that
+   * otherwise appends. A tool-level field alone would need `ps` split into two
+   * tools to express it, putting one verb's flags in two places.
+   *
+   * **S3 was named here too, as `ps <uuid> --watch`, and cannot be built that
+   * way.** `docker ps` takes no positional argument, `--watch` is not a docker
+   * flag, and C06 I4 sends argv to the far side verbatim — so the declaration
+   * would have put a flag docker rejects on a verb that rejects the id. S3 is a
+   * verb-level view instead (`container stats <id>`). The arm is right and the
+   * example was not, which is the distinction worth keeping: **no consumer
+   * outside a test fixture reaches this arm yet**, and saying so is weaker than
+   * the verb arm's claim on purpose.
    */
   view?: boolean;
   summary: string;

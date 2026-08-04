@@ -132,10 +132,20 @@ operation able to withdraw it. The full argument is C22 §13a; what it settles h
 party, and the party is the one `interactive` already names.
 
 **Both `ToolDef` and `FlagDef` carry it, and an invocation is a view if either says so.**
-Two declaration sites and one rule, because the surfaces need both: `/dashboard` is a verb,
-while S12's `--logs` and S3's `--watch` are flags on `ps`. A verb-level field alone cannot
-describe a tool whose tier depends on how it was invoked, and duplicating `ps` into two
-tools to express it would put one verb's flags in two places.
+Two declaration sites and one rule, because the surfaces need both: `/dashboard` and
+docker-tui's `container stats <id>` are verbs, while S12's `--logs` is a flag on a `ps`
+that otherwise appends. A verb-level field alone cannot describe a tool whose tier depends
+on how it was invoked, and duplicating `ps` into two tools to express it would put one
+verb's flags in two places.
+
+**S3 was named here as `ps <uuid> --watch` and cannot be built that way.** `docker ps`
+takes no positional argument, `--watch` is not a docker flag, and C06 I4 sends argv to the
+far side verbatim — so the declaration would have sent a rejected flag on a verb that
+rejects the id, and nothing between here and the transport would have said so. The first
+consumer to declare a view found it. The example is corrected rather than deleted because
+the shape it reached for is real and S12 still needs it; what changes is the claim's
+strength, and it is now written down that **the flag arm's only consumer is a test
+fixture** while the verb arm has a real one.
 
 **Two combinations are refused at parse (I20)**, in I19's shape and for I19's reason:
 
