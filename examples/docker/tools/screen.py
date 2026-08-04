@@ -26,16 +26,46 @@ class Screen:
         self.grid = [[" "] * cols for _ in range(rows)]
         self.r = self.c = 0
 
+    def newline(self) -> None:
+        """Advance a row, scrolling when there is nowhere to advance to.
+
+        This was `min(self.r + 1, self.rows - 1)`, which pins the cursor to the
+        last row and overwrites it forever — wrong, because Ink redraws by
+        moving *up* a computed number of lines, and an emulator whose row has
+        stopped tracking the real one erases the wrong rows from then on.
+
+        **It fixed nothing, and that is worth writing down rather than hiding.**
+        It was changed while `/ps` and `/dashboard` both appeared to render an
+        empty transcript, and the replay is byte-identical before and after: the
+        frames were never lost. They were at rows 29–39 of a 40-row screen and
+        the output was being read through `head -20`.
+
+        So the diagnosis was wrong and the change is still right — those are
+        independent, and the tempting move is to keep the fix and the story it
+        came with. A correct change that alters nothing observable is a signal
+        that the cause is still out there, which is what it turned out to be.
+        The real lesson is one line long: **read the whole screen.** An emulator
+        exists so a frame can be looked at, and looking at half of it
+        reintroduces exactly the ambiguity it was built to remove.
+        """
+        if self.r + 1 < self.rows:
+            self.r += 1
+        else:
+            self.grid.pop(0)
+            self.grid.append([" "] * self.cols)
+
     def put(self, ch: str) -> None:
         if ch == "\n":
-            self.r, self.c = min(self.r + 1, self.rows - 1), 0
+            self.newline()
+            self.c = 0
         elif ch == "\r":
             self.c = 0
         elif ch == "\t":
             self.c = min(self.c + 8 - (self.c % 8), self.cols - 1)
         elif ch >= " ":
             if self.c >= self.cols:
-                self.r, self.c = min(self.r + 1, self.rows - 1), 0
+                self.newline()
+                self.c = 0
             self.grid[self.r][self.c] = ch
             self.c += 1
 

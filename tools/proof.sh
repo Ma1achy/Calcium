@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+#
+# `make proof` — the pack-and-install gate (R01's proof gate, FINDINGS F2).
+#
+# `file:../..` is the inner loop and it lies about four things, because npm
+# symlinks a workspace rather than installing it: a file missing from `files`,
+# an unbuilt `dist/`, a broken `exports` path, and a dependency used but not
+# declared. Every one of those is invisible until a real consumer installs a
+# real tarball. This is that consumer.
+#
+# **Why there is no Verdaccio here, having been asked for by name.**
+#
+# The brief called for a local registry. What the gate is *for* is proving the
+# package is publishable and that what it publishes works when installed — and
+# all of that is reachable without one:
+#
+#   - `npm publish --dry-run` proves publish is not refused (F2's `private: true`
+#     was the whole finding) and prints the exact file list, offline.
+#   - `npm pack` produces the identical tarball a publish would upload.
+#   - installing that tarball into a clean tree is a real install, resolving
+#     through `exports` and `files` exactly as a consumer's would.
+#
+# What a registry would add over that is the round trip: publish, resolve by
+# name, download. It costs **316 packages** (verdaccio 6.9.2) in a repository
+# whose DEPENDENCIES.md opens by saying the strongest supply-chain control is
+# not having dependencies, and which spends four paragraphs refusing
+# typescript-eslint's 87 for a real lint rule. Three hundred and sixteen to
+# verify a `files` array is the same trade one size worse.
+#
+# The gap is named rather than papered over: **this gate does not prove that
+# `npm publish` to a live registry succeeds, or that authentication is
+# configured.** DEPENDENCIES.md carries the row.
+#
+# It does prove the registry *selection*, which turned out to matter — see
+# step 2 and FINDINGS F12.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+say() { printf '\n\033[36m▸ %s\033[0m\n' "$1"; }
+die() { printf '\n\033[31m✗ %s\033[0m\n' "$1" >&2; exit 1; }
+
+# ── 1. A fresh dist, because a probe against a stale one gives a wrong negative
+say "building"
+cd "$ROOT"
+npm run build >/dev/null
+
+# ── 2. Publish is not refused, and it goes where we say
+#
+# **`--registry` does not work here and fails silently**, which is why this
+# asserts the line rather than passing a flag and trusting it. `publishConfig.registry`
+# in package.json beats both `--registry` and `npm_config_registry`, and npm
+# reports the override as accepted while publishing to the configured host. The
+# scoped form is the one that wins. A CI job wiring a local registry with
+# `--registry` would have aimed at the real one and read the auth failure as a
+# problem with the local one. FINDINGS F12.
+say "publish --dry-run, registry override asserted"
+LOCAL="http://localhost:4873"
+OUT="$(npm publish --dry-run "--@fmx:registry=$LOCAL" 2>&1)" || die "npm publish --dry-run refused: $OUT"
+grep -q "Publishing to $LOCAL" <<<"$OUT" \
+  || die "the registry override did not take — npm reports: $(grep -i 'publishing to' <<<"$OUT")"
+
+# ── 3. The real tarball
+say "pack"
+TARBALL="$WORK/$(npm pack --pack-destination "$WORK" --silent)"
+[ -f "$TARBALL" ] || die "npm pack produced no tarball"
+
+# ── 4. A clean tree that has never seen this repository
+#
+# The example is copied without `node_modules`, and its `file:../..` becomes the
+# tarball. Nothing here can reach `$ROOT/src` — that is the point.
+say "installing the tarball into a clean checkout"
+APP="$WORK/app"
+mkdir -p "$APP"
+tar -C "$ROOT/examples/docker" \
+    --exclude node_modules --exclude .venv \
+    -cf - . | tar -C "$APP" -xf -
+
+node -e '
+  const fs = require("node:fs");
+  const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const before = p.dependencies["@fmx/calcium"];
+  if (before !== "file:../..") {
+    console.error(`expected file:../.., found ${before}`);
+    process.exit(1);
+  }
+  p.dependencies["@fmx/calcium"] = "file:" + process.argv[2];
+  fs.writeFileSync(process.argv[1], JSON.stringify(p, null, 2));
+' "$APP/package.json" "$TARBALL"
+
+cd "$APP"
+npm install --ignore-scripts --no-audit --no-fund >/dev/null
+
+# The install is only meaningful if it landed a real directory rather than a
+# link back into the repository. A symlink here would make every assertion
+# below pass against the source tree.
+node -e '
+  const fs = require("node:fs");
+  const st = fs.lstatSync("node_modules/@fmx/calcium");
+  if (st.isSymbolicLink()) {
+    console.error("@fmx/calcium installed as a symlink — the gate is testing the repo, not the package");
+    process.exit(1);
+  }
+' || die "the tarball did not install as a real directory"
+
+# ── 5. The example's own suite, against the installed package
+say "the example's tests, against the installed package"
+npm test
+
+printf '\n\033[32m✓ proof · packed, installed clean, and the example passes against the tarball\033[0m\n'

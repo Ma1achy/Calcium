@@ -173,6 +173,37 @@ class Session implements TuiInstance {
     graph.lifecycle.acquire();
     graph.scheduler.commit("input");
 
+    /**
+     * Step 7's other half — the session's first entry (I44).
+     *
+     * **The step named this and nothing did it.** §4 has said *fire banner
+     * fetches, non-blocking* since this document was written; S02 specifies the
+     * entry in detail and cites the step; C22's own T3.10 and T3.11 test it and
+     * were never written, because there was nothing to write them against. It is
+     * step 12's shape a second time in the same list — a step is a name until
+     * something calls it, and the list does not distinguish the two.
+     *
+     * **Not awaited, and the `void` is the invariant rather than a style.** A
+     * greeting that hangs must leave the prompt usable, so nothing below waits
+     * on it and `#open()` returns while it is still in flight. A rejection is
+     * caught and dropped: the session continues and no entry appears, which is
+     * T3.10 and T3.11.
+     *
+     * C23 appends it (A02 Seam 4), so a `b.live` part inside it is driven
+     * exactly as any other document's is (C23 I33a), and `/clear` removes it.
+     */
+    const greeting = this.config.greeting;
+    if (greeting !== undefined) {
+      void (async () => {
+        try {
+          graph.pipeline.greeting(await greeting());
+        } catch {
+          // Contained. The prompt is already usable and the session is running;
+          // a welcome that could not reach its far side is not a startup fault.
+        }
+      })();
+    }
+
     // Step 7, non-blocking: input is accepted whatever this does, and neither
     // it nor the first frame waits on a fetch (I18). `start()` never awaits it.
     //

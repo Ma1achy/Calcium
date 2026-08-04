@@ -9,21 +9,10 @@
 
 import { b } from "@fmx/calcium";
 import type { Adapter, ColumnDef, Glyph, TableRow, Tone } from "@fmx/calcium";
+import { parseNdjson, str } from "./ndjson.ts";
+import type { Row } from "./ndjson.ts";
 
-/** One line of `docker ps --format json`, before anything is trusted about it. */
-type Row = Readonly<Record<string, unknown>>;
-
-/**
- * Every field read goes through here (walk C4).
- *
- * `Platform` is an object and R01 §4 said everything was a string, so the shape
- * is checked rather than assumed at each use site. A missing or wrongly-shaped
- * value is `""`; nothing throws and nothing renders `[object Object]`.
- */
-const str = (row: Row, key: string): string => {
-  const v = row[key];
-  return typeof v === "string" ? v : "";
-};
+export { parseNdjson };
 
 /**
  * `State` drives the glyph and the tone, never the prose `Status` (R01
@@ -115,37 +104,6 @@ function rowOf(raw: Row, index: number): TableRow {
 }
 
 /**
- * NDJSON out of a transport that expected one document (walk A1, A2).
- *
- * C06 calls `JSON.parse` on the whole of stdout, which fails here — concatenated
- * objects are not a JSON document — so `stdout` is `undefined` and `parseError`
- * is set. `stdoutRaw` is retained either way (C06 I6), explicitly so this is
- * possible.
- *
- * **Per line, with a per-line catch.** One `JSON.parse` over the batch discards
- * six good containers for one bad byte (R3.5). A failed line is counted and
- * reported rather than dropped: a skipped line and no line are indistinguishable
- * in the frame otherwise.
- */
-export function parseNdjson(raw: string): { rows: Row[]; skipped: number } {
-  const rows: Row[] = [];
-  let skipped = 0;
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed === "") continue;
-    try {
-      const parsed: unknown = JSON.parse(trimmed);
-      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-        rows.push(parsed as Row);
-      } else skipped += 1;
-    } catch {
-      skipped += 1;
-    }
-  }
-  return { rows, skipped };
-}
-
-/**
  * `2 running · 0 stopped` — the words do not pluralise.
  *
  * The first version added an `s` and produced "2 runnings · 0 stoppeds", which
@@ -163,12 +121,32 @@ export function createPsAdapter(): Adapter {
       // *normal* case for this far side and says nothing about success.
       const failed = result.exitCode !== 0;
       const { rows, skipped } = failed ? { rows: [], skipped: 0 } : parseNdjson(result.stdoutRaw);
-      const running = rows.filter((r) => str(r, "State") === "running").length;
+      // **A paused container is not a stopped one, and this said it was.**
+      //
+      // The summary was `running` against `everything else`, which reads fine
+      // until the machine has a paused container: `/ps` showed five rows, one of
+      // them `◌ Up 11 minutes (Paused)`, and summarised them as
+      // `4 running · 1 stopped` — a count contradicting a row three lines above
+      // it. Found by the dashboard's walk A1, which had to answer the same
+      // question and answered it differently; nothing in step 1 could have
+      // caught it, because step 1 never had a paused container to look at.
+      //
+      // A two-way split over three states is the shape: every state that is not
+      // the named one falls into the other bucket, and the bucket's label is a
+      // claim about all of them.
+      const states = rows.map((r) => str(r, "State"));
+      const running = states.filter((st) => st === "running").length;
+      const paused = states.filter((st) => st === "paused" || st === "restarting").length;
+      const stopped = states.length - running - paused;
 
       const skippedNote =
         skipped === 0 ? "" : ` · ${String(skipped)} unreadable line${skipped === 1 ? "" : "s"}`;
       const summary =
-        `${count(running, "running")} · ${count(rows.length - running, "stopped")}${skippedNote}`;
+        [
+          count(running, "running"),
+          ...(paused === 0 ? [] : [count(paused, "paused")]),
+          ...(stopped === 0 ? [] : [count(stopped, "stopped")]),
+        ].join(" · ") + skippedNote;
 
       return {
         schema: "tui.view/1",

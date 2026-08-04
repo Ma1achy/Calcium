@@ -28,7 +28,7 @@ import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
-import type { Block } from "../data/viewmodel/index.js";
+import type { Block, ViewDocument } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
@@ -42,6 +42,7 @@ import {
   type LocalHandler,
 } from "./local/registry.js";
 import type { Pipeline, PipelineDeps } from "./types.js";
+import type { EntryId } from "../viewport/transcript/index.js";
 
 /** Which foreground route holds the guard. `null` is idle (C23 §6). */
 export type InFlight = "app" | "local" | "shell" | null;
@@ -574,7 +575,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // — and `meta` travels with it, which is what C23 I7 and `/debug` need and
       // what no block-level patch could carry.
       refresh.settled(pendingId);
-      deps.transcript.settle(pendingId, doc);
+      settleWithDocument(pendingId, doc);
       recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -591,7 +592,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         { message: String(cause), stage: "transport" },
         { origin: "user", verb },
       );
-      deps.transcript.settle(pendingId, failed);
+      settleWithDocument(pendingId, failed);
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {
@@ -907,15 +908,49 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   });
 
   /**
-   * Register every live part an appended document declares, against the entry
-   * that now holds it (C23 §3b, I32).
+   * Register every live part a document declares, against the entry that now
+   * holds it (C23 §3b, I32, I33a).
    *
-   * Called from the one place a document reaches the transcript, so a part
-   * declared on any route is driven and no route has to remember to.
+   * **Declared on any route is driven; stopped on settle, pop, eviction, clear
+   * or shutdown — never on freeze.** Both halves of that are load-bearing and
+   * the first half used to be false.
+   *
+   * It said *called from the one place a document reaches the transcript, so a
+   * part declared on any route is driven and no route has to remember to* —
+   * and there are **two** such places. `append(doc)` carries the local and
+   * notice routes; `settle(id, doc)` carries the app route, where §3's steps 6
+   * and 7 are one call, so the entry is appended *pending* and the blocks
+   * arrive only at settlement. Hanging registration off `append` alone meant an
+   * adapter's `b.live` was never driven at all: loading state, for the life of
+   * the session, with nothing anywhere reporting a fault.
+   *
+   * A sentence claiming total coverage of a set it had miscounted — which no
+   * test could contradict, because none of them declared a live part from an
+   * adapter. A consumer built one on each route and read the frames.
+   *
+   * The second half is **not** the same kind of statement and must not be
+   * "fixed" to match: a frozen entry keeps refreshing (I9, I33), because a
+   * `--watch` scrolled out of view is still running. C24 §5's *teardown on
+   * freeze* row was deleted against exactly that.
    */
   const declareLive = (id: string, blocks: readonly Block[]): void => {
     const parts = liveDeclarations(blocks).map((d) => partOf(d.spec));
     if (parts.length > 0) refresh.declare({ kind: "entry", id }, parts);
+  };
+
+  /**
+   * The second place a document reaches the transcript (I33a).
+   *
+   * **Release-then-declare, and the order is a consequence of the call rather
+   * than of subscriber registration.** C13 emits its `settle` change
+   * synchronously, so the driver's I33 teardown has already run by the time
+   * `settle()` returns — and the declaration that follows is the settled
+   * document's own. Reading the order off two `subscribe` calls would work today
+   * and break on the day someone reorders construction.
+   */
+  const settleWithDocument = (id: EntryId, doc: ViewDocument): void => {
+    deps.transcript.settle(id, doc);
+    declareLive(id, doc.blocks);
   };
 
   /**
@@ -953,6 +988,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     submit,
     onAction,
     identityNotice: (text) => void refresh.identityNotice(text),
+
+    // C22 §4 step 7 (C22 I44). Through `appendAndCommit` like everything else,
+    // which is what drives a live part in it and what lets `/clear` remove it.
+    // No `line`: nothing was typed, so nothing enters history (I29).
+    greeting: (doc) => void appendAndCommit(doc),
     dispose: () => void refresh.dispose(),
 
     /**

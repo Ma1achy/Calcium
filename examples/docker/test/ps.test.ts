@@ -216,6 +216,32 @@ describe("walk B: the columns", () => {
     expect(COLUMNS.find((c) => c.key === "ports")?.flex).toBe(true);
   });
 
+  it("B1d: a paused container is not counted as stopped", () => {
+    // Found by the dashboard's walk A1, in shipped step-1 code. The summary was
+    // `running` against `everything else`, so a real frame read
+    // `4 running · 1 stopped` above a row saying `◌ Up 11 minutes (Paused)`.
+    // Step 1 had no paused container to look at, and every test agreed with the
+    // code.
+    const lines = [
+      { ID: "a", Names: "up", Image: "x", State: "running", Status: "Up 1 hour", Ports: "" },
+      { ID: "b", Names: "held", Image: "x", State: "paused", Status: "Up 1 hour (Paused)", Ports: "" },
+      { ID: "c", Names: "dead", Image: "x", State: "exited", Status: "Exited (0)", Ports: "" },
+    ]
+      .map((o) => JSON.stringify(o))
+      .join("\n");
+    const summary = adapt({ stdoutRaw: lines }).blocks.find((bl) => bl.kind === "notice");
+    const text = summary && "text" in summary ? summary.text : "";
+    expect(text).toBe("1 running · 1 paused · 1 stopped");
+  });
+
+  it("B1e: a state with none of its kind is left out rather than shown as zero", () => {
+    // `0 paused` is noise on the overwhelmingly common frame, and the clause
+    // only earns its width when there is something in it.
+    const summary = adapt().blocks.find((bl) => bl.kind === "notice");
+    const text = summary && "text" in summary ? summary.text : "";
+    expect(text).not.toContain("0 ");
+  });
+
   it("B1c: the summary reads as English, not as a pluralised template", () => {
     // `2 runnings · 0 stoppeds` shipped and every test passed: they asserted the
     // counts and the unreadable-line clause, and none of them read the sentence.

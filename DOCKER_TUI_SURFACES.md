@@ -41,33 +41,112 @@ the confirm         S2 stop/start                   ~   forces the open ruling
 ## S1 — the landing dashboard (no command)
 
 The home screen and the opening shot. **Not** a pushed view — it is the **live block on
-launch**: `b.live` parts composed with static panels, refreshing in place. Typing a
-command freezes it into the transcript, exactly the transcript model.
+launch**: `b.live` parts composed with static panels, refreshing in place. It is an
+ordinary transcript entry, so `/clear` removes it and it scrolls away as the session fills.
+
+**It does not stop refreshing when a command is typed, and the earlier drawing said it
+did.** *"Typing a command freezes it into the transcript"* was a claim about a mechanism
+that does not exist and must not: C23 I9 is that a frozen entry keeps receiving patches
+until settled, I33 lists five teardown triggers **and not freeze**, and C24 §5 records its
+own *teardown on freeze* row being deleted against I9 — *"freezing is not stopping; a
+`--watch` scrolled out of view is still running, which is the whole of what I9 protects."*
+
+Freezing in C13's sense (I2) is a **display** property: the newest entry is `live`, and
+appending a later one makes the previous one not-live. That is what the transcript model
+says and all it says. A landing block you can scroll back to and find still current is the
+better behaviour anyway; the cost is that it polls until eviction, and that cost is the
+price I9 knowingly pays.
+
+**F11's class, fifth instance** — a drawing asserting behaviour, this time contradicting a
+settled invariant rather than the far side's output. It was caught because the fix it
+implied was checked against I9 *before* being built; building it would have re-introduced a
+row that had already been deleted for cause. FINDINGS F17.
+
+**This is a real frame now**, captured from the running application at 120 columns and
+replayed through a terminal emulator — not a drawing. It is kept in preference to the
+sketch that was here because three of the sketch's claims were things Calcium does not do,
+and the differences are listed underneath.
 
 ```
-  ┌─ docker-tui ──────────────────────────── engine 27.3 · 14 containers ─┐  ← panel, keyValue header
-  │                                                                        │
-  ▌ RUNNING (9)                                          CPU 34%  MEM 61%  │  ← b.live, whole panel refreshes
-  ▌ ● api-gateway     ▂▄▆█ 84%   512M/2G    1.2M/3.4M    up 3d            │
-  ▌ ● postgres        ▁▁▂▁  8%   1.1G/2G    880k/12M     up 12d           │  ● = running (ok tone)
-  ▌ ● redis           ▁▁▁▁  2%   40M/512M   120k/4M      up 12d           │
-  ▌ ● worker-1        ▃▅▃▄ 41%   256M/1G    2M/8M        up 3d            │
-  ▌ ● worker-2        ▄▄▅▄ 38%   248M/1G    2M/8M        up 3d            │
-  ▌   … 4 more running                                                    │  ← density: collapse the tail
-  │                                                                        │
-  │  STOPPED (5)   ○ migrate ○ seed ○ backup-cron ○ old-api ○ test-runner │  ← pills, exited (dim/error tone)
-  │                                                                        │
-  └────────────────────────────────────────────────────────────────────  ┘
-     tab a container · ⏎ watch · l logs · d drift · / for a command          ← footer keymap
+┌ docker-tui · engine 29.4.1 · 14 containers ──────────────────────────────────────────┐
+│┌ RUNNING ───────────────────────────────────────────────────────────────────────────┐│
+││7 running · 1 paused   CPU 101% · MEM 4%                                            ││
+││                                                                                    ││
+││NAME                      CPU                MEM                USAGE               ││
+││● dtui-api                ░░░░░░░░ 0.0%      ░░░░░░░░ 0.1%      9.434MiB / 7.75GiB  ││
+││◌ dtui-busy               ░░░░░░░░ 0.0%      ░░░░░░░░ 0.1%      9.438MiB / 7.75GiB  ││
+││● dtui-cache              ░░░░░░░░ 0.3%      ░░░░░░░░ 0.2%      17.43MiB / 7.75GiB  ││
+││● dtui-extra3             ▲ ████████ 100.5%  ░░░░░░░░ 0.1%      9.293MiB / 7.75GiB  ││
+││● reverent_proskuriakova  ░░░░░░░░ 0.2%      ░░░░░░░░ 3.0%      216.5MiB / 7.75GiB  ││
+││… 3 more                                                                            ││
+│└────────────────────────────────────────────────────────────────────────────────────┘│
+│                                                                                      │
+│beautiful_booth  condescending_cohen  dazzling_wozniak  distracted_davinci  dtui-gone │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Exercises in one frame:** panel, `b.live` (the running block), keyValue (the header
-totals), pills with tone (stopped), sparkline bars, tone (running/stopped), the footer,
-and the collapse-the-tail density decision. **The screencast's first five seconds**, doing
-almost everything Calcium does at once.
+At 80, `USAGE` drops and the pills wrap; `NAME`, `CPU` and `MEM` hold.
 
-`system info` = the engine version + container counts in the panel title, one line. A
-welcome screen that is mostly chrome is the thing density is chosen against.
+**Four differences from the sketch, each a finding rather than a compromise.**
+
+1. **There is no `▌`.** `b.live` returns a panel and the driver rebuilds it as a panel, so
+   a live region is a box with a title — visually identical to a static one until it
+   changes. C09's glyph table has a `live` slot (`▌` / `|`) and nothing renders it, and the
+   app must not write the character itself or it will not degrade. FINDINGS F18.
+2. **The counts and totals are in the body, not the title.** A live part's title is
+   captured once at declaration and never re-rendered, so anything that varies freezes
+   there while the rows tick. F16.
+3. **The panel nests, costing two borders.** The live part is a panel inside the outer
+   panel; the sketch drew one box with a gutter.
+4. **Everything that ticks is a poll**, not a stream, and the app runs `docker` itself:
+   `b.live`'s `fetch` has no adapter or transport between it and the far side. F10.
+
+**Exercises in one frame:** panel, `b.live` (the running block), the summary line, pills
+with tone (stopped), value bars, tone and glyph (running/paused/hot), and the
+collapse-the-tail density decision. **The screencast's first five seconds**, doing almost
+everything Calcium does at once.
+
+`system info` = the engine version + container counts in the outer panel's title, one
+line — and that title is static, which is the only reason it may hold them. A welcome
+screen that is mostly chrome is the thing density is chosen against.
+
+**And the collapse chooses by load, not by name.** Showing the first five of a
+name-ordered list hid the busiest container on the machine behind `… 3 more`. Selection is
+by significance; display order is alphabetical so rows do not move between ticks. Two jobs,
+two orders — conflating them is invisible until a frame has an outlier in it.
+
+**`no command` is real now.** The frame above is what launch draws with nothing typed —
+`config.greeting` fired at C22 §4 step 7, appended by C23 like any other document, so
+`/clear` removes it and it scrolls away. F9, closed.
+
+The part **ticks until the entry is evicted or the transcript is cleared**, not until the
+first command. An app that wants launch cheap omits `every` and gets a one-shot; that is
+the app's decision rather than a lifecycle the framework implements, and the alternative is
+the row C24 §5 deleted against C23 I9.
+
+### What the far side actually supplies, and the two corrections it forced
+
+Checked before the rulings rather than after — F4's lesson applied forward, and it changed
+the drawing twice.
+
+**The header's CPU total is a sum, not a utilisation.** `CPU 34%` read as *the machine is a
+third busy*, and docker cannot say that. `stats` gives `CPUPerc` per container,
+per-core-normalised, so a single busy container on an 8-core host reports `780%` and the
+sum has no ceiling. `MemPerc` is a genuine fraction of host memory and does total to
+something meaningful. So the drawing now shows `CPU 340%`, which looks wrong and is right,
+and the two figures are **not** the same kind of number despite sitting side by side. Naming
+that here is cheaper than a reader inferring a denominator that does not exist.
+
+**The panel joins two sources.** `docker stats --no-stream` reports **running containers
+only**; the stopped pills come from `docker ps -a`. Naming a stopped container explicitly
+returns a row of zeros rather than nothing, which is worse than an omission — absent and
+zero are different, and only one of them is a fact about the container. So RUNNING is
+`stats`, STOPPED is `ps -a`, and the count in the header is the sum of two calls.
+
+**And the live block polls; it does not stream.** `docker stats --format json` without
+`--no-stream` interleaves `ESC[H` / `ESC[K` / `ESC[J` with the JSON and redraws a region —
+a presentation of data, not data. Consuming it would put a terminal emulator inside an
+adapter. `b.live`'s `fetch` arm on an interval, against `--no-stream`. FINDINGS F10.
 
 ---
 
@@ -230,6 +309,15 @@ glyph-height), the bar stays, colour goes.
 
 Add `--graph <c>` to promote one container's CPU to a full plot (S3's plot, standalone).
 
+**The history is the app's, and its axis is ticks rather than seconds.** Docker emits an
+instant with no timestamp, so both the sparkline here and S3's plot accumulate app-side —
+gap 1, as predicted. What was not predicted is that `AdapterContext` carries no clock
+either, deliberately (C07 I1: adapters read no clock). So the ring buffer is keyed by
+**tick index**, and S3's `-60s ──── now` axis is `ticks × interval` — a label computed from
+the interval the app chose, not a duration anything measured. True while the driver ticks
+on schedule and quietly wrong across a stall, which is worth saying on the axis rather than
+discovering in a screencast. FINDINGS F11.
+
 ---
 
 ## S5 — `/inspect <c>` (fullscreen view, structured + raw)
@@ -282,6 +370,12 @@ The comparison block doing its actual job — `a`/`b` side by side, differing ro
 `a`/`b` positional (the ruling), the `verdict` column toning the rows that differ. The
 two-column comparison the thin `docker diff` never showed.
 
+**Two of those rows are not in `inspect`.** `cpu %` and `mem` come from `docker stats`, and
+the drawing shows them beside five fields that come from `docker inspect` without saying
+so. So `/compare` joins two sources per container — the same join S1's panel makes, reached
+from the other direction, which is the argument for building S1 first. The other five rows
+diff cleanly: two containers give two objects of the same shape. FINDINGS F11.
+
 ---
 
 ## S7 — `/drift <c>` (comparison, image vs running) **(the comparison showcase)**
@@ -303,8 +397,29 @@ built from. `a` = image default, `b` = live container.
 
 `comparison` with a real before/after, differing rows carrying verdict tone. **The
 comparison block's `/stats`** — the surface that demonstrates the feature at its peak, the
-way S3 does for `b.live`. Source: `docker inspect` the container, `docker image inspect`
-the image, diff the fields.
+way S3 does for `b.live`.
+
+### "Diff the fields" is the one thing this cannot do
+
+The source line used to read *`docker inspect` the container, `docker image inspect` the
+image, **diff the fields***. The two objects do not have the same fields, and the drawing's
+own headline row proves it.
+
+`docker image inspect`'s `Config` carries `ExposedPorts` and `StopSignal`. `docker
+inspect`'s carries `Hostname`, `Domainname`, `AttachStdin/out/err`, `Image`, `StopTimeout`
+— and `ExposedPorts: null`. A key-union diff invents a `changed` row for every key on one
+side only, which is most of them, and each would render as drift the container does not
+have.
+
+The `ports` row is the clearest case. `80` comes from the image's `Config.ExposedPorts`;
+`80→8080` comes from the container's `HostConfig.PortBindings` and `NetworkSettings.Ports`.
+**Two different paths**, so no structural comparison reaches it however the objects are
+walked.
+
+So `/drift` is a **hand-written list of semantic field pairs** — a table of *(label, path
+on the image, path on the container)* — and the comparison block renders it. That is a
+smaller and more honest thing than a diff, and it is what the drawing was always showing;
+the word "diff" was doing work the picture never supported. FINDINGS F11.
 
 ---
 

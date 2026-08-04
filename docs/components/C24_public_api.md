@@ -80,6 +80,26 @@ export type { WorldDriver };
 export { cells, truncate, planColumns };
 ```
 
+**`greeting` is how the session's first entry gets there** (C22 I44). S02 specifies
+that entry — *"an ordinary `ViewDocument`, not a screen … appended to the
+transcript like any command's output"* — and cites C22 §4 step 7, which was a
+step with a name and no mechanism. `TuiConfig` had no field, nothing fired
+anything, and C22's own T3.10 and T3.11 tested it and had never been written.
+
+```ts
+greeting?: () => ViewDocument | Promise<ViewDocument>;
+```
+
+Fired at step 7 and **not awaited**, so a greeting that hangs or rejects leaves
+the prompt usable and simply produces no entry. It appends through C23's ordinary
+path, which is what makes a `b.live` part inside it driven (C23 I33a) and what
+makes `/clear` remove it.
+
+**It does not stop refreshing when the user types.** A live greeting ticks until
+its entry is evicted or the transcript is cleared — C23 I9 and C23 I33, and §5's
+*teardown on freeze* row was deleted against exactly that. An app wanting launch
+to be cheap omits `every` and gets a one-shot.
+
 **`ManifestDocument` is what an author writes; `Manifest` is what the parser
 returns.** The distinction is new and it is C24's most expensive omission to date.
 
