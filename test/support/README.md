@@ -197,6 +197,40 @@ loops forever inside one `advance()`. That is not a hang in the component under
 test, and it presents as an out-of-memory rather than as a failed assertion —
 which is the worst way to learn about it.
 
+### A clock that re-fires unconditionally cannot tell periodic from one-shot
+
+`fakeClock` fires each armed callback **once**, and so does the pipeline harness
+in `execution.ts`. That is not fastidiousness about matching `setTimeout` — it is
+the only way the fake can answer the question a periodic mechanism is asking.
+
+Both of those harnesses used to hold `(() => void)[]` and re-fire **every**
+collected callback on **every** `tick()`. Under that shape a driver that arms a
+repeating timer and a driver that arms once are indistinguishable, because the
+fake supplies the repetition the source is supposed to. C23's stall detection was
+armed once, outside any loop, against C22's ambient one-shot `setTimeout` — so in
+production it checked for silence thirty seconds after construction and never
+again, and a `--watch` that went quiet twice was told once. It sat that way
+through the whole of C22 and C23. Sixteen assertions covered the mechanism and
+every one of them passed, because every one of them was about the *first* silence.
+
+**So the shape of the rule is: a fake must not supply the behaviour under test.**
+The re-firing loop was a convenience — it saved arranging deadlines — and the
+convenience was exactly the property the component was responsible for. That is
+the same failure as a fixture that responds to nothing (above), arriving through
+time rather than through data, and it is harder to see because a clock looks like
+plumbing rather than like a subject.
+
+Two consequences worth stating, because both were paid for:
+
+- **Drive time in steps, not in one long jump.** `tick(60_000)` then `tick(70_000)`
+  finds a timer that fired once and died; `tick(130_000)` does not. C23 T1.30 is
+  written that way for that reason.
+- **A second occurrence is a different test from the first.** Once the clock told
+  the truth, T1.30 exposed a second defect underneath the first — the notice block's
+  id was already taken, so the `append` for the second silence was refused and the
+  mechanism was silent forever after one report. No assertion about one silence can
+  reach that, however many there are.
+
 ### `interactivePty` exists because timing from inside proves nothing
 
 `runInPty` starts a program and waits for it. C03's T5.2 needs to type while the

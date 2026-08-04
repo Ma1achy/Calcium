@@ -159,6 +159,21 @@ export interface Pipeline {
    * `meta`.
    */
   identityNotice(text: string): void;
+  /**
+   * Stops §3b's timers. Called at C22 §8 **step 1**, where `stopping` is set.
+   *
+   * **The step matters and the invariant says so** (C23 I12). `stopping()` is
+   * read at the top of a tick, which cannot see work already in flight; a
+   * `fetch` that resolves during teardown patches a transcript being torn down,
+   * which is precisely what I12's own sentence promises does not happen. So the
+   * timers are stopped where the flag is set, ahead of `beforeRelease` — the
+   * ordering §8 already keeps for `killAll()` against `history.drain()`.
+   *
+   * It had no caller at all: `RefreshDriver.dispose` existed, was implemented,
+   * and was named nowhere in `src/`, so the driver's timer outlived every
+   * session that ended.
+   */
+  dispose(): void;
 }
 
 /** Step 10. Takes the router because C23's submit row ends `resetFocus()`. */
@@ -292,6 +307,18 @@ export type TuiConfig = Readonly<{
 
   /** Step 10's seam. Injected so C22's tests construct a graph without C23. */
   pipeline?: PipelineFactory;
+
+  /**
+   * Where identity comes from (C22 §7, I43). Defaults to a fetcher returning
+   * `null` — a working default, as every optional field has (I17).
+   *
+   * **C22 owns the cadence and the state; the source is the far side's** (§13),
+   * so this is a seam rather than a mechanism here. It was a stub with no field
+   * behind it, commented *until the app supplies one*, and nothing could: which
+   * is why §7's expiry notice had two independent things between it and a
+   * reader, and why removing either alone changed no behaviour at all.
+   */
+  identity?: () => Promise<Identity | null>;
 }>;
 
 export interface TuiInstance {

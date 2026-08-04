@@ -628,6 +628,7 @@ export const TOPICS = {
   "startup-validation": "C24",
   "public-api": "C24",
   "expect-document": "C24",
+  refresh: "C23",
   "patch-window": "C25",
   capabilities: "C02",
   corpus: "C08",

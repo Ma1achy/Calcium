@@ -179,7 +179,7 @@ class Session implements TuiInstance {
     // The fetcher is a stub until the app supplies one — C22 §7 owns the
     // cadence and the state, and the auth flow itself is the far side's (§13).
     this.#identity = createIdentityLoop({
-      fetch: () => Promise.resolve(null),
+      fetch: this.config.identity,
       // **The second producer of C22 I31's class.** This loop settles on a
       // five-minute cadence with no keystroke anywhere near it, and both fields
       // it writes are drawn in the header — so without the commit the header
@@ -197,7 +197,21 @@ class Session implements TuiInstance {
         },
       },
       now: this.config.clock,
-      notify: () => undefined,
+      /**
+       * **C22 signals, C23 appends** (C23 §3b, I19) — and until now C22 signalled
+       * into a function that discarded it.
+       *
+       * `notify: () => undefined` meant the one §3b mechanism described as
+       * working reached nothing: `expiryNotice` composed its text, `warned`
+       * flipped so it would never compose it again, and the notice was dropped.
+       * A token inside a day of expiry said so to nobody, once per session.
+       *
+       * `Pipeline.identityNotice` was built, exported and reached only by its own
+       * unit tests — a producer complete with nothing on the other side, which is
+       * the class MG24 and MG25 exist for, arriving through a default argument
+       * rather than through an unexported member.
+       */
+      notify: (text) => void this.#graph?.pipeline.identityNotice(text),
       // The ambient one, not a second copy. C06's `Clock` needs the same, and
       // two inlined `setTimeout`s is the duplication SP4 is about, in code.
       schedule: this.config.schedule,
@@ -240,6 +254,11 @@ class Session implements TuiInstance {
     // racing shutdown loses the race (T3.19).
     graph.session.beginStopping();
     this.#identity?.stop();
+    // **Here, not in `beforeRelease`** (C23 I12). The flag `beginStopping` sets
+    // is read at the top of a tick and cannot see a `fetch` already in flight;
+    // stopping the timers alongside it is what makes the promise hold. Same
+    // ordering argument as `killAll()` before `history.drain()` at step 2a.
+    graph.pipeline.dispose();
 
     // 2 — release, which runs `beforeRelease` (the cleanup) and then restores
     // the terminal. C01's own guard makes the cleanup once-only.

@@ -42,6 +42,7 @@
 export { createTui } from "./shell/session.js";
 export type {
   ChromeFn,
+  Identity,
   SessionSnapshot,
   StopReason,
   TuiConfig,
@@ -91,6 +92,7 @@ export type {
   ComparisonRow,
   EventLine,
   KeyValueInput,
+  LiveSpec,
   LogLine,
   StepInput,
 } from "./shell/builders/index.js";
@@ -137,6 +139,21 @@ export type {
   CompletionSource,
   Slot,
 } from "./interaction/completion/index.js";
+
+/**
+ * C23 §3b's declaration type, back on the list (C24 §3, I16).
+ *
+ * It was withheld for the whole of C22 and C23 because the mechanism beneath it
+ * had no driver: a consumer could declare a refreshing part, type-check, and
+ * never be called — A03 §2's vacuity class reached through the export list. The
+ * condition named was *the driver*, not a release, and C23 I32 to I35 met it.
+ *
+ * **What the wait produced is worth keeping.** Held back, the type sat where
+ * MG25 could find it, and the two functions under it became that rule's founding
+ * case. Shipped on the first pass it would have been a published surface with a
+ * consumer's suite compiled against something that never fired.
+ */
+export type { ViewRefresh, RefreshHost } from "./shell/refresh.js";
 
 export type {
   Classification,

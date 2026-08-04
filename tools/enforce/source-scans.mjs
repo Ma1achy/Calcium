@@ -678,6 +678,35 @@ export const SCANS = [
     scope: "src/shell/builders/", allow: [],
     why: "a builder inferring a tone or glyph from a field name works for four verbs and fails silently on the fifth (C24 I5)" },
 
+  // --- SS46 — who may append with `origin: "refresh"` -----------------------
+  //
+  // **C23 §3b claimed one producer and there were four**, and the sentence read
+  // as a guarantee while constraining nothing. §3a's row now says what the value
+  // means rather than which mechanism sets it — *provenance, not mechanism*: a
+  // system notice with no user behind it. The four that qualify are C13's cap
+  // marker, C22's two startup warnings, and C23's identity notice.
+  //
+  // A claim about a set wants a check or it is re-made by the next reader who
+  // greps one site. The allow-list is the set, so a fifth append fails here
+  // rather than quietly widening what the word means.
+  //
+  // **Known limit, stated because an unrecorded one reads as strength.** This
+  // finds the literal `origin: "refresh"` and nothing computed — a variable
+  // holding the string, or a `meta` object spread from elsewhere, passes. It is
+  // the same blind spot every textual rule in this suite has, and the reason it
+  // is acceptable here is that all four sites are literals and a computed origin
+  // would be a change worth noticing on its own.
+  { id: "SS46", spec: "C23 §3a · C23 I22",
+    pattern: /origin:\s*"refresh"/,
+    scope: "src/",
+    allow: [
+      "src/viewport/transcript/cap.ts",
+      "src/shell/construct.ts",
+      "src/shell/execution.ts",
+      "src/shell/types.ts",
+    ],
+    why: "`origin: \"refresh\"` is provenance — a system notice with no user behind it (C23 §3a). A fifth site is either a new one of those or the word drifting" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],
