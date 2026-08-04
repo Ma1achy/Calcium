@@ -1135,6 +1135,38 @@ a `height: 9` plot measure 7 and 11 is what caught it. A fixture must be shown t
 the thing under test before it is asserted against, and a number that looks right is exactly
 how that rule gets skipped.
 
+### The obligations a route carries, and the one that is not yet built
+
+**`runIntoView` was written new rather than derived, and inherited whichever
+obligations its author noticed.** That is not a remark about care: `declareLive`,
+`release` and `cancelInFlight` were each entry-only, each found one at a time, and each
+looked like an isolated oversight. Three samples of one cause. The entry route's
+obligations are therefore enumerated against the view route rather than recalled, and the
+`n/a` rows carry reasons — *"the view route does not need that"* is the assumption that
+produced the first three.
+
+Two of those reasons are worth keeping here, because both are rulings rather than notes:
+
+- **`resetFocus` is not called, and calling it would be a defect.** It exists because an
+  append freezes the previous entry and focus must not remain in a frozen block. The view
+  route appends nothing and freezes nothing, and A01 D7 requires the selection to survive
+  the push and be intact on the pop. The absence is the invariant, not an omission.
+- **A cancelled view pops rather than settling**, since there is no entry to settle. The
+  reader gets no record, which is the cost B03 §2 already names for a logs excursion.
+
+**`view` with `streams` is declarable and not yet runnable.** C05 I20 permits the pair
+deliberately — S12's logs view *is* a streaming source in a pushed view — but C23's
+streaming route patches a transcript *entry* (`streamInto`), and routing it into a view
+means patching through the owner instead. Nothing consumes that yet: S3 polls through
+`b.live`'s `fetch`, so building it would be a mechanism with no consumer proving it.
+
+It is refused **when the verb runs, not when it is declared**, and the distinction is the
+point. The declaration stays legal because the spec means it; what does not exist is the
+route. The alternative was worse than either: the pair currently falls to the
+non-streaming path, blocks until the process exits, and **holds the submission guard for
+the whole of it** — which is precisely what C23 I6 exists to prevent. A silent version of
+that would be found by a reader watching a shell stop accepting input.
+
 ### What the decision leaves behind when it throws
 
 Asked because a ruling's rejection path is where it leaves state, and neither a trace nor a
