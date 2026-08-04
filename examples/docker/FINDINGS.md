@@ -282,6 +282,37 @@ boundary. A package cannot reach through its own edge and notice.
 
 ---
 
+## F8 — omitting `env` does not degrade the shell, it stops it opening
+
+| | |
+|---|---|
+| **Surface** | S2 `/ps` — starting the application, immediately after F7 |
+| **Reached for** | nothing. `env` is optional and was left out |
+| **Verdict** | **adapter-side** (the app passes `process.env`), plus a false sentence in C22 |
+
+`TuiConfig.env` is optional, and its own documentation says:
+
+> Omitted, it defaults to `{}`, and the shell degrades to ASCII with no colour: the safe
+> direction, and the alternative is a fifth required field.
+
+**It does not degrade.** `detectCapabilities(config.env)` reads `TERM` from that record;
+with `{}` there is no `TERM`, so `usable` is false, so `altScreen` is false — and
+`acquire()` treats a missing alternate screen as **fatal**: *"alternate screen unsupported
+— the shell cannot open"*. The safe direction turns out to be no direction at all.
+
+The app supplies `env: process.env`, which is what C22 I20 intends — no file under `src/`
+reads the environment, deliberately. So this is app-side work and the finding is the
+sentence: it describes a graceful degradation that does not exist, and it reads as
+reassurance while being the opposite. A03 §2's class arriving in prose, one document over
+from where C19's `--flag=value` sentence did.
+
+**The same shape as F7, and found one minute after it.** An optional field whose default
+makes the framework unusable, invisible because every harness passes a real environment.
+Two in a row is not a coincidence: **the defaults have never been exercised together**, and
+the thing that exercises them is a consumer that supplies only what it was told to.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
