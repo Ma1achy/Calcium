@@ -256,31 +256,41 @@ drill-in + `b.live` + plot + the fullscreen view at once.
 refresh. `esc` pops back to `ps`. The plot fills over a rolling window; the header shows
 live uptime.
 
+**The `⏎` above is compressed notation, and reading it literally was a mistake — F11's
+sixth instance, and the first about the framework's own model rather than the far side.**
+`B03_drill_chain.md` §2 is explicit that there are exactly two ways down and that confusing
+them is what it exists to prevent: **`⏎` on a row appends**, and push is reached by a verb.
+Its canonical path shows the real gesture in two steps — an action `fill`s the prompt with
+`/ps <uuid> --watch`, and the *next* `⏎` submits it and pushes. S3 is reached exactly as the
+logs view is. What S3 does have is A01 D4's qualification for *being* a pushed view: it
+needs the whole screen and its own letter keys (`n`/`p`, `L`, `d`), so the prompt must go.
+FINDINGS F21b.
+
 **This composes:** drill-in (C25 view push), `b.live` (part refresh), plot (C12), the
 fullscreen view's scroll, tone, keyValue. Nothing else in the terminal-tool space does a
 live focused dashboard inside a navigable shell. **Lead the screencast with clicking a
 container and watching it breathe.**
 
-### The seam this tests — gap 7, the important one
+### The seam this tests — gap 7, answered before it was probed
 
-The part-refresh driver's host was ruled `entry | view` — both arms specified. **But the
-driver shipped tested against an entry host.** A view host is the *other arm of the same
-union*, which is exactly where Calcium found untested seams eighteen times.
+**This section used to say the driver shipped tested against an entry host only. It did
+not.** FINDINGS F20 has the evidence and the corrected answers:
 
-S3 is the first thing to drive a `b.live` part **inside a pushed view**, and it will
-answer, on first run:
+- **Does `declare` accept a `view` host and tick it?** Yes, and has since C23 §3b —
+  `test/contract/refresh.test.ts:535`, T4.21, cited to C24 I12.
+- **Does `release` on pop reach it?** No call site exists. A popped view is torn down one
+  tick late, when `put` returns false against a layer that has gone.
+- **Does a refresh hold the scroll?** The question has no subject. C15 holds no offset by
+  design and the producer owns it; there is no producer.
 
-- Does `driver.declare(host, parts)` accept a `view` host and tick it? (Spec says yes.)
-- Does `release(host)` on **pop** stop the view's parts — or only entry teardown paths? A
-  view popped while its parts tick is a subscription outliving its host, the class C14 and
-  C15 both paid for.
-- Does a refresh patching a block **while the view is scrolled** hold the viewport, or
-  jump it? This is `rev`-moves-on-a-settled-entry from the last stretch, now inside a
-  scrollable view — the offset must survive the patch.
+What is absent is a **producer**, not coverage: `declare`'s single call site in `src/`
+hard-codes an entry host. So all three trace to **C22 §13's reserved ruling** — *a verb
+whose result is a pushed view* — which S3 is the first concrete case to force, and which
+step 3 settles rather than files.
 
-If any is wrong, it is the seventeenth-gap shape one more time, found by the first
-consumer to drill in. **The single most valuable thing docker-tui surfaces**, because it
-is the one part of the last stretch exercised against only one of its two declared hosts.
+**The single most valuable thing docker-tui surfaces**, and for a better reason than the
+one first given: not an untested arm, but the largest decision the framework deliberately
+left open for a consumer to force.
 
 ---
 
@@ -554,10 +564,14 @@ neither the probe nor any Calcium test could reach them.
    confirm with real y/n answering — the open item. The demo forces the ruling.
 5. **`exitCode` null-means-signal.** `docker stop` is SIGTERM; the §8a finding lands.
 6. **A frame a consumer can inspect** for `matchesGolden` — the demo's tests want it.
-7. ★ **A `b.live` part hosted by a pushed view** (S3). The driver's `view` host arm,
-   spec'd but shipped tested against an entry host only. Does it tick, does `release` on
-   pop reach it, does a patch hold the scroll. **The most valuable thing the app
-   surfaces**, the untested arm of a union the last stretch declared.
+7. ★ **A `b.live` part hosted by a pushed view** (S3). **Answered — see FINDINGS F20,
+   and the premise below was wrong.** The `view` arm ticks and has been tested since
+   C23 §3b (T4.21). What is absent is a *producer*: `declare`'s one call site hard-codes an
+   entry host, `release` has no pop trigger, and the scroll question has no subject because
+   C15 holds no offset and the owner does not exist. All three are **C22 §13's reserved
+   ruling** — *a verb whose result is a pushed view* — which S3 forces. Still the most
+   valuable thing the app surfaces; the reason changed. Original wording: *"spec'd but
+   shipped tested against an entry host only … the untested arm of a union"*.
 
 Record each gap the way Calcium recorded its own: the surface that needed it, what was
 reached for, whether it is adapter-side work or a real Calcium finding. **Do not fix

@@ -50,6 +50,33 @@ wrong on purpose and watching the report not change**. That is the mutation pass
 the instrument instead of to the code, and it is the only method that has worked on any of
 them.
 
+### A fourth, and it is a different class: two instruments that disagreed
+
+The three above are one instrument giving a wrong answer. This one is **two instruments
+giving different answers, with only one of them consulted.**
+
+`main`'s CI failed on **five consecutive merges** — #12, #13, #14, #15, #16 — while every
+local `make all` on the same commits reported green, and each of those merges was made on
+the strength of the local run. The failures were real tier-5 rows, not infrastructure:
+C03's frame-rate, latency and idle-CPU thresholds on the first three, and C18 T5.5 on the
+last two.
+
+**The local suite is not the authority and had been treated as one.** Nothing in the
+process compared the two, so a red `main` accumulated for five merges without anyone
+holding a wrong belief — the question was never asked.
+
+C18 T5.5 is the instructive half, because it is not a threshold that a shared runner
+misses. It fails in CI and passes locally **deterministically**, for a reason neither
+environment can see alone: the far side prints its `cwd=`, the notice wraps at a position
+that depends on that string's length, and `/workspaces/tui-kit` and
+`/home/runner/work/Calcium/Calcium` differ by fourteen characters. A test that is a
+function of its environment's path length passes and fails for reasons no assertion
+mentions.
+
+**The rule this adds: after a merge, read CI's result, not the local one.** They are two
+instruments, they disagree, and the one that gates nothing is the one that had been
+believed.
+
 ---
 
 ## 1. `tools/screen.py` — a stripped capture is not a frame
