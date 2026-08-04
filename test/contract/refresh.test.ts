@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import { createRefreshDriver, STALL_MS } from "../../src/shell/refresh.js";
 import type { RefreshHost, ViewRefresh } from "../../src/shell/refresh.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
+import { SESSION_BLOCK_CAP } from "../../src/viewport/transcript/cap.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 
@@ -151,6 +152,26 @@ describe("C23 §3b — part refresh", () => {
     expect(p?.kind, "still a panel").toBe("panel");
   });
 
+  it("T1.35b (C04 I25): the refresh keeps the declared block's gapBefore", async () => {
+    // **Found by looking at the frame, not by an assertion.** `b.live` builds its
+    // panel through `finish`, which defaults the gap on; the replacement the
+    // driver made did not carry it, so the document gained a blank row before the
+    // first tick and lost it after. Every assertion about the part's *content*
+    // passed throughout — rhythm is declared by `gapBefore` and applied by the
+    // sequence (C04 I25), so a patch that drops it makes the renderer disagree
+    // with the declaration while the block itself stays correct.
+    const h = harness();
+    const declared = { ...panel("a", "a", raw("a-c", "…")), gapBefore: true } as Block;
+    const id = h.transcript.append(docWith([declared]), { streaming: true });
+
+    h.driver.declare({ kind: "entry", id }, [part({ id: "a" })]);
+    await h.tick();
+
+    const after = h.transcript.entries[0]?.doc.blocks.find((x) => x.id === "a");
+    expect(shown(h, id, "a"), "the control: it really did refresh").toBe("ok");
+    expect(after?.gapBefore, "and the rhythm survived it").toBe(true);
+  });
+
   it("T1.32 (I21): backoff doubles and resets, and a sibling is untouched", async () => {
     // **Two parts, because containment is the invariant.** One failing part
     // asserted alone cannot distinguish "contained" from "the only thing there".
@@ -257,12 +278,19 @@ describe("C23 §3b — part refresh", () => {
   it("T3.32 (I21): a tick during an in-flight fetch does not start a second", async () => {
     // A source slower than its interval otherwise stacks attempts until the
     // cadence means nothing — and each one lands a patch, so the screen churns.
+    // **Two parts, and the second is what makes the row possible.** `armParts`
+    // skips a part that is in flight when it picks the next due time, so a lone
+    // slow part arms nothing and no sweep can overlap it — every assertion below
+    // would pass against a driver with no guard at all. The fast part keeps
+    // sweeps arriving while the slow one is outstanding, which is the only
+    // arrangement in which an overlapping tick exists to be refused.
     let started = 0;
     let release: (() => void) | undefined;
     const h = harness();
-    const id = h.transcript.append(docWith([panel("s", "slow", raw("s-c", "…"))]), {
-      streaming: true,
-    });
+    const id = h.transcript.append(
+      docWith([panel("s", "slow", raw("s-c", "…")), panel("f", "fast", raw("f-c", "…"))]),
+      { streaming: true },
+    );
 
     h.driver.declare({ kind: "entry", id }, [
       part({
@@ -275,6 +303,7 @@ describe("C23 §3b — part refresh", () => {
           });
         },
       }),
+      part({ id: "f", intervalMs: 1_000 }),
     ]);
 
     await h.tick();
@@ -287,7 +316,52 @@ describe("C23 §3b — part refresh", () => {
     expect(shown(h, id, "s")).toBe("done");
   });
 
-  it("T3.30 (I32, I33): a host evicted mid-flight is released, not backed off", async () => {
+  it("T3.30b (I33): a host dropped by C13's cap is released", async () => {
+    // **Eviction proper, not `clear`.** `clear` is a command someone issued;
+    // the cap removes on its own schedule with no caller to be told, which is
+    // why it was in neither §5's containment table nor I9. A row that only
+    // drives `clear` leaves the `evict` arm asserted by nothing.
+    // **Neither live nor streaming, and that is the whole shape of the case.**
+    // C13's sweep skips the live entry (I5) and any streaming one (I6), so those
+    // two can never be evicted — a host that is streaming is unreachable here,
+    // and a row that made one would assert against a state the cap refuses to
+    // produce. What is left is exactly the interesting host: an ordinary settled-
+    // looking entry, scrolled back, still holding a part that ticks.
+    let calls = 0;
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    h.transcript.append(docWith([raw("next", "…")]));
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve("ok");
+        },
+      }),
+    ]);
+
+    await h.tick();
+    expect(calls, "the control: it was running").toBe(1);
+
+    // Push past C13's block cap so the entry that owns the part is evicted.
+    // A hundred thousand blocks, in entries wide enough that the loop is short:
+    // the cap counts blocks rather than entries, which is the arithmetic a row
+    // driving four hundred one-block appends gets wrong silently.
+    const wide = (n: number) =>
+      docWith(Array.from({ length: 1_000 }, (_, k) => raw(`f${String(n)}-${String(k)}`, "x")));
+    for (let i = 0; i < SESSION_BLOCK_CAP / 1_000 + 2; i += 1) h.transcript.append(wide(i));
+    expect(
+      h.transcript.entries.some((e) => e.id === id),
+      "the control: the cap really did drop it",
+    ).toBe(false);
+
+    const at = calls;
+    for (let i = 0; i < 4; i += 1) await h.tick(60_000);
+    expect(calls, "and the part stopped with it").toBe(at);
+  });
+
+  it("T3.30 (I32, I33): a host cleared mid-flight is released, not backed off", async () => {
     // `patch` answers `{ok: false, reason: "unknown"}` for an entry C13 has
     // dropped. Read as a transport failure it becomes a backoff against
     // something gone — a part retrying, slower and slower, forever.

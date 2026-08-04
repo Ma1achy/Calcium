@@ -236,9 +236,26 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
 
   const hosts = new Map<string, { host: RefreshHost; parts: Part[] }>();
 
-  /** Write a part's block back to whichever host holds it. */
+  /**
+   * Write a part's block back to whichever host holds it.
+   *
+   * **`gapBefore` is carried across, and losing it was visible only by looking.**
+   * `b.live` builds its panel through `finish`, which defaults the gap on — so
+   * the declared block has one and the replacement this makes did not. The
+   * document's rhythm therefore changed on the first tick, with the part's own
+   * content correct and every assertion about it passing: C04 I25 says rhythm is
+   * declared by `gapBefore` and applied by the sequence, and a patch that
+   * silently drops it is the renderer disagreeing with the declaration.
+   *
+   * Read off the block currently in place rather than remembered at declaration,
+   * because the part's panel is whatever the host holds now — including one an
+   * earlier patch put there.
+   */
   const put = (host: RefreshHost, part: Part, child: Block): boolean => {
-    const panel = livePanel(part.spec.id, titleOf(part), child);
+    const existing = currentPanel(host, part);
+    const base = livePanel(part.spec.id, titleOf(part), child);
+    const panel: Block =
+      existing?.gapBefore === true ? ({ ...base, gapBefore: true } as Block) : base;
     if (host.kind === "view") return deps.updateView(host.id, part.spec.id, panel);
 
     const outcome = deps.transcript.patch(
@@ -252,10 +269,18 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     return outcome.ok;
   };
 
-  /** C23 I35 — the age lives in the title, and nowhere else does it fit. */
+  /**
+   * C23 I35 — the age lives in the title, and nowhere else does it fit.
+   *
+   * **One guard, not two.** This read `!part.stale || part.lastOk === null`, and
+   * the second arm cannot fire: `stale` is only ever set where `lastOk` is
+   * already non-null. It read as care and was the vacuity class — a condition
+   * with nothing to be wrong about passes exactly like one that is satisfied,
+   * and the mutation pass found it by producing a mutant nothing could kill.
+   */
   const titleOf = (part: Part): string => {
-    if (!part.stale || part.lastOk === null) return part.spec.title;
-    const secs = Math.max(0, Math.round((deps.clock() - part.lastOk) / 1000));
+    if (!part.stale) return part.spec.title;
+    const secs = Math.max(0, Math.round((deps.clock() - (part.lastOk ?? 0)) / 1000));
     return `${part.spec.title} · ${String(secs)}s ago`;
   };
 
@@ -338,13 +363,20 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     }
   };
 
-  /** The child a part's panel is showing, so staleness can re-title without refetching. */
-  const currentChild = (host: RefreshHost, part: Part): Block | null => {
-    if (host.kind === "view") return deps.viewBlock(host.id, part.spec.id);
+  /** The part's panel as the host currently holds it, or `null` if it has gone. */
+  const currentPanel = (host: RefreshHost, part: Part): Panel | null => {
+    if (host.kind === "view") {
+      const child = deps.viewBlock(host.id, part.spec.id);
+      return child === null ? null : livePanel(part.spec.id, titleOf(part), child);
+    }
     const entry = deps.transcript.entries.find((e) => e.id === host.id);
     const found = entry?.doc.blocks.find((b) => b.id === part.spec.id);
-    return found !== undefined && found.kind === "panel" ? (found.children[0] ?? null) : null;
+    return found !== undefined && found.kind === "panel" ? found : null;
   };
+
+  /** The child a part's panel is showing, so staleness can re-title without refetching. */
+  const currentChild = (host: RefreshHost, part: Part): Block | null =>
+    currentPanel(host, part)?.children[0] ?? null;
 
   const release = (host: RefreshHost): void => void hosts.delete(keyOf(host));
 
