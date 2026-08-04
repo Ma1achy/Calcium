@@ -110,7 +110,7 @@ the **end**; `→` is the ASCII-degradable arrow.
 ### The `PORTS` ruling, and the thing it got wrong first
 
 **The rule is: a column keeps the field's identifying end**, and which end that is belongs
-to the field rather than to the table. `ColumnDef.truncate` is named for the operation for
+to the field rather than to the table. `ColumnDef.truncateFrom` is named for the operation for
 exactly this reason (C04 I30) — `"end"` and `"start"` say which side characters are
 *removed* from, so every column answers separately. For a name the head identifies and the
 tail is a hash; for a path the leaf does.
