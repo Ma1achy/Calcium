@@ -160,10 +160,20 @@ install → check → enforce → audit → test → golden → e2e → [repo-sp
 
 | Trigger | Stages |
 |---|---|
-| Every push | `install → check → enforce → audit → test` — under two minutes |
-| Push to `main`, and tags | The above plus `golden → e2e → [repo-specific]` |
+| Every push to a branch | `install → check → enforce → audit → test` — under two minutes |
+| **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]` |
 
 `enforce` stays on every push regardless: it costs five seconds and catches the violations that become load-bearing fastest.
+
+**The pull-request row is new, and it is here because the table's first form made `main` the only place the expensive tier could run — so `main` was the only place it could break, and nothing could stop it.**
+
+`main`'s CI failed on **five consecutive merges** (#12, #13, #14, #15, #16) while every pre-merge check was green, because the pre-merge check does not run the tier that was failing. `make test` excludes tier 5; `full` and `degraded` were conditioned on `github.ref == 'refs/heads/main'`, which a `pull_request` event never satisfies. Every one of those merges was made on a green that had not run the failing test, and the failure was reported afterwards to a branch nobody was gating.
+
+The costs were read the right way round and the trigger was not. **A pull request is not "every push" — it is the merge gate**, and it is the one moment where the expensive tier changes a decision. Branch pushes keep the two-minute promise, which is what that promise was for: the inner loop, where the answer is wanted in seconds and a wrong one costs a re-run.
+
+The budget argument survives intact, because a PR runs the expensive tier once per merge rather than once per push, and it was already running once per merge — on the far side of the merge, where it could only report.
+
+**The general form is the one already recorded in `examples/docker/VERIFYING.md`**: a result read through a channel that cannot express it. Here the channel is a CI job that does not run the test, and green meant *did not run* while reading as *passed* — A03 §2's vacuity class arriving in a pipeline.
 
 | Repo | Last stage |
 |---|---|

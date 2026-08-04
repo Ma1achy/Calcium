@@ -147,7 +147,31 @@ describe("C18 tier 5 — in a real session", () => {
       // a predicate matching it resolves on a frame that has the first half and
       // not the second — which is this row asserting against a screen that is
       // still being drawn. The reply's own marker is the honest signal.
-      await pty.waitForFrame((f) => f.join("").includes("argv=ps --search="), 20_000);
+      //
+      // **A wrap eats the breaking space, so no join restores the line.** This
+      // predicate read `f.join("")` and the assertion below read
+      // `f.map(trimEnd).join("")`, and *both* are wrong for the same reason: when
+      // the notice wraps between `argv=ps` and `--search=`, word wrap consumes
+      // the space at the break. Padded rows glue to `argv=ps   --search=` and
+      // trimmed rows to `argv=ps--search=`; neither is `argv=ps --search=`.
+      //
+      // The two differed only in *which* wrong answer they gave, which is why
+      // fixing the assertion once left the predicate to fail alone — one route of
+      // two, fifteen lines apart, the shape F17 carries.
+      //
+      // So the comparison is whitespace-insensitive on both sides. That is the
+      // only form that reconstructs a logical line without knowing where the
+      // terminal chose to break it.
+      //
+      // It passed everywhere it was run and failed in CI twice consecutively,
+      // because where the notice wraps depends on the width of the `cwd=` the far
+      // side prints: `/workspaces/tui-kit` in the devcontainer against
+      // `/home/runner/work/Calcium/Calcium` on the runner. Deterministic in each
+      // environment and different between them — the shape that reads as
+      // flakiness and is not.
+      const squash = (s: string): string => s.replace(/\s+/gu, "");
+      const joined = (f: readonly string[]): string => squash(f.join(""));
+      await pty.waitForFrame((f) => joined(f).includes(squash("argv=ps --search=")), 20_000);
       const frame = pty.frame.join("\n");
 
       // **Both halves of D24's correspondence, which is now checkable.** The
@@ -159,12 +183,13 @@ describe("C18 tier 5 — in a real session", () => {
         `❯ /ps --search=${UUID} --open-mr`,
       );
       // **Read from the rejoined rows, because the notice wraps** — and where it
-      // wraps depends on the pid's digit count, so a newline-joined frame splits
-      // this token on some runs and not others. Concatenating the rows
-      // reconstructs the logical line the far side wrote.
-      const unwrapped = pty.frame.map((l) => l.trimEnd()).join("");
+      // wraps depends on the pid's digit count *and* on the length of the cwd, so
+      // the token splits in some environments and not others. Whitespace is
+      // squashed out of both sides for the reason above: the break consumes the
+      // space it broke on, so it cannot be put back.
+      const unwrapped = joined(pty.frame);
       expect(unwrapped, "spawned, with the flag D16 appends").toContain(
-        `argv=ps --search=${UUID}`,
+        squash(`argv=ps --search=${UUID}`),
       );
       expect(unwrapped, "and the binary and --json are the spawned half only").toContain("--json");
 
