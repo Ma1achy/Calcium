@@ -1,8 +1,8 @@
 /**
- * `tui-kit/fixtures` — the recording tooling and the fixture model. Dev-only.
+ * `@fmx/calcium/fixtures` — the recording tooling and the fixture model. Dev-only.
  *
  * C24 §2 — see spec. One of three entry points, split by what ships to
- * production: this one and `tui-kit/testing` never reach a production install,
+ * production: this one and `@fmx/calcium/testing` never reach a production install,
  * because a golden-frame differ and a corpus differ have no business in one.
  *
  * A re-export and nothing else. The modules are C08's, under `src/data/`, where

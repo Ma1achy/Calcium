@@ -34,7 +34,7 @@
  *     already structured from the far side, and the framework renders them.
  *
  * Two sibling entry points carry what must never reach production (I8):
- * `tui-kit/testing` and `tui-kit/fixtures`.
+ * `@fmx/calcium/testing` and `@fmx/calcium/fixtures`.
  */
 
 // --- entry ------------------------------------------------------------------
@@ -172,7 +172,7 @@ export type {
 } from "./data/transport/index.js";
 
 /**
- * C08's, not the `tui-kit/fixtures` entry point's.
+ * C08's, not the `@fmx/calcium/fixtures` entry point's.
  *
  * `WorldDriver` is declared in `data/fixtures/world.ts` — L0 data — and the
  * dev-only entry re-exports it alongside the recording tooling. Taking it from

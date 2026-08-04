@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` (mechanism + a default set) + app (its own tokens) |
+| **Package** | `@fmx/calcium` (mechanism + a default set) + app (its own tokens) |
 | **Layer** | L1 presentation |
 | **Depends on** | C04 (`Tone`) · `TerminalCapabilities` injected |
 | **Consumed by** | C09 C11 C12 C25 (every renderer) · L4 (`/theme`, config persistence) |

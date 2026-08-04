@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L0 data |
 | **Depends on** | Nothing. Node's `child_process`, wrapped |
 | **Consumed by** | C06 transport · L4 (shell delegation, handoff) |

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L0 terminal |
 | **Depends on** | `TerminalCapabilities` (injected) · a read-only `acquired` view of C01 (injected) · C01's `writer`, bound (injected) · a render callback |
 | **Consumed by** | L4 shell · C13 C14 C15 C17 (anything that changes what should be on screen) |

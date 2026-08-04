@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` (engine + static sources) + app (dynamic sources) |
+| **Package** | `@fmx/calcium` (engine + static sources) + app (dynamic sources) |
 | **Layer** | L3 interaction |
 | **Depends on** | C05 (`Manifest`) · C18 (the shared tokeniser, the quoter, and `Token`) · C15 (the menu overlay) · C04 (`Block`, for menu content) |
 | **Consumed by** | C16 (`Tab`, `→`) · L4 (ghost text compositing) |

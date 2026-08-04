@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` (mechanism) + app (the prefix policy) |
+| **Package** | `@fmx/calcium` (mechanism) + app (the prefix policy) |
 | **Layer** | L3 interaction |
 | **Depends on** | C05 (`Manifest`, `findTool`, `validateInvocation`) · C04 (`ErrorLike`) |
 | **Consumed by** | L4 execution pipeline · C19 (shares the tokeniser) |

@@ -71,7 +71,7 @@ describe("C24 T2.3 (I8) — testing and fixtures are dev-only", () => {
     const runtime = code("src/index.ts");
     // Type-only imports erase, so the claim is about value imports. C08's
     // `WorldDriver` comes from `data/fixtures/` — L0 — and not from the
-    // `tui-kit/fixtures` entry, which is the distinction that keeps this true.
+    // `@fmx/calcium/fixtures` entry, which is the distinction that keeps this true.
     const valueImports = [...runtime.matchAll(/^import\s+(?!type)[^;]*from\s+"([^"]+)"/gm)].map(
       (m) => m[1] ?? "",
     );

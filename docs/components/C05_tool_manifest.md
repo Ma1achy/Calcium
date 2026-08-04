@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` (schema, loader, validator) + app (the manifest itself) |
+| **Package** | `@fmx/calcium` (schema, loader, validator) + app (the manifest itself) |
 | **Layer** | L0 data |
 | **Depends on** | C04 (`ErrorLike` only). Otherwise pure types, a loader and a pure validator |
 | **Consumed by** | C18 parser (classify, validate before spawn) · C19 completion (flags, enums, arity) · C06 transport (`local` vs spawn) · L4 (help generation, startup checks) |
