@@ -570,6 +570,65 @@ describe("C22 §3 step 12 — the read loop", () => {
     expect(graph.editor.text.split("\n"), "and all of them arrived").toHaveLength(200);
   });
 
+  it("T1.4h4 (C22 I46): Esc on a document view releases its parts, and before the dismiss", () => {
+    // **The wiring, not the mechanism.** T4.38 asserts that `release` stops a
+    // view's parts, by calling `release`. Removing `deps.releaseView()` from
+    // `viewPop` leaves that row green — the mechanism still works and nothing
+    // reaches it, which is the third instance in this branch of a test that
+    // verifies a thing and not its connection.
+    //
+    // Order matters and is asserted: release first, so a fetch resolving during
+    // the pop finds no registration rather than a half-dismissed view.
+    const order: string[] = [];
+    const effects = createKeyEffects({
+      // Stubs, and named as such: `viewPop` touches none of these four, and a
+      // real editor here would be scenery the row does not use.
+      editor: {},
+      completion: {},
+      overlays: {},
+      history: { entries: [], append: () => undefined },
+      patchView: {
+        open: () => null,
+        move: () => false,
+        pop: () => {
+          order.push("patch-pop");
+          return false;
+        },
+      },
+      documentView: {
+        open: () => null,
+        fill: () => false,
+        putBlock: () => false,
+        blockAt: () => null,
+        move: () => false,
+        pop: () => {
+          order.push("dismiss");
+          return true;
+        },
+        // Open, which is the state the branch under test needs. A double
+        // reporting `null` here routes to the patch view and the row passes
+        // while asserting nothing — the state the test claims must be built.
+        openFor: "/ps --watch",
+      },
+      releaseView: () => void order.push("release"),
+      manifest: null,
+      viewport: recordingViewport().viewport,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+      focus: createFocusStore(),
+      liveRows: () => [],
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
+    } as unknown as Parameters<typeof createKeyEffects>[0]);
+
+    effects.table["viewPop"]?.();
+    expect(order, "released at the pop, and before it").toEqual(["release", "dismiss"]);
+    expect(order, "and the patch view was not the one popped").not.toContain("patch-pop");
+  });
+
   it("T1.14 (C22 I32): a lone Esc reaches the router without a second keystroke", async () => {
     // **The empty batch is the one that needs a wake.** `Esc` is held for
     // C16's 50 ms window and decodes to *nothing*, so the early return on an

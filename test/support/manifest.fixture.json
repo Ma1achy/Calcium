@@ -58,6 +58,12 @@
           "type": "string",
           "repeatable": true,
           "summary": "repeatable label"
+        },
+        {
+          "name": "watch",
+          "type": "bool",
+          "view": true,
+          "summary": "follow in a pushed view \u2014 C05 I20, C22 \u00a713a"
         }
       ]
     },

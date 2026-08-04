@@ -31,12 +31,22 @@ import { b } from "../../src/shell/builders/index.js";
 import type { PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult, TransportRouter } from "../../src/data/transport/index.js";
 import { block } from "../../src/data/viewmodel/index.js";
+import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import { createDocumentView } from "../../src/shell/document-view.js";
 import type { Block, ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 
 type Scripted = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
-  adapt?: () => ViewDocument;
+  /**
+   * The double receives the *context*, as a real adapter does (C07).
+   *
+   * It took no arguments, which is the narrow-double class one field over: a
+   * stub that erases what it is given cannot be asked whether the right thing
+   * was passed, and T1.39 needs to tell one submission of `ps` from another.
+   */
+  adapt?: (ctx: { command: string }) => ViewDocument;
   adaptPatch?: () => ViewPatch | null;
   /** A live part returned by the `/guide` local handler — T1.38's control arm. */
   localLive?: () => Block;
@@ -44,8 +54,17 @@ type Scripted = Readonly<{
   spawnShell?: () => { stdout: AsyncIterable<string>; exited: Promise<{ code: number | null }>; overflowed: boolean };
 }>;
 
+const blocks = createBlockRegistry();
+
 function harness(script: Scripted = {}) {
   const transcript = createTranscriptStore();
+  const overlays = createOverlayManager({ registry: blocks });
+  const documentView = createDocumentView({
+    overlays,
+    measure: (blk, width) => blocks.measure(blk, width),
+    region: () => ({ width: 80, height: 24 }),
+    redraw: () => undefined,
+  });
   const session = createSessionStore({ cwd: "/work", env: {}, cluster: "c", version: "1" });
   const commits: string[] = [];
   const resets: number[] = [];
@@ -111,7 +130,7 @@ function harness(script: Scripted = {}) {
     adapters: {
       adapt: (_raw: unknown, ctx: { command: string }) => {
         commands.push({ where: "settle", command: ctx.command });
-        return script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt();
+        return script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt(ctx);
       },
       // **The context is read, not discarded.** This fake took no arguments at
       // all, which is why nothing here could see that C23 passed a literal
@@ -130,7 +149,7 @@ function harness(script: Scripted = {}) {
       sealed: true,
     },
     manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
-    blocks: {} as never,
+    blocks,
     // **The real editor**, wrapped only to record what `fill` set. A two-method
     // stub was the previous version and it broke the day the submit path gained
     // `clear()` (C23 I28) — the same defect as `{} as never`, with a smaller
@@ -154,7 +173,15 @@ function harness(script: Scripted = {}) {
         },
       });
     })(),
-    overlays: {} as never,
+    // **Real, and no longer `{} as never`.** The deps object below ends in
+    // `as unknown as PipelineDeps`, which satisfies the type by *erasure* — every
+    // absent field is invisible, not merely this one. That cast is why a route
+    // could be untested while its seam was green: `documentView` was simply not
+    // there, and nothing said so until a mutation was aimed at the wiring.
+    // These two are built for real so the view route has something to run
+    // against; the rest of the cast is noted in test/support/README.md.
+    overlays,
+    documentView,
     theme: { current: {} as never, setVariant: () => undefined, applyOverrides: () => [] },
     // `append` is real: C23 I29 records every settled submission through it,
     // and a fake without it throws inside the funnel — where the failure reads
@@ -1275,6 +1302,68 @@ describe("C23 §4 — the submit row's two other steps", () => {
     h.tick(1500);
     await settled();
     expect(ticks.adapter, "an adapter's b.live must be driven too (I33a)").toBeGreaterThan(0);
+  });
+
+  it("T1.39 (C22 I45, C24 I12): a live part ticks on the *view* route, through the wiring", async () => {
+    // **The row gap 7's headline actually needs, and the one ten contract rows
+    // do not supply.** Those call `driver.declare` directly, so they verify the
+    // driver's `view` arm and say nothing about whether anything reaches it —
+    // which is exactly what F20 filed against T4.21, reproduced one branch later.
+    // Disabling `declareLiveInView` leaves every one of them green and fails
+    // this.
+    //
+    // **A test that calls the mechanism directly verifies the mechanism, never
+    // the wiring, and the only thing that tells the two apart is disabling the
+    // wiring.** That is the general form, and this row exists because of it.
+    const ticks = { entry: 0, view: 0 };
+    const live = (id: string, count: () => void): Block =>
+      b.live({
+        id,
+        title: id,
+        every: 1000,
+        fetch: () => {
+          count();
+          return Promise.resolve(null);
+        },
+        render: () => block({ kind: "raw", id: `${id}-body`, text: "x" }),
+      });
+
+    const h = harness({
+      adapt: (ctx) => {
+        const watching = ctx.command.includes("--watch");
+        return doc({
+          command: ctx.command,
+          blocks: [
+            live(watching ? "view-part" : "entry-part", () =>
+              watching ? (ticks.view += 1) : (ticks.entry += 1),
+            ),
+          ],
+        });
+      },
+    });
+
+    // **The control runs first**, and it is the entry route: if a part declared
+    // the ordinary way does not tick, the arm below failing says nothing about
+    // routes. T1.38's structure, one host over.
+    h.pipeline.submit("/ps");
+    await settled();
+    h.tick(1500);
+    await settled();
+    expect(ticks.entry, "the control must tick, or the row below proves nothing").toBeGreaterThan(
+      0,
+    );
+
+    // `--watch` declares `view: true` on the fixture's `ps` (C05 I20), so this
+    // submission pushes a view instead of appending an entry.
+    h.pipeline.submit("/ps --watch");
+    await settled();
+    expect(h.transcript.entries.map((e) => e.doc.command), "and no entry was appended").not.toContain(
+      "/ps --watch",
+    );
+
+    h.tick(1500);
+    await settled();
+    expect(ticks.view, "a live part inside a pushed view is driven (gap 7)").toBeGreaterThan(0);
   });
 
   it("T1.21b (I29): a refusal is a submission and is recorded", async () => {
