@@ -34,6 +34,14 @@ const results = runPass({
     why: "walk C1 asserts the STATUS cell carries docker's prose verbatim",
   },
   mutations: [
+    // --- a paused container is not a stopped one (found in step 2) -----------
+    {
+      name: "paused falls into the stopped bucket",
+      file: "src/ps.ts",
+      from: '      const paused = states.filter((st) => st === "paused" || st === "restarting").length;',
+      to: "      const paused = 0;",
+      expect: "B1d",
+    },
     // --- the rulings the walk made ------------------------------------------
     {
       name: "the glyph derives from Status rather than State",
@@ -67,14 +75,15 @@ const results = runPass({
     // --- the transport boundary ---------------------------------------------
     {
       name: "the NDJSON split becomes one JSON.parse over the batch",
-      file: "src/ps.ts",
+      // `src/ndjson.ts` since step 2 extracted the parser for the dashboard.
+      file: "src/ndjson.ts",
       from: "  for (const line of raw.split(\"\\n\")) {",
       to: "  for (const line of [raw]) {",
       expect: "A2 (R3.5)",
     },
     {
       name: "a malformed line is dropped silently instead of counted",
-      file: "src/ps.ts",
+      file: "src/ndjson.ts",
       from: "    } catch {\n      skipped += 1;\n    }",
       to: "    } catch {\n      /* dropped */\n    }",
       expect: "A2 (R3.5)",
@@ -120,7 +129,7 @@ const results = runPass({
     },
     {
       name: "a non-string field is stringified rather than refused",
-      file: "src/ps.ts",
+      file: "src/ndjson.ts",
       from: '  return typeof v === "string" ? v : "";',
       to: "  return v === undefined || v === null ? \"\" : String(v);",
       expect: "C4: a non-string field",
