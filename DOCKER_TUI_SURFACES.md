@@ -95,7 +95,25 @@ The full table, and where responsive columns are shown. A bare table entry — t
 capability no other tool has.
 
 `STATUS` never truncates (a half-word reads as a different word); `PORTS` truncates from
-the end; `→` is the ASCII-degradable arrow.
+the **start**; `→` is the ASCII-degradable arrow.
+
+**`PORTS` truncating from the start is a correction, and the reason generalises.** This
+section said *from the end*, R01 R3.4 says *from the left, keeping the host port*, and R01
+is right. A port mapping is `80→8080`. Cut from the end it becomes `80→80…` and the
+exposed port — the thing a reader would act on — is what goes; cut from the start,
+`…443→8443` keeps it. "Truncate from the end" was written for **names**, where the head
+identifies and the tail is a hash or a suffix. For a mapping the tail identifies.
+
+So the rule is not *ports truncate from the start*. It is **a column keeps the field's
+identifying end**, and which end that is belongs to the field rather than to the table.
+`ColumnDef.truncate` is named for the operation for exactly this reason (C04 I30): `"end"`
+and `"start"` say which side characters are removed from, and every column has to answer
+it separately.
+
+This is the class the height audit's second verdict was: a rule correct for one column,
+applied to another where the identifying end is the opposite one. Two specs disagreeing
+is how it surfaced, and leaving one of them to lose quietly is how it would have come
+back.
 
 Row actions (focused row) — the **drill-in surface** into S3:
 
