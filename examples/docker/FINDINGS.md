@@ -313,6 +313,147 @@ the thing that exercises them is a consumer that supplies only what it was told 
 
 ---
 
+## F9 — the session's first entry cannot be appended ★★
+
+| | |
+|---|---|
+| **Surface** | S1, the landing dashboard — *the live block on launch* |
+| **Reached for** | a way to put a `ViewDocument` into the transcript at startup |
+| **Verdict** | **a real Calcium finding**, F7's shape exactly |
+
+`docs/surfaces/S02_the_welcome.md` specifies a first entry and is unambiguous about what it
+is:
+
+> **It is an ordinary `ViewDocument`, not a screen.** It is appended to the transcript like
+> any command's output, which means `/clear` removes it, it scrolls away as the session
+> fills, and its action buttons work through C23's normal `fill` path. There is no banner
+> renderer.
+
+Its `Source` row cites **C22 §4 step 7**. C22 §4 step 7 is the terminal lifecycle. Nothing
+in C22's twelve construction steps or eight startup steps appends anything, `TuiConfig` has
+no landing or greeting field, and `TuiInstance` is `start` / `stop` / `session` — three
+members, none of which can carry a document. **The surface is specified, agreed, and
+structurally impossible**, which is F7's sentence with a different subject.
+
+**C22 already wrote down the day this would arrive.** §8a, on why `I7` (history flushes on
+every path) and `I5` (cleanup lives only in `beforeRelease`) do not conflict:
+
+> nothing can be appended to history before input is accepted, which is startup step 8 …
+> **If anything ever appends earlier — a startup notice, a restored session — that is the
+> day I7 and I5 genuinely conflict**, and this paragraph is what makes it visible then
+> rather than a silent empty file.
+
+It was written as a hypothetical because nothing could produce one. S1 produces one.
+
+**And there is a precedent in the same document.** C22 line 96 records the local-handler
+gap: C23 §2 said an app registers its own handlers, C23 I27 failed construction when a
+`local` verb had none, and *nothing carried the app's handlers into the pipeline* — so the
+framework refused a configuration it gave no way to complete. Same shape, same file, found
+the same way: by a consumer trying to use what the spec promised.
+
+**Not fixed here, and the ordering is deliberate.** S1's claim is not "append a first
+document" — it is *live block on launch, frozen into the transcript by the first command*.
+So the first entry is a **live** entry, and the seam is "append a first document that may
+be live, and freeze it on first submit like any other". Designing that against S02's
+drawing would repeat F4 on a permanent, fail-on-revert-protected seam. The dashboard is
+built behind a local handler first, and the seam is designed against a body that works.
+
+---
+
+## F10 — `docker stats --format json` is a screen redraw, not a stream of JSON
+
+| | |
+|---|---|
+| **Surface** | S1's running panel, and S4's dense live table |
+| **Reached for** | `docker stats --format json` as the `b.live` `stream` source |
+| **Verdict** | **adapter-side**, and an S1/S4 correction |
+
+The dashboard's whole premise is that stats streams. It does not stream *data*. With
+`--format json` and no `--no-stream` it emits **ANSI cursor control interleaved with the
+JSON**, redrawing a fixed region of the terminal:
+
+```
+^[[H{"BlockIO":"44.3MB / 234MB","CPUPerc":"0.31%",…,"PIDs":"6"}^[[K
+^[[K
+^[[J^[[H{"BlockIO":"44.3MB / 234MB","CPUPerc":"0.31%",…,"PIDs":"6"}^[[K
+```
+
+`ESC[H` home, `ESC[K` erase-line, `ESC[J` erase-display — and **each interval written
+twice**. Ninety-eight lines in seven seconds, of which zero parse as JSON.
+
+Consuming it means writing a terminal emulator inside an adapter. This app already has one
+(`tools/screen.py`) and building it was the right call — for **reading frames the
+application drew**. Putting one on the far-side boundary is the same code in the wrong
+place: the adapter would be interpreting a presentation of data rather than data.
+
+**Ruled: the dashboard polls `docker stats --no-stream --format json` on each tick,
+through `b.live`'s `fetch` arm.** `--no-stream` is clean NDJSON — no escapes, one object
+per container — and `fetch` is the arm the entry host is tested against.
+
+**Two consequences worth naming.** `b.live`'s `stream` arm goes unexercised by this app, so
+it stays in the same position `RefreshHost`'s `view` arm was in before step 3 — specified,
+implemented, and unreached by any consumer. And "stats streams" was an assumption nobody
+had run, which is F4's class again: this one just happened to be checked before it cost a
+ruling rather than after.
+
+Four smaller facts from the same probe, each of which changes a design:
+
+| probe | result | consequence |
+|---|---|---|
+| `--no-stream` default scope | running only | the stopped pills come from `ps -a`; **the panel joins two sources** |
+| a stopped container named explicitly | a zero row, not an omission | absent and zero are different, and only one of them is a fact |
+| an unknown container | `exit=1`, message on stderr | `/ps`'s error path transfers unchanged (R3.6) |
+| a timestamp field | **none** | history is stamped app-side, and `AdapterContext` carries no clock (gap 1) |
+
+---
+
+## F11 — three more surfaces drawn before the far side was run
+
+| | |
+|---|---|
+| **Surface** | S1's header, S3/S4's history, S6 `/compare`, S7 `/drift` |
+| **Reached for** | nothing yet — checked ahead of their rulings, which is the point |
+| **Verdict** | **findings about the design documents**, F4's class, four instances |
+
+F4 ended with *"the remaining speculative surfaces are suspect in the same way … each
+should be checked against real output before its ruling, not after"*. This is that check,
+run two steps early. Three of the four drawings are wrong.
+
+**S7 `/drift` — the two objects do not line up.** The drawing diffs `docker inspect <c>`
+against `docker image inspect <img>` field by field. Their `Config` objects share only part
+of a shape: the image's has `ExposedPorts` and `StopSignal`; the container's has
+`Hostname`, `Domainname`, `Attach*`, `Image`, `StopTimeout`, and `ExposedPorts: null`. A
+key-union diff invents a `changed` row for every key present on one side only — which is
+most of them, and each one would read as drift.
+
+Worse, the drawing's own headline row cannot be produced structurally at all. `ports: 80`
+versus `80→8080` reads `Config.ExposedPorts` on the image and `HostConfig.PortBindings` /
+`NetworkSettings.Ports` on the container — **two different paths**. So `/drift` is a
+hand-written list of semantic field pairs, not a diff of two objects, and the drawing
+implies the opposite.
+
+**S6 `/compare` — two of the rows have no source.** The objects are the same shape here, so
+a structural diff does work. But the drawn rows include `cpu %` and `mem`, which are not in
+`inspect` at all; they are `stats`. The surface needs two sources joined and says nothing
+about it — the same join S1 now has to make, arrived at from the other direction.
+
+**S3's plot and S4's sparkline — there is no history to plot.** Docker emits an instant and
+no timestamp. Gap 1 predicted the ring buffer; the new part is that `AdapterContext` has no
+clock either, so history is keyed by tick rather than by time, and "60 seconds" on S3's
+axis is `ticks × interval` rather than anything measured.
+
+**S1's own header — `CPU 34%` is not a quantity docker can supply.** Summing `MemPerc` is
+meaningful: each is a fraction of total host memory. Summing `CPUPerc` is not — it is
+per-core-normalised and exceeds 100% routinely on a multi-core host, so the sum has no
+ceiling and reads as a percentage of something. The drawing shows a system utilisation
+figure that its source cannot express.
+
+**What this run of the check is worth.** F4 cost a wrong ruling that had to be reversed
+across three documents. These four cost one afternoon of probes and no rulings at all,
+because none had been written yet. That difference is the entire argument for the practice.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
@@ -324,7 +465,16 @@ needs it is built.
 - **Gap 3 — value-colour vs tone-colour.** A CPU bar encodes load on a continuum; Calcium's
   palette is tone slots. Step 2.
 - **Gap 1 — history across ticks.** `b.live` re-renders from the latest fetch; a sparkline
-  needs the previous values. Adapter ring-buffer first.
+  needs the previous values. Adapter ring-buffer first, and keyed by tick rather than by
+  time — F10 found that neither docker nor `AdapterContext` supplies a clock.
+- **Does a `b.live` entry freeze on the next command?** S1's claim is that the launch entry
+  freezes into the transcript when something is typed. Asked against the working
+  `/dashboard` before F9's seam is designed, because if freezing a live entry has its own
+  gap the seam has to know. This is C22 §8a's I7/I5 conflict made concrete: a live first
+  entry is exactly the *restored session* the paragraph anticipated.
+- **`b.live`'s `stream` arm.** F10 rules this app onto `fetch`, so `stream` stays in the
+  position `RefreshHost`'s `view` arm held before step 3 — specified, implemented, unreached
+  by any consumer.
 - **The line budget.** R01 commitment 1 caps app code at 300 lines. Exceeding it is a
   finding *about Calcium* — it means the app had to write something generic itself — so if
   it goes over, the lines that pushed it over get named here rather than the budget raised.

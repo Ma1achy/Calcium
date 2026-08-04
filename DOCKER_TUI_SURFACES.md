@@ -47,7 +47,7 @@ command freezes it into the transcript, exactly the transcript model.
 ```
   ┌─ docker-tui ──────────────────────────── engine 27.3 · 14 containers ─┐  ← panel, keyValue header
   │                                                                        │
-  ▌ RUNNING (9)                                          CPU 34%  MEM 61%  │  ← b.live, whole panel refreshes
+  ▌ RUNNING (9)                                       CPU 340%  MEM 61%   │  ← b.live, whole panel refreshes
   ▌ ● api-gateway     ▂▄▆█ 84%   512M/2G    1.2M/3.4M    up 3d            │
   ▌ ● postgres        ▁▁▂▁  8%   1.1G/2G    880k/12M     up 12d           │  ● = running (ok tone)
   ▌ ● redis           ▁▁▁▁  2%   40M/512M   120k/4M      up 12d           │
@@ -68,6 +68,30 @@ almost everything Calcium does at once.
 
 `system info` = the engine version + container counts in the panel title, one line. A
 welcome screen that is mostly chrome is the thing density is chosen against.
+
+### What the far side actually supplies, and the two corrections it forced
+
+Checked before the rulings rather than after — F4's lesson applied forward, and it changed
+the drawing twice.
+
+**The header's CPU total is a sum, not a utilisation.** `CPU 34%` read as *the machine is a
+third busy*, and docker cannot say that. `stats` gives `CPUPerc` per container,
+per-core-normalised, so a single busy container on an 8-core host reports `780%` and the
+sum has no ceiling. `MemPerc` is a genuine fraction of host memory and does total to
+something meaningful. So the drawing now shows `CPU 340%`, which looks wrong and is right,
+and the two figures are **not** the same kind of number despite sitting side by side. Naming
+that here is cheaper than a reader inferring a denominator that does not exist.
+
+**The panel joins two sources.** `docker stats --no-stream` reports **running containers
+only**; the stopped pills come from `docker ps -a`. Naming a stopped container explicitly
+returns a row of zeros rather than nothing, which is worse than an omission — absent and
+zero are different, and only one of them is a fact about the container. So RUNNING is
+`stats`, STOPPED is `ps -a`, and the count in the header is the sum of two calls.
+
+**And the live block polls; it does not stream.** `docker stats --format json` without
+`--no-stream` interleaves `ESC[H` / `ESC[K` / `ESC[J` with the JSON and redraws a region —
+a presentation of data, not data. Consuming it would put a terminal emulator inside an
+adapter. `b.live`'s `fetch` arm on an interval, against `--no-stream`. FINDINGS F10.
 
 ---
 
@@ -230,6 +254,15 @@ glyph-height), the bar stays, colour goes.
 
 Add `--graph <c>` to promote one container's CPU to a full plot (S3's plot, standalone).
 
+**The history is the app's, and its axis is ticks rather than seconds.** Docker emits an
+instant with no timestamp, so both the sparkline here and S3's plot accumulate app-side —
+gap 1, as predicted. What was not predicted is that `AdapterContext` carries no clock
+either, deliberately (C07 I1: adapters read no clock). So the ring buffer is keyed by
+**tick index**, and S3's `-60s ──── now` axis is `ticks × interval` — a label computed from
+the interval the app chose, not a duration anything measured. True while the driver ticks
+on schedule and quietly wrong across a stall, which is worth saying on the axis rather than
+discovering in a screencast. FINDINGS F11.
+
 ---
 
 ## S5 — `/inspect <c>` (fullscreen view, structured + raw)
@@ -282,6 +315,12 @@ The comparison block doing its actual job — `a`/`b` side by side, differing ro
 `a`/`b` positional (the ruling), the `verdict` column toning the rows that differ. The
 two-column comparison the thin `docker diff` never showed.
 
+**Two of those rows are not in `inspect`.** `cpu %` and `mem` come from `docker stats`, and
+the drawing shows them beside five fields that come from `docker inspect` without saying
+so. So `/compare` joins two sources per container — the same join S1's panel makes, reached
+from the other direction, which is the argument for building S1 first. The other five rows
+diff cleanly: two containers give two objects of the same shape. FINDINGS F11.
+
 ---
 
 ## S7 — `/drift <c>` (comparison, image vs running) **(the comparison showcase)**
@@ -303,8 +342,29 @@ built from. `a` = image default, `b` = live container.
 
 `comparison` with a real before/after, differing rows carrying verdict tone. **The
 comparison block's `/stats`** — the surface that demonstrates the feature at its peak, the
-way S3 does for `b.live`. Source: `docker inspect` the container, `docker image inspect`
-the image, diff the fields.
+way S3 does for `b.live`.
+
+### "Diff the fields" is the one thing this cannot do
+
+The source line used to read *`docker inspect` the container, `docker image inspect` the
+image, **diff the fields***. The two objects do not have the same fields, and the drawing's
+own headline row proves it.
+
+`docker image inspect`'s `Config` carries `ExposedPorts` and `StopSignal`. `docker
+inspect`'s carries `Hostname`, `Domainname`, `AttachStdin/out/err`, `Image`, `StopTimeout`
+— and `ExposedPorts: null`. A key-union diff invents a `changed` row for every key on one
+side only, which is most of them, and each would render as drift the container does not
+have.
+
+The `ports` row is the clearest case. `80` comes from the image's `Config.ExposedPorts`;
+`80→8080` comes from the container's `HostConfig.PortBindings` and `NetworkSettings.Ports`.
+**Two different paths**, so no structural comparison reaches it however the objects are
+walked.
+
+So `/drift` is a **hand-written list of semantic field pairs** — a table of *(label, path
+on the image, path on the container)* — and the comparison block renders it. That is a
+smaller and more honest thing than a diff, and it is what the drawing was always showing;
+the word "diff" was doing work the picture never supported. FINDINGS F11.
 
 ---
 
