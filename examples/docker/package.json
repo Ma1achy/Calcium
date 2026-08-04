@@ -1,0 +1,26 @@
+{
+  "name": "docker-tui",
+  "version": "0.0.0",
+  "description": "The reference application for Calcium — a terminal UI over docker.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "docker-tui": "./src/main.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run --dir test",
+    "start": "node --experimental-strip-types src/main.ts"
+  },
+  "dependencies": {
+    "@fmx/calcium": "file:../.."
+  },
+  "devDependencies": {
+    "@types/node": "26.1.2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

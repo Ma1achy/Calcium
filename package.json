@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "description": "A framework for building terminal user interfaces over JSON-emitting CLIs.",
   "type": "module",
+  "workspaces": [
+    "examples/docker"
+  ],
   "engines": {
     "node": ">=22"
   },
