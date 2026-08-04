@@ -471,9 +471,41 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     result: Extract<ParseResult, { kind: "app" }>,
   ): Promise<void> => {
     const controller = new AbortController();
+
+    /**
+     * **`Ctrl-C` reaches this route too** — the obligation the table found
+     * missing (C22 §13a). It was set on the entry route and not here, which is
+     * `declareLive` and `release` a third time: an obligation the author of a
+     * new route did not notice, in a route written rather than derived.
+     *
+     * It pops rather than settling, because there is no entry to settle. The
+     * reader is left with no record, which §13a rules is the cost B03 §2 already
+     * names for an excursion that appended nothing on the way in.
+     */
+    const cancelThis = (): void => {
+      controller.abort();
+      refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID });
+      deps.documentView.pop();
+      deps.history.append(line, 130);
+      deps.scheduler.commit("completion");
+    };
+    cancelInFlight = cancelThis;
+
     try {
       const transport = deps.transport.for(verb);
       const streams = result.tool.streams ?? false;
+      // **Declarable, not yet runnable** (C22 §13a, C05 I20). The pair is legal
+      // because S12's logs view is exactly it; what does not exist is the route,
+      // since `streamInto` patches a transcript entry and a view is patched
+      // through its owner. Refused loudly here rather than silently falling to
+      // the line below, which would block until the process exited while holding
+      // the guard — the thing C23 I6 exists to prevent.
+      if (streams) {
+        throw new Error(
+          `${verb} declares both view and streams, and that route is not built — ` +
+            `C22 §13a. Drop \`streams\` from the declaration, or run it as an entry.`,
+        );
+      }
       const raw = await transport.invoke({
         verb,
         argv: result.argv,
