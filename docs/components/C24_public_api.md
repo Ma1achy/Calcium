@@ -82,6 +82,25 @@ export { cells, truncate, planColumns };
 
 **`ManifestDocument` is what an author writes; `Manifest` is what the parser
 returns.** The distinction is new and it is C24's most expensive omission to date.
+
+**And stating the distinction is not the same as enforcing it.** The type was
+`Omit<Manifest, "appTools">`, which a `Manifest` satisfies — it has every member
+and one more — so the surface accepted precisely the value construction throws
+on, and the sentence above read as a rule while forbidding nothing. It is now
+`Omit<Manifest, "appTools"> & { readonly appTools?: never }`, and handing
+`createTui` a parsed manifest is a compile error (C22 I23b, T1.4o).
+
+The cost of the gap is the argument for the shape: tier 5's session harness made
+exactly that call, forty-four rows failed, and the branch merged green. **A
+public surface's job is to make the wrong call unbuildable**; a runtime refusal
+protects only the paths somebody remembered to run, and the path nobody ran is
+the one that broke.
+
+**The general form, because this surface is full of the same pair.** A derived
+type related to its source by *one field fewer* is assignable from that source,
+so `Omit` never expresses *input, not output* on its own. Every input/output pair
+exported here wants checking against that question rather than the one it was
+written to answer.
 `TuiConfig.manifest` was typed `Manifest | string` and **neither arm could be
 used**: an author cannot produce a `Manifest`, because `appTools` and the
 framework's six verbs are both derived by `parseManifest` (C05 §3), and the

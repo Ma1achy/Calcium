@@ -304,11 +304,45 @@ because the parser reads `raw["tools"]` as the app's tools and *derives*
 the parser's *output*, and asking an author to supply one was asking for the
 result before the call.
 
-Handing back an already-parsed `Manifest` now fails loudly instead of silently,
-and for free: its `tools` carries the framework's six, I6 refuses duplicate
-names, and the parse error says so. C05 §3 called that property "worth more than
-the tidiness" about apps shadowing `clear`, and it covers this case with no rule
+Handing back an already-parsed `Manifest` fails loudly instead of silently, and
+for free: its `tools` carries the framework's six, I6 refuses duplicate names,
+and the parse error says so. C05 §3 called that property "worth more than the
+tidiness" about apps shadowing `clear`, and it covers this case with no rule
 added.
+
+**And a loud runtime failure was not enough, which took a broken merge to
+establish.** `ManifestDocument` was `Omit<Manifest, "appTools">`, and a
+`Manifest` has every member of that type and one more — so it is structurally
+assignable, and `manifest: parsedManifest` compiles clean at every call site.
+The field's type accepted precisely the value construction throws on.
+
+That is not a hypothetical. `test/support/fixture.mjs` — tier 5's only session
+harness — passed `parsed.value`, with a comment explaining why it had to.
+**Forty-four of a hundred and one tier-5 rows failed and the branch merged**,
+because three harnesses were converted with the fix and this fourth was
+`.mjs` importing from `dist/`, invisible to the search that found the others,
+in the one tier `npm test` excludes.
+
+So the input type **structurally excludes** the output's extra member:
+
+```ts
+export type ManifestDocument = Omit<Manifest, "appTools"> & {
+  readonly appTools?: never;
+};
+```
+
+A hand-written document omits `appTools` and satisfies it unchanged; a parsed
+`Manifest` does not, and says so at the call site rather than at `start()`.
+**This is the temporal-dead-zone argument in a type** (§3a's `const pipeline`,
+and the `Exclude`-to-empty rules elsewhere): where a wrong call can be made
+unbuildable, a runtime refusal is a worse version of the same protection,
+because it needs a test to have been run against it and the type does not.
+
+The general form is worth stating because C24 will meet it again: **a derived
+type whose relationship to its source is "one field fewer" is assignable from
+its source, so `Omit` alone never expresses *this is the input, not the
+output*.** Every input/output pair in the public surface wants checking against
+that.
 
 **I23's refusal is deleted rather than kept beside the parse.** With both arms
 parsed it can no longer fire — a guard whose condition has become unreachable is
@@ -693,6 +727,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I22** — `pipeline` has a working default, as every other optional field does (I17). `config.pipeline` remains the injection point C22's own tests construct a graph through, and a graph always carries a `Pipeline` — an injection seam with no default is a missing wire that only the tests hold together.
 - **I23** — Every manifest reaching the stores has been through `parseManifest`, whichever arm of `config.manifest` supplied it. Restated: it previously said construction *refuses* a manifest lacking `tui-kit`'s six verbs, which was right about the danger and left no accepted input — `parseManifest` is exported nowhere, and the path arm handed `readFile`'s string to a function requiring a record. Construction still appends nothing and derives nothing; it parses, and the one function that may add the six remains the only one that does. An already-parsed `Manifest` handed back now fails on I6's duplicate check, loudly and for free.
 - **I23a** — `TuiConfig.manifest` is `ManifestDocument | string`. A `Manifest` is the parser's *output* — it carries `appTools`, which the parser derives — so requiring one from an author was requiring the result before the call. An author supplies `{ schema, binary, version, tools }`: their own verbs, which is all they can know.
+- **I23b** — `ManifestDocument` structurally excludes `appTools`, so a parsed `Manifest` is **not assignable** to `TuiConfig.manifest` and the mistake is a compile error rather than a `ConstructionError`. `Omit<Manifest, "appTools">` alone does not do this: a `Manifest` has every member of it and one more, so the type accepted exactly the value I23's parse refuses. That gap merged, took tier 5 down by forty-four rows, and was reported green — a runtime refusal only protects code that has been run, and the harness that had not been run was the one that broke. Where a wrong call can be made unbuildable it must be, which is §3a's `const pipeline` argument applied to a type rather than to a binding.
 - **I24** — Raw bytes reach the decoder through `lifecycle.onInput` and through nothing else, and the decoder's deadlines are polled on C22's injected schedule. C22 is the only file that may read stdin, for the reason it is the only one that may read the clock: two readers of one stream is two half-decoded sequences, and the second reader is invisible to the first. The wake-ups are here because C16 owns no timer and C01 owns no clock, so a decoder without them delivers a lone `Esc` on the next keystroke rather than after its window (§3 step 12).
 - **I25** — A suspension is bracketed by `suspend()` before the handoff and `resume()` then `decoder.reset()` after it. The listener's removal is C01's, in the transition; the reset is C22's, because only this file knows both that the terminal came back and that a decoder is holding a sequence the child interrupted (C01 I18, C16 I18).
 - **I26** — Step 11 registers a handler for every focus target that has bindings, and the effect table in `keys.ts` is total over C16's `KeyAction` union. A binding `/help` renders is therefore one dispatch executes, by construction rather than by agreement (C16 I19).
@@ -785,6 +820,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4i** (I27): a paste of two hundred lines → exactly one `commit("input")`; a scroll key → exactly one, issued by the loop and not by the handler. Both halves, because a handler that also commits passes the first.
 - **T1.4m** (I23, I23a): a session constructed from **the public entry point only** — `import { createTui } from "@fmx/calcium"`, a `ManifestDocument` literal of the app's own verbs, no deep import anywhere in the test — starts, and `/help` lists the framework's six alongside it. The constraint is the test: every existing construction harness reaches through the package boundary for `parseManifest`, so each tests a route no consumer has, and that is why both arms of `config.manifest` could be broken with the suite green. The row fails if either the `JSON.parse` or the object-arm parse is removed.
 - **T1.4n** (I23): the path arm — a `manifest.json` on the fake filesystem — constructs, and a file containing malformed JSON produces a `ManifestError` naming the file rather than a `SyntaxError` escaping `start()`.
+- **T1.4o** (I23b): a **type-level** row — `const m: TuiConfig["manifest"] = parseManifest(doc).value` does not compile, asserted with an `@ts-expect-error` that fails if the assignment ever becomes legal again. It is the only shape that can hold I23b: the defect it guards is a call that type-checks, so no runtime assertion can be written against it, and the previous type passed every runtime test of the refusal while permitting the call.
 - **T1.4l** (I23): an already-parsed `Manifest` handed back to `createTui` fails on I6's duplicate-name check, naming a framework verb. The refusal that used to be C22's is C05's now, and this is the row that says it still happens.
 - **T1.4g** (I24): a lone `Esc` with no following byte → the key is dispatched when its window elapses on the injected schedule, not when the next key arrives. A decoder wired without wake-ups passes T1.4f and delivers `Esc` on the next keystroke, which is a key that appears to do nothing until you press another one.
 - **T1.5**: `createTui` with only the four required fields → every default applied and functional.
