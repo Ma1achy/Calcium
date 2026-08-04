@@ -154,6 +154,40 @@ while looking tidier.
 
 ---
 
+## F5 — "never drops" is a sentence Calcium has no way to express
+
+| | |
+|---|---|
+| **Surface** | S2 `/ps` — "`NAME` and `STATUS` never drop" |
+| **Reached for** | a `ColumnDef` field meaning *required* |
+| **Verdict** | **open** — arguably a real Calcium finding, absorbed as arithmetic for now |
+
+S2 and R01 §5 both state that some columns never drop. `planColumns` has no such concept:
+it admits by priority until the next column will not fit and then stops
+(`src/presentation/table/plan.ts:126`). Only the single highest-priority column is forced,
+and that is the degenerate `overflowed` path for a terminal narrower than one column.
+
+So "never drops" is not a guarantee the engine offers — it is an **outcome** of priority
+and arithmetic, true at the widths where the sums work and false below them. With the step-1
+columns it holds to roughly 66 columns and fails beneath.
+
+**Absorbed rather than fixed**: the app picks priorities and `minWidth`s that make the
+claim true across the range that matters, and the walk states it as arithmetic instead of
+as a guarantee.
+
+**Why it may be a real finding.** A `required: true` on `ColumnDef` would be a different
+kind of promise — one the planner could refuse to break, dropping a *lower*-priority column
+or accepting `overflowed` rather than losing an identifying column. Whether that is worth a
+field is genuinely open: priority may be the right primitive and "never drops" may simply be
+imprecise prose in two app-level specs. What is not open is that **two documents claim a
+behaviour the layer beneath cannot express**, which is the shape that reads as satisfied
+and is not.
+
+Deferred to a surface that can settle it. S4's dense live table has more columns and less
+room, and will meet the boundary properly.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
