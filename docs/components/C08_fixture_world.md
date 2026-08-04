@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` (harness) + `prism-tui` (world). Same split as C05 and C07 |
+| **Package** | `@fmx/calcium` (harness) + `prism-tui` (world). Same split as C05 and C07 |
 | **Layer** | L0 data (harness) · L5 app (world) |
 | **Depends on** | C06 (`Invocation`, `RawResult`, `RawPatch`, `FixtureHandler`) · C05 (`Manifest`, for the `__manifest__` endpoint) |
 | **Consumed by** | C06's fixture transport · the demo build · every adapter test |

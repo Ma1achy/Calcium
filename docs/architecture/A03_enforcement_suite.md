@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Architecture |
-| **Package** | `tui-kit` — runs against both packages |
+| **Package** | `@fmx/calcium` — runs against both packages |
 | **Collects** | Every lint rule, source scan, module-graph assertion and compile-level check declared across the 43 specs |
 | **Status** | Draft |
 
@@ -747,7 +747,7 @@ permanently justified by its own presence.
 
 ### MG26 — the dev-only entry points stay out of the bundle
 
-C24 I8 says `tui-kit/testing` and `tui-kit/fixtures` are absent from a
+C24 I8 says `@fmx/calcium/testing` and `@fmx/calcium/fixtures` are absent from a
 production bundle, and T2.3 is its test. **Until C24 there was no bundle to be
 absent from.** `src/index.ts` was `export {}`, so nothing rooted the graph and
 the invariant had nothing to be false about — A03 §2's vacuity class holding an

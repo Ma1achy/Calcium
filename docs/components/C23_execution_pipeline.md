@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L4 shell |
 | **Depends on** | C18 · C05 · C06 · C07 · C13 · C03 · C21 · C22 (session) · C10 C14 C15 C17 C20 (local handlers) |
 | **Consumed by** | C16 (submit) · C22 (constructs it) |

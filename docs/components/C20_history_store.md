@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L3 interaction |
 | **Depends on** | C15 (reverse-search overlay) · C04 (`Block`, for overlay and listing content) · C18 (`tokenise`, for redaction) · an injected filesystem and clock |
 | **Consumed by** | C16 (`↑`/`↓`, `⌃r`) · L4 (`/history`, applying the returned string to C17) |

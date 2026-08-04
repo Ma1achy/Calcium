@@ -1048,7 +1048,7 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
  * MG26 — no module outside `testing/` and `fixtures/` imports them
  * (C24 I8, T2.3).
  *
- * `tui-kit/testing` and `tui-kit/fixtures` are dev-only entry points, and I8
+ * `@fmx/calcium/testing` and `@fmx/calcium/fixtures` are dev-only entry points, and I8
  * says they are absent from a production bundle. Until C24 there was no
  * production bundle: with `src/index.ts` at `export {}`, nothing rooted the
  * graph, so the claim had nothing to be false about — A03 §2's vacuity class

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L2 viewport |
 | **Depends on** | C04 (`ViewDocument`, `ViewPatch`, `applyPatch`, `validateDocument`) |
 | **Consumed by** | C14 viewport · C16 (focus targets) · L4 execution pipeline |

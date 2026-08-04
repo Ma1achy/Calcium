@@ -1,5 +1,5 @@
 /**
- * `tui-kit/testing` — C24 §7. Dev-only, and never in a production bundle (I8).
+ * `@fmx/calcium/testing` — C24 §7. Dev-only, and never in a production bundle (I8).
  *
  * **The two suites arrived by moving, not by rewriting.** Both were written in
  * `test/support/` under an explicit `DESTINATION: src/testing/` header,

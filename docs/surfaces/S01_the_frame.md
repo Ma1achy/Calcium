@@ -4,7 +4,7 @@
 |---|---|
 | **Type** | Surface |
 | **Tier** | Chrome — always present, never scrolls |
-| **Package** | `tui-kit` (structure) + `prism-tui` (header and footer content, via hook 5) |
+| **Package** | `@fmx/calcium` (structure) + `prism-tui` (header and footer content, via hook 5) |
 | **Data source** | C22 `SessionSnapshot` · C14 `VisibleRange` · C17 buffer and cursor · C19 ghost text · C16 `activeTarget` |
 | **Source** | `t01` §The frame · A01 D6, D24a, D30 · A02 §6 hook 5 · C22 §6 |
 | **Status** | Draft |

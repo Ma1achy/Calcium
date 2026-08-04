@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L2 viewport |
 | **Depends on** | C04 (`Block`) · C09 (`measure` via the registry). **Not C14** — the region is passed to `layout()`, so C15 imports nothing from it |
 | **Consumed by** | C16 (input priority) · C19 completion · C20 reverse search · L4 (confirms, pushed views) |

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L0 data |
 | **Depends on** | C21 process runner (same layer, acyclic). **Not C05** — `streams` arrives on the `Invocation`; the caller reads the manifest |
 | **Consumed by** | L4 execution pipeline · C07 adapters (consume its output) |

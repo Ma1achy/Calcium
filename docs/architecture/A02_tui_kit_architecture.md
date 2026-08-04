@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Architecture |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Relationship to A01** | A01 is the **outward** contract — decisions, and what the far side must do. A02 is the **inward** one — how the kit is built |
 | **Consumed by** | C01–C07, C09–C21; the composition root of any consuming app |
 | **Status** | Draft |

@@ -4,7 +4,7 @@
 |---|---|
 | **Type** | Reference application |
 | **Package** | `docker-tui` at `Calcium/examples/docker/` — a monorepo example consuming `@fmx/calcium` as a packaged dependency (sealed `exports` + pack-and-install CI), not through `../../src` |
-| **Depends on** | `tui-kit` only, through its public entry points (C24) |
+| **Depends on** | `@fmx/calcium` only, through its public entry points (C24) |
 | **Consumed by** | Nothing. It is a proof, not a library |
 | **Source** | Scratchpad 4 · A02 §6 forcing function · C24 |
 | **Status** | Draft |
@@ -148,7 +148,7 @@ The app ships a recorded corpus (C08), which does three things:
 - C08's recording tooling gets a **second consumer**, which is the only way to know it works for anyone but Prism
 - Golden frames become reproducible
 
-Recorded via `tui-kit/fixtures`, provenance-marked, with the authored ratio reported. Scenarios: `running`, `mixed`, `empty`, `daemon-down`.
+Recorded via `@fmx/calcium/fixtures`, provenance-marked, with the authored ratio reported. Scenarios: `running`, `mixed`, `empty`, `daemon-down`.
 
 ---
 
@@ -236,7 +236,7 @@ Each row is a claim the framework makes and this app tests.
 
 - **R2.1**: every document passes `measuresCorrectly()` at seven widths.
 - **R2.2**: every document passes `degradesToAscii()` and `degradesTo1Bit()`.
-- **R2.3**: no source file imports a deep path — only `tui-kit`, `tui-kit/testing`, `tui-kit/fixtures`.
+- **R2.3**: no source file imports a deep path — only `tui-kit`, `@fmx/calcium/testing`, `@fmx/calcium/fixtures`.
 - **R2.4**: app source under 300 lines, excluding manifest, fixtures and tests.
 - **R2.5**: no emitted command is a mutating docker subcommand — scanned against a denylist.
 - **R2.6**: the app registers no custom block kind, theme or command policy.

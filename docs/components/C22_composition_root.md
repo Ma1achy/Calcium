@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L4 shell |
 | **Depends on** | Everything below. It is the only component that may |
 | **Consumed by** | The app's entry point · C23 (receives a subset of the graph, by interface — §3a step 10) |

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `tui-kit` |
+| **Package** | `@fmx/calcium` |
 | **Layer** | L4 shell — the façade over everything below |
 | **Depends on** | C04 C05 C07 C09 C10 C22 C23 · re-exports from each |
 | **Consumed by** | Every consuming app — `prism-tui`, the docker reference app, anything else |
@@ -27,9 +27,9 @@ The test it serves: Phase 1 is done when someone who is not its author builds a 
 Three, split by what ships to production.
 
 ```
-tui-kit             runtime — createTui, builders, types, defaultTheme
-tui-kit/testing     adapter harness, document assertions, fakes
-tui-kit/fixtures    recording tooling and the Fixture model
+@fmx/calcium            runtime — createTui, builders, types, defaultTheme
+@fmx/calcium/testing    adapter harness, document assertions, fakes
+@fmx/calcium/fixtures   recording tooling and the Fixture model
 ```
 
 `testing` and `fixtures` are dev-only. One entry with everything would drag a golden-frame differ into every production install for nothing.
@@ -411,7 +411,7 @@ A block is data at every instant (C04 I1). A consumer callback returning frames 
 
 ---
 
-## 7. `tui-kit/testing`
+## 7. `@fmx/calcium/testing`
 
 The adapter story is "pure function, fixture in, document out". The assertions that make that worth anything would otherwise be reimplemented badly by each consumer, or not at all.
 
@@ -545,7 +545,7 @@ carries the state — and §7 records what that changed.
 ## 9. Invariants
 
 - **I1** — Every export is used by **the union of** `prism-tui` and the reference app. Neither alone exercises the whole surface — docker touches no `spectrum`, no `WorldDriver` and only part of the manifest schema. An export used by neither is removed.
-- **I2** — The eleven components in §3's absent list are not reachable from any entry point. **This was unfalsifiable until the entry points existed** — `src/index.ts` was `export {}`, so the claim held over a surface with no exports — and its first real run found `BlockRegistry` named in `tui-kit/testing`, where `renderToLines` took one as a parameter. The sharper half of that finding was not the naming: `createBlockRegistry` is exported from no entry, so the two functions were uncallable by any consumer. An export nothing can invoke is A03 §2's vacuity class reached through the surface rather than through a rule.
+- **I2** — The eleven components in §3's absent list are not reachable from any entry point. **This was unfalsifiable until the entry points existed** — `src/index.ts` was `export {}`, so the claim held over a surface with no exports — and its first real run found `BlockRegistry` named in `@fmx/calcium/testing`, where `renderToLines` took one as a parameter. The sharper half of that finding was not the naming: `createBlockRegistry` is exported from no entry, so the two functions were uncallable by any consumer. An export nothing can invoke is A03 §2's vacuity class reached through the surface rather than through a rule.
 - **I3** — Builders return frozen blocks; there is no second description type.
 - **I4** — A generated id is stable within one document and never rendered.
 - **I5** — No builder infers a tone, glyph or action from a field name.
@@ -556,7 +556,7 @@ carries the state — and §7 records what that changed.
 - **I10** — The runtime entry exports no function that performs I/O except `createTui`.
 - **I11** — The reference app lives in its own repository and consumes `tui-kit` as a published dependency, so the unused-export scan runs against `prism-tui` plus the app's declared import manifest, refreshed on each version bump. It is a reported signal, not a build gate.
 - **I12** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.
-- **I13** — `tui-kit/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
+- **I13** — `@fmx/calcium/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 - **I14** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
 - **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The explicit value arrives through `BlockOpts`, which every one of them accepts; before that argument existed the invariant was unwritable as a test, and so was the half of §4 that promised it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 - **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
@@ -575,7 +575,7 @@ carries the state — and §7 records what that changed.
 7. `b.live` gives A02 §7's whole pattern by default, with fixed behaviour and overridable rendering (I6).
 8. `b.live` works identically in a transcript entry and a pushed view, driven by C23 in both (I12).
 9. Animation lives in block kinds; `measure` cannot see `tick` (I7).
-10. `tui-kit/testing` ships the assertions, so no consumer reimplements them (I13).
+10. `@fmx/calcium/testing` ships the assertions, so no consumer reimplements them (I13).
 11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect (I9).
 12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them (I14).
 13. Every block-returning builder sets a `gapBefore` default of its own, and an explicit value always wins (I15, §4).
