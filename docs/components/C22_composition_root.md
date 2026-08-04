@@ -760,7 +760,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I42** — **A pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes.** A snapshot taken at push time shows a diff the entry no longer holds, and `expand` produces exactly such a patch one keystroke earlier. C15 supplies the reason code and cannot detect the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so the owner watches the transcript, and `Esc` never meets a dangling view because the view is gone before it (C25 §3c A6).
 - **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
 - **I44** — §4 step 7 fires `config.greeting` and does not await it, and C23 appends what it returns through the ordinary append path. A rejection or a hang leaves the prompt usable and produces no entry; nothing about startup waits on it. The step existed in the list, in T3.10 and T3.11, and in S02's `Source` row, and **no code fired anything** — step 12's shape a second time in the same list, and the reason S02's welcome could be specified in detail by three documents and reachable by none. Appending through C23 rather than rendering here is A02 Seam 4: C22 produces a fact, C23 is the only component that appends, and a live part in the greeting is driven because it took the same route every other document takes (C23 I33a).
-- **I45** — **A verb's result is a view when its declaration says so, and the decision is taken before the pending entry is appended.** Read from the manifest at step 2, never from the document the adapter returns: C23 I3 appends the pending entry before the transport runs and C13 has no delete, so an adapter-side decision could only produce a view *and* the entry B03 §2 says a push does not leave. The party is the one `ToolDef.interactive` already names — the app author — because a view is a handoff of input ownership and detection is not available for either.
+- **I45** — **A verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.** Pushed before the transport is invoked and filled after it, so the ordering C23 I3 protects is unchanged and a slow verb is not a blank screen; a failure renders into the view rather than into a transcript that has nothing to show. Read from the manifest at step 2, never from the document the adapter returns: C23 I3 appends the pending entry before the transport runs and C13 has no delete, so an adapter-side decision could only produce a view *and* the entry B03 §2 says a push does not leave. The party is the one `ToolDef.interactive` already names — the app author — because a view is a handoff of input ownership and detection is not available for either.
 - **I46** — **A pushed view is owned by a shell-side component holding one row offset, and C15 holds none.** C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
 
 ---
@@ -1062,6 +1062,32 @@ state — a row offset — over a `ViewDocument`'s blocks.
 
 I41 and I42 were written for the patch view and are now the general shape: one offset and no
 second cursor; rewindowed from what the host holds rather than snapshotted.
+
+### What is on screen while the verb runs
+
+**The view is pushed at step 3's moment and its content is replaced when the document
+arrives.** Neither §13's three questions nor the fourth asks this, and it falls out of the
+answers: step 3 exists so that *something is on screen before the transport is invoked*
+(C23 I3), and ruling the pending entry away removes that without saying what takes its
+place. A consequence between two rulings, owned by neither — so it is ruled here rather
+than discovered when a slow verb looks like a hung terminal.
+
+The view replaces the entry **one for one**, and the ordering is unchanged: pushed before
+step 4, filled after it. C15's `update` is the mechanism and needs nothing new — it is what
+the part-refresh driver already uses on this host (C23 §3b), and §2's transition table has
+four states of which `update` changes none.
+
+Three things follow, and each closes a hole the pending entry used to cover:
+
+- **A failing verb renders its error into the view**, because the view is where the reader
+  is looking and the transcript has nothing to show them. `Esc` still pops, and still
+  appends nothing.
+- **A cancelled view pops**, which is the one case where the reader gets no record at all.
+  That is deliberate and is the cost B03 §2 already names: *"a logs excursion leaves no
+  transcript record, because the push that opened it left none either."*
+- **The push cannot be deferred until the document is in hand.** That reading is tempting
+  and wrong for the same reason step 3 precedes step 4 — feedback that waits for the work
+  is feedback the slow case never gets, and the slow case is the only one that needs it.
 
 ### What the decision leaves behind when it throws
 
