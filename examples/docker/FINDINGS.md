@@ -106,6 +106,54 @@ against R01.
 
 ---
 
+## F4 — a surface drawn before anyone ran the far side encodes the mock's assumptions ★
+
+| | |
+|---|---|
+| **Surface** | S2 `/ps`, the `PORTS` and `IMAGE` columns |
+| **Reached for** | the drawn frame, as the source for a truncation ruling |
+| **Verdict** | **a finding about the design documents**, not about Calcium or the adapter |
+
+S2 draws `PORTS` as `80→8080, 443→8443` and `IMAGE` as `nginx:1.25` in an 18-wide column.
+Docker emits `0.0.0.0:8080->80/tcp, [::]:8080->80/tcp` — forty characters for one published
+port, with an IPv6 twin per IPv4 entry — and image names up to **85 characters**
+(`vsc-tui-kit-07d4a92ac4a68f…-features`). `Status` reaches 22 (`Exited (0) 5 weeks ago`)
+against a drawing that assumed thirteen.
+
+**It cost a wrong ruling, which is how it was found.** S2 and R01 R3.4 disagreed about
+which end `PORTS` truncates from. The disagreement was real and worth ruling on, and the
+ruling — *keep the field's identifying end; for a mapping that is the tail* — was reasoned
+from `80→8080`, where the host port **is** the tail. In the string docker actually sends
+the host port is on the **left**, so the ruling inverted the answer, and R01 R3.4's own
+wording ("truncated from the left, keeping the host port") is not satisfiable at all.
+
+The generalisation survived; only which end identifies flipped. But nothing in either
+document could have caught it, because both were describing the same imagined string.
+
+**Two things follow.**
+
+1. **A classification table is written against captured far-side output, never against the
+   drawings in the spec it is testing.** The row *`Ports` long meets `truncate`* cannot be
+   decided from a document that shows a string the far side never sends. This is the rule
+   the walk needed and did not have.
+2. **The remaining speculative surfaces are suspect in the same way** — S3's plot, S6's
+   comparison, S7's drift were all drawn before anything ran. Each should be checked
+   against real output before its ruling, not after. Knowing the pattern now is the
+   cheapest it will ever be.
+
+This is one level worse than Calcium's own *a figure encoding unstated intent*: there, the
+figure was drawn from something real and the intent went unwritten. Here the figure was
+drawn from nothing, so it encoded intent that was **wrong**, and it read exactly as
+authoritative.
+
+**And a second argument for verbatim, beyond the fail-on-revert.** Condensing
+`0.0.0.0:8080->80/tcp` to `8080→80` discards the bind address, and `0.0.0.0` versus
+`127.0.0.1` is the difference between a port exposed to the network and one that is not.
+A parser decides in advance which information nobody will need, and it decided wrong here
+while looking tidier.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
