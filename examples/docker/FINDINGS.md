@@ -712,6 +712,55 @@ reserved and unreachable, which is A03 §2's class in the glyph table.
 
 ---
 
+## F19 — `ManifestDocument` accepts the one value construction refuses ★★
+
+| | |
+|---|---|
+| **Surface** | none of this app's. Found by tier 5, three weeks of commits after F7 |
+| **Reached for** | nothing — the type said yes and the runtime said no |
+| **Verdict** | **a real Calcium finding**, and the reason F7's fix shipped broken |
+
+F7's fix made `createTui` run both arms of `TuiConfig.manifest` through `parseManifest`,
+so the framework appends its own six verbs rather than demanding the author know them.
+C05 §3 also *refuses* a document that already declares `help`, `clear`, `theme`,
+`history`, `debug` or `exit` — an app must not shadow verbs it does not own. Both correct.
+
+Together they mean **an already-parsed `Manifest` is now exactly what construction
+rejects**, and step 1 wrote a test asserting that (C22 T1.4l). What step 1 did not do was
+check whether the *type* still permitted it:
+
+```ts
+export type ManifestDocument = Omit<Manifest, "appTools">;
+```
+
+`Manifest` has every member of `ManifestDocument` and one more, so it is structurally
+assignable to it. `const d: ManifestDocument = parsedManifest` compiles clean. The field's
+type says a parsed manifest is welcome; the constructor throws on it.
+
+**And that is not hypothetical, because it is what happened.** `test/support/fixture.mjs`
+— tier 5's only session harness — passed `parsed.value` to `createTui`, with a comment
+explaining that this was required. It compiled. **Forty-four of a hundred and one tier-5
+rows failed**, and the branch merged.
+
+Three harnesses were converted with the F7 fix and this was the fourth. It was invisible to
+the search that found the others because it is `.mjs` importing from `dist/`, so no grep for
+a deep TypeScript import could see it, and `npm test` excludes tier 5 by design.
+
+**The type is the fix.** A nominal marker — a branded `Manifest`, or a `parsed: true`
+witness — makes the mistake a compile error at every call site at once, which is the only
+scale at which it can be caught: the value is produced in one place and consumed in
+another, and nothing in between is wrong. This is the *consumer finds variance a producer
+cannot* shape with the arrow reversed — here the producer's own test suite was the
+consumer, and the boundary it crossed was `.ts` to `.mjs`.
+
+**A note on how it was reported, because that is half the finding.** Step 1 was declared
+green on `make all 2>&1 | tail -15; echo $?`, which reports **`tail`'s** exit status. The
+suite had failed. The same construction was used twice more this session before it was
+noticed, and the second time the symptom was blamed on machine contention. An exit code
+read through a pipe is the pipe's.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
