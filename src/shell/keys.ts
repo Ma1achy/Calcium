@@ -23,6 +23,7 @@ import {
   accept,
   contextAt,
   menuLayer,
+  menuRowsShown,
   remainderOf,
   MENU_ID,
   SPINNER_MS,
@@ -234,7 +235,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    */
   function countRemainder(): void {
     const placed = deps.overlays.layout(deps.overlayRegion()).find((p) => p.layer.id === MENU_ID);
-    remainder = remainderOf(placed ?? null, candidates.length, placed?.layer.content.length ?? 0);
+    // **Rows, not blocks** (C19 I23). `content.length` counts boxes, and the
+    // table holding sixty candidates is one of them — so a menu clamped to ten
+    // rows used to report fifty-nine missing where fifty are.
+    remainder = remainderOf(placed ?? null, candidates.length, menuRowsShown(placed ?? null));
     redrawMenu();
   }
 

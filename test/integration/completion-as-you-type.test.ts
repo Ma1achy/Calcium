@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { buildGraph } from "../support/session.js";
+import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import type { CompletionSource } from "../../src/interaction/completion/index.js";
 import type { Graph } from "../../src/shell/construct.js";
 
@@ -269,6 +270,87 @@ describe("C19 §6a — the menu opens as you type", () => {
       graph.overlays.top,
       "backspace dismisses it: filtering cannot widen, and widening is a source call",
     ).toBeNull();
+  });
+});
+
+describe("C19 §6 — the menu's bottom edge", () => {
+  it("T3.25 (C19 I23): the last rendered row is a rule and not a candidate", async () => {
+    // **Read from the rows, not from the block list.** A block appended and
+    // never placed satisfies a test that counts blocks — which is how the same
+    // component came to declare a table with no flex column and render a page
+    // of ellipses (I18). The frame that argued for this one is `/clear` sitting
+    // directly on `❯ /c`, where a reader takes the two as a path.
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    type(stdin, "/h");
+    const layer = graph.overlays.top;
+    if (layer === null) throw new Error("the menu did not open");
+
+    const rows = renderSequenceToLines(graph.blocks, layer.content, 80, {
+      theme: graph.theme.current,
+      capabilities: graph.capabilities,
+      // eslint-disable-next-line no-control-regex
+    }).map((l) => l.replace(/\u001b\[[0-9;]*m/g, ""));
+
+    const last = rows[rows.length - 1] ?? "";
+    expect(last, "a line, drawn by C09 and degrading with the rest").toMatch(
+      /^[─-]/,
+    );
+    expect(last, "and it carries no candidate").not.toContain("/help");
+    expect(rows.slice(0, -1).join("\n"), "which are above it").toContain(
+      "/history",
+    );
+  });
+
+  it("T3.26 (C19 I23): the remainder counts rows, and the caller is what is asked", async () => {
+    // **Through the shell, because the function was never the defect.** T4.5
+    // hands `remainderOf` a row count and agrees with it; nothing asserted the
+    // argument the caller supplies, and the caller supplied `content.length` —
+    // the number of *boxes*, of which the table holding sixty candidates is
+    // one. C15 truncates by clamping height, so the menu said fifty-nine were
+    // missing where fifty are.
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      value: `/entry-${String(i)}`,
+      detail: "a verb",
+    }));
+    const { graph, stdin } = await buildGraph(
+      {
+        completionSources: [
+          { id: "many", slots: ["verb"], dynamic: false, complete: () => many },
+        ],
+      },
+      { columns: 100, rows: 16 },
+    );
+    graph.lifecycle.acquire();
+
+    type(stdin, "/e");
+    const layer = graph.overlays.top;
+    if (layer === null) throw new Error("the menu did not open");
+
+    const indicator = layer.content.find((b) => b.kind === "raw");
+    expect(
+      indicator,
+      "the region cannot hold sixty rows, so it truncated",
+    ).toBeDefined();
+
+    // **Asserted against the block count's answer rather than recomputed.**
+    // Working out the region here would reproduce the arithmetic under test,
+    // and a row that agrees with its own copy of the sum is the shape §8b's
+    // rows exist to avoid. What is claimed is what the defect was: sixty
+    // candidates over a table block is one box, and one box shown of sixty
+    // gives fifty-nine.
+    const missing = Number(
+      /… (\d+) more/.exec(String(indicator?.text ?? ""))?.[1] ?? "0",
+    );
+    expect(
+      missing,
+      "the block count's answer, which is what it used to say",
+    ).not.toBe(59);
+    expect(missing, "several rows of candidates are on screen").toBeLessThan(
+      59,
+    );
+    expect(missing, "and most of sixty are not").toBeGreaterThan(0);
   });
 });
 

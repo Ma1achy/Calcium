@@ -194,8 +194,10 @@ describe("C19 §6 — the menu", () => {
   it("T3.13: a large set still produces one block tree and a declared width", () => {
     const many = Array.from({ length: 5_000 }, (_, i) => ({ value: `candidate-${String(i)}` }));
     const blocks = menuBlocks(many.slice(0, 40), 0, many.length - 40);
-    expect(blocks).toHaveLength(2);
+    // The body, the indicator, and the edge last (C19 I23).
+    expect(blocks).toHaveLength(3);
     expect(blocks[1]).toMatchObject({ kind: "raw", text: "… 4960 more" });
+    expect(blocks[2]).toMatchObject({ kind: "rule" });
     expect(menuWidth(many.slice(0, 40))).toBeGreaterThan(0);
   });
 
@@ -240,7 +242,11 @@ describe("C19 §6 — the menu", () => {
 
     for (const width of [menuWidth(detailed), 60, 100]) {
       const rows = rowsAt(detailed, width);
-      expect(rows, `${String(width)}: one row per candidate`).toHaveLength(2);
+      // One row per candidate, and the edge under them (C19 I23).
+      expect(rows, `${String(width)}: one row per candidate, plus the edge`).toHaveLength(3);
+      expect(rows[2], `${String(width)}: the last row is the edge, not a candidate`).toMatch(
+        /^[─-]/,
+      );
       for (const [i, candidate] of detailed.entries()) {
         expect(rows[i], `${String(width)}: ${candidate.value} is legible`).toContain(
           candidate.value,
@@ -274,9 +280,13 @@ describe("C19 §6 — the menu", () => {
   it("no candidates means no menu is built at all", () => {
     // C15 omits a zero-row layer and dismisses nothing (C15 I15), so the moment
     // the set empties is C19's to act on.
-    const blocks = menuBlocks([], 0, 0);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ kind: "pills", chips: [] });
+    //
+    // **This row found the edge's own edge case.** Adding the `rule` (I23) made
+    // an empty set measure one row, which is a bare line above the prompt in
+    // the exact moment there is nothing to show — and it also breaks C15 I15's
+    // reasoning, which is written about a layer measuring *zero*. The edge
+    // belongs to the candidates, so an empty set draws nothing at all.
+    expect(menuBlocks([], 0, 0)).toHaveLength(0);
   });
 });
 
