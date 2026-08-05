@@ -2602,6 +2602,13 @@ corpus — each timing out at 15 s having taken 24 s.
 |---|---|---|
 | `npm test` | **6 failed** | 2521 passed |
 
+**A third victim shape, measured on the branch after this one:** C17 T3.15 is a
+*ratio* rather than a timeout — a 1 MB paste against a 0.5 MB one, asserting the
+work is not four times the text. Under load it read 6.0 against a limit of 3, and
+three consecutive runs on a quiet box passed. So the class is not "slow rows time
+out": it is anything whose assertion is about time, and a ratio fails in a way
+that reads as an algorithmic regression rather than as a busy machine.
+
 The rows are unchanged between the two runs. It is worth recording because the
 failure names an *enforcement rule* — "SS10 finds no terminal env read outside
 capabilities.ts" — which reads as a real violation and sends a reader to look for
