@@ -2474,3 +2474,22 @@ own pass over the neighbouring rows, several of which are the same shape.
 **And it is why `make load-down` keeps its place** on the asymmetry rather than
 the odds: a row that fails under contention will fail eventually whether or not
 anyone introduced the contention deliberately.
+
+**Reproduced, immediately afterwards, by forgetting the rule.** `dtui-load` was
+left running after a batch of demo captures and tier 5 was run without a thought:
+
+| | with `dtui-load` up | after `make load-down` |
+|---|---|---|
+| `T5.6` — a session with no far side installed | **timed out at 75 s** | **898 ms** |
+
+**Eighty-three times, and it hangs rather than missing a threshold** — which is the
+worse failure mode, because a timeout reads as a deadlock in the code under test.
+The investigation opened on a change to the paint path that had nothing to do with
+it, and what ended it was stashing that change and watching the row fail
+identically without it.
+
+So the class is settled: **these rows are contention-sensitive, the load generator
+is a reliable way to demonstrate it, and step 8's "it did not reproduce" was a
+statement about that afternoon's machine.** Three measurements now, two of them
+failures, and the one that matters is the pair taken four minutes apart on the
+same commit.

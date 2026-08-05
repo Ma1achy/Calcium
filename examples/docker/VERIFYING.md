@@ -219,11 +219,24 @@ session is that the change under test caused it.
 cancels the other: C03's thresholds had no margin on a busy host in step 4 and have margin
 on an idle one now.
 
-**So the rule survives on its asymmetry rather than on its odds**, and saying which matters.
-`make load-down` costs a second. A timing failure diagnosed as a code change costs a
-session, and did. A precaution whose stated justification is a failure nobody can reproduce
-gets deleted by the next person who checks — this one now carries both figures and the date,
-so what gets checked is the claim actually being made.
+**And then it reproduced, on the third measurement, by someone forgetting the rule.**
+`dtui-load` was left up after a run of demo captures and tier 5 was run without thinking:
+
+| | with `dtui-load` up | after `make load-down` |
+|---|---|---|
+| `T5.6` — a session with no far side installed | **timed out at 75s** | **898 ms** |
+
+Eighty-three times, and the failure mode is a *hang* rather than a threshold — which is
+worse than the original `T5.3a` finding, because a timeout reads as a deadlock in the code
+under test rather than as contention. The first minutes of that investigation were spent
+looking at a change to the paint path that had nothing to do with it, and the check that
+ended it was stashing the change and watching the row fail identically without it.
+
+**So the rule keeps its place on the asymmetry *and* now on the odds.** `make load-down`
+costs a second. Not running it cost a 75-second timeout, a bisect against a stashed change,
+and very nearly a wrong conclusion about which commit broke it. A precaution whose stated
+justification is a failure nobody can reproduce gets deleted by the next person who checks;
+this one carries three measurements, two of which are failures.
 
 ## 8. A capture that ends too early is indistinguishable from a command that did nothing
 
