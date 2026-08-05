@@ -442,7 +442,7 @@ export const SEAM_OWNERS = Object.freeze({
   }),
 });
 
-export const SEAM_FILE = "docs/architecture/A02_tui_kit_architecture.md";
+export const SEAM_FILE = "docs/architecture/A02_calcium_architecture.md";
 const SEAM_HEADING = /^###\s+Seam 4/;
 
 /** Seam 4's rows as `{ effect, owner }`, normalised for comparison. */

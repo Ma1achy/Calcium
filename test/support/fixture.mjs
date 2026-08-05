@@ -147,7 +147,7 @@ switch (mode) {
     // fatal, so the refusal has to happen before it, which is what a caller
     // reading `isUsable` is for.
     if (!isUsable(capabilities)) {
-      process.stdout.write("tui-kit: this terminal cannot open an alternate screen.\n");
+      process.stdout.write("Calcium: this terminal cannot open an alternate screen.\n");
       process.stdout.write("Run it under a terminal that supports it, or use --json.\n");
       process.exit(0);
     }
@@ -811,13 +811,13 @@ switch (mode) {
         farSide === "subprocess"
           ? `${process.cwd()}/test/support/farside.mjs`
           : farSide === "no-farside"
-            ? "tui-kit-no-such-far-side"
+            ? "calcium-no-such-far-side"
             : "widget",
       manifest: document,
       theme: defaultTheme,
       ...(transportFor === undefined ? {} : { transport: transportFor }),
       env: process.env,
-      stateDir: mkdtempSync(join(tmpdir(), "tui-kit-session-")),
+      stateDir: mkdtempSync(join(tmpdir(), "calcium-session-")),
       // **The manifest's two app-local verbs** (C22 I3a). C23 I27 refuses a
       // manifest verb marked `local` with no handler, and this is the route
       // that did not exist until the first session ran against this manifest.

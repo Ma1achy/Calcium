@@ -2,7 +2,7 @@
  * The interface an app implements, declared here and implemented nowhere here.
  *
  * C08 §1a, I9 — see spec. This file is the entire coupling between the harness
- * and a world. `tui-kit` references no app type: it names this shape, and an app
+ * and a world. Calcium references no app type: it names this shape, and an app
  * satisfies it. That is what lets `prism-tui` and `docker-tui` each have a world
  * while sharing recording, determinism and redaction rather than reimplementing
  * the machinery three times.

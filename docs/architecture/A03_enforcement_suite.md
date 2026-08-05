@@ -215,7 +215,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG5 | C05 imports nothing from `terminal/` or above | C05 T2.6 |
 | MG6 | C06 imports no C04 type | C06 T2.2 |
 | MG7 | C07 imports nothing from `terminal/` or above | C07 T2.6 |
-| MG8 | `tui-kit` imports nothing from `prism-tui` | C08 T2.6, T2.10 |
+| MG8 | Calcium imports nothing from `prism-tui` | C08 T2.6, T2.10 |
 | MG9 | No block kind imports the registry | C09 T2.11 |
 | MG10 | C13 imports nothing from `terminal/` or `presentation/` | C13 I18, T2.4 |
 | MG11 | C14 imports nothing from `terminal/` | C14 T2.5 |
@@ -258,7 +258,7 @@ It counts imports of the **store itself**, not any symbol from a module that hap
 
 What MG13 guards is a fix the C15 spec pass rejected, and the fabrication is copied from it rather than invented (commitment 14a). C15's I10 asked the overlay manager to dismiss a layer whose anchor row had been evicted, and the only way to notice an eviction is to subscribe to the store. One import buys the detection and pays with C15's statelessness, `layout()`'s purity, and a second component in the tree reading a change stream as a description of current state — the class §2 records and C14 paid for in a blank screen. The reason is recorded by whoever raised the layer instead, and this rule is what stops the one-line version being rediscovered by someone reading I10 without §5 beside it.
 
-**MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; `tui-kit` reaching into `prism-tui` ends the reuse claim outright.
+**MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; Calcium reaching into `prism-tui` ends the reuse claim outright.
 
 ---
 
@@ -270,7 +270,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 
 | # | Forbidden | Where | Declared |
 |---|---|---|---|
-| SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in `tui-kit` outside C22 | C22 T2.4 |
+| SS1 | `Date`, `Date.now`, `performance.now`, `process.hrtime` | anywhere in Calcium outside C22 | C22 T2.4 |
 | SS2 | `Math.random` | anywhere in `src/`; C08 is where it would be reached for | C08 T2.3 |
 | SS3 | `Math.random`, `fs`, `process` — clock reads are SS1's | `src/data/adapters/` | C07 T2.2 |
 | SS4 | clock reads | `src/viewport/` | C13 I9, T2.2 · C14 T2.4 |
@@ -290,7 +290,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 
 **SS1 is the widest and the most valuable.** One injected clock, entering at C22 and nowhere else, is what makes golden frames reproducible and every timing test run on a fake.
 
-**SS44 closes the family by name rather than by variable.** C06 I18 forbade `PRISM_TUI_TRANSPORT` and C22 I20 added `PRISM_TUI_STATE_DIR`; a rule per variable is a list that grows one incident at a time, and the third would be written after it shipped. The prefix is what means "the app's", so the prefix is what the rule matches — and `tui-kit` ships no binary to read one from.
+**SS44 closes the family by name rather than by variable.** C06 I18 forbade `PRISM_TUI_TRANSPORT` and C22 I20 added `PRISM_TUI_STATE_DIR`; a rule per variable is a list that grows one incident at a time, and the third would be written after it shipped. The prefix is what means "the app's", so the prefix is what the rule matches — and Calcium ships no binary to read one from.
 
 **SS42 is the fourth member of that family and the last ambient value that had no owner.** The clock enters at C22, `process.env` at C02, escape literals live in `escapes.ts` — and the terminal's dimensions were read wherever anyone wanted them, which today is one place by luck rather than by rule.
 
@@ -354,7 +354,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 
 **SS34 is the two-owners check.** Ink 7 accepts `render({ alternateScreen })` and will enter and leave it itself. C01 holds the alternate screen, so Ink must not — `held` would stop describing what was taken, and release would emit sequences for state something else already released. The framework's own option is the tempting shortcut precisely because it looks simpler at the call site.
 
-**SS31 and SS32 are supply-chain gates.** `tui-kit` has three runtime dependencies because the specs need no more (A04 §2); a fourth appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
+**SS31 and SS32 are supply-chain gates.** Calcium has three runtime dependencies because the specs need no more (A04 §2); a fourth appearing without justification is the change worth catching. SS32 catches the primary npm attack vector at the point it would first run.
 
 **SS32 runs over the tree, not over our own manifest.** Checking only `package.json` would pass on a tree where every dependency ran code at install time, which is the thing the rule exists to prevent.
 
@@ -450,7 +450,7 @@ Compile-time, zero cost, and each prevents a union member shipping without its h
 | EX11 | `OverlayChange` | emitted by some operation | C15 T2.7 |
 | EX12 | Capability fields | a row in the degradation table with a named owner | C02 T2.6 |
 
-**EX5 is the odd one and the most important for the framework claim.** It asserts a union stays *empty* of domain concepts — adding `uuid` or `target` back to `ArgType` fails the build, which is what keeps `tui-kit` general.
+**EX5 is the odd one and the most important for the framework claim.** It asserts a union stays *empty* of domain concepts — adding `uuid` or `target` back to `ArgType` fails the build, which is what keeps Calcium general.
 
 ---
 

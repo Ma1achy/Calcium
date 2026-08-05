@@ -1,7 +1,7 @@
 # docker-tui — start here
 
 You are building **docker-tui**, the reference application for **Calcium** (a terminal-UI
-framework, formerly `tui-kit`). It lives in the Calcium monorepo at `examples/docker/` and
+framework, formerly Calcium). It lives in the Calcium monorepo at `examples/docker/` and
 consumes Calcium as a packaged dependency — see "Setup" below for why that distinction is
 load-bearing.
 

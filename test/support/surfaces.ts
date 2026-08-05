@@ -49,7 +49,7 @@ export function illustratedRows(file: string, fence: number): number {
  *
  * **Two conventions, both unstated until C22 hit one.** S01 §2 separates its
  * regions with bare horizontal rules; S12 and S13 draw a full box with the
- * title in the top rail. Neither is rendered — `tui-kit` draws no frame around
+ * title in the top rail. Neither is rendered — Calcium draws no frame around
  * anything, and S01 §3's arithmetic is header, viewport, prompt, footer with
  * nothing between them.
  *

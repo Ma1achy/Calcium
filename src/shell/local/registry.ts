@@ -9,7 +9,7 @@
  * looking installed.
  *
  * `seal()` is the moment to compare because it is the only moment both sides are
- * complete: `tui-kit`'s own handlers and the app's are all registered, the
+ * complete: Calcium's own handlers and the app's are all registered, the
  * manifest is loaded and sealed (C22 I3), and input has not been accepted. It is
  * SP4's class at runtime — two records, no comparison — closed at the one point
  * where the answer is cheap and a mismatch is still a configuration error rather

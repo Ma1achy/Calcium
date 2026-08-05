@@ -100,7 +100,7 @@ interface CompletionSource {
 
 That split is what keeps typing cheap. Verb names, sub-verbs, flag names and enum values all come from the manifest and cost a filter over an in-memory array, so ghost text can update live. UUIDs, family names and deployment names require the far side, and recomputing them per keystroke would hammer the API for suggestions nobody asked for.
 
-Static sources ship in `tui-kit` and read only C05. **Domain-backed** dynamic sources are the app's (A02 §6, hook 4).
+Static sources ship in Calcium and read only C05. **Domain-backed** dynamic sources are the app's (A02 §6, hook 4).
 
 **The framework also ships two dynamic sources of its own, and the earlier wording denied it.** "Dynamic sources are the app's" met "path and executable completion are dynamic" and T2.7's requirement that every `Slot` kind have a registered source, and the three cannot all hold: the framework owns the `path` and `executable` slots, so if it ships nothing dynamic those two slots have no source and T5.4 completes nothing. The division is not static-versus-dynamic but **generic versus domain** — a filesystem is not a domain, and a UUID is.
 

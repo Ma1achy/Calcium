@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Architecture |
-| **Packages** | `tui-kit` (framework) · `prism-tui` (Prism's app) |
+| **Packages** | Calcium (framework) · `prism-tui` (Prism's app) |
 | **Consumed by** | Every component, surface and behaviour spec |
 | **Supersedes** | `TUI_SCRATCHPAD.md`, `TUI_SCRATCHPAD_2_surface.md` as the thing to consult. Those remain the reasoning archive |
 | **Status** | Draft |
@@ -46,7 +46,7 @@ Two rules hold the shape together. **Everything renders through the block vocabu
 
 ## 2. Package split
 
-| | `tui-kit` | `prism-tui` |
+| | Calcium | `prism-tui` |
 |---|---|---|
 | Contains | C01–C07, C09–C21, frame structure, 16 default blocks | C08, S01–S15, adapters, manifest content, theme tokens, prefix policy |
 | Knows about | Terminals, blocks, transcripts, input, subprocesses | Runs, model versions, deployments, GitOps |
@@ -88,7 +88,7 @@ Reasoning lives in the scratchpads. These are the decisions.
 | | |
 |---|---|
 | D9 | Verb logic is not the TUI's. The TUI is presentation and input |
-| D10 | The TUI owns a canonical view model; verb JSON is an input to it. The schema is framework-named (`tui.view/1`) — `tui-kit` ships no Prism-branded identifier |
+| D10 | The TUI owns a canonical view model; verb JSON is an input to it. The schema is framework-named (`tui.view/1`) — Calcium ships no Prism-branded identifier |
 | D11 | Per-verb adapters, pure and fixture-tested, **disposable** — deleting one because the far side converged is a success |
 | D12 | A fallback adapter renders any JSON legibly, so neither side blocks the other |
 | D13 | Transport is **per-verb**, not global — verbs migrate from subprocess to native independently |
@@ -379,7 +379,7 @@ Any threshold crossed justifies the experiment. None crossed means upstream Ink 
 
 1. Everything renders through the block vocabulary; nothing draws to the terminal directly.
 2. One module writes to stdout.
-3. Two packages from the first commit; `tui-kit` carries C01–C07 and C09–C21.
+3. Two packages from the first commit; Calcium carries C01–C07 and C09–C21.
 4. Five extension hooks; a consumer never writes a component.
 5. The forty decisions in §3 are the register; the scratchpads are archive.
 6. The far side satisfies B1–B8; the conformance suite asserts it.

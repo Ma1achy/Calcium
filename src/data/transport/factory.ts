@@ -7,7 +7,7 @@
  *
  * `PRISM_TUI_TRANSPORT` does not appear here or anywhere under `src/` (I18). The
  * **app's** entry point reads it and passes a constructed router through
- * `TuiConfig.transport`; `tui-kit` ships no binary, and a framework that claims
+ * `TuiConfig.transport`; Calcium ships no binary, and a framework that claims
  * to serve other apps has no business reading a variable named for one of them.
  * It is also what keeps SS10 true — C02 is the only file under `src/` that
  * touches the environment, and it reads an injected record.

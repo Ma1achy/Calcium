@@ -30,13 +30,13 @@ The generic half is everything the docker reference app would want identically; 
 
 | Half | Package | Contains |
 |---|---|---|
-| **Harness** | `tui-kit` | the provenance model · the record/verify tooling · redaction · the seeded RNG · the resolver · mode handling. The `Fixture` **type** is declared in C06 (C06 §2), which consumes it structurally; C08 owns every rule about it |
+| **Harness** | Calcium | the provenance model · the record/verify tooling · redaction · the seeded RNG · the resolver · mode handling. The `Fixture` **type** is declared in C06 (C06 §2), which consumes it structurally; C08 owns every rule about it |
 | **World** | `prism-tui` | Runs, deployments, model versions, secrets · their transitions · the seed corpus ported from the mockup |
 
 Without this split every consuming app reimplements recording and determinism, which is the machinery most likely to be got wrong.
 
 ```typescript
-// harness — tui-kit
+// harness — Calcium
 function createFixtureHandler(opts: {
   fixtures: readonly Fixture[];
   world?:   WorldDriver;
@@ -205,7 +205,7 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 - **I6** — Default mode is `frozen`.
 - **I7** — Every query returns something. No verb hangs, throws or returns nothing.
 - **I8** — Fixtures contain no secrets, tokens or absolute home paths; redaction runs at capture.
-- **I9** — The world half is app-side. `tui-kit`'s harness imports nothing from `prism-tui`; the coupling is the `WorldDriver` interface alone.
+- **I9** — The world half is app-side. Calcium's harness imports nothing from `prism-tui`; the coupling is the `WorldDriver` interface alone.
 - **I10** — Every `derived` response is structurally identical to the recording it derives from — same keys, same types, different values.
 - **I11** — The harness answers `__manifest__` (B6) from the supplied manifest.
 - **I12** — The world's output satisfies the same contract the real CLI does (A01 B1–B8), so an adapter cannot pass against fixtures and fail against reality for contract reasons.
@@ -233,12 +233,12 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 11. World output satisfies the same boundary contract as the real CLI, including the `__manifest__` endpoint (I11, I12).
 12. The world backs development only; tests run against the recorded corpus (I14).
 13. `record --diff` scopes the reconciliation before it starts — every delta is one adapter line (I15).
-14. The harness is `tui-kit`; the world is the app's. Apps implement `WorldDriver` and get recording, determinism and redaction for free (I9).
+14. The harness is Calcium; the world is the app's. Apps implement `WorldDriver` and get recording, determinism and redaction for free (I9).
 15. World transitions are pure; only the cell holding the current world is mutable (I5).
 16. `live` mode takes an injected clock; nothing in C08 reads ambient time (I4).
 17. `live` mode **pulls**: it reads the clock on each query and advances by the elapsed delta. Nothing in C08 schedules, because a world that advances unasked is a world whose reproducibility depends on real elapsed time (I18).
 18. The corpus file is versioned `tui.fixtures/1` and stores `stdoutRaw`, deriving `stdout` at load. An unrecognised schema fails the load rather than being parsed hopefully (I17).
-19. §7's tests are tagged by half. A **world** test is the reference app's to run, not a deferral `tui-kit` carries — the repo that owns the domain owns the assertion about it (→ A04 §1).
+19. §7's tests are tagged by half. A **world** test is the reference app's to run, not a deferral Calcium carries — the repo that owns the domain owns the assertion about it (→ A04 §1).
 
 ---
 
@@ -252,10 +252,10 @@ C08's two halves ship from different repositories (A04 §1), so its test table d
 
 | Tag | Repo | Asserts |
 |---|---|---|
-| **H** — harness | `tui-kit` | provenance, redaction, the corpus format, the resolver, modes, recording, `--diff` |
+| **H** — harness | Calcium | provenance, redaction, the corpus format, the resolver, modes, recording, `--diff` |
 | **W** — world | `prism-tui`, `docker-tui` | that a *particular* world advances, mutates and refuses as its domain requires |
 
-This is not a deferral list. A **W** row is not a test `tui-kit` is failing to run; it is a test `tui-kit` has no world to run it against, and it becomes the reference app's acceptance list (R01 §9). Left untagged, half this table would sit permanently red in a repo that cannot ever satisfy it, and a backlog nothing can clear is one people learn to scroll past.
+This is not a deferral list. A **W** row is not a test Calcium is failing to run; it is a test Calcium has no world to run it against, and it becomes the reference app's acceptance list (R01 §9). Left untagged, half this table would sit permanently red in a repo that cannot ever satisfy it, and a backlog nothing can clear is one people learn to scroll past.
 
 **A fixed test-double `WorldDriver` is not "the world" for I14's purposes.** The harness tests need something behind route 2, and a fake implementing the interface with constant answers is what they use. The qualifier is the same one C06 I17 already carries for `EmulatedTransport`: what D43 forbids is a test *agreeing with an animated world*, taking values the emulator invented as the expected result. A double that invents nothing cannot drift, and so cannot mask anything.
 
@@ -285,7 +285,7 @@ This is not a deferral list. A **W** row is not a test `tui-kit` is failing to r
 - **H** — **T2.4** (I13): the C06 tier-1 and tier-3 suites pass against the fixture transport.
 - **H** — **T2.4b** (I14): no test path constructs a world. `EmulatedTransport` appears in `test/` only over a fixed handler or a constant `WorldDriver` double, never over something that animates — the qualifier C06 I17 carries, asserted rather than stated.
 - **H** — **T2.5** (I8): no fixture matches the secret, token or home-path patterns.
-- **H** — **T2.6** (I9): **the form this repo can hold.** MG8 as written — `tui-kit` importing nothing from `prism-tui` — has nothing here to fire at, and a rule with nothing to be wrong about passes exactly like a satisfied one (A03 §2). What is asserted here is that `src/` imports nothing outside the declared dependency set and nothing above itself. MG8 proper belongs to whichever repo holds both packages.
+- **H** — **T2.6** (I9): **the form this repo can hold.** MG8 as written — Calcium importing nothing from `prism-tui` — has nothing here to fire at, and a rule with nothing to be wrong about passes exactly like a satisfied one (A03 §2). What is asserted here is that `src/` imports nothing outside the declared dependency set and nothing above itself. MG8 proper belongs to whichever repo holds both packages.
 - **H** — **T2.7** (I2, C06 I20): **every stored field, `argv` included.** A recorded fixture's `result` comes back from replay exactly as stored — no field is rewritten and none is excepted.
 
   An earlier draft of this row carved out `argv`, because `createFixtureTransport` rewrote it to the spawned form and a test written to the literal claim would have failed on the behaviour as it then was. The rewrite is gone (C06 §3): `meta.argv` is a historical fact about the data, so replay reports the invocation that was actually recorded. The exception went with it, which is the better outcome — a byte-for-byte claim with one field carved out is a byte-for-byte claim that has already started to erode.

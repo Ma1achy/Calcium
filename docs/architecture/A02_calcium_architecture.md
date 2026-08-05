@@ -1,4 +1,4 @@
-# A02 — `tui-kit` internal architecture
+# A02 — Calcium internal architecture
 
 | Field | Value |
 |---|---|

@@ -599,7 +599,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 9. `measure(block, w)` equals rendered height at width `w`, and is pure and total (I7).
 10. `Glyph` is a closed vocabulary, which is what makes capability substitution a total guarantee rather than a mostly-true one — a free-string field would leave every unlisted character unsubstituted. The substitution itself is **C09's** and width-preservation is C09 I5: C04 cannot fail when a renderer breaks it (→ C09 I5).
 11. C04 owns the schema — **every** block variant is declared here; C09 owns the registry, C11 the table engine, C12 the plot renderer, C25 the patch renderer (I11).
-12. The schema identifier is framework-named `tui.view/1`. `tui-kit` ships nothing Prism-branded (I2).
+12. The schema identifier is framework-named `tui.view/1`. Calcium ships nothing Prism-branded (I2).
 13. A `pills` block is one logical row; multi-row pill layouts are multiple blocks (I20).
 14. Substitution is 1:1 by column count, so a degraded frame occupies the same cells as an undegraded one (→ C09 I5).
 15. `validateDocument` and `validateBlock` are public, total, and the single enforcement point for I3 (I3, I4).

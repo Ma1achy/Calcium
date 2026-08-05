@@ -247,7 +247,7 @@ describe("C06 e2e", () => {
         pty.type("/ps\r");
         await pty.waitForFrame((f) => f.join("").includes("ENOENT"), 20_000);
         expect(pty.frame.join("\n"), "and it names what was missing").toContain(
-          "tui-kit-no-such-far-side",
+          "calcium-no-such-far-side",
         );
 
         // Everything that does not need one still works: a local verb, the

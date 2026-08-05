@@ -19,7 +19,7 @@ It owns four regions with fixed vertical ownership, the arithmetic that divides 
 
 The constraint that governs every decision here: **the frame must never render more than `rows` rows.** A newline written while the cursor sits on the last row scrolls the alternate screen, producing a visible jump and desynchronising everything below it (C01 §2). Height arithmetic is therefore clamped at every step rather than trusted.
 
-`tui-kit` owns the structure; the header's and footer's *content* is app-supplied (F5). What follows is the structure, plus Prism's content as the worked example.
+Calcium owns the structure; the header's and footer's *content* is app-supplied (F5). What follows is the structure, plus Prism's content as the worked example.
 
 ---
 
@@ -227,7 +227,7 @@ Focus order is C16's (A02 Seam 3). The gutter is drawn from `VisibleRange.live` 
 3. Every derived height is clamped at zero or greater.
 4. The prompt caps at half the terminal and windows around the cursor beyond it.
 5. The prompt gutter is `{first: 2, cont: 2}` and is passed to C17, never assumed by it.
-6. Header and footer content is app-supplied; `tui-kit` owns only the structure.
+6. Header and footer content is app-supplied; Calcium owns only the structure.
 7. Cluster and health never elide; header elision and footer hint-dropping are both fixed orders, tested rather than emergent, and `⏎ run` is never dropped.
 8. Health has four states and is the header's only variable element.
 9. The footer has exactly one context axis — shell keys versus row keys.

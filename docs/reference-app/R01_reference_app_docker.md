@@ -19,11 +19,11 @@ Three jobs, and they pull against each other.
 
 **It is the worked example.** The README gets a stranger to a running shell; this is what they read to do it properly.
 
-**It is a semver check on the public API.** Bumping `tui-kit` and finding this needs changes *is* the definition of a breaking change.
+**It is a semver check on the public API.** Bumping Calcium and finding this needs changes *is* the definition of a breaking change.
 
 Where they conflict, **minimality wins**. A reference app that is itself a large program proves the wrong thing — if it takes 800 lines, the framework is not easy and the app is hiding that.
 
-**Budget: under 300 lines of app code**, excluding the manifest and fixtures. Exceeding it is a finding about `tui-kit`, not a reason to raise the budget.
+**Budget: under 300 lines of app code**, excluding the manifest and fixtures. Exceeding it is a finding about Calcium, not a reason to raise the budget.
 
 ---
 
@@ -208,14 +208,14 @@ Each row is a claim the framework makes and this app tests.
 | `b.live` gives isolation free | `/stats` with one part failing |
 | The subprocess path works | It is the only transport used |
 | Degradation is real | Golden frames, 16 configurations |
-| The public surface suffices | Imports only `tui-kit`, never a deep path |
+| The public surface suffices | Imports only Calcium, never a deep path |
 | The package is a package | It installs from a registry, not a path alias |
 
 ---
 
 ## 10. Commitments
 
-1. Under 300 lines of app code; exceeding it is a finding about `tui-kit`.
+1. Under 300 lines of app code; exceeding it is a finding about Calcium.
 2. Five read-only verbs; nothing mutating.
 3. No custom theme, block kind, command policy or emulator — each omission is a test of a default.
 4. The glyph derives from `State`, never from the prose `Status`.
@@ -225,7 +225,7 @@ Each row is a claim the framework makes and this app tests.
 8. A recorded fixture corpus ships, giving C08's tooling a second consumer.
 9. A monorepo example at `examples/docker/` that consumes the packaged `@fmx/calcium` — sealed `exports` for the dev loop, a local-registry pack-and-install for the proof — never `../../src`.
 10. Its own CI; a skipped real-docker run is recorded, never silent.
-11. It imports only from `tui-kit`'s public entry points, never a deep path.
+11. It imports only from Calcium's public entry points, never a deep path.
 12. It publishes an import manifest on each release, for C24's unused-export scan.
 
 ---
@@ -245,7 +245,7 @@ Each row is a claim the framework makes and this app tests.
 
 - **R2.1**: every document passes `measuresCorrectly()` at seven widths.
 - **R2.2**: every document passes `degradesToAscii()` and `degradesTo1Bit()`.
-- **R2.3**: no source file imports a deep path — only `tui-kit`, `@fmx/calcium/testing`, `@fmx/calcium/fixtures`.
+- **R2.3**: no source file imports a deep path — only `@fmx/calcium`, `@fmx/calcium/testing`, `@fmx/calcium/fixtures`.
 - **R2.4**: app source under 300 lines, excluding manifest, fixtures and tests.
 - **R2.5**: no emitted command is a mutating docker subcommand — scanned against a denylist.
 - **R2.6**: the app registers no custom block kind, theme or command policy.
@@ -269,7 +269,7 @@ Each row is a claim the framework makes and this app tests.
 - **R4.2**: against real docker: `/ps`, drill into `/inspect`, then `/logs`, then `esc` — the B03 chain in a second app.
 - **R4.3**: `/stats` for two minutes with the daemon killed and restarted → parts degrade and recover independently.
 - **R4.4**: a clean clone, `npm install`, `npm start` → a running shell with no further steps.
-- **R4.5**: bump `tui-kit` to a new minor → builds with no app changes. **Requiring changes means the bump was not minor.**
+- **R4.5**: bump Calcium to a new minor → builds with no app changes. **Requiring changes means the bump was not minor.**
 
 ### Fail-on-revert
 
@@ -287,9 +287,9 @@ Each row is a claim the framework makes and this app tests.
 
 | Not here | Where |
 |---|---|
-| The framework itself | `tui-kit`, C01–C24 |
+| The framework itself | Calcium, C01–C24 |
 | Prism's app | `prism-tui` |
-| The README's example | `tui-kit`, as a compiled fixture (C24 T5.1) |
+| The README's example | Calcium, as a compiled fixture (C24 T5.1) |
 | Docker's own behaviour | Docker |
 | Mutating operations | Deliberately absent |
 | A second reference app | Only if a third domain reveals something these two do not |

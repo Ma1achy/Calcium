@@ -331,7 +331,7 @@ describe("C06 contract", () => {
     const offenders = walk("src").filter((f) => /PRISM_TUI_TRANSPORT/.test(code(f)));
 
     // The app's entry point reads it and passes a constructed router through
-    // `TuiConfig.transport`. `tui-kit` ships no binary, and SS10 already forbids
+    // `TuiConfig.transport`. Calcium ships no binary, and SS10 already forbids
     // the `process.env` that would be needed to read one.
     expect(offenders).toEqual([]);
   });

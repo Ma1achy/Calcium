@@ -1339,7 +1339,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       return local.sealed;
     },
 
-    /** Where `tui-kit`'s own handlers and the app's arrive, before `seal()`. */
+    /** Where Calcium's own handlers and the app's arrive, before `seal()`. */
     register: (verb: string, handler: LocalHandler) => void local.register(verb, handler),
 
     get inFlight() {

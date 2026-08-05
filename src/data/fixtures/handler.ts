@@ -2,7 +2,7 @@
  * The resolver: fixture, then world, then a plausible failure.
  *
  * C08 §4, §1a — see spec. This is the half `createEmulatedTransport` calls
- * through (C06 §1), and the whole coupling between `tui-kit` and an app's world
+ * through (C06 §1), and the whole coupling between Calcium and an app's world
  * is the `WorldDriver` interface it takes.
  *
  * **Route 3 returns a failure where the fixture transport throws, and the

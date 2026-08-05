@@ -128,7 +128,7 @@ export type TransportMode = "emulated" | "fixture" | "subprocess";
  *
  * There is no `PRISM_TUI_TRANSPORT` here or anywhere under `src/` (I18). The
  * *app's* entry point resolves it and passes a constructed router through
- * `TuiConfig.transport`; `tui-kit` ships no binary, and a framework that claims
+ * `TuiConfig.transport`; Calcium ships no binary, and a framework that claims
  * to serve other apps has no business reading a variable named for one of them.
  */
 export type TransportDeps =

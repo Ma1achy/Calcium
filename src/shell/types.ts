@@ -136,7 +136,7 @@ export interface Pipeline {
   /** Cancel what is in flight, settling the entry `partial` (C23 I10). */
   cancel(): void;
   /**
-   * Where `tui-kit`'s own local handlers and the app's arrive (C23 §2).
+   * Where Calcium's own local handlers and the app's arrive (C23 §2).
    *
    * Before `seal()`, which reconciles them against the manifest (C23 I27) — and
    * that is why the registry cannot seal at step 4 with the other three: the

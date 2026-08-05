@@ -66,7 +66,7 @@ describe("C05 parse", () => {
 
     expect(Object.isFrozen(result.value)).toBe(true);
     expect(result.value.binary).toBe("widget");
-    // Nine from the fixture, plus the six `tui-kit` ships (C05 §3). Written as
+    // Nine from the fixture, plus the six Calcium ships (C05 §3). Written as
     // the sum rather than 15, so a change to either side names which moved.
     expect(result.value.tools).toHaveLength(9 + FRAMEWORK_TOOLS.length);
     expect(

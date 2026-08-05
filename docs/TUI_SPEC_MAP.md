@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Packages** | `packages/tui-kit/` (the framework) · `packages/prism-tui/` (Prism's app) |
+| **Packages** | `packages/calcium/` (the framework) · `packages/prism-tui/` (Prism's app) |
 | **Supersedes** | The 15-journey decomposition. Journeys were the wrong form — most of what needs specifying here has no narrative |
 | **Companions** | `TUI_SCRATCHPAD.md` (architecture, 30 settled), `TUI_SCRATCHPAD_2_surface.md` (surface, resolved) |
 | **Status** | 23 component specs written. Surfaces and behaviours outstanding |
@@ -33,11 +33,11 @@ Every document ends with a numbered **commitments** list. That is the one thing 
 
 The TUI is built so a teammate can stand up their own with minimal effort. Going through the 21 components, **20 are generic** — only the fixture world is Prism-shaped. The seam is almost already there; what it costs is discipline about where app-specific things live.
 
-| | `tui-kit` | `prism-tui` |
+| | Calcium | `prism-tui` |
 |---|---|---|
 | Contains | C01–C07, C09–C21, frame structure, block defaults | C08, all surfaces, adapters, manifest content, theme tokens, policies |
 | Knows about | Terminals, blocks, transcripts, input, subprocesses | Runs, model versions, deployments, GitOps |
-| Versioned | Independently | Depends on a `tui-kit` major |
+| Versioned | Independently | Depends on a Calcium major |
 
 ### The extension surface
 
@@ -77,7 +77,7 @@ A reference app under `examples/`, roughly 50 lines, wrapping something real —
 
 ## Components
 
-Every component is `tui-kit` except **C08**. Where a row says *+ app*, the framework owns the mechanism and the app supplies the content.
+Every component is Calcium except **C08**. Where a row says *+ app*, the framework owns the mechanism and the app supplies the content.
 
 ### Terminal
 
@@ -237,7 +237,7 @@ Two phases. **The framework is built and proven before Prism goes on it.**
 
 ### Phase 1 — the framework
 
-`tui-kit` plus the reference app, which is built **alongside** the framework rather than after it. A framework with no consumer produces abstractions that are wrong in ways you cannot see until the first consumer arrives — and if that consumer is Prism, every mistake is expensive by the time you find it.
+Calcium plus the reference app, which is built **alongside** the framework rather than after it. A framework with no consumer produces abstractions that are wrong in ways you cannot see until the first consumer arrives — and if that consumer is Prism, every mistake is expensive by the time you find it.
 
 **Reference app: `docker`.** `docker ps --format json` and `docker images --format json` give real tabular data and live-ish state. Everyone has it, no auth, no cluster. Close enough to Prism's shape to be quick, different enough in content that Prism-isms leaking into the framework are visible.
 
@@ -251,7 +251,7 @@ Two phases. **The framework is built and proven before Prism goes on it.**
 
 ### Phase 2 — Prism
 
-`prism-tui` goes on the finished framework. **C08 straddles the two phases**: its harness — the `Fixture` model, recording, redaction, the seeded RNG, the resolver — is `tui-kit` and lands in Phase 1; only the world half is Prism's and lands here.
+`prism-tui` goes on the finished framework. **C08 straddles the two phases**: its harness — the `Fixture` model, recording, redaction, the seeded RNG, the resolver — is Calcium and lands in Phase 1; only the world half is Prism's and lands here.
 
 | | Name | Contains | Exit criterion |
 |---|---|---|---|
@@ -291,7 +291,7 @@ C22 and C23 close the last structural gap: every "L4 orchestrates" obligation de
 ## Build order
 
 ```
-PHASE 1 — tui-kit + reference app
+PHASE 1 — Calcium + reference app
 
 C01 ─ C02 ─ C03 ──────────────────── frame ── B01        M-T1
 
@@ -333,7 +333,7 @@ All resolved.
 
 | Question | Resolution |
 |---|---|
-| Framework name | **`tui-kit`** |
+| Framework name | **Calcium** |
 | Split up front or extract later | **Up front**, two packages from the first commit. 20 of 21 components are already generic, so extraction would be mechanical and the discipline costs the same either way |
 | Does C11 stay separate from C09 | **Separate.** The table engine is the only block with real state; folding it in would make C09 half table logic |
 | Where the fixture world lives | **In-package**, reachable via `--demo` or `PRISM_TUI_TRANSPORT=fixture`. Bundle weight is irrelevant for a Node binary and demoing without a cluster is worth far more |

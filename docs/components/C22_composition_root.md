@@ -138,7 +138,7 @@ only a cast gets past. Every other optional field on `TuiConfig` has the narrowe
 none has yet been wanted conditionally, which is why fifteen fields carry a defect one of
 them has. It is the consumer's problem exclusively: every internal caller passes a literal.
 
-**`PRISM_TUI_STATE_DIR` is resolved by the app's entry point, not here** (I20). An earlier draft of this section had C22 read it, which contradicts A03 SS10 — the scan bans `process.env` across all of `src/` with a one-file allow-list, C02's, because an exception list is the thing that grows. C06 I18 settled the same question for `PRISM_TUI_TRANSPORT` and the reasoning transfers whole: a variable named for one consumer has no business inside a framework that claims to serve others, and `tui-kit` ships no binary to read it from. `prism-tui` reads its own variable and passes the resolved path through `TuiConfig.stateDir`, exactly as it passes a constructed router through `TuiConfig.transport`.
+**`PRISM_TUI_STATE_DIR` is resolved by the app's entry point, not here** (I20). An earlier draft of this section had C22 read it, which contradicts A03 SS10 — the scan bans `process.env` across all of `src/` with a one-file allow-list, C02's, because an exception list is the thing that grows. C06 I18 settled the same question for `PRISM_TUI_TRANSPORT` and the reasoning transfers whole: a variable named for one consumer has no business inside a framework that claims to serve others, and Calcium ships no binary to read it from. `prism-tui` reads its own variable and passes the resolved path through `TuiConfig.stateDir`, exactly as it passes a constructed router through `TuiConfig.transport`.
 
 This is a structural interaction rather than an oversight, which is why it survived review: §2 is about what C22 owns and SS10 is about what `src/` may read, both correct on their own, and the sentence sat in the one cell where they meet.
 
@@ -295,7 +295,7 @@ missing wire look intentional.
 
 **The default is what found the next one, and that is the argument for it.** A
 `Manifest` reaches `createTui` as an object, and `parseManifest` is the only
-thing that appends `tui-kit`'s six verbs (C05 §3) — so a hand-built manifest
+thing that appends Calcium's six verbs (C05 §3) — so a hand-built manifest
 satisfying the type arrives without them, while C23 registers their handlers
 regardless. `/help` and `/clear` are then installed and unclassifiable, which is
 exactly what C23 I27's reconciliation reports. **It could not report it while
@@ -388,7 +388,7 @@ author wrote is a *user* error, and a raw `SyntaxError` escaping construction
 names a position in a string nobody can see. It becomes a `ManifestError` with
 the path, on the same channel as every other thing wrong with a manifest.
 
-**And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — `tui-kit`'s own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
+**And C23's registry is the fourth seal, at step 10.** C23 §2's `LocalRegistry` takes the local handlers — Calcium's own plus the app's — and it cannot seal at step 4 because the app's handlers arrive with the pipeline. So I3's "every registry" means the three at step 4 and C23's at step 10, and commitment 4 counts the seals rather than the registries, which is the number the invariant is actually about.
 
 
 ### 3c. The sequences C22 owns
@@ -524,7 +524,7 @@ Nothing else lives here. The candidates I expected — verb concurrency, exit ar
 
 ## 6. Chrome
 
-The header and footer are **app-supplied functions from a chrome context to blocks** (hook 5, F5). `tui-kit` owns the frame's structure — one row each, fixed position, never scrolling — and the app decides what goes in them.
+The header and footer are **app-supplied functions from a chrome context to blocks** (hook 5, F5). Calcium owns the frame's structure — one row each, fixed position, never scrolling — and the app decides what goes in them.
 
 ```typescript
 type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -755,7 +755,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I10** — Clock and filesystem enter the graph only here.
 - **I11** — Session state has exactly one writer per field, and the two fields with no writer say so. `cluster` and `version` are set at construction and never written after; a field absent from §5's table would read identically to a field nobody writes, and only one of those is a claim.
 - **I12** — `cwd` reaches C21 as a function, never a captured value.
-- **I13** — Chrome is app-supplied; `tui-kit` owns only the frame's structure. It receives the session, the frame's `now` and `columns` — a snapshot alone cannot render the clock S01 §4 specifies or apply its width elisions, and neither belongs on the snapshot: one ticks per frame and the other is C01's to hand down.
+- **I13** — Chrome is app-supplied; Calcium owns only the frame's structure. It receives the session, the frame's `now` and `columns` — a snapshot alone cannot render the clock S01 §4 specifies or apply its width elisions, and neither belongs on the snapshot: one ticks per frame and the other is C01's to hand down.
 - **I13a** — `now` is sampled once per frame and both chrome functions receive the same value. Two independent reads can straddle a second boundary and print a header and a footer that disagree — C01 I12's rule, one layer up.
 - **I14** — C22 never auto-logins.
 - **I15** — An offline cluster degrades the session; system commands keep working.
@@ -763,10 +763,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I17** — `createTui` requires exactly four fields; every other has a working default. The count is the ergonomic claim R01 §1 tests — a working TUI built from the README without asking a question — and a fifth required field is a spec change rather than a convenience.
 - **I18** — Banner and identity fetches are non-blocking: input is accepted before either completes, and neither can delay the first frame. A shell that will not take a keystroke until a network call returns is a shell that hangs on a bad DNS entry.
 - **I19** — Identity refresh runs on C22's injected clock at a five-minute interval, and expiry never discards the command that hit it. The command is retained across re-login and resubmitted by the user, not automatically — a session that silently re-ran a verb after an auth gap would re-run it against whatever the credentials now authorise.
-- **I20** — `tui-kit` reads no environment, variable or record. `PRISM_TUI_STATE_DIR` arrives as `TuiConfig.stateDir`, `PRISM_TUI_TRANSPORT` as `TuiConfig.transport` (C06 I18), and the process environment itself as `TuiConfig.env`, which C22 hands to C02 and C21. A03 SS10's allow-list names one file and that file does not use it — no module under `src/` touches `process.env`.
+- **I20** — Calcium reads no environment, variable or record. `PRISM_TUI_STATE_DIR` arrives as `TuiConfig.stateDir`, `PRISM_TUI_TRANSPORT` as `TuiConfig.transport` (C06 I18), and the process environment itself as `TuiConfig.env`, which C22 hands to C02 and C21. A03 SS10's allow-list names one file and that file does not use it — no module under `src/` touches `process.env`.
 - **I21** — `beforeRelease` is synchronous and returns `undefined`, never a thenable. `killAll()`'s promise is deliberately not awaited: its signals are delivered synchronously and only the reaping is deferred, and awaiting it would make the handler `async`, which C01 I5 forbids because a signal handler cannot await.
 - **I22** — `pipeline` has a working default, as every other optional field does (I17). `config.pipeline` remains the injection point C22's own tests construct a graph through, and a graph always carries a `Pipeline` — an injection seam with no default is a missing wire that only the tests hold together.
-- **I23** — Every manifest reaching the stores has been through `parseManifest`, whichever arm of `config.manifest` supplied it. Restated: it previously said construction *refuses* a manifest lacking `tui-kit`'s six verbs, which was right about the danger and left no accepted input — `parseManifest` is exported nowhere, and the path arm handed `readFile`'s string to a function requiring a record. Construction still appends nothing and derives nothing; it parses, and the one function that may add the six remains the only one that does. An already-parsed `Manifest` handed back now fails on I6's duplicate check, loudly and for free.
+- **I23** — Every manifest reaching the stores has been through `parseManifest`, whichever arm of `config.manifest` supplied it. Restated: it previously said construction *refuses* a manifest lacking Calcium's six verbs, which was right about the danger and left no accepted input — `parseManifest` is exported nowhere, and the path arm handed `readFile`'s string to a function requiring a record. Construction still appends nothing and derives nothing; it parses, and the one function that may add the six remains the only one that does. An already-parsed `Manifest` handed back now fails on I6's duplicate check, loudly and for free.
 - **I23a** — `TuiConfig.manifest` is `ManifestDocument | string`. A `Manifest` is the parser's *output* — it carries `appTools`, which the parser derives — so requiring one from an author was requiring the result before the call. An author supplies `{ schema, binary, version, tools }`: their own verbs, which is all they can know.
 - **I23b** — `ManifestDocument` structurally excludes `appTools`, so a parsed `Manifest` is **not assignable** to `TuiConfig.manifest` and the mistake is a compile error rather than a `ConstructionError`. `Omit<Manifest, "appTools">` alone does not do this: a `Manifest` has every member of it and one more, so the type accepted exactly the value I23's parse refuses. That gap merged, took tier 5 down by forty-four rows, and was reported green — a runtime refusal only protects code that has been run, and the harness that had not been run was the one that broke. Where a wrong call can be made unbuildable it must be, which is §3a's `const pipeline` argument applied to a type rather than to a binding.
 - **I24** — Raw bytes reach the decoder through `lifecycle.onInput` and through nothing else, and the decoder's deadlines are polled on C22's injected schedule. C22 is the only file that may read stdin, for the reason it is the only one that may read the clock: two readers of one stream is two half-decoded sequences, and the second reader is invisible to the first. The wake-ups are here because C16 owns no timer and C01 owns no clock, so a decoder without them delivers a lone `Esc` on the next keystroke rather than after its window (§3 step 12).
@@ -897,7 +897,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T2.1b** (I4a): the signal and fault handlers are synchronous end to end — no `await` between the release and the exit, asserted on the source rather than by timing, because the failure is a submission interleaving and a test cannot make one land in the gap reliably.
 - **T2.2** (I6): on all five paths, the last release byte precedes the first diagnostic byte.
 - **T2.3** (I7): history is flushed on all five paths, including a thrown exception.
-- **T2.4** (I10): a source scan finds no ambient clock or `fs` reference anywhere in `tui-kit` outside C22.
+- **T2.4** (I10): a source scan finds no ambient clock or `fs` reference anywhere in Calcium outside C22.
 - **T2.5**: every hook in A02 §6 has a default except `theme`, and each default is exercised.
 - **T2.6** (I12, TL6): `SpawnOptions.cwd` is a function; a `@ts-expect-error` rejects a string, and the function form is exercised beside it so the rule is not "nothing compiles". A captured string is correct at capture and wrong for every verb after the first `cd` — and the failure is silent, because the verb runs, just somewhere else.
 - **T2.6b** (→ C01 I14): the lifecycle cannot be constructed without `onFatal` (TL7). A failed alternate screen is the only fatal case in the system, so it is the one failure that cannot have undefined handling; optional in the type, every consumer omits it and finds out when nothing can be rendered.

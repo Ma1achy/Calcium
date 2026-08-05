@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Architecture |
-| **Covers** | `tui-kit` · `docker-tui` · `prism-tui` |
+| **Covers** | Calcium · `docker-tui` · `prism-tui` |
 | **Source** | A02 §1 · A03 · R01 §8 · C24 §2 |
 | **Status** | Draft |
 
@@ -13,7 +13,7 @@
 
 | Repo | Contains | Publishes |
 |---|---|---|
-| `tui-kit` | C01–C25, the framework | A package to GitHub Packages, private |
+| Calcium | C01–C25, the framework | A package to GitHub Packages, private |
 | `docker-tui` | R01, the reference app | Nothing — proof, plus an import manifest |
 | `prism-tui` | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
 
@@ -25,7 +25,7 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 ## 2. Dependency posture
 
-**`tui-kit` has three runtime dependencies: `react`, `ink` and `lowlight`.**
+**Calcium has three runtime dependencies: `react`, `ink` and `lowlight`.**
 
 It had two for most of the specification, and that was worth saying because **two was a property that fell out of the specs rather than a target we were defending.** Every other candidate had an internal alternative the specs made better: `Intl.Segmenter` over a grapheme splitter, C10's own arithmetic over a colour library, an injected `() => number` over a date library.
 
@@ -105,7 +105,7 @@ Concretely, R4.4 is `clean clone → npm install → npm start → running shell
 
 | Repo | Base | Adds | For |
 |---|---|---|---|
-| `tui-kit` | Node 22 | `node-pty` build deps · an explicit node feature pinning 22 | C01–C03's PTY tests |
+| Calcium | Node 22 | `node-pty` build deps · an explicit node feature pinning 22 | C01–C03's PTY tests |
 | `docker-tui` | Node 22 | Docker socket mounted read-only | R4.2's real-docker run |
 | `prism-tui` | Node 22 | Python 3.12 + the Prism CLI | Conformance and `record --against`, locally |
 
@@ -177,7 +177,7 @@ The budget argument survives intact, because a PR runs the expensive tier once p
 
 | Repo | Last stage |
 |---|---|
-| `tui-kit` | Publish on tag to GitHub Packages, with attestation and SBOM |
+| Calcium | Publish on tag to GitHub Packages, with attestation and SBOM |
 | `docker-tui` | Real-docker run **where available; the skip is recorded, not silent** (R01 §8) · publish the import manifest on release |
 | `prism-tui` | Conformance against the real CLI where available; `record --diff` reporting structural drift. **No CI yet — local `make all` for now** |
 
@@ -237,7 +237,7 @@ It encodes: read the spec's commitments and invariants first; one test per invar
 
 ## 9. Distribution
 
-**Not published publicly.** `tui-kit` publishes on tag from CI to **GitHub Packages**, private.
+**Not published publicly.** Calcium publishes on tag from CI to **GitHub Packages**, private.
 
 Consumers install it as an ordinary npm dependency pointed at that registry:
 
@@ -257,7 +257,7 @@ This is unchanged in every way that matters for R01's argument. Installing from 
 
 ### Why not a git dependency
 
-`"tui-kit": "git+ssh://git@gitlab.fmx/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
+`"@fmx/calcium": "git+ssh://git@gitlab.fmx/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
 
 **Git dependencies install from source and need a `prepare` script to build** — and A04 §3 bans install scripts outright, because postinstall is the primary npm attack vector. Allowing one for this would be trading the single most valuable supply-chain control for the convenience of not configuring a registry.
 
@@ -270,7 +270,7 @@ Two commitments have to be honest about it:
 - **No npm provenance.** `--provenance` produces a signed attestation verifiable by anyone; it is a public-registry feature. GitHub Actions attestation links the artefact to its workflow, which is the useful part privately, but it is not the same guarantee and should not be described as one.
 - **`npm audit` still works**, because it queries the advisory database rather than the registry the package came from. The gate is unaffected.
 
-`tui-kit` publishes on tag from CI, never a laptop.
+Calcium publishes on tag from CI, never a laptop.
 
 | | |
 |---|---|
@@ -287,7 +287,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 ## 10. Commitments
 
 1. Three repositories, not a monorepo, so each package is exercised as a package.
-2. `tui-kit` has three runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
+2. Calcium has three runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
 3. A new dependency needs a justification in `DEPENDENCIES.md`, and A03 asserts the file matches `package.json`.
 4. `--ignore-scripts` from the first commit, for the whole tree. One dev dependency needs a native build, and it is invoked by name from `make install` rather than by re-enabling install scripts; A03 SS32 names it as its single exception.
 5. `npm ci` in CI, lockfile committed and reviewed.

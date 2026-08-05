@@ -229,7 +229,7 @@ a drawing's terms, rather than in the terms of the layer that has to satisfy it.
 
 `TuiConfig.manifest` is typed `Manifest | string`. **Neither arm worked.**
 
-**The object arm** throws at construction: *"the manifest is missing tui-kit's own verbs
+**The object arm** throws at construction: *"the manifest is missing Calcium's own verbs
 (help, clear, theme, history, debug, exit) — pass the raw document, or the result of
 parseManifest, rather than a hand-built Manifest"*. `parseManifest` is the only thing that
 appends them — `construct.ts:261` says so in a comment — and it was exported from **none**

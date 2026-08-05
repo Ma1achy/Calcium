@@ -27,7 +27,7 @@ and completion, pre-flight validation, help and history all derive from it. Noth
 in the framework knows what your domain is.
 
 ```
-        you describe                    tui-kit                      it renders
+        you describe                    Calcium                      it renders
    ┌──────────────────┐         ┌────────────────────┐         ┌──────────────┐
    │  what operations │ ──────► │  parse · validate  │         │              │
    │  exist, and how  │         │  complete · help   │         │  a frame,     │

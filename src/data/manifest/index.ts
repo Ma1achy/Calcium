@@ -3,7 +3,7 @@
  *
  * C05 — see spec. The manifest is what stops the TUI from guessing. Completion,
  * validation and help all derive from it, and none of them knows what a verb is;
- * `tui-kit` knows there is a tool with typed args, and that is the whole of its
+ * Calcium knows there is a tool with typed args, and that is the whole of its
  * knowledge about any app built on it.
  *
  * The schema is owned here; the content is the app's (commitment 2).

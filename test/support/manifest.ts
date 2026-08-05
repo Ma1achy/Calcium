@@ -1,7 +1,7 @@
 // The fixture manifest C05's suite runs against, and the shape an app writes by
 // hand (commitment 3).
 //
-// **The tools here are deliberately generic.** `tui-kit` knows there is a tool
+// **The tools here are deliberately generic.** Calcium knows there is a tool
 // with typed args and nothing more, so a fixture full of Prism verbs would prove
 // the framework general by asserting it rather than by being it.
 //
