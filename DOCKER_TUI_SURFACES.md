@@ -476,15 +476,31 @@ the two:
 | `nginx:alpine` | `{"80/tcp":{}}` | `SIGQUIT` | 7 |
 | `mcr.microsoft.com/devcontainers/typescript-node:22` | absent | absent | 5 |
 
-Against a live container from the second image: **17 keys on the container's `Config`, 5 on
-the image's, zero image-only, twelve container-only.** So the asymmetry is real, one-sided
-here and two-sided against nginx, and **its shape is a property of what the image
-declares** — the daemon fills a container's `Config` with runtime fields regardless.
+**And the correction above was itself an inference from one measurement.** It read *the
+asymmetry is one-sided here and two-sided against nginx* — inferred from the image key
+counts without measuring nginx's **container** side. Measured, both pairs answer the same:
 
-**The durable claim is that no fixed key list works, only a semantic map.** The specific
-keys were never the finding on either pair, and a correction that merely swapped in freshly
-measured keys would have been the same mistake with better numbers, waiting for a third
-reader and a third pair. FINDINGS F32.
+| pair | image-only keys | container-only keys | image ⊆ container |
+|---|---|---|---|
+| `dtui-web` / `nginx:alpine` | **0** | 12 | yes |
+| devcontainer / `typescript-node:22` | **0** | 12 | yes |
+
+**A container's `Config` is the image's inherited, then filled with runtime fields.** That
+is the durable statement, and it is stronger than *the shape varies*: there are no
+image-only rows to worry about at all, and a key-union diff invents exactly the twelve
+daemon-filled ones — `Hostname`, `Domainname`, the three `Attach*`, `Image`, `StopTimeout`,
+`Tty`, `OpenStdin`, `StdinOnce`, `Volumes`, `User`.
+
+`ExposedPorts` proves it rather than contradicting it: `nginx:alpine` declares `80/tcp` and
+the container carries the *same* `80/tcp`, inherited and identical. **So the ports drift is
+not in `Config` at all** — it is `HostConfig.PortBindings`, which is why the row needs two
+paths and why no walk of `Config` reaches it however thorough.
+
+**Three passes on one sentence, and each pass was accurate about what it had measured.**
+That is the failure worth naming: not error, but a true observation written at the scope of
+a general claim. The rule that catches it is to measure the case that would falsify your own
+falsification — applied here, it caught the second pass one iteration after the first was
+corrected. FINDINGS F32.
 
 The `ports` row is the clearest case. `80` comes from the image's `Config.ExposedPorts`;
 `80→8080` comes from the container's `HostConfig.PortBindings` and `NetworkSettings.Ports`.
