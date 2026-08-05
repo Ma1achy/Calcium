@@ -2389,6 +2389,22 @@ transcript, correctly untouched, on all three rows.
 So the menu is an 82-cell box composited exactly as specified, over a 110-cell
 screen. **What I photographed is what an overlay looks like.**
 
+### The picture that settles it
+
+![The completion menu drawn over a coloured unified diff: the menu's three rows punch a clean black rectangle out of the red and green diff backgrounds, with a perfectly vertical edge at the same column on every row, and the diff's colour resuming beyond it](../../docs/media/menu-over-diff.gif)
+
+**The menu drawn over a surface that is coloured to its right edge.** If cells
+went unwritten, the diff's red and green would show through the gaps *inside* the
+box — between `/compare` and `Two containers, side by side` most obviously. They
+do not: that gap is black, the box's edge is a straight vertical line at one
+column on all three rows, and the colour resumes beyond it.
+
+Asked for an image proving the bug was fixed, this is the image, and it proves
+there was nothing to fix. It was captured against the coloured diff **because**
+the original photograph was taken over a dark transcript, where a written black
+cell and an unwritten one look identical. **The first picture could not have
+distinguished the two states, and I read a conclusion off it anyway.**
+
 ### What is actually true, and it is much weaker
 
 The completion menu has **no border and no background tint**, so its right edge is
@@ -2419,3 +2435,42 @@ carried across four steps without a record. This is a claim published within the
 hour of being formed, from a measurement that was accurate about the wrong thing.
 The check that catches both is the same: *go and look at the mechanism.*
 
+
+---
+
+## F69 — a tier-5 timing row that passes and fails on identical code ★★
+
+`T5.3a` — *a live stream appending above a detached viewport does not move it* —
+failed CI on `feat/more-surfaces`:
+
+```
+AssertionError: the stream advanced past 3 unseen: expected 4 to be greater than 6
+```
+
+**The same commit, merged, passed on `main` minutes later.** Two runs of identical
+code on the same runner class, one red and one green. It also passes locally on
+every run: `make all` reports 94 tier-5 rows green.
+
+The row detaches the viewport, sends sixty page-downs, and asserts the stream has
+advanced by more than three in the meantime. On a contended runner it advanced by
+one. **The assertion is about a race it does not control**: how far a background
+stream gets while sixty keystrokes are processed is a function of the machine, and
+the invariant under test — *appending above a detached viewport does not move it* —
+is not.
+
+**This is VERIFYING §7's class arriving without a load generator.** That entry
+records a busy container making this exact row fail, and step 8 re-measured it and
+could not reproduce the failure — the conclusion drawn there was that C03's
+thresholds have margin on an idle host and none on a busy one. This is the same
+thing with the contention supplied by whoever else was on the runner, and it is
+the evidence the re-measurement lacked: **the row is nondeterministic, and the
+load generator was one way of showing it rather than the cause.**
+
+Filed rather than fixed. The repair is to make the row wait for the stream to
+advance rather than assert how far it got in a fixed window — a `waitForFrame` on
+the count instead of a threshold — which is a change to a tier-5 row and wants its
+own pass over the neighbouring rows, several of which are the same shape.
+
+**And it is why `make load-down` keeps its place** on the asymmetry rather than
+the odds: a row that fails under contention will fail eventually whether or not
+anyone introduced the contention deliberately.

@@ -242,7 +242,17 @@ Arrow keys move the selection, `Enter` accepts, `Esc` dismisses. Those bindings 
 
 **A keystroke that does not extend the current prefix dismisses the menu.** Filtering can only narrow, and backspace widens — there is no set to filter back out of. Stated because "narrow in place on a keystroke" reads as covering backspace, and the implementation that tries to serve it either re-runs a dynamic source on a keystroke (I3) or shows a set that no longer matches what is typed.
 
-**C19 declares the menu's width.** `Layer.width` exists because measurement answers height at a width and never the reverse, so nothing downstream can work out how wide the longest candidate is (C15 I16). It is the same division as the "N more" indicator: C19 knows the candidates, C15 knows the region, and neither can supply the other's half.
+**The menu spans the region, and declares no width.** C15 I16 resolves an overlay's width as `min(layer.width ?? region.width, region.width)`, so omitting the field is how a layer says *all of it* — and that is what the menu wants.
+
+**This reverses an earlier ruling, and the earlier one was right about the mechanism and wrong about the surface.** It read: *"C19 declares the menu's width. `Layer.width` exists because measurement answers height at a width and never the reverse, so nothing downstream can work out how wide the longest candidate is (C15 I16). It is the same division as the 'N more' indicator: C19 knows the candidates, C15 knows the region, and neither can supply the other's half."*
+
+Every sentence of that is true and none of it argues for a narrow menu. `Layer.width` exists so that a **confirm** — forty cells of text, centred — can be forty cells; it is the field's reason and the menu is not its case. What the old ruling actually derived was *C19 is the only component that could compute the widest candidate*, and it then treated the ability as an obligation.
+
+**What decided it is what the box looks like over content.** A menu narrower than the region leaves whatever is behind it visible to its right, on the same rows — measured over a coloured diff, the box is a clean rectangle and the diff's red and green resume beyond it, on every menu row. The compositor is correct and the *picture* is wrong: a reader sees two unrelated things on one line and has to work out where one ends. A prompt-anchored menu is chrome for the prompt, which spans the frame, so the menu does too.
+
+**A confirm still declares one**, and that is the distinction the field is for: a confirm is a *dialogue* — centred, bounded, with the transcript deliberately visible around it — and a completion menu is an *extension of the prompt*. `Placed.left` is 0 for both anchored and fill placements, so nothing about centring changes.
+
+The "N more" division is untouched: C19 still knows the remainder and C15 still reports only *that* it truncated.
 
 Narrowing to *no* candidates leaves a layer measuring zero rows. C15 omits it from the layout and dismisses nothing (C15 I15) — dismissing it is C19's, at the moment the candidate set empties.
 

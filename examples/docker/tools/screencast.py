@@ -6,7 +6,7 @@
 Writes `demo` (the raw stream), `demo.cast` (asciicast v2) and `demo.teardown`.
 Render with `agg demo.cast demo.gif`.
 
-**Six beats, not seven, and STEP8_WALK §B6 is the reason.** The plan's seventh
+**Nine beats, and still not the five depths — STEP8_WALK §B6 is the reason.** The plan's seventh
 was *the same view at five colour depths*. `capture.py` sets the environment once
 at `pty.fork()`, because C02 reads `COLORTERM`, `TERM` and `LANG` when the shell
 is constructed — so **a recording has one depth for its whole length**, and
@@ -48,22 +48,36 @@ BEATS: list[tuple[float, bytes]] = [
     (7.0, b"/ps"),
     (9.0, b"\r"),
     # 2 — the table.
-    (16.0, b"/container stats dtui-load"),
-    (19.0, b"\r"),
-    # 3 — THE SHOT. One sample per tick at TICK_MS = 2000, so the plot needs
-    #     real time to become a shape rather than three points. Sixteen seconds
-    #     is eight ticks, and it cannot be shortened without showing less.
-    (37.0, b"\x1b"),
-    # 4 — esc pops the view; the live entry underneath is still ticking.
-    (40.0, b"/drift dtui-web"),
-    (42.0, b"\r"),
-    # 5 — the comparison at its best.
-    (52.0, b"/config dtui-cfg /etc/nginx/conf.d/default.conf"),
-    (55.0, b"\r"),
-    # 6 — a real unified diff, then the log tail and Ctrl-C out of it.
-    (65.0, b"/logs dtui-web"),
-    (67.0, b"\r"),
-    (76.0, b"\x03"),
+    (15.0, b"/co"),
+    (17.0, b"\t"),
+    # 3 — completion, from the manifest and from no code. Dismissed rather than
+    #     accepted, so the next beat starts from a clean prompt.
+    (21.0, b"\x1b"),
+    (23.0, b"/container stats dtui-load"),
+    (26.0, b"\r"),
+    # 4 — THE SHOT. One sample per tick at TICK_MS = 2000, so the plot needs
+    #     real time to become a shape rather than three points.
+    (44.0, b"\x1b"),
+    # 5 — esc pops the view; the live entry underneath is still ticking.
+    (47.0, b"/drift dtui-web"),
+    (49.0, b"\r"),
+    # 6 — the comparison at its best: two sources, one row per field.
+    (59.0, b"/config dtui-cfg /etc/nginx/conf.d/default.conf"),
+    (62.0, b"\r"),
+    # 7 — a real unified patch. Ctrl-Home to the top, because the additions are
+    #     in the first hunk and the frame after the command is the tail.
+    (70.0, b"\x1b[1;5H"),
+    # 8 — scrolling a transcript far taller than the screen. Each key its own
+    #     write: two page-downs in one write are a paste, not two keys (C16).
+    (74.0, b"\x1b[6~"),
+    (75.5, b"\x1b[6~"),
+    (77.0, b"\x1b[6~"),
+    (78.5, b"\x1b[5~"),
+    (80.0, b"\x1b[F"),
+    # 9 — the log tail, streaming into a pushed view, and Ctrl-C out of it.
+    (83.0, b"/logs dtui-web"),
+    (85.0, b"\r"),
+    (94.0, b"\x03"),
 ]
 
 
@@ -86,4 +100,4 @@ if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "out/demo"
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     warm_the_logs()
-    run(COLS, ROWS, BEATS, out, hold=5.0, env={"LANG": "en_GB.UTF-8", "COLORTERM": "truecolor"})
+    run(COLS, ROWS, BEATS, out, hold=6.0, env={"LANG": "en_GB.UTF-8", "COLORTERM": "truecolor"})
