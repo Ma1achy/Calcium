@@ -339,8 +339,17 @@ export type TuiConfig = Readonly<{
    * matters most: `colourDepth: 1` follows only from C02's `dumb` gate, and
    * that gate also clears `altScreen`, which C02 I7 makes the one refusal that
    * stops the shell. So 1-bit was unreachable by any application.
+   *
+   * **`| undefined` is load-bearing, not noise.** This tree compiles with
+   * `exactOptionalPropertyTypes`, under which an optional property and a
+   * property that may be undefined are different types — so without it a
+   * consumer computing the value conditionally cannot supply the field at all:
+   * neither `capabilities: maybe` nor `...(maybe === undefined ? {} : { … })`
+   * type-checks, and only a cast gets past. Every other optional field on this
+   * type has the same shape and no consumer has needed one conditionally yet
+   * (FINDINGS F53). Fixed here because this is the field with a consumer.
    */
-  capabilities?: Partial<TerminalCapabilities>;
+  capabilities?: Partial<TerminalCapabilities> | undefined;
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;

@@ -126,11 +126,17 @@ export function createRing(cap: number): Ring {
  * outright, because a difference of five in two numbers on one line is easier to
  * miss than a clause naming it.
  */
-export function axisCaption(ring: Ring): string {
-  const base = `${String(ring.ticks)} ticks · ${String(TICK_MS / 1000)}s each`;
+export function axisCaption(ring: Ring, unicode = true): string {
+  // `·` is not ASCII either, and a caption is text an adapter supplies — so it
+  // takes the same flag the bar does (F54). One separator, three occurrences,
+  // and each one had to be found by looking at a frame.
+  const dot = unicode ? "·" : "-";
+  const base = `${String(ring.ticks)} ticks ${dot} ${String(TICK_MS / 1000)}s each`;
   // A total over the view's life, not over the window, and it says `returned
   // nothing` rather than naming a duration for the same reason the rest of the
   // caption does: what is known is how many attempts produced no reading, and
   // how long they took is not.
-  return ring.missed === 0 ? base : `${base} · ${String(ring.missed)} returned nothing`;
+  return ring.missed === 0
+    ? base
+    : `${base} ${dot} ${String(ring.missed)} returned nothing`;
 }

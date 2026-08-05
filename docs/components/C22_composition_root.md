@@ -42,7 +42,7 @@ type TuiConfig = Readonly<{
   debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
 
   env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` degrades to ASCII (I20)
-  capabilities?: Partial<TerminalCapabilities>;   // C02's overrides, wired (I49)
+  capabilities?: Partial<TerminalCapabilities> | undefined;   // C02's overrides, wired (I49)
   clock?:    () => number;
   fs?:       FileSystem;
   stateDir?: string;                       // default ~/.prism; the app resolves PRISM_TUI_STATE_DIR (I20)
@@ -129,6 +129,14 @@ application, and the framework's own e2e row for it composes the frame by hand.
 The field takes the same untrusted-input treatment C02 already gives it: an unknown key is
 ignored, an out-of-range value is rejected with a warning, and the warnings surface where
 C02's always do.
+
+**`| undefined` on the annotation is load-bearing.** This tree compiles with
+`exactOptionalPropertyTypes`, under which an optional property and a property that may be
+undefined are different types — so an application computing the value conditionally could
+not supply the field at all: neither `capabilities: maybe` nor a spread type-checks, and
+only a cast gets past. Every other optional field on `TuiConfig` has the narrower shape and
+none has yet been wanted conditionally, which is why fifteen fields carry a defect one of
+them has. It is the consumer's problem exclusively: every internal caller passes a literal.
 
 **`PRISM_TUI_STATE_DIR` is resolved by the app's entry point, not here** (I20). An earlier draft of this section had C22 read it, which contradicts A03 SS10 — the scan bans `process.env` across all of `src/` with a one-file allow-list, C02's, because an exception list is the thing that grows. C06 I18 settled the same question for `PRISM_TUI_TRANSPORT` and the reasoning transfers whole: a variable named for one consumer has no business inside a framework that claims to serve others, and `tui-kit` ships no binary to read it from. `prism-tui` reads its own variable and passes the resolved path through `TuiConfig.stateDir`, exactly as it passes a constructed router through `TuiConfig.transport`.
 
