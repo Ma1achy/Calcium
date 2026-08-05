@@ -148,12 +148,19 @@ export function createPsAdapter(): Adapter {
           ...(stopped === 0 ? [] : [count(stopped, "stopped")]),
         ].join(" · ") + skippedNote;
 
+      const failure = result.stderr.trim() || `docker exited ${String(result.exitCode)}`;
+
       return {
         schema: "tui.view/1",
         command: ctx.command,
         status: failed ? "error" : "ok",
+        // **C04 I3 requires it, and its absence is silent** — `transcript.append`
+        // throws and `appendAndCommit` discards, so a failing `docker ps` would
+        // have produced no entry at all rather than the error notice below it.
+        // Never seen, because no frame-read ever had docker fail. FINDINGS F35.
+        ...(failed ? { error: { message: failure, stage: "adapter" as const } } : {}),
         blocks: failed
-          ? [b.notice.error(result.stderr.trim() || `docker exited ${String(result.exitCode)}`)]
+          ? [b.notice.error(failure)]
           : [
               b.table({
                 id: "containers",

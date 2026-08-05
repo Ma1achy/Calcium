@@ -1054,7 +1054,7 @@ not `stats`, after docker's output had already been written. Covered by S2.4.
 
 ---
 
-## F27 — `b.plot` cannot pin an axis or label one ★★
+## F27 — `b.plot` could not pin an axis or label one ★★ — **the pin is fixed**
 
 | | |
 |---|---|
@@ -1081,6 +1081,30 @@ truth in one line and cannot be written. The block type has had the field the wh
 
 Second half, smaller: with no `xLabels`, the horizontal unit has to be a separate notice
 block — which is why S3's caption exists and why walk B1 had to rule on where it lives.
+
+### Resolved in part, and the parts are not the same size
+
+**`yMin` and `yMax` now pass through the builder** (C24 §4, spec-first), and S3 sets
+`yMin: 0`. The frame before and after, same container held at 100%:
+
+```
+before   99.93 … 100.83     a 0.2% wobble drawn as a mountain range
+after    0 … 50 … 101       a flat line at the top, which is the truth
+```
+
+A second-order gain nobody designed: the axis labels shortened from six cells to four, so the
+plot itself got wider. **No `yMax` on S3**, deliberately — DASHBOARD_WALK A4 ruled `CPUPerc`
+per-core-normalised, so 780% is ordinary on an eight-core host and C04 I29 clamps rather than
+drops; a ceiling would render a busy container identically to a saturated one.
+
+**The other three stay unexposed, each for its own reason**, written into C24 §4 rather than
+left as an omission: `yFormat` is a trap in the shape a caller wants it (F31), `xLabels` is a
+fixed three-tuple that cannot hold S3's caption sentence, and `emptyMessage` has no consumer.
+
+**And the shape of this finding is worth keeping.** C12 implemented all five fields, its
+tests were right, and every one of them passed — the mechanism was complete and *unreachable
+from the public surface*. A green suite over a mechanism nobody can invoke, which is MG25's
+class arriving from the consumer's side rather than the producer's.
 
 ---
 
@@ -1140,6 +1164,156 @@ is rendered rather than thrown. Reverting the glyph kills that row and only that
 healthy container at two widths saw nothing — the path only runs when a fetch fails, and
 nothing about a working view suggests it exists. `docker rm -f` on the watched container,
 mid-capture, is what produced it.
+
+---
+
+## F30 — `Comparison` has no `added` or `removed` verdict
+
+Its union is `same | better | worse | changed` (`viewmodel/types.ts:315`), and S7's own
+drawing marks a row `▐ added`. The drawing showed a verdict the block has never had.
+
+**Absorbed rather than filed as a blocker**: absence goes in the *data*, so a field present
+on one side only renders `changed` with the absent side as `—`. Filed rather than fixed by
+extending C04 because `same`/`changed` is a **change** axis and `better`/`worse` a
+**judgement** axis — the union already mixes two, and a third pair wants a ruling about what
+the field means rather than one more member.
+
+---
+
+## F31 — `yFormat: "percent"` expects a fraction, and the callers that want it do not have one
+
+`formatValue` returns `${Math.round(v * 100)}%` (`plot/axes.ts:28`). So `percent` wants
+`0.84`, and every far side that emits a field *called* a percentage emits `84`. Docker's
+`CPUPerc` is `100.2%`, parsed to `100.2`; the obvious call renders **`10020%`**.
+
+This is why `b.plot` exposes `yMin`/`yMax` and **not** `yFormat` (F27). The format is correct
+for the loss curves C12 was written against and a trap in the shape a CLI-wrapping consumer
+reaches for. Fixing it means a second format or a documented sentence at the call site, and
+neither is a builder change.
+
+---
+
+## F32 — three passes on one sentence, each accurate about what it had measured ★★
+
+Not a Calcium finding. A finding about **how this record gets written**, and it earns an
+entry because otherwise a fourth reader measures a fourth pair.
+
+| pass | claim | what it had measured |
+|---|---|---|
+| 1 | the image's `Config` carries `ExposedPorts` and `StopSignal`, the container's does not | one service-image pair |
+| 2 | the shape varies by image, so no fixed key list works | two *images*, no container |
+| 3 | **a container's `Config` is the image's inherited, then filled with runtime fields** | both sides of both pairs |
+
+Pass 3, measured: **zero image-only keys and twelve container-only, on both pairs**, image ⊆
+container. Pass 1 was true of `nginx:alpine` and false of `typescript-node:22`. Pass 2 was an
+inference — image keys measured, container keys assumed — and the inference was reasonable
+and wrong.
+
+**The failure is not error. Every word of every pass was accurate; the scope was not.** A
+true observation promoted to a general claim reads exactly like a general claim, and review
+cannot separate them. The method that can: **a claim about how two things relate needs both
+measured**, and *"I measured A and inferred B"* is the shape to distrust.
+
+Pass 2 was written one message after the lesson from pass 1 was recorded. Knowing the failure
+mode does not prevent it — from the inside a wrong generalisation is indistinguishable from a
+right one. Same shape as F20 being filed against T4.21 and the identical test being written a
+branch later.
+
+**And it paid for itself**: measuring the second pair produced `nginx:alpine` as the drift
+fixture, which carries every field kind and both tally arms in one container.
+
+---
+
+## F33 — `Comparison` cannot label its columns
+
+The renderer hard-codes `field`, `a` and `b` (`blocks/kinds/structured.ts`), and the block
+type carries no header fields. Both drawings show labelled columns — S6's
+`FIELD | api-gateway | worker-1`, S7's `FIELD | image (nginx:1.25) | running` — and neither
+is expressible.
+
+What a reader sees:
+
+```
+field                    a                        b
+ports 80/tcp             exposed                  → 8080
+```
+
+`a` and `b` are the type's field names leaking onto the screen. The renderer's own comment
+defends them as *positional rather than directional*, which is right about the **type** and
+does not follow for the **header**: a consumer that knows which side is which cannot say so.
+
+Absorbed with a `keyValue` block above the comparison naming the two sides. That works and it
+is not the same thing — the mapping is one block away from the columns it explains.
+
+---
+
+## F34 — a comparison's verdict is colour and nothing else ★★
+
+`comparisonTone` maps `better → ok`, `worse → error`, `same → muted`, and everything else to
+`default`. That tone styles the `b` cell. **There is no glyph, no mark, and no verdict
+column** — the drawings show `▐ changed` and `▐ differ`, and neither exists.
+
+So a `changed` row and a `same` row differ **only in colour**. C04 I6 makes exactly this
+argument for notices and cells — *colour alone survives neither 1-bit nor a colour-blind
+reader* — and `block()` enforces it there. The comparison block is where the framework does
+not hold itself to it.
+
+**Bounded honestly**: it does not defeat frame-read 2. An undrifted container and a failed
+drift are told apart by *content* — values on both sides and `N identical` tallies, versus a
+warning notice and a column of em dashes — and that distinction survives with no colour at
+all. What does not survive is telling a `changed` row from a `same` row **within** one
+drift, which is the block's primary job.
+
+---
+
+## F35 — an invalid document is discarded, and the command vanishes ★★★
+
+| | |
+|---|---|
+| **Surface** | `/drift no-such-container` |
+| **Reached for** | an error entry |
+| **Verdict** | app-side defect ×3, on a framework path that reports nothing |
+
+`transcript.append` validates and throws (C13 I10). `appendAndCommit` catches, discards the
+outcome and commits the frame anyway — C23 §5's *one stage whose failure loses the outcome*,
+documented and deliberate. **For an app author the effect is that a malformed document is
+indistinguishable from a verb that did nothing**: prompt clears, transcript unchanged, no
+notice, no stderr, nothing.
+
+The frame that found it:
+
+```
+❯ /drift no-such-container
+❯
+```
+
+The cause was mine and there were **three of them**: `/drift`'s error document, `/ps`'s
+failure arm and `/container stats`'s, all setting `status: "error"` and omitting `error`,
+which C04 I3 requires. Two had shipped. **None had ever run**, because no frame-read has yet
+had docker fail on those verbs — and a suite of 91 rows agreed with all three.
+
+Closed as a class rather than as three instances: `test/documents.test.ts` runs every
+document the app can produce through `validateDocument`, failure arms first, with a control
+proving the failure arms are failures and a control proving the validator refuses the
+stripped shape.
+
+**The framework side is not a defect and is worth stating anyway.** C23 §5's swallow is
+argued and correct — an escaping failure would be worse. But the swallow has no diagnostic
+channel at all, and the layer that knows exactly what was wrong with the document is the one
+that throws it away.
+
+---
+
+## F36 — an app cannot validate a document it built
+
+`validateDocument` is not exported (`src/index.ts`). An application therefore has no way to
+check the one thing the layer below will silently refuse (F35), and the test that closes
+F35's class reaches it by deep import — `../../../dist/data/viewmodel/index.js` — which is
+not a thing an application may legitimately do.
+
+The alternative is asserting C04 I3 by hand in the app, which encodes the rule in a second
+place and would agree with a document the framework rejects. Same shape as F28: the
+framework holds a check the consumer needs and does not offer it.
 
 ---
 

@@ -193,3 +193,20 @@ container. With it running, tier-5's `T5.3a` failed on a timing assertion and pa
 removing the fixture made `make all` green. **Not flakiness discovered — load introduced.**
 Worth writing down because the natural reading of a timing failure during a frame-read
 session is that the change under test caused it.
+
+## 8. A capture that ends too early is indistinguishable from a command that did nothing
+
+`/drift dtui-web` at `hold=8` replayed as a typed prompt and an empty transcript. At
+`hold=16` the same command showed four blocks. **The two failures look identical in a
+replay** — nothing rendered, either way — and the wrong reading is the interesting one,
+because "the verb produced nothing" is a plausible defect that would have been chased.
+
+`capture.py`'s own comment already warns that `hold` must outlast the far side. The gap it
+does not cover is that `/drift` makes **two** dependent calls, so its floor is twice a single
+`docker inspect`, and a surface's hold is a property of its call graph rather than of the
+app. Read the same command at two holds before concluding a frame is empty.
+
+That mistake was made twice in one session — once on `/drift dtui-web`, which was a short
+hold, and once on `/drift no-such-container`, which was **not**: the transcript really was
+empty, and F35 is the reason. Distinguishing them took the longer capture and then the
+validator.

@@ -318,22 +318,24 @@ export function createContainerAdapter(): Adapter {
       const failed = result.exitCode !== 0;
       const row = failed ? null : (parseNdjson(result.stdoutRaw).rows[0] ?? null);
 
+      const failure =
+        result.stderr.trim() ||
+        (failed
+          ? `docker exited ${String(result.exitCode)}`
+          : "no such container, or it reported nothing");
+
       const blocks: readonly Block[] =
-        row === null
-          ? [
-              b.notice.error(
-                result.stderr.trim() ||
-                  (failed
-                    ? `docker exited ${String(result.exitCode)}`
-                    : "no such container, or it reported nothing"),
-              ),
-            ]
-          : containerView(row, ctx.width);
+        row === null ? [b.notice.error(failure)] : containerView(row, ctx.width);
 
       return {
         schema: "tui.view/1",
         command: ctx.command,
         status: row === null ? "error" : "ok",
+        // **C04 I3, and its absence is silent** — the document is refused by
+        // C13 and discarded by C23 §5, so a failing invocation would have left
+        // the view holding its spinner with nothing anywhere reporting a fault.
+        // FINDINGS F35.
+        ...(row === null ? { error: { message: failure, stage: "adapter" as const } } : {}),
         blocks,
         meta: {
           verb: ctx.verb,

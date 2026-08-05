@@ -62,8 +62,14 @@ verbs disagree about what a missing side means. One notice, one column of `—`.
 **Found by measuring, not by reasoning.** On the nginx pair:
 
 ```
-User    image = null      container = ""
+User    image = absent (no key)      container = ""
 ```
+
+**And the first write-up of this row said `image = null`, which is the row's own
+mistake made while recording it.** `dict.get("User")` returns `None` for a key that is
+absent and for a key that is `null`, so the evidence was read through an accessor that
+collapses exactly the distinction being documented. Corrected from the key set rather
+than from a lookup. Three representations of nothing, not two.
 
 Both mean *no user set*. A comparison that comes from `JSON.stringify` or `!==` marks the
 row `changed`, and the surface reports drift on a container that has drifted in no way.
@@ -99,9 +105,20 @@ The container inherits `ExposedPorts` unchanged, so a `Config`-only comparison r
 drift on the one row the drawing leads with**. The drift is a published binding, and it
 lives in a different top-level object.
 
-**Ruled: `ports` is a `derived` field** — the two sides come from different paths and each
-is formatted by its own reader. That is the field kind the drawing was always implying and
-never named, and it exists because of this row.
+**Ruled: `ports` reads through a different path per side** — and the first version of this
+ruling called that a fourth field *kind*, `derived`, which did not survive contact with the
+code. Once every field reads through a per-side function the distinction costs nothing to
+express, so `ports` is an ordinary keyed field whose two readers happen to disagree. The
+walk was right that the row is different and wrong that the difference is a kind; a fourth
+arm would have been carried in every `switch` for one field.
+
+**And a second thing this row hides, found by writing the identical-container test.** A
+declaration and a binding are *different vocabularies*: comparing `exposed` against
+`→ 8080` means the row can never read `same`, so a container that has drifted in no way
+still reports drift on its leading row — B4's hazard arriving through B3's fix. The
+container's reader falls back to its own `ExposedPorts` when nothing is published, so an
+exposed-but-unpublished port renders in the image's own words. Measured against an
+undrifted `nginx:alpine` container: **7 rows, 0 changed.**
 
 ### B4 · a keyed field where both sides are large and nearly equal — R4
 
@@ -143,7 +160,13 @@ correct on every row and useful on none.
 
 1. **Each field normalises before comparing** (B1) — `null` and `""` both mean absent, and a
    real image made the row appear immediately.
-2. **`ports` is a distinct field kind**, not a scalar with a clever path (B3).
+2. **`ports` reads a different path per side** (B3) — and that is *not* a fourth field kind,
+   which is what the walk first called it and what the code declined.
+6. **A declaration and a binding must be spoken in one vocabulary** (B3), or the leading row
+   reports drift on every container that has none.
+7. **B1's own evidence was misread while being recorded** — `dict.get()` collapses absent and
+   `null`, which is the distinction the row exists to document. Three representations of
+   nothing, not two.
 3. **The tally excludes fields neither side has** (B5), or the number the empty-drift frame
    rests on is wrong.
 4. **A failed image lookup keeps the block** (A1), because the container's facts survive it.
