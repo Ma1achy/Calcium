@@ -185,7 +185,11 @@ export function createEngine(opts: EngineOptions): CompletionEngine {
         const stamp = { startedAt: opts.now() };
         flight.add(stamp);
         try {
-          return await cache.take(source.id, key, source.ttlMs, async () =>
+          // **The source's own discriminator, appended** (I25). A path source
+          // answers for a directory rather than for the slot, and the engine
+          // cannot work out which part of the prefix that is.
+          const sourceKey = source.cacheKey === undefined ? key : `${key}\u0000${source.cacheKey(ctx)}`;
+          return await cache.take(source.id, sourceKey, source.ttlMs, async () =>
             Promise.resolve(source.complete(ctx)),
           );
         } catch (error) {

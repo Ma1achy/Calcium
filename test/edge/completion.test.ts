@@ -107,6 +107,37 @@ describe("C19 §3 — the TTL on an injected clock (I9, I10)", () => {
     expect(source.calls()).toBe(2);
   });
 
+  it("T3.28 (I25): a path source is cached per directory, not per slot", async () => {
+    // **Found from a frame in the reference application**, whose own path
+    // source has this shape: `/config <c> /etc/ngin`, Tab, Tab — and the second
+    // draws nothing. §3's premise is that a dynamic source answers for the slot
+    // and the engine filters by prefix, which is exactly right for a UUID list
+    // and false for a path: `pathSource` reads the directory out of the prefix,
+    // so `/et` and `/etc/` are different answers under one key and the second
+    // is the first, filtered to nothing.
+    const clock = fakeClock();
+    const engine = createEngine({ now: clock.now });
+    const dirs = fakeDirs({
+      "/": [{ name: "etc", directory: true }],
+      "/etc/": [{ name: "hosts", directory: false }],
+    });
+    engine.register(pathSource(dirs.readDir));
+
+    const first = await engine.request(at("/tail /et‸"), 1);
+    expect(first.candidates.map((c) => c.value)).toEqual(["/etc"]);
+
+    const second = await engine.request(at("/tail /etc/‸"), 2);
+    expect(second.candidates.map((c) => c.value), "the directory's own entries").toEqual([
+      "/etc/hosts",
+    ]);
+
+    // **The control**, or this row passes against a source with no cache at
+    // all: two completions inside one directory are still one read.
+    const reads = dirs.reads().length;
+    await engine.request(at("/tail /etc/h‸"), 3);
+    expect(dirs.reads().length, "the same directory, inside the TTL").toBe(reads);
+  });
+
   it("T3.27 (I24): an argument's answer is cached per earlier argument, not per slot", async () => {
     // **The ordinary case, and the wording that denied it.** §3 read *everything
     // a source's answer depends on except what the user has typed so far*, which

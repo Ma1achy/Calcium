@@ -653,6 +653,36 @@ cannot make on its own.**
   returning `readonly string[]` is, and it wants specifying rather than
   inventing.
 
+## 8b. What the second consumer needed — a completion source
+
+`docker-tui` registering container, image and path sources is the first use of
+`TuiConfig.completionSources` by anything outside this package, and it found one
+thing the same way §8a's builders were found: **by trying to test the hook it
+had just implemented.**
+
+**A `CompletionSource` receives a `CompletionContext` and a consumer cannot
+construct one.** The types are exported and the producers are not — `contextAt`
+derives a context and lives behind the boundary, and the `Manifest` it takes has
+no reachable parser either, since `parseManifest` is internal and an app hands
+`createTui` an unparsed document. So a source's `complete()` is callable only by
+the shell that owns it: the one route an app writes entirely itself is the one
+it cannot exercise, and every alternative is worse than the export. Hand-building
+a context means a literal that agrees with the test and not with the derivation,
+which is the shape C19 §8b's rows exist to catch, and a deep import is the
+mechanism F7 records.
+
+So `contextAt` and `parseManifest` join the surface (I19). Both are pure
+functions over data a consumer already holds, and both have exactly the consumer
+I16 asks for: **the completion source the framework invites the app to write.**
+
+**It is the fifth mechanism this month found complete on one side of a seam and
+unreachable from the other**, after C02's capability overrides (C22 I49), the
+ghost's compositing (C22 I50), `commonPrefix`'s missing caller and the menu's
+remainder argument. The pattern is sharp enough to name: a surface is not
+finished when it is implemented and specified, it is finished when something
+outside the package has used it — and only a real consumer discovers which half
+is missing.
+
 **And one finding is about the assertions rather than the surface.**
 `degradesToAscii` caught a real defect in the probe's own adapter on its first
 run: an em-dash written as the empty-ports placeholder, which no capability
@@ -684,6 +714,7 @@ carries the state — and §7 records what that changed.
 - **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
 - **I17** — `b.seq` is the only place a block's position changes what it carries, and it changes it at construction rather than at measurement (§4a). C04 §3a's ruling stands: a block measures the same wherever it is concatenated. Before this, no code anywhere stripped a first block's gap — the rule every S-series figure depends on was discipline, and the one file in `src/` that set `gapBefore` set it by hand, per position.
 - **I18** — Every `KeyValue` the block type can hold is one `b.kv` can build. The record arm cannot express a repeated label and `KeyValue.rows` is an array, so the array arm is what closes the gap (§4). **The narrowing that C24 had already ruled on was a different one** — `KeyValueInput` against `CellInput`, which is about a value with nowhere to go — and the container was unremarked, which is how it went eleven builders and one whole app without being noticed. A builder narrower than its block is either a ruling with a reason written down or a defect; there is no third state, and the reason is what tells them apart.
+- **I19** — The producers of a hook's argument types are exported wherever the hook is: a consumer implementing `CompletionSource` can build the `CompletionContext` it receives, through `contextAt` and `parseManifest`. A type without its producer is testable only by a hand-built literal that agrees with the test rather than with the derivation.
 
 ---
 
@@ -705,6 +736,7 @@ carries the state — and §7 records what that changed.
 14. Nothing is exported that declares work no code performs; *available* is not an argument for *exported*, and neither is *specified* (I16, §3).
 15. `b.seq` holds the rule that a first block does not gap, and it is the only place a block's position changes what it carries (I17, §4a).
 16. A builder can build every block its kind can hold, or the narrowing is a ruling with its reason beside it (I18, §4).
+17. **A hook's argument types come with their producers** (I19, §8b). An app can write a completion source and could not construct a context to test it with, which the second consumer found the way the first found the builders — by using the thing.
 
 ---
 

@@ -229,11 +229,32 @@ const diff: ToolDef = {
   flags: [],
 };
 
+/**
+ * S9 — the image list, and the argument that gave completion a subject.
+ *
+ * **`repository` exists because the completion source had nothing to serve.**
+ * Building the app's sources (C19 §3 hook 4) turned up that no argument in this
+ * manifest takes an image: `/inspect` is one container in full, `/drift` takes a
+ * container, and this took nothing — so an image source would have been
+ * registered, correct, and unreachable, which is an invariant vacuous until its
+ * subject exists.
+ *
+ * The argument is docker's own and was measured before it was declared:
+ * `docker images nginx --format json` filters server-side and exits 0, and the
+ * shim passes positionals through untouched, so the adapter needs no change.
+ */
 const images: ToolDef = {
   name: "images",
   local: false,
   summary: "The images on this daemon",
-  args: [],
+  args: [
+    {
+      name: "repository",
+      type: "string",
+      required: false,
+      summary: "Only images in this repository",
+    },
+  ],
   flags: [
     {
       name: "all",

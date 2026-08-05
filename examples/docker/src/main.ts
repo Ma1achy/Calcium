@@ -28,6 +28,7 @@ import {
   createTopAdapter,
 } from "./verbs.ts";
 import { argv as eventsArgv, createEventsHandler } from "./events.ts";
+import { dockerSources } from "./completion.ts";
 
 const run = promisify(execFile);
 
@@ -176,6 +177,21 @@ const tui = createTui({
    * drawing was wrong about Calcium's own rules (FINDINGS F17a).
    */
   greeting: () => createDashboardHandler(engine, width, unicodeText)([], { command: "" }),
+  /**
+   * A02 §6 hook 4 — the domain half of completion, which no app had supplied.
+   *
+   * `TuiConfig.completionSources` has existed since C22 and this application
+   * passed none, so `/logs <Tab>` offered nothing and every candidate the demo
+   * ever showed was a manifest verb. That is the F10/F64 shape — a Calcium
+   * surface the reference application does not exercise — and unlike those two
+   * it was closeable.
+   *
+   * **The runner is injected and it is `docker` rather than the shim.** These
+   * are not adapted views: nothing appends `--json`, so there is nothing for
+   * F1's translation to do, and asking the shim would mean `--format json`
+   * arriving twice.
+   */
+  completionSources: dockerSources(async (args) => (await run("docker", [...args], { maxBuffer: 8 << 20 })).stdout),
 });
 
 await tui.start();

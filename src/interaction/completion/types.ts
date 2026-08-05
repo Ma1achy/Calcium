@@ -95,6 +95,22 @@ export interface CompletionSource {
   readonly dynamic: boolean;
   /** Dynamic only; default 60_000. */
   readonly ttlMs?: number;
+  /**
+   * What else this source's answer depends on (I25).
+   *
+   * The engine keys the cache on the slot's identity and the arguments already
+   * typed before it (I24) — everything a source's answer depends on, *if* the
+   * source answers for the slot. A path source does not: it reads the directory
+   * out of the prefix and lists it, so `/et` and `/etc/` are different answers
+   * under one key, and the second `Tab` into a subdirectory is served the first
+   * listing filtered to nothing.
+   *
+   * **Only the source can say which part**, which is why this is a hook. The
+   * whole prefix would be the defect the cache exists to prevent — a fetch per
+   * keystroke — and the engine may not interpret a prefix it hands out
+   * verbatim.
+   */
+  cacheKey?(ctx: CompletionContext): string;
   complete(ctx: CompletionContext): readonly Candidate[] | Promise<readonly Candidate[]>;
 }
 

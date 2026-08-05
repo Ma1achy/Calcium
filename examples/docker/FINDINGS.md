@@ -2493,3 +2493,88 @@ is a reliable way to demonstrate it, and step 8's "it did not reproduce" was a
 statement about that afternoon's machine.** Three measurements now, two of them
 failures, and the one that matters is the pair taken four minutes apart on the
 same commit.
+
+
+---
+
+## F70 — a completion source cannot be tested by the app that writes it
+
+`TuiConfig.completionSources` invites an application to answer for a slot. The
+answer is a function of a `CompletionContext`, and **nothing outside the package
+could build one**: `contextAt` derives a context and lived behind the boundary,
+and the `Manifest` it takes had no reachable parser either, since an app hands
+`createTui` an unparsed document. So a source's `complete()` was callable only by
+the shell that owns it.
+
+Found by writing `test/completion.test.ts` — the first thing anyone does after
+implementing a hook is try to run it — and the alternatives are each worse than
+the export. A hand-built context is a literal that agrees with the test rather
+than with the derivation, which is the class C19 §8b's rows exist to catch; a
+deep import is F7.
+
+Closed in Calcium: `contextAt` and `parseManifest` are on the public surface
+(C24 I19, §8b). **The fifth mechanism this month found complete on one side of a
+seam and unreachable from the other**, after C02's capability overrides, the
+ghost's compositing, `commonPrefix`'s missing caller, and the menu's remainder
+argument.
+
+---
+
+## F71 — the second Tab into a subdirectory draws nothing
+
+Read from a frame: `/config dtui-cfg /etc/ngin`, `Tab` — which completes to
+`/etc/nginx/` correctly — then `Tab` again, and **no menu appears at all**.
+
+C19's cache is keyed on the slot's identity and deliberately not on the prefix:
+a UUID list does not change between `a` and `ab`, and keying on what has been
+typed makes every keystroke after a `Tab` a fresh fetch. That premise is stated
+as *a dynamic source answers for the slot and the engine filters by prefix* —
+and it is **false for a path**, whose answer is a function of the directory part
+of the prefix. So the second `Tab` was served the first's listing of `/etc/`,
+filtered by `/etc/nginx/` to exactly one entry, which rule 3 then inserted
+without changing the buffer.
+
+**The framework's own `pathSource` has the same shape and had carried this since
+C19 landed.** No test reached it: completing one directory is enough for every
+row that existed. The app's source is what put a second directory in a frame.
+
+Closed in Calcium: a source may declare `cacheKey(ctx)` (C19 I25), and both path
+sources return the directory. A hook rather than a rule on the key, because only
+the source knows which part of a prefix it interpreted.
+
+---
+
+## F72 — `ls -p` does not mark a symlinked directory
+
+`/etc/nginx/modules` on the fixture container is a symlink to
+`/usr/lib/nginx/modules`. `ls -1p` appends `/` to real directories only, so the
+path source offered `modules` as a **finished word with a trailing space** — and
+the one thing a user wants to do with a directory, descend into it, is the thing
+that prevents.
+
+Measured out of the corpus rather than reasoned about: the listing was captured
+from a real container and read before it was asserted against. `ls -1pL`
+dereferences, and the corpus carries the marked form.
+
+Nothing about the candidate looks wrong. It is the delimiter, which is invisible
+until it is typed past — the same class as F68's withdrawal in reverse: there,
+the frame said a defect existed and the mechanism said otherwise; here the block
+list said nothing and only the trailing character did.
+
+---
+
+## F73 — contention fails the scan tests too, not only tier 5
+
+F69 records `dtui-load` making a tier-5 row time out. The same hazard was
+measured against **tier 2** while a build, a capture and a suite ran together:
+six rows failed, every one of them a source scan — SS10, SS19, SS44, C12's fuzz
+corpus — each timing out at 15 s having taken 24 s.
+
+| | load average 5.2 | quiet |
+|---|---|---|
+| `npm test` | **6 failed** | 2521 passed |
+
+The rows are unchanged between the two runs. It is worth recording because the
+failure names an *enforcement rule* — "SS10 finds no terminal env read outside
+capabilities.ts" — which reads as a real violation and sends a reader to look for
+one. The scans walk 174 files, and they are the slowest rows in tiers 1 to 4.

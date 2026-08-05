@@ -118,6 +118,12 @@ Dynamic results are cached on `(sourceId, contextKey)` with a 60-second TTL (`j2
 
 **`contextKey` is the slot's identity, not the prefix**, and the difference decides whether the cache is worth having. A slot is identified by its kind, the resolved tool, the flag or argument it belongs to, **and the arguments already typed before it** — everything a source's answer depends on except the token being typed. Keyed on the prefix instead, `--family=a` and `--family=ab` are different entries, every keystroke after a `Tab` is a fresh fetch, and the 60-second TTL never hits anything. The far side would be hammered for suggestions nobody asked for, which is the outcome the static/dynamic split exists to prevent, arriving through the cache instead of through the keystroke path.
 
+**A source may declare what else its answer depends on, and the framework's own path source is why** (I25). §3's premise — *a dynamic source answers for the slot and the engine filters by prefix* — is exactly right for a UUID list and false for a path: `pathSource` reads the directory out of `ctx.prefix` and lists it, so its answer is a function of part of the prefix. Under a key that excludes the prefix entirely, `ls /et⇥` lists `/` and `ls /etc/⇥` is served that same listing, filtered to nothing. The second `Tab` appears to do nothing at all.
+
+**Only the source can say which part**, which is why this is a hook rather than a rule on the key. Including the whole prefix is the defect §3 warns about — every keystroke after a `Tab` a fresh fetch — and no generic rule can extract *the directory* from a string it is not allowed to interpret. `cacheKey(ctx)` is optional, absent on every source whose answer is the slot's, and the path sources return the directory.
+
+**Measured by the reference application before it was fixed here.** docker-tui's own path source has the same shape — `docker exec <c> ls <dir>` — and its frame is where this was found: `/config dtui-cfg /etc/ngin`, `Tab`, `Tab`, and the second one draws nothing. The framework's `pathSource` had carried it since C19 landed, unreachable by any test that completes one directory.
+
 **The earlier arguments are in the key because an answer can depend on them, and the first draft's wording denied it** (I24). It read *everything a source's answer depends on except what the user has typed so far*, which is true only while no source reads another argument — and the case that breaks it is the ordinary one: a path *inside a named container* is `/config <container> <path>`, where the container is argument one and the paths are argument two. Under a key of (kind, tool, argument name) both containers share one entry, so the second is offered the first's directory listing, inside the TTL, with nothing on screen to say why.
 
 **The cost is real and it is in the right place.** Keying on earlier tokens means a fresh fetch whenever an earlier argument changes — which is exactly when the answer changes. It is not the prefix problem returning: the token being *typed* is still excluded, so `--family=a` and `--family=ab` remain one entry and the TTL still does its work.
@@ -585,6 +591,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 - **I22** — A typed menu is rebuilt from the static set on a keystroke and a requested one is filtered in place, because only the second may hold candidates that cost a source call to recover (I3). A rebuild clears the selection.
 - **I23** — The menu's last content row is a `rule`, so its bottom edge against the prompt is a line rather than a change of subject; and the "N more" remainder counts rows, because C15 truncates by clamping height and a count of blocks is off by however many candidates a block holds.
 - **I24** — A dynamic source's cache key carries the arguments typed *before* the current token as well as the slot's identity, because a source's answer may depend on them — a path inside a named container is the ordinary case. Only the token being typed is excluded, so the narrowing keystrokes after a `Tab` still share one entry.
+- **I25** — A dynamic source may declare `cacheKey(ctx)`, naming what its answer depends on beyond the slot's identity and the earlier arguments. A path source returns the directory it is about to list: its answer is a function of part of the prefix, which the engine may not interpret and no generic rule can extract.
 
 ---
 
@@ -610,6 +617,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 18. **Nothing about typing runs a dynamic source.** The as-you-type path calls `suggest`, which is static and synchronous; the split I3 states is unchanged and T2.1a is the row that keeps it (I3, I22).
 19. The menu has a bottom edge, because it spans the region and sits on the prompt: a `rule` as its last row, one row rather than a panel's two. The remainder beside it counts rows and not blocks (I23).
 20. A dynamic source may depend on an argument already typed, so the cache key carries them (I24). The token being typed is still excluded, which is what the cache was for.
+21. A source whose answer depends on part of what is typed says so through `cacheKey` (I25). The framework's own path source is the case, and a whole-prefix key would be the defect the cache exists to prevent.
 
 ---
 
@@ -681,6 +689,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T3.16**: unbalanced quotes in the input → context is `none`; nothing is offered rather than something wrong.
 - **T3.17**: cursor at position 0 of a non-empty line → verb or executable slot, as if empty.
 - **T3.18**: a dynamic source returning duplicates → deduplicated before display.
+- **T3.28** (I25): `pathSource` over a fake reader — complete `/et`, then `/etc/`, and the second is the directory's own entries rather than the first listing filtered to nothing. **The control is two completions in one directory**, which must be one read, or the row passes against a source that simply lost its cache.
 - **T3.27** (I24): two containers and one argument — `/config a /e` then `/config b /e`, with a source counting its calls. Both fetch. **The control is the same container twice**, which must fetch once, or the row passes against a cache that was simply removed.
 - **T3.25** (I23): the menu's rendered rows, with the last one asserted to be a rule and not a candidate — **read from the rows rather than from the block list**, because a block appended and never placed satisfies a test that counts blocks. The frame that argued for it is `/clear` sitting directly on `❯ /c`.
 - **T3.26** (I23): sixty candidates in a ten-row region, driven through the shell rather than through `remainderOf` — the indicator says what is missing in rows. T4.5 passes the row count by hand and agrees with the function; this one asks what the caller supplies, which is where the block count was.
@@ -735,6 +744,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T6.14** (I16): appending the delimiter after a common prefix as well as after a unique match → T1.15 fails, and the second `Tab` never reaches the menu because the token it would have widened has been closed.
 - **T6.15** (I16): moving the delimiter into the engine as one rule → T1.15b fails on two of its three cases, since nothing outside the source knows a directory from a file.
 - **T6.11** (I14): offering verbs for bare text → T1.2 fails.
+- **T6.24** (I25): dropping `cacheKey` from `pathSource` → T3.28 fails, and the second `Tab` into a subdirectory draws nothing. Reachable from the prompt and by no test that completes one directory.
 - **T6.23** (I24): dropping the earlier arguments from the key → T3.27 fails, and a second container is offered the first's directory listing for as long as the TTL lasts.
 - **T6.21** (I23): dropping the rule → T3.25 fails, and the last candidate is adjacent to the prompt again.
 - **T6.22** (I23): passing the block count as `shown` → T3.26 fails, and a menu of sixty says fifty-nine are missing when fifty are.
