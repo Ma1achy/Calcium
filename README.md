@@ -341,6 +341,17 @@ places something *was* lost.
 on each of these terminals is not its problem, and that is the entire argument for
 naming palette slots rather than colours.
 
+The same is true of the variant. `/theme light` is one command, and no adapter
+knows it happened:
+
+![The same dashboard in the light variant on a light terminal: dark text on a pale background, container names and bars in green, the busy container's CPU bar in red, blue accents in the panel title](docs/media/theme-light.gif)
+
+**Calcium paints no background, and that is a decision rather than an omission.**
+The surface tones stop at 1-bit because *background colours are the emulator's and
+a user may override them* — so a variant is a set of foregrounds chosen to pair
+with a terminal, not a skin that repaints one. The image above is rendered on a
+light terminal for that reason.
+
 ---
 
 ## The reference application

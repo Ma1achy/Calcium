@@ -2334,3 +2334,88 @@ Filed with what was measured.
 60 / 80 / 120 / 160 columns and a fixed height; the height axis has no equivalent sweep,
 and a document that renders to zero visible rows produces a frame that is *correct* — it
 is what was asked for. It took someone wanting a smaller picture.
+
+---
+
+## F68 — WITHDRAWN. The overlay is correct; the finding was not ★★★ — **retracted**
+
+**Filed, published in two READMEs, and wrong.** It claimed that the completion
+menu paints no background and that the transcript reads through the gaps between
+its columns. The second half is what a reader sees; the first half is not why,
+and there is no defect.
+
+### What was filed
+
+The menu photographed like this, and the line was quoted as the evidence:
+
+```
+/compare                                              Two containers, side by sidequiet  frosty_hodgkin
+/config        A config file as the container has it, against the image's original──────────────────────
+```
+
+Two texts on one line. Supported by a real measurement — `/config`'s diff emits
+**72** `48;2;` background sequences and the completion capture emits **zero** —
+and by C10 §4a, which added `background` to `Style` as a requirement. The
+conclusion drawn was that the overlay does not use the channel the diff does.
+
+### What going to fix it found
+
+`src/shell/composite.ts` is not only correct, it is **written against this exact
+symptom.** I29's own words:
+
+> Every cell of a box is written, background included. The prompt or the
+> transcript beneath has already painted those cells, so a loop writing only the
+> glyphs a layer's blocks produced leaves the old content showing in the gaps —
+> **and the symptom is text bleeding through a menu, which reads as a C09 defect
+> rather than a compositing one.**
+
+`layerRows` pads every row with `exact(lines[i] ?? "", p.width)`; `spliceRow`
+writes `head + body + tail`. Every cell of the box is written.
+
+**Measured, rather than read.** The same session captured twice — one with the
+Tab, one without — and the frames diffed row by row:
+
+| row | columns that differ |
+|---|---|
+| 29 | 0 – 11 |
+| 30 | 0 – 81 |
+| 31 | 0 – 81 |
+
+**The box is columns 0–81 on every row of it.** Row 29 differs only to column 11
+because its content is short *and the cells it padded were already blank* — the
+padding is written, it simply matches. Everything past column 82 is the
+transcript, correctly untouched, on all three rows.
+
+So the menu is an 82-cell box composited exactly as specified, over a 110-cell
+screen. **What I photographed is what an overlay looks like.**
+
+### What is actually true, and it is much weaker
+
+The completion menu has **no border and no background tint**, so its right edge is
+not visible: a narrow box over text reads as text overlapping text. That is a
+legibility observation about one surface's chrome, not an invariant violation —
+and C10's refusal to paint a background is a deliberate decision with its reason
+written down (*"background colours are the emulator's and a user may override
+them"*), not an omission.
+
+Whether the menu should carry a border is a design question worth asking. It is
+not a bug, and filing it as one was wrong.
+
+### Why it got through, which is the part worth keeping
+
+**The measurement was real and the inference was not.** Zero background sequences
+is a true fact about the capture; it does not imply cells go unwritten, because a
+space written in the default colours *is* a written cell and emits no background
+sequence at all. I had a number, and a specification paragraph that mentioned the
+exact symptom, and I stopped — **the spec passage that seemed to confirm the
+finding was in fact the note explaining why the implementation does not have it.**
+
+The rule this leaves: **a symptom named in a spec is evidence the authors thought
+about it, not evidence they got it wrong.** The paragraph that made the diagnosis
+feel certain should have been the first thing to check the code against.
+
+And it is the sixth blind spot pointed at myself one step later. F66 was a claim
+carried across four steps without a record. This is a claim published within the
+hour of being formed, from a measurement that was accurate about the wrong thing.
+The check that catches both is the same: *go and look at the mechanism.*
+

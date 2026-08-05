@@ -113,7 +113,34 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
 
     # 4 — the block vocabulary, at its least table-like.
     ("config-diff", 120, 34, b"/config dtui-cfg /etc/nginx/conf.d/default.conf", 12.0, TRUE, 10.0),
+
+    # 5 — the comparison block: two sources, one row per field, verdict-toned.
+    ("drift", 120, 34, b"/drift dtui-web", 12.0, TRUE, 10.0),
+
+    # 6 — completion, which is the manifest's doing and no code's. The menu is
+    #     an overlay (C15) drawn over the transcript, with each verb's summary
+    #     from the same table `/help` and dispatch use.
+    ("completion", 120, 34, b"/co", 8.0, TRUE, None),
+
+    # 7 — the light variant, **rendered on a light terminal on purpose.**
+    #     C10 paints no background: §4a's channel exists for diff rows, and the
+    #     surface tones stop at 1-bit precisely because "background colours are
+    #     the emulator's and a user may override them". So a variant is a set of
+    #     foregrounds chosen to pair with a terminal, not a skin that repaints
+    #     one — and showing `/theme light` on a dark terminal would be dark text
+    #     on a dark background, which is a picture of the wrong thing.
+    ("theme-light", 120, 34, b"/theme light", 10.0, TRUE, 8.0),
+
+    # 8 — scrolling a transcript taller than the screen.
+    ("scroll", 110, 30, b"/images", 14.0, TRUE, None),
 ]
+
+# Rendered on a different terminal palette. See shot 7.
+THEME = {"theme-light": "github-light"}
+
+# Keys sent after the command's Enter, one per second — for surfaces that are
+# only interesting once they are on screen.
+AFTER: dict[str, bytes] = {"scroll": b"\x1b[5~\x1b[5~\x1b[6~"}
 
 FONT = "13"
 
@@ -165,13 +192,31 @@ if __name__ == "__main__":
             if pre is not None
             else [(1.5, command), (3.5, b"\r")]
         )
+        # Completion needs the Tab instead of the Enter: the menu is the shot.
+        #
+        # **Early, and that is a workaround for F68 rather than a timing
+        # preference.** The overlay paints no background, so anything already on
+        # screen reads through the gaps between its columns — measured, zero
+        # `48;2;` sequences in the whole capture while `/config`'s diff emits 72.
+        # Triggering it before the landing dashboard's first fetch lands means
+        # there is nothing underneath to bleed through.
+        if name == "completion":
+            script = [(0.8, command), (1.6, b"\t")]
+        for i, key in enumerate(AFTER.get(name, b"").split(b"\x1b")[1:] if False else []):
+            pass
+        after = AFTER.get(name)
+        if after:
+            # Each key its own write, a second apart — two page-ups in one write
+            # are a paste, not two keys (C16).
+            keys = [b"\x1b" + k for k in after.split(b"\x1b") if k]
+            script += [(8.0 + i * 1.5, k) for i, k in enumerate(keys)]
         run(cols, rows, script, raw, hold, env)
         cast = raw + ".cast"
         if still is not None:
             collapse(cast, still)
         gif = os.path.join(out, name + ".gif")
         subprocess.run(
-            ["agg", "--font-size", FONT, "--theme", "asciinema",
+            ["agg", "--font-size", FONT, "--theme", THEME.get(name, "asciinema"),
              *(["--last-frame-duration", "1"] if still is not None else ["--speed", "1.3"]),
              cast, gif],
             check=True, capture_output=True,
