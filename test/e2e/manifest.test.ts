@@ -63,7 +63,12 @@ describe("C05 e2e", () => {
       // same reason.
       pty.type("/prom");
       pty.type("\t");
-      await pty.waitForFrame((f) => f.join("\n").includes("promote a candidate"), 15_000);
+      // **The insertion is the manifest's answer, and it used to be the menu.**
+      // `/prom` is a prefix of exactly one visible tool, so §5 rule 3 completes
+      // the token whole with its delimiter rather than opening a menu over a
+      // set of one — the shell reads `commonPrefix` now, and this row is what
+      // "completion draws from the manifest" looks like at a real prompt.
+      await pty.waitForFrame((f) => promptRow(f).includes("/promote "), 15_000);
 
       // (2) The refusal, which is C05's validation and not C18's parse: the
       // verb resolves and the invocation does not.
@@ -77,11 +82,8 @@ describe("C05 e2e", () => {
       // carried was already true, resolved instantly, and sent the next key to
       // a menu still holding focus — a wait on a condition that was true before
       // the key is the same class as the one `pty.ts` records for frames.
-      const MENU_ROW = "promote a candidate";
-      expect(pty.frame.join("\n"), "the menu row is on the frame").toContain(MENU_ROW);
+      expect(promptRow(pty.frame), "the verb the manifest declares").toContain("/promote");
 
-      pty.type("\u001b"); // dismiss the menu
-      await pty.waitForFrame((f) => !f.join("\n").includes(MENU_ROW), 15_000);
       pty.type("\u0015"); // ⌃u — clear the line
       await pty.waitForFrame((f) => promptRow(f).trim() === "❯", 15_000);
 
