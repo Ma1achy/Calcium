@@ -88,7 +88,25 @@ looking for problems.
 Nothing that mutates. No `stop`, no `rm`, no `run`. Every verb reads, which is
 R01's second commitment and keeps a demo you can hand to someone safe to drive.
 
-`b.live`'s streaming arm is unexercised: `docker stats` streams by redrawing the
-screen rather than by emitting records, so `/stats` polls. Recorded as F10 — the
-arm still has no consumer, and that is a claim about the framework's coverage
-rather than about this app.
+**Two block behaviours it was expected to demonstrate and does not**, in both
+cases because the far side is not the shape the block assumes:
+
+- **`b.live`'s streaming arm** — `docker stats` streams by redrawing the screen
+  rather than by emitting records, so `/stats` polls (F10).
+- **`b.logs`** — `docker logs` emits no level, and R01 commitment 5's own
+  argument forbids parsing one out of arbitrary container output, so the app
+  builds `b.raw` per line (F64).
+
+Both are claims about the framework's coverage rather than about this app, and
+both are worth more than a demonstration would have been.
+
+**One frame-read is structurally unreachable**, and the reason took three
+attempts to state correctly. `/drift` on a container whose image is gone cannot
+happen: a container pins its image blob by **digest** for as long as it exists,
+and the app resolves by digest. `docker rmi` will happily untag while the
+container runs — measured, without `-f` — but the reference the app uses cannot
+dangle. The branch that handles it is right, tested through the injected lookup,
+and has no reachable input from real docker (F66).
+
+**And R01 §13 scores the rest.** Four of twelve commitments do not hold, with
+the line count that made the first one a finding rather than a miss.

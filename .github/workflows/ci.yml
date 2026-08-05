@@ -47,6 +47,54 @@ jobs:
         env:
           TERM: xterm-256color
 
+  # R01 commitment 10, and it was not held. **This job did not exist**, so `make
+  # proof` — the one gate that proves Calcium is a package rather than a
+  # workspace — ran only when someone remembered.
+  #
+  # It was **red from PR #20 through PR #21**, two merged steps, because two of
+  # the app's test files import `../../../dist/…` (F36 and F37's missing exports)
+  # and that path is relative to the checkout. The gate copies the example into a
+  # tree that has never seen this repository, where it resolves to nothing, so
+  # both files failed at import before a single assertion ran. **A gate that is
+  # not wired is not a gate**, and the cost was two merges past a broken one.
+  # FINDINGS F60.
+  #
+  # On pull requests as well as main, for the reason the `full` job already
+  # carries: conditioning a merge gate on the ref alone means it only ever runs
+  # after the merge, on the branch nobody was gating.
+  proof:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    needs: fast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: make install
+      # Packs the real tarball, installs it into a tree that has never seen this
+      # repository, and runs **both** examples' suites against it: `docker-tui`
+      # and the README's `minimal`. It is also the only place CI runs either
+      # example's tests at all.
+      - run: make proof
+
+      # **The skip, recorded rather than silent** — R01 commitment 10's second
+      # half, which is the half that is easy to lose.
+      #
+      # This runner has no docker daemon. Every row above ran against
+      # `test/corpus/`, twelve captures taken by hand from a live daemon, which
+      # is what R01 §7's corpus is for — verified: the app's 235 rows pass with
+      # `docker` removed from `PATH` entirely.
+      #
+      # What CI therefore does **not** exercise: any verb against a real far
+      # side, the fixture containers, and every frame-read. Those are
+      # `examples/docker/VERIFYING.md`'s job and they run in the `docker-tui`
+      # devcontainer.
+      - name: record what this job did not run
+        run: |
+          echo "::notice title=real-docker::No daemon on this runner."
+          echo "::notice title=real-docker::The app's suite ran against test/corpus/ (R01 §7)."
+          echo "::notice title=real-docker::Not exercised: live verbs, make fixtures, every frame-read."
+
   # Degradation is not tested by hoping someone's laptop is misconfigured.
   degraded:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
@@ -70,7 +118,12 @@ jobs:
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [full, degraded]
+    # **`proof` is in this list and was not**, which was the wrong order in the
+    # sharpest possible way: the gate that proves the tarball installs and works
+    # did not gate publishing the tarball. It was also never run automatically
+    # (see the job above), so `publish` was reachable on a tag with the
+    # package-is-a-package claim last checked by hand at an unknown date.
+    needs: [full, degraded, proof]
     runs-on: ubuntu-latest
     permissions:
       contents: read

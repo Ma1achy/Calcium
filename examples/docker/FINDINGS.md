@@ -2234,3 +2234,60 @@ was written.
 Corrected in the index rather than in the drawing, with the tone mapping beside it: S10 is
 the surface where the drawing was wrong twice, once about the framework (F49 — `b.row`
 throws, because C04 I6 requires a glyph for `error`) and once about arithmetic.
+
+---
+
+## F66 — an impossibility asserted, never measured, and wrong about its own reason ★★
+
+Frame-read #5 of step 4 — *`/drift` on a container whose image is gone* — was carried
+from step to step as **impossible**: *docker refuses to remove an image a running
+container references and it cannot be forced.* It was listed as a stated impossibility
+rather than a skipped read, which is the right way to record one.
+
+It was never run, and it was never written down either. Step 8 went looking for the
+record, found none, and measured it instead. Both halves of the claim are wrong:
+
+```
+docker tag alpine dtui-probe:latest
+docker run -d --name c dtui-probe:latest sleep 300
+docker rmi dtui-probe:latest      -> Untagged: dtui-probe:latest      # succeeded, no -f
+docker rmi -f dtui-probe:latest   -> Error: No such image             # already gone
+docker image inspect dtui-probe:latest -> fails: the name is gone
+```
+
+**`rmi` does not refuse. It untags, without `-f`, while the container runs** — the blob
+survives because the container references it, and the *tag* does not. So a container whose
+`Config.Image` names something unresolvable is trivially constructible, and the read was
+available the whole time.
+
+**The read was then run, and `/drift` worked.** It printed `IMAGE alpine:latest` against a
+container created from a tag that no longer exists — because the app resolves the image
+from the container's top-level `Image`, which is `sha256:…`, and asks the daemon for the
+**digest**. RepoTags on the answer supplies a display name.
+
+So the impossibility is real and the reason given was not:
+
+> **A container pins its image blob by digest for as long as it exists, and the app looks
+> it up by digest. The reference cannot dangle while there is a container to drift.**
+
+That is a structural statement about the far side's model, and it is worth having where
+the old one was not: the old one would have been falsified by any docker release that
+changed `rmi`'s behaviour, and this one is falsified only by a container outliving its
+own image, which docker's storage model forbids.
+
+**The consequence is a live branch with no reachable input.** DRIFT_WALK A1 ruled that a
+failed image lookup must keep the block — the container's own facts are still good, and
+the thing reporting the absence must not replace the thing that would have explained it.
+That ruling is correct, implemented, and covered by `drift.test.ts` through the injected
+`Lookup` seam. **The real far side cannot produce the input.**
+
+Which is the honest shape of it, and the reason this is filed rather than deleted: the
+branch is not vacuous — a different far side, a pruned image store, or a `Lookup` pointed
+somewhere else all reach it — but *this* far side does not, and a defensive path whose
+only caller is a test should be labelled as one. The walk was right about what to do and
+the frame-read could never have confirmed it.
+
+**The rule this leaves**: an impossibility is a claim, and a claim carried across four
+steps without a measurement is exactly the thing this project files findings about. It
+cost twenty minutes to check and it was wrong in both directions — the case was reachable,
+and the reason it is uninteresting is better than the reason given.
