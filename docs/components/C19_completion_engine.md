@@ -266,7 +266,9 @@ Narrowing to *no* candidates leaves a layer measuring zero rows. C15 omits it fr
 
 **Two or more static candidates open the menu with no `Tab`** (I19). One candidate is ghost text's case and opens nothing: the suggestion is already on the prompt row, and a one-row menu under it draws the same word twice. Zero closes it. The threshold is where the affordances divide rather than a taste — **a menu is for a choice, and ghost text is for the absence of one.**
 
-**A typed menu holds no selection** (I20), and that is the ruling everything else here follows from. It is a display of what is available, not a choice being made, so every key that is not `Tab`, `↓` or `Esc` belongs to the prompt underneath it: `Enter` submits the line, `↑` walks history, printable characters type. `Tab` and `↓` enter the menu, and from that moment it is an ordinary menu with a selection and the §6 bindings.
+**A typed menu holds no selection** (I20), and that is the ruling everything else here follows from. It is a display of what is available, not a choice being made, so **the prompt's bindings resolve before the menu's** while it holds none: `Enter` submits the line, `↑` walks history, printable characters type, and `Esc` — which the prompt does not bind — falls through to the menu and dismisses it. `Tab` enters it, and from that moment it is an ordinary menu with a selection and the §6 bindings.
+
+**Entered by `Tab` alone, and `↓` is the reason the rule is a precedence rather than a list of keys.** `↓` at the prompt is history and then the live block (C16 I22), so a menu that opened unasked taking it would be the same theft as `Enter`. Two keys named as exceptions would also be a second keymap in the composition root, which C16 I23 exists to prevent — a precedence between two targets needs no key names at all.
 
 Without this ruling the menu is a trap rather than an affordance. `activeTarget` answers `overlay` for anything on the stack (C16 §3), so a menu that opened by itself would take `Enter` — a user typing `/ps` and pressing Enter would accept a candidate instead of running the command — and `↑` would move a selection they never asked for instead of recalling the last command. Neither is a defect in C16: a menu the user asked for should own those keys, and the difference is who asked.
 
@@ -495,7 +497,7 @@ Columns are the whole result, not the field the row is about.
 | 1 | type `/` | `/` | typed, N rows | none | prompt |
 | 2 | type `p` | `/p` | typed, 2 rows | none | prompt |
 | 3 | `Enter` | — | — | none | **prompt: submits `/p`** |
-| 3′ | `↓` instead | `/p` | requested | **0** | menu |
+| 3′ | `Tab` instead | `/ps` or menu | requested | **0** | menu |
 | 4 | `Enter` after 3′ | `/ps` | — | — | **menu: accepts** |
 | 5 | type `s` after 3′ | `/ps` | rebuilt, 1 row → dismissed | cleared | prompt |
 
@@ -532,7 +534,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 | # | The two rules | State | `Enter` | printable | `↑` | `Tab` |
 |---|---|---|---|---|---|---|
 | 1 | `activeTarget` × nothing open | no layer | submit | types | history | `complete` |
-| 2 | `activeTarget` × I20 | typed menu, no selection | **submit** | **types** | **history** | **`complete`** |
+| 2 | `activeTarget` × I20 | typed menu, no selection | **submit** | **types** | **history** | **`complete`** — the prompt's bindings resolve first |
 | 3 | `activeTarget` × §6's bindings | requested menu | accept | narrows it | `menuPrev` | `menuNext` |
 | 4 | C16 I8 × a modal | confirm | the confirm's | dropped | dropped | dropped |
 | 5 | C15 I1 × a text overlay | reverse search over a menu | the search's | the search's | the search's | the search's |
@@ -566,7 +568,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 - **I17** — C19 reads no filesystem. The `path` and `executable` sources take an injected directory reader, so every test runs without one.
 - **I18** — Every candidate the menu holds is legible in it. The table form declares a flex column, so C11 has somewhere to put residual width — it gives residual width only to columns declaring `flex: true` — and the value column's floor is the widest candidate label **plus the selection glyph**, which is on whichever row is selected. Without the flex column every cell rendered `…` at any width; without the glyph in the floor, exactly the selected row truncates, which reads as a flicker rather than as a width defect. It held for every verb carrying a summary and for no verb without one, because a candidate with no `detail` takes the pills path — so half the menu was correct and a row asserting the menu appears passed against both.
 - **I19** — Two or more static candidates open the menu with no `Tab`; one is ghost text's case and opens nothing; zero closes it. `Esc` on such a menu suppresses the opening until the cursor is in a different token or the line is submitted or cleared — otherwise the next character reopens what was just dismissed.
-- **I20** — A menu that opened by typing holds no selection, and every key it does not bind belongs to the prompt under it: `Enter` submits, `↑` walks history, printable characters type. `Tab` and `↓` enter it, and it is an ordinary menu from then on.
+- **I20** — A menu that opened by typing holds no selection, and while it holds none the prompt's bindings resolve first: `Enter` submits, `↑` walks history, printable characters type, `Esc` falls through and dismisses. `Tab` enters it, and it is an ordinary menu from then on.
 - **I21** — `Tab` over a typed menu runs §5's algorithm, dynamic sources included, rather than moving a selection; and it updates the open menu rather than pushing a second one.
 - **I22** — A typed menu is rebuilt from the static set on a keystroke and a requested one is filtered in place, because only the second may hold candidates that cost a source call to recover (I3). A rebuild clears the selection.
 
@@ -590,7 +592,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
 15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner is the one named exception: it asks how long the earliest call still in flight has been outstanding (§7).
 16. **The menu opens as you type**, on two or more static candidates, and closes at one — where ghost text takes over — or at none (I19). `Esc` holds for the rest of the token, so dismissing it is not undone by the next character.
-17. A menu nobody asked for takes no keys from the prompt: it has no selection, `Enter` submits, `↑` is history, and `Tab` or `↓` is how the user enters it (I20). `Tab` still means `Tab` there — §5's algorithm, dynamic sources and all — rather than moving a highlight (I21).
+17. A menu nobody asked for takes no keys from the prompt: it has no selection, the prompt's bindings resolve first, and `Tab` is how the user enters it (I20). `Tab` still means `Tab` there — §5's algorithm, dynamic sources and all — rather than moving a highlight (I21).
 18. **Nothing about typing runs a dynamic source.** The as-you-type path calls `suggest`, which is static and synchronous; the split I3 states is unchanged and T2.1a is the row that keeps it (I3, I22).
 
 ---
