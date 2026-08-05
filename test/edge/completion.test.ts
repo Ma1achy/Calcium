@@ -7,18 +7,39 @@ import {
   executableSource,
   flagValueSource,
   menuBlocks,
-  menuWidth,
   pathSource,
 } from "../../src/interaction/completion/index.js";
 import type { CompletionSource } from "../../src/interaction/completion/index.js";
 import { at, deferredSource, fakeClock, fakeDirs, instantSource } from "../support/completion.js";
 import type { Candidate } from "../../src/interaction/completion/index.js";
 import { createBlockRegistry, type BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { cells } from "../../src/presentation/text.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS } from "../support/render.js";
 
 const FLAG_SLOT = "/ps --status=‸";
+
+
+/**
+ * The width the menu used to declare, kept here as a *floor* for the rows that
+ * assert legibility at a narrow terminal.
+ *
+ * C19 reversed the ruling: the menu now declares no width and spans the region
+ * (C15 I16). `menuWidth` was exported from `src/` for one caller — the line that
+ * declared it — so it went with that line rather than becoming an export nothing
+ * consumes. What it measured is still the right *floor* to test against, which
+ * is what it is doing here.
+ */
+const menuWidth = (cs: readonly { value: string; display?: string; detail?: string }[]): number => {
+  let widest = 0;
+  for (const c of cs) {
+    const label = cells(c.display ?? c.value);
+    const detail = c.detail === undefined ? 0 : cells(c.detail) + 2;
+    widest = Math.max(widest, label + detail);
+  }
+  return widest + 2 + 2;
+};
 
 describe("C19 §3 — a failing source is dropped, not fatal (I6)", () => {
   it("T3.6: one of three throws and the other two still contribute", async () => {

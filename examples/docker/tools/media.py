@@ -112,7 +112,7 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
     ("depth-ascii", 100, 34, b"/container stats dtui-load", 14.0, {"LANG": "C", "DOCKER_TUI_DEPTH": "1"}, 12.0),
 
     # 4 — the block vocabulary, at its least table-like.
-    ("config-diff", 120, 34, b"/config dtui-cfg /etc/nginx/conf.d/default.conf", 12.0, TRUE, 10.0),
+    ("config-diff", 120, 40, b"/config dtui-cfg /etc/nginx/conf.d/default.conf", 16.0, TRUE, 13.0),
 
     # 5 — the comparison block: two sources, one row per field, verdict-toned.
     ("drift", 120, 34, b"/drift dtui-web", 12.0, TRUE, 10.0),
@@ -140,7 +140,14 @@ THEME = {"theme-light": "github-light"}
 
 # Keys sent after the command's Enter, one per second — for surfaces that are
 # only interesting once they are on screen.
-AFTER: dict[str, bytes] = {"scroll": b"\x1b[5~\x1b[5~\x1b[6~"}
+AFTER: dict[str, bytes] = {
+    "scroll": b"\x1b[5~\x1b[5~\x1b[6~",
+    # Ctrl-Home — `global: scrollTop`. The diff is taller than the screen and
+    # its additions are in the first hunk, so the frame that lands after the
+    # command is the *tail* of the patch: thirty deleted lines and not one
+    # added. The picture of a diff has to show both signs.
+    "config-diff": b"\x1b[1;5H",
+}
 
 FONT = "13"
 

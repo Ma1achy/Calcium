@@ -336,6 +336,20 @@ export function createConfigHandler(
           // *nothing* here — an empty patch block, which is the exact failure
           // A1 rules against. Caught by writing the row for it.
           hunks: original === null ? wholeFile(path, lines) : hunks,
+          // **Unified always, rather than C25's width default.**
+          //
+          // `layoutFor` picks split at 100 columns and above, which is a
+          // reasonable default for a framework and the wrong one for this verb.
+          // A config file is read as a *sequence* — a directive and the two
+          // lines around it — and split breaks that reading in half: the eye
+          // has to pair rows across a gutter to reconstruct an order the file
+          // already has. Split earns its place where the two sides are
+          // independent objects, which is `/drift`'s shape and not this one.
+          //
+          // It is the app's call because C25 exposes it as one: `layout` is on
+          // the block and `b.patch` passes it. The default is not wrong; it is
+          // a default, and this verb knows something the framework does not.
+          layout: "unified",
         }),
         agree
           ? // **The glyph is given rather than left to the tone**, and the

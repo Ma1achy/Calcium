@@ -47,24 +47,20 @@ function widestDetail(candidates: readonly Candidate[]): number {
   return widest;
 }
 
-/** The widest candidate label plus its glyph, in cells — the value column's floor. */
+/**
+ * The widest label plus the selection glyph — the value column's floor (I18).
+ *
+ * **The glyph is in the floor rather than in one row's cell.** It is on
+ * whichever row is selected, so a floor derived from the label alone truncates
+ * exactly the selected row, which reads as a flicker rather than as a width
+ * defect.
+ */
 function widestLabel(candidates: readonly Candidate[]): number {
   let widest = 1;
   for (const c of candidates) widest = Math.max(widest, cells(c.display ?? c.value));
   return widest + GLYPH_CELLS;
 }
 
-export function menuWidth(candidates: readonly Candidate[]): number {
-  let widest = 0;
-  for (const c of candidates) {
-    const label = c.display ?? c.value;
-    const detail = c.detail === undefined ? 0 : cells(c.detail) + 2;
-    widest = Math.max(widest, cells(label) + detail);
-  }
-  // The glyph is the selected row's and the column has to hold it whichever row
-  // that is, so it is part of the width rather than of one row.
-  return widest + GLYPH_CELLS + CHROME_CELLS;
-}
 
 /**
  * Pills when the set is short and nothing carries a hint; a table when entries
@@ -174,7 +170,18 @@ export function menuLayer(
     }),
     content: menuBlocks(candidates, selected, remainder),
     dismissable: true,
-    width: menuWidth(candidates),
+    // **No `width`, which is how a layer says *the whole region* (C15 I16:
+    // `min(layer.width ?? region.width, region.width)`).**
+    //
+    // It used to declare `menuWidth(candidates)`, the widest label plus its
+    // hint, and C19 §"the menu spans the region" is the reversal. The old
+    // ruling was right that only C19 can compute that number and wrong that it
+    // should: a menu narrower than the region leaves whatever is behind it
+    // visible on the same rows, so a reader sees two unrelated things on one
+    // line. The menu is chrome for the prompt, and the prompt spans the frame.
+    //
+    // `Layer.width` keeps its purpose — a confirm is a dialogue and wants to be
+    // forty cells and centred. That is the field's case; this was not.
   });
 }
 
