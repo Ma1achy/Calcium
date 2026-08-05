@@ -1,28 +1,42 @@
 # docker-tui
 
-![docker-tui: a ten-beat screencast — the landing dashboard refreshing in place, the /ps table, its rows walked with the arrow keys, a completion menu opening as a verb is typed, drilling into a single container where a CPU plot fills one sample at a time beside memory and network bars, a /drift comparison, a unified config diff with syntax highlighting, a log tail with container names completed from the daemon and exited with Ctrl-C, then the whole transcript scrolled back to the banner before /clear and /dashboard return the opening frame](demo.gif)
+![docker-tui: an eleven-beat screencast — the landing dashboard refreshing in place, then /ps, its rows walked with the arrow keys, a completion menu opening as a verb is typed, image and container names completed from the daemon, one dive into the live single-container view where a CPU plot fills a sample at a time, then back to the transcript for a /drift comparison, a unified config diff whose path was completed inside the container, and two short verbs — before the whole session is scrolled back to the banner and /clear and /dashboard return the opening frame](demo.gif)
 
 **A terminal interface over `docker`, built on [Calcium](../../README.md).** It is
 the framework's reference application: twelve surfaces, every block type, and a
 findings ledger recording every place the framework did not reach.
 
-Ten beats, one session, recorded against real containers: the landing dashboard,
-`/ps` and its rows under the arrow keys, a completion menu that opens as the verb
-is typed, the live single-container view filling its plot, `/drift`, `/config`'s
-unified diff, a log tail whose container name was completed from the daemon, and
-finally the whole transcript scrolled back to the banner — everything above has
-left the screen by then, and that is the only beat that shows it was kept.
+**One session that accumulates, and the screen is taken exactly once.** Eleven
+beats against real containers: the landing dashboard, `/ps` and its rows under
+the arrow keys, a completion menu that opens as the verb is typed, image and
+container names answered by the app's own sources, the dive into the live view
+filling its plot, `/drift`, `/config`'s unified diff with its path completed
+inside the container, two short verbs, and then the whole session scrolled back
+to the banner.
 
-**It ends where it starts.** `/clear` empties the transcript and `/dashboard`
-puts the opening frame back, so the last second of the recording is the first
-one and the loop has no cut in it.
+**The earlier recordings bounced, and the cause was not the pacing.** They used
+three `view: true` verbs — `/container stats`, `/inspect`, `/logs` — and a view
+is a fullscreen layer that appends nothing (A01 D7; C15 T5.5 puts it as *the
+transcript is untouched*). So leaving one gave back the frame it started from,
+and three of nine beats read as jumping to the top. Measured from the frame after
+`Esc`: the transcript held the dashboard and `/ps` and nothing else, because
+nothing had been added to it. One dive is kept, because the live plot is the
+surface everything else was built around, and the beat after it appends
+immediately so the return lands on a transcript that then grows.
+
+**It ends close to where it starts.** `/clear` empties the transcript and
+`/dashboard` puts the opening frame back: 28 of 34 rows are identical to the
+first frame, and the six that differ are the clock, two live CPU figures, and the
+three rows of echo the closing commands leave behind — a command cannot run
+without appearing in the transcript it is clearing. That is as seamless as the
+loop gets, and saying so is better than claiming a cut nobody can see.
 
 **The recording is `demo.cast`**, an asciicast written by `tools/capture.py` — the
 same capture the frames below were read from, not a second run. `agg demo.cast
 demo.gif` re-renders it. Record a new one with `python3 tools/screencast.py
 out/demo`, and read it back beat by beat with `tools/beats.py` before believing
 it: a screencast is a frame-read with an audience, and doing that here found
-four defects the suites could not — the fourth being that **the completion beat
+five defects the suites could not — the fourth being that **the completion beat
 had never worked.** `↓` moves focus into the live block, a printable key
 arriving there does nothing rather than leaking into the prompt behind it (C16
 I22, exactly as specified), and the beat before it never pressed `Esc`. So every
@@ -107,6 +121,22 @@ colours are the emulator's and a user may override them"* — so a variant is a 
 of foregrounds chosen to pair with a terminal, not a skin that repaints one.
 Shown on a dark terminal it would be dark text on a dark background, which is a
 picture of the wrong thing.
+
+### The log tail, streaming
+
+![The /logs view: nginx's startup notices followed by access-log lines, filling the screen as they arrive from a docker logs --follow that is still running](../../docs/media/logs.gif)
+
+**It has a picture because it lost its place in the overview.** `/logs` is one of
+three `view: true` verbs, and the demo keeps exactly one of those — so without a
+shot of its own the streaming surface would have had none anywhere. It is also
+the only verb in this manifest that is `view: true` **and** `streams: true`, a
+combination C05 I20 permits and nothing else here uses.
+
+The lines arrive from a `docker logs --follow` that is still running when the
+frame is taken. Getting that far took F61: `mawk` block-buffers its *input*, so
+the original pipeline delivered nothing at all — `docker logs --follow | cat`
+gave 150 lines in four seconds and `| awk` gave zero, and `/logs` had never
+worked once.
 
 ### Completion, from the manifest and from no code
 

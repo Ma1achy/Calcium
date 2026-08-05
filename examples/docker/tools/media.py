@@ -137,6 +137,16 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
 
     # 8 — scrolling a transcript taller than the screen.
     ("scroll", 110, 30, b"/images", 14.0, TRUE, None),
+
+    # 14 — **the log tail, and it is here because it left the overview.** The
+    #      demo keeps one fullscreen view and `/logs` is not it, so without a
+    #      shot of its own the streaming surface has no picture anywhere. Two
+    #      seconds of nginx access lines arriving inside a pushed view is what
+    #      it is for, and `view: true` **and** `streams: true` together is the
+    #      combination C05 I20 permits and this is the only verb that uses.
+    #
+    #      No `still`: a tail that is not moving is a table.
+    ("logs", 110, 30, b"/logs dtui-web", 16.0, TRUE, None),
 ]
 
 # Rendered on a different terminal palette. See shot 7.

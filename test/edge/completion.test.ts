@@ -249,10 +249,11 @@ describe("C19 §6 — the menu", () => {
   it("T3.13: a large set still produces one block tree and a declared width", () => {
     const many = Array.from({ length: 5_000 }, (_, i) => ({ value: `candidate-${String(i)}` }));
     const blocks = menuBlocks(many.slice(0, 40), 0, many.length - 40);
-    // The body, the indicator, and the edge last (C19 I23).
-    expect(blocks).toHaveLength(3);
-    expect(blocks[1]).toMatchObject({ kind: "raw", text: "… 4960 more" });
-    expect(blocks[2]).toMatchObject({ kind: "rule" });
+    // An edge, the body, the indicator, an edge (C19 I23).
+    expect(blocks).toHaveLength(4);
+    expect(blocks[0]).toMatchObject({ kind: "rule" });
+    expect(blocks[2]).toMatchObject({ kind: "raw", text: "… 4960 more" });
+    expect(blocks[3]).toMatchObject({ kind: "rule" });
     expect(menuWidth(many.slice(0, 40))).toBeGreaterThan(0);
   });
 
@@ -265,8 +266,15 @@ describe("C19 §6 — the menu", () => {
     const second = menuBlocks(candidates, 1, 0);
     expect(first).not.toEqual(second);
 
+    // **Found by kind, not by index.** The menu's edges are blocks too (C19
+    // I23) and this used to read `blocks[0]`, so adding the top one moved the
+    // table out from under it — a row that describes the body by where it sits
+    // breaks whenever the chrome around it changes, which is not what it is
+    // about.
     const glyphs = (blocks: readonly unknown[]): unknown[] => {
-      const table = blocks[0] as { rows: { cells: { value: { glyph?: string } } }[] };
+      const table = blocks.find((b) => (b as { kind: string }).kind === "table") as {
+        rows: { cells: { value: { glyph?: string } } }[];
+      };
       return table.rows.map((r) => r.cells.value.glyph);
     };
     expect(glyphs(first)).toEqual(["bullet", undefined]);
@@ -297,16 +305,15 @@ describe("C19 §6 — the menu", () => {
 
     for (const width of [menuWidth(detailed), 60, 100]) {
       const rows = rowsAt(detailed, width);
-      // One row per candidate, and the edge under them (C19 I23).
-      expect(rows, `${String(width)}: one row per candidate, plus the edge`).toHaveLength(3);
-      expect(rows[2], `${String(width)}: the last row is the edge, not a candidate`).toMatch(
-        /^[─-]/,
-      );
+      // One row per candidate, with an edge above and below them (C19 I23).
+      expect(rows, `${String(width)}: one row per candidate, plus two edges`).toHaveLength(4);
+      expect(rows[0], `${String(width)}: the first row is an edge`).toMatch(/^[─-]/);
+      expect(rows[3], `${String(width)}: and so is the last`).toMatch(/^[─-]/);
       for (const [i, candidate] of detailed.entries()) {
-        expect(rows[i], `${String(width)}: ${candidate.value} is legible`).toContain(
+        expect(rows[i + 1], `${String(width)}: ${candidate.value} is legible`).toContain(
           candidate.value,
         );
-        expect(rows[i], `${String(width)}: and so is its hint`).toContain(candidate.detail);
+        expect(rows[i + 1], `${String(width)}: and so is its hint`).toContain(candidate.detail);
       }
     }
 
@@ -314,14 +321,52 @@ describe("C19 §6 — the menu", () => {
     // is selected, so a floor derived from labels alone truncates exactly one
     // row — a flicker rather than a width defect, and the half that would have
     // been reported next.
-    expect(rowsAt(detailed, menuWidth(detailed))[0], "the glyph costs the column, not the label")
+    // Row 1, because row 0 is the top edge (C19 I23) — the first *candidate*
+    // row is what this is about, and naming it by index is what made the edge's
+    // arrival a failure here rather than a pass.
+    expect(rowsAt(detailed, menuWidth(detailed))[1], "the glyph costs the column, not the label")
       .toContain("/promote");
 
     // **The control, and it is why this survived four components.** A candidate
     // with no `detail` takes the pills path, which never had the defect — so a
     // row asserting only that the menu appears passed against it.
-    expect(rowsAt(plain, menuWidth(plain))[0], "the pills path drew correctly all along")
+    expect(rowsAt(plain, menuWidth(plain))[1], "the pills path drew correctly all along")
       .toContain("/serving");
+  });
+
+  it("T3.19b (I18): at a width too narrow for both columns, the label survives", () => {
+    // **The drop order, and it ran backwards for as long as the menu has had a
+    // table.** C11 admits columns by priority *descending*, and the menu
+    // declared the label below the hint — so at 80 columns over a diff it drew
+    // four summaries and not one verb name. Every row was the declared width
+    // and the block was correct; the only thing wrong was which column was
+    // there, which no assertion about widths can reach.
+    const registry = createBlockRegistry({ defaults: true });
+    registry.register(tableDefinition as unknown as BlockDefinition);
+
+    const detailed = [
+      { value: "/container", detail: "One container in full, live" },
+      { value: "/config", detail: "A config file as the container has it" },
+    ];
+    const rows = renderSequenceToLines(registry, menuBlocks(detailed, 0, 0), 44, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      // eslint-disable-next-line no-control-regex
+    }).map((l) => l.replace(/\u001b\[[0-9;]*m/g, ""));
+
+    const body = rows.slice(1, -1).join("\n");
+    expect(body, "the value is what the user is choosing").toContain("/container");
+    expect(body, "and so is this one").toContain("/config");
+    expect(body, "the hint is what goes").not.toContain("One container in full");
+
+    // **The control**: at a width that fits both, both are there — or this row
+    // passes against a menu that has simply lost its detail column.
+    const wide = renderSequenceToLines(registry, menuBlocks(detailed, 0, 0), 100, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      // eslint-disable-next-line no-control-regex
+    }).map((l) => l.replace(/\u001b\[[0-9;]*m/g, ""));
+    expect(wide.join("\n"), "both columns, given the room").toContain("One container in full");
   });
 
   it("menuWidth measures display cells, not code units", () => {

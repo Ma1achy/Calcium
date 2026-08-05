@@ -26,6 +26,8 @@ import json
 import os
 import sys
 
+from screen import render
+
 QUIET = 0.35
 
 
@@ -55,20 +57,43 @@ def settled_before(frames: list[tuple[float, bytes]], at: float) -> tuple[int, f
     return candidates[-1], frames[candidates[-1]][0]
 
 
-BEATS = [
-    ("1-launch", 8.0),
-    ("2-ps", 15.0),
-    ("3-live", 36.0),
-    ("4-drift", 51.0),
-    ("5-config", 64.0),
-    ("6-logs", 75.0),
-    ("7-after-ctrl-c", 79.0),
-]
+def beats_from_script() -> list[tuple[str, float]]:
+    """The moments the recording pauses, taken from the script that made it.
+
+    **Hand-maintained timestamps go stale silently**, and did: shortening one
+    beat by six seconds left every label after it naming a different moment, so
+    the report said the *deliberate* scroll-to-top beat was not at the top and
+    an ordinary one was. Nothing was wrong with the recording.
+
+    A settled frame is one followed by a pause, so the pauses in the script are
+    exactly the frames worth reading — and reading them from `screencast` means
+    the two cannot disagree.
+    """
+    from screencast import BEATS as SCRIPT
+
+    out: list[tuple[str, float]] = []
+    prev = 0.0
+    for at, _ in SCRIPT:
+        if at - prev > 1.2:
+            out.append((f"{len(out) + 1:02d}-t{prev:.0f}", at - 0.2))
+        prev = at
+    out.append((f"{len(out) + 1:02d}-end", prev + 2.0))
+    return out
+
+
+BEATS: list[tuple[str, float]] = beats_from_script()
+
+# The banner's first line, which is only on screen when the transcript is at its
+# very top. It is the whole of the jump test: any beat but the first and the
+# last two that answers `yes` has snapped back to the beginning.
+BANNER = "## ## ##"
 
 if __name__ == "__main__":
     cast = sys.argv[1] if len(sys.argv) > 1 else "out/demo.cast"
     outdir = sys.argv[2] if len(sys.argv) > 2 else "out/beats"
     os.makedirs(outdir, exist_ok=True)
+    cols = int(sys.argv[3]) if len(sys.argv) > 3 else 110
+    rows = int(sys.argv[4]) if len(sys.argv) > 4 else 34
     frames = load(cast)
     for name, at in BEATS:
         i, t = settled_before(frames, at)
@@ -79,4 +104,16 @@ if __name__ == "__main__":
         path = os.path.join(outdir, name + ".raw")
         with open(path, "wb") as fh:
             fh.write(buf)
-        print(f"{path}: {len(buf)} bytes, settled at t={t:.2f} (asked for {at})")
+        # **Whether the frame jumped, answered by the tool.** A dominance table
+        # showed the banner returning at three timestamps once and it was
+        # explained away as a detector artefact; the bounce was in the numbers
+        # the whole time. This asks the question directly, per beat, so it
+        # cannot be read past.
+        screen = render(buf.decode("utf8", errors="replace"), cols, rows).split("\n")
+        first = next((r.strip() for r in screen if r.strip()), "")
+        at_top = any(BANNER in r for r in screen)
+        flag = "  ** AT THE TOP **" if at_top else ""
+        print(
+            f"{path}: {len(buf)} bytes, settled at t={t:.2f} (asked for {at})\n"
+            f"    top row: {first[:64]!r}{flag}"
+        )
