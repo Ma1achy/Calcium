@@ -2630,3 +2630,54 @@ point and asking where the menu was.
 
 The instrument that found it is the one `README.md` already names — a screencast
 is a frame-read with an audience — and it is now four for four on that recording.
+
+
+---
+
+## F75 — a view leaves nothing behind, and three of them made the demo bounce
+
+The overview gif jumped back to the banner every few commands. Two rounds of
+pacing changes did not fix it, because the cause was not in the script.
+
+**Measured from the frame after `Esc` leaves `/container stats`:** the transcript
+held the dashboard and `/ps` and nothing else. `view: true` verbs — `/container
+stats`, `/inspect`, `/logs` — are fullscreen layers that append no entry (A01
+D7), and C15 T5.5 states it as *the transcript is untouched*. So the recording
+went transcript → fullscreen → **the same transcript** → fullscreen → the same
+transcript, and each return was a frame the viewer had already seen.
+
+**Correct behaviour, wrong material.** Nothing on the pop path touches the
+viewport — the position was never moved; the transcript was simply short enough
+to fit, so its first entry was at the top. A recording that wants to read as one
+session has to be built from verbs that append, and the demo now uses one view
+rather than three.
+
+**A second jump was scripted rather than structural**, and it is the more
+embarrassing half: a beat pressed `⌃Home` to "reach the patch's first hunk", but
+`/config` is `local: true` — a transcript entry, not a view — so `⌃Home` at
+`global` is `scrollTop` over the whole session. It scrolled to the banner every
+time it ran.
+
+**And `PageUp` was not the fix either.** Replacing it, `beats.py` still reported
+that beat at the top: two screens of transcript is one page, so a single `PageUp`
+reaches the banner anyway. The diff is on screen when it lands, and scrolling
+belongs to the closing beat where it is the point.
+
+## F76 — the reading tool answers the question now
+
+The bounce was in a measurement taken before any of this: a per-beat table showed
+the banner returning at three timestamps, and it was explained away as a
+detector artefact instead of looked at. The numbers were right and the reading
+was not.
+
+`tools/beats.py` prints, per beat, the transcript's top row and **whether the
+banner is on screen** — so "did it jump" is answered by the tool rather than by
+eye, and cannot be read past.
+
+**Its beat list is derived from `screencast.BEATS` rather than hand-written**,
+which is the other half. Hand-maintained timestamps went stale the first time a
+beat was shortened: every label after it named a different moment, and the report
+said the deliberate scroll-to-top beat was *not* at the top while an ordinary one
+was. Nothing was wrong with the recording. A settled frame is one followed by a
+pause, so the pauses in the script are exactly the frames worth reading, and
+taking them from the script means the two cannot disagree.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record the demo — ten beats, one session, one capture.
+"""Record the demo — eleven beats, one session, one capture.
 
     python3 tools/screencast.py out/demo
 
@@ -90,100 +90,146 @@ TOP, BOTTOM = b"\x1b[1;5H", b"\x1b[1;5F"
 
 
 def build() -> list[Beat]:
+    """Eleven beats, one session, and the screen is taken exactly once.
+
+    **The bounce was structural, not a pacing problem.** `view: true` verbs —
+    `/container stats`, `/inspect`, `/logs` — are fullscreen layers that append
+    no transcript entry (A01 D7, C15 T5.5: *the transcript is untouched*). So a
+    recording that used three of them went transcript → fullscreen → **the same
+    transcript** → fullscreen → the same transcript, and every return read as a
+    jump back to the dashboard. Measured from the frame after `Esc`: the
+    transcript held the dashboard and `/ps` and nothing else, because nothing
+    had been added to it.
+
+    One dive is kept, because the live plot is the surface everything else was
+    built around and it earns the single fullscreen moment. Beat 7 follows it
+    immediately so the return lands on a transcript that then *grows* — a
+    return to an unchanged frame is what read as a bounce.
+
+    **`⌃Home` appears once, at the end, on purpose.** The previous script
+    pressed it mid-recording to "reach the patch's first hunk", but `/config` is
+    `local: true` — its output is a transcript entry, not a view — so `⌃Home`
+    at `global` is `scrollTop` over the whole transcript and scrolled to the
+    banner every time. Moving within a patch is `PageUp`.
+    """
     b: list[Beat] = []
+
     # 1 — land, and let the dashboard tick before touching anything. A demo that
     #     starts typing immediately never shows that it was already live.
-    t = 5.5
+    t = 6.0
 
-    # 2 — the table.
+    # 2 — the table. The first thing to accumulate, and everything after it
+    #     stacks below rather than replacing it.
     part, t = command(b"/ps", t); b += part
-    t += 3.0
+    t += 3.5
 
-    # 3 — **row focus, which is the only smooth movement this shell has.**
-    #     The transcript scrolls by page and by nothing else — C16 binds
-    #     `pageup`, `pagedown`, `c+home`, `c+end` at `global` and no line step —
-    #     so "scroll slowly" is not a thing to record. What *is* smooth is the
-    #     live block's own cursor moving down its rows, which is a different
-    #     feature and the better one to show.
-    part, t = repeat(DOWN, t, 5, 0.5); b += part
+    # 3 — **row focus, the only smooth movement this shell has.** The transcript
+    #     scrolls by page and by nothing else (C16 binds `pageup`, `pagedown`,
+    #     `c+home`, `c+end` and no line step), so "scroll slowly" is not a thing
+    #     to record. The live block's own cursor moving down its rows is, and it
+    #     is the better feature to show.
+    part, t = repeat(DOWN, t, 4, 0.55); b += part
+    t += 1.0
+    part, t = repeat(UP, t, 1, 0.5); b += part
     t += 1.2
-    part, t = repeat(UP, t, 2, 0.5); b += part
-    t += 1.5
 
-    #     **`Esc` back to the prompt, and without it the next beat is dead.**
-    #     `↓` moves focus *into* the live block (C16 I22), and a printable key
+    #     **`Esc` back to the prompt, and the beat after it was dead without.**
+    #     `↓` moves focus *into* the live block (C16 I22) and a printable key
     #     arriving there does nothing — it does not leak into the prompt behind
-    #     it, which is C16 §"unconsumed keys" working exactly as written. So
-    #     every character of beat 4 was dropped, and the recording has been
-    #     showing an empty prompt where the completion menu is meant to be since
-    #     the beat was written. Nothing in the frame says so: an empty prompt is
-    #     what a prompt looks like.
-    b.append((round(t, 3), ESC)); t += 1.0
-
-    # 4 — **completion, and the menu is not asked for.** Two static candidates
-    #     open it as you type (C19 I19), so `/co` alone is the shot — no Tab,
-    #     and the pause afterwards is the point of the beat rather than dead
-    #     air. Then Tab, which still means Tab: it runs the dynamic sources and
-    #     takes the selection.
-    part, t = typed(b"/co", t); b += part
-    t += 2.0
-    b.append((round(t, 3), TAB)); t += 1.6
-    part, t = repeat(TAB, t, 2, 1.1); b += part
-    t += 1.4
+    #     it, which is C16 working exactly as written. Every character of the
+    #     completion beat was dropped for the whole life of the old recording,
+    #     and nothing in the frame said so: an empty prompt is what a prompt
+    #     looks like. FINDINGS F74.
     b.append((round(t, 3), ESC)); t += 1.2
 
-    # 5 — THE SHOT. One sample per tick at 2s, so the plot needs real time to
-    #     become a shape. Nothing else happens while it fills, on purpose.
-    part, t = command(b"/container stats dtui-load", t); b += part
-    t += 17.0
-    b.append((round(t, 3), ESC)); t += 2.0
-
-    # 6 — the comparison.
-    part, t = command(b"/drift dtui-web", t); b += part
-    t += 6.0
-
-    # 7 — the patch, then to its first hunk, then a page back down. Additions
-    #     are in the first hunk and the frame after the command is the tail.
-    part, t = command(b"/config dtui-cfg /etc/nginx/conf.d/default.conf", t); b += part
-    t += 4.0
-    b.append((round(t, 3), TOP)); t += 3.5
-    part, t = repeat(PAGE_DOWN, t, 2, 2.0); b += part
-    t += 1.5
-
-    # 8 — the log tail in a pushed view, and Ctrl-C out of it.
+    # 4 — **the menu opens unasked** (C19 I19). Two static candidates — `/images`
+    #     and `/inspect` — so `/i` alone is the shot, and the pause is the beat
+    #     rather than dead air. Then `Tab` on the argument, which is the app's
+    #     own source answering: image repositories from `docker images`.
+    part, t = typed(b"/i", t); b += part
+    t += 2.2
+    part, t = typed(b"mages ngi", t); b += part
+    t += 0.7
+    #     **`Tab` on a unique match inserts it whole** (C19 I16, §5 rule 3), so
+    #     this beat is the *insertion* and beat 5 is the menu — two different
+    #     completion behaviours rather than the same one twice.
     #
-    #     **Typed as far as the argument, then Tab**, because that argument is
-    #     where the app's own completion sources live: `container` is declared
-    #     by nine verbs and answered by `docker ps -a`, so the menu here is real
-    #     container names with their states rather than manifest verbs. It is
-    #     the only beat that shows a candidate the framework could not have
-    #     produced.
-    part, t = typed(b"/logs dtui-", t); b += part
-    t += 0.6
-    b.append((round(t, 3), TAB)); t += 2.2
-    part, t = typed(b"web", t); b += part
-    t += 0.5
-    b.append((round(t, 3), ENTER)); t += 0.0
-    t += 7.0
-    b.append((round(t, 3), b"\x03")); t += 2.5
+    #     It is also why the argument is typed as far as `ngi` first. `Tab` on
+    #     the bare argument does open the repository menu, and it is real: this
+    #     machine's is thirty-odd rows of devcontainer build images with hashes
+    #     for names. Honest and unreadable, and the container menu below shows
+    #     the same mechanism against names a viewer can take in.
+    b.append((round(t, 3), TAB)); t += 1.6
+    b.append((round(t, 3), ENTER)); t += 3.5
 
-    # 9 — **the whole transcript, from the top.** Everything above has scrolled
-    #     out of view by now — measured at thirteen dashboard rows of thirty-four
-    #     on landing and none at all by the fifth beat — so the accumulated
-    #     session is real and invisible. `⌃Home` goes to the document's first
-    #     row and `⌃End` comes back, which is the one gesture that shows both
-    #     that the transcript is kept and that it is rendered rather than
-    #     scrolled back through as text.
-    b.append((round(t, 3), TOP)); t += 3.0
+    # 5 — the second app source, and the one the original question asked for:
+    #     real container names, each with its state as a tone and its status as
+    #     the hint. Nine verbs declare a `container` argument and one source
+    #     answers all of them.
+    part, t = typed(b"/container stats dtui-", t); b += part
+    t += 0.6
+    b.append((round(t, 3), TAB)); t += 2.6
+    part, t = typed(b"load", t); b += part
+    t += 0.8
+    b.append((round(t, 3), ENTER)); t += 0.9
+    b.append((round(t, 3), ENTER)); t += 0.5
+
+    # 6 — **THE DIVE, and the only time the screen is taken.** One sample per
+    #     tick at 2 s, so the plot needs real time to become a shape. Nothing
+    #     else happens while it fills.
+    t += 16.0
+    b.append((round(t, 3), b"\x03")); t += 1.6
+    #     `⌃End` is insurance rather than a fix: the transcript was never moved
+    #     (C15 T5.5) and the viewport is still following the tail, so this lands
+    #     where it already is — but it reads as returning rather than appearing.
+    b.append((round(t, 3), BOTTOM)); t += 1.4
+
+    # 7 — immediately, so the return lands on a transcript that grows. A
+    #     comparison block: two sources, one row per field, verdict-toned.
+    part, t = command(b"/drift dtui-web", t); b += part
+    t += 5.5
+
+    # 8 — **the third app source, and the one that needs argument one to answer
+    #     argument two.** `/etc/ng` completes to `/etc/nginx/` with no delimiter
+    #     — a directory continues (C19 I16) — so the next `Tab` lists inside it.
+    part, t = typed(b"/config dtui-cfg /etc/ng", t); b += part
+    t += 0.6
+    b.append((round(t, 3), TAB)); t += 1.6
+    b.append((round(t, 3), TAB)); t += 2.4
+    part, t = typed(b"conf", t); b += part
+    t += 0.7
+    b.append((round(t, 3), ENTER)); t += 1.0
+    b.append((round(t, 3), TAB)); t += 1.4
+    b.append((round(t, 3), ENTER)); t += 5.5
+    #     **And no paging here at all.** The first draft moved within the patch
+    #     with `PageUp` — right, against `⌃Home`, which is what the old script
+    #     did and which scrolls the whole session — and `beats.py` still
+    #     reported this beat **at the top**: two screens of transcript is one
+    #     page, so a single `PageUp` reaches the banner anyway. The diff is on
+    #     screen when it lands, which is the shot; scrolling is beat 10's, at
+    #     the end, deliberately.
+
+    # 9 — two short entries, so the tail keeps moving and the transcript is
+    #     visibly longer than the screen by the time beat 10 asks about it.
+    part, t = command(b"/port dtui-web", t); b += part
+    t += 3.0
+    part, t = command(b"/top dtui-web", t); b += part
+    t += 3.5
+
+    # 10 — **the whole session, reviewed.** Everything above has left the screen
+    #      by now, so this is the only beat that shows it was kept — and it is
+    #      the rendering system as much as the transcript: the banner, the
+    #      dashboard and every block below them are still there to be drawn.
+    b.append((round(t, 3), TOP)); t += 3.2
     part, t = repeat(PAGE_DOWN, t, 3, 1.1); b += part
     t += 1.0
     b.append((round(t, 3), BOTTOM)); t += 2.0
 
-    # 10 — **the loop.** `/clear` empties the transcript and `/dashboard` puts
-    #     the opening frame back, so the last second of the recording is the
-    #     first one and the gif cycles without a cut.
+    # 11 — **the loop.** `/clear` empties the transcript and `/dashboard` puts
+    #      the opening frame back, so the last second of the recording is the
+    #      first one and the gif cycles without a cut.
     part, t = command(b"/clear", t); b += part
-    t += 1.2
+    t += 1.4
     part, t = command(b"/dashboard", t); b += part
     return b
 
