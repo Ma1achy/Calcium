@@ -107,6 +107,30 @@ describe("C19 §3 — the TTL on an injected clock (I9, I10)", () => {
     expect(source.calls()).toBe(2);
   });
 
+  it("T3.27 (I24): an argument's answer is cached per earlier argument, not per slot", async () => {
+    // **The ordinary case, and the wording that denied it.** §3 read *everything
+    // a source's answer depends on except what the user has typed so far*, which
+    // holds only while no source reads another argument. `serving scale
+    // <service> <replicas>` is the shape — and the real one is a path inside a
+    // named container, where argument two is answered by asking argument one.
+    const clock = fakeClock();
+    const engine = createEngine({ now: clock.now });
+    const source = instantSource("replicas", ["positional"], [{ value: "3" }]);
+    engine.register(source);
+
+    await engine.request(at("/serving scale web ‸"), 1);
+    await engine.request(at("/serving scale api ‸"), 2);
+    expect(source.calls(), "two services are two answers").toBe(2);
+
+    // **The control, and without it this row passes against no cache at all.**
+    // The same earlier argument still shares an entry, which is what the cache
+    // is for — and the token being *typed* is still excluded, so the keystrokes
+    // that narrow a menu do not each cost a fetch.
+    await engine.request(at("/serving scale web ‸"), 3);
+    await engine.request(at("/serving scale web 1‸"), 4);
+    expect(source.calls(), "the same service, inside the TTL").toBe(2);
+  });
+
   it("the TTL runs from resolution, not from the call", async () => {
     const clock = fakeClock();
     const engine = createEngine({ now: clock.now });
