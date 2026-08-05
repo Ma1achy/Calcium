@@ -260,11 +260,30 @@ const port: ToolDef = {
   flags: [],
 };
 
+/**
+ * S11's live one — **and `local: true`, which is the ruling rather than the
+ * convenience.**
+ *
+ * `docker events` is asked for a *window* rather than followed as a stream
+ * (`events.ts`), so this could be an adapter — one call, one document. It is a
+ * local handler because the window is re-fetched every tick and the ring that
+ * accumulates it has to outlive the fetch, and an adapter is handed one result
+ * with nowhere to keep anything. That is the same reason the dashboard is
+ * local, and gap 1's ring is the precedent.
+ */
+const events: ToolDef = {
+  name: "events",
+  local: true,
+  summary: "Container lifecycle events, newest first",
+  args: [],
+  flags: [],
+};
+
 export function buildManifest(engineVersion: string): ManifestDocument {
   return {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps, dashboard, containerStats, inspect, logs, drift, compare, config, diff, images, top, port],
+    tools: [ps, dashboard, containerStats, inspect, logs, drift, compare, config, diff, images, top, port, events],
   };
 }

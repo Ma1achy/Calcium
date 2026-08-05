@@ -657,6 +657,22 @@ neither the probe nor any Calcium test could reach them.
    and the sparkline share this source — build the buffer once, both work.
 2. **A live table that appends.** S11 `/events` grows over time — between "one live block
    that refreshes" and "a new entry per event."
+
+   **Answered — and it does not survive as
+   filed.** The premise underneath it is that the far side produces only deltas, and
+   `docker events --since 10m --until 0s --format json` exits 0 with a **window**: both
+   bounds take relative durations, so the app reads no clock it does not have (C07 I1). A
+   window is a snapshot, which is what `b.live` is for, and the adapter accumulates into
+   the ring gap 1 already built. No Calcium change.
+
+   > Before asking for an append primitive, ask whether the far side can be asked for a
+   > window.
+
+   The limit, stated: this holds for a source with a bounded historical query and **fails
+   for one without**. `docker logs` has no `--until` that leaves the follow running, which
+   is why S9 went the view+streams route (C22 I48). So both halves have an answer and
+   neither is an append primitive. `examples/docker/S11_WALK.md` §8b carries the ruling
+   and the eight-row trace; F51 is what `/events` found instead."
 3. ★ **Value-colour vs tone-colour.** A CPU bar/plot colour encodes *load* (green→red),
    not a semantic slot (ok/warn/error). Calcium's palette is tone-slots. **A load gradient
    may have no home** — the first thing docker wants that the colour model may genuinely

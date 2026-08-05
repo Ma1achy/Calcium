@@ -306,3 +306,33 @@ array back through a record turns three mappings into two.
 
 **A7 landed as ruled**, and the frame is where it is visible: an untagged image renders
 `—  —  dfaaf8991346`, its ID the only identity it has.
+
+**§8b's ruling holds, and the frame is the proof rather than the suite.** `/events` open
+for fourteen seconds while a container was stopped from another shell: the panel went from
+two rows to six, newest first, with `12:30:21  die  dtui-quiet · exit 137 · alpine:latest`
+at the top of the new ones. That is an append, drawn by a block that replaces — gap 2's
+whole question, answered by asking the far side for a window.
+
+**Two things the trace was wrong about, both found by the code.**
+
+- `b.live` returns a **`panel`**, not a `live` block, and its behaviour is held beside the
+  document rather than inside it. So a test cannot call `fetch` or `render` off what the
+  document carries, and E5 had to be driven through the handler — which is the better test
+  anyway: the ring is shared across invocations by construction, and a test calling
+  `absorb` directly would pass against a handler that rebuilt it every time.
+- **The drop notice inferred what it should have counted.** `body` said *oldest dropped*
+  when `events.length >= CAP`, comparing a ring's contents against the module constant
+  rather than against that ring's own cap — so a ring of two holding two said nothing had
+  gone, and a full default ring said something had whether or not it ever did. `history.ts`
+  has the identical rule for the identical reason, one surface over, and this was written
+  anyway. The ring counts now.
+
+**And E6's assumption was worth checking rather than trusting.** `eventsDefinition.measure`
+is `atLeastOne(length)`, so an empty `b.events` block does occupy a row and draw nothing.
+The notice is not belt-and-braces.
+
+**What `/events` found instead of gap 2**: `EventLine` has no tone and the renderer paints
+every `type` in `accent`, while the sibling `logs` kind tones its `level` from a fixed
+vocabulary. On the surface the kind is named for, `die · exit 137` is the same colour as
+`start`. F51, and it is F49's neighbour — a change axis with no home in a health palette,
+and a health axis with no way onto a block.

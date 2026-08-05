@@ -1733,3 +1733,36 @@ because the columns are not known in advance and so the widths cannot be either.
 written.** Having read it did not prevent writing it again, and the mutation for `/top`'s
 half failed nothing — twenty-four rows green against every column truncated. Only the frame
 showed either. `verbs.test.ts` T7 exists because of that mutation.
+
+---
+
+## F51 — `events` cannot say which of its events is bad, and `logs` can
+
+Two block kinds of the same shape, and only one of them tones its rows.
+
+| kind | row | what the renderer paints |
+|---|---|---|
+| `logs` | `{ ts, level, message }` | `level` in `levelTone(level)` — error, warn, dim, info |
+| `events` | `{ ts, type, message }` | `type` in `accent`, always |
+
+`/events` is the consumer. A container lifecycle stream is `create`, `start`, `die`,
+`kill`, `oom` — and on screen a `die · exit 137` is the same colour as a `start`. The
+surface the kind is *named for* is the one that cannot say which line the reader should be
+looking at.
+
+The remedy is not obviously "add a tone to `EventLine`". `logs` solved it with a **fixed
+vocabulary the renderer knows**, which is why it needs no tone field, and docker's actions
+are not that vocabulary. Either the kind takes a `tone`, which puts the choice in the
+adapter and makes two kinds inconsistent in the other direction, or it takes a severity in
+the vocabulary `logs` already uses, which asks every producer to map its own words onto
+four levels.
+
+Filed, not fixed, and it is **F49's neighbour rather than a separate thing**: F49 is a
+change axis with no home in a health palette, and this is a health axis with no way onto a
+block. Both were found the same week by two surfaces, and the pair is the argument for
+looking at C10's model rather than at either block.
+
+*Meanwhile*: the app puts the exit code in the message, so `die · exit 137` says what it
+needs to in words. That is the same answer C04's `Glyph` comment gives — what the
+vocabulary cannot say goes in the text — and it is why this is a finding rather than a
+blocker.

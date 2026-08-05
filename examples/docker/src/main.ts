@@ -27,6 +27,7 @@ import {
   createPortAdapter,
   createTopAdapter,
 } from "./verbs.ts";
+import { argv as eventsArgv, createEventsHandler } from "./events.ts";
 
 const run = promisify(execFile);
 
@@ -117,6 +118,10 @@ const tui = createTui({
     drift: createDriftHandler(),
     compare: createCompareHandler(),
     config: createConfigHandler(),
+    // The window, fetched against `docker` directly rather than through the
+    // shim: this is a local handler, so nothing appends `--json` and there is
+    // nothing to translate.
+    events: createEventsHandler(async () => (await run("docker", [...eventsArgv()], { maxBuffer: 8 << 20 })).stdout),
   },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).

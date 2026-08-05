@@ -45,6 +45,7 @@ import {
   createPortAdapter,
   createTopAdapter,
 } from "../src/verbs.ts";
+import { createEventsHandler } from "../src/events.ts";
 
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
@@ -125,6 +126,9 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   ["/port — no such container", () => createPortAdapter().adapt(result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
   ["/port — nothing published", () => createPortAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
   ["/port — ok", () => createPortAdapter().adapt(result({ stdoutRaw: read("port-real.txt") }), ctx)],
+  ["/events — the daemon is unreachable", () => createEventsHandler(() => Promise.reject(new Error("down")))([], { command: "/events" })],
+  ["/events — no lifecycle events at all", () => createEventsHandler(() => Promise.resolve(""))([], { command: "/events" })],
+  ["/events — ok", () => createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { command: "/events" })],
 ];
 
 describe("F35: every document this app produces is one C13 will accept", () => {
