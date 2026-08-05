@@ -37,6 +37,15 @@ import type { ViewDocument } from "@fmx/calcium";
 import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
 import { createContainerAdapter } from "../src/container.ts";
+import { createInspectAdapter } from "../src/inspect.ts";
+import { createConfigHandler, type Far } from "../src/config.ts";
+import {
+  createDiffAdapter,
+  createImagesAdapter,
+  createPortAdapter,
+  createTopAdapter,
+} from "../src/verbs.ts";
+import { createEventsHandler } from "../src/events.ts";
 
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
@@ -53,6 +62,14 @@ const result = (over: Partial<Record<string, unknown>> = {}): never =>
   }) as never;
 
 const ctx = { command: "/x", verb: "x", transport: "subprocess", origin: "user", width: 120 } as never;
+
+/** S8's far side, injected — see the table below. */
+const FAR = (over: Partial<Far> = {}): Far => ({
+  facts: () => Promise.resolve({ image: "nginx:alpine", mounts: ["/etc/nginx/conf.d/default.conf"] }),
+  running: () => Promise.resolve("a\nB\n"),
+  fromImage: () => Promise.resolve("a\nb\n"),
+  ...over,
+});
 
 /**
  * Every document the app can produce, named by the path that produces it.
@@ -73,6 +90,45 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   ["container stats — non-zero", () => createContainerAdapter().adapt(result({ exitCode: 1, stderr: "no such container" }), ctx)],
   ["container stats — zero rows", () => createContainerAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
   ["container stats — ok", () => createContainerAdapter().adapt(result({ stdoutRaw: read("stats-real.ndjson") }), ctx)],
+  // **S5's arms, added with the verb rather than after it.** Step 4's lesson
+  // was that three error documents shipped, two of them never run, and 91 rows
+  // agreed with all three — so a new verb's failures join this table on the day
+  // the verb exists, not on the day one is seen.
+  ["/inspect — docker exited non-zero", () => createInspectAdapter().adapt(result({ exitCode: 1, stderr: "No such object" }), ctx)],
+  ["/inspect — exit zero, empty array", () => createInspectAdapter().adapt(result({ stdoutRaw: "[]" }), ctx)],
+  ["/inspect — exit zero, unparseable", () => createInspectAdapter().adapt(result({ stdoutRaw: "<html>" }), ctx)],
+  ["/inspect --raw — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json"), argv: ["docker", "inspect", "x", "--raw"] }), ctx)],
+  ["/inspect — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json") }), ctx)],
+  // S8's arms. The far side is injected so every one of them is reachable —
+  // three of these are daemon states that occur only sometimes, and an arm that
+  // cannot be driven is an arm that never runs.
+  ["/config — no container", () => createConfigHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { command: "/config nope /x" })],
+  ["/config — no path, with candidates", () => createConfigHandler(FAR())(["dtui-cfg"], { command: "/config dtui-cfg" })],
+  ["/config — no path, no mounts", () => createConfigHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { command: "/config c" })],
+  ["/config — no arguments", () => createConfigHandler(FAR())([], { command: "/config" })],
+  ["/config — the running file is unreadable", () => createConfigHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { command: "/config c /x" })],
+  ["/config — the image side is unavailable", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { command: "/config c /x" })],
+  ["/config — the files agree", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { command: "/config c /x" })],
+  ["/config — ok", () => createConfigHandler(FAR())(["c", "/x.conf"], { command: "/config c /x.conf" })],
+  // S10 and S11's arms. **Four verbs is four more failure arms nobody reaches
+  // by accident**, which is why they arrive with the verbs rather than after
+  // the first time one is seen — step 4's lesson, applied ahead of the defect
+  // rather than behind it.
+  ["/diff — no such container", () => createDiffAdapter().adapt(result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
+  ["/diff — nothing changed", () => createDiffAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
+  ["/diff — ok", () => createDiffAdapter().adapt(result({ stdoutRaw: read("diff-real.txt") }), ctx)],
+  ["/images — daemon unreachable", () => createImagesAdapter().adapt(result({ exitCode: 1, stderr: "Cannot connect to the Docker daemon" }), ctx)],
+  ["/images — exit zero, unreadable", () => createImagesAdapter().adapt(result({ stdoutRaw: "<html>" }), ctx)],
+  ["/images — ok", () => createImagesAdapter().adapt(result({ stdoutRaw: read("images-real.ndjson") }), ctx)],
+  ["/top — container not running", () => createTopAdapter().adapt(result({ exitCode: 1, stderr: "container abc is not running" }), ctx)],
+  ["/top — exit zero, no header", () => createTopAdapter().adapt(result({ stdoutRaw: "\n" }), ctx)],
+  ["/top — ok", () => createTopAdapter().adapt(result({ stdoutRaw: read("top-real.txt") }), ctx)],
+  ["/port — no such container", () => createPortAdapter().adapt(result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
+  ["/port — nothing published", () => createPortAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
+  ["/port — ok", () => createPortAdapter().adapt(result({ stdoutRaw: read("port-real.txt") }), ctx)],
+  ["/events — the daemon is unreachable", () => createEventsHandler(() => Promise.reject(new Error("down")))([], { command: "/events" })],
+  ["/events — no lifecycle events at all", () => createEventsHandler(() => Promise.resolve(""))([], { command: "/events" })],
+  ["/events — ok", () => createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { command: "/events" })],
 ];
 
 describe("F35: every document this app produces is one C13 will accept", () => {

@@ -536,8 +536,28 @@ overrides; `docker exec cat` the running one, pull the image's original, diff.
    1 hunk · +2 -1
 ```
 
-The three line kinds, context lines, lowlight over nginx-conf/JSON/Dockerfile. **The
-unified-diff-with-context showcase** the C/A/D list could not be.
+The three line kinds, context lines, lowlight over nginx-conf/JSON/Dockerfile — the diff
+showcase the C/A/D list could not be.
+
+**Corrected in place, and the drawing was wrong three times over** (F11's precedent, ninth
+instance). Measured against `dtui-cfg`, an `nginx:alpine` container with a bind-mounted
+`default.conf`:
+
+- **It is not the *unified* showcase.** `layoutFor` chooses by width — split at a wide
+  terminal, unified below — so one verb draws both, which is more showcase than the drawing
+  asked for. Frame-read at 120 (split, two columns) and 80 (unified). The app does **not**
+  pin `layout`; taking the adaptive default is the point.
+- **The pair does not exist by default.** `nginx:alpine` ships a 44-line `default.conf` and
+  a plain container has it byte-identical. A container whose config differs from its image's
+  is one somebody set up that way, so the fixture is part of the surface.
+- **`/config <c>` cannot discover the file.** `.Mounts` gives `Type: "bind"` for a file and
+  for a directory with no distinguishing field, so the bare form offers the bind
+  destinations as candidates rather than guessing. `/config <c> <path>` is the verb.
+
+And the drawing never said it joins two sources: the running file is `docker exec <c> cat`,
+the image's needs `docker run --rm <image> cat` — **442ms, measured**, a container created,
+started, read and removed. That makes this verb an order of magnitude slower than `/drift`
+and the cost is named here rather than discovered.
 
 ---
 
@@ -637,6 +657,22 @@ neither the probe nor any Calcium test could reach them.
    and the sparkline share this source — build the buffer once, both work.
 2. **A live table that appends.** S11 `/events` grows over time — between "one live block
    that refreshes" and "a new entry per event."
+
+   **Answered — and it does not survive as
+   filed.** The premise underneath it is that the far side produces only deltas, and
+   `docker events --since 10m --until 0s --format json` exits 0 with a **window**: both
+   bounds take relative durations, so the app reads no clock it does not have (C07 I1). A
+   window is a snapshot, which is what `b.live` is for, and the adapter accumulates into
+   the ring gap 1 already built. No Calcium change.
+
+   > Before asking for an append primitive, ask whether the far side can be asked for a
+   > window.
+
+   The limit, stated: this holds for a source with a bounded historical query and **fails
+   for one without**. `docker logs` has no `--until` that leaves the follow running, which
+   is why S9 went the view+streams route (C22 I48). So both halves have an answer and
+   neither is an append primitive. `examples/docker/S11_WALK.md` §8b carries the ruling
+   and the eight-row trace; F51 is what `/events` found instead."
 3. ★ **Value-colour vs tone-colour.** A CPU bar/plot colour encodes *load* (green→red),
    not a semantic slot (ok/warn/error). Calcium's palette is tone-slots. **A load gradient
    may have no home** — the first thing docker wants that the colour model may genuinely

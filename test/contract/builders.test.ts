@@ -399,6 +399,38 @@ describe("C24 §4 — the rulings that are not mechanical", () => {
     expect(kit().renderToLines(t, 60).map(visible).join("\n")).toContain("no containers");
   });
 
+  /**
+   * C24 I18 — the array arm, and the case the record arm cannot state.
+   *
+   * The assertion is on the **rendered frame**, not on `rows.length`: what is
+   * wrong when a record swallows a duplicate is that the screen shows one
+   * binding where the container has two, and a length assertion agrees with a
+   * builder that concatenated the two values into one row.
+   */
+  it("T1.3a (I18): b.kv given an array keeps a repeated label, in order", () => {
+    const ports = b.kv([
+      { label: "80/tcp", value: "0.0.0.0:8080" },
+      { label: "80/tcp", value: "[::]:8080" },
+      { label: "443/tcp", value: "127.0.0.1:9090" },
+    ]);
+    expect(validateBlock(ports).ok).toBe(true);
+
+    const lines = kit().renderToLines(ports, 60).map(visible);
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain("0.0.0.0:8080");
+    expect(lines[1]).toContain("[::]:8080");
+    expect(lines[2]).toContain("127.0.0.1:9090");
+    // Both rows carry the label, so a reader can tell which port each binding
+    // belongs to without counting back to the last one that had a name.
+    expect(lines.filter((l) => l.includes("80/tcp"))).toHaveLength(2);
+  });
+
+  it("T1.3a (I18): the two arms agree on a value and on a tone", () => {
+    const fromRecord = b.kv({ state: b.warn("degraded") }, { id: "k" });
+    const fromArray = b.kv([{ label: "state", value: b.warn("degraded") }], { id: "k" });
+    expect(fromArray).toEqual(fromRecord);
+  });
+
   it("T3.3: b.kv with 200 rows is valid and measures linearly", () => {
     const rows: Record<string, string> = {};
     for (let i = 0; i < 200; i += 1) rows[`key${String(i)}`] = `value${String(i)}`;

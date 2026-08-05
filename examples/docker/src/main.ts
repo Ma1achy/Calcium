@@ -17,7 +17,17 @@ import { BINARY, buildManifest } from "./manifest.ts";
 import { createPsAdapter } from "./ps.ts";
 import { createDashboardHandler } from "./dashboard.ts";
 import { createContainerAdapter } from "./container.ts";
+import { createInspectAdapter } from "./inspect.ts";
+import { createLogsAdapter } from "./logs.ts";
 import { createCompareHandler, createDriftHandler } from "./drift.ts";
+import { createConfigHandler } from "./config.ts";
+import {
+  createDiffAdapter,
+  createImagesAdapter,
+  createPortAdapter,
+  createTopAdapter,
+} from "./verbs.ts";
+import { argv as eventsArgv, createEventsHandler } from "./events.ts";
 
 const run = promisify(execFile);
 
@@ -34,6 +44,30 @@ const run = promisify(execFile);
  * than handed down.
  */
 const width = (): number => process.stdout.columns || 80;
+
+/**
+ * Whether the terminal can draw block elements — `▄ ▀ █`.
+ *
+ * **Decided by the app, and that is a finding rather than a design** (F43).
+ * `detectCapabilities` is not exported and a local handler is handed no
+ * capabilities at all, so the one route an app writes entirely itself cannot
+ * ask the framework what the terminal supports — the third instance of a fact
+ * the consumer needs and is not offered (F14, F36).
+ *
+ * It matters because **capability substitution covers glyphs the framework
+ * picks, not text an adapter supplies** — step 1's em-dash finding, eight rows
+ * high. `▄▀█` in a `raw` block pass through untouched and draw as garbage on a
+ * terminal that cannot show them, so choosing is unavoidably the app's job and
+ * carrying an ASCII variant is the correct app-side answer.
+ *
+ * The test is deliberately crude: a UTF-8 locale and a terminal that is not
+ * `dumb`. Getting it wrong costs a wordmark, not correctness.
+ */
+const blockElements = (): boolean => {
+  const term = process.env["TERM"] ?? "";
+  const locale = `${process.env["LC_ALL"] ?? ""}${process.env["LANG"] ?? ""}`;
+  return term !== "" && term !== "dumb" && /utf-?8/iu.test(locale);
+};
 
 /**
  * The daemon's version, for the manifest's skew field.
@@ -69,11 +103,25 @@ const tui = createTui({
   env: process.env,
   // Keyed by the verb, and a sub-verb's key is its whole name — the space is
   // part of it, not a separator this side of C18.
-  adapters: { ps: createPsAdapter(), "container stats": createContainerAdapter() },
+  adapters: {
+    ps: createPsAdapter(),
+    "container stats": createContainerAdapter(),
+    inspect: createInspectAdapter(),
+    logs: createLogsAdapter(),
+    diff: createDiffAdapter(),
+    images: createImagesAdapter(),
+    top: createTopAdapter(),
+    port: createPortAdapter(),
+  },
   localHandlers: {
-    dashboard: createDashboardHandler(engine, width),
+    dashboard: createDashboardHandler(engine, width, blockElements),
     drift: createDriftHandler(),
     compare: createCompareHandler(),
+    config: createConfigHandler(),
+    // The window, fetched against `docker` directly rather than through the
+    // shim: this is a local handler, so nothing appends `--json` and there is
+    // nothing to translate.
+    events: createEventsHandler(async () => (await run("docker", [...eventsArgv()], { maxBuffer: 8 << 20 })).stdout),
   },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).
@@ -87,7 +135,7 @@ const tui = createTui({
    * scrolled out of view is still running. S1's drawing said it froze; the
    * drawing was wrong about Calcium's own rules (FINDINGS F17a).
    */
-  greeting: () => createDashboardHandler(engine, width)([], { command: "" }),
+  greeting: () => createDashboardHandler(engine, width, blockElements)([], { command: "" }),
 });
 
 await tui.start();

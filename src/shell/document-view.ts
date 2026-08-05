@@ -43,7 +43,8 @@
  * indivisible units, and each further reducer is that work again. They wait for
  * a consumer, like everything else here.
  */
-import type { Block, ViewDocument } from "../data/viewmodel/index.js";
+import { applyPatch } from "../data/viewmodel/index.js";
+import type { Block, ErrorLike, ViewDocument, ViewPatch } from "../data/viewmodel/index.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
 import { b } from "./builders/index.js";
 
@@ -53,12 +54,28 @@ export const DOCUMENT_VIEW_ID = "document-view";
 /** The block the view shows between `open` and `fill`. */
 const WAITING_ID = "document-view-waiting";
 
+/** The I47 indicator's id. Reserved, so a document cannot collide with it (C04 I14). */
+const TRUNCATED_ID = "document-view-truncated";
+
 export type DocumentViewMotion = "up" | "down" | "top" | "bottom" | "pageUp" | "pageDown";
 
 export type DocumentViewDeps = Readonly<{
   overlays: OverlayManager;
-  /** Measured through the registry, because the window must agree with C15. */
-  measure: (block: Block, width: number) => number;
+  /**
+   * Measured through the registry, because the window must agree with C15.
+   *
+   * **The sequence, not a block at a time** — and that distinction is a defect
+   * this used to have. `renderSequenceToLines` separates blocks, so a window of
+   * *n* blocks is *n* rows taller than the sum of their heights, and a
+   * projection that added `measure(block)` one at a time packed nearly twice
+   * what the region could hold. C15 then cut the excess in silence. The
+   * registry has `measureSequence` for exactly this and the viewport is already
+   * given it (`construct.ts`); this was handed the per-block one.
+   *
+   * Found by reading a frame, not by arithmetic: the split rendered with a
+   * blank row between every block and the projection had no idea.
+   */
+  measureSequence: (blocks: readonly Block[], width: number) => number;
   /** The region a view fills, which is the whole of it (C15 §4). */
   region: () => Readonly<{ width: number; height: number }>;
   /** A frame, because a motion changes what is on screen and nothing else will. */
@@ -88,6 +105,28 @@ export interface DocumentView {
    * covers the other side.
    */
   putBlock(blockId: string, next: Block): boolean;
+  /**
+   * Apply a `ViewPatch` to the held document — the streaming route's seam (I48).
+   *
+   * **Through C04's `applyPatch`, which is the same function C13 calls**
+   * (`transcript/store.ts`). A view that re-implemented `append` would be a
+   * second answer to a settled question, exactly as a second height codepath
+   * would be (I46).
+   *
+   * **Not merged with `putBlock`, and the difference is the contract rather
+   * than the mechanism.** `putBlock` is the refresh driver's and is total: the
+   * driver knows the id exists and a `false` means *release the host*. This
+   * reports C13's three-armed outcome, because that is what `streamInto`
+   * branches on — a malformed patch says so, an already-final one says
+   * something else, and a loop that could not tell them apart would append the
+   * wrong notice.
+   *
+   * `ok: false` with no reason when nothing is open: a patch may already be in
+   * flight when `pop()` runs, and the loop treats it as *stop consuming*.
+   * Returning rather than throwing for C13's `settle(id, doc)` reason — a throw
+   * would abandon the loop mid-iteration with the subscription still registered.
+   */
+  patch(view: ViewPatch): DocumentViewPatch;
   /** The block the view currently holds for an id, so staleness can retitle. */
   blockAt(blockId: string): Block | null;
   move(motion: DocumentViewMotion): boolean;
@@ -97,7 +136,42 @@ export interface DocumentView {
   readonly openFor: string | null;
 }
 
+/**
+ * **C13's `PatchOutcome` arms, deliberately** — minus `rev`, which is an entry's.
+ *
+ * The same discriminants because `streamInto` branches on them: a malformed
+ * patch says one thing to the reader and an already-gone target says another,
+ * and a loop that could not tell them apart would append the wrong notice. A
+ * shape of its own here rather than C13's type imported, because `rev` has no
+ * meaning for a view and a field that is always the same number is a field
+ * somebody will read.
+ */
+export type DocumentViewPatch =
+  | Readonly<{ ok: true }>
+  | Readonly<{ ok: false; reason: "closed" | "layer" | "project" }>
+  | Readonly<{ ok: false; reason: "patch"; error: ErrorLike }>;
+
 type State = Readonly<{ command: string; blocks: readonly Block[]; offset: number }>;
+
+/**
+ * The `meta` a held document is given so `applyPatch` can take it.
+ *
+ * **Never read.** `applyPatch` is pure over `blocks` and this route has no
+ * transport, no exit code and no duration — the entry route's `meta` comes from
+ * a `RawResult` and a stream has none until it ends. Written once here rather
+ * than invented per patch, so nothing downstream can mistake it for provenance.
+ */
+const EMPTY_META: ViewDocument["meta"] = Object.freeze({
+  verb: null,
+  adapter: "document-view",
+  exitCode: 0,
+  durationMs: 0,
+  truncated: false,
+  argv: [],
+  stderr: "",
+  transport: "local",
+  origin: "user",
+});
 
 export function createDocumentView(deps: DocumentViewDeps): DocumentView {
   let state: State | null = null;
@@ -110,9 +184,17 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
    *
    * **At least one block, always.** A block taller than the whole region would
    * otherwise window to nothing, and an empty view is indistinguishable from a
-   * broken one; C15 reports the overflow through `Placed.truncated`, which is
-   * what that field is for. This is the one place the block-boundary rule and
-   * the region can genuinely disagree, and showing the block is the honest half.
+   * broken one. This is the one place the block-boundary rule and the region
+   * can genuinely disagree, and showing the block is **half** the honest answer;
+   * saying that it was cut is the other half (I47).
+   *
+   * **This comment used to cite `Placed.truncated` as the mechanism reporting
+   * the overflow, and nothing here read it.** C19's menu does (C19 §5); this
+   * file named the field, named what it was for, and had no consumer of it —
+   * which reads exactly like a file that reads it. The fact is now stated on
+   * screen, and from this projection's own measurement rather than from a
+   * second layout: a row count and the region are what C15 compares too, and
+   * `deps.measure` is deliberately the same registry so the two cannot drift.
    */
   const project = (at: State): readonly Block[] => {
     const { width, height } = deps.region();
@@ -121,12 +203,60 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     let used = 0;
     for (let i = from; i < at.blocks.length; i += 1) {
       const block = at.blocks[i] as Block;
-      const rows = deps.measure(block, width);
-      if (out.length > 0 && used + rows > height) break;
+      // The candidate sequence, because what a block costs depends on what is
+      // beside it. Asking the block alone is what put the separator rows
+      // outside the arithmetic.
+      const rows = deps.measureSequence([...out, block], width);
+      if (out.length > 0 && rows > height) break;
       out.push(block);
-      used += rows;
+      used = rows;
     }
-    return Object.freeze(out);
+    // **I47 — overflow here means exactly one block, and that is a consequence
+    // rather than a test.** The loop breaks before a second block can push
+    // `used` past the region, so `used > height` can only be the first block
+    // exceeding it alone. Guarding on `out.length !== 1` as well reads as
+    // caution and is a clause nothing can make false — A03 §2's vacuity class,
+    // caught by a mutation that swapped it out and failed nothing.
+    //
+    // That single block is the unscrollable case: the offset indexes blocks, so
+    // there is no second offset to move to and the rows past the region are
+    // reachable by no key. More blocks below is *not* this — `n` reaches those,
+    // and an indicator there would cry wolf.
+    const only = out[0];
+    if (only === undefined || used <= height) return Object.freeze(out);
+    return Object.freeze([notice(used, height, width), only]);
+  };
+
+  /**
+   * The I47 indicator, **above the block it describes**.
+   *
+   * Below is where it belongs by reading order and where it cannot go: the
+   * block is taller than the region, so anything after it sits past row
+   * `height` and is the first thing cut. An indicator that the truncation
+   * truncates is A03 §2's vacuity class wearing a glyph. The implementation
+   * settled this, not the walk — the walk ruled that the view says so and had
+   * no reason to think about where.
+   *
+   * Two passes, because the indicator's own height decides how much of the
+   * block is shown and therefore the number it states. Measured rather than
+   * assumed to be one row: it wraps at a narrow width, and a hard-coded 1 would
+   * overstate what the reader can see by exactly the rows the wrap cost.
+   */
+  const notice = (rows: number, height: number, width: number): Block => {
+    const build = (hidden: number): Block =>
+      b.notice.warn(
+        `${String(hidden)} more rows — this block is taller than the screen, and `
+          + `n/p move by block so they cannot reach them`,
+        { id: TRUNCATED_ID },
+      );
+    let self = 1;
+    for (let pass = 0; pass < 2; pass += 1) {
+      const candidate = build(rows - Math.max(0, height - self));
+      const measured = deps.measureSequence([candidate], width);
+      if (measured === self) return candidate;
+      self = measured;
+    }
+    return build(rows - Math.max(0, height - self));
   };
 
   const layerFor = (at: State): Layer => ({
@@ -148,10 +278,10 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
   /** The last offset from which the tail still fills the region, or 0. */
   const lastOffset = (at: State): number => {
     const { width, height } = deps.region();
-    let used = 0;
     for (let i = at.blocks.length - 1; i >= 0; i -= 1) {
-      used += deps.measure(at.blocks[i] as Block, width);
-      if (used > height) return Math.min(i + 1, at.blocks.length - 1);
+      if (deps.measureSequence(at.blocks.slice(i), width) > height) {
+        return Math.min(i + 1, at.blocks.length - 1);
+      }
     }
     return 0;
   };
@@ -202,6 +332,50 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
       if (!applied) return false;
       deps.redraw();
       return true;
+    },
+
+    patch(view) {
+      const at = state;
+      if (at === null) return { ok: false, reason: "closed" };
+      // A whole `ViewDocument` is what `applyPatch` takes, and the view holds
+      // blocks and an offset. The command is carried so a `document` patch —
+      // which replaces the lot — cannot silently rename what the view is for.
+      const held: ViewDocument = {
+        schema: "tui.view/1",
+        command: at.command,
+        status: "ok",
+        blocks: at.blocks,
+        meta: EMPTY_META,
+      };
+      const result = applyPatch(held, view);
+      if (!result.ok) return { ok: false, reason: "patch", error: result.error };
+
+      /**
+       * **A follow keeps the bottom, and only if it had it** (I48).
+       *
+       * `lastOffset` is computed against the *old* block list, so this asks
+       * *were we at the end before this arrived* — which is the question tail
+       * semantics turn on. A reader who has scrolled up is reading, and moving
+       * the window under them is the same failure as never moving it.
+       */
+      const wasAtBottom = at.offset >= lastOffset(at);
+      const grown: State = { ...at, blocks: result.doc.blocks };
+      const candidate: State = wasAtBottom ? { ...grown, offset: lastOffset(grown) } : grown;
+      // Both assigned together or neither, for `putBlock`'s reason: a throw
+      // between the document and the projection leaves the owner holding a
+      // document no frame ever displayed.
+      let content: readonly Block[];
+      try {
+        content = project(candidate);
+      } catch {
+        return { ok: false, reason: "project" };
+      }
+      state = candidate;
+      if (!deps.overlays.update(DOCUMENT_VIEW_ID, { content })) {
+        return { ok: false, reason: "layer" };
+      }
+      deps.redraw();
+      return { ok: true };
     },
 
     blockAt(blockId) {

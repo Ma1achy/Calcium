@@ -25,12 +25,25 @@ import {
 
 const registry = createBlockRegistry();
 
-/** Every block here is three rows, so a region of six holds exactly two. */
+/**
+ * Every block here is three rows and a sequence separates them, so a region of
+ * **eight** holds exactly two — not six.
+ *
+ * **The figure was six and it was the sum of the blocks.** `renderSequenceToLines`
+ * puts a row between blocks, so two three-row blocks cost eight and the old
+ * fixture asserted a window one block wider than the frame could hold. The
+ * control below is what failed when the view stopped measuring a block at a
+ * time, which is the whole reason it names the number instead of assuming it.
+ */
 const ROWS = 3;
-const REGION = { width: 40, height: 6 };
+const REGION = { width: 40, height: 8 };
 
 const chunk = (id: string, text: string): Block =>
   b.panel(text, [b.raw(text, { id: `${id}-c` })], { id });
+
+/** A block of exactly `rows` rows — C22 I47's subject, which `chunk` cannot be. */
+const tall = (id: string, rows: number): Block =>
+  b.raw(Array.from({ length: rows }, (_, i) => `line ${String(i)}`).join("\n"), { id });
 
 const docOf = (blocks: readonly Block[]): ViewDocument => ({
   schema: "tui.view/1",
@@ -60,7 +73,7 @@ describe("C22 §13a — the document view", () => {
     redraws = 0;
     view = createDocumentView({
       overlays,
-      measure: (block, width) => registry.measure(block, width),
+      measureSequence: (blocks, width) => registry.measureSequence(blocks, width),
       region: () => REGION,
       redraw: () => {
         redraws += 1;
@@ -78,7 +91,16 @@ describe("C22 §13a — the document view", () => {
     // to `b.raw` fails *this* row with a reason, rather than silently turning
     // every window assertion into a claim about a different number of blocks.
     expect(registry.measure(chunk("probe", "x"), REGION.width)).toBe(ROWS);
-    expect(Math.floor(REGION.height / ROWS)).toBe(2);
+    // **Measured as a sequence, because that is what the view now asks and what
+    // the frame draws.** Stating it as `height / ROWS` was the arithmetic the
+    // code used rather than the one the terminal does, and the two differ by a
+    // separator per block.
+    const two = [chunk("p", "x"), chunk("q", "y")];
+    expect(registry.measureSequence(two, REGION.width)).toBe(REGION.height);
+    expect(
+      registry.measureSequence([...two, chunk("r", "z")], REGION.width),
+      "and a third does not fit",
+    ).toBeGreaterThan(REGION.height);
   });
 
   it("T4.31 (C22 I45): open pushes a view before the document exists, and fill replaces it", () => {
@@ -150,6 +172,142 @@ describe("C22 §13a — the document view", () => {
     ).toBe("refreshed");
   });
 
+  it("T4.40 (C22 I47): a block taller than the region is unscrollable, and says so", () => {
+    // **The fixture is shown to be the trap before anything is asserted about
+    // the remedy.** Without these two lines the row passes against a view that
+    // scrolls perfectly well and happens to emit a notice — and it is the
+    // *unscrollable* case I47 is about. `n` is refused, not unhelpful.
+    view.open("/watch api");
+    view.fill(docOf([tall("big", 12)]));
+    expect(view.move("down"), "no second offset to move to — the motion is refused").toBe(false);
+    expect(view.move("bottom"), "and `G` has nowhere to go either").toBe(false);
+
+    // **The indicator is first, and that is not a stylistic choice.** The block
+    // is taller than the region, so anything after it sits past the last row
+    // and is the first thing C15 cuts — an indicator below would be truncated
+    // by the truncation it reports.
+    expect(ids()[0], "above the block it describes, or it is cut with it").toBe(
+      "document-view-truncated",
+    );
+    expect(ids()).toEqual(["document-view-truncated", "big"]);
+  });
+
+  it("T4.41 (C22 I47): the count is what the reader cannot reach, wrap included", () => {
+    view.open("/watch api");
+    view.fill(docOf([tall("big", 12)]));
+
+    const indicator = content()[0] as Block;
+    const self = registry.measureSequence([indicator], REGION.width);
+    // The notice wraps at 40 columns, which is the case the two passes exist
+    // for: the indicator's own height is rows the block does not get, so a
+    // hard-coded 1 would overstate what is on screen by exactly the wrap.
+    expect(self, "the fixture wraps, or the two passes are untested here").toBeGreaterThan(1);
+
+    // The block's cost is its own sequence height, which is what the view
+    // compares against the region — reading `12` off the fixture would be
+    // asserting the arithmetic rather than the frame.
+    const block = content()[1] as Block;
+    const rows = registry.measureSequence([block], REGION.width);
+    const shown = REGION.height - self;
+    expect(indicator.kind === "notice" ? indicator.text : "").toContain(String(rows - shown));
+    // C04 I6 — a meaning tone needs a glyph, or the notice is colour alone.
+    expect(indicator.kind === "notice" ? indicator.glyph : undefined).toBeDefined();
+  });
+
+  it("T4.42 (C22 I47): more blocks below is not truncation, and gets no indicator", () => {
+    // The wolf-crying arm. `n` reaches these, so an indicator here would train
+    // the reader to ignore the one case it matters for.
+    view.open("/watch api");
+    view.fill(docOf([chunk("a", "one"), chunk("b", "two"), chunk("c", "three")]));
+    expect(ids()).toEqual(["a", "b"]);
+    expect(view.move("down"), "and this one genuinely scrolls").toBe(true);
+  });
+
+  it("T4.43 (C22 I48): a ViewPatch appends, which putBlock cannot do", () => {
+    // **The seam, and the fixture shows why `putBlock` was not enough.** A
+    // stream's first patch is an `append` against a document that does not hold
+    // the block, which is precisely the case `putBlock` refuses.
+    view.open("/logs api");
+    view.fill(docOf([]));
+    expect(view.putBlock("line-0", chunk("line-0", "one")), "putBlock refuses it").toBe(false);
+
+    expect(view.patch({ op: "append", block: chunk("line-0", "one") })).toEqual({ ok: true });
+    expect(view.patch({ op: "append", block: chunk("line-1", "two") })).toEqual({ ok: true });
+    expect(ids()).toEqual(["line-0", "line-1"]);
+  });
+
+  it("T4.44 (C22 I48): it goes through C04's applyPatch, so C04 I14 is enforced here too", () => {
+    // Not a second patch model: a duplicate id is refused by the same function
+    // C13 calls, with the same reason, rather than by a rule this file invented.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "one")]));
+    const again = view.patch({ op: "append", block: chunk("a", "two") });
+
+    expect(again.ok).toBe(false);
+    expect(again.ok === false && again.reason, "C13's arm, so the loop can branch").toBe("patch");
+    expect(
+      again.ok === false && again.reason === "patch" ? again.error.message : "",
+      "and it names C04 I14 rather than restating it here",
+    ).toContain("I14");
+    expect(ids(), "and nothing was written").toEqual(["a"]);
+  });
+
+  it("T4.45 (C22 I48): a patch after the pop is refused, never thrown", () => {
+    // Walk A4. The abort is cooperative, so a patch may be in flight when the
+    // pop runs; a throw would abandon the streaming loop mid-iteration with the
+    // subscription still registered — C13's `settle(id, doc)` hazard.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "one")]));
+    view.pop();
+
+    let outcome: ReturnType<DocumentView["patch"]> | null = null;
+    expect(() => {
+      outcome = view.patch({ op: "append", block: chunk("b", "two") });
+    }).not.toThrow();
+    expect(outcome).toEqual({ ok: false, reason: "closed" });
+  });
+
+  it("T4.46 (C22 I48): a replace reaches a block the window is not showing", () => {
+    // The same property T4.35 holds for `putBlock`: the owner holds the
+    // document and the layer holds a window, so a patch addresses the document.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "one"), chunk("b", "two"), chunk("c", "three")]));
+    expect(ids(), "`c` is out of the window").not.toContain("c");
+
+    expect(view.patch({ op: "replace", blockId: "c", block: chunk("c", "patched") }).ok).toBe(true);
+    view.move("bottom");
+    const back = content().find((x) => x.id === "c");
+    expect(back?.kind === "panel" ? back.title : null).toBe("patched");
+  });
+
+  it("T4.47 (C22 I48): an append holds the bottom, so a follow follows", () => {
+    // **Found by reading a frame, not by either walk artefact.** A stopped
+    // container's follow showed twenty-six lines of start-up and no sign that
+    // anything had happened since — the new output and the terminal notice were
+    // both below the fold, for ever.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "1"), chunk("b", "2"), chunk("c", "3")]));
+    view.move("bottom");
+    const atBottom = ids();
+    expect(atBottom, "the fixture is at the end before anything arrives").toContain("c");
+
+    view.patch({ op: "append", block: chunk("d", "4") });
+    expect(ids(), "the window moved with the append").toContain("d");
+  });
+
+  it("T4.48 (C22 I48): a reader who scrolled up is left alone", () => {
+    // The other half, and it is the same defect reversed: a window that moves
+    // under someone reading is as wrong as one that never moves.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "1"), chunk("b", "2"), chunk("c", "3")]));
+    view.move("top");
+    expect(ids(), "parked at the top").not.toContain("c");
+
+    view.patch({ op: "append", block: chunk("d", "4") });
+    expect(ids(), "and still parked at the top").not.toContain("d");
+    expect(ids()[0]).toBe("a");
+  });
+
   it("T4.36 (C22 I45): pop closes the view and leaves nothing behind", () => {
     view.open("/watch api");
     view.fill(docOf([chunk("a", "one")]));
@@ -184,7 +342,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
 
     const view = createDocumentView({
       overlays,
-      measure: (blk, width) => registry.measure(blk, width),
+      measureSequence: (blks, width) => registry.measureSequence(blks, width),
       region: () => REGION,
       redraw: () => undefined,
     });

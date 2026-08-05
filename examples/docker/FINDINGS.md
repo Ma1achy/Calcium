@@ -1,5 +1,10 @@
 # docker-tui — findings
 
+**Triaged in [`TRIAGE.md`](TRIAGE.md)** — the same forty-four grouped by shape and ranked by
+how many surfaces hit them. This file is the log, in the order things were found; that one
+is the view a reader deciding what to do next needs. Past thirty entries, *filed* stops
+telling anyone which are one change and which are forty.
+
 What the first consumer found, in the shape Calcium recorded its own: **the surface that
 needed it**, **what was reached for**, and **whether it is adapter-side work or a real
 Calcium finding**.
@@ -1362,6 +1367,228 @@ framework holds a check the consumer needs and does not offer it.
 
 ---
 
+## F37 — no producer can see the region, and one cannot measure a block either ★★★
+
+**The threshold a view's producer needs is unreachable from the only two places that build
+a document.** `AdapterContext` carries `width` and no height (`data/adapters/types.ts`);
+`LocalContext` carries `command` and nothing else; and reading the terminal is forbidden
+outside `terminal/lifecycle.ts`. So an app deciding how to divide content for a **pushed
+view** — whose whole bound is the region — has no legitimate way to know what it is
+dividing against.
+
+`INSPECT_WALK.md` B1 ruled *"split by keys while a block overflows the region, and measure
+to decide"*, and the code falsified it within an hour. What is reachable is a **declared
+floor**, and the asymmetry is what saves it from being the fixed constant the walk rejected:
+over-splitting costs granularity, under-splitting strands rows a reader cannot reach, so a
+floor is correct at every region above it and honest below. `SPLIT_FLOOR = 21` is a 24-row
+terminal's region — measured, 114 blocks, **0 rows stranded at 40 rows and 3 at 24**,
+against 208 stranded by no split at all.
+
+**The second half is that the app cannot measure a block.** `createBlockRegistry` is not
+public, so `codeRows` reimplements the measurer's arithmetic — exactly the drift CLAUDE.md
+forbids. `cells` *is* public, which is the sanctioned half; the rest is pinned against the
+real measurer by deep import (`test/inspect.test.ts` I1), and **it caught the arithmetic
+being wrong on its first run**: 69 against 68, because a code block wraps at the full width
+and the first version assumed a border inset.
+
+Same family as F14 (a local handler has no width) and F36 (an app cannot validate). Three
+instances now of *the framework holds a fact the consumer needs and does not offer it*, and
+this is the first where the missing fact is the one the surface is defined by.
+
+---
+
+## F38 — a drawing's footer promises a key with no binding
+
+S5 draws `r raw` in the view's footer. There is no plain `r` at the `pushedView` target —
+`keymap.ts` has `Ctrl-R` at `prompt` and at `overlay`, and nothing else. A toggle is a C16
+keymap change *and* a mode the view does not hold, so `--raw` is a flag in this step.
+
+Fourth time a drawing has committed the framework to something unbuilt (F4, F11, F30's
+verdict, this). Filed rather than fixed: a view that re-fills itself from a mode it holds is
+a real feature, not a binding.
+
+---
+
+## F39 — a flag that selects a rendering is sent to the far side ★★★
+
+**Every flag a `ToolDef` declares is transmitted.** C06 I4 sends argv over verbatim, which
+is right for `--all` and wrong for `--raw`: `/inspect <c> --raw` ran
+`docker inspect <c> --raw` and docker exited 125 with `unknown flag: --raw`. There is no way
+to declare a flag that selects a **rendering** rather than an invocation.
+
+**Found by reading the frame, and the suite could not have found it.** All twelve rows for
+this verb passed, because they hand argv to the adapter directly and never spawn anything —
+the tests cover the mechanism and this is the wiring. The recurrence CLAUDE.md names, in the
+place it keeps happening.
+
+Absorbed by the shim, which now strips `--raw` for `inspect` before `exec docker`. The
+adapter still sees it, because `RawResult.argv` is what Calcium built rather than what
+reached the binary. Third translation in that file and the first that is not about docker's
+shape at all — `--json` and `--no-stream` are about the far side; this one is about the
+framework having no place to put a presentation flag.
+
+---
+
+## F40 — the document view measured its window a block at a time ★★★ — **fixed**
+
+A rendered sequence separates its blocks, so *n* blocks occupy *n* rows more than the sum of
+their heights. `document-view.ts` projected by adding `measure(block)` one at a time, so it
+packed nearly twice what the region holds and C15 cut the excess in silence. The registry
+has `measureSequence` and C14 is already given it; the view was handed the per-block one.
+
+**Invisible for the same reason S3's granularity was.** With four blocks the error is four
+rows against a region with room to spare; with 103 it is 103. A defect proportional to a
+count that every existing surface kept small reads as correct until one does not — and no
+arithmetic finds it, because both sides of the comparison are the code's own.
+
+Found by reading a frame and seeing a blank row between every block. Fixed, with the
+contract test's fixture corrected from 6 to 8 rows — the control had stated the region as
+`height / ROWS`, which was the arithmetic the code used rather than the one the terminal
+does, and it failed the moment the view started measuring what is drawn.
+
+---
+
+## F41 — `b.patch` cannot say what it elided below the last hunk
+
+`Patch.collapsedAfter` exists and is documented at length — *"one hunk at line 18 of a
+200-line file elides 14 lines above and 170 below"* — and `b.patch` passes `path`,
+`language`, `hunks` and `layout`, and not that. `Hunk.collapsedBefore` **is** reachable, so
+a patch can state what it skipped above each hunk and never what it skipped below the last
+one.
+
+`/config` is the consumer: a 44-line file with one hunk near the top ends with about thirty
+lines that simply stop. `test/config.test.ts` C4 asserts the gap rather than only filing it.
+
+**F27's shape, third instance** — a complete mechanism on one side, unreachable from the
+builder. F27's `yMin`/`yMax` closed the same way and this is one line.
+
+---
+
+## F42 — a drawing named a layout the framework chooses by width
+
+S8 called itself *"the unified-diff-with-context showcase"*. `layoutFor` picks split at a
+wide terminal and unified below, so the app pinning `layout: "unified"` would have discarded
+a capability to satisfy a sentence. Frame-read at both: **split at 120, unified at 80, from
+one verb and no flag.**
+
+Not a defect in either — it is the fifth time a drawing has described the framework rather
+than been checked against it (F4, F11, F30's verdict, F38, this), and the pattern is worth
+the entry more than the instance is. Corrected in `DOCKER_TUI_SURFACES.md` in place.
+
+---
+
+## F43 — an app cannot ask what the terminal supports ★★★
+
+`detectCapabilities` is not exported (`src/index.ts`), and `LocalContext` carries `command`
+and nothing else. So the one route an app writes entirely itself cannot ask the framework
+what the terminal can draw, and `main.ts` sniffs `TERM` and `LANG` itself — duplicating
+`terminal/capabilities.ts` in the app, which is precisely what C02 exists to prevent.
+
+**It is not avoidable by deferring to the framework**, and that is what makes it a gap
+rather than a preference. Step 1's em-dash finding established that *capability
+substitution covers glyphs the framework picks, not text an adapter supplies*: `▄ ▀ █` in a
+`raw` block pass through untouched and draw as garbage on a terminal that cannot show them.
+So the app **must** choose, and it must choose without being told.
+
+Third instance of the family, and now the strongest: **F14** (a local handler has no width,
+so `main.ts` reads `process.stdout.columns`), **F36** (an app cannot validate a document it
+built), and this. All three are *the framework holds a fact the consumer needs and does not
+offer it*, all three are worked around by the app duplicating framework code, and F14's
+workaround is already documented as wrong across a resize.
+
+---
+
+## F44 — the banner's own document was wrong three times, and measuring caught each
+
+Not a Calcium finding — an artefact one, filed because the *pattern* is the fourth of its
+kind (F4, F11, F32, this) and the pattern is worth more than any instance.
+
+`DOCKER_TUI_BANNER.md` stated the whale's per-row extents as `40, 31, 31, 33, 40, 28, 25, 22`;
+measured, they are `31, 31, 31, 33, 40, 29, 26, 23` — **four of eight wrong**. It stated
+`whale(40) + gap(4) + wordmark(60) = 103`, which comes to 104, because the wordmark's
+content is 59 and its stored width 60. And its tier table gave fixed thresholds that are
+right for the block wordmark and wrong for the ASCII one, which is 76 cells and fits the
+tier the table reserved for the whale alone.
+
+Every one was found by building the thing and measuring, and none by reading. All three
+corrected in place.
+
+The one claim that was **right and would have bitten if trusted as written**: the wordmark's
+top pad is already in the document — 8 rows, first blank, 7 of content. The instruction said
+*add one row*, which would have produced nine, and a build step that trimmed blank lines
+would have silently undone a padding its author believed applied. `test/banner.test.ts` K3
+holds it, and the whole art is pinned against the document's fenced blocks so the two cannot
+drift.
+
+---
+
+## F45 — an app cannot render a stream that is not JSON ★★★
+
+C07 rules that **an adapter with `adaptPatch` owns the `data` row and nothing else**
+(`adapters/stream.ts:64`). The degradation rows are the transport's own reporting, and for a
+JSON far side that is right: an unparseable line among good ones is noise, not content.
+
+**For `docker logs` every line is unparseable**, so the app's `adaptPatch` is never
+consulted and C07's fallback accumulates the whole follow into **one growing `raw` block**
+(`REMAINDER_ID`, replaced per line). In a transcript entry that is fine — C14 windows an
+entry by rows. In a **view** it is precisely the pathology C22 I47 was written for: the
+window falls on block boundaries, so one block taller than the region is shown cut and
+reachable by no key, and a follow makes it taller every second.
+
+Two mechanisms, each correct, whose combination is not. **Measured in a frame**: the
+indicator fired with *"81 more rows"* and the follow was unreadable.
+
+**The app has no route at all** — it cannot see the lines, so it cannot choose a block per
+line. Absorbed by the shim, which wraps each line as `{"line": "..."}` and thereby makes
+`docker logs` into the JSON-emitting CLI this framework is for. That is an honest
+translation rather than a workaround (R01's premise is a far side that speaks JSON, and this
+verb does not) — and **the cost is `exec`**: a pipeline means the shim waits rather than
+being replaced, so C21's SIGTERM arrives at the shell instead of at docker and a `trap`
+forwards it.
+
+The fix with a consumer behind it is narrower than *expose everything*: **an adapter that
+declares `adaptPatch` should be offered `malformed` when the stream has degraded**, which is
+the state in which those lines are content rather than noise.
+
+---
+
+## F46 — the stdout/stderr split is a JSON-CLI assumption, and a log verb inverts it
+
+C06 streams stdout; stderr is diagnostics. That is the right split for a far side whose
+stdout is data — and `docker logs` relays the *container's* two channels, so for most server
+software the content is on stderr. nginx writes every `[notice]` and every request line
+there.
+
+**The first `/logs` frame showed the entrypoint's seven start-up lines and then nothing, for
+ever** — which reads exactly like a container that has gone quiet, and is the most plausible
+wrong reading available. Found by reading the frame and noticing which lines were missing
+rather than that any were.
+
+Absorbed by the shim (`2>&1` for `logs` only). Filed because the general form is real: a
+verb whose output *is* the far side's stderr has no way to say so, and `Invocation` has no
+field for it.
+
+---
+
+## F47 — a pushed view did not follow its own stream ★★★ — **fixed**
+
+`/logs` on a container that stopped mid-follow showed twenty-six lines of start-up and no
+sign that anything had happened since. The window sat at offset 0 while the document grew
+beneath it, so **the output the reader asked to watch and the terminal notice above it were
+both below the fold, permanently**.
+
+**Neither walk artefact reaches it.** A rule about what a frame *contains* is invisible to a
+table indexed by obligations and to a trace indexed by events — the fifth recorded blind
+spot, third surface it has caught. And it is invisible to the suite for the same reason: the
+route tests assert *the patch arrived in the document*, which was true throughout.
+
+Fixed as C22 I48's last clause: **an append holds the window at the bottom when it was at
+the bottom, and leaves it alone otherwise.** Both halves are the ruling — a window that
+never moves shows its first screen for ever, and one that moves under a reader who has
+scrolled up is the same fault reversed.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
@@ -1414,3 +1641,128 @@ needs it is built.
   docker. R01's claim was that an app over 300 lines has been made to write something
   generic; five things, and the largest is a parser for the format the framework's own
   transport could not read.
+
+---
+
+## F48 — a builder narrower than its block, where the narrowing was never ruled ★★★ — **fixed**
+
+`KeyValue.rows` is `readonly { label; value; tone? }[]`. `b.kv` took
+`Record<string, string | KeyValueInput>`. So the block could always carry a repeated label
+and the builder could not.
+
+The consumer is `/port`. A published container port has one binding per address family:
+
+```
+$ docker port dtui-port
+80/tcp -> 0.0.0.0:8080
+80/tcp -> [::]:8080
+443/tcp -> 127.0.0.1:9090
+```
+
+A record built by `reduce` keeps the second and loses the first, with nothing said. Three
+mappings become two, and the frame shows a container publishing on IPv6 only.
+
+**What makes this worth an invariant rather than a patch**: C24 had already ruled on a
+narrowing here, and it is a different one — `KeyValueInput` against `CellInput`, because a
+`KeyValue` row has nowhere to put a glyph. That ruling is sound and it is about the
+*value*. The container went unremarked, through eleven builders and one whole application,
+because the documented narrowing reads as covering the parameter.
+
+**Fixed**: C24 I18 and commitment 16, `b.kv` gains an array arm, the record arm stays and
+stays the one to reach for. `S11_WALK.md` A5.
+
+---
+
+## F49 — a change axis has no home in a health palette ★★★
+
+S10 draws `/diff` with `+` added in **ok** tone, `-` deleted in **error**, `~` modified in
+**warn**. `b.row` threw:
+
+```
+cell: tone "error" requires a non-empty glyph (C04 I6, D29)
+      — colour alone does not survive 1-bit or a colour-blind reader
+```
+
+**The throw was right, twice over.** A deleted file is a fact about a container, not a
+fault, and `error` is a health slot; and the marker `-` already carries the distinction
+without colour, which is what I6 exists to guarantee. So the app carries the change axis in
+the marker and the word, and takes its tones from the slots that claim no severity —
+`ok`, `accent`, `muted`.
+
+But the drawing was not being careless. It wanted **three colours meaning added, deleted
+and modified**, which is a change axis, and `Tone` is a judgement axis with ten slots and
+no room for one. That is **gap 3's shape on a surface with no numbers in it** — gap 3 was
+filed about a CPU load gradient, and this is the same collision with a categorical axis
+instead of a continuous one.
+
+**And it is F30's other half.** F30 filed `Comparison`'s verdict union — `same | better |
+worse | changed` — for mixing a change axis with a judgement axis in one type. This is the
+same two axes colliding one block over, where the palette has only the judgement one. Two
+blocks, two symptoms, one absent concept.
+
+Filed, not fixed. Adding a change axis to `Tone` is a theme change across C10, every block
+kind and both degradation paths, and the app has a correct rendering without it. What this
+entry buys is that the next surface wanting *added versus deleted* finds the reason rather
+than the workaround — and that F30 and this are read together, because separately they each
+look like one block's oddity.
+
+---
+
+## F50 — a column with no `flex` is allocated its minimum and nothing more
+
+Not a Calcium defect: `planColumns` does what C11 says. It is a **shape a consumer gets
+wrong twice**, and both instances were invisible to the suite.
+
+| surface | written | rendered at 120 |
+|---|---|---|
+| `/ps` NAME | `flex: true` | 54 spare columns absorbed by the name, PORTS truncated |
+| `/diff` PATH | `flex: true` | `modified` at column 108, an empty row between it and its path |
+| `/diff` PATH | no flex, `maxWidth: 72` | truncated to 20 cells with 80 empty beside it |
+| `/top` all but CMD | `minWidth: 4` | `109…` for a PID, `sta…` for a user |
+
+The rule underneath: **a non-flex column is allocated its `minWidth`, so a `minWidth` that
+ignores the content is a truncation, and a `flex` column takes everything, so a fixed
+column after one is pushed to the terminal's edge.**
+
+`/diff`'s answer is the fixed column **first** and the flexible one second — the only
+arrangement of two columns where both are read together. `/top`'s is that each column asks
+its own content how wide it needs to be, through `cells` rather than `.length` (C24 I14),
+because the columns are not known in advance and so the widths cannot be either.
+
+**The `/ps` instance is documented in a comment three lines from where `/diff`'s was
+written.** Having read it did not prevent writing it again, and the mutation for `/top`'s
+half failed nothing — twenty-four rows green against every column truncated. Only the frame
+showed either. `verbs.test.ts` T7 exists because of that mutation.
+
+---
+
+## F51 — `events` cannot say which of its events is bad, and `logs` can
+
+Two block kinds of the same shape, and only one of them tones its rows.
+
+| kind | row | what the renderer paints |
+|---|---|---|
+| `logs` | `{ ts, level, message }` | `level` in `levelTone(level)` — error, warn, dim, info |
+| `events` | `{ ts, type, message }` | `type` in `accent`, always |
+
+`/events` is the consumer. A container lifecycle stream is `create`, `start`, `die`,
+`kill`, `oom` — and on screen a `die · exit 137` is the same colour as a `start`. The
+surface the kind is *named for* is the one that cannot say which line the reader should be
+looking at.
+
+The remedy is not obviously "add a tone to `EventLine`". `logs` solved it with a **fixed
+vocabulary the renderer knows**, which is why it needs no tone field, and docker's actions
+are not that vocabulary. Either the kind takes a `tone`, which puts the choice in the
+adapter and makes two kinds inconsistent in the other direction, or it takes a severity in
+the vocabulary `logs` already uses, which asks every producer to map its own words onto
+four levels.
+
+Filed, not fixed, and it is **F49's neighbour rather than a separate thing**: F49 is a
+change axis with no home in a health palette, and this is a health axis with no way onto a
+block. Both were found the same week by two surfaces, and the pair is the argument for
+looking at C10's model rather than at either block.
+
+*Meanwhile*: the app puts the exit code in the message, so `die · exit 137` says what it
+needs to in words. That is the same answer C04's `Glyph` comment gives — what the
+vocabulary cannot say goes in the text — and it is why this is a finding rather than a
+blocker.

@@ -53,7 +53,7 @@ export type {
 // builders — §4
 export { b };
 export type {
-  BlockOpts, ColumnDef, CellInput, KeyValueInput, StepInput, LogLine,
+  BlockOpts, ColumnDef, CellInput, KeyValueInput, KeyValueRow, StepInput, LogLine,
   EventLine, ChipInput, ComparisonRow,
 };
 
@@ -200,7 +200,8 @@ export const b: {
     error(text: string, opts?: BlockOpts): Notice;
     info(text: string, opts?: BlockOpts): Notice;
   };
-  kv(rows: Record<string, string | KeyValueInput>, opts?: BlockOpts): KeyValue;
+  kv(rows: Record<string, string | KeyValueInput> | readonly KeyValueRow[],
+     opts?: BlockOpts): KeyValue;
   table(spec: BlockOpts & { columns: ColumnDef[]; rows: TableRow[];
                             showHeader?: boolean; emptyMessage?: string }): Table;
   col(key: string, spec?: Partial<Omit<ColumnDef, "key">>): ColumnDef;
@@ -315,6 +316,27 @@ and `tone` and still pass, and a hand-written literal with a `glyph` is a compil
 error under excess property checking. Silently dropping the field would be a
 parameter that accepts what it cannot honour — the vacuity class arriving as an
 argument type.
+
+**And the record is not the only arm, because a record cannot hold two rows with
+the same label.** `KeyValue.rows` is an array — `{ label; value; tone? }[]` — so the
+block has always been able to carry a repeated label, and the builder could not. The
+first consumer that needed it is `/port`: a published container port has one binding
+per address family, so `docker port` says
+
+```
+80/tcp -> 0.0.0.0:8080
+80/tcp -> [::]:8080
+```
+
+and a record built by `reduce` keeps the second and loses the first, silently. That is
+the same defect class the narrowing above avoids — a parameter that accepts what it
+cannot honour — arriving through the container rather than through the value type.
+
+So `b.kv` takes **either** a record or `readonly KeyValueRow[]`, where `KeyValueRow` is
+`{ label: string; value: string | KeyValueInput }`. The record arm stays and remains the
+one to reach for: labels are unique on almost every surface, and `{ status: b.warn("x") }`
+is the shape this builder exists for. The array arm is what a surface uses when its labels
+come from the far side and the far side has not promised they are distinct.
 
 **A bare string is a cell with default tone.** `{ family: "digit-classifier" }` and `{ status: b.warn("degraded") }` in the same object, because most cells carry no tone and paying `{ text: … }` for all of them is the noise this removes.
 
@@ -660,6 +682,7 @@ carries the state — and §7 records what that changed.
 - **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The explicit value arrives through `BlockOpts`, which every one of them accepts; before that argument existed the invariant was unwritable as a test, and so was the half of §4 that promised it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 - **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
 - **I17** — `b.seq` is the only place a block's position changes what it carries, and it changes it at construction rather than at measurement (§4a). C04 §3a's ruling stands: a block measures the same wherever it is concatenated. Before this, no code anywhere stripped a first block's gap — the rule every S-series figure depends on was discipline, and the one file in `src/` that set `gapBefore` set it by hand, per position.
+- **I18** — Every `KeyValue` the block type can hold is one `b.kv` can build. The record arm cannot express a repeated label and `KeyValue.rows` is an array, so the array arm is what closes the gap (§4). **The narrowing that C24 had already ruled on was a different one** — `KeyValueInput` against `CellInput`, which is about a value with nowhere to go — and the container was unremarked, which is how it went eleven builders and one whole app without being noticed. A builder narrower than its block is either a ruling with a reason written down or a defect; there is no third state, and the reason is what tells them apart.
 
 ---
 
@@ -680,6 +703,7 @@ carries the state — and §7 records what that changed.
 13. Every block-returning builder sets a `gapBefore` default of its own, and an explicit value always wins (I15, §4).
 14. Nothing is exported that declares work no code performs; *available* is not an argument for *exported*, and neither is *specified* (I16, §3).
 15. `b.seq` holds the rule that a first block does not gap, and it is the only place a block's position changes what it carries (I17, §4a).
+16. A builder can build every block its kind can hold, or the narrowing is a ruling with its reason beside it (I18, §4).
 
 ---
 
@@ -690,6 +714,7 @@ carries the state — and §7 records what that changed.
 - **T1.1**: each builder produces a block passing `validateBlock` — twenty cases.
 - **T1.2**: an omitted id is generated and unique within a document; a supplied one is preserved.
 - **T1.3**: a bare string cell and a `b.warn(...)` cell in one row both produce valid cells.
+- **T1.3a (I18)**: `b.kv` given an array of rows with a repeated label produces both rows, in order; given a record it produces one row per key, in insertion order. The array form with a tone and the record form with a tone agree.
 - **T1.4**: `b.live` without `every` produces a one-shot part; with `every`, a periodic one; with `stream`, a streaming one.
 - **T1.5**: `b.live`'s default `renderError` produces the A02 §7 shape.
 - **T1.6**: `b.spinner` advances with `tick`; its measured height does not.

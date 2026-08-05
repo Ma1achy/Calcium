@@ -54,6 +54,10 @@ const find = (from: Block | readonly Block[], kind: string): Block | undefined =
   return undefined;
 };
 
+/** The outer panel, by kind — the dashboard's blocks are not a fixed sequence. */
+const panelIn = (blocks: readonly Block[]): Panel =>
+  blocks.find((bl) => bl.kind === "panel") as Panel;
+
 const tableIn = (from: Block | readonly Block[]): Table => find(from, "table") as Table;
 const textOf = (row: { cells: Record<string, { text?: string } | undefined> }, key: string): string =>
   row.cells[key]?.text ?? "";
@@ -224,7 +228,10 @@ describe("walk A: the classification table", () => {
   it("A9: zero running renders the panel and its message, never no panel", () => {
     const none: Snapshot = { containers: SNAP.containers.filter(() => false), stats: [], skipped: 0 };
     const blocks = dashboard(none, 120, "29.4.1");
-    const panel = blocks[0] as Panel;
+    // **Found by kind, not by position.** This said `blocks[0]` and meant *the
+    // panel*; the banner arriving above it turned a claim about identity into a
+    // claim about order, and the row failed for a reason it was not about.
+    const panel = panelIn(blocks);
     expect(panel.kind).toBe("panel");
     // A panel that vanishes reads as a failure to fetch, and this is the one
     // case where the fetch succeeded perfectly.
@@ -330,7 +337,7 @@ describe("the live declaration", () => {
   });
 
   it("the outer panel names the engine and the total, both of them real", () => {
-    const panel = dashboard(SNAP, 120, "29.4.1")[0] as Panel;
+    const panel = panelIn(dashboard(SNAP, 120, "29.4.1"));
     expect(panel.title).toContain("29.4.1");
     expect(panel.title).toContain(String(SNAP.containers.length));
   });

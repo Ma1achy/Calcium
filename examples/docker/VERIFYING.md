@@ -210,3 +210,34 @@ That mistake was made twice in one session — once on `/drift dtui-web`, which 
 hold, and once on `/drift no-such-container`, which was **not**: the transcript really was
 empty, and F35 is the reason. Distinguishing them took the longer capture and then the
 validator.
+
+---
+
+## 9. Never truncate your own frame output — the reader's cut is not the frame's edge
+
+`screen.py` prints a grid. Piping it through `head -20`, or slicing `[:12]` in the little
+python that numbers the rows, produces **exactly what a short frame produces**: rows, then
+nothing. There is no marker distinguishing *the frame ended here* from *I stopped printing
+here*, and the second reads as the first every time.
+
+**Three diagnoses have now been wrong for this reason**, in three separate steps:
+
+| step | the cut | what was actually there |
+|---|---|---|
+| 2 | `head -20` | the entry was at rows 29–39 |
+| 5 | `[:12]` on `/config dtui-cfg` | the notice and the candidates at rows 12–15 |
+| 5 | `[:16]` on a stopped container | the refusal at rows 26–27, below the dashboard |
+
+The third is the sharpest, because the byte stream *contained* the text — `grep` found
+`cannot read` at offset 26337 — and the replayed frame appeared not to. That combination
+reads as **drawn and then overwritten**, which is a real and serious defect class, and two
+minutes went into it before the cause turned out to be the `[:16]`.
+
+**So: print every row, always.** A frame at 40 rows is 40 lines of output; there is no
+budget being saved. If the output genuinely needs narrowing, narrow the *columns* — the
+frame's height is the thing being read and the thing a cut destroys.
+
+The general form, and the reason this sits beside the instruments rather than in
+`FINDINGS.md`: **an instrument that silently discards evidence is indistinguishable from
+evidence that was not there.** §0's pipe, §1's stripped capture and §8's short hold are the
+same sentence about three different tools; this one is about the reader.

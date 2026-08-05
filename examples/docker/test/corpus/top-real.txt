@@ -1,0 +1,7 @@
+UID                 PID                 PPID                C                   STIME               TTY                 TIME                CMD
+root                28124               28101               0                   Aug04               ?                   00:01:17            /bin/sh -c echo Container started trap "exit 0" 15 /usr/local/share/docker-init.sh exec "$@" while sleep 1 & wait $!; do :; done -
+root                28162               28124               0                   Aug04               ?                   00:00:00            bash /usr/local/share/docker-init.sh
+root                28163               28124               0                   Aug04               ?                   00:00:00            bash /usr/local/share/docker-init.sh
+root                28168               28163               0                   Aug04               ?                   00:00:00            tee -a /tmp/vscr-docker-from-docker.log
+root                28170               28162               0                   Aug04               ?                   00:00:00            socat UNIX-LISTEN:/var/run/docker.sock,fork,mode=660,user=node,backlog=128 UNIX-CONNECT:/var/run/docker-host.sock
+root                19694               28124               0                   12:10               ?                   00:00:00            sleep 1

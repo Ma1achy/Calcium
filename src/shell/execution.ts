@@ -494,25 +494,57 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     try {
       const transport = deps.transport.for(verb);
       const streams = result.tool.streams ?? false;
-      // **Declarable, not yet runnable** (C22 §13a, C05 I20). The pair is legal
-      // because S12's logs view is exactly it; what does not exist is the route,
-      // since `streamInto` patches a transcript entry and a view is patched
-      // through its owner. Refused loudly here rather than silently falling to
-      // the line below, which would block until the process exited while holding
-      // the guard — the thing C23 I6 exists to prevent.
-      if (streams) {
-        throw new Error(
-          `${verb} declares both view and streams, and that route is not built — ` +
-            `C22 §13a. Drop \`streams\` from the declaration, or run it as an entry.`,
-        );
-      }
-      const raw = await transport.invoke({
+      const invocation = {
         verb,
         argv: result.argv,
         streams,
+        // 0 is unbounded, which is what a follow needs (C06 commitment 7).
         timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
         signal: controller.signal,
-      });
+      };
+
+      /**
+       * **The fourth route** (C22 I48, §13a), and the three obligations it does
+       * not share with the entry one are ruled in the spec rather than here.
+       *
+       * The order of these four lines is the whole of what was refused before:
+       * the guard is released *before* the loop or one follow holds the session
+       * (C23 I6), and the canceller is registered *before* the loop is awaited
+       * or Ctrl-C falls past C16 §5's rung — which on this route quits the
+       * shell, because the view's loop is the only thing on screen.
+       */
+      if (streams) {
+        guard.release();
+        liveStreams.push({ id: DOCUMENT_VIEW_ID, cancel: cancelThis });
+        // **An empty document before the loop.** `open()` pushed a spinner and
+        // `ViewPatch` has no delete, so appending beside it would leave it
+        // spinning under the notice that says the stream stopped.
+        deps.documentView.fill({
+          schema: "tui.view/1",
+          command: displayed,
+          status: "ok",
+          blocks: [],
+          meta: {
+            verb,
+            adapter: "stream",
+            exitCode: 0,
+            durationMs: 0,
+            truncated: false,
+            argv: result.argv,
+            stderr: "",
+            transport: "subprocess",
+            origin: "user",
+          },
+        });
+        try {
+          await streamIntoView(displayed, verb, transport.stream(invocation));
+        } finally {
+          forgetStream(DOCUMENT_VIEW_ID);
+        }
+        return;
+      }
+
+      const raw = await transport.invoke(invocation);
       const doc = deps.adapters.adapt(raw, {
         command: displayed,
         verb,
@@ -741,6 +773,121 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * and the two want opposite endings: settle with what was kept, or map the
    * failure through C07. C23 is the first consumer of that shape.
    */
+  /**
+   * `streamInto`'s sibling — the same loop against a view (C22 I48).
+   *
+   * **Not a parameterisation of `streamInto`, and that is a decision.** The two
+   * differ at every branch: the target, the settlement, and what a failed patch
+   * means. A shared function with a `target` flag would carry six conditionals
+   * and read as one route with exceptions, when it is two routes with a common
+   * shape — and the shape is what the route-obligation table already records.
+   *
+   * **What is genuinely shared is `seq`'s discipline** (C07 I15, I30): a
+   * per-stream counter, incremented per patch *adapted* rather than applied,
+   * because a patch C07 mapped to `null` still occupied a position. Counting
+   * only the applied ones reuses a position after every dropped line, and the
+   * collision that produces is the one no test that builds its own context can
+   * see.
+   */
+  const streamIntoView = async (
+    displayed: string,
+    verb: string,
+    patches: AsyncIterable<RawPatch>,
+  ): Promise<void> => {
+    let seq = 0;
+
+    /**
+     * **A view has no settlement** (C22 I48). `end`, a malformed patch and a
+     * failure all append a notice and leave the view open, because the stream
+     * ending is not the reader having finished with it — `docker logs` without
+     * `-f` ends immediately, and a view that popped would flash and vanish.
+     * Only the wording differs, so only the wording is a parameter.
+     */
+    const finish = (text: string, tone: "ok" | "warn" | "error", id: string): void => {
+      // C04 I6 — a toned notice carries a glyph, or `block()` throws and the
+      // containment path leaves the reader with a view that simply stopped.
+      // F29 is what happens when this is forgotten one layer down.
+      deps.documentView.patch({
+        op: "append",
+        block: block({ kind: "notice", id: blockId(id), tone, glyph: tone, text }),
+      });
+      // The stall machinery is per host and this one has stopped producing, so
+      // `settled` still fires — it is only `transcript.settle` that has no
+      // counterpart here, and only because there is no transcript on this route.
+      refresh.settled(DOCUMENT_VIEW_ID);
+      deps.scheduler.commit("completion");
+    };
+
+    try {
+      for await (const patch of patches) {
+        if (patch.kind === "end") {
+          // **The walk said this route has no exit code and it was wrong.**
+          // `RawPatch` `end` carries a whole `RawResult`
+          // (`transport/types.ts:63`), so the code is right there — the ruling
+          // was written from *what a patch is for* rather than from the type,
+          // and the type is the thing that can falsify it.
+          //
+          // It matters to the reader rather than being a detail: a follow that
+          // ends because the container stopped is a different event from one
+          // that ends because the log ran out, and the code is what separates
+          // them. Still not phrased as *the container stopped* — a non-zero
+          // code is the `docker logs` process's, and inferring the container's
+          // fate from it is a second claim this route cannot make.
+          const code = patch.result.exitCode;
+          // **And the reason, when there is one.** The first version said only
+          // *exited 1*, which a frame-read against a container that does not
+          // exist showed to be the wrong half: the reader is told the follow
+          // failed and not why, while `stderr` sat on the same `RawResult`
+          // carrying `No such container`. The entry route has the transcript's
+          // error rendering behind it; this route has only what it appends.
+          const why = patch.result.stderr.trim().split("\n")[0] ?? "";
+          finish(
+            code === 0
+              ? "the log stream ended"
+              : `the log stream ended — ${why === "" ? `docker exited ${String(code)}` : why}`,
+            code === 0 ? "ok" : "warn",
+            "stream-end",
+          );
+          return;
+        }
+
+        const view = deps.adapters.adaptPatch(patch, {
+          command: displayed,
+          verb,
+          width: deps.lifecycle.size().columns,
+          userRequestedJson: false,
+          transport: "subprocess",
+          origin: "user",
+          tool: null,
+          seq,
+        });
+        seq += 1;
+        if (view === null) continue;
+
+        const outcome = deps.documentView.patch(view);
+        if (outcome.ok) {
+          refresh.sawPatch(DOCUMENT_VIEW_ID);
+          deps.scheduler.commit("stream");
+          continue;
+        }
+
+        if (outcome.reason === "patch") {
+          finish(`output truncated: ${outcome.error.message}`, "warn", "truncated");
+          return;
+        }
+
+        // `"closed"`, `"layer"`, `"project"` — the view is gone or could not be
+        // reprojected, so there is nothing to append a notice *to*. Stop
+        // consuming: a subprocess still streaming into a layer that has been
+        // popped spends a process on output nothing can receive. This is the
+        // arm A4 rules, and it is why the owner returns rather than throwing.
+        return;
+      }
+    } catch (cause) {
+      finish(`stream failed: ${String(cause)}`, "error", "stream-error");
+    }
+  };
+
   const streamInto = async (
     id: string,
     /**

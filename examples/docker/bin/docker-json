@@ -29,6 +29,33 @@
 
 set -eu
 
+# **Not every docker verb has a `--format` flag**, and the translation below is
+# wrong for the ones that do not. Measured against the daemon:
+#
+#     docker diff  <c> --format json   unknown flag: --format          (exit 125)
+#     docker port  <c> --format json   unknown flag: --format          (exit 125)
+#     docker logs  <c> --format json   unknown flag: --format          (exit 125)
+#     docker top   <c> --format json   ps: error: unknown user-defined
+#                                      format specifier "json"         (exit 1)
+#
+# `top` is the one worth reading twice. `docker top CONTAINER [ps OPTIONS]`
+# hands its tail to `ps` **inside the container**, so docker accepts the flag,
+# ps rejects it, and the error names a user-defined format specifier — which
+# sends a reader looking at the image's userland rather than at this file.
+#
+# So the verbs are named here rather than met one at a time. `logs` used to
+# strip the pair by hand further down; this replaces that, and the general form
+# is shorter than the four cases it stands in for. See S11_WALK.md A1 and A2.
+#
+# **The list is a fact about one docker version and nothing checks it.** A
+# release that gives `diff` a `--format` flag leaves this stripping something
+# that would now work — which costs one verb's JSON rather than correctness, and
+# this whole file is deleted when F1 closes.
+no_format=0
+case "${1:-}" in
+  diff | port | top | logs) no_format=1 ;;
+esac
+
 # An explicit `--format` from the user wins, and `--json` is then dropped rather
 # than appended after it. Docker takes the last `--format` it is given, so
 # emitting both would work by accident and break the day that changes.
@@ -45,7 +72,11 @@ done
 original=$#
 for arg in "$@"; do
   if [ "$arg" = "--json" ]; then
-    if [ "$has_format" -eq 0 ]; then
+    if [ "$no_format" -eq 1 ]; then
+      # Dropped, not translated. The reader asked for the app's rendering of
+      # this verb and the far side has no say in it.
+      :
+    elif [ "$has_format" -eq 0 ]; then
       set -- "$@" --format json
       has_format=1
     fi
@@ -82,7 +113,102 @@ if [ "$is_stats" -eq 1 ]; then
   set -- "$@" --no-stream
 fi
 
+# `--raw` is docker-tui's own, and Calcium sends every declared flag to the far
+# side (C06 I4: argv goes over verbatim). There is no way to declare a flag that
+# selects a *rendering* rather than an invocation, so `/inspect <c> --raw` runs
+# `docker inspect <c> --raw` and docker exits 125 with `unknown flag: --raw`.
+#
+# Found by reading the frame. Every unit row passed, because they hand argv to
+# the adapter directly and never spawn anything — the suite tests the mechanism
+# and the shim is the wiring. FINDINGS F39.
+#
+# The adapter still sees it: `RawResult.argv` is what Calcium built, and this
+# strips only what reaches docker. Third translation in this file, and the first
+# that is not about the far side's shape at all — it is about the framework
+# having no place to put a presentation flag.
+case "${1:-}" in
+  inspect)
+    original=$#
+    for arg in "$@"; do
+      if [ "$arg" != "--raw" ]; then
+        set -- "$@" "$arg"
+      fi
+    done
+    shift "$original"
+    ;;
+  logs)
+    # **`-f` and `--tail` are supplied here for F39's reason.** Calcium builds
+    # argv from what the reader typed plus what the manifest declares, so an app
+    # cannot add a flag to a spawn — the same wall `--raw` hit from the other
+    # direction, and the same answer as `--no-stream` for `stats`. S9 is a
+    # *follow*, and it replays 200 lines rather than the whole log, because the
+    # whole log and what is on screen are different requests.
+    #
+    # The `--format json` strip that used to live here is gone: `logs` is in the
+    # `no_format` list at the top of this file, with `diff`, `port` and `top`.
+    #
+    # Only if the reader has not said otherwise.
+    has_follow=0
+    has_tail=0
+    for arg in "$@"; do
+      case "$arg" in
+        -f | --follow) has_follow=1 ;;
+        --tail | --tail=*) has_tail=1 ;;
+      esac
+    done
+    if [ "$has_follow" -eq 0 ]; then set -- "$@" --follow; fi
+    if [ "$has_tail" -eq 0 ]; then set -- "$@" --tail 200; fi
+    ;;
+esac
+
+# **`logs` merges stderr into stdout, and that is the finding rather than the
+# line.** Calcium's channel split is a JSON-CLI assumption — stdout is the data,
+# stderr is diagnostics — and `docker logs` inverts it: it relays the container's
+# own two channels, and most server software logs to stderr. nginx writes every
+# `[notice]` and every request line there, so a follow reading stdout alone shows
+# the entrypoint's seven start-up lines and then nothing, for ever, which reads
+# exactly like a container that has gone quiet.
+#
+# Found by reading the frame: the follow worked and showed the wrong seven lines.
+# FINDINGS F46.
+#
 # `exec`, so signals and the exit code reach docker directly. C21 sends SIGTERM
 # and escalates; an intermediate shell would absorb the first one and Calcium
 # would report a timeout for a process that was told to stop.
-exec docker "$@"
+#
+# **And `logs` wraps each line as JSON, which is the fifth translation and the
+# one that says most about the premise.** C07 rules that *an adapter with
+# `adaptPatch` owns the `data` row and nothing else* (`adapters/stream.ts`) —
+# right for a JSON CLI, where an unparseable line among good ones is the
+# transport's business. For `docker logs` **every** line is unparseable, so the
+# app's adapter is never consulted and C07's fallback accumulates the whole
+# follow into one growing `raw` block. In a transcript entry that is fine; in a
+# view it is the exact pathology C22 I47 was written for — one block taller than
+# the region, unscrollable, growing every second. FINDINGS F45.
+#
+# So the shim makes `docker logs` into the JSON-emitting CLI this framework is
+# for. That is the honest translation rather than a workaround: R01's premise is
+# a far side that speaks JSON, and this verb does not.
+#
+# **The cost is `exec`.** A pipeline means this shell waits rather than being
+# replaced, so C21's SIGTERM arrives here instead of at docker — hence the trap,
+# which forwards it. Without that, stopping a follow would leave a `docker logs`
+# running until its pipe closed.
+case "${1:-}" in
+  logs)
+    docker "$@" 2>&1 | awk '{
+      line = $0
+      gsub(/\\/, "\\\\", line)
+      gsub(/"/, "\\\"", line)
+      gsub(/\t/, "\\t", line)
+      gsub(/\r/, "", line)
+      printf "{\"line\":\"%s\"}\n", line
+      fflush()
+    }' &
+    child=$!
+    trap 'kill -TERM "$child" 2>/dev/null' TERM INT
+    wait "$child"
+    exit $?
+    ;;
+  *) exec docker "$@" ;;
+esac

@@ -118,4 +118,12 @@ if __name__ == "__main__":
     # exactly like a command that produced nothing.
     hold = float(sys.argv[5]) if len(sys.argv) > 5 else 12.0
     # Typed, then Enter two seconds later — outside the paste window.
-    run(cols, rows, [(1.5, command), (3.5, b"\r")], out, hold)
+    #
+    # **Keys after the Enter**, for a surface that is only interesting once it
+    # is on screen: a pushed view's motions cannot be read from the frame the
+    # command produced. Given as a sixth argument, one keypress per second, and
+    # each one its own write for the same reason the command is not a burst —
+    # bytes arriving together are a paste, and `n` twice in one write is text.
+    keys = sys.argv[6].encode() if len(sys.argv) > 6 else b""
+    after = [(5.0 + i, bytes([k])) for i, k in enumerate(keys)]
+    run(cols, rows, [(1.5, command), (3.5, b"\r"), *after], out, hold)

@@ -159,7 +159,14 @@
           "summary": "what to follow"
         }
       ],
-      "flags": []
+      "flags": [
+        {
+          "name": "screen",
+          "type": "bool",
+          "view": true,
+          "summary": "follow into a pushed view rather than the transcript"
+        }
+      ]
     },
     {
       "name": "dashboard",

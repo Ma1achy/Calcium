@@ -1,0 +1,10 @@
+C /var
+C /var/cache
+C /var/cache/nginx
+A /var/cache/nginx/proxy_temp
+A /var/cache/nginx/scgi_temp
+A /var/cache/nginx/uwsgi_temp
+A /var/cache/nginx/client_temp
+A /var/cache/nginx/fastcgi_temp
+C /run
+A /run/nginx.pid
