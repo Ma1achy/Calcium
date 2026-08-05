@@ -36,6 +36,7 @@ function world() {
 
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),
+    overlayAnswerCallback: () => null,
     overlayTop: () => {
       const top = overlays.top;
       return top === null

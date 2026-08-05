@@ -1,0 +1,179 @@
+/**
+ * `ctx.ask` — a question a local handler awaits (C23 I36, C16 I25).
+ *
+ * L4's, because it is a sequence across three components and nothing below may
+ * hold it: C15 owns the layer, C16 routes the keys, C23 suspends the handler.
+ * That is A02 Seam 4's shape and the reason this file is here rather than in any
+ * of them.
+ *
+ * **The layer is pushed `dismissable: false` and the user can still escape it**,
+ * which is not the contradiction it reads as. C15's flag says *the router may not
+ * discard this layer without telling its owner* — and it may not, because
+ * discarding it silently leaves the awaiting handler pending forever. `Esc` and
+ * `⌃c` are escapes the **owner** performs, resolving with the default choice
+ * (C23 I36). The word means two things and the layer needs opposite answers to
+ * them; the flag only ever answered the second. See DOCKER_TUI_COMPLETION.md
+ * Ruling A, where the two were one word.
+ *
+ * **Placement is `centred`** — C15 §`Placed` carries `left` precisely so a
+ * centred confirm's horizontal extent is recoverable for hit-testing, so the
+ * shape was anticipated there before anything raised one.
+ */
+
+import { block } from "../data/viewmodel/construct.js";
+import type { Block } from "../data/viewmodel/types.js";
+import type { InputEvent } from "../interaction/router/types.js";
+import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
+import type { AskOptions, Choice } from "./local/registry.js";
+
+export const CONFIRM_LAYER_ID = "confirm";
+
+export type ConfirmDeps = Readonly<{
+  overlays: OverlayManager;
+  /** The frame is L4's to commit; C15 never paints (A02 Seam 4). */
+  invalidate: () => void;
+}>;
+
+export interface ConfirmHost {
+  /** C23 I36 — resolves with a choice on every path, never null. */
+  ask(opts: AskOptions): Promise<string>;
+  /**
+   * C16 I25 — the top layer's answer handler, or null.
+   *
+   * **Read from the top only, never searched down the stack**, for the reason
+   * C15 `pop()` gives: a question raised over a completion menu must not be
+   * answered by the menu.
+   */
+  answerHandler(): ((e: InputEvent) => boolean) | null;
+  /** Whether a question is open — C22 refuses a submission while one is. */
+  readonly open: boolean;
+}
+
+/**
+ * The choice a bare `Enter` takes, and the one `Esc` and `⌃c` resolve with.
+ *
+ * **Falls back to the last choice rather than the first when none is marked.**
+ * For a destructive verb the safe option is conventionally last (`yes`, `no`),
+ * and a default that silently means *the first thing offered* is the wrong way
+ * for this to fail. Callers in this repository always mark one; the fallback is
+ * for a caller that forgets, and it should forget safely.
+ */
+function defaultChoice(choices: readonly Choice[]): Choice {
+  return choices.find((c) => c.default === true) ?? choices[choices.length - 1]!;
+}
+
+function render(opts: AskOptions, selected: number): readonly Block[] {
+  const children: Block[] = [
+    block({ kind: "notice", id: "confirm-question", tone: "warn", glyph: "warn", text: opts.question }),
+  ];
+  // Ruling C's payload — what the answer will affect, shown with the question
+  // rather than in the entry that follows it.
+  if (opts.detail !== undefined) children.push(opts.detail);
+
+  children.push(
+    block({
+      kind: "raw",
+      id: "confirm-choices",
+      gapBefore: true,
+      text: opts.choices
+        .map((c, i) => `${i === selected ? "▸" : " "} [${c.key}] ${c.label}`)
+        .join("\n"),
+    }),
+  );
+
+  return [block({ kind: "panel", id: "confirm-panel", title: "Confirm", children })];
+}
+
+export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
+  let handler: ((e: InputEvent) => boolean) | null = null;
+
+  return {
+    get open() {
+      return handler !== null;
+    },
+
+    answerHandler() {
+      // The guard is the top layer's identity rather than a stored flag: a
+      // second record of "is the question on top" is one that can disagree with
+      // C15's stack, and C16 asks this on every keystroke.
+      return deps.overlays.top?.id === CONFIRM_LAYER_ID ? handler : null;
+    },
+
+    ask(opts) {
+      if (opts.choices.length === 0) {
+        // A question with nothing to answer it cannot resolve, and resolving it
+        // with an invented key would put a value in the handler's hands that no
+        // caller wrote. Construction error, C23 I27's standard.
+        return Promise.reject(new Error("ask() needs at least one choice"));
+      }
+
+      let selected = opts.choices.findIndex((c) => c.default === true);
+      if (selected < 0) selected = opts.choices.length - 1;
+
+      const layer: Layer = {
+        id: CONFIRM_LAYER_ID,
+        kind: "overlay",
+        placement: { kind: "centred" },
+        content: render(opts, selected),
+        dismissable: false,
+      };
+
+      const disposable = deps.overlays.push(layer);
+
+      return new Promise<string>((resolve) => {
+        const settle = (key: string): boolean => {
+          handler = null;
+          disposable[Symbol.dispose]();
+          deps.invalidate();
+          resolve(key);
+          return true;
+        };
+
+        const redraw = (): boolean => {
+          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected) });
+          deps.invalidate();
+          return true;
+        };
+
+        handler = (e) => {
+          if (e.kind !== "key") return false;
+          const { name, ctrl } = e.key;
+
+          // Both escapes resolve with the default (C23 I36). They are routed
+          // here rather than special-cased in C16 because what they mean is the
+          // question's business, and a router that knew it would hold half of a
+          // rule whose other half lives two layers away (C16 I25).
+          if (name === "escape" || (ctrl && name === "c")) {
+            return settle(defaultChoice(opts.choices).key);
+          }
+          if (name === "return" || name === "enter") {
+            return settle(opts.choices[selected]!.key);
+          }
+          if (name === "up" || name === "left") {
+            selected = (selected - 1 + opts.choices.length) % opts.choices.length;
+            return redraw();
+          }
+          if (name === "down" || name === "right" || name === "tab") {
+            selected = (selected + 1) % opts.choices.length;
+            return redraw();
+          }
+
+          // Accelerators, and they are checked last so a choice keyed `c` cannot
+          // shadow `⌃c`. Bare only: `⌥y` is not `y`.
+          if (!ctrl && !e.key.meta) {
+            const hit = opts.choices.find((c) => c.key === name);
+            if (hit !== undefined) return settle(hit.key);
+          }
+
+          // **Consumed, and nothing happens.** An unbound key at an open
+          // question must not fall through — C16 I8 blocks the surface beneath,
+          // and returning false here would send the key back up the ladder to
+          // the rung that consumes `⌃c` into silence.
+          return true;
+        };
+
+        deps.invalidate();
+      });
+    },
+  };
+}

@@ -52,6 +52,7 @@ import { createFocusStore } from "../interaction/router/focus.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
+import { createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { createDecoder } from "../interaction/router/decode.js";
 import { createKeyEffects } from "./keys.js";
 import { createDocumentView } from "./document-view.js";
@@ -216,6 +217,15 @@ export type Graph = Readonly<{
   lifecycle: TerminalLifecycle;
   scheduler: ReturnType<typeof createFrameScheduler>;
   router: ReturnType<typeof createRouter>;
+  /**
+   * `ctx.ask`'s host, exposed because **C22 raises the exit confirm** (C23 I36).
+   *
+   * The Ctrl-C ladder's top rung asks the same question a local handler does and
+   * must ask it the same way — a second confirm mechanism for the session's own
+   * would be two renderings of one thing, and the one nobody looks at is the one
+   * that rots.
+   */
+  confirm: ConfirmHost;
   /**
    * C16's stored focus, exposed because the **frame** needs it too (C16 §3).
    *
@@ -576,6 +586,19 @@ export async function constructGraph(
   // components (C16 I22).
   const focus = createFocusStore();
 
+  /**
+   * `ctx.ask`'s host (C23 I36, C16 I25).
+   *
+   * **Before the router and not thunked**, unlike the pipeline: it needs only
+   * the overlay store and the scheduler, both of which exist by now, and rung 4
+   * reads it on every keystroke at an open question. A thunk here would buy
+   * nothing and add a nullable to the one path that must not answer quietly.
+   */
+  const confirm = createConfirmHost({
+    overlays: stores.overlays,
+    invalidate: () => void scheduler.commit("input"),
+  });
+
   const router = at("router", () =>
     createRouter({
       focus,
@@ -587,7 +610,7 @@ export async function constructGraph(
       // the nullable form answers quietly, and a quiet `null` here is Ctrl-C
       // taking a lower rung over a running verb — C23 §8a A1 restored by its
       // own fix.
-      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline),
+      deps: routerDeps(stores, runner, scheduler, deps.frame, () => pipeline, confirm),
     }),
   );
 
@@ -645,6 +668,7 @@ export async function constructGraph(
       overlays: stores.overlays,
       patchView,
       documentView,
+      confirm,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same
       // reason the handler does not await it: a failed write means the choice
@@ -964,6 +988,7 @@ export async function constructGraph(
     focus,
     pipeline,
     session,
+    confirm,
     log: Object.freeze([...log]),
   });
 }
@@ -1014,6 +1039,7 @@ function routerDeps(
   scheduler: ReturnType<typeof createFrameScheduler>,
   frame: FrameQueries,
   pipeline: () => Pipeline | null,
+  confirm: ConfirmHost,
 ): RouterDeps {
   const top = (): Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null => {
     const layer = stores.overlays.top;
@@ -1024,6 +1050,7 @@ function routerDeps(
 
   return {
     overlayTop: top,
+    overlayAnswerCallback: confirm.answerHandler,
     overlayRegion: frame.overlayRegion,
     placed: () => stores.overlays.layout(frame.overlayRegion()),
     popLayer: () => void stores.overlays.pop(),

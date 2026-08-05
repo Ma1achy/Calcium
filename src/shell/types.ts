@@ -10,6 +10,7 @@
  * C23 satisfies it structurally when it lands.
  */
 
+import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry } from "../data/adapters/index.js";
 import type { Manifest, ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
@@ -241,6 +242,14 @@ export type PipelineDeps = Readonly<{
   patchView: PatchView;
   /** C22 §13a — raised when a verb's declaration says its result is a view. */
   documentView: DocumentView;
+  /**
+   * `ctx.ask`'s host (C23 I36).
+   *
+   * On the deps rather than built here, because C22's own exit rung asks the
+   * same question through the same object — one confirm mechanism, one
+   * rendering.
+   */
+  confirm: ConfirmHost;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (variant: "dark" | "light") => void;

@@ -18,6 +18,7 @@
 // taking their own arm correctly cannot see a mis-dispatch; what catches it is
 // the entry ending in the *other* arm's state.
 import { createEditor } from "../../src/interaction/editor/index.js";
+import { createConfirmHost } from "../../src/shell/confirm.js";
 import { describe, expect, it } from "vitest";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
@@ -221,6 +222,12 @@ function harness(script: Scripted = {}) {
     bindings: () => [{ keys: "c+c", does: "global: cancel" }],
     binary: "widget",
     commandPolicy: slashPolicy,
+    // Real (C23 I36) — `runLocal` builds `ctx.ask` from this for **every** local
+    // verb, not only ones that ask, so a missing host fails `/guide` and
+    // `/theme` alike. This is the second harness in the tree with its own
+    // `as unknown as PipelineDeps`, and the cast is why the compiler saw
+    // neither.
+    confirm: createConfirmHost({ overlays, invalidate: () => undefined }),
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);
