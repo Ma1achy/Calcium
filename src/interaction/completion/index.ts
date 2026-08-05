@@ -25,7 +25,7 @@ export {
   type DirEntry,
   type ReadDir,
 } from "./sources.js";
-export { MENU_ID, menuBlocks, menuLayer, menuWidth, remainderOf } from "./menu.js";
+export { MENU_ID, menuBlocks, menuLayer, remainderOf } from "./menu.js";
 export {
   CompletionError,
   SLOT_KINDS,

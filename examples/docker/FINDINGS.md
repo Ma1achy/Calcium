@@ -2389,6 +2389,22 @@ transcript, correctly untouched, on all three rows.
 So the menu is an 82-cell box composited exactly as specified, over a 110-cell
 screen. **What I photographed is what an overlay looks like.**
 
+### The picture that settles it
+
+![The completion menu drawn over a coloured unified diff: the menu's three rows punch a clean black rectangle out of the red and green diff backgrounds, with a perfectly vertical edge at the same column on every row, and the diff's colour resuming beyond it](../../docs/media/menu-over-diff.gif)
+
+**The menu drawn over a surface that is coloured to its right edge.** If cells
+went unwritten, the diff's red and green would show through the gaps *inside* the
+box — between `/compare` and `Two containers, side by side` most obviously. They
+do not: that gap is black, the box's edge is a straight vertical line at one
+column on all three rows, and the colour resumes beyond it.
+
+Asked for an image proving the bug was fixed, this is the image, and it proves
+there was nothing to fix. It was captured against the coloured diff **because**
+the original photograph was taken over a dark transcript, where a written black
+cell and an unwritten one look identical. **The first picture could not have
+distinguished the two states, and I read a conclusion off it anyway.**
+
 ### What is actually true, and it is much weaker
 
 The completion menu has **no border and no background tint**, so its right edge is

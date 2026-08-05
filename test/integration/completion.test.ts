@@ -135,9 +135,15 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
 
   it("T4.5: C19 renders the `N more` indicator from `Placed.truncated`", () => {
     const manager = createOverlayManager({ registry });
+    // **Sixty entries in a ten-row region**, and the *height* is what truncates.
+    // This used to pass with a shorter region because the menu declared a narrow
+    // width and the pills wrapped into far more rows than they needed; now it
+    // spans the region (C19 §"the menu spans the region"), so the same set fits
+    // in fewer rows and the fixture has to be honest about which axis it is
+    // testing. Truncation is vertical, and it always was.
     const many = Array.from({ length: 60 }, (_, i) => ({ value: `entry-${String(i)}` }));
     manager.push(menuLayer(many, 0, 0, { row: 2, rows: 1 }));
-    const placed = manager.layout({ width: 80, height: 20 });
+    const placed = manager.layout({ width: 80, height: 10 });
     const menu = placed[0];
     if (menu === undefined) throw new Error("unreachable");
 
@@ -147,9 +153,23 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
     expect(remainderOf(menu, many.length, 10)).toBe(50);
   });
 
-  it("C19 declares the width, because measurement answers height at a width", () => {
+  it("the menu declares no width, so C15 gives it the whole region", () => {
+    // **The reversal.** This asserted the opposite — that C19 declares a width
+    // wide enough for the longest candidate — and the ruling was right about
+    // the mechanism and wrong about the surface: a menu narrower than the
+    // region leaves whatever is behind it visible on the same rows, and a
+    // reader sees two unrelated things on one line.
+    //
+    // `Layer.width` keeps its purpose. A confirm is a dialogue and wants to be
+    // forty cells and centred; a completion menu is an extension of the prompt,
+    // and the prompt spans the frame.
     const layer = menuLayer(candidates, 0, 0, { row: 2, rows: 1 });
-    expect(layer.width).toBeGreaterThan("running".length + "3 up".length);
+    expect(layer.width, "declaring one is what made it narrow").toBeUndefined();
+
+    // And C15 I16 resolves the absence to the region's width.
+    const manager = createOverlayManager({ registry });
+    manager.push(layer);
+    expect(manager.layout({ width: 96, height: 20 })[0]?.width).toBe(96);
   });
 });
 
