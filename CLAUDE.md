@@ -219,6 +219,65 @@ Each of these produces code that compiles, passes review, and is wrong.
   before a line of implementation looked disproportionate at the time, and every one
   of those seven pre-code defects would otherwise have been a rewrite.
 
+- **Ask where a settled claim is written down.** This is the sixth blind spot and it is
+  the only one about the *record* rather than about an artefact — every other instrument
+  checks a thing that exists. The frame-read checks output. The mutation pass checks
+  tests. The audit checks code. **Nothing checks whether a belief has a source.**
+
+  **A claim repeated across steps acquires the authority of a ruling without ever having
+  been one.** docker-tui's frame-read #5 was carried through four steps as a stated
+  impossibility — *docker refuses to remove an image a running container references and it
+  cannot be forced* — and re-stated each time as *already recorded, keep it recorded*.
+  Going to find the record turned up nothing, so it was measured instead: `rmi` does not
+  refuse, it untags without `-f` while the container runs, and the read was reachable the
+  whole time. Running it, the surface **worked**, because the app resolves the image by
+  digest rather than by tag.
+
+  **Wrong in both directions, which is the shape to watch for.** It was not impossible for
+  the reason given, and it *was* impossible for a reason nobody had stated — a container
+  pins its image blob by digest for as long as it exists, so the reference cannot dangle.
+  The old reason would be falsified by any docker release changing `rmi`; the real one only
+  by a container outliving its own image. Twenty minutes to check. FINDINGS F66.
+
+  So: when a claim is about to be carried into another step, ask which file holds it. If
+  the answer is *a previous plan*, it is a belief and not a ruling, and the cheapest moment
+  to find that out is before something is built on it.
+
+- **Where the findings actually came from, measured over one step.** Eleven findings across
+  docker-tui's step 8, and **not one came from a test written to look for it**:
+
+  | how it was found | count |
+  |---|---|
+  | reading a frame | 4 |
+  | writing a second consumer from the public surface | 3 |
+  | the mutation pass | 2 |
+  | an untouched file appearing in a diff | 1 |
+  | asking where a settled claim was written | 1 |
+
+  **Every instrument that found something is a way of looking rather than a thing
+  asserted.** That is the case for the whole discipline in one table, and it is why the
+  scheduled steps are *walk*, *read the frame*, *mutate* — verbs — rather than a list of
+  properties to assert. A suite indexed by what you already suspect tests each rule against
+  itself and agrees.
+
+  The two rare ones are worth naming because nothing else reaches them. **A file you did
+  not touch appearing in a diff is evidence about a mechanism you did not know was
+  running** — `src/main.ts` arrived with a mode change and no content change, which is how
+  it emerged that npm chmods a `bin` target and that a missing shebang, not the mode, was
+  the whole of F56. And the sixth blind spot above is the other.
+
+- **A guard whose trigger did not fire keeps its place on asymmetry, not on odds — with
+  both figures and the date.** `make fixtures` starts a load generator, and `make
+  load-down` exists because a busy container once made tier 5's `T5.3a` fail. Re-measured
+  when the target was written, it **did not reproduce**: tier 5 ran green with the load up.
+
+  Both measurements are real and neither cancels the other. Deleting the guard on the
+  strength of the second is wrong, and so is leaving a comment that claims a reproducible
+  failure — **a justification the next person checks and cannot reproduce is a justification
+  they delete.** What keeps it is the asymmetry: running it costs a second, and a timing
+  failure diagnosed as a code change costs a session, and did. Record both numbers, say
+  which argument the rule rests on, and it survives being checked.
+
 - **British English** in prose and identifiers: artefact, behaviour, normalise, colour,
   initialise, serialise.
 
