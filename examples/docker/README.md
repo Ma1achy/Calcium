@@ -1,21 +1,34 @@
 # docker-tui
 
-![docker-tui: a six-beat screencast — the landing dashboard refreshing in place, the /ps table, drilling into a single container where a CPU plot fills one sample at a time beside memory and network bars, a /drift comparison, a unified config diff with syntax highlighting, and a streaming log tail exited with Ctrl-C](demo.gif)
+![docker-tui: a ten-beat screencast — the landing dashboard refreshing in place, the /ps table, its rows walked with the arrow keys, a completion menu opening as a verb is typed, drilling into a single container where a CPU plot fills one sample at a time beside memory and network bars, a /drift comparison, a unified config diff with syntax highlighting, a log tail with container names completed from the daemon and exited with Ctrl-C, then the whole transcript scrolled back to the banner before /clear and /dashboard return the opening frame](demo.gif)
 
 **A terminal interface over `docker`, built on [Calcium](../../README.md).** It is
 the framework's reference application: twelve surfaces, every block type, and a
 findings ledger recording every place the framework did not reach.
 
-Six beats, one session, recorded against real containers: the landing dashboard,
-`/ps`, the live single-container view filling its plot, `/drift`, `/config`'s
-unified diff, and a log tail exited with `⌃c`.
+Ten beats, one session, recorded against real containers: the landing dashboard,
+`/ps` and its rows under the arrow keys, a completion menu that opens as the verb
+is typed, the live single-container view filling its plot, `/drift`, `/config`'s
+unified diff, a log tail whose container name was completed from the daemon, and
+finally the whole transcript scrolled back to the banner — everything above has
+left the screen by then, and that is the only beat that shows it was kept.
+
+**It ends where it starts.** `/clear` empties the transcript and `/dashboard`
+puts the opening frame back, so the last second of the recording is the first
+one and the loop has no cut in it.
 
 **The recording is `demo.cast`**, an asciicast written by `tools/capture.py` — the
 same capture the frames below were read from, not a second run. `agg demo.cast
 demo.gif` re-renders it. Record a new one with `python3 tools/screencast.py
 out/demo`, and read it back beat by beat with `tools/beats.py` before believing
 it: a screencast is a frame-read with an audience, and doing that here found
-three defects the suites could not.
+four defects the suites could not — the fourth being that **the completion beat
+had never worked.** `↓` moves focus into the live block, a printable key
+arriving there does nothing rather than leaking into the prompt behind it (C16
+I22, exactly as specified), and the beat before it never pressed `Esc`. So every
+character was dropped and the recording showed an empty prompt where the menu was
+meant to be. Nothing in the frame says so, which is the whole difficulty: an
+empty prompt is what a prompt looks like.
 
 ---
 
@@ -97,22 +110,34 @@ picture of the wrong thing.
 
 ### Completion, from the manifest and from no code
 
-![The completion menu open after typing slash c o and pressing tab: three verbs listed — container, compare and config — each with its summary, drawn as a floating box over the transcript, with the transcript still visible to the right of the box's edge](../../docs/media/completion.gif)
+![The completion menu open after typing slash c o, with no key pressed to summon it: three verbs listed — container, compare and config — each with its summary right-aligned, the box spanning the full width of the terminal, and a horizontal rule separating the last candidate from the prompt below](../../docs/media/completion.gif)
 
-**Nothing in this application implements completion.** The menu is the manifest's
+**Nothing in this application implements the verb menu.** It is the manifest's
 verbs and their summaries, from the same table dispatch uses; adding a verb makes
 it completable with no code change, which is the property the manifest exists for.
 
-**The transcript continues to the right of it, and that is the box's edge rather
-than a defect** — which took a retraction to establish. It looked like text
-bleeding through the menu, and was filed as one; the frames were then captured
-twice, with the Tab and without, and diffed. The box is columns 0–81 on every one
-of its rows, every cell written, and everything past 82 is the transcript
-correctly untouched. F68 in `FINDINGS.md` is the withdrawal and what it cost.
+**No key summoned it.** Two or more candidates open the menu as the verb is typed
+(C19 I19) — `Tab` is what *enters* it, and the shot is the state before that. The
+menu holds no selection while it is a display of what is available, so `Enter`
+still submits the line and `↑` still walks history: a menu nobody asked for takes
+no keys from the prompt underneath it.
 
-What survives is smaller: the menu has no border and no background tint, so its
-right edge is invisible against surrounding text. That is a question about one
-surface's chrome, not a bug.
+**The rule under the last candidate is the menu's bottom edge**, and it is there
+because of what a frame looked like without it. The menu spans the region and is
+anchored to the prompt, so `/clear` and `❯ /co` were adjacent rows of text with
+nothing between them — read as one line, `/co/container` is a path. Two findings
+came out of drawing it: an empty candidate set drew a bare rule above the prompt
+at the exact moment there was nothing to show, and an unlabelled rule drew a
+heading's separator into a boundary, a two-cell gap at its left. Both were
+invisible to every count and visible in the picture.
+
+**The container names are the application's**, and they are the half nobody had
+supplied: `TuiConfig.completionSources` had existed since C22 with no consumer, so
+`/logs <Tab>` offered nothing and every candidate shown here was a framework verb.
+`src/completion.ts` answers three arguments — a container for the nine verbs that
+declare one, a repository for `/images`, and a path *inside* a named container,
+which is the one that needs argument one to answer argument two. Registering them
+found three defects, F70 to F72.
 
 ---
 

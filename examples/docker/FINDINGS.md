@@ -2578,3 +2578,27 @@ The rows are unchanged between the two runs. It is worth recording because the
 failure names an *enforcement rule* — "SS10 finds no terminal env read outside
 capabilities.ts" — which reads as a real violation and sends a reader to look for
 one. The scans walk 174 files, and they are the slowest rows in tiers 1 to 4.
+
+
+---
+
+## F74 — the demo's completion beat never worked
+
+Beat 4 of `demo.cast` types `/co` and shows the menu. Read back frame by frame,
+**the prompt is empty for the whole beat** — and it has been since the beat was
+written, through every version of the gif that has shipped.
+
+Beat 3 walks the `/ps` table's rows with `↓`, which moves focus *into* the live
+block (C16 I22). A printable key arriving there does nothing: C16 §"unconsumed
+keys" says in as many words that it must not leak into the prompt behind it. So
+every character of the next beat was dropped, correctly, by a rule written to
+prevent exactly the thing that would have made the beat work by accident.
+
+`Esc` returns focus to the prompt and the beat now runs. What is worth recording
+is why it survived: **an empty prompt is what a prompt looks like.** There is no
+frame to compare against, no assertion that could have failed, and the beat is
+one of ten in a ninety-second recording. It took reading the beat at a settled
+point and asking where the menu was.
+
+The instrument that found it is the one `README.md` already names — a screencast
+is a frame-read with an audience — and it is now four for four on that recording.

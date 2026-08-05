@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record the demo — six beats, one session, one capture.
+"""Record the demo — ten beats, one session, one capture.
 
     python3 tools/screencast.py out/demo
 
@@ -85,7 +85,8 @@ def repeat(key: bytes, at: float, times: int, every: float) -> tuple[list[Beat],
 
 
 DOWN, UP, ESC, TAB, ENTER = b"\x1b[B", b"\x1b[A", b"\x1b", b"\t", b"\r"
-PAGE_DOWN, PAGE_UP, TOP = b"\x1b[6~", b"\x1b[5~", b"\x1b[1;5H"
+PAGE_DOWN, PAGE_UP = b"\x1b[6~", b"\x1b[5~"
+TOP, BOTTOM = b"\x1b[1;5H", b"\x1b[1;5F"
 
 
 def build() -> list[Beat]:
@@ -109,10 +110,23 @@ def build() -> list[Beat]:
     part, t = repeat(UP, t, 2, 0.5); b += part
     t += 1.5
 
-    # 4 — completion. Typed, opened, browsed, dismissed — a person looking at
-    #     the list rather than a screenshot of it.
+    #     **`Esc` back to the prompt, and without it the next beat is dead.**
+    #     `↓` moves focus *into* the live block (C16 I22), and a printable key
+    #     arriving there does nothing — it does not leak into the prompt behind
+    #     it, which is C16 §"unconsumed keys" working exactly as written. So
+    #     every character of beat 4 was dropped, and the recording has been
+    #     showing an empty prompt where the completion menu is meant to be since
+    #     the beat was written. Nothing in the frame says so: an empty prompt is
+    #     what a prompt looks like.
+    b.append((round(t, 3), ESC)); t += 1.0
+
+    # 4 — **completion, and the menu is not asked for.** Two static candidates
+    #     open it as you type (C19 I19), so `/co` alone is the shot — no Tab,
+    #     and the pause afterwards is the point of the beat rather than dead
+    #     air. Then Tab, which still means Tab: it runs the dynamic sources and
+    #     takes the selection.
     part, t = typed(b"/co", t); b += part
-    t += 0.6
+    t += 2.0
     b.append((round(t, 3), TAB)); t += 1.6
     part, t = repeat(TAB, t, 2, 1.1); b += part
     t += 1.4
@@ -137,11 +151,35 @@ def build() -> list[Beat]:
     t += 1.5
 
     # 8 — the log tail in a pushed view, and Ctrl-C out of it.
-    part, t = command(b"/logs dtui-web", t); b += part
+    #
+    #     **Typed as far as the argument, then Tab**, because that argument is
+    #     where the app's own completion sources live: `container` is declared
+    #     by nine verbs and answered by `docker ps -a`, so the menu here is real
+    #     container names with their states rather than manifest verbs. It is
+    #     the only beat that shows a candidate the framework could not have
+    #     produced.
+    part, t = typed(b"/logs dtui-", t); b += part
+    t += 0.6
+    b.append((round(t, 3), TAB)); t += 2.2
+    part, t = typed(b"web", t); b += part
+    t += 0.5
+    b.append((round(t, 3), ENTER)); t += 0.0
     t += 7.0
     b.append((round(t, 3), b"\x03")); t += 2.5
 
-    # 9 — **the loop.** `/clear` empties the transcript and `/dashboard` puts
+    # 9 — **the whole transcript, from the top.** Everything above has scrolled
+    #     out of view by now — measured at thirteen dashboard rows of thirty-four
+    #     on landing and none at all by the fifth beat — so the accumulated
+    #     session is real and invisible. `⌃Home` goes to the document's first
+    #     row and `⌃End` comes back, which is the one gesture that shows both
+    #     that the transcript is kept and that it is rendered rather than
+    #     scrolled back through as text.
+    b.append((round(t, 3), TOP)); t += 3.0
+    part, t = repeat(PAGE_DOWN, t, 3, 1.1); b += part
+    t += 1.0
+    b.append((round(t, 3), BOTTOM)); t += 2.0
+
+    # 10 — **the loop.** `/clear` empties the transcript and `/dashboard` puts
     #     the opening frame back, so the last second of the recording is the
     #     first one and the gif cycles without a cut.
     part, t = command(b"/clear", t); b += part
