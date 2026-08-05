@@ -283,6 +283,24 @@ describe("S3's document", () => {
     expect(captionOf(first)).toBe(captionOf(second));
   });
 
+  it("D6 (F27): the CPU plot's floor is pinned and its ceiling is not", () => {
+    // **Read off the document rather than off `cpuBlock`**, because the helper
+    // having the field says nothing about the composition using it.
+    //
+    // `yMin: 0` because absent a pin the range is the data's, and a container
+    // held at 100% drew a 0.2% wobble as a full-height mountain range. No
+    // `yMax` because `CPUPerc` is per-core-normalised — DASHBOARD_WALK A4 —
+    // so 780% is ordinary on eight cores, and C04 I29 clamps to the edge: a
+    // ceiling would render a busy container identically to a saturated one.
+    const panel = containerView(STATS[0] as Row, 120).find((bl) => bl.id === "cpu") as {
+      children: readonly Block[];
+    };
+    const plot = (panel.children[0] as Group).children[0] as Plot;
+
+    expect(plot.yMin).toBe(0);
+    expect(plot.yMax, "a ceiling would flatten 100% and 780% together").toBeUndefined();
+  });
+
   it("D5: the header's ID is the container's id, not the argument it was opened by", () => {
     // **Found by reading the frame, and green through the fix — so nothing
     // covered it.** `docker stats` reports `Container` as whatever it was

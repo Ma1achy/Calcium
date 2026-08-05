@@ -280,8 +280,31 @@ function events(input: readonly EventLine[], opts?: BlockOpts): Events {
   );
 }
 
-function plot(spec: BlockOpts & { series: readonly Series[]; height: number; axes?: boolean }): Plot {
-  const { series, height, axes } = spec;
+/**
+ * **`yMin` and `yMax` are here and `yFormat`, `xLabels` and `emptyMessage` are
+ * not** — C24 §4 carries the reasoning for each, and this comment carries the
+ * one that made the pin urgent.
+ *
+ * Absent a pin the range is the data's, so a series that is genuinely flat is
+ * drawn against its own noise. A CPU plot watching a container pinned at 100%
+ * rendered a 0.2% wobble as a full-height mountain range — a reader sees violent
+ * load where the load is flat. C04 I29 clamps out-of-range values to the edge
+ * rather than dropping them, so a floor costs nothing at the top.
+ *
+ * Both, never one: C04 I29 makes them independently optional, and a builder that
+ * floors an axis without capping it leaves a consumer working out which half
+ * exists.
+ */
+function plot(
+  spec: BlockOpts & {
+    series: readonly Series[];
+    height: number;
+    axes?: boolean;
+    yMin?: number;
+    yMax?: number;
+  },
+): Plot {
+  const { series, height, axes, yMin, yMax } = spec;
   return finish<Plot>(
     {
       kind: "plot",
@@ -290,6 +313,8 @@ function plot(spec: BlockOpts & { series: readonly Series[]; height: number; axe
       series,
       height,
       ...(axes === undefined ? {} : { axes }),
+      ...(yMin === undefined ? {} : { yMin }),
+      ...(yMax === undefined ? {} : { yMax }),
     } as Plot,
     spec,
     true,

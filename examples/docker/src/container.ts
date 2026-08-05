@@ -98,6 +98,20 @@ export function cpuBlock(ring: Ring, trouble?: Block): Block {
         series: [{ values: [...ring.values], label: "CPU %", tone: "ok" }],
         height: PLOT_HEIGHT,
         axes: true,
+        /**
+         * **The floor is pinned and the ceiling is not** (F27, C04 I29).
+         *
+         * Without `yMin` the range is the data's, and a container pinned at 100%
+         * drew a 0.2% wobble as a full-height mountain range — the plot at its
+         * least trustworthy in exactly the case a reader most wants to trust it.
+         *
+         * **And `yMax: 100` would be the opposite error.** DASHBOARD_WALK A4:
+         * `CPUPerc` is per-core-normalised, so `780%` is an ordinary reading on
+         * an eight-core host, and I29 clamps to the edge rather than dropping —
+         * a ceiling would render a busy container identically to a saturated
+         * one, which is the finding walk A4 already ruled against for the bar.
+         */
+        yMin: 0,
       }),
       b.notice("muted", axisCaption(ring), undefined, { id: "cpu-axis" }),
       ...(trouble === undefined ? [] : [trouble]),
