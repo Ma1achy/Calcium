@@ -1472,6 +1472,51 @@ the entry more than the instance is. Corrected in `DOCKER_TUI_SURFACES.md` in pl
 
 ---
 
+## F43 — an app cannot ask what the terminal supports ★★★
+
+`detectCapabilities` is not exported (`src/index.ts`), and `LocalContext` carries `command`
+and nothing else. So the one route an app writes entirely itself cannot ask the framework
+what the terminal can draw, and `main.ts` sniffs `TERM` and `LANG` itself — duplicating
+`terminal/capabilities.ts` in the app, which is precisely what C02 exists to prevent.
+
+**It is not avoidable by deferring to the framework**, and that is what makes it a gap
+rather than a preference. Step 1's em-dash finding established that *capability
+substitution covers glyphs the framework picks, not text an adapter supplies*: `▄ ▀ █` in a
+`raw` block pass through untouched and draw as garbage on a terminal that cannot show them.
+So the app **must** choose, and it must choose without being told.
+
+Third instance of the family, and now the strongest: **F14** (a local handler has no width,
+so `main.ts` reads `process.stdout.columns`), **F36** (an app cannot validate a document it
+built), and this. All three are *the framework holds a fact the consumer needs and does not
+offer it*, all three are worked around by the app duplicating framework code, and F14's
+workaround is already documented as wrong across a resize.
+
+---
+
+## F44 — the banner's own document was wrong three times, and measuring caught each
+
+Not a Calcium finding — an artefact one, filed because the *pattern* is the fourth of its
+kind (F4, F11, F32, this) and the pattern is worth more than any instance.
+
+`DOCKER_TUI_BANNER.md` stated the whale's per-row extents as `40, 31, 31, 33, 40, 28, 25, 22`;
+measured, they are `31, 31, 31, 33, 40, 29, 26, 23` — **four of eight wrong**. It stated
+`whale(40) + gap(4) + wordmark(60) = 103`, which comes to 104, because the wordmark's
+content is 59 and its stored width 60. And its tier table gave fixed thresholds that are
+right for the block wordmark and wrong for the ASCII one, which is 76 cells and fits the
+tier the table reserved for the whale alone.
+
+Every one was found by building the thing and measuring, and none by reading. All three
+corrected in place.
+
+The one claim that was **right and would have bitten if trusted as written**: the wordmark's
+top pad is already in the document — 8 rows, first blank, 7 of content. The instruction said
+*add one row*, which would have produced nine, and a build step that trimmed blank lines
+would have silently undone a padding its author believed applied. `test/banner.test.ts` K3
+holds it, and the whole art is pinned against the document's fenced blocks so the two cannot
+drift.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that

@@ -38,6 +38,30 @@ const run = promisify(execFile);
 const width = (): number => process.stdout.columns || 80;
 
 /**
+ * Whether the terminal can draw block elements — `▄ ▀ █`.
+ *
+ * **Decided by the app, and that is a finding rather than a design** (F43).
+ * `detectCapabilities` is not exported and a local handler is handed no
+ * capabilities at all, so the one route an app writes entirely itself cannot
+ * ask the framework what the terminal supports — the third instance of a fact
+ * the consumer needs and is not offered (F14, F36).
+ *
+ * It matters because **capability substitution covers glyphs the framework
+ * picks, not text an adapter supplies** — step 1's em-dash finding, eight rows
+ * high. `▄▀█` in a `raw` block pass through untouched and draw as garbage on a
+ * terminal that cannot show them, so choosing is unavoidably the app's job and
+ * carrying an ASCII variant is the correct app-side answer.
+ *
+ * The test is deliberately crude: a UTF-8 locale and a terminal that is not
+ * `dumb`. Getting it wrong costs a wordmark, not correctness.
+ */
+const blockElements = (): boolean => {
+  const term = process.env["TERM"] ?? "";
+  const locale = `${process.env["LC_ALL"] ?? ""}${process.env["LANG"] ?? ""}`;
+  return term !== "" && term !== "dumb" && /utf-?8/iu.test(locale);
+};
+
+/**
  * The daemon's version, for the manifest's skew field.
  *
  * Being unable to reach docker is not fatal here: the shell should open and say
@@ -77,7 +101,7 @@ const tui = createTui({
     inspect: createInspectAdapter(),
   },
   localHandlers: {
-    dashboard: createDashboardHandler(engine, width),
+    dashboard: createDashboardHandler(engine, width, blockElements),
     drift: createDriftHandler(),
     compare: createCompareHandler(),
     config: createConfigHandler(),
@@ -94,7 +118,7 @@ const tui = createTui({
    * scrolled out of view is still running. S1's drawing said it froze; the
    * drawing was wrong about Calcium's own rules (FINDINGS F17a).
    */
-  greeting: () => createDashboardHandler(engine, width)([], { command: "" }),
+  greeting: () => createDashboardHandler(engine, width, blockElements)([], { command: "" }),
 });
 
 await tui.start();

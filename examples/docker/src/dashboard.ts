@@ -23,6 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
+import { banner } from "./banner.ts";
 import type { Block, ColumnDef, Glyph, TableRow, Tone, ViewDocument } from "@fmx/calcium";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
@@ -365,12 +366,29 @@ export const LIVE_TITLE = "RUNNING";
  * one case where the fetch succeeded perfectly. So zero running renders the
  * panel with its empty message, never no panel.
  */
-export function dashboard(snap: Snapshot, width: number, engine: string): readonly Block[] {
+export function dashboard(
+  snap: Snapshot,
+  width: number,
+  engine: string,
+  blocks = true,
+): readonly Block[] {
   const all = join(snap);
   const live = all.filter(isLive);
   const stopped = all.filter((c) => !isLive(c));
 
+  /**
+   * **The banner is chrome and is chosen here**, at document-build time, from a
+   * width the app had to read itself and a capability the app had to decide
+   * itself (F14, F43).
+   *
+   * It is above the panel rather than inside it: inside, its 103 cells would
+   * set the panel's minimum width and a narrow terminal would get a bordered
+   * box sized for art it is not showing.
+   */
+  const art = banner(width, blocks);
+
   return [
+    ...(art === null ? [] : [art]),
     b.panel(`docker-tui · engine ${engine} · ${String(all.length)} containers`, [
       b.live({
         id: "running",
@@ -415,12 +433,20 @@ export function dashboard(snap: Snapshot, width: number, engine: string): readon
 export function createDashboardHandler(
   engine: string,
   width: () => number,
+  /**
+   * Whether the terminal can draw `▄ ▀ █`.
+   *
+   * **Injected, because a local handler is told nothing about the terminal and
+   * `detectCapabilities` is not exported** (F43). The app decides in `main.ts`,
+   * which is also the only file allowed to look at the environment.
+   */
+  blocks: () => boolean = () => true,
 ): (argv: readonly string[], ctx: { command: string }) => Promise<ViewDocument> {
   return async (_argv, ctx) => ({
     schema: "tui.view/1",
     command: ctx.command,
     status: "ok",
-    blocks: dashboard(await fetchSnapshot(), width(), engine),
+    blocks: dashboard(await fetchSnapshot(), width(), engine, blocks()),
     meta: {
       verb: "dashboard",
       adapter: "dashboard",

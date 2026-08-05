@@ -23,7 +23,7 @@ It is a `raw` block, chosen at document-build time from `ctx.width` and
           \____\______/ 
 ```
 
-8 rows, **40 cells once padded** — the lines are ragged as written (40, 31, 31, 33, 40, 28, 25, 22) and must be stored padded. Every character is ASCII (`# / \ ~ { } " _ o = .`), so it needs no
+8 rows, **40 cells once padded**. The lines are ragged as written — content extents **31, 31, 31, 33, 40, 29, 26, 23**, corrected from the figures first recorded here, four of which were wrong — *and* the block carries trailing whitespace out to 43. So storing it padded is **two operations, trim then pad**: padding alone leaves three rows wider than the rest. Every character is ASCII (`# / \ ~ { } " _ o = .`), so it needs no
 variant — it renders identically at truecolour and at ASCII depth.
 
 ### The wordmark — block elements, needs an ASCII variant
@@ -39,7 +39,7 @@ variant — it renders identically at truecolour and at ASCII depth.
  ▀▀▀▀▀       ▀▀▀▀      ▀▀▀▀▀   ▀▀   ▀▀▀    ▀▀▀▀▀    ▀▀      
 ```
 
-**7 rows, a uniform 60 cells** — measured, and it needs one row of top padding to align with the whale. Uses `▄ ▀ █` — **block elements, not ASCII.**
+**8 rows as stored — one blank, then 7 of content — and a uniform 60 cells as written, 59 of content.** The top pad **is the blank first line above**, already present. It must not be stripped and must not be added again: this section first read as an instruction to add one, which would have produced nine. Uses `▄ ▀ █` — **block elements, not ASCII.**
 
 ### The ASCII wordmark — the variant the above needs
 
@@ -70,7 +70,7 @@ variant — it renders identically at truecolour and at ASCII depth.
           \____\______/                      ▀▀▀▀▀       ▀▀▀▀      ▀▀▀▀▀   ▀▀   ▀▀▀    ▀▀▀▀▀    ▀▀
 ```
 
-`whale(40) + gap(4) + wordmark(60) = 103`. The gap is a choice; 4 reads well, 2 is tight.
+`whale(40) + gap(4) + wordmark(59) = 103`. The wordmark's *content* is 59 cells and its stored width 60, so the arithmetic first written here — `+ 60` — came to 104 and disagreed with the measured 103 beside it. The gap is a choice; 4 reads well, 2 is tight.
 
 ### Three things that had to be fixed to compose it, all the app's job at build time
 
@@ -94,11 +94,21 @@ wordmark then starts at a different column on every row. Store it **padded to a 
 that is most of the screen spent on decoration. The tiers preserve step 2's density
 decision.
 
-| width | banner | rows |
-|---|---|---|
-| **≥ 103** | whale + wordmark side by side (103 exactly; 110 gives margin) | 8 |
-| **80–102** | whale alone (40 cells); the name goes in the panel title | 8 |
-| **< 80** | no art — the title line S1 already has | 0 |
+**The threshold is each variant's own width, not a constant** — corrected after building it,
+and the frame at 80 is the evidence.
+
+| variant | width | drawn when | rows |
+|---|---|---|---|
+| whale + block wordmark | **103** | width ≥ 103 and block elements available | 8 |
+| whale + ASCII wordmark | **76** | width ≥ 76 otherwise | 8 |
+| whale alone | **40** | width ≥ 40 otherwise | 8 |
+| nothing | — | below 40 | 0 |
+
+The table first written here reserved 80–102 for the whale alone. That is right for the
+block wordmark and **wrong for the ASCII one**: whale + ASCII wordmark is 76 cells and fits
+an 80-column terminal with four to spare, so a fixed 103 would have drawn a lone whale with
+the name's space empty beside it. Frame-read at 80 shows the name where the table said it
+could not go.
 
 ## The depth variants
 
@@ -113,7 +123,7 @@ ASCII only                 the ASCII wordmark
 the whale                  unchanged either way — it is already ASCII
 ```
 
-**Four variants total**: (wide | narrow) × (blocks | ASCII).
+**Four selections, three renderings**: (wide | narrow) × (blocks | ASCII), and the whale is already ASCII, so narrow×blocks and narrow×ASCII are the same picture. Recorded rather than left as an off-by-one in the count.
 
 ---
 
