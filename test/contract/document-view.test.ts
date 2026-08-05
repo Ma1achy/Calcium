@@ -32,6 +32,10 @@ const REGION = { width: 40, height: 6 };
 const chunk = (id: string, text: string): Block =>
   b.panel(text, [b.raw(text, { id: `${id}-c` })], { id });
 
+/** A block of exactly `rows` rows — C22 I47's subject, which `chunk` cannot be. */
+const tall = (id: string, rows: number): Block =>
+  b.raw(Array.from({ length: rows }, (_, i) => `line ${String(i)}`).join("\n"), { id });
+
 const docOf = (blocks: readonly Block[]): ViewDocument => ({
   schema: "tui.view/1",
   command: "/watch api",
@@ -148,6 +152,52 @@ describe("C22 §13a — the document view", () => {
       back?.kind === "panel" ? back.title : null,
       "the tick that landed while it was out of view is on screen when it returns",
     ).toBe("refreshed");
+  });
+
+  it("T4.40 (C22 I47): a block taller than the region is unscrollable, and says so", () => {
+    // **The fixture is shown to be the trap before anything is asserted about
+    // the remedy.** Without these two lines the row passes against a view that
+    // scrolls perfectly well and happens to emit a notice — and it is the
+    // *unscrollable* case I47 is about. `n` is refused, not unhelpful.
+    view.open("/watch api");
+    view.fill(docOf([tall("big", 12)]));
+    expect(view.move("down"), "no second offset to move to — the motion is refused").toBe(false);
+    expect(view.move("bottom"), "and `G` has nowhere to go either").toBe(false);
+
+    // **The indicator is first, and that is not a stylistic choice.** The block
+    // is taller than the region, so anything after it sits past the last row
+    // and is the first thing C15 cuts — an indicator below would be truncated
+    // by the truncation it reports.
+    expect(ids()[0], "above the block it describes, or it is cut with it").toBe(
+      "document-view-truncated",
+    );
+    expect(ids()).toEqual(["document-view-truncated", "big"]);
+  });
+
+  it("T4.41 (C22 I47): the count is what the reader cannot reach, wrap included", () => {
+    view.open("/watch api");
+    view.fill(docOf([tall("big", 12)]));
+
+    const indicator = content()[0] as Block;
+    const self = registry.measure(indicator, REGION.width);
+    // The notice wraps at 40 columns, which is the case the two passes exist
+    // for: the indicator's own height is rows the block does not get, so a
+    // hard-coded 1 would overstate what is on screen by exactly the wrap.
+    expect(self, "the fixture wraps, or the two passes are untested here").toBeGreaterThan(1);
+
+    const shown = REGION.height - self;
+    expect(indicator.kind === "notice" ? indicator.text : "").toContain(String(12 - shown));
+    // C04 I6 — a meaning tone needs a glyph, or the notice is colour alone.
+    expect(indicator.kind === "notice" ? indicator.glyph : undefined).toBeDefined();
+  });
+
+  it("T4.42 (C22 I47): more blocks below is not truncation, and gets no indicator", () => {
+    // The wolf-crying arm. `n` reaches these, so an indicator here would train
+    // the reader to ignore the one case it matters for.
+    view.open("/watch api");
+    view.fill(docOf([chunk("a", "one"), chunk("b", "two"), chunk("c", "three")]));
+    expect(ids()).toEqual(["a", "b"]);
+    expect(view.move("down"), "and this one genuinely scrolls").toBe(true);
   });
 
   it("T4.36 (C22 I45): pop closes the view and leaves nothing behind", () => {

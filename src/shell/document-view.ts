@@ -53,6 +53,9 @@ export const DOCUMENT_VIEW_ID = "document-view";
 /** The block the view shows between `open` and `fill`. */
 const WAITING_ID = "document-view-waiting";
 
+/** The I47 indicator's id. Reserved, so a document cannot collide with it (C04 I14). */
+const TRUNCATED_ID = "document-view-truncated";
+
 export type DocumentViewMotion = "up" | "down" | "top" | "bottom" | "pageUp" | "pageDown";
 
 export type DocumentViewDeps = Readonly<{
@@ -110,9 +113,17 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
    *
    * **At least one block, always.** A block taller than the whole region would
    * otherwise window to nothing, and an empty view is indistinguishable from a
-   * broken one; C15 reports the overflow through `Placed.truncated`, which is
-   * what that field is for. This is the one place the block-boundary rule and
-   * the region can genuinely disagree, and showing the block is the honest half.
+   * broken one. This is the one place the block-boundary rule and the region
+   * can genuinely disagree, and showing the block is **half** the honest answer;
+   * saying that it was cut is the other half (I47).
+   *
+   * **This comment used to cite `Placed.truncated` as the mechanism reporting
+   * the overflow, and nothing here read it.** C19's menu does (C19 §5); this
+   * file named the field, named what it was for, and had no consumer of it —
+   * which reads exactly like a file that reads it. The fact is now stated on
+   * screen, and from this projection's own measurement rather than from a
+   * second layout: a row count and the region are what C15 compares too, and
+   * `deps.measure` is deliberately the same registry so the two cannot drift.
    */
   const project = (at: State): readonly Block[] => {
     const { width, height } = deps.region();
@@ -126,7 +137,52 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
       out.push(block);
       used += rows;
     }
-    return Object.freeze(out);
+    // **I47 — overflow here means exactly one block, and that is a consequence
+    // rather than a test.** The loop breaks before a second block can push
+    // `used` past the region, so `used > height` can only be the first block
+    // exceeding it alone. Guarding on `out.length !== 1` as well reads as
+    // caution and is a clause nothing can make false — A03 §2's vacuity class,
+    // caught by a mutation that swapped it out and failed nothing.
+    //
+    // That single block is the unscrollable case: the offset indexes blocks, so
+    // there is no second offset to move to and the rows past the region are
+    // reachable by no key. More blocks below is *not* this — `n` reaches those,
+    // and an indicator there would cry wolf.
+    const only = out[0];
+    if (only === undefined || used <= height) return Object.freeze(out);
+    return Object.freeze([notice(used, height, width), only]);
+  };
+
+  /**
+   * The I47 indicator, **above the block it describes**.
+   *
+   * Below is where it belongs by reading order and where it cannot go: the
+   * block is taller than the region, so anything after it sits past row
+   * `height` and is the first thing cut. An indicator that the truncation
+   * truncates is A03 §2's vacuity class wearing a glyph. The implementation
+   * settled this, not the walk — the walk ruled that the view says so and had
+   * no reason to think about where.
+   *
+   * Two passes, because the indicator's own height decides how much of the
+   * block is shown and therefore the number it states. Measured rather than
+   * assumed to be one row: it wraps at a narrow width, and a hard-coded 1 would
+   * overstate what the reader can see by exactly the rows the wrap cost.
+   */
+  const notice = (rows: number, height: number, width: number): Block => {
+    const build = (hidden: number): Block =>
+      b.notice.warn(
+        `${String(hidden)} more rows — this block is taller than the screen, and `
+          + `n/p move by block so they cannot reach them`,
+        { id: TRUNCATED_ID },
+      );
+    let self = 1;
+    for (let pass = 0; pass < 2; pass += 1) {
+      const candidate = build(rows - Math.max(0, height - self));
+      const measured = deps.measure(candidate, width);
+      if (measured === self) return candidate;
+      self = measured;
+    }
+    return build(rows - Math.max(0, height - self));
   };
 
   const layerFor = (at: State): Layer => ({
