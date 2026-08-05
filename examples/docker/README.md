@@ -97,20 +97,22 @@ picture of the wrong thing.
 
 ### Completion, from the manifest and from no code
 
-![The completion menu open over the transcript after typing slash c o and pressing tab: three verbs listed — container, compare and config — each with its summary, and the text of the transcript visible through the gaps between the menu's columns](../../docs/media/completion.gif)
+![The completion menu open after typing slash c o and pressing tab: three verbs listed — container, compare and config — each with its summary, drawn as a floating box over the transcript, with the transcript still visible to the right of the box's edge](../../docs/media/completion.gif)
 
 **Nothing in this application implements completion.** The menu is the manifest's
-verbs and their summaries, from the same table `/help` and dispatch use; adding a
-verb makes it completable with no code change, which is the property the manifest
-exists for.
+verbs and their summaries, from the same table dispatch uses; adding a verb makes
+it completable with no code change, which is the property the manifest exists for.
 
-**And the transcript reads through it, which is F68.** The overlay paints no
-background — measured, zero background sequences in the whole capture while
-`/config`'s diff emits seventy-two — so anything already on screen shows through
-the gaps between its columns. The channel exists, is specified as a requirement
-(C10 §4a), and the one surface that by definition has content behind it does not
-use it. It is left in the picture rather than staged around, because a ledger that
-only shows what works is not a ledger.
+**The transcript continues to the right of it, and that is the box's edge rather
+than a defect** — which took a retraction to establish. It looked like text
+bleeding through the menu, and was filed as one; the frames were then captured
+twice, with the Tab and without, and diffed. The box is columns 0–81 on every one
+of its rows, every cell written, and everything past 82 is the transcript
+correctly untouched. F68 in `FINDINGS.md` is the withdrawal and what it cost.
+
+What survives is smaller: the menu has no border and no background tint, so its
+right edge is invisible against surrounding text. That is a question about one
+surface's chrome, not a bug.
 
 ---
 

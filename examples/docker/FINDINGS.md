@@ -2337,45 +2337,85 @@ is what was asked for. It took someone wanting a smaller picture.
 
 ---
 
-## F68 — the completion overlay paints no background, so the transcript reads through it ★★★
+## F68 — WITHDRAWN. The overlay is correct; the finding was not ★★★ — **retracted**
 
-Found while making a picture of completion for the README. The menu renders, the
-verbs and summaries are right, and the line reads:
+**Filed, published in two READMEs, and wrong.** It claimed that the completion
+menu paints no background and that the transcript reads through the gaps between
+its columns. The second half is what a reader sees; the first half is not why,
+and there is no defect.
+
+### What was filed
+
+The menu photographed like this, and the line was quoted as the evidence:
 
 ```
 /compare                                              Two containers, side by sidequiet  frosty_hodgkin
 /config        A config file as the container has it, against the image's original──────────────────────
 ```
 
-**Two texts on one line.** The menu is drawn over the transcript and fills only the
-cells its own text occupies, so everything underneath shows through the gaps —
-container pills, panel borders, whatever happens to be there.
+Two texts on one line. Supported by a real measurement — `/config`'s diff emits
+**72** `48;2;` background sequences and the completion capture emits **zero** —
+and by C10 §4a, which added `background` to `Style` as a requirement. The
+conclusion drawn was that the overlay does not use the channel the diff does.
 
-**The channel exists and works, and this overlay does not use it.** Measured over
-three captures of the same session:
+### What going to fix it found
 
-| capture | `48;2;` sequences emitted |
+`src/shell/composite.ts` is not only correct, it is **written against this exact
+symptom.** I29's own words:
+
+> Every cell of a box is written, background included. The prompt or the
+> transcript beneath has already painted those cells, so a loop writing only the
+> glyphs a layer's blocks produced leaves the old content showing in the gaps —
+> **and the symptom is text bleeding through a menu, which reads as a C09 defect
+> rather than a compositing one.**
+
+`layerRows` pads every row with `exact(lines[i] ?? "", p.width)`; `spliceRow`
+writes `head + body + tail`. Every cell of the box is written.
+
+**Measured, rather than read.** The same session captured twice — one with the
+Tab, one without — and the frames diffed row by row:
+
+| row | columns that differ |
 |---|---|
-| `/config`'s diff | **72** |
-| `/drift` | 0 |
-| the completion menu | **0** |
+| 29 | 0 – 11 |
+| 30 | 0 – 81 |
+| 31 | 0 – 81 |
 
-C10 §4a added `background` to `Style` as *"the second colour channel and,
-deliberately, the last one"* — a requirement rather than a preference, because
-C25's diff rows cannot be expressed without it. The diff uses it. The overlay,
-which is the one surface that by definition has content behind it, does not.
+**The box is columns 0–81 on every row of it.** Row 29 differs only to column 11
+because its content is short *and the cells it padded were already blank* — the
+padding is written, it simply matches. Everything past column 82 is the
+transcript, correctly untouched, on all three rows.
 
-**This is the opposite of the usual shape here.** Almost every finding in this
-ledger is a consumer reaching for something the framework does not have. This is
-a mechanism the framework has, specified and working, that the surface needing it
-most does not reach for.
+So the menu is an 82-cell box composited exactly as specified, over a 110-cell
+screen. **What I photographed is what an overlay looks like.**
 
-It is also invisible to everything that tests overlays. A menu asserted by its
-rows and their order is correct; a golden frame of a menu over an *empty*
-transcript is correct; `measure` is correct, because the menu occupies exactly the
-rows it says. **The defect is only in the composition, and only when something is
-underneath.**
+### What is actually true, and it is much weaker
 
-The workaround for the README image is to trigger the menu before the landing
-dashboard has fetched, so there is nothing to read through — which is worth
-recording as the workaround it is.
+The completion menu has **no border and no background tint**, so its right edge is
+not visible: a narrow box over text reads as text overlapping text. That is a
+legibility observation about one surface's chrome, not an invariant violation —
+and C10's refusal to paint a background is a deliberate decision with its reason
+written down (*"background colours are the emulator's and a user may override
+them"*), not an omission.
+
+Whether the menu should carry a border is a design question worth asking. It is
+not a bug, and filing it as one was wrong.
+
+### Why it got through, which is the part worth keeping
+
+**The measurement was real and the inference was not.** Zero background sequences
+is a true fact about the capture; it does not imply cells go unwritten, because a
+space written in the default colours *is* a written cell and emits no background
+sequence at all. I had a number, and a specification paragraph that mentioned the
+exact symptom, and I stopped — **the spec passage that seemed to confirm the
+finding was in fact the note explaining why the implementation does not have it.**
+
+The rule this leaves: **a symptom named in a spec is evidence the authors thought
+about it, not evidence they got it wrong.** The paragraph that made the diagnosis
+feel certain should have been the first thing to check the code against.
+
+And it is the sixth blind spot pointed at myself one step later. F66 was a claim
+carried across four steps without a record. This is a claim published within the
+hour of being formed, from a measurement that was accurate about the wrong thing.
+The check that catches both is the same: *go and look at the mechanism.*
+
