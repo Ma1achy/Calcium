@@ -43,42 +43,114 @@ COLS, ROWS = 110, 34
 # stats --no-stream` and takes about three seconds; a capture that moves on
 # before it lands shows an empty transcript, which reads exactly like a command
 # that produced nothing (VERIFYING.md §8).
-BEATS: list[tuple[float, bytes]] = [
-    # 1 — launch. The banner and the landing dashboard, refreshing in place.
-    (7.0, b"/ps"),
-    (9.0, b"\r"),
+# ── The timeline, built rather than written out ──────────────────────────────
+#
+# **Every command is typed one character at a time**, and the first version of
+# this file wrote each one as a single burst. That is not slow-motion realism —
+# it is a different code path. C16 has a paste window: bytes arriving together
+# are *pasted text*, so a burst never touched the editor's per-keystroke
+# handling, and on screen a whole command appeared between one frame and the
+# next. It read as a machine because it was one.
+#
+# `CPS` is a human rate. The jitter is deterministic — a fixed cycle rather than
+# a random one — because a recording that differs run to run cannot be diffed
+# against the last one.
+CPS = 13.0
+JITTER = (0.0, 0.035, -0.02, 0.05, 0.01, -0.01, 0.04, 0.0)
+
+Beat = tuple[float, bytes]
+
+
+def typed(text: bytes, at: float) -> tuple[list[Beat], float]:
+    """`text`, one keystroke at a time, and the moment the last one lands."""
+    out: list[Beat] = []
+    t = at
+    for i, ch in enumerate(text):
+        out.append((round(t, 3), bytes([ch])))
+        t += 1.0 / CPS + JITTER[i % len(JITTER)]
+    return out, t
+
+
+def command(text: bytes, at: float, think: float = 0.45) -> tuple[list[Beat], float]:
+    """Type it, pause the way a person does before committing, then Enter."""
+    out, t = typed(text, at)
+    t += think
+    out.append((round(t, 3), b"\r"))
+    return out, t
+
+
+def repeat(key: bytes, at: float, times: int, every: float) -> tuple[list[Beat], float]:
+    """One key, several times, each its own write (C16: a burst is a paste)."""
+    return [(round(at + i * every, 3), key) for i in range(times)], at + times * every
+
+
+DOWN, UP, ESC, TAB, ENTER = b"\x1b[B", b"\x1b[A", b"\x1b", b"\t", b"\r"
+PAGE_DOWN, PAGE_UP, TOP = b"\x1b[6~", b"\x1b[5~", b"\x1b[1;5H"
+
+
+def build() -> list[Beat]:
+    b: list[Beat] = []
+    # 1 — land, and let the dashboard tick before touching anything. A demo that
+    #     starts typing immediately never shows that it was already live.
+    t = 5.5
+
     # 2 — the table.
-    (15.0, b"/co"),
-    (17.0, b"\t"),
-    # 3 — completion, from the manifest and from no code. Dismissed rather than
-    #     accepted, so the next beat starts from a clean prompt.
-    (21.0, b"\x1b"),
-    (23.0, b"/container stats dtui-load"),
-    (26.0, b"\r"),
-    # 4 — THE SHOT. One sample per tick at TICK_MS = 2000, so the plot needs
-    #     real time to become a shape rather than three points.
-    (44.0, b"\x1b"),
-    # 5 — esc pops the view; the live entry underneath is still ticking.
-    (47.0, b"/drift dtui-web"),
-    (49.0, b"\r"),
-    # 6 — the comparison at its best: two sources, one row per field.
-    (59.0, b"/config dtui-cfg /etc/nginx/conf.d/default.conf"),
-    (62.0, b"\r"),
-    # 7 — a real unified patch. Ctrl-Home to the top, because the additions are
-    #     in the first hunk and the frame after the command is the tail.
-    (70.0, b"\x1b[1;5H"),
-    # 8 — scrolling a transcript far taller than the screen. Each key its own
-    #     write: two page-downs in one write are a paste, not two keys (C16).
-    (74.0, b"\x1b[6~"),
-    (75.5, b"\x1b[6~"),
-    (77.0, b"\x1b[6~"),
-    (78.5, b"\x1b[5~"),
-    (80.0, b"\x1b[F"),
-    # 9 — the log tail, streaming into a pushed view, and Ctrl-C out of it.
-    (83.0, b"/logs dtui-web"),
-    (85.0, b"\r"),
-    (94.0, b"\x03"),
-]
+    part, t = command(b"/ps", t); b += part
+    t += 3.0
+
+    # 3 — **row focus, which is the only smooth movement this shell has.**
+    #     The transcript scrolls by page and by nothing else — C16 binds
+    #     `pageup`, `pagedown`, `c+home`, `c+end` at `global` and no line step —
+    #     so "scroll slowly" is not a thing to record. What *is* smooth is the
+    #     live block's own cursor moving down its rows, which is a different
+    #     feature and the better one to show.
+    part, t = repeat(DOWN, t, 5, 0.5); b += part
+    t += 1.2
+    part, t = repeat(UP, t, 2, 0.5); b += part
+    t += 1.5
+
+    # 4 — completion. Typed, opened, browsed, dismissed — a person looking at
+    #     the list rather than a screenshot of it.
+    part, t = typed(b"/co", t); b += part
+    t += 0.6
+    b.append((round(t, 3), TAB)); t += 1.6
+    part, t = repeat(TAB, t, 2, 1.1); b += part
+    t += 1.4
+    b.append((round(t, 3), ESC)); t += 1.2
+
+    # 5 — THE SHOT. One sample per tick at 2s, so the plot needs real time to
+    #     become a shape. Nothing else happens while it fills, on purpose.
+    part, t = command(b"/container stats dtui-load", t); b += part
+    t += 17.0
+    b.append((round(t, 3), ESC)); t += 2.0
+
+    # 6 — the comparison.
+    part, t = command(b"/drift dtui-web", t); b += part
+    t += 6.0
+
+    # 7 — the patch, then to its first hunk, then a page back down. Additions
+    #     are in the first hunk and the frame after the command is the tail.
+    part, t = command(b"/config dtui-cfg /etc/nginx/conf.d/default.conf", t); b += part
+    t += 4.0
+    b.append((round(t, 3), TOP)); t += 3.5
+    part, t = repeat(PAGE_DOWN, t, 2, 2.0); b += part
+    t += 1.5
+
+    # 8 — the log tail in a pushed view, and Ctrl-C out of it.
+    part, t = command(b"/logs dtui-web", t); b += part
+    t += 7.0
+    b.append((round(t, 3), b"\x03")); t += 2.5
+
+    # 9 — **the loop.** `/clear` empties the transcript and `/dashboard` puts
+    #     the opening frame back, so the last second of the recording is the
+    #     first one and the gif cycles without a cut.
+    part, t = command(b"/clear", t); b += part
+    t += 1.2
+    part, t = command(b"/dashboard", t); b += part
+    return b
+
+
+BEATS: list[Beat] = build()
 
 
 def warm_the_logs() -> None:
