@@ -246,6 +246,12 @@ Arrow keys move the selection, `Enter` accepts, `Esc` dismisses. Those bindings 
 
 **A keystroke that does not extend the current prefix dismisses the menu.** Filtering can only narrow, and backspace widens — there is no set to filter back out of. Stated because "narrow in place on a keystroke" reads as covering backspace, and the implementation that tries to serve it either re-runs a dynamic source on a keystroke (I3) or shows a set that no longer matches what is typed.
 
+**The menu's last content row is a `rule`, and that is the whole of its bottom edge** (I23). A prompt-anchored menu spanning the region sits directly on the prompt, so the last candidate and the line being typed are adjacent rows of text with nothing between them — read from a frame, `• /container` above `❯ /co` is one block, and a reader takes the two as a path. The top edge needs nothing: the transcript above is a different kind of content and reads as one.
+
+**A rule and not a panel**, decided on rows. A panel costs two of them in a region already competing with the transcript, and buys a boundary at the top that the reading defect never involved. `rule` is one row, it is in C04's vocabulary, it degrades with everything else, and it is the block C09 already draws for exactly this.
+
+**Adding it moved a number that was already wrong, which is how the second half was found.** The remainder is `total - shown`, and the shell was passing `layer.content.length` as `shown` — the count of *blocks*, not of rows. C15 truncates by clamping height (C15 §4), so a menu of sixty candidates clamped to ten rows reported fifty-nine missing rather than fifty. T4.5 passes the row count by hand and is right about the function; nothing asserted the argument the caller supplies. So `shown` is the placed height less the rows that are not candidates — the rule, and the indicator itself when there is one.
+
 **The menu spans the region, and declares no width.** C15 I16 resolves an overlay's width as `min(layer.width ?? region.width, region.width)`, so omitting the field is how a layer says *all of it* — and that is what the menu wants.
 
 **This reverses an earlier ruling, and the earlier one was right about the mechanism and wrong about the surface.** It read: *"C19 declares the menu's width. `Layer.width` exists because measurement answers height at a width and never the reverse, so nothing downstream can work out how wide the longest candidate is (C15 I16). It is the same division as the 'N more' indicator: C19 knows the candidates, C15 knows the region, and neither can supply the other's half."*
@@ -571,6 +577,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 - **I20** — A menu that opened by typing holds no selection, and while it holds none the prompt's bindings resolve first: `Enter` submits, `↑` walks history, printable characters type, `Esc` falls through and dismisses. `Tab` enters it, and it is an ordinary menu from then on.
 - **I21** — `Tab` over a typed menu runs §5's algorithm, dynamic sources included, rather than moving a selection; and it updates the open menu rather than pushing a second one.
 - **I22** — A typed menu is rebuilt from the static set on a keystroke and a requested one is filtered in place, because only the second may hold candidates that cost a source call to recover (I3). A rebuild clears the selection.
+- **I23** — The menu's last content row is a `rule`, so its bottom edge against the prompt is a line rather than a change of subject; and the "N more" remainder counts rows, because C15 truncates by clamping height and a count of blocks is off by however many candidates a block holds.
 
 ---
 
@@ -594,6 +601,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 16. **The menu opens as you type**, on two or more static candidates, and closes at one — where ghost text takes over — or at none (I19). `Esc` holds for the rest of the token, so dismissing it is not undone by the next character.
 17. A menu nobody asked for takes no keys from the prompt: it has no selection, the prompt's bindings resolve first, and `Tab` is how the user enters it (I20). `Tab` still means `Tab` there — §5's algorithm, dynamic sources and all — rather than moving a highlight (I21).
 18. **Nothing about typing runs a dynamic source.** The as-you-type path calls `suggest`, which is static and synchronous; the split I3 states is unchanged and T2.1a is the row that keeps it (I3, I22).
+19. The menu has a bottom edge, because it spans the region and sits on the prompt: a `rule` as its last row, one row rather than a panel's two. The remainder beside it counts rows and not blocks (I23).
 
 ---
 
@@ -665,6 +673,8 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T3.16**: unbalanced quotes in the input → context is `none`; nothing is offered rather than something wrong.
 - **T3.17**: cursor at position 0 of a non-empty line → verb or executable slot, as if empty.
 - **T3.18**: a dynamic source returning duplicates → deduplicated before display.
+- **T3.25** (I23): the menu's rendered rows, with the last one asserted to be a rule and not a candidate — **read from the rows rather than from the block list**, because a block appended and never placed satisfies a test that counts blocks. The frame that argued for it is `/clear` sitting directly on `❯ /c`.
+- **T3.26** (I23): sixty candidates in a ten-row region, driven through the shell rather than through `remainderOf` — the indicator says what is missing in rows. T4.5 passes the row count by hand and agrees with the function; this one asks what the caller supplies, which is where the block count was.
 - **T3.20** (I19): typing to two static candidates → the menu is on the stack with no `Tab`; typing on to one → dismissed, and the ghost carries it. The one-candidate case is the control: a threshold of one draws the same word twice and passes any row that only asks whether the menu appeared.
 - **T3.21** (I22): backspace with a **typed** menu open → the menu widens rather than dismissing, and the change log shows `content` rather than `pop` then `push`. T3.12b is the same key over a **requested** menu and asserts the opposite, which is the pair I22 exists to keep apart.
 - **T3.22** (I21): `Tab` over a typed menu → the dynamic source runs and the layer is `update`d. The mutation that binds it to `menuNext` instead passes every candidate assertion and leaves the app's own sources unreachable; the assertion is on the source having been called, and on there being no second `push`.
@@ -716,6 +726,8 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T6.14** (I16): appending the delimiter after a common prefix as well as after a unique match → T1.15 fails, and the second `Tab` never reaches the menu because the token it would have widened has been closed.
 - **T6.15** (I16): moving the delimiter into the engine as one rule → T1.15b fails on two of its three cases, since nothing outside the source knows a directory from a file.
 - **T6.11** (I14): offering verbs for bare text → T1.2 fails.
+- **T6.21** (I23): dropping the rule → T3.25 fails, and the last candidate is adjacent to the prompt again.
+- **T6.22** (I23): passing the block count as `shown` → T3.26 fails, and a menu of sixty says fifty-nine are missing when fifty are.
 - **T6.17** (I19): recomputing the menu on a keystroke through `request` rather than `suggest` → T2.1a fails, a keystroke spawns a subprocess in every app that registers a domain source, and no assertion about the candidate set changes.
 - **T6.18** (I20): giving a typed menu a selection at index 0 on open → T3.20's Enter case fails: the user types `/ps`, presses Enter, and a candidate is accepted instead of the command being run.
 - **T6.19** (I21): letting `overlay`/`tab` answer for a typed menu → T3.22 fails and no dynamic source is ever reachable once the menu opens by itself.
