@@ -2334,3 +2334,48 @@ Filed with what was measured.
 60 / 80 / 120 / 160 columns and a fixed height; the height axis has no equivalent sweep,
 and a document that renders to zero visible rows produces a frame that is *correct* — it
 is what was asked for. It took someone wanting a smaller picture.
+
+---
+
+## F68 — the completion overlay paints no background, so the transcript reads through it ★★★
+
+Found while making a picture of completion for the README. The menu renders, the
+verbs and summaries are right, and the line reads:
+
+```
+/compare                                              Two containers, side by sidequiet  frosty_hodgkin
+/config        A config file as the container has it, against the image's original──────────────────────
+```
+
+**Two texts on one line.** The menu is drawn over the transcript and fills only the
+cells its own text occupies, so everything underneath shows through the gaps —
+container pills, panel borders, whatever happens to be there.
+
+**The channel exists and works, and this overlay does not use it.** Measured over
+three captures of the same session:
+
+| capture | `48;2;` sequences emitted |
+|---|---|
+| `/config`'s diff | **72** |
+| `/drift` | 0 |
+| the completion menu | **0** |
+
+C10 §4a added `background` to `Style` as *"the second colour channel and,
+deliberately, the last one"* — a requirement rather than a preference, because
+C25's diff rows cannot be expressed without it. The diff uses it. The overlay,
+which is the one surface that by definition has content behind it, does not.
+
+**This is the opposite of the usual shape here.** Almost every finding in this
+ledger is a consumer reaching for something the framework does not have. This is
+a mechanism the framework has, specified and working, that the surface needing it
+most does not reach for.
+
+It is also invisible to everything that tests overlays. A menu asserted by its
+rows and their order is correct; a golden frame of a menu over an *empty*
+transcript is correct; `measure` is correct, because the menu occupies exactly the
+rows it says. **The defect is only in the composition, and only when something is
+underneath.**
+
+The workaround for the README image is to trigger the menu before the landing
+dashboard has fetched, so there is nothing to read through — which is worth
+recording as the workaround it is.
