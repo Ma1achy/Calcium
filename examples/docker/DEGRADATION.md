@@ -112,17 +112,38 @@ change**: see F54 below.
 
 ## The banner, at both ends of the unicode axis
 
+**At 120 columns, and the width is stated because the first version of this pair
+did not state it and was wrong for that reason.** The block-element variant is
+**103 cells** wide and the ASCII one is 76, so at the 100 columns the five depth
+frames above were captured at, the block variant does not fit and the app falls
+back for a reason that has nothing to do with the locale. A pair meant to isolate
+the unicode axis was confounded by the width axis, and both frames were also cut
+mid-line — which is the rule about never truncating your own frame output,
+broken in the document that argues for reading frames. Re-captured whole.
+
 ```
-       /""""""""""""""""\___/ ===            ██    ██   ▄████▄    ▄█████▄  ██ ▄██▀    ▄████▄
-  ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~     ██    ██  ██▀  ▀██  ██▀    ▀  ██▄██     ██▄▄▄▄██
-       \______ o          __/                ██    ██  ██    ██  ██        ██▀██▄    ██▀▀▀▀▀▀
+                    ##        .
+              ## ## ##       ==              ▄▄▄▄▄                         ▄▄
+           ## ## ## ##      ===              ██▀▀▀██                       ██
+       /""""""""""""""""\___/ ===            ██    ██   ▄████▄    ▄█████▄  ██ ▄██▀    ▄████▄    ██▄████
+  ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~     ██    ██  ██▀  ▀██  ██▀    ▀  ██▄██     ██▄▄▄▄██   ██▀
+       \______ o          __/                ██    ██  ██    ██  ██        ██▀██▄    ██▀▀▀▀▀▀   ██
+         \    \        __/                   ██▄▄▄██   ▀██▄▄██▀  ▀██▄▄▄▄█  ██  ▀█▄   ▀██▄▄▄▄█   ██
+          \____\______/                      ▀▀▀▀▀       ▀▀▀▀      ▀▀▀▀▀   ▀▀   ▀▀▀    ▀▀▀▀▀    ▀▀
 ```
 
 ```
+                    ##        .
+              ## ## ##       ==
+           ## ## ## ##      ===
        /""""""""""""""""\___/ ===            ____             _
   ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~    |  _ \  ___   ___| | _____ _ __
        \______ o          __/               | | | |/ _ \ / __| |/ / _ \ '__|
+         \    \        __/                  | |_| | (_) | (__|   <  __/ |
+          \____\______/                     |____/ \___/ \___|_|\_\___|_|
 ```
+
+Same width, same terminal, one variable: `LANG=en_GB.UTF-8` against `LANG=C`.
 
 The wordmark falls back and the whale does not, because the whale was always ASCII.
 **The substitution is the app's, and that is the design rather than a shortfall**: C09

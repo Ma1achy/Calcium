@@ -1871,3 +1871,83 @@ the last thing left that cannot render.
 Filed, not fixed. C22 §6 owns the prompt and gives it no capability-dependent form, so this
 wants a ruling — a pair like C09's, or a `PROMPT` that takes the record — rather than a
 character swapped in place.
+
+---
+
+## F56 — a `bin` entry is a claim about an executable, and nothing checks it ★★★ — **fixed**
+
+`examples/docker/package.json` has declared
+
+```json
+"bin": { "docker-tui": "./src/main.ts" }
+```
+
+since the app's first commit. It could never have run: a TypeScript file, mode `0644`, no
+shebang. `npm link` writes the symlink without looking at either, so the declaration was
+accepted at every stage that could have refused it — install, pack, `npm publish
+--dry-run`, and `make proof`, which installs the real tarball into a clean tree and runs
+the suite against it.
+
+**The reason nothing noticed is the reason it is worth filing.** Three separate consumers
+existed and all three reached around the entry point:
+
+| consumer | what it ran |
+|---|---|
+| the test suite | the modules, imported directly |
+| every session | `npm start`, which named `src/main.ts` itself |
+| `tools/capture.py` | `node --experimental-strip-types src/main.ts` |
+
+That is **F7's shape exactly** — `createTui` unusable from the public surface and invisible
+because every internal caller reached around it — reproduced one level out, in a manifest
+field rather than an export. And it is **F52's vacuity shape**: a declaration with a
+documented purpose, a value, and no producer. F52 was a parameter with a spec, a precedence
+rule, four unit rows and a tier-5 row, all green, and no consumer; this is the mirror.
+
+**The app's own help had been advertising the broken command for four steps.** Run without
+a TTY it prints `docker-tui  open the interactive shell`, which is a sentence about a
+command that did not exist.
+
+Fixed: `bin/docker-tui.js`, a shebanged launcher, mode `0755`, with `package.json`
+repointed. **`tools/capture.py` now spawns the bin rather than the module**, so every frame
+this repository reads goes through the entry point a user has — which is where a broken
+launcher becomes cheap to notice.
+
+`test/bin.test.ts` covers it in four rows, resolving the path *through the manifest field*
+so that repointing the field moves the test with it. Mutations, each run inside the
+container:
+
+| mutation | rows killed |
+|---|---|
+| `bin` back to `./src/main.ts` | 4 of 4 |
+| the execute bit removed | 2 — the mode row, and the spawn with `EACCES` |
+| the shebang removed | 2 — the shebang row, and the spawn |
+| the launcher imports nothing | 1 — the spawn |
+
+**And the mutation pass produced a finding about itself.** Run from the host, `chmod 644`
+left the container reading `755` — measured: Docker Desktop's bind mount does not propagate
+the mode. A mutation applied on the host never reached the file the test opens, and it did
+not fail cleanly either; it produced a *partial* result, which reads as a weak assertion
+rather than as a broken experiment. The rule is the fixture rule pointed at the harness:
+**mutate in the same filesystem view the test reads**, and the row now records the limit
+beside itself rather than leaving it to be rediscovered.
+
+---
+
+## F57 — a comparison frame that varied two axes, in the document arguing for frames ★
+
+`DEGRADATION.md`'s banner pair was captioned *"at both ends of the unicode axis"* and was
+not. The block-element wordmark is **103 cells** wide and the ASCII one is **76**; the five
+depth frames beside it were captured at **100**, where the block variant cannot fit and the
+app falls back for a reason that has nothing to do with the locale. Either the pair was
+taken at a width it never stated, or it was taken at 100 and the frames disagree with the
+caption. Both frames were also **cut mid-line** — the one rule the document exists to
+argue for.
+
+Re-captured at 120, where both variants fit, with the width stated and the frames whole.
+The claim survives: same terminal, same width, `LANG=en_GB.UTF-8` against `LANG=C`.
+
+**The general form is not "state the width".** It is that a fallback ladder has as many
+axes as it has guards, and `bannerLines` has two — `if (v.blocks && !blocks) continue` and
+`if (widthOf(v.lines) <= width) return`. A comparison that varies one of them while the
+other silently decides the answer is a frame-read that cannot be wrong, which is A03 §2's
+vacuity class arriving as a demonstration. **Read the ladder before choosing the pair.**

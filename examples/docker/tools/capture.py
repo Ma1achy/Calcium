@@ -24,7 +24,17 @@ import signal
 import sys
 import time
 
-APP = ["node", "--experimental-strip-types", "src/main.ts"]
+# **The bin, not the module.** This used to be `node
+# --experimental-strip-types src/main.ts`, which is the mechanism rather than
+# the wiring: every frame in this repository was read against an entry point no
+# user has. The `bin` entry was broken for the whole project — a `.ts` file,
+# mode 0644, no shebang — and none of these captures could have shown it,
+# because none of them went through it.
+#
+# Going through it now means the harness fails if the shebang, the mode bit or
+# the launcher's import ever breaks, which is the one place that failure is
+# cheap to notice.
+APP = ["./bin/docker-tui.js"]
 
 
 def run(

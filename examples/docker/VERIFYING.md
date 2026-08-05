@@ -5,6 +5,25 @@ wrongly cost more than getting the code wrong, and each names the occasion.
 
 ---
 
+## Which container
+
+Two, since A04 §4 stopped saying *one per repo*. Both mount the repository root at
+`/workspaces/tui-kit`, so the paths below are the same in either — **what differs is
+what is installed**, and the framework's has no docker socket by design.
+
+| target | container | why |
+|---|---|---|
+| `make all` · `make enforce` · `make proof` | `calcium` | the framework's suite, including tier 5's PTY rows; needs `node-pty`, needs no daemon |
+| the app's `npm test` | either | it runs against `test/corpus/`, which is why CI can run it without docker |
+| `make fixtures` · `docker-tui` · `tools/capture.py` | `docker-tui` | the socket is only here |
+
+**A frame-read and a timing tier must not share a container run.** `make fixtures` brings
+up a load container so the CPU plot has a shape to draw, and a busy container made tier 5's
+`T5.3a` fail during step 4 — it passed alone, and `make all` went green once it was removed.
+`make fixtures-down` first, then the suite. §7 below carries the full account.
+
+---
+
 ## 0. An exit code read through a pipe is the pipe's
 
 ```sh

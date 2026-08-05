@@ -119,6 +119,16 @@ in the framework's container is exactly how that assumption gets made — not
 deliberately, but by someone reaching for `docker` in a test because it happened
 to be on `PATH`.
 
+**The separation is in what is installed, not in where the file sits.** Both
+configs live under `.devcontainer/`, because a devcontainer config in a
+subdirectory makes that subdirectory the workspace — and the example's
+dependency is `"@fmx/calcium": "file:../.."`, which then points outside the
+mount and fails to install. `.devcontainer/<name>/devcontainer.json` is the
+supported multi-container layout and each mounts the repository root, so the
+path resolves to the thing it names. **This is the rule's cheapest possible
+failure**: an example's container placed beside the example, for the obvious
+reason, that cannot install the example.
+
 The cost is real and is the reason it was not done first: a full pass now needs
 both containers up, and every working note that names one has to say which.
 `examples/docker/VERIFYING.md` carries that mapping.
@@ -134,7 +144,7 @@ Concretely, R4.4 is `clean clone → npm install → npm start → running shell
 | Container | Config | Base | Adds | For |
 |---|---|---|---|---|
 | Calcium | `.devcontainer/` | Node 22 | `node-pty` build deps · an explicit node feature pinning 22 | C01–C03's PTY tests |
-| `docker-tui` | `examples/docker/.devcontainer/` | Node 22 | `docker-outside-of-docker` · a built `dist/` · the `docker-tui` bin linked | R4.2's real-docker run |
+| `docker-tui` | `.devcontainer/docker-tui/` | Node 22 | `docker-outside-of-docker` · a built `dist/` · the `docker-tui` bin linked | R4.2's real-docker run |
 | `prism-tui` | its repo's `.devcontainer/` | Node 22 | Python 3.12 + the Prism CLI | Conformance and `record --against`, locally |
 
 **Outside-of-docker, not in-docker, and not a read-only socket.** An earlier
