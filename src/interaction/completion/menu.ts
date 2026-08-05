@@ -71,7 +71,8 @@ function widestLabel(candidates: readonly Candidate[]): number {
  */
 export function menuBlocks(
   candidates: readonly Candidate[],
-  selected: number,
+  /** `null` while the menu is a display rather than a choice (I20). */
+  selected: number | null,
   remainder: number,
 ): readonly Block[] {
   const detailed = candidates.some((c) => c.detail !== undefined);
@@ -155,7 +156,7 @@ export function menuBlocks(
  */
 export function menuLayer(
   candidates: readonly Candidate[],
-  selected: number,
+  selected: number | null,
   remainder: number,
   anchor: Readonly<{ row: number; rows: number }>,
 ): Layer {

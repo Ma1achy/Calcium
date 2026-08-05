@@ -387,14 +387,21 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   const placed = deps.overlays();
   const top = placed[placed.length - 1];
   if (top !== undefined) {
-    if (top.cursor === undefined) return null;
-    return {
-      row: frame.region.top + top.top + top.cursor.row,
-      col: top.left + top.cursor.col,
-    };
+    if (top.cursor !== undefined) {
+      return {
+        row: frame.region.top + top.top + top.cursor.row,
+        col: top.left + top.cursor.col,
+      };
+    }
+    // A layer with no cursor of its own hides it — **unless the prompt is still
+    // taking keys underneath**, which is the completion menu holding no
+    // selection (C22 §6a row 2a, C19 I20). `promptFocused` is the router's
+    // precedence rather than a second opinion about it, so the cursor cannot
+    // say the prompt is inert while the prompt is answering keys.
+    if (!deps.promptFocused()) return null;
+  } else if (!deps.promptFocused()) {
+    return null;
   }
-
-  if (!deps.promptFocused()) return null;
 
   const cell = deps.promptCursor();
   const window = promptWindow(frame, deps.promptRows());

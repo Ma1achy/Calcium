@@ -28,6 +28,19 @@ export const SPINNER_MS = 500;
 
 export interface CompletionEngine {
   register(source: CompletionSource): Disposable;
+  /**
+   * The static candidate set, synchronously (§6a, I19).
+   *
+   * **`ghost` is this function's single-candidate case**, and they are one
+   * function rather than two because two would be two filters over two source
+   * lists that agree until someone edits one.
+   *
+   * It is what the as-you-type menu is built from, and the reason that menu is
+   * a presentation change rather than an engine one: the set has always been
+   * computed per keystroke and has only ever been *reduced*. Nothing here runs
+   * a dynamic source — that is `request`, and I3 is unchanged.
+   */
+  suggest(ctx: CompletionContext): readonly Candidate[];
   /** Synchronous, static sources only (I7). */
   ghost(ctx: CompletionContext): string | null;
   request(ctx: CompletionContext, seq: number): Promise<CompletionResult>;
@@ -146,9 +159,14 @@ export function createEngine(opts: EngineOptions): CompletionEngine {
       };
     },
 
+    suggest(ctx) {
+      return staticCandidates(ctx);
+    },
+
     ghost(ctx) {
       // Static only, which means manifest-backed only — so `path` and
       // `executable` have no ghost text and `Tab` is required (I3, T1.4b).
+      // The same call `suggest` exposes, not a second filter beside it.
       const candidates = staticCandidates(ctx);
       const only = candidates.length === 1 ? candidates[0] : undefined; // graphemes-ok: a candidate count, not text
       if (only === undefined) return null;

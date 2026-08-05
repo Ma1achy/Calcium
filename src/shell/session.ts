@@ -387,7 +387,8 @@ class Session implements TuiInstance {
       // C16's derived focus, read rather than stored — the cursor belongs to
       // whatever holds the keys, and a second record of that would drift from
       // the display exactly as a stored focus does (C16 §3, C15 I19).
-      promptFocused: () => graph.router.target === "prompt",
+      promptFocused: () =>
+        graph.router.target === "prompt" || graph.promptUnderMenu(),
       // **Fresh on every paint, and that is the invariant rather than a style**
       // (C22 I38). `spinning` changes with the clock, not with the frame, so a
       // value captured when the request started can never become true — and
