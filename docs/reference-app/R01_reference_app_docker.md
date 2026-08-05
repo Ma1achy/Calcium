@@ -346,7 +346,7 @@ something the framework holds:
 | a boolean threaded through eight functions | the fact is needed at the leaves and enters at the root | F54 |
 | its own block measurer, by deep import | no public measurer | F37 |
 | its own document validation, by deep import | no public validator | F36 |
-| six `?? 0` coercions | `RawResult.exitCode` is `number \| null`, `DocumentMeta.exitCode` is not | F58 |
+| five `?? 0` coercions, every one discarded | the adapter's return demands ten `meta` fields and the registry honours three | F58b |
 | six hand-built empty notices | `emptyMessage` exists on `b.table` and on nothing else | roadmap 3 |
 
 That is `docs/ROADMAP.md` entry 1 with a line count attached. **The commitment worked**: it

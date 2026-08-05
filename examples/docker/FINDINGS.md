@@ -1986,9 +1986,8 @@ meta: { exitCode: raw.exitCode, … }
 ```
 
 **Every adapter in this repository writes `result.exitCode ?? 0`** — `ps.ts:176`,
-`verbs.ts:46`, and four more. `null` means *the process was killed by a signal
-and never exited*, and `?? 0` reports that as a clean success. `RawResult` even
-carries `signal` beside it, and `DocumentMeta` has no field for it, so the
+`logs.ts:106`, `verbs.ts:46`, `container.ts:367`, `inspect.ts:216`. `RawResult`
+carries `signal` beside it and `DocumentMeta` has no field for it, so the
 information is available at the coercion and has nowhere to go.
 
 **Found by the second consumer, which is the whole argument for having one.**
@@ -1997,10 +1996,69 @@ above it already contain. `examples/minimal` is forty lines written from the
 public surface with no house style to copy, and it hit the same wall on its first
 compile — which is the evidence that this is the API's shape rather than a habit.
 
-Filed rather than fixed. The choices are all Calcium's: widen `DocumentMeta` to
-`number | null`, add `signal`, or say in C04 that a signalled process is exit 0
-and mean it. **The third is defensible and is not what the type says today** — it
-is what six call sites say, silently, one `??` at a time.
+### Corrected 2026-08-05, measured — right about the wall, wrong about the damage
+
+Step 9 went to build on this and went looking for the record first. Two claims
+were carried, neither measured, and **both are false**:
+
+| carried claim | measured |
+|---|---|
+| `?? 0` reports signal-death as a clean success | an adapter returning `exitCode: 999` yields **`0`**; a `SIGTERM` death yields **`143`** |
+| `docker stop` produces a null exit code | `docker stop` exits **`0`**; the container's `137` is a field in the payload |
+
+`authoritativeMeta` (`registry.ts:84`) is applied on **every** route and sets
+`exitCode: exitCodeOf(raw)` unconditionally, ignoring what the adapter supplied.
+`exitCodeOf` maps `SIGTERM → 143` and never-started → `-1`, which is C07 §85's
+table working exactly as written. So `meta.exitCode` was comparable across apps
+the whole time, and the five coercions never reached a document.
+
+The second claim was a conflation of two different exit codes. `RawResult.exitCode`
+is the **docker binary's**; the 137 a stopped container reports is the
+**container's**, and it is data in the JSON envelope. They were being read as one
+number. Nothing in the mutation family produces a null `RawResult.exitCode` at
+all — that path belongs to cancellation and timeout, which C07 §4 already maps.
+
+**Wrong in both directions, which is the shape to watch for.** The field was not
+broken for the reason given, and there *is* a defect nobody had stated — see F58b,
+which is what is left of this once the false half is removed. `DocumentMeta` is
+**not** widened to `number | null`: the ruling C24 §8a and ROADMAP F58 were both
+waiting for would have been taken on a premise that measurement falsifies.
+
+Twenty minutes to check, against a change to a public type that is expensive to
+reverse after publication. This is CLAUDE.md's sixth blind spot: the claim was
+re-stated across four documents and never held a measurement, and re-stating is
+what made it feel settled.
+
+---
+
+## F58b — the type demands ten fields and the registry honours three ★★★
+
+What is left of F58 once the falsified half is removed, and it is the reason the
+five dead coercions exist.
+
+`Adapter.adapt` returns a `ViewDocument`, so the compiler requires a complete
+`meta` — ten fields. `authoritativeMeta` then keeps exactly **three** of them
+(`resultId`, `adapter`, `truncated`, per C07 §3's "the three the registry cannot
+know") and overwrites the other seven from the `RawResult` and the context.
+
+So an adapter author is **required to compute seven values that are discarded**,
+with no signal that they are. That is the whole of F58's real content: the
+compiler does not merely force a false line, it forces a false line *and throws it
+away*, which is why nobody noticed the value was wrong — nothing downstream ever
+showed it.
+
+Measured: an adapter returning `exitCode: 999` produces a document reading `0`.
+
+**The count is five and they are one consumer only in the sense that one
+repository contains them** — the same argument F58 made and the same one that
+holds here. Every adapter that will ever be written hits this, because the type
+requires it.
+
+The fix is a type rather than a field: the adapter's return wants a `meta` narrowed
+to the three honoured keys, so that supplying `exitCode` does not compile instead
+of not mattering. That is a C07 and C24 surface change, it belongs before the
+freeze, and it is **not** taken here — step 9 is the consumer that found it, not
+the step that rules on it.
 
 ---
 
