@@ -60,11 +60,41 @@ type LocalHandler = (args: readonly string[], ctx: LocalContext) =>
   ViewDocument | Promise<ViewDocument>;
   // `args` is what follows the verb, not `ParseResult.argv`
 
+interface LocalContext {
+  readonly command: string;          // as typed, for `doc.command`
+  ask(opts: AskOptions): Promise<string>;
+}
+
+type AskOptions = Readonly<{
+  question: string;
+  detail?: Block;                    // what the answer will affect
+  choices: readonly Readonly<{ key: string; label: string; default?: true }>[];
+}>;
+
 interface LocalRegistry {
   register(verb: string, handler: LocalHandler): void;
   seal(): void;
 }
 ```
+
+#### `ctx.ask` — a question the handler awaits
+
+**A choice list rather than a yes/no box**, because the two-choice case is the
+degenerate one and a second consumer needs single-select and free text. One
+mechanism, ruled once.
+
+`ask` resolves with a chosen `key` and **never with null**. Declining is a choice
+— it is the one marked `default` — so there is no second way to say *nothing
+happened* and no caller that has to handle both. `Esc` and `⌃c` resolve with the
+default for the same reason: cancelling the question and declining it produce the
+same outcome, so a distinction between them would be one nothing downstream could
+act on.
+
+**The prompt is unavailable while a question is open, and that is C15's modality
+rather than a second mechanism here.** The layer is pushed with
+`dismissable: false`, which is what C16 I8's first clause reads, so nothing beneath
+it takes a key. See I36 for why that flag is `false` on a layer the user can
+plainly escape.
 
 Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
 
@@ -529,6 +559,7 @@ Per submission.
 - **I33a** — A live part is declared wherever a document reaches the transcript, and that is **both** `append(doc)` and `settle(id, doc)` — declaration is route-independent, so an adapter's `b.live` is driven exactly as a local handler's is. Registration hung off `append` alone and the app route appends a *pending* entry and settles with the document, so every adapter-declared part rendered its loading state and never ticked. I32 and I33 govern hosts and triggers and neither mentions a route; the guarantee lived only in a comment that had miscounted the places a document arrives. **This does not weaken I33**: settlement still releases what the entry had declared, and then declares what the settled document declares — one rule, both behaviours, and freeze still stops nothing (I9).
 - **I34** — A refresh applies its result as **one `replace` of one block**, and that block is a `panel` whose children are what the consumer rendered. One op, one `rev`, atomic: several patches for one logical refresh would invalidate C14 N times and leave a frame composable half-applied. The kind is not free — `Panel` is the only one carrying a `title`, and every state a live part announces (I35, A02 §7 rule 1) is announced there.
 - **I35** — Past `staleAfter` — default twice the interval — a part's panel is replaced by the same panel with its age in the title, and **staleness never stops the refresh**: a stale part is one still trying, and the marker clears on the next success. S13 commitment 4 has required this since before the mechanism existed, and C24 §5 cited §3b for it while §3b had nothing to cite.
+- **I36** — **A question raised by `ctx.ask` is pushed with `dismissable: false`, and it resolves with a choice on every path.** The two halves are one invariant because either alone is a defect. `dismissable: false` is what C16 I8's first clause reads, so no key reaches the surface beneath an open question — and it also stops C16's rung 4 from popping the layer on `⌃c`, which would close the question while the handler's promise stayed pending and the entry never settled. **The flag says the router may not discard this layer without telling its owner; it does not say the user cannot escape it.** Those are two meanings of one word and the layer needs opposite answers to them: `Esc` and `⌃c` resolve with the default choice, which the answer handler does (C16 I25), so the escape the user sees is the owner resolving rather than the router discarding. Resolving with a choice on every path is the second half: `ask` returns `Promise<string>` and never null, because declining **is** the choice marked `default` and a second representation of *nothing happened* is one every caller must handle and none can act on differently.
 
 ---
 
@@ -565,6 +596,7 @@ Per submission.
 29. A refresh names its part and is registered against its host, so one `release(host)` is every teardown path (I32).
 30. A refresh stops on settle, pop, evict, clear and `stopping`, and keeps running through a freeze (I33, I9).
 31. A refresh patches one `panel` in one op, and past `staleAfter` that panel's title carries its age rather than the screen going quietly wrong (I34, I35).
+32. A local handler may ask a question and await the answer. It is a choice list, it is modal by C15's flag rather than by a second mechanism, and it resolves with a choice on every path including `Esc` and `⌃c` — so no caller distinguishes declining from cancelling, because nothing downstream could act on the difference (I36, C16 I25).
 28. A `view` action resolves its target within the source entry and refuses two things — an unresolvable target, and a view raised onto a non-empty stack — rather than ignoring the first or letting C15's throw cross a renderer's callback (I31).
 
 ---
