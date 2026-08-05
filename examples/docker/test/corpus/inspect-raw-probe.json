@@ -1,0 +1,247 @@
+[
+    {
+        "Id": "0159cf7f7046944606496c5a02b97194451ec085cdcd32e0c07319792f0951e2",
+        "Created": "2026-08-04T10:18:38.01324109Z",
+        "Path": "/bin/sh",
+        "Args": [
+            "-c",
+            "echo Container started\ntrap \"exit 0\" 15\n/usr/local/share/docker-init.sh\nexec \"$@\"\nwhile sleep 1 \u0026 wait $!; do :; done",
+            "-"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 28124,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-08-04T10:18:39.135901299Z",
+            "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:476b8ba378e5b0b752dc98b29d1d6c1a7961e36d767e0d3f9700e2ed6b423ac7",
+        "ResolvConfPath": "/var/lib/docker/containers/0159cf7f7046944606496c5a02b97194451ec085cdcd32e0c07319792f0951e2/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/0159cf7f7046944606496c5a02b97194451ec085cdcd32e0c07319792f0951e2/hostname",
+        "HostsPath": "/var/lib/docker/containers/0159cf7f7046944606496c5a02b97194451ec085cdcd32e0c07319792f0951e2/hosts",
+        "LogPath": "/var/lib/docker/containers/0159cf7f7046944606496c5a02b97194451ec085cdcd32e0c07319792f0951e2/0159cf7f7046944606496c5a02b97194451ec085cdcd32e0c07319792f0951e2-json.log",
+        "Name": "/reverent_proskuriakova",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": null,
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "bridge",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": [
+                "label=disable"
+            ],
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": [],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "Mounts": [
+                {
+                    "Type": "bind",
+                    "Source": "/Users/malachy/src/tui-kit",
+                    "Target": "/workspaces/tui-kit",
+                    "Consistency": "cached"
+                },
+                {
+                    "Type": "bind",
+                    "Source": "/var/run/docker.sock",
+                    "Target": "/var/run/docker-host.sock"
+                }
+            ],
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "Storage": {
+            "RootFS": {
+                "Snapshot": {
+                    "Name": "overlayfs"
+                }
+            }
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/Users/malachy/src/tui-kit",
+                "Destination": "/workspaces/tui-kit",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/run/docker.sock",
+                "Destination": "/var/run/docker-host.sock",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "0159cf7f7046",
+            "Domainname": "",
+            "User": "root",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "TERM=xterm-256color",
+                "LANG=en_GB.UTF-8",
+                "PATH=/usr/local/share/nvm/current/bin:/usr/local/share/nvm/current/bin:/usr/local/share/npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "NODE_VERSION=22.23.1",
+                "YARN_VERSION=1.22.22",
+                "NVM_DIR=/usr/local/share/nvm",
+                "NVM_SYMLINK_CURRENT=true"
+            ],
+            "Cmd": [
+                "-c",
+                "echo Container started\ntrap \"exit 0\" 15\n/usr/local/share/docker-init.sh\nexec \"$@\"\nwhile sleep 1 \u0026 wait $!; do :; done",
+                "-"
+            ],
+            "Image": "vsc-tui-kit-07d4a92ac4a68fb50dbce9c896f098749025b70cd1c451c63c693d12f94199f1-features",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": [
+                "/bin/sh"
+            ],
+            "Labels": {
+                "dev.containers.id": "typescript-node",
+                "dev.containers.release": "v0.4.29",
+                "dev.containers.source": "https://github.com/devcontainers/images",
+                "dev.containers.timestamp": "Wed, 01 Jul 2026 15:43:15 GMT",
+                "dev.containers.variant": "22-trixie",
+                "devcontainer.config_file": "/Users/malachy/src/tui-kit/.devcontainer/devcontainer.json",
+                "devcontainer.local_folder": "/Users/malachy/src/tui-kit",
+                "devcontainer.metadata": "[ {\"id\":\"ghcr.io/devcontainers/features/common-utils:2\"}, {\"id\":\"ghcr.io/devcontainers/features/git:1\",\"customizations\":{\"vscode\":{\"settings\":{\"github.copilot.chat.codeGeneration.instructions\":[{\"text\":\"This dev container includes an up-to-date version of Git, built from source as needed, pre-installed and available on the `PATH`.\"}]}}}}, {\"id\":\"ghcr.io/devcontainers/features/node:1\",\"customizations\":{\"vscode\":{\"extensions\":[\"dbaeumer.vscode-eslint\"],\"settings\":{\"github.copilot.chat.codeGeneration.instructions\":[{\"text\":\"This dev container includes `node`, `npm` and `eslint` pre-installed and available on the `PATH` for Node.js and JavaScript development.\"}]}}}}, {\"customizations\":{\"vscode\":{\"extensions\":[\"dbaeumer.vscode-eslint\"]}},\"remoteUser\":\"node\"}, {\"id\":\"ghcr.io/devcontainers/features/git:1\",\"customizations\":{\"vscode\":{\"settings\":{\"github.copilot.chat.codeGeneration.instructions\":[{\"text\":\"This dev container includes an up-to-date version of Git, built from source as needed, pre-installed and available on the `PATH`.\"}]}}}}, {\"customizations\":{\"vscode\":{\"extensions\":[\"dbaeumer.vscode-eslint\"],\"settings\":{\"github.copilot.chat.codeGeneration.instructions\":[{\"text\":\"This dev container includes the TypeScript compiler (`tsc`) pre-installed and available on the `PATH` for TypeScript development.\"}]}}},\"remoteUser\":\"node\"}, {\"id\":\"ghcr.io/devcontainers/features/docker-outside-of-docker:1\",\"securityOpt\":[\"label=disable\"],\"entrypoint\":\"/usr/local/share/docker-init.sh\",\"mounts\":[{\"source\":\"/var/run/docker.sock\",\"target\":\"/var/run/docker-host.sock\",\"type\":\"bind\"}],\"customizations\":{\"vscode\":{\"extensions\":[\"ms-azuretools.vscode-containers\"],\"settings\":{\"github.copilot.chat.codeGeneration.instructions\":[{\"text\":\"This dev container includes the Docker CLI (`docker`) pre-installed and available on the `PATH` for running and managing containers using the Docker daemon on the host machine.\"}]}}}}, {\"id\":\"ghcr.io/devcontainers/features/node:1\",\"customizations\":{\"vscode\":{\"extensions\":[\"dbaeumer.vscode-eslint\"],\"settings\":{\"github.copilot.chat.codeGeneration.instructions\":[{\"text\":\"This dev container includes `node`, `npm` and `eslint` pre-installed and available on the `PATH` for Node.js and JavaScript development.\"}]}}}}, {\"onCreateCommand\":\"sudo apt-get update \u0026\u0026 sudo apt-get install -y python3 make g++\",\"postCreateCommand\":\"node --version \u0026\u0026 npm ci --ignore-scripts\",\"customizations\":{\"vscode\":{\"extensions\":[\"dbaeumer.vscode-eslint\",\"vitest.explorer\"],\"settings\":{\"editor.formatOnSave\":true,\"typescript.tsdk\":\"node_modules/typescript/lib\"}}},\"containerEnv\":{\"TERM\":\"xterm-256color\",\"LANG\":\"en_GB.UTF-8\"}} ]",
+                "version": "5.0.1"
+            },
+            "StopTimeout": 1
+        },
+        "NetworkSettings": {
+            "SandboxID": "690ea5df2de84a7a934c94f57228e4d3b3e2a860359b4f7a6612700b8e67a4b9",
+            "SandboxKey": "/var/run/docker/netns/690ea5df2de8",
+            "Ports": {},
+            "Networks": {
+                "bridge": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "6df1bcae5ccc4678ee0c610b66146ed44ec37d6c5d48e6eec142343a89c3cf7e",
+                    "EndpointID": "8d9b2602f898a5dab3652df4c153806f702a2c2eda8a71759c3a1674e91f47a5",
+                    "Gateway": "172.17.0.1",
+                    "IPAddress": "172.17.0.2",
+                    "MacAddress": "9a:04:36:a8:f5:3e",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        },
+        "ImageManifestDescriptor": {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:8fd8ebbe6c38c185aa829b9e63edd08efbb7fd034c605b9c82b6c9b1f67e5dc7",
+            "size": 6000,
+            "platform": {
+                "architecture": "arm64",
+                "os": "linux"
+            }
+        }
+    }
+]
