@@ -122,6 +122,22 @@ of foregrounds chosen to pair with a terminal, not a skin that repaints one.
 Shown on a dark terminal it would be dark text on a dark background, which is a
 picture of the wrong thing.
 
+### The log tail, streaming
+
+![The /logs view: nginx's startup notices followed by access-log lines, filling the screen as they arrive from a docker logs --follow that is still running](../../docs/media/logs.gif)
+
+**It has a picture because it lost its place in the overview.** `/logs` is one of
+three `view: true` verbs, and the demo keeps exactly one of those — so without a
+shot of its own the streaming surface would have had none anywhere. It is also
+the only verb in this manifest that is `view: true` **and** `streams: true`, a
+combination C05 I20 permits and nothing else here uses.
+
+The lines arrive from a `docker logs --follow` that is still running when the
+frame is taken. Getting that far took F61: `mawk` block-buffers its *input*, so
+the original pipeline delivered nothing at all — `docker logs --follow | cat`
+gave 150 lines in four seconds and `| awk` gave zero, and `/logs` had never
+worked once.
+
 ### Completion, from the manifest and from no code
 
 ![The completion menu open after typing slash c o, with no key pressed to summon it: three verbs listed — container, compare and config — each with its summary right-aligned, the box spanning the full width of the terminal, and a horizontal rule separating the last candidate from the prompt below](../../docs/media/completion.gif)
