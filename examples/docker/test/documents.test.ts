@@ -39,6 +39,12 @@ import { createPsAdapter } from "../src/ps.ts";
 import { createContainerAdapter } from "../src/container.ts";
 import { createInspectAdapter } from "../src/inspect.ts";
 import { createConfigHandler, type Far } from "../src/config.ts";
+import {
+  createDiffAdapter,
+  createImagesAdapter,
+  createPortAdapter,
+  createTopAdapter,
+} from "../src/verbs.ts";
 
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
@@ -103,6 +109,22 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   ["/config — the image side is unavailable", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { command: "/config c /x" })],
   ["/config — the files agree", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { command: "/config c /x" })],
   ["/config — ok", () => createConfigHandler(FAR())(["c", "/x.conf"], { command: "/config c /x.conf" })],
+  // S10 and S11's arms. **Four verbs is four more failure arms nobody reaches
+  // by accident**, which is why they arrive with the verbs rather than after
+  // the first time one is seen — step 4's lesson, applied ahead of the defect
+  // rather than behind it.
+  ["/diff — no such container", () => createDiffAdapter().adapt(result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
+  ["/diff — nothing changed", () => createDiffAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
+  ["/diff — ok", () => createDiffAdapter().adapt(result({ stdoutRaw: read("diff-real.txt") }), ctx)],
+  ["/images — daemon unreachable", () => createImagesAdapter().adapt(result({ exitCode: 1, stderr: "Cannot connect to the Docker daemon" }), ctx)],
+  ["/images — exit zero, unreadable", () => createImagesAdapter().adapt(result({ stdoutRaw: "<html>" }), ctx)],
+  ["/images — ok", () => createImagesAdapter().adapt(result({ stdoutRaw: read("images-real.ndjson") }), ctx)],
+  ["/top — container not running", () => createTopAdapter().adapt(result({ exitCode: 1, stderr: "container abc is not running" }), ctx)],
+  ["/top — exit zero, no header", () => createTopAdapter().adapt(result({ stdoutRaw: "\n" }), ctx)],
+  ["/top — ok", () => createTopAdapter().adapt(result({ stdoutRaw: read("top-real.txt") }), ctx)],
+  ["/port — no such container", () => createPortAdapter().adapt(result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
+  ["/port — nothing published", () => createPortAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
+  ["/port — ok", () => createPortAdapter().adapt(result({ stdoutRaw: read("port-real.txt") }), ctx)],
 ];
 
 describe("F35: every document this app produces is one C13 will accept", () => {

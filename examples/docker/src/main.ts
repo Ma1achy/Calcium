@@ -21,6 +21,12 @@ import { createInspectAdapter } from "./inspect.ts";
 import { createLogsAdapter } from "./logs.ts";
 import { createCompareHandler, createDriftHandler } from "./drift.ts";
 import { createConfigHandler } from "./config.ts";
+import {
+  createDiffAdapter,
+  createImagesAdapter,
+  createPortAdapter,
+  createTopAdapter,
+} from "./verbs.ts";
 
 const run = promisify(execFile);
 
@@ -101,6 +107,10 @@ const tui = createTui({
     "container stats": createContainerAdapter(),
     inspect: createInspectAdapter(),
     logs: createLogsAdapter(),
+    diff: createDiffAdapter(),
+    images: createImagesAdapter(),
+    top: createTopAdapter(),
+    port: createPortAdapter(),
   },
   localHandlers: {
     dashboard: createDashboardHandler(engine, width, blockElements),

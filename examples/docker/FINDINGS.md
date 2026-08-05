@@ -1641,3 +1641,95 @@ needs it is built.
   docker. R01's claim was that an app over 300 lines has been made to write something
   generic; five things, and the largest is a parser for the format the framework's own
   transport could not read.
+
+---
+
+## F48 — a builder narrower than its block, where the narrowing was never ruled ★★★ — **fixed**
+
+`KeyValue.rows` is `readonly { label; value; tone? }[]`. `b.kv` took
+`Record<string, string | KeyValueInput>`. So the block could always carry a repeated label
+and the builder could not.
+
+The consumer is `/port`. A published container port has one binding per address family:
+
+```
+$ docker port dtui-port
+80/tcp -> 0.0.0.0:8080
+80/tcp -> [::]:8080
+443/tcp -> 127.0.0.1:9090
+```
+
+A record built by `reduce` keeps the second and loses the first, with nothing said. Three
+mappings become two, and the frame shows a container publishing on IPv6 only.
+
+**What makes this worth an invariant rather than a patch**: C24 had already ruled on a
+narrowing here, and it is a different one — `KeyValueInput` against `CellInput`, because a
+`KeyValue` row has nowhere to put a glyph. That ruling is sound and it is about the
+*value*. The container went unremarked, through eleven builders and one whole application,
+because the documented narrowing reads as covering the parameter.
+
+**Fixed**: C24 I18 and commitment 16, `b.kv` gains an array arm, the record arm stays and
+stays the one to reach for. `S11_WALK.md` A5.
+
+---
+
+## F49 — a change axis has no home in a health palette ★★★
+
+S10 draws `/diff` with `+` added in **ok** tone, `-` deleted in **error**, `~` modified in
+**warn**. `b.row` threw:
+
+```
+cell: tone "error" requires a non-empty glyph (C04 I6, D29)
+      — colour alone does not survive 1-bit or a colour-blind reader
+```
+
+**The throw was right, twice over.** A deleted file is a fact about a container, not a
+fault, and `error` is a health slot; and the marker `-` already carries the distinction
+without colour, which is what I6 exists to guarantee. So the app carries the change axis in
+the marker and the word, and takes its tones from the slots that claim no severity —
+`ok`, `accent`, `muted`.
+
+But the drawing was not being careless. It wanted **three colours meaning added, deleted
+and modified**, which is a change axis, and `Tone` is a judgement axis with ten slots and
+no room for one. That is **gap 3's shape on a surface with no numbers in it** — gap 3 was
+filed about a CPU load gradient, and this is the same collision with a categorical axis
+instead of a continuous one.
+
+**And it is F30's other half.** F30 filed `Comparison`'s verdict union — `same | better |
+worse | changed` — for mixing a change axis with a judgement axis in one type. This is the
+same two axes colliding one block over, where the palette has only the judgement one. Two
+blocks, two symptoms, one absent concept.
+
+Filed, not fixed. Adding a change axis to `Tone` is a theme change across C10, every block
+kind and both degradation paths, and the app has a correct rendering without it. What this
+entry buys is that the next surface wanting *added versus deleted* finds the reason rather
+than the workaround — and that F30 and this are read together, because separately they each
+look like one block's oddity.
+
+---
+
+## F50 — a column with no `flex` is allocated its minimum and nothing more
+
+Not a Calcium defect: `planColumns` does what C11 says. It is a **shape a consumer gets
+wrong twice**, and both instances were invisible to the suite.
+
+| surface | written | rendered at 120 |
+|---|---|---|
+| `/ps` NAME | `flex: true` | 54 spare columns absorbed by the name, PORTS truncated |
+| `/diff` PATH | `flex: true` | `modified` at column 108, an empty row between it and its path |
+| `/diff` PATH | no flex, `maxWidth: 72` | truncated to 20 cells with 80 empty beside it |
+| `/top` all but CMD | `minWidth: 4` | `109…` for a PID, `sta…` for a user |
+
+The rule underneath: **a non-flex column is allocated its `minWidth`, so a `minWidth` that
+ignores the content is a truncation, and a `flex` column takes everything, so a fixed
+column after one is pushed to the terminal's edge.**
+
+`/diff`'s answer is the fixed column **first** and the flexible one second — the only
+arrangement of two columns where both are read together. `/top`'s is that each column asks
+its own content how wide it needs to be, through `cells` rather than `.length` (C24 I14),
+because the columns are not known in advance and so the widths cannot be either.
+
+**The `/ps` instance is documented in a comment three lines from where `/diff`'s was
+written.** Having read it did not prevent writing it again, and the mutation for `/top`'s
+half failed nothing — twenty-four rows green against every column truncated. Only the frame
+showed either. `verbs.test.ts` T7 exists because of that mutation.

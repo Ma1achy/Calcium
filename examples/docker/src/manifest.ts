@@ -208,11 +208,63 @@ const logs: ToolDef = {
  * this file. A document on disk is static, and the one field that must not be
  * would have had to go stale for the loader's sake.
  */
+/**
+ * S10 and S11's four one-call verbs.
+ *
+ * **All four `local: false`, and three of the four far sides do not emit
+ * JSON.** That is not a reason to make them local: an adapter is handed a whole
+ * `RawResult` and parses whatever arrived, which is what `/ps` already does with
+ * NDJSON. Making them local would give up the transport, the real `meta`, and
+ * `AdapterContext.width` (F14) in exchange for nothing.
+ *
+ * `bin/docker-json` drops Calcium's `--json` for `diff`, `port` and `top`
+ * (S11_WALK.md A1). None of them is a view: one call, one document, no claim on
+ * the whole screen (A01 D4).
+ */
+const diff: ToolDef = {
+  name: "diff",
+  local: false,
+  summary: "What a container has changed on its own filesystem",
+  args: [{ name: "container", type: "string", required: true, summary: "Container id or name" }],
+  flags: [],
+};
+
+const images: ToolDef = {
+  name: "images",
+  local: false,
+  summary: "The images on this daemon",
+  args: [],
+  flags: [
+    {
+      name: "all",
+      short: "a",
+      type: "bool",
+      summary: "Include intermediate images as well as tagged ones",
+    },
+  ],
+};
+
+const top: ToolDef = {
+  name: "top",
+  local: false,
+  summary: "The processes running inside a container",
+  args: [{ name: "container", type: "string", required: true, summary: "Container id or name" }],
+  flags: [],
+};
+
+const port: ToolDef = {
+  name: "port",
+  local: false,
+  summary: "A container's published port mappings",
+  args: [{ name: "container", type: "string", required: true, summary: "Container id or name" }],
+  flags: [],
+};
+
 export function buildManifest(engineVersion: string): ManifestDocument {
   return {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps, dashboard, containerStats, inspect, logs, drift, compare, config],
+    tools: [ps, dashboard, containerStats, inspect, logs, drift, compare, config, diff, images, top, port],
   };
 }

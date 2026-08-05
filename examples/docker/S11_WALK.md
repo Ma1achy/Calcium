@@ -269,6 +269,40 @@ append looks like on screen, which is the whole of gap 2 in one sentence.
 
 ## §3a — what the implementation returned
 
-*The walk rules the shape; the code is the first thing that can falsify it.* Empty until
-the code exists — every line below is written after the thing it describes ran, and a
-prediction recorded here in advance would be the walk marking its own homework.
+*The walk rules the shape; the code is the first thing that can falsify it.* Every line
+below was written after the thing it describes ran.
+
+**A10 was wrong, and the framework is what said so.** The ruling was *the marker is text
+and the tone carries the colour*, with S10's `ok` / `error` / `warn`. `b.row` threw: C04 I6
+requires a glyph on `error` and `warn`, because *colour alone does not survive 1-bit or a
+colour-blind reader*. The throw was right twice — a deleted file is a fact about a
+container and not a fault, and the marker already carries the distinction without colour.
+So the tones are now the slots that claim no severity, and the finding underneath is that
+**a change axis has no home in a health palette**: gap 3's shape on a surface with no
+numbers in it, and F30's other half one block over. F49.
+
+**A9's ordering claim was positional and docker's order is not stable.** The test named
+`client_temp` at index 3 and the next capture returned `proxy_temp`. What holds every time
+is that the parent `C` precedes the children that caused it, which is the claim A9 was
+actually making.
+
+**Two things only the frame could say, and both are the same defect.** A column with no
+`flex` is allocated its `minWidth` and nothing more.
+
+- `/diff` drawn as S10 draws it — path, then the word — put `modified` at column 108 with
+  an empty row between it and its path. Moving the slack to the word column truncated the
+  path to twenty cells with eighty empty beside it. The fixed column goes first and the
+  flexible one second, which is the only arrangement of two where both are read together.
+  `/ps`'s NAME column carries this lesson in a comment in this repository; having read it
+  did not prevent writing it again.
+- `/top` with a flat `minWidth: 4` rendered `109…` for a PID and `sta…` for a user. The
+  columns are not known in advance (A6), so their widths cannot be either — each asks its
+  own content, through `cells` rather than `.length` (C24 I14). **The mutation for this
+  failed nothing**, which indicted the tests rather than the code: T7 exists because of it.
+
+**A5 landed as ruled.** `b.kv`'s array arm is C24 I18, and `/port dtui-port` shows `80/tcp`
+twice on screen — once for `0.0.0.0` and once for `[::]`. The mutation that routes the
+array back through a record turns three mappings into two.
+
+**A7 landed as ruled**, and the frame is where it is visible: an untagged image renders
+`—  —  dfaaf8991346`, its ID the only identity it has.
