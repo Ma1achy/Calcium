@@ -73,6 +73,45 @@ C09.
 
 ![A side-by-side unified diff of an nginx config: line numbers down both sides, thirty deleted lines on a dark red background, two added, syntax colouring on directives and paths, and a summary reading one hunk plus two minus thirty](../../docs/media/config-diff.gif)
 
+![A comparison of a container against the image it came from: a field column, an image column and a container column, showing entrypoint, command, working directory and stop signal identical, then a published port, a bind mount and an environment variable present only on the container, and two summary rows counting the fields that match](../../docs/media/drift.gif)
+
+**Two sources, one block.** `/drift` runs `docker inspect` and then `docker image
+inspect` on whatever the first one reports, and pairs the fields by hand — the two
+objects do not have the same shape, so no structural diff reaches it. The rows
+that match collapse into a count rather than filling the screen.
+
+The verdicts are visibly untoned, and that is F30 and F34 in the picture: a
+`Comparison`'s verdict is carried by colour and nothing else, and its union mixes
+a *change* axis with a *judgement* axis. It is `docs/ROADMAP.md` entry 4.
+
+### The theme, on the terminal it is for
+
+![The same landing dashboard rendered in the light variant on a light terminal: dark text, green container names and bars, the busy container's CPU bar in red, and blue accents in the panel title](../../docs/media/theme-light.gif)
+
+`/theme light`, rendered on a light terminal **on purpose**. C10 paints no
+background — the surface tones stop at 1-bit precisely because *"background
+colours are the emulator's and a user may override them"* — so a variant is a set
+of foregrounds chosen to pair with a terminal, not a skin that repaints one.
+Shown on a dark terminal it would be dark text on a dark background, which is a
+picture of the wrong thing.
+
+### Completion, from the manifest and from no code
+
+![The completion menu open over the transcript after typing slash c o and pressing tab: three verbs listed — container, compare and config — each with its summary, and the text of the transcript visible through the gaps between the menu's columns](../../docs/media/completion.gif)
+
+**Nothing in this application implements completion.** The menu is the manifest's
+verbs and their summaries, from the same table `/help` and dispatch use; adding a
+verb makes it completable with no code change, which is the property the manifest
+exists for.
+
+**And the transcript reads through it, which is F68.** The overlay paints no
+background — measured, zero background sequences in the whole capture while
+`/config`'s diff emits seventy-two — so anything already on screen shows through
+the gaps between its columns. The channel exists, is specified as a requirement
+(C10 §4a), and the one surface that by definition has content behind it does not
+use it. It is left in the picture rather than staged around, because a ledger that
+only shows what works is not a ledger.
+
 ---
 
 ## What to look at
