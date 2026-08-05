@@ -168,31 +168,107 @@ describe("C19 §6a — the menu opens as you type", () => {
     const { graph, stdin, clock } = await buildGraph();
     graph.lifecycle.acquire();
 
-    type(stdin, "/h");
-    expect(graph.overlays.top?.id).toBe(MENU_ID);
+    // **`/` then `h`, and the first draft used `/h` then `i`.** That one was
+    // vacuous and only the mutation pass could say so: `/hi` has a single
+    // candidate, so the menu stays shut whether or not `Esc` suppressed
+    // anything, and dropping the suppression entirely failed nothing. The
+    // suppression is only observable where a menu *would* have opened.
+    type(stdin, "/");
+    expect(
+      menuRows(graph).length,
+      "every verb, and the menu is up",
+    ).toBeGreaterThan(2);
 
-    // **The window has to elapse, and typing through it is a different key.**
-    // C16 holds a lone `Esc` for 50 ms (§2) because `Esc` then `i` is `Alt-i`,
-    // so a row that types straight through the window never sends `Esc` at all
-    // — and it fails looking exactly like a suppression that did not work.
+    // The window has to elapse, and typing through it is a different key: C16
+    // holds a lone `Esc` for 50 ms (§2) because `Esc` then `h` is `Alt-h`, so a
+    // row that types straight through never sends `Esc` at all — and it fails
+    // looking exactly like a suppression that did not work.
     stdin.emit("\u001b");
     clock.advance(80);
     await new Promise((r) => setTimeout(r, 80));
     expect(graph.overlays.top, "Esc dismissed it").toBeNull();
 
-    type(stdin, "i");
+    type(stdin, "h");
+    expect(graph.editor.text, "the character still types").toBe("/h");
     expect(
       graph.overlays.top,
-      "dismissed, and the next character does not undo it",
+      "two candidates would open it, and the dismissal holds for the token",
     ).toBeNull();
-    expect(graph.editor.text).toBe("/hi");
 
+    // T3.24 — an explicit request is the user asking again.
     stdin.emit("\t");
     await new Promise((r) => setTimeout(r, 0));
+    expect(menuRows(graph), "Tab clears the hold").toEqual([
+      "/help",
+      "/history",
+    ]);
+  });
+
+  it("T3.23 (C19 I19): submitting the line clears the hold", async () => {
+    // The other half, and it is a different mechanism rather than a second
+    // case: suppression is held per token, and the next line's first token
+    // starts at the same offset the dismissed one did — so nothing about the
+    // context would ever clear it. The submit path does.
+    const { graph, stdin, clock } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    type(stdin, "/");
+    expect(graph.overlays.top?.id).toBe(MENU_ID);
+
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+
+    stdin.emit("\r");
+    type(stdin, "/");
+    expect(graph.overlays.top?.id, "a new line, and the menu opens again").toBe(
+      MENU_ID,
+    );
+  });
+
+  it("T3.12, T3.12b: a requested menu narrows in place, and backspace dismisses it", async () => {
+    // **C19 §8's requested-menu keystroke cell, unreachable until now.** The
+    // character never arrived: with the layer up `activeTarget` is `overlay`,
+    // and nothing forwarded what that handler does not bind. Three specs
+    // described narrowing and the code had no way to be asked.
+    //
+    // This is also the row the forward's mutation needed. Removing it left
+    // every existing assertion green, because the *display* menu is served by
+    // the precedence one line above and only a requested menu depends on the
+    // forward itself.
+    const { graph, stdin } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    type(stdin, "/");
+    stdin.emit("\t");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(menuRows(graph).length, "a menu the user asked for").toBeGreaterThan(
+      2,
+    );
+
+    const changes: string[] = [];
+    graph.overlays.subscribe((c) => void changes.push(c.kind));
+
+    type(stdin, "h");
     expect(
       graph.editor.text,
-      "an explicit request is the user asking again",
-    ).toBe("/history ");
+      "the character reaches C17 through the layer",
+    ).toBe("/h");
+    expect(menuRows(graph), "narrowed in place").toEqual(["/help", "/history"]);
+    // **No `push` and no `pop`, rather than a count of updates** (C15 T4.7b).
+    // The count is two — the layer is updated, then again once C15 has placed
+    // it and can say how many candidates were cut — and pinning it here would
+    // pin the second pass rather than the claim, which is that the menu is
+    // changed in place and never taken down and put back.
+    expect(new Set(changes), "in place: no pop, no push").toEqual(
+      new Set(["content"]),
+    );
+
+    type(stdin, "\u007f");
+    expect(
+      graph.overlays.top,
+      "backspace dismisses it: filtering cannot widen, and widening is a source call",
+    ).toBeNull();
   });
 });
 
