@@ -293,14 +293,15 @@ describe("C19 §6 — the menu's bottom edge", () => {
       // eslint-disable-next-line no-control-regex
     }).map((l) => l.replace(/\u001b\[[0-9;]*m/g, ""));
 
+    // **Both ends**, because the two seams close independently — the bottom one
+    // shipped for a round with the top one open, and the menu still read as
+    // continuous with the transcript above it.
+    const first = rows[0] ?? "";
     const last = rows[rows.length - 1] ?? "";
-    expect(last, "a line, drawn by C09 and degrading with the rest").toMatch(
-      /^[─-]/,
-    );
-    expect(last, "and it carries no candidate").not.toContain("/help");
-    expect(rows.slice(0, -1).join("\n"), "which are above it").toContain(
-      "/history",
-    );
+    expect(first, "a line above, against the transcript").toMatch(/^[─-]/);
+    expect(last, "and one below, against the prompt").toMatch(/^[─-]/);
+    expect(first + last, "neither carries a candidate").not.toContain("/help");
+    expect(rows.slice(1, -1).join("\n"), "the candidates are between them").toContain("/history");
   });
 
   it("T3.26 (C19 I23): the remainder counts rows, and the caller is what is asked", async () => {

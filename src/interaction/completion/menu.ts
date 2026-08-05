@@ -85,7 +85,15 @@ export function menuBlocks(
             key: "value",
             label: "",
             align: "left",
-            priority: 1,
+            // **Higher than the hint's, and it was lower** (I18). C11 admits
+            // columns by priority *descending* (plan.ts step 2), so `1` against
+            // the detail's `2` meant the labels were dropped first — at 80
+            // columns over a diff the menu drew four summaries and not one verb
+            // name, which is I18's own claim failing in the direction it was
+            // written about. §6 says which way round it goes in as many words:
+            // the label is what the user is reading, and the hint is
+            // right-aligned against it.
+            priority: 2,
             minWidth: widestLabel(candidates),
             // **The flex is C19's declaration, not a default C11 should
             // change** (I18). C11 gives residual width only to a `flex` column
@@ -101,7 +109,7 @@ export function menuBlocks(
             key: "detail",
             label: "",
             align: "right",
-            priority: 2,
+            priority: 1,
             minWidth: widestDetail(candidates),
             sortable: false,
           },
@@ -135,15 +143,21 @@ export function menuBlocks(
         })),
       };
 
-  // **The bottom edge, and it is the last row whatever else is here** (I23).
-  // The menu spans the region and is anchored to the prompt, so without it the
-  // last candidate and the line being typed are adjacent rows of text: read
-  // from a frame, `• /container` over `❯ /co` is one block and a reader takes
-  // the two as a path. An empty label is a plain line — C09 draws `── ` and
-  // fills the rest, and it degrades to ASCII with the rest of the menu.
+  // **The edges, and there are two** (I23). The menu spans the region, so its
+  // neighbours in both directions are left-aligned text at the same width: the
+  // prompt below and the transcript above. Without them, `• /container` over
+  // `❯ /co` is a path and `dtui-cfg  nginx:alpine  ● Up 4 minutes` over
+  // `/container` is another row of the same table.
   //
-  // The top edge needs nothing: the transcript above is a different kind of
-  // content and reads as one.
+  // **The top one was ruled unnecessary and the frame said otherwise** — with
+  // the bottom edge already in place, the menu still read as continuous
+  // upward. The sentence that ruled it out claimed the transcript is "a
+  // different kind of content", and it is not: it is the same plain text at
+  // the same width, which is why the seam closes invisibly.
+  //
+  // An empty label is a plain line — C09 draws it unbroken (C09 I21) and it
+  // degrades to ASCII with the rest of the menu.
+  const top: Block = { kind: "rule", id: `${MENU_ID}-edge-top`, label: "" };
   const edge: Block = { kind: "rule", id: `${MENU_ID}-edge`, label: "" };
 
   // **An empty set draws nothing, edge included**, and an existing row is what
@@ -156,8 +170,9 @@ export function menuBlocks(
   // **C19 renders the indicator, because only C19 knows the remainder** (C15
   // I8). C15 reports *that* it truncated through `Placed.truncated`; it holds no
   // candidates and cannot say how many were lost.
-  if (remainder <= 0) return Object.freeze([body, edge]);
+  if (remainder <= 0) return Object.freeze([top, body, edge]);
   return Object.freeze([
+    top,
     body,
     { kind: "raw", id: `${MENU_ID}-more`, text: `… ${String(remainder)} more` } satisfies Block,
     edge,
@@ -223,13 +238,13 @@ export function remainderOf(placed: Placed | null, total: number, shown: number)
 /**
  * The rows of a placement that hold candidates (I23).
  *
- * The rule always costs one, and the indicator costs one whenever it is drawn
+ * The rules cost one each, and the indicator costs one whenever it is drawn
  * — which is whenever anything was cut, which is the case this is called in.
  * Subtracting both here rather than at the call site keeps the menu's own
  * chrome a fact of this file, where the blocks are built.
  */
 export function menuRowsShown(placed: Placed | null): number {
   if (placed === null) return 0;
-  const chrome = placed.truncated ? 2 : 1;
+  const chrome = placed.truncated ? 3 : 2;
   return Math.max(0, placed.height - chrome);
 }
