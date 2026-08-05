@@ -17,6 +17,7 @@ import { BINARY, buildManifest } from "./manifest.ts";
 import { createPsAdapter } from "./ps.ts";
 import { createDashboardHandler } from "./dashboard.ts";
 import { createContainerAdapter } from "./container.ts";
+import { createInspectAdapter } from "./inspect.ts";
 import { createCompareHandler, createDriftHandler } from "./drift.ts";
 
 const run = promisify(execFile);
@@ -69,7 +70,11 @@ const tui = createTui({
   env: process.env,
   // Keyed by the verb, and a sub-verb's key is its whole name — the space is
   // part of it, not a separator this side of C18.
-  adapters: { ps: createPsAdapter(), "container stats": createContainerAdapter() },
+  adapters: {
+    ps: createPsAdapter(),
+    "container stats": createContainerAdapter(),
+    inspect: createInspectAdapter(),
+  },
   localHandlers: {
     dashboard: createDashboardHandler(engine, width),
     drift: createDriftHandler(),

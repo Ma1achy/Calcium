@@ -37,6 +37,7 @@ import type { ViewDocument } from "@fmx/calcium";
 import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
 import { createContainerAdapter } from "../src/container.ts";
+import { createInspectAdapter } from "../src/inspect.ts";
 
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
@@ -73,6 +74,15 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   ["container stats — non-zero", () => createContainerAdapter().adapt(result({ exitCode: 1, stderr: "no such container" }), ctx)],
   ["container stats — zero rows", () => createContainerAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
   ["container stats — ok", () => createContainerAdapter().adapt(result({ stdoutRaw: read("stats-real.ndjson") }), ctx)],
+  // **S5's arms, added with the verb rather than after it.** Step 4's lesson
+  // was that three error documents shipped, two of them never run, and 91 rows
+  // agreed with all three — so a new verb's failures join this table on the day
+  // the verb exists, not on the day one is seen.
+  ["/inspect — docker exited non-zero", () => createInspectAdapter().adapt(result({ exitCode: 1, stderr: "No such object" }), ctx)],
+  ["/inspect — exit zero, empty array", () => createInspectAdapter().adapt(result({ stdoutRaw: "[]" }), ctx)],
+  ["/inspect — exit zero, unparseable", () => createInspectAdapter().adapt(result({ stdoutRaw: "<html>" }), ctx)],
+  ["/inspect --raw — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json"), argv: ["docker", "inspect", "x", "--raw"] }), ctx)],
+  ["/inspect — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json") }), ctx)],
 ];
 
 describe("F35: every document this app produces is one C13 will accept", () => {

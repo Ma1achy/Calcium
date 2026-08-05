@@ -93,6 +93,35 @@ const containerStats: ToolDef = {
 };
 
 /**
+ * S5's fullscreen view — the first surface with more content than region.
+ *
+ * **`view: true` and `local: false`.** One call, so an adapter fits, and the
+ * adapter route is the only one that carries `width` (FINDINGS F14) — which
+ * `--raw` needs, because a wrapped code block's height depends on it.
+ *
+ * `--raw` is a **flag, not the `r` toggle S5's footer draws.** There is no plain
+ * `r` binding at the `pushedView` target — `keymap.ts` has `Ctrl-R` at `prompt`
+ * and `overlay` and nothing else — so the toggle is a C16 keymap change plus a
+ * mode the view does not hold. Filed as F38; the flag is what exists today.
+ */
+const inspect: ToolDef = {
+  name: "inspect",
+  local: false,
+  view: true,
+  summary: "One container in full — structured, or the raw JSON",
+  args: [
+    { name: "container", type: "string", required: true, summary: "Container id or name" },
+  ],
+  flags: [
+    {
+      name: "raw",
+      type: "bool",
+      summary: "The literal docker inspect JSON, syntax-highlighted",
+    },
+  ],
+};
+
+/**
  * S7 and S6 — the comparison block's two surfaces.
  *
  * **Local, and forced rather than chosen.** `/drift` runs `docker inspect <c>`
@@ -134,6 +163,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps, dashboard, containerStats, drift, compare],
+    tools: [ps, dashboard, containerStats, inspect, drift, compare],
   };
 }

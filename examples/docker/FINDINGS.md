@@ -1362,6 +1362,87 @@ framework holds a check the consumer needs and does not offer it.
 
 ---
 
+## F37 — no producer can see the region, and one cannot measure a block either ★★★
+
+**The threshold a view's producer needs is unreachable from the only two places that build
+a document.** `AdapterContext` carries `width` and no height (`data/adapters/types.ts`);
+`LocalContext` carries `command` and nothing else; and reading the terminal is forbidden
+outside `terminal/lifecycle.ts`. So an app deciding how to divide content for a **pushed
+view** — whose whole bound is the region — has no legitimate way to know what it is
+dividing against.
+
+`INSPECT_WALK.md` B1 ruled *"split by keys while a block overflows the region, and measure
+to decide"*, and the code falsified it within an hour. What is reachable is a **declared
+floor**, and the asymmetry is what saves it from being the fixed constant the walk rejected:
+over-splitting costs granularity, under-splitting strands rows a reader cannot reach, so a
+floor is correct at every region above it and honest below. `SPLIT_FLOOR = 21` is a 24-row
+terminal's region — measured, 114 blocks, **0 rows stranded at 40 rows and 3 at 24**,
+against 208 stranded by no split at all.
+
+**The second half is that the app cannot measure a block.** `createBlockRegistry` is not
+public, so `codeRows` reimplements the measurer's arithmetic — exactly the drift CLAUDE.md
+forbids. `cells` *is* public, which is the sanctioned half; the rest is pinned against the
+real measurer by deep import (`test/inspect.test.ts` I1), and **it caught the arithmetic
+being wrong on its first run**: 69 against 68, because a code block wraps at the full width
+and the first version assumed a border inset.
+
+Same family as F14 (a local handler has no width) and F36 (an app cannot validate). Three
+instances now of *the framework holds a fact the consumer needs and does not offer it*, and
+this is the first where the missing fact is the one the surface is defined by.
+
+---
+
+## F38 — a drawing's footer promises a key with no binding
+
+S5 draws `r raw` in the view's footer. There is no plain `r` at the `pushedView` target —
+`keymap.ts` has `Ctrl-R` at `prompt` and at `overlay`, and nothing else. A toggle is a C16
+keymap change *and* a mode the view does not hold, so `--raw` is a flag in this step.
+
+Fourth time a drawing has committed the framework to something unbuilt (F4, F11, F30's
+verdict, this). Filed rather than fixed: a view that re-fills itself from a mode it holds is
+a real feature, not a binding.
+
+---
+
+## F39 — a flag that selects a rendering is sent to the far side ★★★
+
+**Every flag a `ToolDef` declares is transmitted.** C06 I4 sends argv over verbatim, which
+is right for `--all` and wrong for `--raw`: `/inspect <c> --raw` ran
+`docker inspect <c> --raw` and docker exited 125 with `unknown flag: --raw`. There is no way
+to declare a flag that selects a **rendering** rather than an invocation.
+
+**Found by reading the frame, and the suite could not have found it.** All twelve rows for
+this verb passed, because they hand argv to the adapter directly and never spawn anything —
+the tests cover the mechanism and this is the wiring. The recurrence CLAUDE.md names, in the
+place it keeps happening.
+
+Absorbed by the shim, which now strips `--raw` for `inspect` before `exec docker`. The
+adapter still sees it, because `RawResult.argv` is what Calcium built rather than what
+reached the binary. Third translation in that file and the first that is not about docker's
+shape at all — `--json` and `--no-stream` are about the far side; this one is about the
+framework having no place to put a presentation flag.
+
+---
+
+## F40 — the document view measured its window a block at a time ★★★ — **fixed**
+
+A rendered sequence separates its blocks, so *n* blocks occupy *n* rows more than the sum of
+their heights. `document-view.ts` projected by adding `measure(block)` one at a time, so it
+packed nearly twice what the region holds and C15 cut the excess in silence. The registry
+has `measureSequence` and C14 is already given it; the view was handed the per-block one.
+
+**Invisible for the same reason S3's granularity was.** With four blocks the error is four
+rows against a region with room to spare; with 103 it is 103. A defect proportional to a
+count that every existing surface kept small reads as correct until one does not — and no
+arithmetic finds it, because both sides of the comparison are the code's own.
+
+Found by reading a frame and seeing a blank row between every block. Fixed, with the
+contract test's fixture corrected from 6 to 8 rows — the control had stated the region as
+`height / ROWS`, which was the arithmetic the code used rather than the one the terminal
+does, and it failed the moment the view started measuring what is drawn.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that

@@ -143,3 +143,43 @@ for (const wrap of [false, true]) {
   const total = perKeyW.reduce((n, bl) => n + registry.measure(bl, REGION.width), 0);
   console.log(`wrap=${String(wrap).padEnd(5)} whole=${registry.measure(one, REGION.width)} rows · perKey total=${total} rows`);
 }
+
+// ── Ruling 1 falsified: no producer can see the region ──────────────────────
+
+/**
+ * `AdapterContext` carries `width` and no height; `LocalContext` carries only
+ * `command`; and reading the terminal is forbidden outside `terminal/`. So the
+ * threshold the walk ruled — *the region* — is unreachable from the only two
+ * places that build a document.
+ *
+ * What is left is a **declared floor**: split until every block fits the
+ * smallest region the app supports, and let I47's indicator carry the residue
+ * below that. The asymmetry is what makes it defensible — over-splitting costs
+ * granularity, under-splitting strands rows — so a floor is correct at every
+ * region above it and honest below.
+ */
+const splitTo = (bound) => {
+  const out = [];
+  const walk = (path, value, depth) => {
+    const block = b.code("json", `"${path}": ${JSON.stringify(value, null, 2)}`,
+      { id: `raw-${path}`, wrap: true });
+    const rows = registry.measure(block, REGION.width);
+    const children = value !== null && typeof value === "object" ? Object.entries(value) : [];
+    if (rows <= bound || children.length === 0 || depth >= 3) { out.push(block); return; }
+    for (const [k, v] of children) walk(`${path}.${k}`, v, depth + 1);
+  };
+  for (const [k, v] of Object.entries(doc)) walk(k, v, 0);
+  return out;
+};
+
+for (const bound of [37, 21, 12]) {
+  const blocks = splitTo(bound);
+  const tallest = Math.max(...blocks.map((bl) => registry.measure(bl, REGION.width)));
+  for (const region of [37, 21]) {
+    const stranded = blocks.reduce(
+      (n, bl) => n + Math.max(0, registry.measure(bl, REGION.width) - region), 0);
+    console.log(`floor=${String(bound).padStart(2)} → ${String(blocks.length).padStart(3)} blocks, ` +
+      `tallest=${String(tallest).padStart(3)} · at region ${String(region).padStart(2)}: ` +
+      `${String(stranded).padStart(3)} rows stranded`);
+  }
+}

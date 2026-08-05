@@ -50,6 +50,23 @@ fixed at two levels: `HostConfig` at 108 rows needs a second and eighteen scalar
 none, and the threshold is the region, which R5 makes a property of the terminal. A fixed
 depth is right at 40 rows and wrong at 24.
 
+**And the code falsified the threshold within the hour.** `AdapterContext` carries `width`
+and no height, `LocalContext` carries only `command`, and reading the terminal is forbidden
+outside `terminal/lifecycle.ts` — so *the region* is unreachable from either place that
+builds a document (FINDINGS F37). The walk ruled against a fact the producer cannot have.
+
+What survives is the **reason** rather than the threshold: the ruling was right that a fixed
+*depth* is wrong, because depth is a property of the data and the constraint is rows. A
+**declared floor** keeps that and drops what could not be had — split until every block fits
+the smallest region the app supports, which is correct at every region above it and honest
+below, where the indicator carries the residue. The asymmetry is what makes it defensible
+and it is worth stating: **over-splitting costs granularity, under-splitting strands rows.**
+Measured at floor 21: 114 blocks, 0 stranded at a 40-row terminal, 3 at a 24-row one.
+
+The walk was wrong about the mechanism and right about the shape, which is the third time
+the implementation has corrected an artefact of this project and the second time the
+correction left the ruling's argument intact.
+
 ### B2 · a leaf that overflows and has no keys to split by — R7 × R1
 
 The rule above says *split while it overflows*. **It does not terminate.** Measured: a
@@ -165,10 +182,28 @@ framework to something unbuilt (F4, F11, F30's verdict, this).
 
 ---
 
+## §3a What the implementation returned to the walk
+
+Three rulings came back changed, and none of them by review.
+
+- **B1's threshold was unreachable** (F37) — the walk named the region and no producer can
+  see it. The argument survived; the number did not.
+- **A page overshoots** was ruled correct and turned out to understate the case. The view
+  measured its window a block at a time, and a rendered sequence separates its blocks, so
+  the projection packed nearly twice the region and C15 cut the rest in silence (F40). No
+  row of either artefact reaches that, because both sides of the comparison are the code's
+  own arithmetic — **it was found by reading a frame and seeing a blank row between every
+  block**, which is the discipline doing precisely what it is for.
+- **A4's `r` toggle was ruled filed and the flag was ruled sufficient.** It is not: every
+  declared flag goes to the far side verbatim, so `--raw` reached docker and it exited 125
+  (F39). The walk asked *which key does this* and never asked *where does this word go*.
+
 ## §4 What this walk settled before any code
 
-1. **Split by keys while a block overflows the region, measured** (B1) — not fixed at two
-   levels, because the threshold is the terminal.
+1. **Split by keys while a block overflows a declared floor, measured** (B1) — not fixed at
+   two levels, because the constraint is rows rather than depth; and not *the region*, which
+   the walk ruled and no producer can see (F37). The floor is correct above it and honest
+   below.
 2. **The split does not terminate, and the floor is a leaf with no children** (B2) — so the
    indicator is what makes the residue honest, and the two rulings interlock.
 3. **`--raw` wraps** (B3) — 11% more rows against silently discarding 2.7KB from the mode

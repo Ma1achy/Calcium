@@ -82,6 +82,31 @@ if [ "$is_stats" -eq 1 ]; then
   set -- "$@" --no-stream
 fi
 
+# `--raw` is docker-tui's own, and Calcium sends every declared flag to the far
+# side (C06 I4: argv goes over verbatim). There is no way to declare a flag that
+# selects a *rendering* rather than an invocation, so `/inspect <c> --raw` runs
+# `docker inspect <c> --raw` and docker exits 125 with `unknown flag: --raw`.
+#
+# Found by reading the frame. Every unit row passed, because they hand argv to
+# the adapter directly and never spawn anything — the suite tests the mechanism
+# and the shim is the wiring. FINDINGS F39.
+#
+# The adapter still sees it: `RawResult.argv` is what Calcium built, and this
+# strips only what reaches docker. Third translation in this file, and the first
+# that is not about the far side's shape at all — it is about the framework
+# having no place to put a presentation flag.
+case "${1:-}" in
+  inspect)
+    original=$#
+    for arg in "$@"; do
+      if [ "$arg" != "--raw" ]; then
+        set -- "$@" "$arg"
+      fi
+    done
+    shift "$original"
+    ;;
+esac
+
 # `exec`, so signals and the exit code reach docker directly. C21 sends SIGTERM
 # and escalates; an intermediate shell would absorb the first one and Calcium
 # would report a timeout for a process that was told to stop.
