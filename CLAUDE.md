@@ -239,9 +239,28 @@ Each of these produces code that compiles, passes review, and is wrong.
   The old reason would be falsified by any docker release changing `rmi`; the real one only
   by a container outliving its own image. Twenty minutes to check. FINDINGS F66.
 
+  **The second instance came from the other direction: not one plan, but four documents.**
+  F58 said `?? 0` reports a signal death as a clean exit, and it was written in FINDINGS,
+  ROADMAP, C24 §8a and R01's table — each citing the situation rather than a measurement.
+  It was one commit from widening `DocumentMeta.exitCode`, a public type, when measuring
+  showed the registry overwrites `exitCode` on every route: an adapter returning `999`
+  yields `0`, and `SIGTERM` already yielded `143`. **Repetition across documents is not
+  corroboration**; four restatements of an unmeasured claim are one unmeasured claim.
+
+  Wrong in both directions again, and again concealing a real defect nobody had stated —
+  the adapter's return type demands ten `meta` fields and the registry honours three, so
+  seven are computed and thrown away. That is F58b, and its fix is a **narrower** type
+  where the old finding asked for a wider one.
+
+  **Watch for a conflation rather than a mistake.** F58's second premise read the
+  *container's* exit code — 137, a field in the payload — as the *CLI's*, which is 0.
+  Both readings are about "an exit code", nothing in the prose forced a choice, and that
+  is how it survived four documents and two authors.
+
   So: when a claim is about to be carried into another step, ask which file holds it. If
-  the answer is *a previous plan*, it is a belief and not a ruling, and the cheapest moment
-  to find that out is before something is built on it.
+  the answer is *a previous plan* or *several documents that cite each other*, it is a
+  belief and not a ruling, and the cheapest moment to find that out is before something is
+  built on it.
 
 - **Where the findings actually came from, measured over one step.** Eleven findings across
   docker-tui's step 8, and **not one came from a test written to look for it**:
