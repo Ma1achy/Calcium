@@ -298,6 +298,20 @@ guarantee you can switch off is not one.
 
 ---
 
+## The reference application
+
+`docker-tui` — a terminal interface over `docker`, and the app this framework was
+proved against. Twelve surfaces, every block type, and sixty-five findings logged
+while building it.
+
+![docker-tui](examples/docker/demo.gif)
+
+[`examples/docker/`](examples/docker/README.md) has the recording, how to run it,
+and the ledger. [`docs/ROADMAP.md`](docs/ROADMAP.md) is what the ledger turned
+into: four pieces of framework work, each with a real consumer behind it.
+
+---
+
 ## The smallest complete example
 
 A far side that prints JSON, a manifest saying what operations exist, an adapter

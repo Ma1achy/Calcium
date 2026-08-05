@@ -2069,3 +2069,103 @@ resolve from the package root — the repository in the dev loop,
 is still a deep import and still F36/F37.
 
 `make proof` now runs both examples and passes: `PROOF_EXIT=0`, 233 and 3.
+
+---
+
+## F61 — `/logs` had never worked, and no assertion could have said so ★★★ — **fixed**
+
+`/logs dtui-web` opens a pushed view and renders **an empty screen**. Reproduced
+in isolation, then narrowed to the shim, then to one word of it.
+
+`bin/docker-json` wraps each log line as `{"line":"…"}` — F45's translation,
+because `docker logs` emits no JSON — and it did the wrapping with `awk`.
+**mawk, which is `/usr/bin/awk` on Debian and therefore in this container,
+block-buffers its input.** `fflush()` governs output and has nothing to say about
+that. Measured:
+
+| | |
+|---|---|
+| `docker logs --follow ... \| cat`, 4s | **150 lines** |
+| `docker logs --follow ... \| awk '{print NR; fflush()}'`, 4s | **0 lines** |
+| the same with 11 KB of log already present | still 0 |
+| a slow generator into `sed -u` or `while read` | every line, immediately |
+
+A stream that *ends* is fine: mawk hits EOF, processes the remainder, everything
+appears. A `--follow` never ends. So the defect is invisible to every finite
+test and visible in every real use.
+
+**Why nothing caught it, and this is the part worth keeping.** `test/shim.test.ts`
+had twenty rows and every one asserts **argv** — what the shim hands docker.
+There was no row asserting a line comes back out, and the fake `docker` the rows
+use *prints and exits*, which is exactly the shape that hides it. A test that
+calls the mechanism and never the wiring, with the fake supplying the very
+property under test.
+
+It is also the empty-block class arriving through the instrument rather than the
+data: *nothing on screen* and *nothing to show* are the same picture, and a
+pushed view removes the prompt, so there was not even a cursor to suggest the app
+was alive.
+
+Fixed with `sed -u`, which is line-buffered by request. Its output was diffed
+against the awk program's on every escape case — plain, quote, backslash, tab,
+CR — **before** the replacement was written, so the repair could not quietly
+change the format while fixing the buffering.
+
+Two rows added, and they are about **arrival**, not about which program wraps:
+a second fake that writes three lines slowly and then does not exit, and
+`timeout` rather than `head`, because closing the pipe ends the stream and hands
+back the buffered-flush behaviour being ruled out. Reverting the shim to `awk`
+kills both and nothing else.
+
+---
+
+## F62 — the headline shot was a flat line ★★
+
+`make fixtures` ran `dtui-load` as `while :; do :; done`, which is what you reach
+for when you want load. Read back off the recording, the live single-container
+view — the composition the whole demo was built around — was **a flat line at
+100% across the full width of the plot.**
+
+Correct, honest, and the least interesting figure C12 can draw.
+
+**Nothing in any suite could have said so.** The plot's height, its axis labels,
+its sample count and its bounds were all exactly right; `degradesTo1Bit` passed;
+the arithmetic was perfect. A constant is a valid series. Only looking at it
+says that a demo of a plot should have a shape.
+
+Bursts of differing length instead — `5 3 7 2 6 4` seconds busy, three idle
+between — measured at 108%, 0%, 65%, 109%, 0%, 68% across six samples. The
+recording now shows a curve rising and falling.
+
+**The class is "correct for the fixtures is a property of the fixtures".** It has
+appeared before as a defect proportional to a small count; this is its other
+face, where the fixture is not too small but too *uniform*, and no assertion
+about the code can reach it.
+
+---
+
+## F63 — the recording and the frames disagreed, and the recording was wrong ★★
+
+`tools/capture.py`'s new asciicast writer decoded each read independently with
+`errors="replace"`. `os.read` splits on **bytes**, so a 64 KiB read lands
+mid-UTF-8-sequence whenever the terminal is drawing box characters — which is
+continuously, here. The result was U+FFFD in the middle of a panel border, and
+the panel then wrapped: a corrupted frame in the recording with the raw capture
+beside it perfectly intact.
+
+Found by reading a beat, not by reading the writer. The raw stream and the cast
+come from **one** capture on purpose — so that a frame-read and a played beat
+cannot disagree about what happened — and this was the two disagreeing.
+
+Fixed with an incremental decoder, which carries a partial sequence into the next
+chunk. `errors` is left strict: there is now nothing for it to paper over, and a
+failure would be a real one. Zero U+FFFD in the re-recorded cast, against 1 per
+beat before.
+
+**And the cut had the same shape as the corruption.** The first frame-read of the
+recording sliced the stream at chosen timestamps — "beat one is t=8.0" — and
+showed a container listed twice and a row with a broken sequence. Both were the
+cut landing mid-redraw. `tools/beats.py` cuts at a **gap in the output** instead:
+a terminal redraws in a burst and then goes quiet, so the last frame before a
+pause is a settled screen by construction. VERIFYING.md §8's hazard, pointed at
+the reading instrument rather than at the capture.

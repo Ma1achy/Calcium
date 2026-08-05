@@ -60,9 +60,24 @@ fixtures:           ## bring up the demo containers (idempotent — removes any 
 	@# started and left to finish rather than run with `--rm`.
 	docker run -d --name dtui-quiet alpine \
 	  sh -c 'echo "dtui-quiet: started, and about to stop"; sleep 2' >/dev/null
-	@# S3's plot needs a curve. See `load-down` — this one is not like the others.
+	@# S3's plot needs a curve, and **a busy loop is not one.**
+	@#
+	@# The first version of this was `while :; do :; done`, which is what you
+	@# reach for when you want load. Read back off the frame, the headline shot —
+	@# the live single-container view, the composition the whole demo was built
+	@# around — was a **flat line at 100%** across the full width of the plot.
+	@# Correct, honest, and the least interesting figure C12 can draw. Nothing in
+	@# the suite could have said so: the plot's height, its axis labels and its
+	@# sample count were all exactly right.
+	@#
+	@# Bursts of differing length instead, so the trace rises and falls and the
+	@# reader can see one sample per tick arriving. `date +%s` rather than
+	@# fractional sleeps because busybox's `sleep` and `timeout` disagree about
+	@# fractions and the container is `alpine`.
+	@#
+	@# See `load-down` — this one is not like the others.
 	docker run -d --name dtui-load alpine \
-	  sh -c 'while :; do :; done' >/dev/null
+	  sh -c 'while :; do for b in 5 3 7 2 6 4; do e=$$(( $$(date +%s) + $$b )); while [ $$(date +%s) -lt $$e ]; do :; done; sleep 3; done; done' >/dev/null
 	@$(MAKE) --no-print-directory fixtures-status
 
 fixtures-down:      ## remove all four, running or not

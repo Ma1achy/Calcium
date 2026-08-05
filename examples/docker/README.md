@@ -4,17 +4,18 @@
 the framework's reference application: twelve surfaces, every block type, and a
 findings ledger recording every place the framework did not reach.
 
-```
-❯ /ps
+![docker-tui](demo.gif)
 
-NAME              IMAGE                 STATUS                    PORTS
-dtui-load         alpine                ● Up 25 seconds           —
-dtui-quiet        alpine                ✗ Exited (0) 23 seconds…  —
-dtui-cfg          nginx:alpine          ● Up 25 seconds           80/tcp
-dtui-web          nginx:alpine          ● Up 25 seconds           0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
+Six beats, one session, recorded against real containers: the landing dashboard,
+`/ps`, the live single-container view filling its plot, `/drift`, `/config`'s
+unified diff, and a log tail exited with `⌃c`.
 
-4 running · 6 stopped
-```
+**The recording is `demo.cast`**, an asciicast written by `tools/capture.py` — the
+same capture the frames below were read from, not a second run. `agg demo.cast
+demo.gif` re-renders it. Record a new one with `python3 tools/screencast.py
+out/demo`, and read it back beat by beat with `tools/beats.py` before believing
+it: a screencast is a frame-read with an audience, and doing that here found
+three defects the suites could not.
 
 ---
 

@@ -76,6 +76,12 @@ def run(
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
 
     captured = bytearray()
+    # **Timed, for the same bytes.** `frames` is `(seconds-from-start, chunk)`,
+    # which is everything asciicast v2 needs and costs one tuple per read. The
+    # raw stream and the timed one are the same capture seen two ways rather
+    # than two captures — so a frame read from `screen.py` and a beat played in
+    # the recording cannot disagree about what happened.
+    frames: list[tuple[float, bytes]] = []
     start = time.monotonic()
     pending = list(script)
     total = max(t for t, _ in script) + hold
@@ -94,6 +100,7 @@ def run(
             if not chunk:
                 break
             captured.extend(chunk)
+            frames.append((time.monotonic() - start, chunk))
 
     # The capture is split at the teardown: the live frame is everything up to
     # the signal, the exit sequence is written beside it.
@@ -132,11 +139,51 @@ def run(
         fh.write(live_bytes)
     with open(out_path + ".teardown", "wb") as fh:
         fh.write(bytes(captured)[len(live_bytes):])
+    write_cast(out_path + ".cast", cols, rows, frames)
     print(
         f"{out_path}: {len(live_bytes)} bytes live "
-        f"(+{len(captured) - len(live_bytes)} teardown) at {cols}x{rows}",
+        f"(+{len(captured) - len(live_bytes)} teardown) at {cols}x{rows}, "
+        f"{len(frames)} cast frames",
         file=sys.stderr,
     )
+
+
+def write_cast(
+    path: str, cols: int, rows: int, frames: list[tuple[float, bytes]]
+) -> None:
+    """asciicast v2: a JSON header line, then one `[time, "o", text]` per read.
+
+    **Written here rather than taken from a package**, and the argument is
+    DEPENDENCIES.md's: the format is a header and a list, the writer is twenty
+    lines, and `asciinema` would be a tool installed to produce a file this
+    already has in memory. The recording and the frame-reads then come from *one*
+    capture, which matters more than the twenty lines — a screencast recorded by
+    a second run of the app is a different session from the one that was read.
+
+    **Decoded incrementally, and the first version was not — which was visible
+    in the second frame anyone read.** The format is JSON, so the payload must be
+    text, and `os.read` splits on bytes: a 64 KiB read lands mid-sequence
+    whenever the terminal is drawing box characters, which is most of the time
+    here. Decoding each chunk independently with `errors="replace"` put U+FFFD
+    in the middle of a panel border, and the panel then wrapped — a corrupted
+    frame in the recording, with the raw stream beside it perfectly intact.
+
+    `IncrementalDecoder` carries the partial sequence to the next chunk, which
+    is what makes the cast and the raw capture the same session rather than two
+    accounts of it. `errors` is left strict deliberately: there is nothing left
+    for it to paper over, and a failure here would be a real one.
+    """
+    import codecs
+    import json
+
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    with open(path, "w", encoding="utf8") as fh:
+        header = {"version": 2, "width": cols, "height": rows, "env": {"TERM": "xterm-256color"}}
+        fh.write(json.dumps(header) + "\n")
+        for i, (at, chunk) in enumerate(frames):
+            text = decoder.decode(chunk, final=i == len(frames) - 1)
+            if text:
+                fh.write(json.dumps([round(at, 6), "o", text]) + "\n")
 
 
 if __name__ == "__main__":

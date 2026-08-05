@@ -194,17 +194,36 @@ esac
 # replaced, so C21's SIGTERM arrives here instead of at docker — hence the trap,
 # which forwards it. Without that, stopping a follow would leave a `docker logs`
 # running until its pipe closed.
+# **`sed -u`, and it used to be `awk`. The change is the whole of F61.**
+#
+# mawk — which is `/usr/bin/awk` on Debian, and therefore in this container —
+# **block-buffers its input.** `fflush()` flushes output and has nothing to say
+# about that. On a stream that ends, mawk hits EOF, processes the remainder and
+# everything appears; on a `--follow` that never ends, nothing appears until the
+# buffer fills. Measured: eleven kilobytes of nginx log, four seconds, zero
+# bytes through `awk` and 150 lines through `cat`.
+#
+# So `/logs` opened a view and rendered an empty screen, for as long as a
+# container logged less than a bufferful — which is every container anyone would
+# demo. It is the empty-block class arriving through the instrument: *nothing on
+# screen* and *nothing to show* look the same, and the pushed view had removed
+# the prompt, so there was not even a cursor to suggest the app was alive.
+#
+# `sed -u` is line-buffered by request and its output is byte-identical to the
+# awk program's on every escape case — plain, quote, backslash, tab, CR — which
+# was checked by diffing the two before this line was written rather than after.
+#
+# **`-u` is GNU sed's**, and busybox's accepts it too. A platform with neither
+# would silently return to the defect, so `test/shim.test.ts` asserts a line
+# arrives rather than asserting which program produced it.
 case "${1:-}" in
   logs)
-    docker "$@" 2>&1 | awk '{
-      line = $0
-      gsub(/\\/, "\\\\", line)
-      gsub(/"/, "\\\"", line)
-      gsub(/\t/, "\\t", line)
-      gsub(/\r/, "", line)
-      printf "{\"line\":\"%s\"}\n", line
-      fflush()
-    }' &
+    docker "$@" 2>&1 | sed -u \
+      -e 's/\\/\\\\/g' \
+      -e 's/"/\\"/g' \
+      -e 's/\r//g' \
+      -e 's/\t/\\t/g' \
+      -e 's/.*/{"line":"&"}/' &
     child=$!
     trap 'kill -TERM "$child" 2>/dev/null' TERM INT
     wait "$child"

@@ -251,3 +251,87 @@ describe("S9: the shim supplies the follow and the tail", () => {
     expect(argvOf("inspect", "abc", "--json")).not.toContain("--tail");
   });
 });
+
+/**
+ * F61 — the follow that produced nothing, and the shape of test that missed it.
+ *
+ * Every row above asserts **argv**: what the shim hands docker. Not one asserts
+ * that a line comes back out, and the wrapper had been broken for as long as it
+ * has existed on any machine where `/usr/bin/awk` is mawk — which is Debian's
+ * default and therefore this container's.
+ *
+ * mawk block-buffers its *input*. `fflush()` governs output and says nothing
+ * about that. A finite stream ends, mawk processes the remainder, and everything
+ * appears — which is exactly the shape every existing row has, because the fake
+ * exits. A `--follow` never ends, so nothing appeared until a buffer filled:
+ * eleven kilobytes of real nginx log and four seconds produced **zero bytes**
+ * through `awk` and 150 lines through `cat`.
+ *
+ * **`/logs` therefore opened a pushed view and rendered an empty screen**, and
+ * the pushed view removes the prompt, so there was not even a cursor to suggest
+ * the app was alive. It is the empty-block class reached through the instrument
+ * rather than the data.
+ *
+ * The rows below are deliberately about *arrival*, not about which program does
+ * the wrapping. `sed -u` is the fix; a platform whose `sed` ignores `-u` would
+ * return to the defect silently, and a row naming `sed` would still pass.
+ */
+describe("F61: a line arrives, and arrives while the stream is still open", () => {
+  /**
+   * A second fake, and it is the fixture the whole finding turns on: it writes
+   * three lines slowly and then **does not exit**. Every other row in this file
+   * uses a fake that prints and returns, which is the shape that hides the
+   * defect — mawk reaches EOF, processes its buffer, and everything appears.
+   */
+  let followBin: string;
+  beforeAll(() => {
+    followBin = mkdtempSync(join(tmpdir(), "docker-tui-follow-"));
+    const fake = join(followBin, "docker");
+    writeFileSync(
+      fake,
+      [
+        "#!/bin/sh",
+        "# Three lines, slowly, carrying every escape the wrapper exists for,",
+        "# then a sleep well past the timeout so the stream is unambiguously open",
+        "# when the assertion is made.",
+        'printf "plain\\n"; sleep 0.2',
+        'printf \'with "q"\\n\'; sleep 0.2',
+        'printf "with \\\\ back\\n"',
+        "sleep 30",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(fake, 0o755);
+  });
+
+  /** The real shim, killed by timeout rather than by closing its pipe. */
+  const followLines = (): { line: string }[] => {
+    // **`timeout`, never `head`.** Closing the pipe ends the stream, and the
+    // end of the stream is precisely what made mawk look correct. A row that
+    // reads three lines and stops would pass against the broken wrapper.
+    const out = execFileSync("sh", ["-c", `timeout 3 "$0" logs c --json || true`, SHIM], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${followBin}:${process.env["PATH"] ?? ""}` },
+    });
+    return out.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as { line: string });
+  };
+
+  it("S6.1: lines arrive while the far side is still running", () => {
+    // Under mawk this is `[]`. `fflush()` is about output and the buffering is
+    // on input, so no amount of flushing in the wrapper could have fixed it.
+    expect(
+      followLines().map((l) => l.line),
+      "nothing arrived while the stream was open — the input buffering is back",
+    ).toEqual(["plain", 'with "q"', "with \\ back"]);
+  }, 20_000);
+
+  it("S6.2: and each one is a JSON object the adapter can parse", () => {
+    // F45's premise: `docker logs` emits no JSON, so the shim makes it into the
+    // JSON-emitting far side the framework is for. If a line came back raw, C07
+    // would treat every line as unparseable and the fallback would accumulate
+    // the whole follow into one growing `raw` block — C22 I47's pathology.
+    const lines = followLines();
+    expect(lines).toHaveLength(3);
+    for (const l of lines) expect(typeof l.line).toBe("string");
+  }, 20_000);
+});

@@ -40,11 +40,17 @@
   // repository was read; `make` and `g++` are for the root install's one named
   // native rebuild (A04 §3, SS32's single exception).
   //
-  // `agg` renders the screencast. It is a single static binary rather than an
-  // npm package on purpose — DEPENDENCIES.md's posture is that the strongest
-  // supply-chain control is not having dependencies, and a tool that runs once
-  // to produce a committed artefact has no business in the dependency graph.
-  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++",
+  // `agg` renders the screencast from the `.cast` this repository records
+  // itself. A single static binary rather than an npm package on purpose —
+  // DEPENDENCIES.md's posture is that the strongest supply-chain control is not
+  // having dependencies, and a tool that runs once to produce a committed
+  // artefact has no business in the dependency graph. It is pinned to a version
+  // and fetched by URL so a reader can see exactly what lands.
+  //
+  // Nothing in the app or its tests needs it: `tools/capture.py` writes the
+  // `.cast` with twenty lines of its own, and the frames are read from the raw
+  // stream. `agg` only turns a recording into a picture.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++ && sudo sh -c 'curl -sL -o /usr/local/bin/agg https://github.com/asciinema/agg/releases/download/v1.9.0/agg-$(uname -m)-unknown-linux-gnu && chmod 755 /usr/local/bin/agg'",
 
   // **Both installs, in order, and the order is load-bearing.** The app
   // resolves `@fmx/calcium` to `file:../..`, and npm packs that directory using
