@@ -231,6 +231,7 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
   const repeatable = takeOptionalBoolean(raw, "repeatable", e, at);
   const requires = takeStringArray(raw, "requires", e, at);
   const conflicts = takeStringArray(raw, "conflicts", e, at);
+  const view = takeOptionalBoolean(raw, "view", e, at);
 
   return {
     name,
@@ -240,6 +241,7 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
     ...(repeatable === undefined ? {} : { repeatable }),
     ...(requires === undefined ? {} : { requires }),
     ...(conflicts === undefined ? {} : { conflicts }),
+    ...(view === undefined ? {} : { view }),
     summary,
   };
 }
@@ -402,6 +404,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const oneShot = takeOptionalBoolean(raw, "oneShot", e, at);
   const hidden = takeOptionalBoolean(raw, "hidden", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
+  const view = takeOptionalBoolean(raw, "view", e, at);
 
   // I19 — the two combinations that describe a verb which cannot exist. Both
   // are cross-field rules of I4's kind and sit where I4 sits, so the report
@@ -427,6 +430,30 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     }
   }
 
+  // I20 — `view` is the tier, and its two refusals are I19's shape. `streams` is
+  // deliberately absent from them: S12's logs view is a streaming source rendered
+  // into a pushed view, so refusing that pair would refuse the surface C22 §13a
+  // was ruled for.
+  if (view === true) {
+    if (interactive === true) {
+      fail(
+        e,
+        `${at}.view`,
+        `"${name}" declares both view and interactive — both hand input ownership ` +
+          `away, the view to the shell's own keymap and the handoff to a child; ` +
+          `drop whichever one the verb does not do`,
+      );
+    }
+    if (oneShot === true) {
+      fail(
+        e,
+        `${at}.view`,
+        `"${name}" declares both view and oneShot — a one-shot writes one frame ` +
+          `and exits without a terminal, and a view is a claim on one that stays`,
+      );
+    }
+  }
+
   return {
     name,
     local,
@@ -437,6 +464,7 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     ...(oneShot === undefined ? {} : { oneShot }),
     ...(hidden === undefined ? {} : { hidden }),
     ...(interactive === undefined ? {} : { interactive }),
+    ...(view === undefined ? {} : { view }),
   };
 }
 

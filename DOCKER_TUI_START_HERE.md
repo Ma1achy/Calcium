@@ -144,8 +144,11 @@ turns it into blocks.
 From the gap list in the surfaces doc, these two are the ones only this app drawing these surfaces would
 surface — neither the probe nor any Calcium test could reach them:
 
-- **Gap 7 — a `b.live` part hosted by a pushed view (surface S3).** The part-refresh
-  driver's host was ruled `entry | view`, but shipped tested against an *entry* host only.
+- **Gap 7 — a `b.live` part hosted by a pushed view (surface S3).** **Answered, and the
+  premise was wrong — FINDINGS F20.** The `view` arm was tested from the day it shipped
+  (T4.21); what is missing is a *producer*, and the answer is C22 §13's reserved ruling.
+  The original wording, kept because the miss is the useful part: *"the part-refresh
+  driver's host was ruled `entry | view`, but shipped tested against an entry host only."*
   S3 (the live single-container drill-in) is the first thing to host a live part in a
   *view*. Does the driver tick it, does teardown-on-pop reach it, does a refresh hold the
   scroll. This is the untested arm of a union — the exact shape Calcium found eighteen

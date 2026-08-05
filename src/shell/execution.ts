@@ -32,6 +32,8 @@ import type { Block, ViewDocument } from "../data/viewmodel/index.js";
 import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
+import { DOCUMENT_VIEW_ID } from "./document-view.js";
+import { isViewInvocation } from "../data/manifest/index.js";
 import { liveDeclarations } from "./builders/live.js";
 import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
@@ -451,6 +453,100 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   };
 
   /**
+   * Step 4 onward, for a verb whose result is a view (C22 §13a).
+   *
+   * The transcript is untouched throughout — that is the ruling, and it is why
+   * `Esc` has nothing to do to a source entry and why C16 I2 preserves focus:
+   * focus resets only on append, and nothing appends.
+   *
+   * A failure renders **into the view**, because the view is where the reader is
+   * looking and the transcript has nothing to show them. History still records
+   * the line: history is C20's store and not the transcript, and a view the
+   * reader cannot reopen from `↑` would be a surface reachable exactly once.
+   */
+  const runIntoView = async (
+    displayed: string,
+    line: string,
+    verb: string,
+    result: Extract<ParseResult, { kind: "app" }>,
+  ): Promise<void> => {
+    const controller = new AbortController();
+
+    /**
+     * **`Ctrl-C` reaches this route too** — the obligation the table found
+     * missing (C22 §13a). It was set on the entry route and not here, which is
+     * `declareLive` and `release` a third time: an obligation the author of a
+     * new route did not notice, in a route written rather than derived.
+     *
+     * It pops rather than settling, because there is no entry to settle. The
+     * reader is left with no record, which §13a rules is the cost B03 §2 already
+     * names for an excursion that appended nothing on the way in.
+     */
+    const cancelThis = (): void => {
+      controller.abort();
+      refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID });
+      deps.documentView.pop();
+      deps.history.append(line, 130);
+      deps.scheduler.commit("completion");
+    };
+    cancelInFlight = cancelThis;
+
+    try {
+      const transport = deps.transport.for(verb);
+      const streams = result.tool.streams ?? false;
+      // **Declarable, not yet runnable** (C22 §13a, C05 I20). The pair is legal
+      // because S12's logs view is exactly it; what does not exist is the route,
+      // since `streamInto` patches a transcript entry and a view is patched
+      // through its owner. Refused loudly here rather than silently falling to
+      // the line below, which would block until the process exited while holding
+      // the guard — the thing C23 I6 exists to prevent.
+      if (streams) {
+        throw new Error(
+          `${verb} declares both view and streams, and that route is not built — ` +
+            `C22 §13a. Drop \`streams\` from the declaration, or run it as an entry.`,
+        );
+      }
+      const raw = await transport.invoke({
+        verb,
+        argv: result.argv,
+        streams,
+        timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
+        signal: controller.signal,
+      });
+      const doc = deps.adapters.adapt(raw, {
+        command: displayed,
+        verb,
+        width: deps.lifecycle.size().columns,
+        userRequestedJson: result.argv.includes("--json"),
+        transport: "subprocess",
+        origin: "user",
+        tool: result.tool,
+      });
+      if (!deps.documentView.fill(doc)) return;
+      // **Declare-on-push, which had no call site until now** (C23 I33a, F20).
+      // `declareLive` hard-coded an entry host because an entry was the only
+      // host anything produced; this is the other arm of `RefreshHost`, reached
+      // for the first time.
+      declareLiveInView(doc.blocks);
+      recordHistory(line, doc);
+      if (doc.meta.resultId !== undefined) deps.writes.setLastUuid(doc.meta.resultId);
+    } catch (cause) {
+      // C23 I2 — a transport that fails, times out or throws ends in a document
+      // like everything else. It just lands somewhere else.
+      const failed = errorDoc(line, { message: String(cause), stage: "transport" }, {
+        origin: "user",
+        verb,
+      });
+      deps.documentView.fill(failed);
+      recordHistory(line, failed);
+    } finally {
+      cancelInFlight = null;
+      guard.release();
+      deps.scheduler.commit("completion");
+    }
+  };
+
+  /**
    * C23 §3 — the eight steps, and the ordering that fails silently.
    *
    * **Step 3 before step 4** (C23 I3). The pending entry reaches the transcript
@@ -488,6 +584,18 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     guard.take("app", verb);
 
     /**
+     * **The tier, read here because after step 3 it is too late** (C22 I45,
+     * C05 I20).
+     *
+     * C23 I3 appends the pending entry before the transport is invoked and C13
+     * has no delete, so a decision taken on seeing the result could only produce
+     * a view *and* the entry B03 §2 says a push does not leave. The declaration
+     * is the only thing known this early, which is the whole of §13a's argument
+     * for putting it on the manifest.
+     */
+    const asView = isViewInvocation(result.tool, result.validation.args);
+
+    /**
      * **The displayed command: the user's line, with `$_` resolved** (I15,
      * C22 I33, D24).
      *
@@ -499,6 +607,29 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * typed, which is exactly D24's one-token mapping.
      */
     const displayed = `/${result.argv.join(" ")}`;
+
+    /**
+     * **Step 3, for a view: the layer takes the pending entry's place** (C22 I45).
+     *
+     * One for one and in the same slot — pushed before the transport, filled
+     * after it — because step 3 exists so that something is on screen before the
+     * work starts, and ruling the entry away without a replacement would make a
+     * slow verb look like a hung terminal.
+     *
+     * A refusal here is the one case that falls back to appending: C15 I1
+     * permits one view at a time, and a second `/ps --watch` while the first is
+     * open has to say so somewhere the reader is looking. The transcript is that
+     * somewhere, and this is the only path on which a view verb touches it.
+     */
+    if (asView) {
+      const refusal = deps.documentView.open(displayed);
+      if (refusal === null) {
+        await runIntoView(displayed, line, verb, result);
+        return;
+      }
+      appendAndCommit(errorDoc(line, { message: refusal }, { origin: "user", verb }), line);
+      return;
+    }
 
     // Step 3 — the pending entry. Before step 4. This is the ordering.
     const pendingId = deps.transcript.append(
@@ -900,6 +1031,25 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           kind: "notice",
           id: `${spec.id}-error`,
           tone: "error",
+          /**
+           * **Without this the framework's own default throws** (C04 I6, D29).
+           *
+           * An `error` notice requires a non-empty glyph — colour alone survives
+           * neither 1-bit nor a colour-blind reader — and `block()` enforces it.
+           * `b.notice` fills the glyph in through `glyphFor`; this path
+           * constructs the block directly and skipped its own convenience, so
+           * the one thing that runs when a live part's fetch fails could not be
+           * constructed at all.
+           *
+           * A `BlockShapeError` out of a `.then` inside the refresh driver:
+           * unhandled, one tick after a fetch failed, on any part whose declarer
+           * did not supply a `renderError`. **A03 §2's vacuity class in a
+           * default** — never exercised, because no test had ever failed a fetch
+           * on a part that did not override this. Found by inducing a stall and
+           * looking at the frame (FINDINGS F29); the frame showed a view frozen
+           * mid-tick with the exception on stderr behind it.
+           */
+          glyph: "error",
           text:
             retryInMs === null
               ? err.message
@@ -933,6 +1083,19 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * `--watch` scrolled out of view is still running. C24 §5's *teardown on
    * freeze* row was deleted against exactly that.
    */
+  /**
+   * The view arm of I33a's declaration, and the call site that did not exist.
+   *
+   * `declareLive` hard-codes `{ kind: "entry" }` because an entry was the only
+   * host anything in the tree produced — the finding gap 7 was filed against
+   * (F20). This is the other arm, reached now that a verb's result can be a
+   * view, and it is the same `declare` with the same parts.
+   */
+  const declareLiveInView = (blocks: readonly Block[]): void => {
+    const parts = liveDeclarations(blocks).map((d) => partOf(d.spec));
+    if (parts.length > 0) refresh.declare({ kind: "view", id: DOCUMENT_VIEW_ID }, parts);
+  };
+
   const declareLive = (id: string, blocks: readonly Block[]): void => {
     const parts = liveDeclarations(blocks).map((d) => partOf(d.spec));
     if (parts.length > 0) refresh.declare({ kind: "entry", id }, parts);
@@ -971,16 +1134,30 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // commits that an entry and a pushed view are driven by *the same code*,
     // not that they are the same store: C13 patches, C15 updates, and the
     // driver holds one loop over both.
+    // **The document view is asked, not the layer** (C22 §13a, C22 I46). Its layer
+    // holds a *window* of the document, so a part scrolled out of view is absent
+    // from `layer.content` while being perfectly alive — patching the layer
+    // directly would report that as a vanished host and release the parts, and
+    // the reader would come back from a scroll to a dead panel.
+    //
+    // The owner holds the whole document, so it answers for blocks the window
+    // does not currently show. `putBlock` is total (§13a): the reprojection
+    // happens into a local and nothing is assigned unless it succeeds.
     updateView: (id, blockId, next) => {
+      if (id === DOCUMENT_VIEW_ID) return deps.documentView.putBlock(blockId, next);
       const layer = deps.overlays.stack.find((l) => l.id === id);
       if (layer === undefined) return false;
       const content = layer.content.map((b) => (b.id === blockId ? next : b));
       return deps.overlays.update(id, { content });
     },
     viewBlock: (id, blockId) => {
-      const layer = deps.overlays.stack.find((l) => l.id === id);
-      const found = layer?.content.find((b) => b.id === blockId);
-      return found !== undefined && found.kind === "panel" ? (found.children[0] ?? null) : null;
+      const found =
+        id === DOCUMENT_VIEW_ID
+          ? deps.documentView.blockAt(blockId)
+          : deps.overlays.stack.find((l) => l.id === id)?.content.find((b) => b.id === blockId);
+      return found !== undefined && found !== null && found.kind === "panel"
+        ? (found.children[0] ?? null)
+        : null;
     },
   });
 
@@ -988,6 +1165,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     submit,
     onAction,
     identityNotice: (text) => void refresh.identityNotice(text),
+    releaseView: () => void refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID }),
 
     // C22 §4 step 7 (C22 I44). Through `appendAndCommit` like everything else,
     // which is what drives a live part in it and what lets `/clear` remove it.

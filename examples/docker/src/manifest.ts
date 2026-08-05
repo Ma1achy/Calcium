@@ -60,6 +60,39 @@ const dashboard: ToolDef = {
 };
 
 /**
+ * S3's drill-in — the surface C22 §13a was ruled for.
+ *
+ * **`view: true` on the tool, and the name is the ruling twice over.** S02 drew
+ * this as `ps <uuid> --watch` and it cannot be spawned: `docker ps` takes no
+ * positional, `--watch` is not a docker flag, and C06 I4 sends argv to the far
+ * side verbatim. `docker container stats` is real and takes the id.
+ *
+ * And it is a **sub-verb** rather than plain `stats` so that `/stats` stays free
+ * for S4, which S02 reserves for a transcript entry — a tool-level `view` on
+ * `stats` would have pushed S4 as well. C05 supports the space (`findTool`
+ * matches longest-first) and C18 splits it back into argv.
+ *
+ * `local: false`, so this is the app route: transport, adapter, and
+ * `AdapterContext.width` — which the plot's window is sized from and which a
+ * local handler would not have had (FINDINGS F14).
+ */
+const containerStats: ToolDef = {
+  name: "container stats",
+  local: false,
+  view: true,
+  summary: "One container, live — CPU over time, memory, network",
+  args: [
+    {
+      name: "container",
+      type: "string",
+      required: true,
+      summary: "Container id or name",
+    },
+  ],
+  flags: [],
+};
+
+/**
  * `engineVersion` is the daemon's, read at startup rather than written down: the
  * field exists for skew reporting, and a manifest claiming a version the daemon
  * does not have reports the wrong skew — which is worse than reporting none.
@@ -73,6 +106,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps, dashboard],
+    tools: [ps, dashboard, containerStats],
   };
 }

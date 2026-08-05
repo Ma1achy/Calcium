@@ -41,6 +41,7 @@ type FlagDef = Readonly<{
   repeatable?: boolean;
   requires?:   readonly string[];     // other flags that must accompany it
   conflicts?:  readonly string[];
+  view?:       boolean;               // this flag makes the result a view — C22 §13a (I20)
   summary:     string;
 }>;
 
@@ -76,6 +77,7 @@ type ToolDef = Readonly<{
   oneShot?:  boolean;                 // writes one frame to stdout and exits; bypasses the TTY gate
   hidden?:   boolean;                 // omitted from help and completion, still invocable
   interactive?: boolean;              // takes the terminal — C23 §4's handoff (I19)
+  view?:        boolean;              // the result is a pushed view — C22 §13a (I20)
 }>;
 
 type Manifest = Readonly<{
@@ -113,6 +115,51 @@ The list is a runtime constant with the type derived from it, so a new member wi
 ### `hidden` — invocable, not offered
 
 `visibleTools` omits a hidden tool; `findTool` still resolves it. That pair *is* the meaning of the field, and it is what makes it useful for a deprecation or an internal escape hatch: the verb keeps working for whoever knows its name while it leaves the help. A `hidden` that also stopped resolving would be a weak form of deleting the entry, and deleting the entry is how you delete a verb. T1.15 asserts the pair in one test, because separately both halves pass while the intent disappears between them.
+
+### `view` — the tier, decided before the verb runs
+
+A verb whose result needs the whole screen and its own letter keys is a **pushed view**
+rather than a transcript entry, and A01 D4 is the test: *live vs pushed is decided by input
+ownership — a pushed view takes letter keys while the prompt would otherwise hold focus, so
+the prompt must go.* S12's logs view binds `l`, `g`, `G` and `/`; docker-tui's S3 binds
+`n`/`p`, `L` and `d`.
+
+**It is declared here because it must be known before the verb runs, and that is forced.**
+C23 I3 appends the pending entry *before* the transport is invoked, and C13 has no delete —
+C23 §8a A4 ruled it must not gain one. An adapter that decided the tier on seeing its result
+would produce a view *and* the transcript entry B03 §2 says a push does not leave, with no
+operation able to withdraw it. The full argument is C22 §13a; what it settles here is the
+party, and the party is the one `interactive` already names.
+
+**Both `ToolDef` and `FlagDef` carry it, and an invocation is a view if either says so.**
+Two declaration sites and one rule, because the surfaces need both: `/dashboard` and
+docker-tui's `container stats <id>` are verbs, while S12's `--logs` is a flag on a `ps`
+that otherwise appends. A verb-level field alone cannot describe a tool whose tier depends
+on how it was invoked, and duplicating `ps` into two tools to express it would put one
+verb's flags in two places.
+
+**S3 was named here as `ps <uuid> --watch` and cannot be built that way.** `docker ps`
+takes no positional argument, `--watch` is not a docker flag, and C06 I4 sends argv to the
+far side verbatim — so the declaration would have sent a rejected flag on a verb that
+rejects the id, and nothing between here and the transport would have said so. The first
+consumer to declare a view found it. The example is corrected rather than deleted because
+the shape it reached for is real and S12 still needs it; what changes is the claim's
+strength, and it is now written down that **the flag arm's only consumer is a test
+fixture** while the verb arm has a real one.
+
+**Two combinations are refused at parse (I20)**, in I19's shape and for I19's reason:
+
+- **`view` with `interactive`.** Both hand input ownership away, to different places — the
+  view to the shell's own keymap, the handoff to a child process. There is no arbitration
+  that is not a guess, and whichever C23 picked the other declaration would do nothing and
+  say nothing.
+- **`view` with `oneShot`.** A one-shot writes one frame to stdout and exits, bypassing the
+  TTY gate; a view is nothing but a claim on a terminal that stays. The flag would be inert,
+  which is A03 §2's vacuity class arriving in a manifest.
+
+`view` with `streams` is **allowed**, and deliberately: S12's logs view is a streaming
+NDJSON source rendered into a pushed view, so refusing the pair would refuse the surface the
+ruling was taken for.
 
 ### `interactive` — the app author is the only party who knows
 
@@ -286,6 +333,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I17** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
 - **I18** — There is exactly one distance-2 suggester in the tree, and it is C05's. A01 A.2's cutoff is a policy about *when a suggestion is worth making*, and two implementations agree about the distance and diverge about the tie-break — which is where a suggestion is wrong rather than absent, and a wrong suggestion is the thing the cutoff exists to prevent.
 - **I19** — `interactive` is refused with `streams` and refused with `local: true`. Enforced at parse, as I4 is. Both combinations describe a verb that cannot exist, and both would otherwise be discovered by a user watching a terminal misbehave rather than by the author who declared them.
+- **I20** — `view` is declarable on a `ToolDef` and on a `FlagDef`, and an invocation is a view if either declares it. It is refused with `interactive` and with `oneShot`, at parse, as I19 is; it is permitted with `streams`, because S12's logs view is exactly that pair. The declaration lives here rather than on the document an adapter returns because C22 §13a shows an adapter-side decision cannot be implemented: C23 I3 appends the pending entry first and C13 has nothing that removes it.
 
 ---
 
@@ -307,6 +355,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 14. Conflicts are directional in the check and deduplicated in the report (I17).
 15. The distance-2 suggester is exported, so C18's unknown verbs and C05's unknown flags are one implementation (I18).
 16. `interactive` declares a verb that takes the terminal, and the two combinations that cannot exist are refused at parse (I19).
+17. `view` declares that a result is a pushed view rather than a transcript entry, on a tool or on a flag, and it is read before the verb runs because nothing can withdraw a pending entry afterwards (I20, C22 §13a).
 
 ---
 

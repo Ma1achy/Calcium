@@ -94,3 +94,46 @@ describe("F1: the shim translates Calcium's --json into docker's --format json",
     expect(argvOf("ps", "--json", "--all")).toEqual(["ps", "--format", "json", "--all"]);
   });
 });
+
+/**
+ * F26 — the second translation, and the same class as the first.
+ *
+ * `docker container stats` redraws a region forever and never exits, so C06
+ * would wait on a process with no intention of finishing. The far side's default
+ * shape does not match the framework's contract and the app absorbs it, which is
+ * what an adapter layer is for.
+ */
+describe("F26: the shim supplies --no-stream for the verb that would never exit", () => {
+  it("S2.1: container stats gains --no-stream", () => {
+    expect(argvOf("container", "stats", "abc", "--json")).toEqual([
+      "container",
+      "stats",
+      "abc",
+      "--format",
+      "json",
+      "--no-stream",
+    ]);
+  });
+
+  it("S2.2: no other verb gains it", () => {
+    // A blanket append puts an unknown flag on `ps`, which fails every listing
+    // in the app — the failure mode is total and the guard is one `case`.
+    expect(argvOf("ps", "--json")).not.toContain("--no-stream");
+    expect(argvOf("images", "--json")).not.toContain("--no-stream");
+  });
+
+  it("S2.3: an explicit --no-stream is not doubled", () => {
+    const argv = argvOf("container", "stats", "abc", "--no-stream", "--json");
+    expect(argv.filter((a) => a === "--no-stream")).toHaveLength(1);
+  });
+
+  it("S2.4: the shim still exits zero for a verb it does not touch", () => {
+    // **`[ … ] && …` as the last command of the script is a non-zero exit under
+    // `set -e`**, so the short form of the guard would have made the shim fail
+    // for every verb that is not `stats` — with docker's own output already
+    // written, which is the shape that reads as a transport fault.
+    // Untranslated, because there is no `--json` to translate — and `argvOf`
+    // throws on a non-zero exit, so passing *is* the exit-code assertion.
+    expect(argvOf("ps")).toEqual(["ps"]);
+  });
+});

@@ -816,14 +816,341 @@ read through a pipe is the pipe's.
 
 ---
 
+## F20 — gap 7's premise was false, and its answer is a reserved ruling ★★
+
+| | |
+|---|---|
+| **Surface** | S3's drill-in, and the whole of what step 3 was pointed at |
+| **Reached for** | a route by which an app's `b.live` part is hosted by a pushed view |
+| **Verdict** | **a finding about the design documents**, and the ruling it uncovers is C22 §13's |
+
+Gap 7 was filed as *"the driver's `view` host arm, specified and shipped tested against an
+entry host only"* and called the most valuable thing this app surfaces. It is, and the
+premise was wrong. Answered by reading, before a probe was built:
+
+| gap 7 asks | answer |
+|---|---|
+| Does `declare` accept a `view` host and tick it? | **Yes, and has since C23 §3b landed.** `test/contract/refresh.test.ts:535` — T4.21, cited to C24 I12 — declares `{ kind: "view", id: "dash" }`, asserts the part patched through C15's seam, then that `release` stops it. T2.20 declares one host of each kind and asserts `dispose` stops both |
+| Does `release` on **pop** reach it? | **No call site exists.** A popped view is torn down lazily, one tick late, when `put` returns false against a layer that has gone (`refresh.ts:317`, `:326`) |
+| Does a refresh hold the **scroll**? | **The question has no subject.** C15 holds no offset *by design* — `overlay/manager.ts:10-15`: *"it does not know … where a view has scrolled. Each of those was written into the spec as a duty here and moved back to the owner"* — so the offset belongs to the producer, and there is no producer |
+
+**What is missing is not coverage. It is a producer.** `declare` has exactly one call site
+in all of `src/` (`execution.ts:938`) and hard-codes `{ kind: "entry", id }`. T4.21's own
+comment says so: *"The host arm with no shell-level producer. Nothing in the tree pushes an
+app-supplied view yet."*
+
+All three questions therefore trace to one row, which names itself:
+
+> **C22 §13** — **A verb whose result is a pushed view.** *Still undecided, and narrower
+> than it was.* … What makes a **verb's result** a view rather than a transcript entry, who
+> decides, and what `Esc` does to the entry it came from are all exactly as open as they
+> were. … **Recorded this way because a partial producer is the most likely thing to be
+> mistaken for a resolution.**
+
+So gap 7 is not a defect to fix. It is a decision the framework deliberately left open,
+with a written warning about the precise way it would be misread, waiting for a consumer
+concrete enough to force it. That is the difference between this and F7, F17 and F19: those
+were wrong. This was **reserved**.
+
+**Five sites asserted the false premise** and are corrected in the same commit:
+`DOCKER_TUI_SURFACES.md` §S3's seam section, `:268`, `:281`, `:560`, `FINDINGS.md`'s open
+list, and `DOCKER_TUI_START_HERE.md:140`.
+
+**And one test's assertion names a mechanism it does not exercise.** T4.21 closes with
+`expect(calls, "and the pop stopped it")` while the test calls `release(host)` directly —
+there is no pop, and release-on-pop is the thing that does not exist. The assertion is
+correct and its message describes a route that has never run.
+
+---
+
+## F21 — the action model has no route from a keystroke ★★
+
+| | |
+|---|---|
+| **Surface** | S3's drill-in gesture, and every row action every surface draws |
+| **Reached for** | pressing a key on a focused row and having its action fire |
+| **Verdict** | **a real Calcium finding**, and the one that was actually under gap 7 |
+
+`src/shell/actions.ts` implements all five `Action` arms — `fill`, `exec`, `open`, `expand`,
+`view` — and is wired into the pipeline at `execution.ts:837`. **`pipeline.onAction` is
+called only from `test/unit/execution.test.ts`.** Nothing in `src/` invokes it. `paint.ts`
+builds every render context with `theme` and `capabilities` alone (`:136-139`), so
+`RenderContext.onAction` falls back to the no-op at `render-lines.ts:65`.
+
+An app can build a `{ kind: "view", label, target }`, have C04 validate it and C09 render
+its label into a row's action bar, and **no keystroke will ever reach the dispatcher**. This
+is C24 I16's own subject — *"a consumer could declare a refreshing part, type-check, and
+never be called"* — arriving on `Action` rather than on `ViewRefresh`.
+
+Three things compound it, and each is separately true:
+
+- `TuiConfig` has no keymap seam. `construct.ts:564` is `createKeymap(defaultKeymap)` with
+  nothing merged in.
+- The `liveBlock` target has three bindings — `escape`, `down`, `up` (`keymap.ts:276-278`).
+  There is **no `enter`**, and no `rowActivate` in `KeyAction`, which is a closed union.
+- `BlockKeymap` is exported and dead: no block field carries one, and `Keymap.mergeBlock` is
+  called only from `test/unit/router-keymap.test.ts`.
+
+So `/ps` renders a table you can move a cursor through and cannot act on.
+
+**Gap 7 predicted the right place and the wrong mechanism.** It said the view arm was
+untested; the view arm ticks fine, and what is missing is the route from a key to the action
+that would push a view. Worth recording as a miss rather than a hit: the prediction was
+**wrong about the mechanism and right that a gap was there**, which is F17's shape — the
+answer was a third thing rather than either of the two offered. A prediction scored as
+simply correct teaches nothing about how it was reached.
+
+---
+
+## F21b — the fork was drawn wrong, and the source corrected it ★★
+
+| | |
+|---|---|
+| **Surface** | S3, and which ruling step 3 was about to settle |
+| **Reached for** | a decision on whether S3's drill-in is an affordance or a verb's result |
+| **Verdict** | **not a defect** — a design-authority ruling that failed review, caught by reading |
+
+Gap 7's three answers were put as a fork: is S3's `⏎`-on-a-row an **affordance on a block**
+(the C25 shape, which §13 says answers none of its question) or a **verb's result** (the
+case §13 reserves)? The fork was framed, and ruled *affordance*, **before
+`docs/behaviours/B03_drill_chain.md` §2 had been read.** §2 answers it outright:
+
+> **There are exactly two, and confusing them is the mistake this document exists to
+> prevent.**
+>
+> | | Append | Push |
+> | Used by | **`⏎` on a row**, every action `fill` | `--logs`, `/dashboard` |
+
+`⏎` on a row **appends**. An action never pushes — it `fill`s. B03's canonical path
+(`:49-50`) shows the real gesture as two steps: `≡ logs` is a `fill` that writes
+`/ps a3f9b21 --logs` into the prompt, and the *next* `⏎` submits it and pushes. S3's drawing
+showing *"`⏎` on a `ps` row pushes a view"* is compressed notation for that, not a third
+mechanism.
+
+Had the affordance ruling stood, it would have installed precisely the confusion B03 exists
+to prevent — and it would have been found after the producer was built, not before.
+
+**Filed alongside F17a, and for the same reason.** F17a records an instruction that would
+have re-introduced a deleted row; this records a fork drawn from incomplete evidence and
+corrected by the source. A record that logs only the framework's errors is measuring one
+side of the work.
+
+**The general form is the one already in CLAUDE.md**: a correct conclusion from incomplete
+evidence is still wrong. F9 grepped for a field when the seam was a step; this read §13 and
+C25 without reading the behaviour document that governs both.
+
+---
+
+## F22 — `gapBefore` cannot be carried on the view arm
+
+| | |
+|---|---|
+| **Surface** | S3, the first view that will hold more than one block |
+| **Reached for** | nothing yet — found while reading `put` for gap 7 |
+| **Verdict** | **a real Calcium finding**, dormant until its subject exists |
+
+`put` carries a part's `gapBefore` across a refresh by reading the block currently in place
+(`refresh.ts:254-258`), and the comment above it explains why — the declared panel has a gap,
+a replacement built fresh does not, and *"the document's rhythm therefore changed on the
+first tick, with the part's own content correct and every assertion about it passing"*. C04
+I25 makes that the renderer disagreeing with the declaration. It was found by looking at a
+frame.
+
+**The fix reaches one arm of two.** `currentPanel` reads the real block on the entry arm —
+`entry.doc.blocks.find(...)` — and on the view arm *reconstructs* one through `livePanel`
+(`refresh.ts:367-375`), which sets no `gapBefore` (`:79`). So `existing?.gapBefore === true`
+is structurally always false for a view host. C24 I12 says `b.live` *"behaves identically in
+a transcript entry and in a pushed view"*, and here it cannot.
+
+**Observability was established before this entry was written, not assumed.** A layer's
+content goes through `measureSequence` (`overlay/place.ts:110`, `:128`) and
+`renderSequenceToLines`, both of which honour `gapBefore` — *"the only thing in C04's
+vocabulary that produces vertical space"*. But C24 I17 strips the **first** block's gap, and
+the only view that has ever existed holds exactly one block (`patch-view.ts:95`,
+`content: [windowPatch(...)]`).
+
+So the branch has been dead for the whole life of the code and wakes the day a view holds
+two blocks — which is S3, with its plot, its MEM/NET block and its static ports/mounts.
+**An invariant is vacuous until its subject exists**, arriving on a fix rather than on a
+rule.
+
+---
+
+## F23 — `view: true` on a local tool is accepted and does nothing
+
+| | |
+|---|---|
+| **Surface** | S3, while choosing its route |
+| **Reached for** | a local verb that pushes a view |
+| **Verdict** | **a real Calcium finding**, filed rather than fixed |
+
+`asView` is computed in `runApp` (`execution.ts:596`) and nowhere else. `runLocal` (`:408`)
+never consults it, so a `local: true` tool declaring `view: true` parses, seals, validates,
+runs — and appends a transcript entry, silently, exactly as if the field were absent.
+
+C05 I20 refuses `view` with `interactive` and with `oneShot`, both because the flag would be
+inert and A03 §2's vacuity class in a manifest is what I19 exists to prevent. `view` with
+`local` is inert in the same way and is refused by nothing.
+
+**Filed, not fixed, and the reason is not cost.** The repair is to extend the local route,
+because `/dashboard` is local and S6/S7 will want views; refusing the combination would
+foreclose them to close a hole. What this app can prove today is that the combination is
+reachable and silent, and it proves it by having had to route around it.
+
+---
+
+## F24 — a live part re-renders with no width ★★
+
+| | |
+|---|---|
+| **Surface** | S3's plot, whose window length is a display decision |
+| **Reached for** | a sample count that suits the terminal |
+| **Verdict** | **a real Calcium finding** |
+
+`LiveSpec.render` is `(data: unknown) => Block` (`builders/types.ts:126`). Data, and nothing
+else — no width, no context. So anything width-dependent inside a live part is fixed when
+the document is built and cannot follow a resize.
+
+S3's plot is the concrete case. `form: "line"` does no windowing, so the ring's length *is*
+the window, and one sample per column is the density that neither downsamples nor stretches.
+The cap is taken from `AdapterContext.width` when the view opens and is wrong from the first
+resize afterwards: a view opened at 120 and read at 80 draws two samples per column.
+
+**F14's shape, one layer over, and worth separating from it.** F14 is the *local* route
+lacking width. This is the *refresh* route lacking it, and it bites the adapter route too —
+`ctx.width` is available at build and gone by the first tick. The app cannot compensate: the
+only other source is `process.stdout.columns`, which would be a second place the terminal's
+width lives, and C01 I13 exists to prevent exactly that.
+
+---
+
+## F25 — the dashboard takes a width it never reads
+
+`dashboard(snap, width, engine)` (`dashboard.ts:368`) accepts a width and uses it nowhere.
+`createDashboardHandler` threads it in from `main.ts`'s `width()`, which is F14's workaround
+reading `process.stdout.columns` — so the app pays F14's cost for a parameter no code
+consumes. Found while looking for whether the width reached a live part at all (F24).
+
+Small, and left in place rather than removed: the day a local handler is handed a width, the
+parameter is the seam it arrives on. Recorded so its uselessness is a decision.
+
+---
+
+## F26 — `docker stats` streams by default, and a request/response transport cannot consume it
+
+The same class as F1, and the second line the shim carries. `docker container stats` without
+`--no-stream` redraws a region forever and never exits; C06 invokes and waits for the
+process to end, so the verb would hang rather than fail. `bin/docker-json` supplies the flag
+for that verb only.
+
+**A translation, not a workaround, and the boundary matters.** The shim adds a flag docker
+has; it does not rewrite a verb. The shim earning its keep on a second far-side mismatch is
+evidence for F1's argument rather than against it — the framework's contract and the far
+side's defaults disagree in more than one place, and an app is where they are reconciled.
+
+One thing the shell found: `[ … ] && …` as the script's last command is a non-zero exit under
+`set -e`, so the short form of the guard would have made the shim fail for every verb that is
+not `stats`, after docker's output had already been written. Covered by S2.4.
+
+---
+
+## F27 — `b.plot` cannot pin an axis or label one ★★
+
+| | |
+|---|---|
+| **Surface** | S3's CPU plot |
+| **Reached for** | `yMin`, `yMax`, `xLabels` |
+| **Verdict** | **a real Calcium finding**, and the frame is the evidence |
+
+The `Plot` block carries `yMin`, `yMax`, `yFormat`, `xLabels` and `emptyMessage`. The builder
+passes `series`, `height` and `axes` (`builders/index.ts:283`) and nothing else, so an app
+using the public surface cannot reach any of them.
+
+**The consequence is not cosmetic, and only the frame showed it.** A container pinned at 100%
+CPU renders like this:
+
+```
+│100.21 │⠑⠢⢄⡀                                                    ⣀⠤⠒⠑⠢⢄⡀
+│       │   ⠈⠑⠢⢄⡀                                            ⢀⡠⠔⠊      ⠈⠒⠤⣀
+│100.02 │                          ⠈⠑⠒⠒⠒⠒⠒⠢⠤⠤⠤⠤⠤⠤⠤⠤⠤⢄⣀⣀⣀⡠⠔⠊⠁              ⠈⠑⠢⢄
+```
+
+The axis auto-ranges to the data, so **a 0.2% wobble is drawn as a mountain range**. A reader
+sees a load swinging violently; the load is flat at 100%. `yMin: 0, yMax: 100` would say the
+truth in one line and cannot be written. The block type has had the field the whole time.
+
+Second half, smaller: with no `xLabels`, the horizontal unit has to be a separate notice
+block — which is why S3's caption exists and why walk B1 had to rule on where it lives.
+
+---
+
+## F28 — an app cannot reach the live parts it just declared
+
+`b.live` records its `LiveSpec` in a `WeakMap` beside the document (`builders/live.ts:30`),
+and neither the map nor `liveDeclarations` is exported. So an app that builds a document
+holding live parts cannot get at the `fetch` or `render` it supplied — the declaration is
+write-only from the app's side.
+
+The cost is to testing, and it is the cost that matters here: a `fetch` can only be exercised
+by running the whole refresh driver, which needs a shell, a transport and a clock. S3 works
+around it by exporting `createCpuTick` so the tick has a seam, which is honest but is the app
+building a testing affordance the framework withheld.
+
+**And that shape is the one this branch already paid for.** Four defects in the previous
+stretch survived a green suite because every row called a mechanism directly and nothing
+called the wiring. A framework that makes the mechanism unreachable pushes every consumer
+toward whole-stack tests or none.
+
+---
+
+## F29 — the framework's own default `renderError` could not be constructed ★★★
+
+| | |
+|---|---|
+| **Surface** | S3, during an induced stall |
+| **Reached for** | nothing — this is what runs when a live fetch fails |
+| **Verdict** | **a real Calcium defect, fixed**, with this app as the consumer proving it |
+
+`partOf` builds the default error notice with `block()` rather than `b.notice`
+(`execution.ts:1030`), so it skipped `glyphFor` and produced `tone: "error"` with **no
+glyph** — which C04 I6 refuses and `block()` enforces. The one thing that runs when a live
+part's fetch fails could not be constructed at all:
+
+```
+BlockShapeError: notice "cpu-error": tone "error" requires a non-empty glyph (C04 I6, D29)
+    at requireGlyph (dist/data/viewmodel/construct.js:64:11)
+    at Object.renderError (dist/shell/execution.js:870:34)
+    at dist/shell/refresh.js:197:43
+```
+
+Thrown out of a `.then` inside the refresh driver: **unhandled, one tick after any fetch
+failure, on any part whose declarer did not override `renderError`.** The frame showed a view
+frozen mid-tick with the exception on stderr behind it — and a frozen live panel is exactly
+what a slow far side looks like, so nothing in the frame said *defect*.
+
+**A03 §2's vacuity class, in a default.** Every existing test either succeeds or supplies its
+own `renderError`, so the branch had never run — and a branch that has never run passes
+exactly like one that works. Forty lines above, the *stream*-failure path constructs the same
+notice **with** the glyph, so the pattern was known and missed in one place.
+
+Fixed, with `T1.40` driving a rejecting fetch through the pipeline and asserting the notice
+is rendered rather than thrown. Reverting the glyph kills that row and only that row.
+
+**It took inducing a stall to find, which is the part worth keeping.** Two frame-reads of a
+healthy container at two widths saw nothing — the path only runs when a fetch fails, and
+nothing about a working view suggests it exists. `docker rm -f` on the watched container,
+mid-capture, is what produced it.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that
 needs it is built.
 
-- **Gap 7 — a `b.live` part hosted by a pushed view** (S3). The driver's `view` host arm,
-  specified and shipped tested against an entry host only. The most valuable thing this app
-  can surface, and step 3 reaches it.
+- **Gap 7 — resolved, and it was not what it said it was.** See F20. The `view` host arm
+  ticks and has been tested since C23 §3b; what is absent is a *producer*, and the answer is
+  C22 §13's reserved ruling rather than a defect. Step 3 settles it.
 - **Gap 3 — value-colour vs tone-colour.** A CPU bar encodes load on a continuum; Calcium's
   palette is tone slots. Step 2.
 - **Gap 1 — history across ticks.** `b.live` re-renders from the latest fetch; a sparkline
@@ -834,9 +1161,10 @@ needs it is built.
   `/dashboard` before F9's seam is designed, because if freezing a live entry has its own
   gap the seam has to know. This is C22 §8a's I7/I5 conflict made concrete: a live first
   entry is exactly the *restored session* the paragraph anticipated.
-- **`b.live`'s `stream` arm.** F10 rules this app onto `fetch`, so `stream` stays in the
-  position `RefreshHost`'s `view` arm held before step 3 — specified, implemented, unreached
-  by any consumer.
+- **`b.live`'s `stream` arm.** F10 rules this app onto `fetch`, so `stream` is specified,
+  implemented and unreached by any consumer. It was described here as holding the position
+  `RefreshHost`'s `view` arm held; F20 corrects that — the `view` arm was *tested* and
+  unreached, which is a weaker gap than `stream`'s and a different one.
 - **The line budget — over, at 354 of 300** (comments and blanks stripped; `src/*.ts` plus
   `bin/docker-json`). R01 commitment 1's rule is that exceeding it is a finding about
   Calcium rather than app bloat, so here are the lines that did it:

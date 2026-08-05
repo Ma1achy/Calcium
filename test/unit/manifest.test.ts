@@ -332,6 +332,57 @@ describe("C05 validate", () => {
     expect(clean.value.tools.find((t) => t.name === "ps")?.interactive).toBeUndefined();
   });
 
+  it("T1.20 (I20): view is refused with interactive and with oneShot, permitted with streams, and readable from a flag", () => {
+    // **The `streams` arm is the one that stops this being a copy of I19.** A
+    // rule that refused every combination would satisfy the two negative
+    // assertions exactly, and S12's logs view — a streaming source rendered into
+    // a pushed view — would be undeclarable while both of them agreed the field
+    // worked. That surface is the reason C22 §13a was ruled at all.
+    const findEdit = (source: Record<string, unknown>): Record<string, unknown> =>
+      (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "edit")!;
+
+    const withInteractive = raw();
+    findEdit(withInteractive)["view"] = true;
+    expect(errorsOf(parseManifest(withInteractive))).toContain(
+      'tools[6].view: "edit" declares both view and interactive — both hand input ' +
+        "ownership away, the view to the shell's own keymap and the handoff to a child; " +
+        "drop whichever one the verb does not do",
+    );
+
+    const withOneShot = raw();
+    const e1 = findEdit(withOneShot);
+    delete e1["interactive"];
+    e1["view"] = true;
+    e1["oneShot"] = true;
+    expect(errorsOf(parseManifest(withOneShot))).toContain(
+      'tools[6].view: "edit" declares both view and oneShot — a one-shot writes one ' +
+        "frame and exits without a terminal, and a view is a claim on one that stays",
+    );
+
+    // Permitted with `streams`, deliberately — this is S12's shape.
+    const withStreams = raw();
+    const e2 = findEdit(withStreams);
+    delete e2["interactive"];
+    e2["view"] = true;
+    e2["streams"] = true;
+    const streamed = parseManifest(withStreams);
+    expect(streamed.ok, errorsOf(streamed).join("\n")).toBe(true);
+
+    // And the field survives onto both declaration sites, which is what C23
+    // reads. Asserted rather than assumed: a `takeOptionalBoolean` that was
+    // never added drops the key silently under I3's leniency and looks
+    // identical from outside.
+    const viewTool = raw();
+    const e3 = findEdit(viewTool);
+    delete e3["interactive"];
+    e3["view"] = true;
+    const parsed = parseManifest(viewTool);
+    expect(parsed.ok, errorsOf(parsed).join("\n")).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.tools.find((t) => t.name === "edit")?.view).toBe(true);
+    expect(parsed.value.tools.find((t) => t.name === "ps")?.view).toBeUndefined();
+  });
+
   it("T1.18 (I17): a conflict is reported once, whichever side declares it", () => {
     // One-directional is how an app ordinarily writes it, and deduplicating by
     // name order dropped exactly those. Mutual is one mistake, so it stays one

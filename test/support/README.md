@@ -304,3 +304,46 @@ collaborator there would make a failure ambiguous about which side broke.
 The two harnesses are not a duplication to be merged. They encode the difference
 between the tiers, and merging them would mean one of the tiers stopped asserting
 what it is for.
+
+## A test that calls the mechanism verifies the mechanism, never the wiring
+
+The newest rule, and it took four instances in one branch to name.
+
+**A test that constructs a thing and calls it is the natural test to write, and
+it is indistinguishable from a route-level test until you disable the wiring.**
+Both are green. Both read as covering the feature. Only a mutation aimed at the
+*connection* rather than at the code tells them apart.
+
+The instances, in the order they happened:
+
+| the test | what it called | what it did not cover |
+|---|---|---|
+| C23's `T4.21` | `driver.declare({kind:"view"})` directly | that anything reaches the view arm — its own comment says so, and FINDINGS F20 filed it |
+| `document-view.test.ts` T4.37–T4.39 | `driver.declare` directly, one branch after filing F20 | `declareLiveInView`; disabling it left all ten rows green |
+| `T4.38` | `driver.release(host)` directly | `keys.ts`'s `viewPop`; deleting `releaseView()` from it changed nothing |
+| — | — | and the *order* inside `viewPop`, which no row saw until one asserted it |
+
+The second is the instructive one: **F20 was filed against exactly this shape,
+and the same shape was written again a branch later by the person who filed it.**
+That is not carelessness. It is what the rule is about — the two kinds of test
+look the same from the inside, so noticing requires a mutation rather than a
+reading.
+
+So: **for anything with a producer and a consumer, one row must go through the
+producer.** The seam rows stay — they localise a failure — but a suite of only
+seam rows is a suite that will pass on the day nothing calls them.
+
+## `as unknown as` on a deps object hides every absent seam at once
+
+`test/unit/execution.test.ts` ends its deps literal with
+`as unknown as PipelineDeps`, and that cast is **why the gap above was
+reachable**. It satisfies the type by erasure, so a missing field is not a type
+error and not a runtime error until something calls it — and `documentView` was
+simply not there while every row passed.
+
+The narrow-double rule elsewhere in this file is about a fake that answers one
+question and erases the rest. This is that class at its most permissive: it
+erases the *question of which seams exist at all*. `overlays`, `documentView` and
+`blocks` are real objects now for that reason; the remaining cast is a known
+weakness, and anything added to `PipelineDeps` will be silently absent here until
+a row calls it.

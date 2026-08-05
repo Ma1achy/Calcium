@@ -760,6 +760,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I42** — **A pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes.** A snapshot taken at push time shows a diff the entry no longer holds, and `expand` produces exactly such a patch one keystroke earlier. C15 supplies the reason code and cannot detect the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so the owner watches the transcript, and `Esc` never meets a dangling view because the view is gone before it (C25 §3c A6).
 - **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
 - **I44** — §4 step 7 fires `config.greeting` and does not await it, and C23 appends what it returns through the ordinary append path. A rejection or a hang leaves the prompt usable and produces no entry; nothing about startup waits on it. The step existed in the list, in T3.10 and T3.11, and in S02's `Source` row, and **no code fired anything** — step 12's shape a second time in the same list, and the reason S02's welcome could be specified in detail by three documents and reachable by none. Appending through C23 rather than rendering here is A02 Seam 4: C22 produces a fact, C23 is the only component that appends, and a live part in the greeting is driven because it took the same route every other document takes (C23 I33a).
+- **I45** — **A verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.** Pushed before the transport is invoked and filled after it, so the ordering C23 I3 protects is unchanged and a slow verb is not a blank screen; a failure renders into the view rather than into a transcript that has nothing to show. Read from the manifest at step 2, never from the document the adapter returns: C23 I3 appends the pending entry before the transport runs and C13 has no delete, so an adapter-side decision could only produce a view *and* the entry B03 §2 says a push does not leave. The party is the one `ToolDef.interactive` already names — the app author — because a view is a handoff of input ownership and detection is not available for either.
+- **I46** — **A pushed view is owned by a shell-side component holding one offset, and C15 holds none.** The owner windows at **block boundaries** and hands C15 a smaller sequence, which is C25 I18's shape generalised: C15 measures the result through the same registry as everything else, so there is no second height codepath and `Placed` gains no scroll offset. A plot is atomic within that window and always will be — C12 I1 puts its series out of the height's reach, so *granular where the kind divides, atomic where it does not* is the ceiling, and row-granular scroll is not on the path. C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
 
 ---
 
@@ -801,6 +803,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 18. C22 owns the pushed view: one piece of state, rewindowed from the live block, dismissed on eviction with the reason C15 declares and cannot detect (I41, I42).
 16a. A keystroke during a pending completion cancels it, so nothing arrives late to a prompt that has moved on. C19 holds the mechanism; L4 is the caller that was missing (I39).
 16. The completion spinner is composed from a fresh read of C19's `spinning` on every paint, and a request arms a wake at the threshold so a frame exists to show it. Appearance, never geometry (I38).
+19. A verb's result is a view when its tool or one of its flags declares it, decided before the pending entry exists — so `Esc` finds no entry to touch and selection survives because nothing appended (I45, §13a).
+20. A pushed view's offset belongs to its owner and never to C15, and its parts are released at the pop (I46, §13a).
 
 ---
 
@@ -982,6 +986,218 @@ One value, one file: `${stateDir}/theme`, holding the variant.
 
 ---
 
+---
+
+## 13a. A verb whose result is a view — the ruling §13 reserved
+
+§13 held this open through four stretches and warned that **a partial producer is the most
+likely thing to be mistaken for a resolution**. It was right to wait: C25's fullscreen patch
+looked like a producer and answers none of the questions below, and the first attempt at
+this ruling read S3's drawing as an *affordance* and had to be withdrawn against
+`B03_drill_chain.md` §2 (FINDINGS F21b).
+
+The concrete case is docker-tui's S3 — `⏎` on a `ps` row `fill`s the prompt with
+`/ps <uuid> --watch`, and the next `⏎` submits it. The general rule falls out of it; it was
+not reasoned in the abstract, because S1 was drawn that way and contradicted I9.
+
+### What makes a verb's result a view
+
+**A01 D4's test, and the framework already has it**: *live vs pushed is decided by input
+ownership — a pushed view takes letter keys while the prompt would otherwise hold focus, so
+the prompt must go.* S3 binds `n`/`p`, `L` and `d`; S12 binds `l`, `g`, `G` and `/`. Nothing
+new is invented here. What was missing was never the test — it was **who applies it, and
+when**.
+
+### Who decides, and why it cannot be the adapter
+
+**The manifest, read before the verb runs.** Not the adapter, and this is forced rather
+than preferred:
+
+- **C23 I3 — the pending entry is appended before the transport is invoked** (`§4` step 3
+  before step 4). By the time an adapter has seen a result and could say *this wants the
+  screen*, its entry is in the transcript.
+- **C13 has no delete, and C23 §8a A4 already ruled that it must not gain one.** So the
+  entry cannot be withdrawn.
+- **B03 §2 says a push leaves the transcript untouched.**
+
+Those three cannot hold together with an adapter-side decision. The tier must therefore be
+known **before step 3**, and the only thing known before a verb runs is its declaration.
+
+This is the same argument, and the same party, as `ToolDef.interactive`: *"the app author is
+the only party who can know this. Detection is not available."* A view is a handoff of input
+ownership exactly as a TTY handoff is, so it is declared where that one is.
+
+**Both a tool and a flag may declare it, and the invocation is a view if either does.** One
+rule, two declaration sites, because the surfaces need both: `/dashboard` is a verb, while
+S12's `--logs` and S3's `--watch` are flags on `ps`, and a verb-level field alone cannot
+express a tool whose tier depends on how it was invoked. C05 I20 holds the field and its
+refusals.
+
+### What `Esc` does to the source entry
+
+**Nothing, because there is no source entry.** The decision precedes step 3, so no pending
+entry is ever appended: the transcript is untouched in the strong sense B03 §2 means, and
+`↑⏎` re-runs the line from history like any other.
+
+Selection survives for a reason already in the tree rather than a new one — **C16 I2 resets
+focus only on append**, and no append happens. A01 D7 is satisfied by the absence, which is
+what B03 means by *"reversing a push touches the transcript exactly as much as making one
+did."*
+
+**The command is still recorded in history**, which is not a contradiction: history is
+C20's line store and not the transcript, and a view the reader cannot re-open from `↑` would
+be a surface reachable exactly once.
+
+### Who owns the scroll offset
+
+**The view's owner, which is a shell-side component, and C15 gains nothing.** C15 §183 is
+already explicit — *"A view's content is already the region's worth, and C15 does not scroll
+it. The owner windows it"* — and says why: an offset there is a second scroll model beside
+C14's, which A01 D3 spent a decision avoiding.
+
+What did not exist is an owner for a document that is not a patch. `patch-view.ts` owns one
+for `Patch` blocks and refuses everything else (`its `open` returns a refusal for any other
+kind`), so the ruling names its sibling: a **document view**, holding I41's one piece of
+state — a row offset — over a `ViewDocument`'s blocks.
+
+I41 and I42 were written for the patch view and are now the general shape: one offset and no
+second cursor; rewindowed from what the host holds rather than snapshotted.
+
+### What is on screen while the verb runs
+
+**The view is pushed at step 3's moment and its content is replaced when the document
+arrives.** Neither §13's three questions nor the fourth asks this, and it falls out of the
+answers: step 3 exists so that *something is on screen before the transport is invoked*
+(C23 I3), and ruling the pending entry away removes that without saying what takes its
+place. A consequence between two rulings, owned by neither — so it is ruled here rather
+than discovered when a slow verb looks like a hung terminal.
+
+The view replaces the entry **one for one**, and the ordering is unchanged: pushed before
+step 4, filled after it. C15's `update` is the mechanism and needs nothing new — it is what
+the part-refresh driver already uses on this host (C23 §3b), and §2's transition table has
+four states of which `update` changes none.
+
+Three things follow, and each closes a hole the pending entry used to cover:
+
+- **A failing verb renders its error into the view**, because the view is where the reader
+  is looking and the transcript has nothing to show them. `Esc` still pops, and still
+  appends nothing.
+- **A cancelled view pops**, which is the one case where the reader gets no record at all.
+  That is deliberate and is the cost B03 §2 already names: *"a logs excursion leaves no
+  transcript record, because the push that opened it left none either."*
+- **The push cannot be deferred until the document is in hand.** That reading is tempting
+  and wrong for the same reason step 3 precedes step 4 — feedback that waits for the work
+  is feedback the slow case never gets, and the slow case is the only one that needs it.
+
+### How a view windows what it holds
+
+**C25 I18's shape, already ruled — cited rather than invented.** *"A window is a `Patch`,
+not a list of rows. `Layer.content` is `Block[]`, so the owner of a pushed view cannot hand
+C15 a slice of rendered output — it hands back a smaller block, and C15 measures and draws
+it through the same registry as everything else."* The document view is that sentence with
+`Patch` replaced by a block sequence: the owner holds the whole document and an offset, and
+puts on the layer the blocks that fit.
+
+**The window falls on block boundaries.** A block is included or it is not, and I46's one
+piece of state indexes blocks rather than rows.
+
+**The plot is atomic for windowing, permanently.** C12 I1 makes a plot's height a function
+of the block alone and puts the series deliberately out of reach — *"a 200-epoch run's block
+is the same height as a 10-epoch one"* — so reducing a plot's data changes nothing about its
+height, and reducing its `height` **rescales the curve** rather than windowing it. There is
+no version of this that yields the top half of a plot.
+
+So the upgrade path is **granular where the kind divides, atomic where it does not**, and it
+is written that way on purpose: *row-granular scroll* is a promise C12 I1 forbids for the one
+block S3 leads with, and a spec that offered it would be describing something no
+implementation can deliver.
+
+**Per-kind reducers are shape-available and unwritten.** `table`, `keyValue` and `panel`
+divide at rows and children with no mid-row slicing and no measurer change — which is why
+this is not the mid-row option, whose cost lands on the measurer, the one thing that must
+never drift. But `windowPatch` needed a dedicated file and a concept of indivisible *units*
+to get right, and each further reducer is that work again. They are deferred until a
+consumer forces one, in the same way and for the same reason as everything else here.
+
+**The deferral is measured rather than assumed.** S3 filled measures **30 rows at 120 and at
+80**, and a view fills the region (C15 §4), so at any realistic terminal height nothing is
+out of view and the granularity is invisible for this surface:
+
+```
+width 120: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
+width  80: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
+```
+
+**26 as declared, 30 once the parts fill**, and the difference is not slack: `details` is
+declared holding the framework's `loading…` placeholder and grows to four rows of key-values
+when its one-shot fetch returns. So the figure a measurer sees before anything ticks is not
+the figure the terminal shows, and for a surface near the region's height the safe one is
+the larger. Both are read from the built application — 26 through the same registry C15
+measures with, 30 counted off a replayed capture at each width.
+
+**The figure was 21 and named three blocks that were never built** (`memnet-panel`,
+`ports`). It was an estimate of the drawing, taken before S3 existed, and it survived into a
+sentence beginning *measured rather than assumed*. The built surface has four blocks, three
+of them bordered panels, and an eight-row plot. The conclusion is unchanged and the margin
+it had was half what this claimed.
+
+And the attempts before *that* returned **13**, measured against a registry holding no plot
+definition (`registry.ts` — *"`table`, `plot` and `patch` are not here"*). The same fault
+recurred while correcting this passage: a fresh probe answered **17**, because
+`createBlockRegistry()` alone still has no plot and the shell registers it separately at
+`construct.ts:297`. A probe built on the framework's defaults is measuring a different
+application than the one that runs, and the number it returns is plausible every time.
+
+### The obligations a route carries, and the one that is not yet built
+
+**`runIntoView` was written new rather than derived, and inherited whichever
+obligations its author noticed.** That is not a remark about care: `declareLive`,
+`release` and `cancelInFlight` were each entry-only, each found one at a time, and each
+looked like an isolated oversight. Three samples of one cause. The entry route's
+obligations are therefore enumerated against the view route rather than recalled, and the
+`n/a` rows carry reasons — *"the view route does not need that"* is the assumption that
+produced the first three.
+
+Two of those reasons are worth keeping here, because both are rulings rather than notes:
+
+- **`resetFocus` is not called, and calling it would be a defect.** It exists because an
+  append freezes the previous entry and focus must not remain in a frozen block. The view
+  route appends nothing and freezes nothing, and A01 D7 requires the selection to survive
+  the push and be intact on the pop. The absence is the invariant, not an omission.
+- **A cancelled view pops rather than settling**, since there is no entry to settle. The
+  reader gets no record, which is the cost B03 §2 already names for a logs excursion.
+
+**`view` with `streams` is declarable and not yet runnable.** C05 I20 permits the pair
+deliberately — S12's logs view *is* a streaming source in a pushed view — but C23's
+streaming route patches a transcript *entry* (`streamInto`), and routing it into a view
+means patching through the owner instead. Nothing consumes that yet: S3 polls through
+`b.live`'s `fetch`, so building it would be a mechanism with no consumer proving it.
+
+It is refused **when the verb runs, not when it is declared**, and the distinction is the
+point. The declaration stays legal because the spec means it; what does not exist is the
+route. The alternative was worse than either: the pair currently falls to the
+non-streaming path, blocks until the process exits, and **holds the submission guard for
+the whole of it** — which is precisely what C23 I6 exists to prevent. A silent version of
+that would be found by a reader watching a shell stop accepting input.
+
+### What the decision leaves behind when it throws
+
+Asked because a ruling's rejection path is where it leaves state, and neither a trace nor a
+table indexes it (C13's `settle(id, doc)` is the measured case).
+
+- **A refused declaration throws at parse**, where C05 I19 already puts `interactive`'s
+  refusals — before a session exists, so there is no half-built state to leave.
+- **A push that fails leaves no entry**, because none was appended. This is the property
+  that makes the ruling safe rather than merely tidy: the failure mode of an adapter-side
+  decision would have been an orphaned pending entry that nothing could settle or remove —
+  C23 I9's forbidden state, two components from the decision that produced it.
+- **The owner's `putBlock` is total.** It patches the held document and reprojects the window, and a reprojection that threw after the document had been updated would leave the owner holding a document no frame ever displayed — the same two-step hazard as C13's `settle(id, doc)`, in a component two removed from the driver that called it. So it reprojects into a local, assigns both, and returns `false` rather than throwing; the driver's existing `false → release(host)` covers the other side.
+- **A pop while parts are in flight** is the one real hazard, and it belongs to the producer
+  rather than to this ruling: release must happen at the pop and not one tick later, or a
+  fetch resolves into a layer that has gone. C23 I33's teardown set gains the trigger.
+
+---
+
 ## 13. Out of scope
 
 | Not here | Where |
@@ -992,4 +1208,4 @@ One value, one file: `${stateDir}/theme`, holding the variant.
 | The auth flow itself | The far side; C22 displays and offers |
 | Prism's chrome content | `prism-tui` |
 | Multi-cluster sessions | Phase 2 |
-| **A verb whose result is a pushed view** | **Still undecided, and narrower than it was.** C25's fullscreen patch now pushes a `kind: "view"` layer, so the clause "nothing in the tree pushes one" has stopped being true — but that view is an *affordance on a block*, invoked by the reader through a `view` action (C04 I34, C23 I31), and it answers none of this row's question. What makes a **verb's result** a view rather than a transcript entry, who decides, and what `Esc` does to the entry it came from are all exactly as open as they were. C15 T5.5 stays deferred on this row and not on C25. Recorded this way because a partial producer is the most likely thing to be mistaken for a resolution |
+| ~~A verb whose result is a pushed view~~ | **Taken — §13a.** Reserved through four stretches and settled by the first consumer concrete enough to force it: docker-tui's S3, a live single-container view reached the way S12's logs view is. The row stays in the table, struck through rather than deleted, because *what it refused to guess* is the useful record |

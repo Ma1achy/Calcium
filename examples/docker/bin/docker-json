@@ -55,6 +55,33 @@ for arg in "$@"; do
 done
 shift "$original"
 
+# `docker container stats` streams by default, and a request/response transport
+# cannot consume that — it redraws a region forever and never exits, so C06
+# would wait for a process with no intention of finishing. `--no-stream` is
+# docker's own opt-out, and supplying it here is the same class of translation as
+# `--json` above: the far side's default shape does not match the framework's
+# contract, and the app absorbs the difference. See FINDINGS F26.
+#
+# **Only for this verb, and only when the caller has not said otherwise.** A
+# blanket append would put an unknown flag on `ps`, and overriding an explicit
+# `--no-stream` is not this file's business.
+#
+# `if`, not `[ … ] && …`: under `set -e` a false test as the last command of the
+# script is a non-zero exit, so the short form would make the shim fail for every
+# verb that is not `stats`.
+is_stats=0
+case "${1:-}${2:+ $2}" in
+  stats | "container stats") is_stats=1 ;;
+esac
+for arg in "$@"; do
+  if [ "$arg" = "--no-stream" ]; then
+    is_stats=0
+  fi
+done
+if [ "$is_stats" -eq 1 ]; then
+  set -- "$@" --no-stream
+fi
+
 # `exec`, so signals and the exit code reach docker directly. C21 sends SIGTERM
 # and escalates; an intermediate shell would absorb the first one and Calcium
 # would report a timeout for a process that was told to stop.

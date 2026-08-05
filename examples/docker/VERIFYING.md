@@ -50,6 +50,33 @@ wrong on purpose and watching the report not change**. That is the mutation pass
 the instrument instead of to the code, and it is the only method that has worked on any of
 them.
 
+### A fourth, and it is a different class: two instruments that disagreed
+
+The three above are one instrument giving a wrong answer. This one is **two instruments
+giving different answers, with only one of them consulted.**
+
+`main`'s CI failed on **five consecutive merges** — #12, #13, #14, #15, #16 — while every
+local `make all` on the same commits reported green, and each of those merges was made on
+the strength of the local run. The failures were real tier-5 rows, not infrastructure:
+C03's frame-rate, latency and idle-CPU thresholds on the first three, and C18 T5.5 on the
+last two.
+
+**The local suite is not the authority and had been treated as one.** Nothing in the
+process compared the two, so a red `main` accumulated for five merges without anyone
+holding a wrong belief — the question was never asked.
+
+C18 T5.5 is the instructive half, because it is not a threshold that a shared runner
+misses. It fails in CI and passes locally **deterministically**, for a reason neither
+environment can see alone: the far side prints its `cwd=`, the notice wraps at a position
+that depends on that string's length, and `/workspaces/tui-kit` and
+`/home/runner/work/Calcium/Calcium` differ by fourteen characters. A test that is a
+function of its environment's path length passes and fails for reasons no assertion
+mentions.
+
+**The rule this adds: after a merge, read CI's result, not the local one.** They are two
+instruments, they disagree, and the one that gates nothing is the one that had been
+believed.
+
 ---
 
 ## 1. `tools/screen.py` — a stripped capture is not a frame
@@ -126,3 +153,43 @@ derived from the same computation as the code cannot see that computation being 
 has now happened twice — `STATUS`'s `minWidth >= max(cells(Status))` in step 1, and the CPU
 column compared against a string padded to the same constant in step 2, which survived its
 own mutation.
+
+## 5. `tools/measure-s3.mjs` — a probe on the framework's defaults is a different application
+
+S3's height decides whether C22 I46's block-boundary windowing is visible at all, so the
+figure is load-bearing rather than descriptive. Three attempts, three plausible wrong
+answers:
+
+| answer | measured against |
+|---|---|
+| **13** | a registry with no plot definition, and a malformed `b.kv` call |
+| **21** | the drawing, before S3 existed — three blocks, two of which were never built |
+| **17** | `createBlockRegistry()` alone, which still has no plot |
+| **26 / 30** | the built document, through the registry the shell composes |
+
+`table`, `plot` and `patch` register through the public mechanism rather than shipping with
+the defaults (`registry.ts`, deliberately — it is what proves the extension point). The
+shell does it at `construct.ts:297`; a probe that does not measures a plot through the
+fallback and answers a number that looks entirely reasonable. **The same fault recurred
+while correcting the passage the first instance of it had produced.**
+
+26 is the declared document and 30 is what the terminal shows: the one-shot `details` part
+is declared holding `loading…` and grows to four key-value rows. For a surface near the
+region's height the safe figure is the larger, and neither is derivable from the other.
+
+## 6. `tools/s3_esc.py` — the question a frame at the end cannot answer
+
+`capture.py` ends at the teardown, so a capture that stops at the pop cannot tell a clean
+release from a part still ticking against a layer that has gone. This one presses `Esc`
+alone — never in the same burst as anything else, C16's paste window — and then holds for
+several intervals, so a surviving tick has time to draw. It does not; the frame after the
+pop is the dashboard, with no S3 panel and no transcript entry, which is B03 §2's push
+semantics visible rather than argued.
+
+## 7. A load generator is a fixture, and it perturbs the other instruments
+
+S3's plot says nothing about an idle container, so the frame-reads ran against a busy-loop
+container. With it running, tier-5's `T5.3a` failed on a timing assertion and passed alone;
+removing the fixture made `make all` green. **Not flakiness discovered — load introduced.**
+Worth writing down because the natural reading of a timing failure during a frame-read
+session is that the change under test caused it.
