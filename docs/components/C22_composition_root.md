@@ -1103,6 +1103,19 @@ puts on the layer the blocks that fit.
 **The window falls on block boundaries.** A block is included or it is not, and I46's one
 piece of state indexes blocks rather than rows.
 
+**And the window is measured as a sequence, not a block at a time.** A rendered sequence
+separates its blocks, so *n* blocks occupy *n* rows more than the sum of their heights — and
+a projection that adds `measure(block)` one at a time packs nearly twice what the region
+holds, which C15 then cuts in silence. The registry has `measureSequence` for this and C14
+is already given it; the document view was handed the per-block one and nobody noticed
+until a surface arrived whose blocks were numerous enough for the error to be visible.
+
+**It was invisible for the same reason S3's granularity was**: with four blocks the
+discrepancy is four rows against a region with room to spare, and with 103 it is 103. A
+defect proportional to a count that every existing surface kept small reads as correct until
+one does not — and no arithmetic finds it, because both sides of the comparison are the
+code's own. It was found by reading a frame and seeing a blank row between every block.
+
 **The plot is atomic for windowing, permanently.** C12 I1 makes a plot's height a function
 of the block alone and puts the series deliberately out of reach — *"a 200-epoch run's block
 is the same height as a 10-epoch one"* — so reducing a plot's data changes nothing about its
