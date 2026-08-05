@@ -29,6 +29,33 @@
 
 set -eu
 
+# **Not every docker verb has a `--format` flag**, and the translation below is
+# wrong for the ones that do not. Measured against the daemon:
+#
+#     docker diff  <c> --format json   unknown flag: --format          (exit 125)
+#     docker port  <c> --format json   unknown flag: --format          (exit 125)
+#     docker logs  <c> --format json   unknown flag: --format          (exit 125)
+#     docker top   <c> --format json   ps: error: unknown user-defined
+#                                      format specifier "json"         (exit 1)
+#
+# `top` is the one worth reading twice. `docker top CONTAINER [ps OPTIONS]`
+# hands its tail to `ps` **inside the container**, so docker accepts the flag,
+# ps rejects it, and the error names a user-defined format specifier — which
+# sends a reader looking at the image's userland rather than at this file.
+#
+# So the verbs are named here rather than met one at a time. `logs` used to
+# strip the pair by hand further down; this replaces that, and the general form
+# is shorter than the four cases it stands in for. See S11_WALK.md A1 and A2.
+#
+# **The list is a fact about one docker version and nothing checks it.** A
+# release that gives `diff` a `--format` flag leaves this stripping something
+# that would now work — which costs one verb's JSON rather than correctness, and
+# this whole file is deleted when F1 closes.
+no_format=0
+case "${1:-}" in
+  diff | port | top | logs) no_format=1 ;;
+esac
+
 # An explicit `--format` from the user wins, and `--json` is then dropped rather
 # than appended after it. Docker takes the last `--format` it is given, so
 # emitting both would work by accident and break the day that changes.
@@ -45,7 +72,11 @@ done
 original=$#
 for arg in "$@"; do
   if [ "$arg" = "--json" ]; then
-    if [ "$has_format" -eq 0 ]; then
+    if [ "$no_format" -eq 1 ]; then
+      # Dropped, not translated. The reader asked for the app's rendering of
+      # this verb and the far side has no say in it.
+      :
+    elif [ "$has_format" -eq 0 ]; then
       set -- "$@" --format json
       has_format=1
     fi
@@ -113,25 +144,10 @@ case "${1:-}" in
     # *follow*, and it replays 200 lines rather than the whole log, because the
     # whole log and what is on screen are different requests.
     #
-    # **`docker logs` has no `--format` at all**, so the translation at the top
-    # of this file produces `unknown flag: --format` rather than JSON. It is not
-    # a JSON-emitting verb: it streams whatever the container wrote to stdout,
-    # which for nginx is plain text.
+    # The `--format json` strip that used to live here is gone: `logs` is in the
+    # `no_format` list at the top of this file, with `diff`, `port` and `top`.
     #
-    # That is not a gap in Calcium — C06 I12 degrades a stream that stops
-    # parsing and C07 accumulates the remainder, which is the designed answer.
-    # What the shim has to do is stop *asking* for JSON from a verb that has no
-    # such flag, exactly as it stops sending `--raw` to a verb that has no such
-    # flag. Third verb in this file, same sentence.
-    original=$#
-    for arg in "$@"; do
-      case "$arg" in
-        --format | json) : ;;
-        *) set -- "$@" "$arg" ;;
-      esac
-    done
-    shift "$original"
-    # Appended after the strip, and only if the reader has not said otherwise.
+    # Only if the reader has not said otherwise.
     has_follow=0
     has_tail=0
     for arg in "$@"; do

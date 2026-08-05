@@ -38,9 +38,26 @@ beforeAll(() => {
 function argvOf(...args: string[]): string[] {
   const out = execFileSync(SHIM, args, {
     encoding: "utf8",
-    env: { ...process.env, PATH: fakeBin },
+    // **The fake first, the real path behind it.** `PATH: fakeBin` alone was
+    // enough until `logs`, whose branch pipes through `awk` rather than
+    // `exec`ing docker — so the row failed with `awk: not found`, which is the
+    // test finding a runtime dependency the other branches do not have.
+    env: { ...process.env, PATH: `${fakeBin}:${process.env["PATH"] ?? ""}` },
   });
   return out.split("\n").slice(0, -1);
+}
+
+/**
+ * The same, for `logs` — whose branch does not `exec` docker.
+ *
+ * F45's wrapping means every line docker writes comes back as `{"line": "…"}`,
+ * so the fake's one-argument-per-line output arrives wrapped too. Unwrapping it
+ * here rather than asserting the raw text keeps the assertion about **argv**,
+ * which is what these rows are for; asserting the JSON would make them a test of
+ * the wrapper by accident.
+ */
+function logsArgvOf(...args: string[]): string[] {
+  return argvOf(...args).map((line) => (JSON.parse(line) as { line: string }).line);
 }
 
 describe("F1: the shim translates Calcium's --json into docker's --format json", () => {
@@ -135,5 +152,102 @@ describe("F26: the shim supplies --no-stream for the verb that would never exit"
     // Untranslated, because there is no `--json` to translate — and `argvOf`
     // throws on a non-zero exit, so passing *is* the exit-code assertion.
     expect(argvOf("ps")).toEqual(["ps"]);
+  });
+});
+
+/**
+ * S11_WALK.md A1 and A2 — the verbs with no `--format` flag.
+ *
+ * **These rows exist because three of them were met one at a time.** `logs`
+ * stripped the translated pair by hand; `diff`, `port` and `top` would each have
+ * arrived as their own frame-read. Measured against the daemon before the list
+ * was written:
+ *
+ *     docker diff <c> --format json    unknown flag: --format         exit 125
+ *     docker port <c> --format json    unknown flag: --format         exit 125
+ *     docker logs <c> --format json    unknown flag: --format         exit 125
+ *     docker top  <c> --format json    ps: error: unknown user-defined
+ *                                      format specifier "json"        exit 1
+ */
+describe("A1: --json is dropped for a verb docker cannot format", () => {
+  it("S3.1: diff, port, top and logs lose --json entirely", () => {
+    expect(argvOf("diff", "abc", "--json")).toEqual(["diff", "abc"]);
+    expect(argvOf("port", "abc", "--json")).toEqual(["port", "abc"]);
+    expect(argvOf("top", "abc", "--json")).toEqual(["top", "abc"]);
+    // `logs` gains its own two flags below; what matters here is the absence.
+    expect(logsArgvOf("logs", "abc", "--json")).not.toContain("--format");
+  });
+
+  it("S3.2: every other verb still translates", () => {
+    // The list is an exception, so the rule it excepts has to be asserted
+    // beside it — otherwise a list that grew to cover everything would pass.
+    expect(argvOf("images", "--json")).toEqual(["images", "--format", "json"]);
+    expect(argvOf("inspect", "abc", "--json")).toEqual([
+      "inspect",
+      "abc",
+      "--format",
+      "json",
+    ]);
+  });
+
+  it("S3.3: the verb is read from the first argument, not searched for", () => {
+    // A container named `diff` must not put `ps` in the list. The far side's
+    // vocabulary and the reader's arguments occupy the same argv, and only
+    // position tells them apart.
+    //
+    // The translated pair lands where `--json` was, not at the end — asserted as
+    // measured rather than as assumed, because the first version of this row
+    // guessed the other order, and a guess that passes becomes a rule.
+    expect(argvOf("ps", "--json", "diff")).toEqual(["ps", "--format", "json", "diff"]);
+  });
+});
+
+/**
+ * F39 — `--raw` selects a rendering and reaches the far side anyway.
+ *
+ * **This row and the four below did not exist**, and a comment in `src/logs.ts`
+ * said one of them did: *"the test asserts the shim rather than this constant"*,
+ * written about `TAIL`. It was A03 §2's vacuity class arriving in a comment —
+ * a sentence naming a mechanism, satisfied by the naming.
+ */
+describe("F39: the shim strips a flag that selects a rendering", () => {
+  it("S4.1: --raw does not reach docker", () => {
+    expect(argvOf("inspect", "abc", "--raw", "--json")).toEqual([
+      "inspect",
+      "abc",
+      "--format",
+      "json",
+    ]);
+  });
+
+  it("S4.2: only for inspect — no other verb has one to strip", () => {
+    expect(argvOf("ps", "--raw", "--json")).toContain("--raw");
+  });
+});
+
+describe("S9: the shim supplies the follow and the tail", () => {
+  it("S5.1: logs gains --follow and --tail 200", () => {
+    expect(logsArgvOf("logs", "abc", "--json")).toEqual([
+      "logs",
+      "abc",
+      "--follow",
+      "--tail",
+      "200",
+    ]);
+  });
+
+  it("S5.2: an explicit follow or tail from the reader wins", () => {
+    const a = logsArgvOf("logs", "abc", "--tail", "5", "--json");
+    expect(a.filter((x) => x === "--tail")).toHaveLength(1);
+    expect(a).toContain("5");
+    expect(a).not.toContain("200");
+
+    const c = logsArgvOf("logs", "abc", "-f", "--json");
+    expect(c).not.toContain("--follow");
+  });
+
+  it("S5.3: no other verb gains them", () => {
+    expect(argvOf("ps", "--json")).not.toContain("--follow");
+    expect(argvOf("inspect", "abc", "--json")).not.toContain("--tail");
   });
 });
