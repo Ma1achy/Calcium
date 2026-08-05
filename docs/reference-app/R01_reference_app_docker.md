@@ -293,3 +293,117 @@ Each row is a claim the framework makes and this app tests.
 | Docker's own behaviour | Docker |
 | Mutating operations | Deliberately absent |
 | A second reference app | Only if a third domain reveals something these two do not |
+
+---
+
+## 13. The scorecard — what the app proved, and what it did not
+
+Written after the application was finished, because a commitment nobody scores is
+indistinguishable from a commitment satisfied. Twelve rows, and **four of them do not
+hold.** Each figure below is measured rather than recalled.
+
+| | commitment | verdict |
+|---|---|---|
+| 1 | under 300 lines of app code | **exceeded — 663** |
+| 2 | five read-only verbs, nothing mutating | held, and widened |
+| 3 | no custom theme, block kind, policy or emulator | **held** |
+| 4 | the glyph derives from `State`, never the prose `Status` | held |
+| 5 | `Ports` and `Status` render verbatim | held, and it took a correction |
+| 6 | `/stats` polls via `b.live`; `/logs` covers streaming | half |
+| 7 | one `b.live` part failing leaves the others rendering | held |
+| 8 | a recorded fixture corpus, giving C08 a second consumer | **not proven** |
+| 9 | a monorepo example consuming the packaged framework | held — and was silently broken |
+| 10 | its own CI; a skipped real-docker run recorded, never silent | **not held** |
+| 11 | imports only public entry points, never a deep path | held in `src/`, **broken in `test/`** |
+| 12 | an import manifest published on each release | **not done** |
+
+### 1 — 663, against 300, and the overage is the finding it said it would be
+
+*"Under 300 lines of app code; exceeding it is a finding about Calcium."*
+
+**Measured with comments stripped**, because half of this application is commentary and a
+raw line count would report how much was explained rather than how much was written:
+
+| | lines |
+|---|---|
+| raw `wc -l` across `src/` | 3853 |
+| code, comments removed | 1895 |
+| **R01's own four verbs plus their wiring** | **663** |
+| comment share | 50% |
+
+The 1895 is not the number to judge: `DOCKER_TUI_SURFACES.md` supersedes this spec's scope
+and builds twelve surfaces rather than four. **663 is the honest comparison**, and it is
+2.2× the bound.
+
+**The commitment asked for exactly this to be treated as evidence, so here is where the
+overage went.** Every one of these is a logged finding, and each is an app writing
+something the framework holds:
+
+| what the app wrote | why | finding |
+|---|---|---|
+| its own terminal-width read | `LocalContext` carries `command` and nothing else | F14 |
+| its own capability detection | `detectCapabilities` is not exported | F43 |
+| a boolean threaded through eight functions | the fact is needed at the leaves and enters at the root | F54 |
+| its own block measurer, by deep import | no public measurer | F37 |
+| its own document validation, by deep import | no public validator | F36 |
+| six `?? 0` coercions | `RawResult.exitCode` is `number \| null`, `DocumentMeta.exitCode` is not | F58 |
+| six hand-built empty notices | `emptyMessage` exists on `b.table` and on nothing else | roadmap 3 |
+
+That is `docs/ROADMAP.md` entry 1 with a line count attached. **The commitment worked**: it
+was set as a tripwire rather than a target, it tripped, and what it caught is the same
+thing the triage independently ranked first.
+
+### 6 — half, and the missing half has two causes
+
+`/stats` polls via `b.live`, as specified. `/logs` streams — but through C07's fallback
+rather than `b.live`'s `stream` arm, because `docker stats` streams by redrawing the screen
+rather than by emitting records (F10). **`b.live`'s streaming arm has no consumer in this
+application**, and neither does the `logs` block: the app builds `b.raw` per line, because
+`docker logs` emits no level and R01 commitment 5's own argument forbids parsing one out
+(F64).
+
+Two block behaviours this app was expected to demonstrate and does not, in both cases
+because the far side is not the shape the block assumes. That is worth more than a
+demonstration would have been.
+
+### 8 — not proven, and the corpus that exists is not the one promised
+
+*"Recorded via `@fmx/calcium/fixtures`, provenance-marked, with the authored ratio
+reported. Scenarios: `running`, `mixed`, `empty`, `daemon-down`."*
+
+`test/corpus/` holds **twelve real captures** — `ps-real.ndjson`, `stats-real.ndjson`,
+`diff-real.txt` and the rest — taken by hand from a live daemon and committed as text.
+They do the job the commitment's *first* reason names: CI runs the app's suite with no
+docker at all.
+
+They are not C08 recordings. Nothing in this application imports
+`@fmx/calcium/fixtures` — the only reference is `seal.test.ts`, which asserts the entry
+point **exists** and imports nothing from it. **C08's tooling still has exactly one
+consumer**, which was the commitment's second and more interesting reason.
+
+Stated as unproven rather than quietly satisfied by the corpus that happens to exist.
+
+### 10 and 12 — not held, and the first one cost something
+
+CI runs `make test`, `make golden`, `make e2e` and a degraded matrix. It runs **no job for
+this application at all**, and no `make proof`.
+
+That is not merely an omission. `make proof` was **red from PR #20 through PR #21** —
+two merged steps — because two test files reached into `../../../dist`, a path that exists
+in this checkout and not in the clean tree the gate builds. Nothing noticed, because
+nothing ran it (F60). A gate that is not wired is not a gate, and the cost was two merges
+past a broken one.
+
+No import manifest is published (commitment 12), so C24 T2.2's unused-export scan has
+never had this consumer's data.
+
+### 11 — held where it was written down, broken where it was not
+
+No file under `src/` imports anything but `@fmx/calcium` and two `node:` builtins —
+23 imports, checked. **`test/` reaches into `dist/` twice**, for the measurer and the
+validator (F36, F37), and both are recorded with an `eslint-disable` naming the finding.
+
+The commitment says *no source file*, and a test is not a source file by that reading. The
+honest verdict is that **the letter holds and the spirit is the finding**: the app cannot
+test what it builds without reaching past the boundary the commitment protects, and that is
+a stronger statement about the public surface than a violation in `src/` would have been.

@@ -1,7 +1,7 @@
 # The do-first list
 
 Four pieces of Calcium work, each with a real application hitting it. Derived from
-`examples/docker/FINDINGS.md` — fifty-five entries logged in the order they were hit — by
+`examples/docker/FINDINGS.md` — sixty-seven entries logged in the order they were hit — by
 way of `examples/docker/TRIAGE.md`, which groups them by shape and ranks them by how many
 independent surfaces reached for the same thing.
 
@@ -17,7 +17,7 @@ first, and those are marked.
 
 | | what to build | consumers | cost | needs a ruling |
 |---|---|---|---|---|
-| **1** | [The producer-context contract](#1) | **6** | large, and it replaces six workarounds | **yes** |
+| **1** | [The producer-context contract](#1) | **6** | large — and R01 §13 prices it at **363 lines over budget** | **yes** |
 | **2** | [Three builder fields, F27's shape](#2) | **5** (3 closed) | one line each | no |
 | **3** | [Absence that is distinguishable from failure](#3) | **8** | small in code, wide in reach | partly |
 | **4** | [A change axis distinct from `Tone`](#4) | **3** | model change across C04, C09, C10 | **yes** |
@@ -65,8 +65,19 @@ the root. That is not a copy to delete later; it is a parameter in eight signatu
   runs before the window exists. The honest answer may be that this one field cannot be
   supplied and the split floor stays declared.
 
+**And it now has a number, which none of the other entries do.** R01 commitment 1 set a
+tripwire — *under 300 lines of app code; exceeding it is a finding about Calcium* — and
+R01 §13 measured it with comments stripped: **663 lines** for R01's own four verbs. The
+overage is 363, and it is itemised there: the width read, the capability detection, the
+threaded boolean, the two deep imports, six `?? 0` coercions and six hand-built empty
+notices. **The tripwire was set before any of this existed and it caught the thing the
+triage independently ranked first**, which is a stronger argument for the entry than the
+consumer count is.
+
 **Cost**: large. Six workarounds delete, three of which are deep imports into `dist/` that
-a consumer should never have written.
+a consumer should never have written — and one of those deep imports silently disabled
+`make proof` for two merged steps (F60), because it was aimed at a *repository* and the
+gate builds a tree that has never seen one.
 
 ---
 
@@ -146,6 +157,19 @@ half is framework work:
   not — so half the app's instances are a field and half are a hand-built notice beside the
   block. That asymmetry is worth a ruling.
 
+**And the class has a form nobody predicted: it arrives through the *instrument*.**
+`/logs` opened a pushed view and rendered an empty screen for as long as the verb has
+existed, because mawk block-buffers its input and the shim wrapped log lines with `awk`
+(F61). Nothing was absent, nothing had failed, and the picture was the same one — with
+the prompt gone, because a pushed view takes it, so not even a cursor suggested the app
+was alive.
+
+**That is the eighth instance and the first where the emptiness is a bug rather than a
+state**, which sharpens what the entry is asking for. A rendering that says nothing is
+indistinguishable from *empty*, from *failed*, and now from *broken* — three worlds, one
+frame. Whatever C22 grows here has to be producible by the shell when the producer never
+spoke at all, which none of the six app-side sentences can do.
+
 **Cost**: F15 is small and load-bearing. The `emptyMessage` asymmetry is three fields.
 
 ---
@@ -193,12 +217,21 @@ teach — three surfaces reached for it before anyone went looking.
 
 ## What is not on this list
 
-Fifty-five findings, four entries. The rest are one of:
+Sixty-seven findings, four entries. The rest are one of:
 
-- **Closed** — F2, F7, F9, F19, F21b, F17a, F40, F45, F47, and the three from entry 2.
-- **Artefact discipline, not code** — F4, F11, F30, F32, F38, F42, F44. Seven surfaces, the
-  largest single group in the triage, and it costs nothing to fix: a drawing that describes
-  the framework rather than being checked against it. First in practice because it is free.
+- **Closed** — F2, F7, F9, F19, F21b, F17a, F40, F45, F47, F56, F60, F61, and the three
+  from entry 2.
+- **Artefact discipline, not code** — F4, F11, F30, F32, F38, F42, F44, F57, F65. **Nine
+  surfaces, still the largest single group**, and it costs nothing to fix: a drawing that
+  describes the framework rather than being checked against it. First in practice because
+  it is free.
+
+  **The group grew in a way that says something.** `DOCKER_TUI_SURFACES.md` now carries a
+  corrections index — nineteen, across twelve surfaces — and the score is **7 framework,
+  6 far side, 6 the drawing wrong about itself.** A design document written with the specs
+  open got the framework wrong seven times. Reading a spec and checking against it are
+  different acts, and only the second is a test. That is A03 §2's vacuity class one level
+  up: a sentence about a mechanism reads exactly like a sentence that was checked.
 - **The far side's shape** — F1, F26, F39, F46, absorbed by one 200-line shim. Real work,
   and it is the app's rather than Calcium's until a second far side disagrees the same way.
 - **Singles** — one consumer each, filed and waiting for a second.
@@ -210,11 +243,29 @@ puts it low, and the ranking is wrong about this one: there is exactly one promp
 consumer has it. It is left off the list because it wants the same ruling as C09 §4 already
 made for glyphs, and folding it into that ruling is cheaper than making a second one.
 
+**F58 is the newest exclusion and the one most likely to be wrong.** `RawResult.exitCode`
+is `number | null`; `DocumentMeta.exitCode` is `number`. Every adapter in the reference
+application writes `?? 0` — six of them — which reports *killed by a signal* as *exited
+cleanly*, with `RawResult.signal` sitting beside the coercion and no field to go to.
+
+By the ranking rule it is a single: one consumer, so it waits for a second. **The ranking
+is the wrong instrument here for a reason worth naming.** Consumer count measures whether
+a gap generalises, and it works because independent surfaces reaching for the same thing is
+evidence. This is not a gap a surface reaches for — it is a wall every adapter hits on its
+first compile, and the six instances are one consumer only in the sense that one repository
+contains them. The evidence that it generalises is that **the type system forces it**:
+there is no correct line to write, so every consumer will write the same false one.
+
+It stays off the list because the fix needs a ruling that is C04's, not a field —
+widen to `number | null`, add `signal`, or say plainly that a signalled process is exit 0
+and mean it. **The third is defensible and is what six call sites already say, silently,
+one `??` at a time.**
+
 ---
 
 ## How this document was produced, in case it is done again
 
-Fifty-five findings were logged **in the order they were hit**, each accurate about what it
+Sixty-seven findings were logged **in the order they were hit**, each accurate about what it
 found and none of them ranked. Past thirty, *filed* stopped meaning anything: a reader
 could not tell which entries were one change and which were forty.
 

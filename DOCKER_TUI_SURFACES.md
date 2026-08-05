@@ -1,5 +1,16 @@
 # docker-tui — surface designs
 
+> **This is the design, not a description of what was built.** It was written before any
+> of it existed, and the app is complete: `examples/docker/README.md` describes what runs.
+> The drawings here are kept **as drawn**, corrections marked in place, because
+> **being wrong about a drawing is the most-instantiated finding in the project** and a
+> document rewritten to agree with the code destroys the evidence for it.
+>
+> **[The corrections index](#appendix--the-corrections-index) is at the bottom, and it is
+> the reason to read this file.** Nineteen corrections across twelve surfaces, each one a
+> claim that looked right until something was measured — and four of them are still owed,
+> because the finding landed after this document was last touched.
+
 The complete, self-contained design. Twelve surfaces, every frame drawn in place, the
 reasoning for each choice, the build order, and the seven predicted gaps. This supersedes
 the earlier sketch and drafts — read only this.
@@ -715,3 +726,88 @@ Step 1 is the smallest thing that runs against real containers. Steps 3 (gap 7, 
 headline) and 4 (the comparison block at its best) are where the demo earns its keep —
 the composition the framework built toward and the block that was thinnest, both central.
 Nothing added to Calcium before step 1.
+
+---
+
+# Appendix — the corrections index
+
+**Nineteen corrections across twelve surfaces**, and the count is the point. Filed one at
+a time they read as ordinary revision; collected, they are the project's most-instantiated
+finding — *a drawing describes the framework or the far side rather than being checked
+against either* — and the reason the drawings above are kept as drawn rather than tidied.
+
+The index exists because the corrections were **unclaimable while they were scattered.**
+Each one is marked in place, in the surface it belongs to, which is right for a reader
+working through that surface and useless for anyone asking *how often does this happen*.
+Fifteen of them had to be found by reading all seven hundred lines. Four more were never
+folded in at all — nobody re-reads a design document after the surface it describes ships.
+
+**Who was wrong** is the column that earns its place. Three answers, and they are not
+equally common:
+
+| | count | what it means |
+|---|---|---|
+| **the far side** | 6 | docker sends something other than the drawing assumed |
+| **the framework** | 7 | Calcium's model cannot express, or does not do, what the drawing showed |
+| **the drawing itself** | 6 | internally inconsistent, or a claim about nothing measurable |
+
+The middle row is the uncomfortable one: **a design document written by someone holding
+the framework's specs still got the framework wrong seven times.** Reading a spec and
+checking against it are different acts, and only the second one is a test.
+
+---
+
+## A · Corrected in place, above
+
+| | surface | what was drawn | what was found | who was wrong | finding |
+|---|---|---|---|---|---|
+| A1 | S1 | *typing a command freezes the dashboard into the transcript* | freezing is not stopping — C23 I9, and I33's five teardown triggers do not include it | framework | F17a |
+| A2 | S1 | `CPU 34%` as a utilisation | `CPUPerc` is per-core-normalised, so the sum has no ceiling; the drawing now reads `CPU 340%` | far side | — |
+| A3 | S2 | `PORTS` as `80→8080, 443→8443` | docker sends `0.0.0.0:8080->80/tcp, [::]:8080->80/tcp` — forty characters and an IPv6 twin per entry, and R01 forbids parsing it | far side | F4 |
+| A4 | S2 | `truncateFrom: "start"` on `Ports` | the host port is on the **left** of the real string, so `"start"` loses the thing a reader wants. R01 R3.4 makes the same error from the other side | drawing | — |
+| A5 | S3 | the axis `-60s ──── now` | there is no clock on this path (C07 I1), so the ordinate is a tick index and a duration label claims what it cannot support | framework | F11 |
+| A6 | S3 | `⏎` read as pushing a view | B03 §2: `⏎` on a row **appends**; a push comes from a verb, with an action filling the prompt between | framework | F11 |
+| A7 | S3 | the verb `ps <uuid> --watch` | `docker ps` takes no positional and `--watch` is not a flag — three facts making the verb unspawnable, none checked | far side | — |
+| A8 | gap 7 | *the driver ships tested against an entry host only* | it does not: the `view` arm has been tested since C23 §3b (T4.21). What is absent is a **producer** | framework | F20 |
+| A9 | S6 | five `/compare` rows drawn as one source | `cpu %` and `mem` come from `docker stats`, so the surface joins two sources and never said so | drawing | F11 |
+| A10 | S7 | the verdict `▐ added` | `Comparison`'s union is `same/better/worse/changed` — a mark the block has never had | framework | F30 |
+| A11 | S7 | `env LOG_LEVEL` as one row | `env` is a keyed set; the drawing implies it and never states the rule | drawing | — |
+| A12 | S7 | *`docker inspect` the container, the image, **diff the fields*** | the two objects do not have the same fields, so a key-union diff invents drift that does not exist | far side | F11 |
+| A13 | S7 | *the image's `Config` carries `ExposedPorts` and `StopSignal`* | true of a service image, false of a base image — **a correction that was itself corrected**, by measuring the case that would falsify the falsification | far side | F32 |
+| A14 | S8 | *the unified showcase* | `layoutFor` chooses by width, so one verb draws split **and** unified — more showcase than was asked for | framework | F11 |
+| A15 | S8 | the two sources unnamed | the image's copy costs `docker run --rm <image> cat` — **442ms measured**, a container created, started, read and removed | far side | — |
+
+## B · Still owed — the finding landed after this document was last touched
+
+**These four are the more interesting half**, because nothing brought them back here. A
+design document is read while the surface is being built and never afterwards, so a
+correction found during a *later* step has no path home. That is the failure this index
+is meant to close, and it is why the table exists rather than four more edits in place.
+
+| | surface | what is still drawn | what was found | finding |
+|---|---|---|---|---|
+| B1 | S10 | `+` added *(ok tone)*, `-` deleted *(error tone)*, `~` modified *(warn)* | `b.row` **throws**: C04 I6 requires a glyph for `error` and `warn`, and correctly — a deleted file is not a fault. The markers carry the axis as **text**, in `ok`/`muted`/`accent` | F49 |
+| B2 | S10 | `3 added · 1 modified · 1 deleted` under a list of **four** rows | the tally counts five. **The drawing disagrees with itself**, and no amount of measuring the far side would have caught it | F65 |
+| B3 | S9 | a panel with `following · 342 lines`, key hints, and `▐` tone on a `WARN` line | the app builds `b.raw` per line. `docker logs` emits no level, the shim wraps each line as `{"line":"…"}`, and **`b.logs` has no consumer in this application at all** | F64 |
+| B4 | S11 | `/events` — *`b.live` streaming … gap 2* | ruled the other way in step 6: an adapter accumulates into a ring, because `--until` makes `docker events` terminate and both bounds take relative durations. Gap 2 downgraded from *Calcium needs an append primitive* | — |
+
+---
+
+## What the index says that the corrections do not
+
+**Six of the nineteen are the drawing wrong about itself** — internally inconsistent, or
+asserting something with no measurable content. Those are the ones no amount of running
+docker would have caught, and they are the argument for the by-hand walk: a classification
+table indexed by rule interaction reads the drawing *against itself*, which is the only
+instrument that reaches them.
+
+**Two are corrections to corrections** (A13, and A4's second ruling). Both were sound
+reasoning from a false premise, and in both cases the premise was *a picture in this
+document* rather than a measurement. **A drawing used as evidence for the next drawing is
+how a single unchecked claim propagates**, and it is why R01 R3.4 carries A4's mistake too.
+
+**And the score is 7–6–6 between the framework, the far side, and the drawing.** The far
+side being surprising is expected and is what an adapter absorbs. The framework being
+misdescribed *by a document written with its specs open* is the finding worth taking
+somewhere else: it is the same shape as A03 §2's vacuity class, one level up. A sentence
+about a mechanism reads exactly like a sentence that was checked against one.

@@ -1,6 +1,6 @@
 # F1–F55, triaged
 
-`FINDINGS.md` is a log: fifty-five entries in the order they were hit, each accurate about
+`FINDINGS.md` is a log: sixty-seven entries in the order they were hit, each accurate about
 what it found. Past thirty, *filed* stops meaning much — a reader cannot tell which entries
 are one change and which are forty, or which to do first.
 

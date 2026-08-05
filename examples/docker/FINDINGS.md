@@ -2169,3 +2169,68 @@ cut landing mid-redraw. `tools/beats.py` cuts at a **gap in the output** instead
 a terminal redraws in a burst and then goes quiet, so the last frame before a
 pause is a settled screen by construction. VERIFYING.md §8's hazard, pointed at
 the reading instrument rather than at the capture.
+
+---
+
+## F64 — the app never built the block the surface was written for ★★
+
+S9's drawing shows a pushed logs view with a titled panel, a `following · 342 lines`
+header, key hints along the bottom, and `▐` tone on a `WARN` line. Its **Exercises**
+line claims *tone on individual lines (WARN/ERROR coloured)*.
+
+`src/logs.ts` builds `b.raw(text)`. One block per line, no timestamp, no level, no tone.
+
+**Every step of the chain removes the information the drawing needed**, and each step is
+correct on its own:
+
+- `docker logs` emits plain text, so there is nothing structured to read (F46 already
+  found that half of it goes to stderr);
+- the shim wraps each line as `{"line":"…"}` because C07's fallback would otherwise
+  accumulate the whole follow into one growing `raw` block (F45);
+- so the adapter receives one opaque string per line, and `b.logs` wants `{ts, level,
+  message}`.
+
+**`b.logs` therefore has no consumer in this application at all**, which is the same
+shape as F10 — `b.live`'s streaming arm, unexercised for a different reason. Two block
+behaviours the reference app was expected to demonstrate and does not, and in both cases
+because the far side is not the shape the block assumes.
+
+Filed rather than fixed. Parsing a level out of arbitrary container output is the thing
+R01 commitment 5 forbids for `Ports` and forbids here for the same reason: *a parser would
+be wrong within a release*, and nginx, postgres and a shell script agree on nothing.
+
+**What it costs is a claim, not a feature.** The surfaces document says this app exercises
+tone on log lines. It does not, and until this entry nothing said so.
+
+---
+
+## F65 — a drawing wrong about itself, which no measurement could catch ★
+
+S10's tally:
+
+```
+   ~ /var/log/nginx           modified
+   + /var/log/nginx/access.log added
+   + /tmp/cache               added
+   - /etc/nginx/default.conf  deleted
+
+   3 added · 1 modified · 1 deleted
+```
+
+Four rows above; five in the tally. Two `+`, not three.
+
+**Every other instance of the drawing-was-wrong class is a drawing wrong about the
+world** — what docker sends, what the framework does. Running docker a thousand times
+would not have found this one, because it is not a claim about docker. It is the picture
+disagreeing with its own caption.
+
+That is the class the by-hand walk reaches and nothing else does: a classification table
+indexed by rule interaction reads a drawing **against itself**, which is exactly the
+operation no test performs. And it is the same shape as the tally rows in `/drift` that
+DRIFT_WALK insisted on — a summary that a reader can check against the thing it summarises
+is worth having *because* a reader can check it, and this one has been unchecked since it
+was written.
+
+Corrected in the index rather than in the drawing, with the tone mapping beside it: S10 is
+the surface where the drawing was wrong twice, once about the framework (F49 — `b.row`
+throws, because C04 I6 requires a glyph for `error`) and once about arithmetic.
