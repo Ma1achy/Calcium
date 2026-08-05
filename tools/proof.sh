@@ -68,46 +68,66 @@ say "pack"
 TARBALL="$WORK/$(npm pack --pack-destination "$WORK" --silent)"
 [ -f "$TARBALL" ] || die "npm pack produced no tarball"
 
-# ── 4. A clean tree that has never seen this repository
+# ── 4. Clean trees that have never seen this repository
 #
-# The example is copied without `node_modules`, and its `file:../..` becomes the
+# Each example is copied without `node_modules`, and its `file:../..` becomes the
 # tarball. Nothing here can reach `$ROOT/src` — that is the point.
-say "installing the tarball into a clean checkout"
-APP="$WORK/app"
-mkdir -p "$APP"
-tar -C "$ROOT/examples/docker" \
-    --exclude node_modules --exclude .venv \
-    -cf - . | tar -C "$APP" -xf -
+#
+# **Two examples, and the second one is the README's.** `examples/minimal` is
+# the block quoted in the root README, and STEP8_WALK §A4 is why it has to be
+# here rather than merely present: `files` is `["dist", "README.md", "LICENSE"]`,
+# so nothing under `examples/` ships in the tarball, and this script used to copy
+# exactly one directory. A README example verified from the workspace is verified
+# through the npm-workspace symlink — the one resolution that cannot see a
+# packaging mistake, which is precisely what F7 was.
+install_example() {
+  local name="$1" app="$WORK/$1"
+  say "installing the tarball into a clean checkout: $name"
+  mkdir -p "$app"
+  tar -C "$ROOT/examples/$name" \
+      --exclude node_modules --exclude .venv \
+      -cf - . | tar -C "$app" -xf -
 
-node -e '
-  const fs = require("node:fs");
-  const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  const before = p.dependencies["@fmx/calcium"];
-  if (before !== "file:../..") {
-    console.error(`expected file:../.., found ${before}`);
-    process.exit(1);
-  }
-  p.dependencies["@fmx/calcium"] = "file:" + process.argv[2];
-  fs.writeFileSync(process.argv[1], JSON.stringify(p, null, 2));
-' "$APP/package.json" "$TARBALL"
+  node -e '
+    const fs = require("node:fs");
+    const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const before = p.dependencies["@fmx/calcium"];
+    if (before !== "file:../..") {
+      console.error(`expected file:../.., found ${before}`);
+      process.exit(1);
+    }
+    p.dependencies["@fmx/calcium"] = "file:" + process.argv[2];
+    fs.writeFileSync(process.argv[1], JSON.stringify(p, null, 2));
+  ' "$app/package.json" "$TARBALL"
 
-cd "$APP"
-npm install --ignore-scripts --no-audit --no-fund >/dev/null
+  cd "$app"
+  npm install --ignore-scripts --no-audit --no-fund >/dev/null
 
-# The install is only meaningful if it landed a real directory rather than a
-# link back into the repository. A symlink here would make every assertion
-# below pass against the source tree.
-node -e '
-  const fs = require("node:fs");
-  const st = fs.lstatSync("node_modules/@fmx/calcium");
-  if (st.isSymbolicLink()) {
-    console.error("@fmx/calcium installed as a symlink — the gate is testing the repo, not the package");
-    process.exit(1);
-  }
-' || die "the tarball did not install as a real directory"
+  # The install is only meaningful if it landed a real directory rather than a
+  # link back into the repository. A symlink here would make every assertion
+  # below pass against the source tree.
+  node -e '
+    const fs = require("node:fs");
+    const st = fs.lstatSync("node_modules/@fmx/calcium");
+    if (st.isSymbolicLink()) {
+      console.error("@fmx/calcium installed as a symlink — the gate is testing the repo, not the package");
+      process.exit(1);
+    }
+  ' || die "$name: the tarball did not install as a real directory"
 
-# ── 5. The example's own suite, against the installed package
-say "the example's tests, against the installed package"
-npm test
+  # And the README the package actually ships, which is what
+  # `examples/minimal`'s quoting row reads through the resolved package.
+  # Backticks are escaped deliberately: inside double quotes they are command
+  # substitution, so an unescaped 'files' here would try to *run* files — and
+  # only ever on the failure path, where nobody would be watching.
+  [ -f "node_modules/@fmx/calcium/README.md" ] \
+    || die "$name: the installed package has no README.md — \`files\` and the docs disagree"
 
-printf '\n\033[32m✓ proof · packed, installed clean, and the example passes against the tarball\033[0m\n'
+  say "$name's tests, against the installed package"
+  npm test
+}
+
+install_example docker
+install_example minimal
+
+printf '\n\033[32m✓ proof · packed, installed clean, and both examples pass against the tarball\033[0m\n'

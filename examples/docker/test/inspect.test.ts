@@ -12,8 +12,8 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-// eslint-disable-next-line no-restricted-imports -- F37: no public measurer.
-import { createBlockRegistry } from "../../../dist/presentation/blocks/index.js";
+// F37: no public measurer. Resolved through the package — see `deep.ts`.
+import { createBlockRegistry } from "./deep.ts";
 import type { Block, Code, KeyValue, Notice } from "@fmx/calcium";
 import { SPLIT_FLOOR, codeRows, createInspectAdapter, splitRaw, structuredBlocks } from "../src/inspect.ts";
 import type { Row } from "../src/ndjson.ts";

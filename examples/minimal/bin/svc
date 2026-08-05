@@ -1,0 +1,11 @@
+#!/bin/sh
+# The far side: any program that prints JSON on stdout.
+#
+# Calcium appends `--json` to the argv it spawns, so a real CLI would use that
+# flag to switch formats. This one only has the machine-readable form, so it
+# ignores every argument — which is the whole contract from Calcium's side.
+cat <<'JSON'
+{"name":"api","state":"running","replicas":3}
+{"name":"worker","state":"running","replicas":8}
+{"name":"cron","state":"stopped","replicas":0}
+JSON

@@ -1972,3 +1972,100 @@ axes as it has guards, and `bannerLines` has two — `if (v.blocks && !blocks) c
 `if (widthOf(v.lines) <= width) return`. A comparison that varies one of them while the
 other silently decides the answer is a frame-read that cannot be wrong, which is A03 §2's
 vacuity class arriving as a demonstration. **Read the ladder before choosing the pair.**
+
+---
+
+## F58 — the only way to satisfy the compiler is to assert something false ★★★
+
+`RawResult.exitCode` is `number | null`. `DocumentMeta.exitCode` is `number`. So
+the obvious line does not type-check:
+
+```
+meta: { exitCode: raw.exitCode, … }
+  Type 'number | null' is not assignable to type 'number'.
+```
+
+**Every adapter in this repository writes `result.exitCode ?? 0`** — `ps.ts:176`,
+`verbs.ts:46`, and four more. `null` means *the process was killed by a signal
+and never exited*, and `?? 0` reports that as a clean success. `RawResult` even
+carries `signal` beside it, and `DocumentMeta` has no field for it, so the
+information is available at the coercion and has nowhere to go.
+
+**Found by the second consumer, which is the whole argument for having one.**
+Nobody writing the sixth adapter in an existing file questions a line the five
+above it already contain. `examples/minimal` is forty lines written from the
+public surface with no house style to copy, and it hit the same wall on its first
+compile — which is the evidence that this is the API's shape rather than a habit.
+
+Filed rather than fixed. The choices are all Calcium's: widen `DocumentMeta` to
+`number | null`, add `signal`, or say in C04 that a signalled process is exit 0
+and mean it. **The third is defensible and is not what the type says today** — it
+is what six call sites say, silently, one `??` at a time.
+
+---
+
+## F59 — a published example that does not compile, and the reason it does not ★★
+
+The root README's `b.live` snippet, unchanged since it was written and shipped in
+every tarball (`files` includes `README.md`):
+
+```ts
+b.live({ id: "metrics", every: 30_000, fetch: () => api.metrics(),
+         render: data => b.kv({ cpu: data.cpu, memory: data.memory }) })
+```
+
+Type-checked for the first time in step 8. Three errors:
+
+| | |
+|---|---|
+| `title` is missing | it is required on `LiveSpec`, and the example never had it |
+| `data.cpu` | `render` is `(data: unknown) => Block` |
+| `data.memory` | the same |
+
+**The second is the finding and the first is the symptom.** `fetch` returns
+`Promise<unknown>` — honestly, because the far side's shape is not Calcium's to
+know — so `render` receives `unknown` and every real call site narrows it:
+`render: (data) => ioBlock(data as Row | null, unicode)`. The README advertised
+an ergonomics the builder does not have, and it read as correct because the
+shape is exactly what a reader expects.
+
+Corrected in place, with the cast shown and named rather than tidied away. The
+generalisation is F27's, one level out: **an example is a claim about an API, and
+an unchecked one is a claim nothing can refute.** The marked block in the README
+is now quoted from `examples/minimal/main.ts` and checked by a row; this snippet
+is not, and that limit is recorded beside the row rather than left implicit.
+
+---
+
+## F60 — the proof gate had been red for two PRs, and it is the one CI does not run ★★★ — **fixed**
+
+`make proof` fails on `main`. Two of the app's test files import
+`../../../dist/…` — F36's missing validator and F37's missing measurer, both
+recorded — and **that path is relative to this checkout.** The gate copies the
+example into a tree that has never seen the repository, where `../../../dist`
+resolves to nothing, so both files fail at import before a single assertion runs:
+
+```
+Error: Cannot find module '../../../dist/data/viewmodel/index.js'
+       imported from /tmp/tmp.hfOh8ELsp0/docker/test/documents.test.ts
+Test Files  2 failed | 12 passed (14)
+```
+
+`inspect.test.ts` landed in PR #20. **The gate has been broken since, and nothing
+noticed, because `make proof` is the one target CI does not run** — which
+`docs/ROADMAP.md` already listed as an outstanding item. This is what the item
+cost: two merges past a red gate, and the roadmap's own entry sitting one line
+above the reason it mattered.
+
+**Three findings stacked, and only the third is new.** F36 and F37 are why the
+reach exists. This is that the reach was aimed at a *repository*, so the
+workaround for a missing export silently excluded itself from the check that
+exists to test the package. **A workaround that cannot survive the boundary it
+works around is a second defect wearing the first one's clothes.**
+
+Fixed in `test/deep.ts`: `dist/` is inside the tarball, so the same modules
+resolve from the package root — the repository in the dev loop,
+`node_modules/@fmx/calcium` under the gate. One expression, both worlds, and it
+is still a deep import and still F36/F37.
+
+`make proof` now runs both examples and passes: `PROOF_EXIT=0`, 233 and 3.

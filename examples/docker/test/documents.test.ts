@@ -31,8 +31,9 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-// eslint-disable-next-line no-restricted-imports -- F36: no public validator.
-import { validateDocument } from "../../../dist/data/viewmodel/index.js";
+// F36: no public validator. Resolved through the package — see `deep.ts`,
+// which is also the reason `make proof` was red for two PRs.
+import { validateDocument } from "./deep.ts";
 import type { ViewDocument } from "@fmx/calcium";
 import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
