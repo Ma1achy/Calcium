@@ -2,12 +2,15 @@
  * The `bin` entry — F56.
  *
  * **`package.json` declared this command from the app's first commit and it
- * could never have run.** `"docker-tui": "./src/main.ts"`: a TypeScript file,
- * mode `0644`, with no shebang. npm links whatever path it is given without
- * looking at either, so the declaration was accepted, published in the manifest,
- * described in the README-that-did-not-exist-yet, and named in the app's own
- * non-TTY help — which has been telling readers to run `docker-tui` for four
- * steps.
+ * could never have run.** `"docker-tui": "./src/main.ts"`: a TypeScript file
+ * with no shebang. The declaration was accepted everywhere it could have been
+ * refused, published in the manifest, and named in the app's own non-TTY help —
+ * which has been telling readers to run `docker-tui` for four steps.
+ *
+ * **The missing shebang is the fatal half**, measured rather than assumed: npm
+ * chmods a bin target to 755 on install and cannot supply a `#!`, so the kernel
+ * hands the file to `sh` and `sh` parses TypeScript. FINDINGS F56 has the
+ * transcript.
  *
  * Nothing caught it because nothing ran it. Every test imports the modules
  * directly; every session used `npm start`; `tools/capture.py` spawned
@@ -54,7 +57,17 @@ describe("F56: the bin is a claim about an executable", () => {
     expect(declared).toMatch(/\.js$/);
   });
 
-  it("it has the execute bit — npm links the path without checking", () => {
+  it("it has the execute bit — for the consumers that never run an install", () => {
+    // **Not because npm would leave it broken.** Measured: npm chmods a bin
+    // target to 755 on install, from 644, in both the package and the link. So
+    // an installed consumer is fine either way, and an earlier version of this
+    // comment claimed otherwise.
+    //
+    // What the row actually guards is everyone who reads the file without an
+    // install in between: git records `100755`, a fresh clone runs
+    // `./bin/docker-tui.js` directly, and `tools/capture.py` spawns that path
+    // for every frame in this repository. None of them asks npm for anything.
+    //
     // **Known limit, and it is in the harness rather than in the row.** The
     // repository is bind-mounted into the devcontainer through Docker Desktop,
     // which does not propagate the host's mode: measured at the moment this was

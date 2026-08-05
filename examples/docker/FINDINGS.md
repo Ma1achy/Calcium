@@ -1882,11 +1882,32 @@ character swapped in place.
 "bin": { "docker-tui": "./src/main.ts" }
 ```
 
-since the app's first commit. It could never have run: a TypeScript file, mode `0644`, no
-shebang. `npm link` writes the symlink without looking at either, so the declaration was
-accepted at every stage that could have refused it — install, pack, `npm publish
---dry-run`, and `make proof`, which installs the real tarball into a clean tree and runs
-the suite against it.
+since the app's first commit. It could never have run, and the declaration was accepted at
+every stage that could have refused it — install, pack, `npm publish --dry-run`, and `make
+proof`, which installs the real tarball into a clean tree and runs the suite against it.
+
+**Which of the two problems was fatal was measured, because the first version of this entry
+guessed and guessed wrong.** It said npm links the path without looking at the mode or the
+shebang. Half of that is false:
+
+```
+$ cat package.json               # bin: { "bt": "./cli.ts" }, cli.ts is mode 644
+$ npm install file:../pkg
+after install, source: 755       # npm chmods the bin target
+after install, linked: 755
+$ ./node_modules/.bin/bt
+./node_modules/.bin/bt: 1: Syntax error: word unexpected (expecting ")")
+```
+
+**npm fixes the mode and cannot fix the shebang.** So the mode was never the barrier — it
+explains an unrelated puzzle instead, which is why `src/main.ts` had quietly become `755`
+in the working tree: npm had been chmodding it at every install for as long as the field
+pointed there. The fatal half is the missing `#!`: the kernel hands the file to `sh`, which
+parses TypeScript as shell and says so. That line is what a user would have got.
+
+**The `.ts` extension is the second half and is independent.** With a shebang added, the
+file would load — Node strips types by default from 22.18 — and fail with a syntax error on
+22.0, which `engines: ">=22"` permits.
 
 **The reason nothing noticed is the reason it is worth filing.** Three separate consumers
 existed and all three reached around the entry point:
