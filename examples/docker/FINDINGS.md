@@ -1443,6 +1443,35 @@ does, and it failed the moment the view started measuring what is drawn.
 
 ---
 
+## F41 — `b.patch` cannot say what it elided below the last hunk
+
+`Patch.collapsedAfter` exists and is documented at length — *"one hunk at line 18 of a
+200-line file elides 14 lines above and 170 below"* — and `b.patch` passes `path`,
+`language`, `hunks` and `layout`, and not that. `Hunk.collapsedBefore` **is** reachable, so
+a patch can state what it skipped above each hunk and never what it skipped below the last
+one.
+
+`/config` is the consumer: a 44-line file with one hunk near the top ends with about thirty
+lines that simply stop. `test/config.test.ts` C4 asserts the gap rather than only filing it.
+
+**F27's shape, third instance** — a complete mechanism on one side, unreachable from the
+builder. F27's `yMin`/`yMax` closed the same way and this is one line.
+
+---
+
+## F42 — a drawing named a layout the framework chooses by width
+
+S8 called itself *"the unified-diff-with-context showcase"*. `layoutFor` picks split at a
+wide terminal and unified below, so the app pinning `layout: "unified"` would have discarded
+a capability to satisfy a sentence. Frame-read at both: **split at 120, unified at 80, from
+one verb and no flag.**
+
+Not a defect in either — it is the fifth time a drawing has described the framework rather
+than been checked against it (F4, F11, F30's verdict, F38, this), and the pattern is worth
+the entry more than the instance is. Corrected in `DOCKER_TUI_SURFACES.md` in place.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that

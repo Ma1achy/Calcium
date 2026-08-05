@@ -38,6 +38,7 @@ import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
 import { createContainerAdapter } from "../src/container.ts";
 import { createInspectAdapter } from "../src/inspect.ts";
+import { createConfigHandler, type Far } from "../src/config.ts";
 
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
@@ -54,6 +55,14 @@ const result = (over: Partial<Record<string, unknown>> = {}): never =>
   }) as never;
 
 const ctx = { command: "/x", verb: "x", transport: "subprocess", origin: "user", width: 120 } as never;
+
+/** S8's far side, injected — see the table below. */
+const FAR = (over: Partial<Far> = {}): Far => ({
+  facts: () => Promise.resolve({ image: "nginx:alpine", mounts: ["/etc/nginx/conf.d/default.conf"] }),
+  running: () => Promise.resolve("a\nB\n"),
+  fromImage: () => Promise.resolve("a\nb\n"),
+  ...over,
+});
 
 /**
  * Every document the app can produce, named by the path that produces it.
@@ -83,6 +92,17 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   ["/inspect — exit zero, unparseable", () => createInspectAdapter().adapt(result({ stdoutRaw: "<html>" }), ctx)],
   ["/inspect --raw — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json"), argv: ["docker", "inspect", "x", "--raw"] }), ctx)],
   ["/inspect — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json") }), ctx)],
+  // S8's arms. The far side is injected so every one of them is reachable —
+  // three of these are daemon states that occur only sometimes, and an arm that
+  // cannot be driven is an arm that never runs.
+  ["/config — no container", () => createConfigHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { command: "/config nope /x" })],
+  ["/config — no path, with candidates", () => createConfigHandler(FAR())(["dtui-cfg"], { command: "/config dtui-cfg" })],
+  ["/config — no path, no mounts", () => createConfigHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { command: "/config c" })],
+  ["/config — no arguments", () => createConfigHandler(FAR())([], { command: "/config" })],
+  ["/config — the running file is unreadable", () => createConfigHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { command: "/config c /x" })],
+  ["/config — the image side is unavailable", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { command: "/config c /x" })],
+  ["/config — the files agree", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { command: "/config c /x" })],
+  ["/config — ok", () => createConfigHandler(FAR())(["c", "/x.conf"], { command: "/config c /x.conf" })],
 ];
 
 describe("F35: every document this app produces is one C13 will accept", () => {

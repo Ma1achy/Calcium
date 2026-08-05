@@ -150,6 +150,33 @@ const compare: ToolDef = {
 };
 
 /**
+ * S8 — the patch block's own surface.
+ *
+ * **Local, and forced for `/drift`'s reason twice over**: two calls where the
+ * second depends on the first (`docker exec` for the running file, then
+ * `docker run --rm <image> cat` for the baseline), and an adapter is handed one
+ * result. A transcript entry rather than a view — no letter keys, no claim on
+ * the screen (A01 D4).
+ *
+ * **`path` is required and the bare form is not an error to be tidied away.**
+ * `.Mounts` gives `Type: "bind"` for a file and for a directory with no
+ * distinguishing field, so discovery cannot be ruled in; given no path the verb
+ * offers the bind destinations as candidates. Declared `required: false` so C05
+ * lets the verb run and answer, rather than refusing before it can say what it
+ * would have needed.
+ */
+const config: ToolDef = {
+  name: "config",
+  local: true,
+  summary: "A config file as the container has it, against the image's original",
+  args: [
+    { name: "container", type: "string", required: true, summary: "Container id or name" },
+    { name: "path", type: "string", required: false, summary: "Path to the file inside the container" },
+  ],
+  flags: [],
+};
+
+/**
  * `engineVersion` is the daemon's, read at startup rather than written down: the
  * field exists for skew reporting, and a manifest claiming a version the daemon
  * does not have reports the wrong skew — which is worse than reporting none.
@@ -163,6 +190,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps, dashboard, containerStats, inspect, drift, compare],
+    tools: [ps, dashboard, containerStats, inspect, drift, compare, config],
   };
 }

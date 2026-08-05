@@ -19,6 +19,7 @@ import { createDashboardHandler } from "./dashboard.ts";
 import { createContainerAdapter } from "./container.ts";
 import { createInspectAdapter } from "./inspect.ts";
 import { createCompareHandler, createDriftHandler } from "./drift.ts";
+import { createConfigHandler } from "./config.ts";
 
 const run = promisify(execFile);
 
@@ -79,6 +80,7 @@ const tui = createTui({
     dashboard: createDashboardHandler(engine, width),
     drift: createDriftHandler(),
     compare: createCompareHandler(),
+    config: createConfigHandler(),
   },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).

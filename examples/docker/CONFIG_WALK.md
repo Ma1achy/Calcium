@@ -148,6 +148,24 @@ than `/drift`.
 
 ---
 
+## §3a What the implementation returned to the walk
+
+- **A1's ruling had no rendering.** The walk ruled that a missing image side keeps the block
+  and renders the running file as context lines. `hunksOf` keeps only what sits near a
+  change, so all-context input yields **no hunks at all** — an empty patch block, which is
+  the exact failure A1 rules out, arriving through the function written to serve it.
+  `wholeFile` is the answer and the walk had no reason to know one was needed. Third time
+  the implementation has falsified an artefact of this project.
+- **B5 was right and understated.** `collapsedAfter` is unreachable from the builder
+  (F41) — and the walk called it a scoping call. It is not: a 44-line file with one hunk
+  near the top ends with thirty lines that stop with no statement that anything followed,
+  which is the same *content stopping is indistinguishable from content ending* that C22 I47
+  exists for, one block down.
+- **The layout was never asked about.** Neither artefact has a row for *what does this block
+  look like*, because both index rule interactions and a rendering is not a rule. S8 called
+  itself the unified showcase; `layoutFor` chooses by width and draws split at 120 and
+  unified at 80 (F42). Found by reading a frame, which is the only thing that asks.
+
 ## §4 What this walk settled before any code
 
 1. **`/config <c> <path>` takes the path** (B1) — discovery is unrulable from `inspect`, and
