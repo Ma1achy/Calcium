@@ -25,9 +25,18 @@ import {
 
 const registry = createBlockRegistry();
 
-/** Every block here is three rows, so a region of six holds exactly two. */
+/**
+ * Every block here is three rows and a sequence separates them, so a region of
+ * **eight** holds exactly two — not six.
+ *
+ * **The figure was six and it was the sum of the blocks.** `renderSequenceToLines`
+ * puts a row between blocks, so two three-row blocks cost eight and the old
+ * fixture asserted a window one block wider than the frame could hold. The
+ * control below is what failed when the view stopped measuring a block at a
+ * time, which is the whole reason it names the number instead of assuming it.
+ */
 const ROWS = 3;
-const REGION = { width: 40, height: 6 };
+const REGION = { width: 40, height: 8 };
 
 const chunk = (id: string, text: string): Block =>
   b.panel(text, [b.raw(text, { id: `${id}-c` })], { id });
@@ -64,7 +73,7 @@ describe("C22 §13a — the document view", () => {
     redraws = 0;
     view = createDocumentView({
       overlays,
-      measure: (block, width) => registry.measure(block, width),
+      measureSequence: (blocks, width) => registry.measureSequence(blocks, width),
       region: () => REGION,
       redraw: () => {
         redraws += 1;
@@ -82,7 +91,16 @@ describe("C22 §13a — the document view", () => {
     // to `b.raw` fails *this* row with a reason, rather than silently turning
     // every window assertion into a claim about a different number of blocks.
     expect(registry.measure(chunk("probe", "x"), REGION.width)).toBe(ROWS);
-    expect(Math.floor(REGION.height / ROWS)).toBe(2);
+    // **Measured as a sequence, because that is what the view now asks and what
+    // the frame draws.** Stating it as `height / ROWS` was the arithmetic the
+    // code used rather than the one the terminal does, and the two differ by a
+    // separator per block.
+    const two = [chunk("p", "x"), chunk("q", "y")];
+    expect(registry.measureSequence(two, REGION.width)).toBe(REGION.height);
+    expect(
+      registry.measureSequence([...two, chunk("r", "z")], REGION.width),
+      "and a third does not fit",
+    ).toBeGreaterThan(REGION.height);
   });
 
   it("T4.31 (C22 I45): open pushes a view before the document exists, and fill replaces it", () => {
@@ -179,14 +197,19 @@ describe("C22 §13a — the document view", () => {
     view.fill(docOf([tall("big", 12)]));
 
     const indicator = content()[0] as Block;
-    const self = registry.measure(indicator, REGION.width);
+    const self = registry.measureSequence([indicator], REGION.width);
     // The notice wraps at 40 columns, which is the case the two passes exist
     // for: the indicator's own height is rows the block does not get, so a
     // hard-coded 1 would overstate what is on screen by exactly the wrap.
     expect(self, "the fixture wraps, or the two passes are untested here").toBeGreaterThan(1);
 
+    // The block's cost is its own sequence height, which is what the view
+    // compares against the region — reading `12` off the fixture would be
+    // asserting the arithmetic rather than the frame.
+    const block = content()[1] as Block;
+    const rows = registry.measureSequence([block], REGION.width);
     const shown = REGION.height - self;
-    expect(indicator.kind === "notice" ? indicator.text : "").toContain(String(12 - shown));
+    expect(indicator.kind === "notice" ? indicator.text : "").toContain(String(rows - shown));
     // C04 I6 — a meaning tone needs a glyph, or the notice is colour alone.
     expect(indicator.kind === "notice" ? indicator.glyph : undefined).toBeDefined();
   });
@@ -234,7 +257,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
 
     const view = createDocumentView({
       overlays,
-      measure: (blk, width) => registry.measure(blk, width),
+      measureSequence: (blks, width) => registry.measureSequence(blks, width),
       region: () => REGION,
       redraw: () => undefined,
     });

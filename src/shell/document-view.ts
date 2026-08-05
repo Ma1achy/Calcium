@@ -60,8 +60,21 @@ export type DocumentViewMotion = "up" | "down" | "top" | "bottom" | "pageUp" | "
 
 export type DocumentViewDeps = Readonly<{
   overlays: OverlayManager;
-  /** Measured through the registry, because the window must agree with C15. */
-  measure: (block: Block, width: number) => number;
+  /**
+   * Measured through the registry, because the window must agree with C15.
+   *
+   * **The sequence, not a block at a time** — and that distinction is a defect
+   * this used to have. `renderSequenceToLines` separates blocks, so a window of
+   * *n* blocks is *n* rows taller than the sum of their heights, and a
+   * projection that added `measure(block)` one at a time packed nearly twice
+   * what the region could hold. C15 then cut the excess in silence. The
+   * registry has `measureSequence` for exactly this and the viewport is already
+   * given it (`construct.ts`); this was handed the per-block one.
+   *
+   * Found by reading a frame, not by arithmetic: the split rendered with a
+   * blank row between every block and the projection had no idea.
+   */
+  measureSequence: (blocks: readonly Block[], width: number) => number;
   /** The region a view fills, which is the whole of it (C15 §4). */
   region: () => Readonly<{ width: number; height: number }>;
   /** A frame, because a motion changes what is on screen and nothing else will. */
@@ -132,10 +145,13 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     let used = 0;
     for (let i = from; i < at.blocks.length; i += 1) {
       const block = at.blocks[i] as Block;
-      const rows = deps.measure(block, width);
-      if (out.length > 0 && used + rows > height) break;
+      // The candidate sequence, because what a block costs depends on what is
+      // beside it. Asking the block alone is what put the separator rows
+      // outside the arithmetic.
+      const rows = deps.measureSequence([...out, block], width);
+      if (out.length > 0 && rows > height) break;
       out.push(block);
-      used += rows;
+      used = rows;
     }
     // **I47 — overflow here means exactly one block, and that is a consequence
     // rather than a test.** The loop breaks before a second block can push
@@ -178,7 +194,7 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
     let self = 1;
     for (let pass = 0; pass < 2; pass += 1) {
       const candidate = build(rows - Math.max(0, height - self));
-      const measured = deps.measure(candidate, width);
+      const measured = deps.measureSequence([candidate], width);
       if (measured === self) return candidate;
       self = measured;
     }
@@ -204,10 +220,10 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
   /** The last offset from which the tail still fills the region, or 0. */
   const lastOffset = (at: State): number => {
     const { width, height } = deps.region();
-    let used = 0;
     for (let i = at.blocks.length - 1; i >= 0; i -= 1) {
-      used += deps.measure(at.blocks[i] as Block, width);
-      if (used > height) return Math.min(i + 1, at.blocks.length - 1);
+      if (deps.measureSequence(at.blocks.slice(i), width) > height) {
+        return Math.min(i + 1, at.blocks.length - 1);
+      }
     }
     return 0;
   };

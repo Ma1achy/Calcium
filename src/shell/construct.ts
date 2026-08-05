@@ -615,7 +615,7 @@ export async function constructGraph(
    */
   const documentView = createDocumentView({
     overlays: stores.overlays,
-    measure: (block, width) => built.blocks.measure(block, width),
+    measureSequence: (blocks, width) => built.blocks.measureSequence(blocks, width),
     region: deps.frame.overlayRegion,
     redraw: () => void scheduler.commit("input"),
   });

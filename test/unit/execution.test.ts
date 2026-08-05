@@ -61,7 +61,7 @@ function harness(script: Scripted = {}) {
   const overlays = createOverlayManager({ registry: blocks });
   const documentView = createDocumentView({
     overlays,
-    measure: (blk, width) => blocks.measure(blk, width),
+    measureSequence: (blks, width) => blocks.measureSequence(blks, width),
     region: () => ({ width: 80, height: 24 }),
     redraw: () => undefined,
   });
