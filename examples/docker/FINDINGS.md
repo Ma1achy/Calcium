@@ -1247,7 +1247,7 @@ is not the same thing — the mapping is one block away from the columns it expl
 
 ---
 
-## F34 — a comparison's verdict is colour and nothing else ★★
+## F34 — a comparison's verdict is colour and nothing else ★★ — **the checker's blind spot is fixed**
 
 `comparisonTone` maps `better → ok`, `worse → error`, `same → muted`, and everything else to
 `default`. That tone styles the `b` cell. **There is no glyph, no mark, and no verdict
@@ -1258,11 +1258,56 @@ argument for notices and cells — *colour alone survives neither 1-bit nor a co
 reader* — and `block()` enforces it there. The comparison block is where the framework does
 not hold itself to it.
 
-**Bounded honestly**: it does not defeat frame-read 2. An undrifted container and a failed
-drift are told apart by *content* — values on both sides and `N identical` tallies, versus a
-warning notice and a column of em dashes — and that distinction survives with no colour at
-all. What does not survive is telling a `changed` row from a `same` row **within** one
-drift, which is the block's primary job.
+**Bounded honestly, and the bound moved once it was measured.** Two of the four verdicts are
+recoverable and two are not:
+
+- **`same` and `changed` survive without colour.** The two cells sit side by side and either
+  read alike or do not — a reader derives the verdict from the row itself. So frame-read 2
+  is safe, and so is the `/drift` surface as built.
+- **`better` and `worse` do not.** `200ms` against `150ms` says nothing about which is
+  wanted, and the tone on the `b` cell is the only thing that does. Nothing in `field`, `a`
+  or `b` expresses a judgement, and `ComparisonRow` has no glyph field to put one in.
+
+So the first write-up of this entry — *"a `changed` row and a `same` row are identical"* —
+overstated it, in the same way F32's first pass did: accurate about the mechanism, wrong
+about the consequence. Closing the half that is real means a glyph on `ComparisonRow`, a C04
+spec change, recorded there.
+
+### The checker had a blind spot, and that half is fixed
+
+`expectDocument().degradesTo1Bit()` ends in `hasNoColourOnlyDistinction`, whose whole job is
+finding meaning carried by colour alone. It switched on `block.kind` and ended
+`default: break`:
+
+| | kinds |
+|---|---|
+| checked | 4 — `notice`, `keyValue`, `pills`, `table` |
+| traversed | 2 — `panel`, `group` |
+| **passed in silence** | **11**, including `comparison` |
+
+`validate.ts` has solved exactly this since T2.10 with `Record<BlockKind, KindCheck>` —
+*"a new kind without a row here is a type error, not a silent pass"* — and the compliance
+sweep, in the same package, had the opposite property. **A03 §2's vacuity class in the
+checker**, found because a consumer built the one block kind it skipped.
+
+Fixed: the default now asserts against an enumerated
+`KINDS_WITH_NOTHING_TO_CHECK`, each entry carrying the fact that makes it nothing —
+`logs` prints its level, `steps` selects a glyph from `state`, `plot` substitutes stacked
+strips at one bit, and seven kinds carry no meaning-bearing field at all. `comparison` is
+listed as a schema gap with its reason, the disposal `pills` and `keyValue` already had.
+
+**T2.13** drives the corpus through it, so a kind added tomorrow and wired nowhere fails
+there. **T2.13b** drives an *app-registered* kind, which is the property T2.13 cannot reach:
+with every shipped kind accounted for, deleting the guard kills nothing, because its subject
+is a kind that does not exist yet. A registry takes kinds the union has never seen — that is
+what makes C09 §3's extension mechanism real — so the alien kind is the case an app hits
+first, and before this the sweep reported it compliant without looking at it.
+
+**One measurement in this entry was wrong twice before it was right.** The count above first
+read *four of eleven carry a meaning-bearing field*; a regex reading the type declarations
+ran past `}> & Gap;` and attributed a neighbour's `tone` and `glyph` to `Rule`. `Rule` is
+`{ kind, id, label }`. The compiler is what said so, and the true count is **two** —
+`steps` and `comparison`.
 
 ---
 
