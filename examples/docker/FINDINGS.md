@@ -1,5 +1,10 @@
 # docker-tui — findings
 
+**Triaged in [`TRIAGE.md`](TRIAGE.md)** — the same forty-four grouped by shape and ranked by
+how many surfaces hit them. This file is the log, in the order things were found; that one
+is the view a reader deciding what to do next needs. Past thirty entries, *filed* stops
+telling anyone which are one change and which are forty.
+
 What the first consumer found, in the shape Calcium recorded its own: **the surface that
 needed it**, **what was reached for**, and **whether it is adapter-side work or a real
 Calcium finding**.
