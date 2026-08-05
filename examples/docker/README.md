@@ -1,10 +1,10 @@
 # docker-tui
 
+![docker-tui: a six-beat screencast — the landing dashboard refreshing in place, the /ps table, drilling into a single container where a CPU plot fills one sample at a time beside memory and network bars, a /drift comparison, a unified config diff with syntax highlighting, and a streaming log tail exited with Ctrl-C](demo.gif)
+
 **A terminal interface over `docker`, built on [Calcium](../../README.md).** It is
 the framework's reference application: twelve surfaces, every block type, and a
 findings ledger recording every place the framework did not reach.
-
-![docker-tui](demo.gif)
 
 Six beats, one session, recorded against real containers: the landing dashboard,
 `/ps`, the live single-container view filling its plot, `/drift`, `/config`'s
@@ -42,11 +42,40 @@ measurements, including the one where it did not reproduce.
 
 ---
 
-## What to look at
+## What it looks like, and what each picture proves
 
-The drill-in is the surface everything else was built around: `/ps`, then Enter
-on a container, and watch it breathe. A plot filling one sample at a time, bars
-moving, four independent parts where one failing leaves the other three drawing.
+Every image below is rendered from a committed `.cast` by
+`tools/media.py`, so they regenerate when the app changes rather than rotting.
+**None of them is a cropped screenshot** — one cannot be reproduced, and is right
+only on the day it is taken.
+
+### The drill-in — the surface everything else was built around
+
+![The live single-container view: a CPU plot drawn in braille filling one sample every two seconds, above panels showing memory as a bar, network and block IO totals, and the container's image, state, ports and mounts](../../docs/media/s3-live.gif)
+
+**A structured block that refreshes itself, inside a scrollable transcript.** The
+adapter returns a description four times a second and never draws; the plot, the
+bars, the panels and the failure isolation are the framework's.
+
+### The same table, at 120 columns and at 80
+
+![docker-tui at 120 columns: the banner in block elements, a dashboard with CPU and MEM bars and a USAGE column, and a /ps table with NAME, IMAGE, STATUS and PORTS](../../docs/media/ps-120.gif)
+
+![docker-tui at 80 columns: the banner has fallen back to ASCII letterforms, the dashboard has dropped its USAGE column, the container pills wrap to two lines, and the /ps table has dropped PORTS — keeping NAME, IMAGE and STATUS](../../docs/media/ps-80.gif)
+
+**Four independent things respond, and the adapter asked for none of them.** The
+table drops `PORTS` by declared priority, the dashboard drops `USAGE`, the pills
+wrap, and the wordmark falls back to ASCII because the block-element variant is
+103 cells wide. Column priorities are data on a `ColumnDef`; the rest is C11 and
+C09.
+
+### The block vocabulary, at its least table-like
+
+![A side-by-side unified diff of an nginx config: line numbers down both sides, thirty deleted lines on a dark red background, two added, syntax colouring on directives and paths, and a summary reading one hunk plus two minus thirty](../../docs/media/config-diff.gif)
+
+---
+
+## What to look at
 
 | | |
 |---|---|
@@ -68,7 +97,7 @@ This directory is mostly evidence. In the order that makes sense:
 
 | | |
 |---|---|
-| [`FINDINGS.md`](FINDINGS.md) | sixty entries, logged in the order they were hit |
+| [`FINDINGS.md`](FINDINGS.md) | sixty-nine entries, logged in the order they were hit |
 | [`TRIAGE.md`](TRIAGE.md) | the same, grouped by shape and ranked by consumer count |
 | [`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) | **the deliverable** — four pieces of framework work, each with a real surface behind it |
 | [`DEGRADATION.md`](DEGRADATION.md) | the same view at five colour depths, as frames |

@@ -23,6 +23,10 @@
       "default": "./dist/fixtures/index.js"
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ma1achy/Calcium.git"
+  },
   "files": [
     "dist",
     "README.md",
