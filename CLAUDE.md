@@ -1,4 +1,4 @@
-# tui-kit
+# Calcium
 
 A framework for building terminal user interfaces over JSON-emitting CLIs.
 The specs are the contract: 25 component specs, 4 architecture documents.

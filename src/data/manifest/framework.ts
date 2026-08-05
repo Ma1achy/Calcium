@@ -1,5 +1,5 @@
 /**
- * C05 §3 — the six verbs `tui-kit` ships, as rows in every parsed manifest.
+ * C05 §3 — the six verbs Calcium ships, as rows in every parsed manifest.
  *
  * **They are verbs.** They have names, take arguments, complete, validate and
  * appear in help; everything the manifest exists to describe is true of them,

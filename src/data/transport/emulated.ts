@@ -2,7 +2,7 @@
  * The development transport: a closure stands in for the far side.
  *
  * C06 §1 — see spec. `createEmulatedTransport` takes a **handler function**, not
- * a world object, and that is the whole of the coupling: `tui-kit` references no
+ * a world object, and that is the whole of the coupling: Calcium references no
  * app type, and C08's world stays entirely on the app side behind a closure
  * (commitment 15).
  *

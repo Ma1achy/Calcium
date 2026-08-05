@@ -1,7 +1,33 @@
 # docker-tui — start here
 
+> **This briefed work that is now finished.** All eight steps landed; the application is
+> complete against `DOCKER_TUI_SURFACES.md` and R01 §13 scores what it did and did not
+> prove. It is kept because **the predictions are the useful part** — a brief that names
+> what it expects to find, beside a ledger of what was actually found, is a measurement of
+> how well anyone can see a framework's gaps before building on it.
+>
+> Read it that way, and then read these:
+>
+> | | |
+> |---|---|
+> | [`examples/docker/README.md`](examples/docker/README.md) | what the application is, and how to run it |
+> | [`examples/docker/FINDINGS.md`](examples/docker/FINDINGS.md) | sixty-five entries, in the order they were hit |
+> | [`docs/ROADMAP.md`](docs/ROADMAP.md) | **the deliverable** — what the findings turned into |
+> | [`DOCKER_TUI_SURFACES.md`](DOCKER_TUI_SURFACES.md#appendix--the-corrections-index) | the design, and nineteen corrections to it |
+>
+> **How the two predictions below scored**, since that is what this file is now for:
+> gap 7 was **answered before it was probed** and the premise was wrong (F20) — the arm
+> was tested, the *producer* was missing. Gap 3 was **right and too narrow**: it named a
+> continuous axis, and the same collision arrived categorically in `/diff` (F49) and as an
+> absent field in `/events` (F51). It is `docs/ROADMAP.md` entry 4, at three consumers.
+>
+> **One prediction in this file was simply wrong and is worth the sentence.** The proof
+> gate below is written around Verdaccio, by name. It ships without one — `npm publish
+> --dry-run` plus `npm pack` plus a clean install prove everything a round trip would,
+> for 316 fewer packages, and `tools/proof.sh` opens by saying so.
+
 You are building **docker-tui**, the reference application for **Calcium** (a terminal-UI
-framework, formerly `tui-kit`). It lives in the Calcium monorepo at `examples/docker/` and
+framework, formerly Calcium). It lives in the Calcium monorepo at `examples/docker/` and
 consumes Calcium as a packaged dependency — see "Setup" below for why that distinction is
 load-bearing.
 

@@ -3,29 +3,36 @@
 | Field | Value |
 |---|---|
 | **Type** | Architecture |
-| **Covers** | `tui-kit` · `docker-tui` · `prism-tui` |
+| **Covers** | Calcium · `docker-tui` · `prism-tui` |
 | **Source** | A02 §1 · A03 · R01 §8 · C24 §2 |
 | **Status** | Draft |
 
 ---
 
-## 1. Three repositories
+## 1. Three deliverables, two repositories
 
-| Repo | Contains | Publishes |
-|---|---|---|
-| `tui-kit` | C01–C25, the framework | A package to GitHub Packages, private |
-| `docker-tui` | R01, the reference app | Nothing — proof, plus an import manifest |
-| `prism-tui` | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
+| Deliverable | Where it lives | Contains | Publishes |
+|---|---|---|---|
+| Calcium | `Calcium/` | C01–C25, the framework | A package to GitHub Packages, private |
+| `docker-tui` | `Calcium/examples/docker/` | R01, the reference app | Nothing — proof, plus an import manifest |
+| `prism-tui` | its own repository | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
 
 Separate rather than a monorepo because R01 §8's argument generalises: **a workspace path alias proves nothing about the package being a package.** Missing files in `files`, a wrong `exports` map, unresolvable type declarations, a peer dependency that is really a hard one — all invisible from inside a workspace, all immediately visible from outside.
 
-`prism-tui` could be a workspace member of the Prism monorepo. It should not be, for the same reason.
+**`docker-tui` resolved differently, and the argument above is why it could.** R01 §8 moved it to `Calcium/examples/docker/` on the finding that separation was never the goal — *building against the packaged artefact* was, and separation was one way to get it. Two mechanisms buy the same guarantee inside the workspace:
+
+- **The seal.** `"@fmx/calcium": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to three entry points, so `import "@fmx/calcium/src/…"` is a resolution error enforced by npm rather than by discipline.
+- **The proof.** `make proof` packs the real tarball, installs it into a tree that has never seen this repository, and runs the app's suite against it — refusing to proceed if npm resolved a symlink instead.
+
+**The distinction that makes this safe is what a repository boundary was actually protecting.** It was never the file layout; it was the resolution path. A boundary enforced by `exports` fails the same way a boundary enforced by separation does — at install, not at review — and it fails on every developer's machine rather than only in CI.
+
+`prism-tui` could be a workspace member of the Prism monorepo. It should not be, and the reason does not transfer from `docker-tui`: it is a *different organisation's* application, so the boundary being protected there is ownership rather than resolution, and no `exports` map enforces that one.
 
 ---
 
 ## 2. Dependency posture
 
-**`tui-kit` has three runtime dependencies: `react`, `ink` and `lowlight`.**
+**Calcium has three runtime dependencies: `react`, `ink` and `lowlight`.**
 
 It had two for most of the specification, and that was worth saying because **two was a property that fell out of the specs rather than a target we were defending.** Every other candidate had an internal alternative the specs made better: `Intl.Segmenter` over a grapheme splitter, C10's own arithmetic over a colour library, an injected `() => number` over a date library.
 
@@ -92,8 +99,39 @@ That is the exact shape of failure this section exists to prevent, produced by t
 
 ## 4. Devcontainers
 
-One per repo. **Required for development, never required for consumption** — and
-those are different claims that an earlier draft ran together.
+**One per thing that needs a different machine, not one per repository.**
+**Required for development, never required for consumption** — and those are
+different claims that an earlier draft ran together.
+
+The rule used to read *one per repo*, which was the same sentence as the one
+above for as long as §1's three deliverables lived in three repositories. Once
+`docker-tui` moved into `Calcium/examples/`, the two came apart, and the wrong
+half was the one that got followed: the docker feature was added to the
+framework's container, which is the only reading *one per repo* allows and the
+one this section's own next paragraph forbids.
+
+**An example that needs a far side gets its own container, and the framework's
+must not acquire it.** That is the rule, and it is the concrete form of the
+paragraph below: a container the framework does not need is a dependency the
+framework does not have, and the whole value of "never required for consumption"
+is that nothing under `src/` may come to assume the container is there. A socket
+in the framework's container is exactly how that assumption gets made — not
+deliberately, but by someone reaching for `docker` in a test because it happened
+to be on `PATH`.
+
+**The separation is in what is installed, not in where the file sits.** Both
+configs live under `.devcontainer/`, because a devcontainer config in a
+subdirectory makes that subdirectory the workspace — and the example's
+dependency is `"@fmx/calcium": "file:../.."`, which then points outside the
+mount and fails to install. `.devcontainer/<name>/devcontainer.json` is the
+supported multi-container layout and each mounts the repository root, so the
+path resolves to the thing it names. **This is the rule's cheapest possible
+failure**: an example's container placed beside the example, for the obvious
+reason, that cannot install the example.
+
+The cost is real and is the reason it was not done first: a full pass now needs
+both containers up, and every working note that names one has to say which.
+`examples/docker/VERIFYING.md` carries that mapping.
 
 Contributors and agents work inside the container: Node parity with CI, the
 `node-pty` toolchain, reproducibility, and blast radius. Consumers must never need
@@ -103,11 +141,27 @@ quietly become "if they adopt our container".
 
 Concretely, R4.4 is `clean clone → npm install → npm start → running shell, no further steps`, and the container appears nowhere in it.
 
-| Repo | Base | Adds | For |
-|---|---|---|---|
-| `tui-kit` | Node 22 | `node-pty` build deps · an explicit node feature pinning 22 | C01–C03's PTY tests |
-| `docker-tui` | Node 22 | Docker socket mounted read-only | R4.2's real-docker run |
-| `prism-tui` | Node 22 | Python 3.12 + the Prism CLI | Conformance and `record --against`, locally |
+| Container | Config | Base | Adds | For |
+|---|---|---|---|---|
+| Calcium | `.devcontainer/` | Node 22 | `node-pty` build deps · an explicit node feature pinning 22 | C01–C03's PTY tests |
+| `docker-tui` | `.devcontainer/docker-tui/` | Node 22 | `docker-outside-of-docker` · a built `dist/` · the `docker-tui` bin linked | R4.2's real-docker run |
+| `prism-tui` | its repo's `.devcontainer/` | Node 22 | Python 3.12 + the Prism CLI | Conformance and `record --against`, locally |
+
+**Outside-of-docker, not in-docker, and not a read-only socket.** An earlier
+draft of this row said *"Docker socket mounted read-only"*, and it was wrong
+twice. The feature mounts the host socket read-write — it must, because the CLI
+writes requests to it — so the row described a configuration nobody had. And a
+read-only bind of a unix socket restricts nothing anyway: `ro` governs the
+directory entry, not the byte stream, so a reader who believed the row would
+have believed in a control that cannot exist. **A sentence naming a security
+property is a claim about a mechanism, and this one named neither the mechanism
+in use nor a mechanism that works.** The real control is that the socket is in
+one container, reachable by one example, and the framework cannot see it.
+
+Nested docker is refused for a different reason: a nested daemon gives the app
+an empty container list, which reads as *a working app with nothing to show*
+rather than as a misconfiguration. The frames must be read against real
+containers.
 
 `prism-tui`'s carries Python **because the container exists to make local testing possible**, and conformance is the test you most want to run before pushing. A container that forced a CI round-trip to check the boundary would defeat its purpose.
 
@@ -177,7 +231,7 @@ The budget argument survives intact, because a PR runs the expensive tier once p
 
 | Repo | Last stage |
 |---|---|
-| `tui-kit` | Publish on tag to GitHub Packages, with attestation and SBOM |
+| Calcium | Publish on tag to GitHub Packages, with attestation and SBOM |
 | `docker-tui` | Real-docker run **where available; the skip is recorded, not silent** (R01 §8) · publish the import manifest on release |
 | `prism-tui` | Conformance against the real CLI where available; `record --diff` reporting structural drift. **No CI yet — local `make all` for now** |
 
@@ -237,7 +291,7 @@ It encodes: read the spec's commitments and invariants first; one test per invar
 
 ## 9. Distribution
 
-**Not published publicly.** `tui-kit` publishes on tag from CI to **GitHub Packages**, private.
+**Not published publicly.** Calcium publishes on tag from CI to **GitHub Packages**, private.
 
 Consumers install it as an ordinary npm dependency pointed at that registry:
 
@@ -257,7 +311,7 @@ This is unchanged in every way that matters for R01's argument. Installing from 
 
 ### Why not a git dependency
 
-`"tui-kit": "git+ssh://git@gitlab.fmx/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
+`"@fmx/calcium": "git+ssh://git@gitlab.fmx/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
 
 **Git dependencies install from source and need a `prepare` script to build** — and A04 §3 bans install scripts outright, because postinstall is the primary npm attack vector. Allowing one for this would be trading the single most valuable supply-chain control for the convenience of not configuring a registry.
 
@@ -270,7 +324,7 @@ Two commitments have to be honest about it:
 - **No npm provenance.** `--provenance` produces a signed attestation verifiable by anyone; it is a public-registry feature. GitHub Actions attestation links the artefact to its workflow, which is the useful part privately, but it is not the same guarantee and should not be described as one.
 - **`npm audit` still works**, because it queries the advisory database rather than the registry the package came from. The gate is unaffected.
 
-`tui-kit` publishes on tag from CI, never a laptop.
+Calcium publishes on tag from CI, never a laptop.
 
 | | |
 |---|---|
@@ -286,8 +340,8 @@ The reference app bumping is the release gate. It lives in another repo precisel
 
 ## 10. Commitments
 
-1. Three repositories, not a monorepo, so each package is exercised as a package.
-2. `tui-kit` has three runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
+1. Every package is exercised as a package — by separation where the boundary is ownership, and by a sealed `exports` map plus a pack-and-install gate where it is resolution. `docker-tui` takes the second route (§1); `prism-tui` takes the first.
+2. Calcium has three runtime dependencies; the specs require no more. The count is an outcome of the justification bar, not a target.
 3. A new dependency needs a justification in `DEPENDENCIES.md`, and A03 asserts the file matches `package.json`.
 4. `--ignore-scripts` from the first commit, for the whole tree. One dev dependency needs a native build, and it is invoked by name from `make install` rather than by re-enabling install scripts; A03 SS32 names it as its single exception.
 5. `npm ci` in CI, lockfile committed and reviewed.
@@ -304,6 +358,8 @@ The reference app bumping is the release gate. It lives in another repo precisel
 16. Heavy stages run on `main` and tags; `enforce` runs on every push regardless.
 17. `CLAUDE.md` states the invisible rules, and instructs that a wrong spec is changed before the code.
 18. One skill — `implement-component`.
+19. One container per thing that needs a different machine, not one per repository. An example needing a far side gets its own; the framework's acquires nothing the framework does not have.
+20. The socket lives in one container, and no claim is made that it is read-only — a read-only bind of a unix socket is not a control (§4).
 
 ---
 

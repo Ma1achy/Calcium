@@ -66,7 +66,7 @@ interface LocalRegistry {
 }
 ```
 
-`tui-kit` ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
+Calcium ships handlers for the concerns it owns — `/help` renders from the manifest (C16 §6, so documentation cannot drift), `/clear` empties C13, `/theme` switches C10, `/history` reads C20, `/debug` reads an entry's invocation record, `/exit` calls `C22.stop`. An app registers its own alongside them.
 
 **The six are rows in every manifest (C05 §3), and that is what makes them reachable.** C18 classifies `local` from the manifest, so a handler for a verb the manifest does not declare is one nothing can ever route to — which is exactly what I27's reconciliation reports. Registering the handlers without the rows was tried and failed construction on all six, correctly.
 

@@ -35,7 +35,7 @@ type TransportMode = "emulated" | "fixture" | "subprocess";
 function createTransport(deps: TransportDeps): VerbTransport;   // mode is a field of deps
 ```
 
-**C06 does not read the environment** (I18). `PRISM_TUI_TRANSPORT` is resolved by the *app's* entry point — `prism-tui` and `docker-tui` each read their own and pass a constructed router through `TuiConfig.transport`. `tui-kit` ships no binary, and a variable named for one consumer has no business inside a framework that claims to serve others. It is also what keeps SS10 true: the only file under `src/` that touches `process.env` is C02's, reading an injected record.
+**C06 does not read the environment** (I18). `PRISM_TUI_TRANSPORT` is resolved by the *app's* entry point — `prism-tui` and `docker-tui` each read their own and pass a constructed router through `TuiConfig.transport`. Calcium ships no binary, and a variable named for one consumer has no business inside a framework that claims to serve others. It is also what keeps SS10 true: the only file under `src/` that touches `process.env` is C02's, reading an injected record.
 
 Nothing else in the codebase branches on mode.
 
@@ -116,7 +116,7 @@ function createRouter(opts: {
 }): TransportRouter;
 ```
 
-`createEmulatedTransport` takes a **handler function**, not a world object. `tui-kit` must not reference an app type, and a closure keeps the fixture world entirely on the app side (C08) while the framework supplies only the interface.
+`createEmulatedTransport` takes a **handler function**, not a world object. Calcium must not reference an app type, and a closure keeps the fixture world entirely on the app side (C08) while the framework supplies only the interface.
 
 `cwd` is a function, not a value. The shell's working directory changes when the user runs `cd` (C18 built-in), and a captured string would spawn every subsequent verb in the original directory.
 
@@ -285,10 +285,10 @@ Settling covers success, failure, cancellation and timeout alike — every path 
 9. Malformed-line degradation needs 10% *and* a 10-line floor, depends on arrival order by design, and is sticky once tripped (I12).
 10. One non-streaming invocation at a time; streams are exempt (I13).
 11. Transport is selected per verb, defaulting when unmapped (I14).
-12. Three implementations behind one interface, selected by one mode value; nothing else branches on mode. The **app's** entry point resolves `PRISM_TUI_TRANSPORT` and passes a constructed router through `TuiConfig.transport`; `tui-kit` has no binary and reads no environment (I18).
+12. Three implementations behind one interface, selected by one mode value; nothing else branches on mode. The **app's** entry point resolves `PRISM_TUI_TRANSPORT` and passes a constructed router through `TuiConfig.transport`; Calcium has no binary and reads no environment (I18).
 13. Tests run against the recorded corpus, never the emulator's world, so emulator drift cannot mask a regression (I17).
 14. `cwd` is read at spawn time so pass-through `cd` is honoured (I22).
-15. The **emulated** transport takes a handler closure; `tui-kit` references no app type. The fixture transport takes a corpus (I23).
+15. The **emulated** transport takes a handler closure; Calcium references no app type. The fixture transport takes a corpus (I23).
 16. Line buffering is bounded at 1 MB (I11).
 17. All three implementations are substitutable in every test that does not concern spawning (I15).
 18. The fixture transport replays and nothing else — no clock, no world state (I16).

@@ -4,7 +4,7 @@
 |---|---|
 | **Type** | Surface |
 | **Tier** | Transcript — the session's first entry |
-| **Package** | `prism-tui` (content) on `tui-kit` (blocks) |
+| **Package** | `prism-tui` (content) on Calcium (blocks) |
 | **Data source** | Static · C22 `SessionSnapshot` · `whoami` · GitLab MR query · `ps --mine` |
 | **Source** | `t01` §What the dev sees before typing · A01 D24a · C22 §4 step 7 |
 | **Status** | Draft |

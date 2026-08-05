@@ -229,7 +229,7 @@ a drawing's terms, rather than in the terms of the layer that has to satisfy it.
 
 `TuiConfig.manifest` is typed `Manifest | string`. **Neither arm worked.**
 
-**The object arm** throws at construction: *"the manifest is missing tui-kit's own verbs
+**The object arm** throws at construction: *"the manifest is missing Calcium's own verbs
 (help, clear, theme, history, debug, exit) — pass the raw document, or the result of
 parseManifest, rather than a hand-built Manifest"*. `parseManifest` is the only thing that
 appends them — `construct.ts:261` says so in a comment — and it was exported from **none**
@@ -1871,3 +1871,423 @@ the last thing left that cannot render.
 Filed, not fixed. C22 §6 owns the prompt and gives it no capability-dependent form, so this
 wants a ruling — a pair like C09's, or a `PROMPT` that takes the record — rather than a
 character swapped in place.
+
+---
+
+## F56 — a `bin` entry is a claim about an executable, and nothing checks it ★★★ — **fixed**
+
+`examples/docker/package.json` has declared
+
+```json
+"bin": { "docker-tui": "./src/main.ts" }
+```
+
+since the app's first commit. It could never have run, and the declaration was accepted at
+every stage that could have refused it — install, pack, `npm publish --dry-run`, and `make
+proof`, which installs the real tarball into a clean tree and runs the suite against it.
+
+**Which of the two problems was fatal was measured, because the first version of this entry
+guessed and guessed wrong.** It said npm links the path without looking at the mode or the
+shebang. Half of that is false:
+
+```
+$ cat package.json               # bin: { "bt": "./cli.ts" }, cli.ts is mode 644
+$ npm install file:../pkg
+after install, source: 755       # npm chmods the bin target
+after install, linked: 755
+$ ./node_modules/.bin/bt
+./node_modules/.bin/bt: 1: Syntax error: word unexpected (expecting ")")
+```
+
+**npm fixes the mode and cannot fix the shebang.** So the mode was never the barrier — it
+explains an unrelated puzzle instead, which is why `src/main.ts` had quietly become `755`
+in the working tree: npm had been chmodding it at every install for as long as the field
+pointed there. The fatal half is the missing `#!`: the kernel hands the file to `sh`, which
+parses TypeScript as shell and says so. That line is what a user would have got.
+
+**The `.ts` extension is the second half and is independent.** With a shebang added, the
+file would load — Node strips types by default from 22.18 — and fail with a syntax error on
+22.0, which `engines: ">=22"` permits.
+
+**The reason nothing noticed is the reason it is worth filing.** Three separate consumers
+existed and all three reached around the entry point:
+
+| consumer | what it ran |
+|---|---|
+| the test suite | the modules, imported directly |
+| every session | `npm start`, which named `src/main.ts` itself |
+| `tools/capture.py` | `node --experimental-strip-types src/main.ts` |
+
+That is **F7's shape exactly** — `createTui` unusable from the public surface and invisible
+because every internal caller reached around it — reproduced one level out, in a manifest
+field rather than an export. And it is **F52's vacuity shape**: a declaration with a
+documented purpose, a value, and no producer. F52 was a parameter with a spec, a precedence
+rule, four unit rows and a tier-5 row, all green, and no consumer; this is the mirror.
+
+**The app's own help had been advertising the broken command for four steps.** Run without
+a TTY it prints `docker-tui  open the interactive shell`, which is a sentence about a
+command that did not exist.
+
+Fixed: `bin/docker-tui.js`, a shebanged launcher, mode `0755`, with `package.json`
+repointed. **`tools/capture.py` now spawns the bin rather than the module**, so every frame
+this repository reads goes through the entry point a user has — which is where a broken
+launcher becomes cheap to notice.
+
+`test/bin.test.ts` covers it in four rows, resolving the path *through the manifest field*
+so that repointing the field moves the test with it. Mutations, each run inside the
+container:
+
+| mutation | rows killed |
+|---|---|
+| `bin` back to `./src/main.ts` | 4 of 4 |
+| the execute bit removed | 2 — the mode row, and the spawn with `EACCES` |
+| the shebang removed | 2 — the shebang row, and the spawn |
+| the launcher imports nothing | 1 — the spawn |
+
+**And the mutation pass produced a finding about itself.** Run from the host, `chmod 644`
+left the container reading `755` — measured: Docker Desktop's bind mount does not propagate
+the mode. A mutation applied on the host never reached the file the test opens, and it did
+not fail cleanly either; it produced a *partial* result, which reads as a weak assertion
+rather than as a broken experiment. The rule is the fixture rule pointed at the harness:
+**mutate in the same filesystem view the test reads**, and the row now records the limit
+beside itself rather than leaving it to be rediscovered.
+
+---
+
+## F57 — a comparison frame that varied two axes, in the document arguing for frames ★
+
+`DEGRADATION.md`'s banner pair was captioned *"at both ends of the unicode axis"* and was
+not. The block-element wordmark is **103 cells** wide and the ASCII one is **76**; the five
+depth frames beside it were captured at **100**, where the block variant cannot fit and the
+app falls back for a reason that has nothing to do with the locale. Either the pair was
+taken at a width it never stated, or it was taken at 100 and the frames disagree with the
+caption. Both frames were also **cut mid-line** — the one rule the document exists to
+argue for.
+
+Re-captured at 120, where both variants fit, with the width stated and the frames whole.
+The claim survives: same terminal, same width, `LANG=en_GB.UTF-8` against `LANG=C`.
+
+**The general form is not "state the width".** It is that a fallback ladder has as many
+axes as it has guards, and `bannerLines` has two — `if (v.blocks && !blocks) continue` and
+`if (widthOf(v.lines) <= width) return`. A comparison that varies one of them while the
+other silently decides the answer is a frame-read that cannot be wrong, which is A03 §2's
+vacuity class arriving as a demonstration. **Read the ladder before choosing the pair.**
+
+---
+
+## F58 — the only way to satisfy the compiler is to assert something false ★★★
+
+`RawResult.exitCode` is `number | null`. `DocumentMeta.exitCode` is `number`. So
+the obvious line does not type-check:
+
+```
+meta: { exitCode: raw.exitCode, … }
+  Type 'number | null' is not assignable to type 'number'.
+```
+
+**Every adapter in this repository writes `result.exitCode ?? 0`** — `ps.ts:176`,
+`verbs.ts:46`, and four more. `null` means *the process was killed by a signal
+and never exited*, and `?? 0` reports that as a clean success. `RawResult` even
+carries `signal` beside it, and `DocumentMeta` has no field for it, so the
+information is available at the coercion and has nowhere to go.
+
+**Found by the second consumer, which is the whole argument for having one.**
+Nobody writing the sixth adapter in an existing file questions a line the five
+above it already contain. `examples/minimal` is forty lines written from the
+public surface with no house style to copy, and it hit the same wall on its first
+compile — which is the evidence that this is the API's shape rather than a habit.
+
+Filed rather than fixed. The choices are all Calcium's: widen `DocumentMeta` to
+`number | null`, add `signal`, or say in C04 that a signalled process is exit 0
+and mean it. **The third is defensible and is not what the type says today** — it
+is what six call sites say, silently, one `??` at a time.
+
+---
+
+## F59 — a published example that does not compile, and the reason it does not ★★
+
+The root README's `b.live` snippet, unchanged since it was written and shipped in
+every tarball (`files` includes `README.md`):
+
+```ts
+b.live({ id: "metrics", every: 30_000, fetch: () => api.metrics(),
+         render: data => b.kv({ cpu: data.cpu, memory: data.memory }) })
+```
+
+Type-checked for the first time in step 8. Three errors:
+
+| | |
+|---|---|
+| `title` is missing | it is required on `LiveSpec`, and the example never had it |
+| `data.cpu` | `render` is `(data: unknown) => Block` |
+| `data.memory` | the same |
+
+**The second is the finding and the first is the symptom.** `fetch` returns
+`Promise<unknown>` — honestly, because the far side's shape is not Calcium's to
+know — so `render` receives `unknown` and every real call site narrows it:
+`render: (data) => ioBlock(data as Row | null, unicode)`. The README advertised
+an ergonomics the builder does not have, and it read as correct because the
+shape is exactly what a reader expects.
+
+Corrected in place, with the cast shown and named rather than tidied away. The
+generalisation is F27's, one level out: **an example is a claim about an API, and
+an unchecked one is a claim nothing can refute.** The marked block in the README
+is now quoted from `examples/minimal/main.ts` and checked by a row; this snippet
+is not, and that limit is recorded beside the row rather than left implicit.
+
+---
+
+## F60 — the proof gate had been red for two PRs, and it is the one CI does not run ★★★ — **fixed**
+
+`make proof` fails on `main`. Two of the app's test files import
+`../../../dist/…` — F36's missing validator and F37's missing measurer, both
+recorded — and **that path is relative to this checkout.** The gate copies the
+example into a tree that has never seen the repository, where `../../../dist`
+resolves to nothing, so both files fail at import before a single assertion runs:
+
+```
+Error: Cannot find module '../../../dist/data/viewmodel/index.js'
+       imported from /tmp/tmp.hfOh8ELsp0/docker/test/documents.test.ts
+Test Files  2 failed | 12 passed (14)
+```
+
+`inspect.test.ts` landed in PR #20. **The gate has been broken since, and nothing
+noticed, because `make proof` is the one target CI does not run** — which
+`docs/ROADMAP.md` already listed as an outstanding item. This is what the item
+cost: two merges past a red gate, and the roadmap's own entry sitting one line
+above the reason it mattered.
+
+**Three findings stacked, and only the third is new.** F36 and F37 are why the
+reach exists. This is that the reach was aimed at a *repository*, so the
+workaround for a missing export silently excluded itself from the check that
+exists to test the package. **A workaround that cannot survive the boundary it
+works around is a second defect wearing the first one's clothes.**
+
+Fixed in `test/deep.ts`: `dist/` is inside the tarball, so the same modules
+resolve from the package root — the repository in the dev loop,
+`node_modules/@fmx/calcium` under the gate. One expression, both worlds, and it
+is still a deep import and still F36/F37.
+
+`make proof` now runs both examples and passes: `PROOF_EXIT=0`, 233 and 3.
+
+---
+
+## F61 — `/logs` had never worked, and no assertion could have said so ★★★ — **fixed**
+
+`/logs dtui-web` opens a pushed view and renders **an empty screen**. Reproduced
+in isolation, then narrowed to the shim, then to one word of it.
+
+`bin/docker-json` wraps each log line as `{"line":"…"}` — F45's translation,
+because `docker logs` emits no JSON — and it did the wrapping with `awk`.
+**mawk, which is `/usr/bin/awk` on Debian and therefore in this container,
+block-buffers its input.** `fflush()` governs output and has nothing to say about
+that. Measured:
+
+| | |
+|---|---|
+| `docker logs --follow ... \| cat`, 4s | **150 lines** |
+| `docker logs --follow ... \| awk '{print NR; fflush()}'`, 4s | **0 lines** |
+| the same with 11 KB of log already present | still 0 |
+| a slow generator into `sed -u` or `while read` | every line, immediately |
+
+A stream that *ends* is fine: mawk hits EOF, processes the remainder, everything
+appears. A `--follow` never ends. So the defect is invisible to every finite
+test and visible in every real use.
+
+**Why nothing caught it, and this is the part worth keeping.** `test/shim.test.ts`
+had twenty rows and every one asserts **argv** — what the shim hands docker.
+There was no row asserting a line comes back out, and the fake `docker` the rows
+use *prints and exits*, which is exactly the shape that hides it. A test that
+calls the mechanism and never the wiring, with the fake supplying the very
+property under test.
+
+It is also the empty-block class arriving through the instrument rather than the
+data: *nothing on screen* and *nothing to show* are the same picture, and a
+pushed view removes the prompt, so there was not even a cursor to suggest the app
+was alive.
+
+Fixed with `sed -u`, which is line-buffered by request. Its output was diffed
+against the awk program's on every escape case — plain, quote, backslash, tab,
+CR — **before** the replacement was written, so the repair could not quietly
+change the format while fixing the buffering.
+
+Two rows added, and they are about **arrival**, not about which program wraps:
+a second fake that writes three lines slowly and then does not exit, and
+`timeout` rather than `head`, because closing the pipe ends the stream and hands
+back the buffered-flush behaviour being ruled out. Reverting the shim to `awk`
+kills both and nothing else.
+
+---
+
+## F62 — the headline shot was a flat line ★★
+
+`make fixtures` ran `dtui-load` as `while :; do :; done`, which is what you reach
+for when you want load. Read back off the recording, the live single-container
+view — the composition the whole demo was built around — was **a flat line at
+100% across the full width of the plot.**
+
+Correct, honest, and the least interesting figure C12 can draw.
+
+**Nothing in any suite could have said so.** The plot's height, its axis labels,
+its sample count and its bounds were all exactly right; `degradesTo1Bit` passed;
+the arithmetic was perfect. A constant is a valid series. Only looking at it
+says that a demo of a plot should have a shape.
+
+Bursts of differing length instead — `5 3 7 2 6 4` seconds busy, three idle
+between — measured at 108%, 0%, 65%, 109%, 0%, 68% across six samples. The
+recording now shows a curve rising and falling.
+
+**The class is "correct for the fixtures is a property of the fixtures".** It has
+appeared before as a defect proportional to a small count; this is its other
+face, where the fixture is not too small but too *uniform*, and no assertion
+about the code can reach it.
+
+---
+
+## F63 — the recording and the frames disagreed, and the recording was wrong ★★
+
+`tools/capture.py`'s new asciicast writer decoded each read independently with
+`errors="replace"`. `os.read` splits on **bytes**, so a 64 KiB read lands
+mid-UTF-8-sequence whenever the terminal is drawing box characters — which is
+continuously, here. The result was U+FFFD in the middle of a panel border, and
+the panel then wrapped: a corrupted frame in the recording with the raw capture
+beside it perfectly intact.
+
+Found by reading a beat, not by reading the writer. The raw stream and the cast
+come from **one** capture on purpose — so that a frame-read and a played beat
+cannot disagree about what happened — and this was the two disagreeing.
+
+Fixed with an incremental decoder, which carries a partial sequence into the next
+chunk. `errors` is left strict: there is now nothing for it to paper over, and a
+failure would be a real one. Zero U+FFFD in the re-recorded cast, against 1 per
+beat before.
+
+**And the cut had the same shape as the corruption.** The first frame-read of the
+recording sliced the stream at chosen timestamps — "beat one is t=8.0" — and
+showed a container listed twice and a row with a broken sequence. Both were the
+cut landing mid-redraw. `tools/beats.py` cuts at a **gap in the output** instead:
+a terminal redraws in a burst and then goes quiet, so the last frame before a
+pause is a settled screen by construction. VERIFYING.md §8's hazard, pointed at
+the reading instrument rather than at the capture.
+
+---
+
+## F64 — the app never built the block the surface was written for ★★
+
+S9's drawing shows a pushed logs view with a titled panel, a `following · 342 lines`
+header, key hints along the bottom, and `▐` tone on a `WARN` line. Its **Exercises**
+line claims *tone on individual lines (WARN/ERROR coloured)*.
+
+`src/logs.ts` builds `b.raw(text)`. One block per line, no timestamp, no level, no tone.
+
+**Every step of the chain removes the information the drawing needed**, and each step is
+correct on its own:
+
+- `docker logs` emits plain text, so there is nothing structured to read (F46 already
+  found that half of it goes to stderr);
+- the shim wraps each line as `{"line":"…"}` because C07's fallback would otherwise
+  accumulate the whole follow into one growing `raw` block (F45);
+- so the adapter receives one opaque string per line, and `b.logs` wants `{ts, level,
+  message}`.
+
+**`b.logs` therefore has no consumer in this application at all**, which is the same
+shape as F10 — `b.live`'s streaming arm, unexercised for a different reason. Two block
+behaviours the reference app was expected to demonstrate and does not, and in both cases
+because the far side is not the shape the block assumes.
+
+Filed rather than fixed. Parsing a level out of arbitrary container output is the thing
+R01 commitment 5 forbids for `Ports` and forbids here for the same reason: *a parser would
+be wrong within a release*, and nginx, postgres and a shell script agree on nothing.
+
+**What it costs is a claim, not a feature.** The surfaces document says this app exercises
+tone on log lines. It does not, and until this entry nothing said so.
+
+---
+
+## F65 — a drawing wrong about itself, which no measurement could catch ★
+
+S10's tally:
+
+```
+   ~ /var/log/nginx           modified
+   + /var/log/nginx/access.log added
+   + /tmp/cache               added
+   - /etc/nginx/default.conf  deleted
+
+   3 added · 1 modified · 1 deleted
+```
+
+Four rows above; five in the tally. Two `+`, not three.
+
+**Every other instance of the drawing-was-wrong class is a drawing wrong about the
+world** — what docker sends, what the framework does. Running docker a thousand times
+would not have found this one, because it is not a claim about docker. It is the picture
+disagreeing with its own caption.
+
+That is the class the by-hand walk reaches and nothing else does: a classification table
+indexed by rule interaction reads a drawing **against itself**, which is exactly the
+operation no test performs. And it is the same shape as the tally rows in `/drift` that
+DRIFT_WALK insisted on — a summary that a reader can check against the thing it summarises
+is worth having *because* a reader can check it, and this one has been unchecked since it
+was written.
+
+Corrected in the index rather than in the drawing, with the tone mapping beside it: S10 is
+the surface where the drawing was wrong twice, once about the framework (F49 — `b.row`
+throws, because C04 I6 requires a glyph for `error`) and once about arithmetic.
+
+---
+
+## F66 — an impossibility asserted, never measured, and wrong about its own reason ★★
+
+Frame-read #5 of step 4 — *`/drift` on a container whose image is gone* — was carried
+from step to step as **impossible**: *docker refuses to remove an image a running
+container references and it cannot be forced.* It was listed as a stated impossibility
+rather than a skipped read, which is the right way to record one.
+
+It was never run, and it was never written down either. Step 8 went looking for the
+record, found none, and measured it instead. Both halves of the claim are wrong:
+
+```
+docker tag alpine dtui-probe:latest
+docker run -d --name c dtui-probe:latest sleep 300
+docker rmi dtui-probe:latest      -> Untagged: dtui-probe:latest      # succeeded, no -f
+docker rmi -f dtui-probe:latest   -> Error: No such image             # already gone
+docker image inspect dtui-probe:latest -> fails: the name is gone
+```
+
+**`rmi` does not refuse. It untags, without `-f`, while the container runs** — the blob
+survives because the container references it, and the *tag* does not. So a container whose
+`Config.Image` names something unresolvable is trivially constructible, and the read was
+available the whole time.
+
+**The read was then run, and `/drift` worked.** It printed `IMAGE alpine:latest` against a
+container created from a tag that no longer exists — because the app resolves the image
+from the container's top-level `Image`, which is `sha256:…`, and asks the daemon for the
+**digest**. RepoTags on the answer supplies a display name.
+
+So the impossibility is real and the reason given was not:
+
+> **A container pins its image blob by digest for as long as it exists, and the app looks
+> it up by digest. The reference cannot dangle while there is a container to drift.**
+
+That is a structural statement about the far side's model, and it is worth having where
+the old one was not: the old one would have been falsified by any docker release that
+changed `rmi`'s behaviour, and this one is falsified only by a container outliving its
+own image, which docker's storage model forbids.
+
+**The consequence is a live branch with no reachable input.** DRIFT_WALK A1 ruled that a
+failed image lookup must keep the block — the container's own facts are still good, and
+the thing reporting the absence must not replace the thing that would have explained it.
+That ruling is correct, implemented, and covered by `drift.test.ts` through the injected
+`Lookup` seam. **The real far side cannot produce the input.**
+
+Which is the honest shape of it, and the reason this is filed rather than deleted: the
+branch is not vacuous — a different far side, a pruned image store, or a `Lookup` pointed
+somewhere else all reach it — but *this* far side does not, and a defensive path whose
+only caller is a test should be labelled as one. The walk was right about what to do and
+the frame-read could never have confirmed it.
+
+**The rule this leaves**: an impossibility is a claim, and a claim carried across four
+steps without a measurement is exactly the thing this project files findings about. It
+cost twenty minutes to check and it was wrong in both directions — the case was reachable,
+and the reason it is uninteresting is better than the reason given.

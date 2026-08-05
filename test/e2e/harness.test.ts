@@ -298,7 +298,7 @@ describe("session far-side variants", () => {
         // C06 T3.17 from the session's side: a spawn failure is a result, so the
         // shell reports it rather than dying with it.
         expect(frame).toContain("ENOENT");
-        expect(frame, "and it says which binary").toContain("tui-kit-no-such-far-side");
+        expect(frame, "and it says which binary").toContain("calcium-no-such-far-side");
         expect(frame, "no far side, so nothing it could have said").not.toContain("far side pid=");
 
         // The session survives it, which is the difference between a control and

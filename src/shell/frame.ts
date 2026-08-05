@@ -1,7 +1,7 @@
 /**
  * C22 §6 — the frame: chrome, transcript region, prompt.
  *
- * `tui-kit` owns the structure — one chrome row each, fixed, never scrolling —
+ * Calcium owns the structure — one chrome row each, fixed, never scrolling —
  * and the app decides what goes in them.
  *
  * **Two values are sampled exactly once per frame, and both have a reason with

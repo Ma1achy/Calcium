@@ -1,0 +1,26 @@
+{
+  "name": "svc-tui",
+  "version": "0.0.0",
+  "description": "The smallest complete Calcium application \u2014 the README's example, as a file that runs.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "svc-tui": "./main.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "start": "node main.ts",
+    "test": "vitest run --dir test"
+  },
+  "dependencies": {
+    "@fmx/calcium": "file:../.."
+  },
+  "devDependencies": {
+    "@types/node": "26.1.2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

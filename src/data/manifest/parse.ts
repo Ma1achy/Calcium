@@ -494,7 +494,7 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
     const seen = new Map<string, number>();
     // **Seeded with the framework's six** (C05 §3), so an app declaring its own
     // `clear` collides at parse rather than silently overriding a verb
-    // `tui-kit`'s handlers depend on. I6 already refuses duplicates; this is
+    // Calcium's handlers depend on. I6 already refuses duplicates; this is
     // that rule reaching the rows the app did not write.
     const framework = new Set(FRAMEWORK_NAMES);
 
@@ -511,7 +511,7 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
         fail(
           e,
           `tools[${i}].name`,
-          `"${parsed.name}" is a verb tui-kit ships (C05 §3) — choose another name, ` +
+          `"${parsed.name}" is a verb Calcium ships (C05 §3) — choose another name, ` +
             `or the framework's handler for it becomes unreachable`,
         );
         return;

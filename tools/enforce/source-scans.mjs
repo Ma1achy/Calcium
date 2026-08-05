@@ -640,7 +640,7 @@ export const SCANS = [
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 
   // The third member of the injected-ambient family, after the clock and the
-  // environment record. `tui-kit` ships no binary, so a variable named for one
+  // environment record. Calcium ships no binary, so a variable named for one
   // consumer has no business inside a framework that claims to serve others —
   // `prism-tui` reads its own and passes the value through `TuiConfig`.
   //

@@ -27,7 +27,7 @@ and completion, pre-flight validation, help and history all derive from it. Noth
 in the framework knows what your domain is.
 
 ```
-        you describe                    tui-kit                      it renders
+        you describe                    Calcium                      it renders
    ┌──────────────────┐         ┌────────────────────┐         ┌──────────────┐
    │  what operations │ ──────► │  parse · validate  │         │              │
    │  exist, and how  │         │  complete · help   │         │  a frame,     │
@@ -282,13 +282,97 @@ three working panels behind one broken one.
 You get that from one builder:
 
 ```ts
-b.live({ id: "metrics", every: 30_000, fetch: () => api.metrics(),
-         render: data => b.kv({ cpu: data.cpu, memory: data.memory }) })
+b.live({ id: "metrics", title: "Metrics", every: 30_000, fetch: () => api.metrics(),
+         render: data => { const m = data as Metrics;
+                           return b.kv({ cpu: m.cpu, memory: m.memory }) } })
 ```
+
+The cast is not decoration. `fetch` returns whatever the far side sent, so
+`render` receives `unknown` and the consumer narrows it — which is honest about
+where the type actually comes from, and is the one place this builder is less
+pleasant than it looks.
 
 Backoff, staleness marking, stagger offsets, teardown and the error rendering all
 come free. **The behaviour is fixed and only the rendering is overridable** — a
 guarantee you can switch off is not one.
+
+---
+
+## The reference application
+
+`docker-tui` — a terminal interface over `docker`, and the app this framework was
+proved against. Twelve surfaces, every block type, and sixty-five findings logged
+while building it.
+
+![docker-tui](examples/docker/demo.gif)
+
+[`examples/docker/`](examples/docker/README.md) has the recording, how to run it,
+and the ledger. [`docs/ROADMAP.md`](docs/ROADMAP.md) is what the ledger turned
+into: four pieces of framework work, each with a real consumer behind it.
+
+---
+
+## The smallest complete example
+
+A far side that prints JSON, a manifest saying what operations exist, an adapter
+turning one shape into blocks. That is the whole of it — everything else is
+Calcium's.
+
+<!-- verified against examples/minimal/main.ts by examples/minimal/test/minimal.test.ts -->
+
+```ts
+import { b, createTui, defaultTheme } from "@fmx/calcium";
+import type { Adapter } from "@fmx/calcium";
+const manifest = {
+  schema: "tui.manifest/1",
+  binary: "svc",
+  version: "1.0.0",
+  tools: [{ name: "list", local: false, summary: "List services", args: [], flags: [] }],
+} as const;
+const list: Adapter = {
+  schema: "tui.view/1",
+  adapt: (raw, ctx) => {
+        b.table({
+          columns: [
+            b.col("name", { label: "SERVICE", minWidth: 12, flex: true }),
+            b.col("state", { label: "STATE", minWidth: 10 }),
+            b.col("replicas", { label: "REPLICAS", minWidth: 8, align: "right" }),
+          ],
+        b.notice("muted", `${String(rows.length)} services`),
+const tui = createTui({
+  name: "svc-tui",
+  binary: new URL("bin/svc", import.meta.url).pathname,
+  manifest,
+  theme: defaultTheme,
+  env: process.env,
+  adapters: { list },
+});
+await tui.start();
+```
+
+and it draws:
+
+```
+❯ /list
+
+SERVICE                                                                 STATE       REPLICAS
+api                                                                     ● running          3
+worker                                                                  ● running          8
+cron                                                                    ○ stopped          0
+3 services
+❯
+```
+
+The glyphs, the tones, the column widths, the header and the prompt are all the
+framework's. The adapter said `tone: "ok"` and `glyph: "running"`; what those
+become on a 256-colour terminal, a 16-colour one, or an ASCII one is not its
+problem.
+
+**The whole thing is `examples/minimal/`, it runs, and it is checked** — the block
+above is quoted from that file line for line by a test, because a README example
+that has drifted is worse than none: it fails on your machine and not on ours.
+`make proof` runs it from the packed tarball rather than from this workspace, so
+what is verified is the published package.
 
 ---
 

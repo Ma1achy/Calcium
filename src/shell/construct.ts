@@ -312,7 +312,7 @@ export async function constructGraph(
     // **Both arms are parsed here, and that is the whole of I23** (C22 §3a).
     //
     // The object arm used to be taken as already-parsed and refused when it
-    // lacked `tui-kit`'s six verbs — which no author could supply, because
+    // lacked Calcium's six verbs — which no author could supply, because
     // `parseManifest` derives them and is exported from no entry point. The path
     // arm handed `readFile`'s **string** to a function that requires a record,
     // with no `JSON.parse` between them, so it had never run. `createTui` could

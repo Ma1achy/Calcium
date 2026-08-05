@@ -16,7 +16,7 @@
 
 The manifest is what stops the TUI from guessing. Without it, tab completion hand-maintains a copy of the far side's flags and drifts the first time someone adds one; the parser cannot reject `--open-mrr` before paying 300 ms to have a subprocess reject it; and `--help` is written twice.
 
-It is also the thing that makes the framework general. `tui-kit` knows nothing about `promote` or `--replicas`; it knows there is a tool with typed args, and every behaviour above is derived from that.
+It is also the thing that makes the framework general. Calcium knows nothing about `promote` or `--replicas`; it knows there is a tool with typed args, and every behaviour above is derived from that.
 
 **During standalone development the manifest is a hand-written JSON fixture the app ships.** Whether the far side later generates it via `<binary> __manifest__ --json` (B6) is a wiring-time question. The expensive half was never the framework's (A01 §5).
 
@@ -252,7 +252,7 @@ The *report* is deduplicated on the unordered pair. One error for one mistake �
 
 ## 3. The framework's own verbs
 
-**`parseManifest` returns the app's tools plus `tui-kit`'s six**, and this belongs here rather than in C22 because it is a statement about what a manifest *is*.
+**`parseManifest` returns the app's tools plus Calcium's six**, and this belongs here rather than in C22 because it is a statement about what a manifest *is*.
 
 `/help`, `/clear`, `/theme`, `/history`, `/debug` and `/exit` are verbs. They have names, they take arguments, they complete, they validate, and they appear in help. Everything the manifest exists to describe is true of them, and the only reason they were absent is that nobody wrote them down. C23 ships the handlers (C23 §2); C18 classifies `local` from the manifest; so without the rows, the handlers are registered for verbs nothing can ever classify to — which is precisely what C23 I27's reconciliation reports, and it is right to.
 
@@ -319,7 +319,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I3** — Parsing is strict about structure and lenient about extension. Unknown *fields* are ignored; malformed *known* fields are errors. A newer far side can add fields without breaking an older TUI.
 - **I4** — `values` is present iff `type === "enum"`; `pattern` is present iff `type === "pattern"`. Enforced at parse.
 - **I5** — No `ArgType` encodes an app-domain concept. The union is closed and generic; app-specific shapes use `pattern`.
-- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins — **including against the framework's six** (§3), so an app shadowing `clear` fails at parse rather than silently overriding a verb `tui-kit`'s own handlers depend on.
+- **I6** — Tool names are unique. Duplicates are a parse error, not a last-wins — **including against the framework's six** (§3), so an app shadowing `clear` fails at parse rather than silently overriding a verb Calcium's own handlers depend on.
 - **I7** — `findTool` returns the longest matching tool.
 - **I8** — `validateInvocation` is pure and performs no I/O.
 - **I9** — Validation failures are `ErrorLike`, rendering through the ordinary error path.
@@ -340,7 +340,7 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 ## 7. Commitments
 
 1. The manifest is the single source of truth for verbs, sub-verbs, flags, enums, arity and local-vs-spawn (I1).
-2. `tui-kit` owns the schema, loader and validator; the app owns the manifest content (→ A01 §2).
+2. Calcium owns the schema, loader and validator; the app owns the manifest content (→ A01 §2).
 3. A hand-written fixture manifest ships; far-side generation is a wiring-time concern (→ A01 §5).
 4. Sub-verbs are multi-token names, matched longest-first (I7).
 5. Validation runs before any spawn, is pure, and produces `ErrorLike` (I8, I9).

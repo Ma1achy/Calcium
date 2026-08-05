@@ -1,0 +1,76 @@
+{
+  // The reference application's container — A04 §4's second row.
+  //
+  // **Why it is here and not at `examples/docker/.devcontainer/`**, which is
+  // where the plan put it and where it does not work. A devcontainer config
+  // under a subdirectory makes that subdirectory the workspace, so only
+  // `examples/docker` gets bind-mounted — and the app's dependency is
+  // `"@fmx/calcium": "file:../.."`, which then points outside the mount and
+  // fails to install. `.devcontainer/<name>/devcontainer.json` is the supported
+  // multi-container layout: VS Code offers both by name and each mounts the
+  // repository root, so `file:../..` resolves to the thing it names.
+  //
+  // The separation A04 §4 asks for is therefore about **what is installed**,
+  // not about where the file sits. This container has the socket; the
+  // framework's does not, and cannot acquire one by accident.
+  "name": "docker-tui",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+
+    // **Outside-of-docker, not in-docker.** The app's far side is the machine's
+    // own daemon. A nested daemon would give it an empty container list, which
+    // reads as a working app with nothing to show rather than as a
+    // misconfiguration — the worst kind of wrong, because it looks like the
+    // right kind of right.
+    //
+    // `moby: false` is required, not a preference. The feature defaults to the
+    // Moby packages and `typescript-node:22` resolves to Debian trixie, where
+    // `moby-cli` does not exist and the build fails outright. Docker CE's own
+    // CLI is what installs there.
+    //
+    // The socket is mounted read-write, because the CLI writes requests to it.
+    // A04 §4 says why no claim to the contrary is made: a read-only bind of a
+    // unix socket governs the directory entry, not the byte stream.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false }
+  },
+
+  // `python3` drives `tools/capture.py`, which is how every frame in this
+  // repository was read; `make` and `g++` are for the root install's one named
+  // native rebuild (A04 §3, SS32's single exception).
+  //
+  // `agg` renders the screencast from the `.cast` this repository records
+  // itself. A single static binary rather than an npm package on purpose —
+  // DEPENDENCIES.md's posture is that the strongest supply-chain control is not
+  // having dependencies, and a tool that runs once to produce a committed
+  // artefact has no business in the dependency graph. It is pinned to a version
+  // and fetched by URL so a reader can see exactly what lands.
+  //
+  // Nothing in the app or its tests needs it: `tools/capture.py` writes the
+  // `.cast` with twenty lines of its own, and the frames are read from the raw
+  // stream. `agg` only turns a recording into a picture.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y python3 make g++ && sudo sh -c 'curl -sL -o /usr/local/bin/agg https://github.com/asciinema/agg/releases/download/v1.9.0/agg-$(uname -m)-unknown-linux-gnu && chmod 755 /usr/local/bin/agg'",
+
+  // **Both installs, in order, and the order is load-bearing.** The app
+  // resolves `@fmx/calcium` to `file:../..`, and npm packs that directory using
+  // its `files` list — which is `["dist"]`. An app installed before the
+  // framework is built gets a package with no `dist/`, and the failure arrives
+  // as an unresolvable import rather than as a missing build step.
+  "postCreateCommand": "node --version && npm ci --ignore-scripts && npm rebuild node-pty --ignore-scripts=false && npm run build && cd examples/docker && npm install --ignore-scripts && npm link",
+
+  "containerEnv": {
+    "TERM": "xterm-256color",
+    "LANG": "en_GB.UTF-8"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "vitest.explorer"],
+      "settings": {
+        "editor.formatOnSave": true,
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  }
+}

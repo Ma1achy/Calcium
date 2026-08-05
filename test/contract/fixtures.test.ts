@@ -201,7 +201,7 @@ describe("C08 §7 — the module and its boundaries", () => {
   });
 
   it("T2.6, T2.10 (I9, MG8): the harness imports only C05, C06 and its own modules", () => {
-    // MG8 as A03 states it — `tui-kit` importing nothing from `prism-tui` — has
+    // MG8 as A03 states it — Calcium importing nothing from `prism-tui` — has
     // nothing in this repo to fire at, and a rule with nothing to be wrong about
     // passes exactly like a satisfied one (A03 §2). This is the form this repo
     // can hold: no import reaches outside `src/data/`, so no app type can enter.

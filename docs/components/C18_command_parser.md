@@ -182,7 +182,7 @@ Returning the verb rather than a boolean is what keeps the prefix in one place. 
 
 F2's intent is a replaceable prefix rule, not a replaceable parser.
 
-The prefix itself is a **pluggable policy** (F2). `/` is this app's choice; another consumer may want `:` or none. `tui-kit` supplies the default and the rule above describes it.
+The prefix itself is a **pluggable policy** (F2). `/` is this app's choice; another consumer may want `:` or none. Calcium supplies the default and the rule above describes it.
 
 ---
 

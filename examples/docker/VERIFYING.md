@@ -5,6 +5,25 @@ wrongly cost more than getting the code wrong, and each names the occasion.
 
 ---
 
+## Which container
+
+Two, since A04 §4 stopped saying *one per repo*. Both mount the repository root at
+`/workspaces/tui-kit`, so the paths below are the same in either — **what differs is
+what is installed**, and the framework's has no docker socket by design.
+
+| target | container | why |
+|---|---|---|
+| `make all` · `make enforce` · `make proof` | `calcium` | the framework's suite, including tier 5's PTY rows; needs `node-pty`, needs no daemon |
+| the app's `npm test` | either | it runs against `test/corpus/`, which is why CI can run it without docker |
+| `make fixtures` · `docker-tui` · `tools/capture.py` | `docker-tui` | the socket is only here |
+
+**A frame-read and a timing tier must not share a container run.** `make fixtures` brings
+up a load container so the CPU plot has a shape to draw, and a busy container made tier 5's
+`T5.3a` fail during step 4 — it passed alone, and `make all` went green once it was removed.
+`make fixtures-down` first, then the suite. §7 below carries the full account.
+
+---
+
 ## 0. An exit code read through a pipe is the pipe's
 
 ```sh
@@ -193,6 +212,18 @@ container. With it running, tier-5's `T5.3a` failed on a timing assertion and pa
 removing the fixture made `make all` green. **Not flakiness discovered — load introduced.**
 Worth writing down because the natural reading of a timing failure during a frame-read
 session is that the change under test caused it.
+
+**Re-measured in step 8, and it did not reproduce.** `make fixtures` brings up `dtui-load`
+— the same shape of busy loop — and tier 5 ran green with it up: 94 passed, 7 todo,
+`E2E_WITH_LOAD_EXIT=0` read from a redirect. Both measurements are real, and neither
+cancels the other: C03's thresholds had no margin on a busy host in step 4 and have margin
+on an idle one now.
+
+**So the rule survives on its asymmetry rather than on its odds**, and saying which matters.
+`make load-down` costs a second. A timing failure diagnosed as a code change costs a
+session, and did. A precaution whose stated justification is a failure nobody can reproduce
+gets deleted by the next person who checks — this one now carries both figures and the date,
+so what gets checked is the claim actually being made.
 
 ## 8. A capture that ends too early is indistinguishable from a command that did nothing
 

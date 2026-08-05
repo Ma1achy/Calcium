@@ -1,5 +1,5 @@
 /**
- * The local handlers `tui-kit` ships — the concerns it owns (C23 §2).
+ * The local handlers Calcium ships — the concerns it owns (C23 §2).
  *
  * An app registers its own alongside them, and `seal()` reconciles both against
  * the manifest (C23 I27). These six exist because the framework owns what they

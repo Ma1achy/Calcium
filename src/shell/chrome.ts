@@ -1,7 +1,7 @@
 /**
  * C22 §6 — the default header and footer, and the prompt's gutter.
  *
- * `tui-kit` owns the frame's structure — one row each, fixed position, never
+ * Calcium owns the frame's structure — one row each, fixed position, never
  * scrolling — and the app decides what goes in them. The default exists so that
  * `createTui({ name, binary, manifest, theme })` produces a usable shell (I17):
  * a framework that required chrome to render anything would make the four-field

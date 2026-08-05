@@ -1,31 +1,29 @@
 {
-  "name": "tui-kit",
+  "name": "calcium",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
 
-    // The docker CLI plus the host's socket, for `examples/docker` (R01).
+    // **There is no docker feature here, and there was.** It lived in this file
+    // for four steps, with a comment arguing — correctly, against A04 §4 as it
+    // was then worded — that the reference app cannot be exercised without a
+    // daemon and the daemon is on the host.
     //
-    // **Outside-of-docker, not in-docker.** The reference app's far side is the
-    // machine's own daemon: a nested daemon would give it an empty container
-    // list, which reads as a working app with nothing to show rather than as a
-    // misconfiguration. The containers the frames are read against must be the
-    // real ones.
+    // The argument was sound and the conclusion was wrong, because the rule it
+    // reasoned from was *one container per repo*, and R01 §8 had already moved
+    // `docker-tui` inside this one. Under that wording there was nowhere else to
+    // put it. A04 §4 now keys the rule on the machine rather than the layout,
+    // and `examples/docker/.devcontainer/` is where the socket lives.
     //
-    // This is what keeps CLAUDE.md's rule whole. The app cannot be exercised
-    // without a daemon, the daemon is on the host, and the alternative was one
-    // documented exception to "never on the host" — in a rule whose entire value
-    // is having none. Calcium itself gains nothing from this feature and must
-    // not: A04 §4 says the container is never the supported path, and nothing
-    // under `src/` may come to need a socket.
+    // **What the framework's container must not have is not a preference.**
+    // Nothing under `src/` may come to need a socket, and the way that
+    // requirement gets acquired is never a decision — it is someone reaching for
+    // `docker` in a test because it happened to be on `PATH`. Absence is the
+    // only form of that rule anything enforces.
     //
-    // `moby: false` is required, not a preference. The feature defaults to the
-    // Moby packages, and `typescript-node:22` now resolves to Debian trixie,
-    // where `moby-cli` does not exist — the build fails outright. Docker CE's
-    // own CLI is what installs there. Landing the feature without this was a
-    // config committed unrun, which the commit that added it said it was and
-    // is the reason it is being corrected rather than discovered later.
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false }
+    // The comment is kept rather than deleted because a ruling that silently
+    // evaporates is how the same mistake gets made twice, and this one was
+    // deliberate both times.
   },
 
   // A04 §4 — required for development, never required for consumption.

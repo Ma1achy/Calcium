@@ -14,7 +14,7 @@
 
 ## 1. Purpose
 
-C01 owns every piece of terminal state the application takes from the user's shell, and guarantees it is given back. It is the only module in `tui-kit` permitted to write an escape sequence.
+C01 owns every piece of terminal state the application takes from the user's shell, and guarantees it is given back. It is the only module in Calcium permitted to write an escape sequence.
 
 The failure it exists to prevent is not a bad render. It is a dev whose terminal is silently in raw mode with a hidden cursor after the process died — a terminal that appears hung, recoverable only by typing `reset` blind. Every other component can fail and be contained (A02 §7). C01 failing corrupts something outside the process that the process can no longer fix.
 

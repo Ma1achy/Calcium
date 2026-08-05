@@ -248,7 +248,7 @@ describe("C05 contract", () => {
 
     expect(wrong.ok, "the framework's own rows collide with themselves").toBe(false);
     if (wrong.ok) return;
-    expect(wrong.error.map((e) => e.message).join("\n")).toContain("tui-kit ships");
+    expect(wrong.error.map((e) => e.message).join("\n")).toContain("Calcium ships");
   });
 
   it("T2.8 (I8): findTool caches by identity, and a second manifest does not observe the first's", () => {
