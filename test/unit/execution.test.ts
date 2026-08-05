@@ -240,6 +240,15 @@ function harness(script: Scripted = {}) {
     pipeline,
     transcript,
     session,
+    /**
+     * The layer stack, for the view routes.
+     *
+     * **Exposed rather than asserted through `documentView`**: the question
+     * T1.41 asks is *what is on screen*, and the owner's own state is the thing
+     * that would agree with a projection bug. The layer is what C15 hands the
+     * composer.
+     */
+    overlays,
     seqs,
     commands,
     commits,
@@ -1302,6 +1311,160 @@ describe("C23 §4 — the submit row's two other steps", () => {
     h.tick(1500);
     await settled();
     expect(ticks.adapter, "an adapter's b.live must be driven too (I33a)").toBeGreaterThan(0);
+  });
+
+  it("T1.41 (C22 I48): a view+streams verb patches the view and releases the guard", async () => {
+    // **The route C22 §13a reserved, refused loudly, and this exercises.** The
+    // fixture's `tail --screen` is the first declaration that is both, and it
+    // had none until the route existed.
+    const patches: RawPatch[] = [
+      { kind: "data", value: { line: "one" } },
+      { kind: "data", value: { line: "two" } },
+    ];
+    let n = 0;
+    const h = harness({
+      stream: async function* () {
+        for (const p of patches) yield p;
+        // No `end` — a follow is still following, which is the state the whole
+        // route exists for and the one an entry-shaped test never sits in.
+        await new Promise(() => undefined);
+      },
+      adaptPatch: () => {
+        n += 1;
+        return { op: "append", block: block({ kind: "raw", id: `line-${String(n)}`, text: "x" }) };
+      },
+    });
+
+    h.pipeline.submit("/tail --screen");
+    await settled();
+
+    // The patches reached the *view*, and the transcript is untouched — B03 §2
+    // in the strong sense §13a took it.
+    const content = h.overlays.stack[0]?.content ?? [];
+    expect(content.map((bl) => bl.id)).toEqual(["line-1", "line-2"]);
+    expect(h.transcript.entries, "a push leaves the transcript alone").toHaveLength(0);
+
+    // **C23 I6 — released before the loop, which is the whole reason the pair
+    // was refused.** The stream never ends, so a guard released after it is a
+    // guard held for ever: this assertion is the one that fails against the old
+    // fallthrough, where the pair blocked on `invoke` with the guard taken.
+    expect(h.pipeline.inFlight, "a follow does not hold the session").toBeNull();
+  });
+
+  it("T1.42 (C22 I48, C16 §5): the follow is registered, so Ctrl-C reaches it", async () => {
+    // **The rung nothing had exercised.** Omitting the registration on an entry
+    // loses a cancellation; omitting it here means Ctrl-C falls past the rung —
+    // and on this route the view's loop is the only thing on screen, so the
+    // next rung quits the session.
+    // **The fake honours the abort, because the real transport does.** A
+    // generator that ignores the signal leaves the loop parked for ever and the
+    // `finally` unreachable, which would make this row a claim about a
+    // transport nobody ships. A fake must not supply the behaviour, and it must
+    // not withhold it either.
+    let stop = (): void => undefined;
+    const stopped = new Promise<void>((r) => {
+      stop = r;
+    });
+    const h = harness({
+      stream: async function* () {
+        yield { kind: "data", value: { line: "one" } } as RawPatch;
+        await stopped;
+      },
+      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
+    });
+
+    h.pipeline.submit("/tail --screen");
+    await settled();
+    expect(h.pipeline.liveStreams, "registered before the loop was awaited").toBe(1);
+
+    // And cancelling it pops the view — the asymmetry the walk ruled: Ctrl-C is
+    // the reader saying stop, where `end` is the far side saying it.
+    h.pipeline.cancelNewestStream();
+    await settled();
+    expect(h.overlays.stack, "a cancelled view pops").toHaveLength(0);
+
+    stop();
+    await settled();
+    expect(h.pipeline.liveStreams, "and the `finally` forgets its canceller").toBe(0);
+  });
+
+  it("T1.43 (C22 I48): the stream ending appends a notice and leaves the view open", async () => {
+    // **A view has no settlement, and must not pop on `end`.** `docker logs`
+    // without `-f` ends immediately; a view that popped would flash and vanish
+    // before anything could be read.
+    const h = harness({
+      stream: async function* () {
+        yield { kind: "data", value: { line: "one" } } as RawPatch;
+        yield { kind: "end", result: result({ exitCode: 0 }) } as RawPatch;
+      },
+      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
+    });
+
+    h.pipeline.submit("/tail --screen");
+    await settled();
+
+    expect(h.overlays.stack, "the view is still there").toHaveLength(1);
+    const content = h.overlays.stack[0]?.content ?? [];
+    const notice = content.find((bl) => bl.kind === "notice");
+    expect(notice, "and it says the stream ended").toBeDefined();
+    expect(notice?.kind === "notice" ? notice.text : "").toContain("ended");
+    // C04 I6 — F29 is what happens when a toned notice loses its glyph.
+    expect(notice?.kind === "notice" ? notice.glyph : undefined).toBeDefined();
+  });
+
+  it("T1.44 (C22 I48): a non-zero exit is in the notice, which the walk said it could not be", async () => {
+    // The walk ruled that a `RawPatch` `end` carries no exit code. It carries a
+    // whole `RawResult` — the ruling was reasoned from what a patch is *for*
+    // rather than read off the type, and the type is what falsified it. A
+    // follow that ends because the container stopped is a different event from
+    // one whose log ran out.
+    const h = harness({
+      stream: async function* () {
+        yield { kind: "end", result: result({ exitCode: 137 }) } as RawPatch;
+      },
+    });
+
+    h.pipeline.submit("/tail --screen");
+    await settled();
+
+    const content = h.overlays.stack[0]?.content ?? [];
+    const notice = content.find((bl) => bl.kind === "notice");
+    expect(notice?.kind === "notice" ? notice.text : "").toContain("137");
+    expect(notice?.kind === "notice" ? notice.tone : "").toBe("warn");
+
+    // **And the reason when the far side gave one**, which a frame-read added:
+    // *exited 1* tells the reader the follow failed and not why, and `stderr`
+    // is on the same `RawResult` the code came from.
+    const h2 = harness({
+      stream: async function* () {
+        yield {
+          kind: "end",
+          result: result({ exitCode: 1, stderr: "Error: No such container: nope\n" }),
+        } as RawPatch;
+      },
+    });
+    h2.pipeline.submit("/tail --screen");
+    await settled();
+    const n2 = (h2.overlays.stack[0]?.content ?? []).find((bl) => bl.kind === "notice");
+    expect(n2?.kind === "notice" ? n2.text : "").toContain("No such container");
+  });
+
+  it("T1.45 (C22 I48): a stream failure lands in the view rather than nowhere", async () => {
+    const h = harness({
+      stream: async function* () {
+        yield { kind: "data", value: {} } as RawPatch;
+        throw new Error("pipe died");
+      },
+      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
+    });
+
+    h.pipeline.submit("/tail --screen");
+    await settled();
+
+    const content = h.overlays.stack[0]?.content ?? [];
+    const notice = content.find((bl) => bl.kind === "notice");
+    expect(notice?.kind === "notice" ? notice.text : "").toContain("pipe died");
+    expect(h.overlays.stack, "and the view stays, holding what arrived").toHaveLength(1);
   });
 
   it("T1.39 (C22 I45, C24 I12): a live part ticks on the *view* route, through the wiring", async () => {

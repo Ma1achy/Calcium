@@ -177,6 +177,29 @@ const config: ToolDef = {
 };
 
 /**
+ * S9's pushed streaming view — **the surface that forced C22 I48**.
+ *
+ * `view: true` **and** `streams: true`, which C05 I20 has permitted since it was
+ * written and no route could run until now: the pair fell to the non-streaming
+ * path, blocked until the process exited and held the submission guard for the
+ * whole of it, so C23 refused it loudly instead. `docker logs -f` has no natural
+ * end and A01 D4's test makes it a view, so this is the declaration that had to
+ * exist before the route could.
+ *
+ * `-f` and `--tail 200` are the shim's, for F39's reason: an app cannot add a
+ * flag to a spawn.
+ */
+const logs: ToolDef = {
+  name: "logs",
+  local: false,
+  view: true,
+  streams: true,
+  summary: "Follow a container's output",
+  args: [{ name: "container", type: "string", required: true, summary: "Container id or name" }],
+  flags: [],
+};
+
+/**
  * `engineVersion` is the daemon's, read at startup rather than written down: the
  * field exists for skew reporting, and a manifest claiming a version the daemon
  * does not have reports the wrong skew — which is worse than reporting none.
@@ -190,6 +213,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps, dashboard, containerStats, inspect, drift, compare, config],
+    tools: [ps, dashboard, containerStats, inspect, logs, drift, compare, config],
   };
 }

@@ -105,9 +105,94 @@ case "${1:-}" in
     done
     shift "$original"
     ;;
+  logs)
+    # **`-f` and `--tail` are supplied here for F39's reason.** Calcium builds
+    # argv from what the reader typed plus what the manifest declares, so an app
+    # cannot add a flag to a spawn — the same wall `--raw` hit from the other
+    # direction, and the same answer as `--no-stream` for `stats`. S9 is a
+    # *follow*, and it replays 200 lines rather than the whole log, because the
+    # whole log and what is on screen are different requests.
+    #
+    # **`docker logs` has no `--format` at all**, so the translation at the top
+    # of this file produces `unknown flag: --format` rather than JSON. It is not
+    # a JSON-emitting verb: it streams whatever the container wrote to stdout,
+    # which for nginx is plain text.
+    #
+    # That is not a gap in Calcium — C06 I12 degrades a stream that stops
+    # parsing and C07 accumulates the remainder, which is the designed answer.
+    # What the shim has to do is stop *asking* for JSON from a verb that has no
+    # such flag, exactly as it stops sending `--raw` to a verb that has no such
+    # flag. Third verb in this file, same sentence.
+    original=$#
+    for arg in "$@"; do
+      case "$arg" in
+        --format | json) : ;;
+        *) set -- "$@" "$arg" ;;
+      esac
+    done
+    shift "$original"
+    # Appended after the strip, and only if the reader has not said otherwise.
+    has_follow=0
+    has_tail=0
+    for arg in "$@"; do
+      case "$arg" in
+        -f | --follow) has_follow=1 ;;
+        --tail | --tail=*) has_tail=1 ;;
+      esac
+    done
+    if [ "$has_follow" -eq 0 ]; then set -- "$@" --follow; fi
+    if [ "$has_tail" -eq 0 ]; then set -- "$@" --tail 200; fi
+    ;;
 esac
 
+# **`logs` merges stderr into stdout, and that is the finding rather than the
+# line.** Calcium's channel split is a JSON-CLI assumption — stdout is the data,
+# stderr is diagnostics — and `docker logs` inverts it: it relays the container's
+# own two channels, and most server software logs to stderr. nginx writes every
+# `[notice]` and every request line there, so a follow reading stdout alone shows
+# the entrypoint's seven start-up lines and then nothing, for ever, which reads
+# exactly like a container that has gone quiet.
+#
+# Found by reading the frame: the follow worked and showed the wrong seven lines.
+# FINDINGS F46.
+#
 # `exec`, so signals and the exit code reach docker directly. C21 sends SIGTERM
 # and escalates; an intermediate shell would absorb the first one and Calcium
 # would report a timeout for a process that was told to stop.
-exec docker "$@"
+#
+# **And `logs` wraps each line as JSON, which is the fifth translation and the
+# one that says most about the premise.** C07 rules that *an adapter with
+# `adaptPatch` owns the `data` row and nothing else* (`adapters/stream.ts`) —
+# right for a JSON CLI, where an unparseable line among good ones is the
+# transport's business. For `docker logs` **every** line is unparseable, so the
+# app's adapter is never consulted and C07's fallback accumulates the whole
+# follow into one growing `raw` block. In a transcript entry that is fine; in a
+# view it is the exact pathology C22 I47 was written for — one block taller than
+# the region, unscrollable, growing every second. FINDINGS F45.
+#
+# So the shim makes `docker logs` into the JSON-emitting CLI this framework is
+# for. That is the honest translation rather than a workaround: R01's premise is
+# a far side that speaks JSON, and this verb does not.
+#
+# **The cost is `exec`.** A pipeline means this shell waits rather than being
+# replaced, so C21's SIGTERM arrives here instead of at docker — hence the trap,
+# which forwards it. Without that, stopping a follow would leave a `docker logs`
+# running until its pipe closed.
+case "${1:-}" in
+  logs)
+    docker "$@" 2>&1 | awk '{
+      line = $0
+      gsub(/\\/, "\\\\", line)
+      gsub(/"/, "\\\"", line)
+      gsub(/\t/, "\\t", line)
+      gsub(/\r/, "", line)
+      printf "{\"line\":\"%s\"}\n", line
+      fflush()
+    }' &
+    child=$!
+    trap 'kill -TERM "$child" 2>/dev/null' TERM INT
+    wait "$child"
+    exit $?
+    ;;
+  *) exec docker "$@" ;;
+esac

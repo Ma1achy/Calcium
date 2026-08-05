@@ -1522,6 +1522,73 @@ drift.
 
 ---
 
+## F45 — an app cannot render a stream that is not JSON ★★★
+
+C07 rules that **an adapter with `adaptPatch` owns the `data` row and nothing else**
+(`adapters/stream.ts:64`). The degradation rows are the transport's own reporting, and for a
+JSON far side that is right: an unparseable line among good ones is noise, not content.
+
+**For `docker logs` every line is unparseable**, so the app's `adaptPatch` is never
+consulted and C07's fallback accumulates the whole follow into **one growing `raw` block**
+(`REMAINDER_ID`, replaced per line). In a transcript entry that is fine — C14 windows an
+entry by rows. In a **view** it is precisely the pathology C22 I47 was written for: the
+window falls on block boundaries, so one block taller than the region is shown cut and
+reachable by no key, and a follow makes it taller every second.
+
+Two mechanisms, each correct, whose combination is not. **Measured in a frame**: the
+indicator fired with *"81 more rows"* and the follow was unreadable.
+
+**The app has no route at all** — it cannot see the lines, so it cannot choose a block per
+line. Absorbed by the shim, which wraps each line as `{"line": "..."}` and thereby makes
+`docker logs` into the JSON-emitting CLI this framework is for. That is an honest
+translation rather than a workaround (R01's premise is a far side that speaks JSON, and this
+verb does not) — and **the cost is `exec`**: a pipeline means the shim waits rather than
+being replaced, so C21's SIGTERM arrives at the shell instead of at docker and a `trap`
+forwards it.
+
+The fix with a consumer behind it is narrower than *expose everything*: **an adapter that
+declares `adaptPatch` should be offered `malformed` when the stream has degraded**, which is
+the state in which those lines are content rather than noise.
+
+---
+
+## F46 — the stdout/stderr split is a JSON-CLI assumption, and a log verb inverts it
+
+C06 streams stdout; stderr is diagnostics. That is the right split for a far side whose
+stdout is data — and `docker logs` relays the *container's* two channels, so for most server
+software the content is on stderr. nginx writes every `[notice]` and every request line
+there.
+
+**The first `/logs` frame showed the entrypoint's seven start-up lines and then nothing, for
+ever** — which reads exactly like a container that has gone quiet, and is the most plausible
+wrong reading available. Found by reading the frame and noticing which lines were missing
+rather than that any were.
+
+Absorbed by the shim (`2>&1` for `logs` only). Filed because the general form is real: a
+verb whose output *is* the far side's stderr has no way to say so, and `Invocation` has no
+field for it.
+
+---
+
+## F47 — a pushed view did not follow its own stream ★★★ — **fixed**
+
+`/logs` on a container that stopped mid-follow showed twenty-six lines of start-up and no
+sign that anything had happened since. The window sat at offset 0 while the document grew
+beneath it, so **the output the reader asked to watch and the terminal notice above it were
+both below the fold, permanently**.
+
+**Neither walk artefact reaches it.** A rule about what a frame *contains* is invisible to a
+table indexed by obligations and to a trace indexed by events — the fifth recorded blind
+spot, third surface it has caught. And it is invisible to the suite for the same reason: the
+route tests assert *the patch arrived in the document*, which was true throughout.
+
+Fixed as C22 I48's last clause: **an append holds the window at the bottom when it was at
+the bottom, and leaves it alone otherwise.** Both halves are the ruling — a window that
+never moves shows its first screen for ever, and one that moves under a reader who has
+scrolled up is the same fault reversed.
+
+---
+
 ## Open, not yet reached
 
 Recorded so their absence is a decision. Each gets an entry above when the surface that

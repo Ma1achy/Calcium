@@ -43,7 +43,8 @@
  * indivisible units, and each further reducer is that work again. They wait for
  * a consumer, like everything else here.
  */
-import type { Block, ViewDocument } from "../data/viewmodel/index.js";
+import { applyPatch } from "../data/viewmodel/index.js";
+import type { Block, ErrorLike, ViewDocument, ViewPatch } from "../data/viewmodel/index.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
 import { b } from "./builders/index.js";
 
@@ -104,6 +105,28 @@ export interface DocumentView {
    * covers the other side.
    */
   putBlock(blockId: string, next: Block): boolean;
+  /**
+   * Apply a `ViewPatch` to the held document — the streaming route's seam (I48).
+   *
+   * **Through C04's `applyPatch`, which is the same function C13 calls**
+   * (`transcript/store.ts`). A view that re-implemented `append` would be a
+   * second answer to a settled question, exactly as a second height codepath
+   * would be (I46).
+   *
+   * **Not merged with `putBlock`, and the difference is the contract rather
+   * than the mechanism.** `putBlock` is the refresh driver's and is total: the
+   * driver knows the id exists and a `false` means *release the host*. This
+   * reports C13's three-armed outcome, because that is what `streamInto`
+   * branches on — a malformed patch says so, an already-final one says
+   * something else, and a loop that could not tell them apart would append the
+   * wrong notice.
+   *
+   * `ok: false` with no reason when nothing is open: a patch may already be in
+   * flight when `pop()` runs, and the loop treats it as *stop consuming*.
+   * Returning rather than throwing for C13's `settle(id, doc)` reason — a throw
+   * would abandon the loop mid-iteration with the subscription still registered.
+   */
+  patch(view: ViewPatch): DocumentViewPatch;
   /** The block the view currently holds for an id, so staleness can retitle. */
   blockAt(blockId: string): Block | null;
   move(motion: DocumentViewMotion): boolean;
@@ -113,7 +136,42 @@ export interface DocumentView {
   readonly openFor: string | null;
 }
 
+/**
+ * **C13's `PatchOutcome` arms, deliberately** — minus `rev`, which is an entry's.
+ *
+ * The same discriminants because `streamInto` branches on them: a malformed
+ * patch says one thing to the reader and an already-gone target says another,
+ * and a loop that could not tell them apart would append the wrong notice. A
+ * shape of its own here rather than C13's type imported, because `rev` has no
+ * meaning for a view and a field that is always the same number is a field
+ * somebody will read.
+ */
+export type DocumentViewPatch =
+  | Readonly<{ ok: true }>
+  | Readonly<{ ok: false; reason: "closed" | "layer" | "project" }>
+  | Readonly<{ ok: false; reason: "patch"; error: ErrorLike }>;
+
 type State = Readonly<{ command: string; blocks: readonly Block[]; offset: number }>;
+
+/**
+ * The `meta` a held document is given so `applyPatch` can take it.
+ *
+ * **Never read.** `applyPatch` is pure over `blocks` and this route has no
+ * transport, no exit code and no duration — the entry route's `meta` comes from
+ * a `RawResult` and a stream has none until it ends. Written once here rather
+ * than invented per patch, so nothing downstream can mistake it for provenance.
+ */
+const EMPTY_META: ViewDocument["meta"] = Object.freeze({
+  verb: null,
+  adapter: "document-view",
+  exitCode: 0,
+  durationMs: 0,
+  truncated: false,
+  argv: [],
+  stderr: "",
+  transport: "local",
+  origin: "user",
+});
 
 export function createDocumentView(deps: DocumentViewDeps): DocumentView {
   let state: State | null = null;
@@ -274,6 +332,50 @@ export function createDocumentView(deps: DocumentViewDeps): DocumentView {
       if (!applied) return false;
       deps.redraw();
       return true;
+    },
+
+    patch(view) {
+      const at = state;
+      if (at === null) return { ok: false, reason: "closed" };
+      // A whole `ViewDocument` is what `applyPatch` takes, and the view holds
+      // blocks and an offset. The command is carried so a `document` patch —
+      // which replaces the lot — cannot silently rename what the view is for.
+      const held: ViewDocument = {
+        schema: "tui.view/1",
+        command: at.command,
+        status: "ok",
+        blocks: at.blocks,
+        meta: EMPTY_META,
+      };
+      const result = applyPatch(held, view);
+      if (!result.ok) return { ok: false, reason: "patch", error: result.error };
+
+      /**
+       * **A follow keeps the bottom, and only if it had it** (I48).
+       *
+       * `lastOffset` is computed against the *old* block list, so this asks
+       * *were we at the end before this arrived* — which is the question tail
+       * semantics turn on. A reader who has scrolled up is reading, and moving
+       * the window under them is the same failure as never moving it.
+       */
+      const wasAtBottom = at.offset >= lastOffset(at);
+      const grown: State = { ...at, blocks: result.doc.blocks };
+      const candidate: State = wasAtBottom ? { ...grown, offset: lastOffset(grown) } : grown;
+      // Both assigned together or neither, for `putBlock`'s reason: a throw
+      // between the document and the projection leaves the owner holding a
+      // document no frame ever displayed.
+      let content: readonly Block[];
+      try {
+        content = project(candidate);
+      } catch {
+        return { ok: false, reason: "project" };
+      }
+      state = candidate;
+      if (!deps.overlays.update(DOCUMENT_VIEW_ID, { content })) {
+        return { ok: false, reason: "layer" };
+      }
+      deps.redraw();
+      return { ok: true };
     },
 
     blockAt(blockId) {

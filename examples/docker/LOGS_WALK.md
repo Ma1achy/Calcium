@@ -167,13 +167,20 @@ saying *stop this*, and stopping the stream while leaving its window open would 
 ### A3 · the container stops while following — B3
 
 `docker logs -f` exits when the container does. So this is `end` arriving without the reader
-asking, and B3's ruling covers it: a notice, and the view stays. **The notice must not claim
-the stream ended normally**, because the reader will want to know whether the container died
-— but the exit code is not available on a `RawPatch` `end`, so the honest wording names what
-is known: *the log stream ended*, not *the container stopped*.
+asking, and B3's ruling covers it: a notice, and the view stays.
 
-Recorded because the first draft said "the container stopped", which is a fact this route
-does not have.
+**This row was written twice and wrong the first time, and the type is what corrected it.**
+The first version said the exit code *is not available on a `RawPatch` `end`*, so the notice
+could only say *the log stream ended*. It is available: `end` carries a whole `RawResult`
+(`transport/types.ts:63`). The ruling was reasoned from what a patch is *for* — a stream of
+lines — rather than read off the type, and this is the fourth time the implementation has
+falsified an artefact of this project.
+
+**Ruled with the code in hand:** a follow that ends because the container stopped is a
+different event from one that ends because the log ran out, and the exit code is what
+separates them, so the notice carries it. It still does **not** say *the container stopped* —
+a non-zero code belongs to the `docker logs` process, and inferring the container's fate
+from it is a second claim this route cannot make.
 
 ### A4 · a patch arrives after the pop — A1 × R7
 
@@ -203,6 +210,28 @@ appended to a document the reader is looking at rather than to an entry scrolled
 is the thing they see rather than a thing they find.
 
 ---
+
+## §3a What the implementation and the frames returned to the walk
+
+Four, and the last is the one neither artefact could have held.
+
+- **A3's exit code.** The walk said `end` carries none; it carries a whole `RawResult`
+  (`transport/types.ts:63`). Reasoned from what a patch is *for* rather than read off the
+  type. Corrected in place above — and the frame then added the other half: *exited 1* tells
+  the reader the follow failed and not why, while `stderr` sits on the same result carrying
+  `No such container`.
+- **The app has no route to a non-JSON stream** (F45). C07 gives `adaptPatch` the `data` row
+  and nothing else, so for a verb whose every line is `malformed` the app is never consulted
+  and the fallback's single growing block is what a view cannot scroll. B2 ruled the seam for
+  patches and never asked *which patches reach the app*.
+- **The content was on stderr** (F46). Not a row in either artefact, because both index the
+  framework's rules and this is a fact about docker.
+- **The view did not follow its own stream** (F47). **The sharpest, and structurally
+  unreachable from here**: the table indexes obligations and the trace indexes events, and
+  this is a rule about *what a frame contains* — the fifth blind spot, third surface. The
+  suite could not see it either, because every route test asserts that the patch arrived in
+  the document, which was true the whole time. Only a frame of a real container stopping
+  showed twenty-six lines of start-up and no sign anything had happened since.
 
 ## §4 What this walk settled before any code
 

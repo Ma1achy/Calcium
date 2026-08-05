@@ -18,6 +18,7 @@ import { createPsAdapter } from "./ps.ts";
 import { createDashboardHandler } from "./dashboard.ts";
 import { createContainerAdapter } from "./container.ts";
 import { createInspectAdapter } from "./inspect.ts";
+import { createLogsAdapter } from "./logs.ts";
 import { createCompareHandler, createDriftHandler } from "./drift.ts";
 import { createConfigHandler } from "./config.ts";
 
@@ -99,6 +100,7 @@ const tui = createTui({
     ps: createPsAdapter(),
     "container stats": createContainerAdapter(),
     inspect: createInspectAdapter(),
+    logs: createLogsAdapter(),
   },
   localHandlers: {
     dashboard: createDashboardHandler(engine, width, blockElements),

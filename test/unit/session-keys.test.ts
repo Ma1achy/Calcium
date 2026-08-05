@@ -259,6 +259,9 @@ describe("C22 §3 step 11 — the effect table", () => {
         open: () => null,
         fill: () => false,
         putBlock: () => false,
+        // C22 I48's seam. A stub, because this file drives the keymap rather than
+        // the view — but present, because the type is what says the two agree.
+        patch: () => ({ ok: false, reason: "closed" }) as const,
         blockAt: () => null,
         move: () => false,
         pop: () => false,

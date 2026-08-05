@@ -223,6 +223,91 @@ describe("C22 §13a — the document view", () => {
     expect(view.move("down"), "and this one genuinely scrolls").toBe(true);
   });
 
+  it("T4.43 (C22 I48): a ViewPatch appends, which putBlock cannot do", () => {
+    // **The seam, and the fixture shows why `putBlock` was not enough.** A
+    // stream's first patch is an `append` against a document that does not hold
+    // the block, which is precisely the case `putBlock` refuses.
+    view.open("/logs api");
+    view.fill(docOf([]));
+    expect(view.putBlock("line-0", chunk("line-0", "one")), "putBlock refuses it").toBe(false);
+
+    expect(view.patch({ op: "append", block: chunk("line-0", "one") })).toEqual({ ok: true });
+    expect(view.patch({ op: "append", block: chunk("line-1", "two") })).toEqual({ ok: true });
+    expect(ids()).toEqual(["line-0", "line-1"]);
+  });
+
+  it("T4.44 (C22 I48): it goes through C04's applyPatch, so C04 I14 is enforced here too", () => {
+    // Not a second patch model: a duplicate id is refused by the same function
+    // C13 calls, with the same reason, rather than by a rule this file invented.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "one")]));
+    const again = view.patch({ op: "append", block: chunk("a", "two") });
+
+    expect(again.ok).toBe(false);
+    expect(again.ok === false && again.reason, "C13's arm, so the loop can branch").toBe("patch");
+    expect(
+      again.ok === false && again.reason === "patch" ? again.error.message : "",
+      "and it names C04 I14 rather than restating it here",
+    ).toContain("I14");
+    expect(ids(), "and nothing was written").toEqual(["a"]);
+  });
+
+  it("T4.45 (C22 I48): a patch after the pop is refused, never thrown", () => {
+    // Walk A4. The abort is cooperative, so a patch may be in flight when the
+    // pop runs; a throw would abandon the streaming loop mid-iteration with the
+    // subscription still registered — C13's `settle(id, doc)` hazard.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "one")]));
+    view.pop();
+
+    let outcome: ReturnType<DocumentView["patch"]> | null = null;
+    expect(() => {
+      outcome = view.patch({ op: "append", block: chunk("b", "two") });
+    }).not.toThrow();
+    expect(outcome).toEqual({ ok: false, reason: "closed" });
+  });
+
+  it("T4.46 (C22 I48): a replace reaches a block the window is not showing", () => {
+    // The same property T4.35 holds for `putBlock`: the owner holds the
+    // document and the layer holds a window, so a patch addresses the document.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "one"), chunk("b", "two"), chunk("c", "three")]));
+    expect(ids(), "`c` is out of the window").not.toContain("c");
+
+    expect(view.patch({ op: "replace", blockId: "c", block: chunk("c", "patched") }).ok).toBe(true);
+    view.move("bottom");
+    const back = content().find((x) => x.id === "c");
+    expect(back?.kind === "panel" ? back.title : null).toBe("patched");
+  });
+
+  it("T4.47 (C22 I48): an append holds the bottom, so a follow follows", () => {
+    // **Found by reading a frame, not by either walk artefact.** A stopped
+    // container's follow showed twenty-six lines of start-up and no sign that
+    // anything had happened since — the new output and the terminal notice were
+    // both below the fold, for ever.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "1"), chunk("b", "2"), chunk("c", "3")]));
+    view.move("bottom");
+    const atBottom = ids();
+    expect(atBottom, "the fixture is at the end before anything arrives").toContain("c");
+
+    view.patch({ op: "append", block: chunk("d", "4") });
+    expect(ids(), "the window moved with the append").toContain("d");
+  });
+
+  it("T4.48 (C22 I48): a reader who scrolled up is left alone", () => {
+    // The other half, and it is the same defect reversed: a window that moves
+    // under someone reading is as wrong as one that never moves.
+    view.open("/logs api");
+    view.fill(docOf([chunk("a", "1"), chunk("b", "2"), chunk("c", "3")]));
+    view.move("top");
+    expect(ids(), "parked at the top").not.toContain("c");
+
+    view.patch({ op: "append", block: chunk("d", "4") });
+    expect(ids(), "and still parked at the top").not.toContain("d");
+    expect(ids()[0]).toBe("a");
+  });
+
   it("T4.36 (C22 I45): pop closes the view and leaves nothing behind", () => {
     view.open("/watch api");
     view.fill(docOf([chunk("a", "one")]));
