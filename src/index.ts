@@ -164,6 +164,15 @@ export type {
 } from "./interaction/parser/index.js";
 
 export type { BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
+/**
+ * The record a `RenderContext` carries, and what `TuiConfig.capabilities`
+ * overrides (C22 I49).
+ *
+ * Exported by name because a consumer writing an override wants to name the
+ * type it is a `Partial` of; the shape was already reachable through
+ * `RenderContext` and could not be spelled.
+ */
+export type { TerminalCapabilities } from "./terminal/capabilities.js";
 export type { Measure, MeasureFn } from "./data/viewmodel/index.js";
 export type { BlockKeymap } from "./interaction/router/types.js";
 
