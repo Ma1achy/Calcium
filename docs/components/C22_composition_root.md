@@ -762,6 +762,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I44** — §4 step 7 fires `config.greeting` and does not await it, and C23 appends what it returns through the ordinary append path. A rejection or a hang leaves the prompt usable and produces no entry; nothing about startup waits on it. The step existed in the list, in T3.10 and T3.11, and in S02's `Source` row, and **no code fired anything** — step 12's shape a second time in the same list, and the reason S02's welcome could be specified in detail by three documents and reachable by none. Appending through C23 rather than rendering here is A02 Seam 4: C22 produces a fact, C23 is the only component that appends, and a live part in the greeting is driven because it took the same route every other document takes (C23 I33a).
 - **I45** — **A verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.** Pushed before the transport is invoked and filled after it, so the ordering C23 I3 protects is unchanged and a slow verb is not a blank screen; a failure renders into the view rather than into a transcript that has nothing to show. Read from the manifest at step 2, never from the document the adapter returns: C23 I3 appends the pending entry before the transport runs and C13 has no delete, so an adapter-side decision could only produce a view *and* the entry B03 §2 says a push does not leave. The party is the one `ToolDef.interactive` already names — the app author — because a view is a handoff of input ownership and detection is not available for either.
 - **I46** — **A pushed view is owned by a shell-side component holding one offset, and C15 holds none.** The owner windows at **block boundaries** and hands C15 a smaller sequence, which is C25 I18's shape generalised: C15 measures the result through the same registry as everything else, so there is no second height codepath and `Placed` gains no scroll offset. A plot is atomic within that window and always will be — C12 I1 puts its series out of the height's reach, so *granular where the kind divides, atomic where it does not* is the ceiling, and row-granular scroll is not on the path. C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
+- **I47** — **A pushed view whose content C15 truncated says so on screen.** I46's window falls on block boundaries and the projection emits at least one block whatever its height, so a block taller than the region is shown cut and cannot be scrolled — the offset indexes blocks, and with one block there is no second offset to move to. The owner's remedy is to split, and splitting has a floor: a leaf with no children to split by has no smaller form that is still that leaf, so a producer can promise zero unreachable rows for every document whose leaves fit and not in general. **The two are one ruling and neither half is sufficient** — split alone leaves a silent residue, and the indicator alone leaves a document nothing can cross. `Placed.truncated` carries the fact already and C19's menu reads it (C19 §5); the duty here is to read it for a view. Content stopping mid-object with no indicator is indistinguishable from content ending, which is why this is not decoration.
 
 ---
 
@@ -805,6 +806,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 16. The completion spinner is composed from a fresh read of C19's `spinning` on every paint, and a request arms a wake at the threshold so a frame exists to show it. Appearance, never geometry (I38).
 19. A verb's result is a view when its tool or one of its flags declares it, decided before the pending entry exists — so `Esc` finds no entry to touch and selection survives because nothing appended (I45, §13a).
 20. A pushed view's offset belongs to its owner and never to C15, and its parts are released at the pop (I46, §13a).
+21. A view whose content C15 truncated reports it on screen, because a block taller than the region is shown cut and cannot be scrolled — and splitting, the owner's half of the remedy, has a floor at a leaf with no children (I47, §13a).
 
 ---
 
@@ -1147,6 +1149,46 @@ recurred while correcting this passage: a fresh probe answered **17**, because
 `createBlockRegistry()` alone still has no plot and the shell registers it separately at
 `construct.ts:297`. A probe built on the framework's defaults is measuring a different
 application than the one that runs, and the number it returns is plausible every time.
+
+### The block that does not fit, and the pair that makes it honest
+
+**S3 was the surface where the granularity was invisible, and it is not the general case.**
+docker-tui's `/inspect --raw` is the first consumer with more content than region — a real
+`docker inspect` is **245 rows against a 37-row region** — and it found that the ceiling
+above has a floor beneath it.
+
+Two rules meet here and neither is wrong on its own. The window falls on block boundaries
+(I46), and the projection emits **at least one block whatever its height**, because a block
+taller than the region would otherwise window to nothing and an empty view is
+indistinguishable from a broken one. Together they mean **a single tall block is shown, cut,
+and unscrollable**: the offset indexes blocks, so with one block there is no second offset
+to move to and the motion is *refused* rather than unhelpful. The reader presses a
+documented key and nothing happens.
+
+**The consumer's half is to split, and splitting has a floor.** An app that emits one block
+per top-level key takes the unreachable rows from 208 to 77; splitting a second level
+wherever a block still overflows takes them to 0, at 103 blocks. But the rule does not
+terminate: a leaf with no children to split by — a `Config.Env` of 300 variables, **302
+rows** — has no smaller form that is still that leaf, and one block per string is 300 blocks
+with the structure gone. So a producer can promise zero unreachable rows **for every document
+whose leaves fit**, and not in general.
+
+**So the ruling is a pair, and neither half is sufficient.** The owner splits what it can,
+and the view **reports what it could not**: when C15 places the layer truncated, the view
+says so on screen. `Placed.truncated` already carries the fact — C19's menu reads it and
+draws `N more` (C19 §5) — and until this consumer the document view cited that field as the
+mechanism reporting its overflow without ever reading it.
+
+The failure mode is why the second half is load-bearing rather than decorative: **content
+stopping mid-object with no indicator is indistinguishable from content ending.** A reader
+who is told the frame was cut goes looking; a reader who is not, stops. Stating the two as
+one ruling is deliberate — split alone leaves a silent residue, and the indicator alone
+leaves a document nothing can cross.
+
+**A comment citing a mechanism is evidence its author knew of the mechanism, not evidence
+the file uses it.** That is the general form of how this was missed, and it is worth the
+sentence: the file named `Placed.truncated`, named what it was for, and had no consumer of
+it, which reads exactly like a file that reads it.
 
 ### The obligations a route carries, and the one that is not yet built
 
