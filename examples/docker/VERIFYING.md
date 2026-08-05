@@ -213,6 +213,18 @@ removing the fixture made `make all` green. **Not flakiness discovered — load 
 Worth writing down because the natural reading of a timing failure during a frame-read
 session is that the change under test caused it.
 
+**Re-measured in step 8, and it did not reproduce.** `make fixtures` brings up `dtui-load`
+— the same shape of busy loop — and tier 5 ran green with it up: 94 passed, 7 todo,
+`E2E_WITH_LOAD_EXIT=0` read from a redirect. Both measurements are real, and neither
+cancels the other: C03's thresholds had no margin on a busy host in step 4 and have margin
+on an idle one now.
+
+**So the rule survives on its asymmetry rather than on its odds**, and saying which matters.
+`make load-down` costs a second. A timing failure diagnosed as a code change costs a
+session, and did. A precaution whose stated justification is a failure nobody can reproduce
+gets deleted by the next person who checks — this one now carries both figures and the date,
+so what gets checked is the claim actually being made.
+
 ## 8. A capture that ends too early is indistinguishable from a command that did nothing
 
 `/drift dtui-web` at `hold=8` replayed as a typed prompt and an empty transcript. At
