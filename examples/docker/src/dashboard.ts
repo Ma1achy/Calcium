@@ -170,10 +170,45 @@ const CPU_WIDTH = GLYPH_SLOT + BAR_CELLS + 1 + 6;
  * the number keeps counting, which is the honest rendering of a figure whose
  * ceiling is the core count and is not knowable here.
  */
-export function bar(value: number | null): { text: string; tone: Tone; glyph?: Glyph } {
-  if (value === null) return { text: "—".padEnd(CPU_WIDTH - GLYPH_SLOT), tone: "muted" };
+/**
+ * The bar's two alphabets, and **the choice is the app's because nothing else
+ * can make it** (F43, F54).
+ *
+ * `█ ░ —` are block elements and an em-dash. Capability substitution covers the
+ * glyphs C09 picks, **not text an adapter supplies** — so on a terminal
+ * declaring `unicode: ascii` these pass through untouched and draw as garbage.
+ * S12 measured it: at `LANG=C` the frame kept `░░░░░░░░` beside a plot that had
+ * correctly become `.::-==++**##@@` and borders that had correctly become `+--+`.
+ *
+ * The framework was right about all of that and cannot help here: an adapter is
+ * handed `AdapterContext`, which carries `width` and no capabilities, so the
+ * flag is computed in `main.ts` from the environment and threaded in by hand.
+ * That thread is the price of F43 and it is what makes F43 a finding rather
+ * than a preference.
+ */
+/**
+ * The separator, on the same axis as the alphabet.
+ *
+ * `·` is U+00B7 — not a block element, and not ASCII either. It was the fourth
+ * character S12's frame scan found and the first the *list* of characters
+ * missed, which is why the test asserts a codepoint range now: a coverage set
+ * drawn from the defects already found covers exactly those.
+ */
+export const dot = (unicode: boolean): string => (unicode ? "·" : "-");
+
+const ALPHABET = {
+  full: { filled: "█", empty: "░", absent: "—" },
+  ascii: { filled: "#", empty: ".", absent: "-" },
+} as const;
+
+export function bar(
+  value: number | null,
+  unicode = true,
+): { text: string; tone: Tone; glyph?: Glyph } {
+  const mark = unicode ? ALPHABET.full : ALPHABET.ascii;
+  if (value === null) return { text: mark.absent.padEnd(CPU_WIDTH - GLYPH_SLOT), tone: "muted" };
   const filled = Math.min(BAR_CELLS, Math.round((value / 100) * BAR_CELLS));
-  const glyphs = "█".repeat(filled) + "░".repeat(BAR_CELLS - filled);
+  const glyphs = mark.filled.repeat(filled) + mark.empty.repeat(BAR_CELLS - filled);
   const text = `${glyphs} ${value.toFixed(1)}%`.padEnd(CPU_WIDTH - GLYPH_SLOT);
 
   // **A toned cell must carry a glyph, and finding that out cost nothing only
@@ -244,13 +279,14 @@ export const COLUMNS: readonly ColumnDef[] = [
   b.col("usage", { label: "USAGE", priority: 40, minWidth: 18 }),
 ];
 
-function rowOf(c: Joined): TableRow {
+function rowOf(c: Joined, unicode: boolean): TableRow {
   const { glyph, tone } = stateOf(c.state);
+  const absent = unicode ? ALPHABET.full.absent : ALPHABET.ascii.absent;
   return b.row(c.id, {
     name: { text: c.name, glyph, tone },
-    cpu: bar(c.cpu),
-    mem: bar(c.memPerc),
-    usage: c.memText === "" ? { text: "—", tone: "muted" } : { text: c.memText },
+    cpu: bar(c.cpu, unicode),
+    mem: bar(c.memPerc, unicode),
+    usage: c.memText === "" ? { text: absent, tone: "muted" } : { text: c.memText },
   });
 }
 
@@ -263,7 +299,7 @@ function rowOf(c: Joined): TableRow {
  * say how many are hidden — whose overlap at the boundary is a line that buys
  * nothing.
  */
-export function livePanelBody(live: readonly Joined[]): Block {
+export function livePanelBody(live: readonly Joined[], unicode = true): Block {
   // **Selection and display order are different jobs, and conflating them hid
   // the wrong containers.**
   //
@@ -297,7 +333,7 @@ export function livePanelBody(live: readonly Joined[]): Block {
     // Invisible in a single frame, and invisible in the tests: it was found by
     // replaying prefixes of one capture and noticing the one line that never
     // moved.
-    b.notice("muted", summaryLine(live)),
+    b.notice("muted", summaryLine(live, unicode)),
     b.table({
       // **Not `running`.** That is the live panel's id, and C04 I14 refuses a
       // document with two blocks sharing one — `ViewPatch` addresses by id, so a
@@ -305,8 +341,12 @@ export function livePanelBody(live: readonly Joined[]): Block {
       // the easiest pair in the world to name the same thing.
       id: "running-rows",
       columns: COLUMNS,
-      rows: shown.map(rowOf),
-      emptyMessage: "nothing running · every container is stopped",
+      // **Not `shown.map(rowOf)`** — the point-free form silently handed the
+      // array index in as `blocks`, so every row but the first would have drawn
+      // its full alphabet on an ASCII terminal. TypeScript caught it; a
+      // JavaScript port of this line would not have.
+      rows: shown.map((c) => rowOf(c, unicode)),
+      emptyMessage: `nothing running ${dot(unicode)} every container is stopped`,
     }),
     ...(hidden === 0 ? [] : [b.notice("muted", `… ${String(hidden)} more`)]),
   ]);
@@ -338,15 +378,15 @@ export function totals(live: readonly Joined[]): { cpu: string; mem: string } {
  * `stats` includes paused containers, so a panel headed `RUNNING (5)` would be
  * describing five containers of which one is not running.
  */
-export function summaryLine(live: readonly Joined[]): string {
+export function summaryLine(live: readonly Joined[], unicode = true): string {
   const running = live.filter((c) => c.state === "running").length;
   const paused = live.length - running;
   const counts =
     paused === 0
       ? `${String(running)} running`
-      : `${String(running)} running · ${String(paused)} paused`;
+      : `${String(running)} running ${dot(unicode)} ${String(paused)} paused`;
   const t = totals(live);
-  return `${counts}   CPU ${t.cpu} · MEM ${t.mem}`;
+  return `${counts}   CPU ${t.cpu} ${dot(unicode)} MEM ${t.mem}`;
 }
 
 /**
@@ -370,7 +410,7 @@ export function dashboard(
   snap: Snapshot,
   width: number,
   engine: string,
-  blocks = true,
+  unicode = true,
 ): readonly Block[] {
   const all = join(snap);
   const live = all.filter(isLive);
@@ -385,11 +425,13 @@ export function dashboard(
    * set the panel's minimum width and a narrow terminal would get a bordered
    * box sized for art it is not showing.
    */
-  const art = banner(width, blocks);
+  const art = banner(width, unicode);
 
   return [
     ...(art === null ? [] : [art]),
-    b.panel(`docker-tui · engine ${engine} · ${String(all.length)} containers`, [
+    b.panel(
+      `docker-tui ${dot(unicode)} engine ${engine} ${dot(unicode)} ${String(all.length)} containers`,
+      [
       b.live({
         id: "running",
         title: LIVE_TITLE,
@@ -397,7 +439,7 @@ export function dashboard(
         fetch: fetchSnapshot,
         render: (data) => {
           const s = data as Snapshot;
-          return livePanelBody(join(s).filter(isLive));
+          return livePanelBody(join(s).filter(isLive), unicode);
         },
         // **Without this the first frame says `loading…` for two seconds**, and
         // the handler is holding a snapshot the whole time. `b.live` returns its
@@ -409,7 +451,7 @@ export function dashboard(
         // It also makes the panel honest across the gap: the driver's first tick
         // is one interval away, so between them the only truthful thing to show
         // is the data the document was built from.
-        renderLoading: () => livePanelBody(live),
+        renderLoading: () => livePanelBody(live, unicode),
       }),
       b.pills(
         stopped.map((c) => ({ label: c.name, tone: "muted" as Tone })),

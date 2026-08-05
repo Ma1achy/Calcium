@@ -73,6 +73,7 @@ export type { LiveSpec, ViewRefresh };
 export type { Identity };
 export type { CommandPolicy, Classification, ParseResult };
 export type { BlockDefinition, Measure, MeasureFn, RenderContext, BlockKeymap };
+export type { TerminalCapabilities };   // what `TuiConfig.capabilities` overrides — C22 I49
 export type { TransportRouter, VerbTransport, Invocation };
 export type { WorldDriver };
 

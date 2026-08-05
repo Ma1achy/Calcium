@@ -28,14 +28,34 @@ APP = ["node", "--experimental-strip-types", "src/main.ts"]
 
 
 def run(
-    cols: int, rows: int, script: list[tuple[float, bytes]], out_path: str, hold: float = 3.0
+    cols: int,
+    rows: int,
+    script: list[tuple[float, bytes]],
+    out_path: str,
+    hold: float = 3.0,
+    env: dict[str, str] | None = None,
 ) -> None:
-    """`script` is (seconds-from-start, bytes-to-send); it is read in order."""
+    """`script` is (seconds-from-start, bytes-to-send); it is read in order.
+
+    `env` overrides the child's environment, which is how S12 captures the same
+    surface at five depths. `TERM` and `COLORTERM` are the two the depth is read
+    from and `LANG` decides unicode — C02 §3 — and the app hands `process.env`
+    straight to `createTui`, so setting them here is the whole mechanism.
+
+    A value of `""` **unsets** the variable rather than setting it empty: absent
+    `COLORTERM` and empty `COLORTERM` are different inputs to C02's rules, and
+    the 256-colour row needs the first.
+    """
     pid, fd = pty.fork()
     if pid == 0:
         os.environ["TERM"] = "xterm-256color"
         os.environ["COLUMNS"] = str(cols)
         os.environ["LINES"] = str(rows)
+        for key, value in (env or {}).items():
+            if value == "":
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         os.execvp(APP[0], APP)
 
     # The size the child sees, set on the master before it draws anything.
@@ -117,6 +137,14 @@ if __name__ == "__main__":
     # capture that ends mid-fetch shows an empty transcript — which reads
     # exactly like a command that produced nothing.
     hold = float(sys.argv[5]) if len(sys.argv) > 5 else 12.0
+    # Everything after the hold is either a `KEY=VALUE` environment override
+    # (S12's five depths) or the keystrokes to send afterwards. They are told
+    # apart by the `=`, because the keystroke argument was here first and adding
+    # a positional after it would have made the environment optional-in-the-
+    # middle. `KEY=` unsets rather than setting empty.
+    tail = sys.argv[6:]
+    overrides = dict(a.split("=", 1) for a in tail if "=" in a)
+    rest = [a for a in tail if "=" not in a]
     # Typed, then Enter two seconds later — outside the paste window.
     #
     # **Keys after the Enter**, for a surface that is only interesting once it
@@ -124,6 +152,6 @@ if __name__ == "__main__":
     # command produced. Given as a sixth argument, one keypress per second, and
     # each one its own write for the same reason the command is not a burst —
     # bytes arriving together are a paste, and `n` twice in one write is text.
-    keys = sys.argv[6].encode() if len(sys.argv) > 6 else b""
+    keys = rest[0].encode() if rest else b""
     after = [(5.0 + i, bytes([k])) for i, k in enumerate(keys)]
-    run(cols, rows, [(1.5, command), (3.5, b"\r"), *after], out, hold)
+    run(cols, rows, [(1.5, command), (3.5, b"\r"), *after], out, hold, overrides)

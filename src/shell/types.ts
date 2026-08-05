@@ -25,6 +25,7 @@ import type { CommandPolicy } from "../interaction/parser/index.js";
 import type { BlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
 import type { ThemeSet, ThemeStore } from "../presentation/theme/index.js";
 import type { FrameScheduler } from "../terminal/frame-scheduler.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { TerminalLifecycle } from "../terminal/lifecycle.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { TranscriptStore } from "../viewport/transcript/index.js";
@@ -323,6 +324,32 @@ export type TuiConfig = Readonly<{
    * colour: the safe direction, and the alternative is a fifth required field.
    */
   env?: Readonly<NodeJS.ProcessEnv>;
+  /**
+   * C02's capability overrides, wired (I49).
+   *
+   * `detectCapabilities(env, overrides)` has taken these since C02 was written:
+   * C02 I4 makes a valid one win unconditionally, including for `altScreen`,
+   * an unknown key is ignored and an out-of-range value is rejected with a
+   * warning. **Nothing an application could call ever supplied them** — this
+   * line is the producer, and until it existed the two callers in the tree were
+   * `construct.ts` passing one argument and a test fixture reaching in by deep
+   * import.
+   *
+   * The consumer that found it is the degradation showcase, at the depth that
+   * matters most: `colourDepth: 1` follows only from C02's `dumb` gate, and
+   * that gate also clears `altScreen`, which C02 I7 makes the one refusal that
+   * stops the shell. So 1-bit was unreachable by any application.
+   *
+   * **`| undefined` is load-bearing, not noise.** This tree compiles with
+   * `exactOptionalPropertyTypes`, under which an optional property and a
+   * property that may be undefined are different types — so without it a
+   * consumer computing the value conditionally cannot supply the field at all:
+   * neither `capabilities: maybe` nor `...(maybe === undefined ? {} : { … })`
+   * type-checks, and only a cast gets past. Every other optional field on this
+   * type has the same shape and no consumer has needed one conditionally yet
+   * (FINDINGS F53). Fixed here because this is the field with a consumer.
+   */
+  capabilities?: Partial<TerminalCapabilities> | undefined;
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;

@@ -173,7 +173,9 @@ describe("the rendering", () => {
   it("E6: no events renders a sentence, because an empty events block is blank", () => {
     // `eventsDefinition.measure` is `atLeastOne(length)`, so a `b.events` block
     // with no rows occupies a row and draws nothing — the exact frame that
-    // reads as a broken fetch. Fifth instance of the empty-block class.
+    // reads as a broken fetch. Sixth instance of the empty-block class — the
+    // count was one low until the roadmap totalled them, because /port's was
+    // filed as a variant of the class rather than a member of it.
     const ring = createRing();
     expect(body(ring).kind).toBe("notice");
     expect(noticeIn(body(ring)).text).toContain("waiting for the first window");

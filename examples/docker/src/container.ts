@@ -89,7 +89,7 @@ async function readDetails(id: string): Promise<Row | null> {
  * fetch's return value is what put the newest sample *into* the ring, and by the
  * time this runs the ring is the whole answer.
  */
-export function cpuBlock(ring: Ring, trouble?: Block): Block {
+export function cpuBlock(ring: Ring, trouble?: Block, unicode = true): Block {
   return b.group(
     "column",
     [
@@ -113,7 +113,7 @@ export function cpuBlock(ring: Ring, trouble?: Block): Block {
          */
         yMin: 0,
       }),
-      b.notice("muted", axisCaption(ring), undefined, { id: "cpu-axis" }),
+      b.notice("muted", axisCaption(ring, unicode), undefined, { id: "cpu-axis" }),
       ...(trouble === undefined ? [] : [trouble]),
     ],
     { id: "cpu-body" },
@@ -148,22 +148,31 @@ export function cpuErrorBlock(ring: Ring, message: string, retryInMs: number | n
  * non-colour channel on anything severe, and a `keyValue` row has no glyph field
  * to put one in — the framework offers `label`, `value` and `tone` and nothing
  * else. Rather than colour a row that cannot carry the mark beside it, the bar's
- * own `█`/`░` run is the channel: it survives 1-bit and it survives a
- * colour-blind reader, which is the whole of what the rule is protecting.
+ * own run is the channel: it survives 1-bit and it survives a colour-blind
+ * reader, which is the whole of what the rule is protecting.
+ *
+ * **S12 measured the sentence above and found half of it.** The run does survive
+ * one bit — the frame at `colourDepth: 1` still shows it and the meaning moves
+ * to bold and dim. It does **not** survive `unicode: ascii`: `█` and `░` are
+ * adapter text, and capability substitution covers the glyphs C09 picks. At
+ * `LANG=C` the frame kept `░░░░░░░░` beside a plot that had correctly become
+ * `.::-==++**##@@`. So the alphabet is chosen by the caller, from a flag the app
+ * computes itself because `AdapterContext` carries no capabilities (F43, F54).
  */
-export function ioBlock(row: Row | null): Block {
+export function ioBlock(row: Row | null, unicode = true): Block {
   if (row === null) {
     return b.notice("muted", "no measurements — the container is not running", undefined, {
       id: "io-body",
     });
   }
   const memPerc = percent(str(row, "MemPerc"));
+  const absent = unicode ? "—" : "-";
   return b.kv(
     {
-      MEM: `${bar(memPerc).text}  ${str(row, "MemUsage")}`,
-      NET: str(row, "NetIO") || "—",
-      BLK: str(row, "BlockIO") || "—",
-      PIDS: str(row, "PIDs") || "—",
+      MEM: `${bar(memPerc, unicode).text}  ${str(row, "MemUsage")}`,
+      NET: str(row, "NetIO") || absent,
+      BLK: str(row, "BlockIO") || absent,
+      PIDS: str(row, "PIDs") || absent,
     },
     { id: "io-body" },
   );
@@ -246,7 +255,7 @@ export function createCpuTick(ring: Ring, read: () => Promise<Row | null>): () =
  * The verb's own result seeds the first sample, so the opening frame draws a
  * point rather than an empty axis.
  */
-export function containerView(row: Row, width: number): readonly Block[] {
+export function containerView(row: Row, width: number, unicode = true): readonly Block[] {
   /**
    * **`ID`, not `Container` — and the frame is what said so.**
    *
@@ -277,8 +286,8 @@ export function containerView(row: Row, width: number): readonly Block[] {
       title: "CPU",
       every: TICK_MS,
       fetch: tickCpu,
-      render: () => cpuBlock(ring),
-      renderLoading: () => cpuBlock(ring),
+      render: () => cpuBlock(ring, undefined, unicode),
+      renderLoading: () => cpuBlock(ring, undefined, unicode),
       // Overridden so the history survives the failure that made it
       // interesting. The framework's default replaces the child outright, which
       // is right for a part whose block *is* its latest fetch and wrong for one
@@ -287,11 +296,11 @@ export function containerView(row: Row, width: number): readonly Block[] {
     }),
     b.live({
       id: "io",
-      title: "MEMORY · NETWORK · BLOCK",
+      title: unicode ? "MEMORY · NETWORK · BLOCK" : "MEMORY - NETWORK - BLOCK",
       every: TICK_MS,
       fetch: () => readStats(id),
-      render: (data) => ioBlock(data as Row | null),
-      renderLoading: () => ioBlock(row),
+      render: (data) => ioBlock(data as Row | null, unicode),
+      renderLoading: () => ioBlock(row, unicode),
     }),
     b.live({
       // No `every` — one-shot. Rendered once, never retried, never re-titled.
@@ -299,6 +308,19 @@ export function containerView(row: Row, width: number): readonly Block[] {
       title: "DETAILS",
       fetch: () => readDetails(id),
       render: (data) => detailsBlock(data as Row | null),
+      // **Supplied, and the reason is an ellipsis.** Left out, C24's default
+      // renders `loading…` — U+2026, a framework string constant with no
+      // capability substitution behind it, which reaches an ASCII terminal
+      // whole. The app can replace its own; it cannot replace the prompt, which
+      // is the other instance and the one that made this a finding (F55).
+      //
+      // It also says something truer: this part is one-shot, so what is
+      // happening is a single `docker ps` filtered by id, and naming it beats
+      // a participle.
+      renderLoading: () =>
+        b.notice("muted", unicode ? "reading the container's record…" : "reading the container's record", undefined, {
+          id: "details-loading",
+        }),
     }),
   ];
 }
@@ -311,7 +333,7 @@ export function containerView(row: Row, width: number): readonly Block[] {
  * screen by the time this runs (C22 I45 pushes at step 3), so returning nothing
  * useful would leave a reader looking at a spinner that stopped.
  */
-export function createContainerAdapter(): Adapter {
+export function createContainerAdapter(unicodeText: () => boolean = () => true): Adapter {
   return {
     schema: "tui.view/1",
     adapt(result, ctx): ViewDocument {
@@ -325,7 +347,9 @@ export function createContainerAdapter(): Adapter {
           : "no such container, or it reported nothing");
 
       const blocks: readonly Block[] =
-        row === null ? [b.notice.error(failure)] : containerView(row, ctx.width);
+        row === null
+          ? [b.notice.error(failure)]
+          : containerView(row, ctx.width, unicodeText());
 
       return {
         schema: "tui.view/1",

@@ -220,6 +220,49 @@ describe("C22 §3 — construction order", () => {
     expect(before(graph.log, "registries", "stores")).toBe(true);
   });
 
+  it("T1.4d (I49): a config override reaches the capability record", async () => {
+    // **The parameter existed and had no producer.** C02 I4 makes a valid
+    // override win unconditionally, T1.9/T3.4/T3.5 test the rules and T5.5
+    // asserts one on the wire — all of it satisfied while `construct.ts` passed
+    // one argument and the only other caller was a test fixture.
+    //
+    // The environment says four-bit; the override says one. The detected value
+    // is asserted alongside it, so the row cannot pass against a build that
+    // ignores the environment as well.
+    const detected = await build({ env: { TERM: "xterm" } });
+    expect(detected.graph.capabilities.colourDepth).toBe(4);
+
+    const forced = await build({ env: { TERM: "xterm" }, capabilities: { colourDepth: 1 } });
+    expect(forced.graph.capabilities.colourDepth).toBe(1);
+  });
+
+  it("T1.4d (I49): altScreen is overridable, which is the case that makes it usable", async () => {
+    // C02 I4 names `altScreen` specifically, and it is the field with
+    // consequences: it is the sole hard refusal (C02 I7), and the only rule
+    // producing `colourDepth: 1` — the `dumb` gate — clears it. So a
+    // one-bit terminal is unreachable unless both can be said at once, which is
+    // the whole reason the degradation showcase found this.
+    const dumb = await build({ env: { TERM: "dumb" } });
+    expect(dumb.graph.capabilities.altScreen).toBe(false);
+
+    const forced = await build({
+      env: { TERM: "dumb" },
+      capabilities: { colourDepth: 1, altScreen: true },
+    });
+    expect(forced.graph.capabilities).toMatchObject({ colourDepth: 1, altScreen: true });
+  });
+
+  it("T1.4d (I49): a bad override is rejected, and the detected value stands", async () => {
+    // C02 validates; C22's duty is only that they arrive. Asserted here because
+    // a producer that filtered on the way past would be a second validator, and
+    // two validators is how the two disagree.
+    const { graph } = await build({
+      env: { TERM: "xterm-256color" },
+      capabilities: { colourDepth: 12 as 1 },
+    });
+    expect(graph.capabilities.colourDepth).toBe(8);
+  });
+
   it("T1.14 (C01 I13): the viewport is built against the real terminal width", async () => {
     // The pair §3a could not see, because the constraint lives in C01. The
     // viewport takes width and height at step 5; only `lifecycle.ts` may read

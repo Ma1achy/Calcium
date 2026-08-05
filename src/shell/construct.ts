@@ -279,7 +279,12 @@ export async function constructGraph(
   // Before the registries, because a block definition may vary by capability
   // (A02 §3) — and a record built after them would give a table in ASCII beside
   // a sparkline that is not, which is the thing C02 exists to prevent.
-  const detection = at("capabilities", () => detectCapabilities(config.env));
+  // The overrides are C02's to validate — an unknown key is ignored and a bad
+  // value is rejected with a warning that surfaces where C02's others do. This
+  // line's whole job is that they arrive at all (I49).
+  const detection = at("capabilities", () =>
+    detectCapabilities(config.env, config.capabilities),
+  );
 
   // --- 3. registries: blocks, adapters, manifest, completion sources --------
   // **Manifest before completion sources**, within the step: the default

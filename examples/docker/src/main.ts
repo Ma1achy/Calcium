@@ -46,7 +46,14 @@ const run = promisify(execFile);
 const width = (): number => process.stdout.columns || 80;
 
 /**
- * Whether the terminal can draw block elements — `▄ ▀ █`.
+ * Whether the terminal can draw anything outside ASCII.
+ *
+ * **It was called `blockElements` and the name was already too narrow.** It was
+ * written for the banner's `▄ ▀ █`; the second consumer is S3's `█`/`░` bar and
+ * the third is a `·` in a caption, which is not a block element at all. The
+ * predicate never was about block elements — it is C02's `unicode` axis, which
+ * the app has to compute for itself because no consumer is handed the record
+ * (F43).
  *
  * **Decided by the app, and that is a finding rather than a design** (F43).
  * `detectCapabilities` is not exported and a local handler is handed no
@@ -63,10 +70,31 @@ const width = (): number => process.stdout.columns || 80;
  * The test is deliberately crude: a UTF-8 locale and a terminal that is not
  * `dumb`. Getting it wrong costs a wordmark, not correctness.
  */
-const blockElements = (): boolean => {
+const unicodeText = (): boolean => {
   const term = process.env["TERM"] ?? "";
   const locale = `${process.env["LC_ALL"] ?? ""}${process.env["LANG"] ?? ""}`;
   return term !== "" && term !== "dumb" && /utf-?8/iu.test(locale);
+};
+
+/**
+ * S12's depth, resolved by the app because that is where an environment variable
+ * named for one application belongs (C22 I20's rule, and `PRISM_TUI_STATE_DIR`'s
+ * precedent).
+ *
+ * **Four of the five depths need nothing here** — `COLORTERM=truecolor` gives
+ * 24, `xterm-256color` gives 8, `xterm` gives 4, and `LANG=C` gives ASCII, all
+ * through C02's own rules. **1-bit needs this**, because the only rule producing
+ * `colourDepth: 1` is the `dumb` gate and that gate also clears `altScreen`,
+ * which C02 I7 makes the one refusal that stops the shell. Before C22 I49 there
+ * was no way for any application to say it (FINDINGS F52).
+ *
+ * Nothing else is overridden: `altScreen` stays detected, so this asks for a
+ * one-bit *palette* on a terminal that can still open, which is what the
+ * showcase is about.
+ */
+const depthOverride = (): { colourDepth: 1 | 4 | 8 | 24 } | undefined => {
+  const raw = Number(process.env["DOCKER_TUI_DEPTH"] ?? "");
+  return raw === 1 || raw === 4 || raw === 8 || raw === 24 ? { colourDepth: raw } : undefined;
 };
 
 /**
@@ -101,11 +129,23 @@ const tui = createTui({
   // `altScreen` is false, and `acquire()` refuses to open the shell. The spec
   // says omitting it degrades to ASCII with no colour; it does not degrade.
   env: process.env,
+  // Undefined unless S12 asked, so an ordinary run detects exactly as before.
+  //
+  // **That this line compiles is itself a finding.** Calcium builds with
+  // `exactOptionalPropertyTypes`, under which an optional property and a
+  // property that may be undefined are different types — so `capabilities?:
+  // Partial<TerminalCapabilities>` could not be supplied conditionally by any
+  // consumer at all: neither an assignment nor a spread type-checks, only a
+  // cast. Every internal caller passes a literal, which is why no producer
+  // could have met it. FINDINGS F53.
+  capabilities: depthOverride(),
   // Keyed by the verb, and a sub-verb's key is its whole name — the space is
   // part of it, not a separator this side of C18.
   adapters: {
     ps: createPsAdapter(),
-    "container stats": createContainerAdapter(),
+    // The same flag the banner uses, for the same reason and a second time —
+    // which is what makes F43 a finding rather than a one-off inconvenience.
+    "container stats": createContainerAdapter(unicodeText),
     inspect: createInspectAdapter(),
     logs: createLogsAdapter(),
     diff: createDiffAdapter(),
@@ -114,7 +154,7 @@ const tui = createTui({
     port: createPortAdapter(),
   },
   localHandlers: {
-    dashboard: createDashboardHandler(engine, width, blockElements),
+    dashboard: createDashboardHandler(engine, width, unicodeText),
     drift: createDriftHandler(),
     compare: createCompareHandler(),
     config: createConfigHandler(),
@@ -135,7 +175,7 @@ const tui = createTui({
    * scrolled out of view is still running. S1's drawing said it froze; the
    * drawing was wrong about Calcium's own rules (FINDINGS F17a).
    */
-  greeting: () => createDashboardHandler(engine, width, blockElements)([], { command: "" }),
+  greeting: () => createDashboardHandler(engine, width, unicodeText)([], { command: "" }),
 });
 
 await tui.start();

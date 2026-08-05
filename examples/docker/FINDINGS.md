@@ -1766,3 +1766,108 @@ looking at C10's model rather than at either block.
 needs to in words. That is the same answer C04's `Glyph` comment gives — what the
 vocabulary cannot say goes in the text — and it is why this is a finding rather than a
 blocker.
+
+---
+
+## F52 — a parameter fully tested and unreachable at once ★★★ — **fixed**
+
+`detectCapabilities(env, overrides)` has taken overrides since C02 was written. C02 I4
+makes a valid one win unconditionally, including for `altScreen`; T1.9, T3.4 and T3.5 test
+the rules; T5.5 asserts one reaching the wire. All of it passed while `construct.ts` called
+the function with **one argument**, and the only other caller in the repository was
+`test/support/fixture.mjs` — which reaches in by deep import and composes its own frame,
+and whose comment says the wiring is C22's.
+
+A03 §2's vacuity class arriving through a **parameter**. C24 I16 is written about exported
+declarations and MG25 scans free functions and constants, so neither could see an argument
+nothing supplies.
+
+**S12 is the consumer, and it found it at the depth that matters most.** Four of the five
+depths come from the environment. `colourDepth: 1` comes from none of them: the only rule
+producing it is C02's `dumb` gate, and that gate also clears `altScreen`, which C02 I7
+makes the one refusal that stops the shell. Measured:
+
+```
+$ TERM=dumb docker-tui
+Error: alternate screen unsupported — the shell cannot open
+```
+
+**Fixed**: C22 I49 and commitment 23, `TuiConfig.capabilities`, three lines.
+
+---
+
+## F53 — `exactOptionalPropertyTypes` makes an optional field unsupplyable
+
+A consumer computing an optional config value cannot pass it. Neither form compiles:
+
+```ts
+capabilities: maybeUndefined                                  // TS2379
+...(maybe === undefined ? {} : { capabilities: maybe })       // TS2379 as well
+```
+
+Under the flag an optional property and a property that may be undefined are different
+types, so `capabilities?: Partial<TerminalCapabilities>` accepts a value or *absence of the
+key* — and a spread of a conditional produces `T | undefined`, which is the second thing.
+Only a cast gets past.
+
+**A consumer finds this and a producer cannot**: every internal caller passes a literal, so
+nothing in `src/` or the test tree could ever have met it. Fifteen optional fields on
+`TuiConfig` have the shape; **one of them has been wanted conditionally**, and that one now
+carries `| undefined`. The rest are filed rather than changed, because a variance widened
+for no consumer is a guess about the next one.
+
+---
+
+## F54 — the app drew five characters an ASCII terminal cannot show ★★★ — **fixed**
+
+Capability substitution covers the glyphs C09 picks, **not text an adapter supplies** —
+which is documented, correct, and had gone unpaid for four surfaces. At `LANG=C` the S3
+frame kept `░░░░░░░░` beside a plot that had correctly become `.::-==++**##@@`.
+
+| character | where | how it was found |
+|---|---|---|
+| `░` `█` | the CPU/MEM bar | reading the ASCII frame |
+| `—` | the absent-value dash | fixing the bar, in the same function |
+| `·` | three captions and a panel title | scanning the frame for codepoints > 127 |
+| `…` | `loading…` — **the framework's**, not the app's | a test asserting a *range* rather than the three known characters |
+
+**The fourth row is the finding inside the finding.** The first assertion listed `█ ░ —` —
+a coverage set drawn from the defects already found, which covers exactly those and nothing
+else. Changing it to *no codepoint above 127* found a fifth character immediately.
+
+**Fixed** app-side by threading a flag from `main.ts` through `bar`, `rowOf`,
+`livePanelBody`, `summaryLine`, `ioBlock`, `cpuBlock`, `axisCaption` and `containerView`.
+The predicate was called `blockElements` and is now `unicodeText`: it was written for the
+banner's `▄▀█`, and its second and third consumers wanted it for a `·` and an em-dash,
+which are not block elements at all.
+
+**That thread is the price of F43** — `AdapterContext` carries `width` and no capabilities,
+so an adapter cannot ask, and every adapter emitting non-ASCII text must be constructed
+with an app-computed flag. Eight functions for one boolean the framework already holds.
+
+---
+
+## F55 — the framework draws two characters it does not substitute ★★★
+
+With the app's five fixed, the ASCII dashboard contains exactly one non-ASCII character:
+
+```
+U+276F '❯' x2    the prompt — `PROMPT = "❯ "`, src/shell/config.ts:32
+U+2026 '…'       `loading…` — b.live's default renderLoading
+```
+
+Both are string constants concatenated into a frame with nothing between them and the
+terminal. C09 §4's whole argument is that a glyph is a *slot* and never a character,
+because *"C09 substitutes 1:1 by column count for the glyphs it owns, and emitted a
+block-supplied one verbatim — the guarantee held for the box drawing and failed for
+whatever an adapter wrote"*. These are neither: they are L4 text, outside the vocabulary
+the argument is about.
+
+**The prompt is the sharper half.** It is on every frame the shell ever draws, on the one
+line the reader types into, and no application can replace it — `renderLoading` an app can
+supply, and does. On a terminal that reports `unicode: ascii` the framework's own prompt is
+the last thing left that cannot render.
+
+Filed, not fixed. C22 §6 owns the prompt and gives it no capability-dependent form, so this
+wants a ruling — a pair like C09's, or a `PROMPT` that takes the record — rather than a
+character swapped in place.

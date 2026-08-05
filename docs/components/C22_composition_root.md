@@ -42,6 +42,7 @@ type TuiConfig = Readonly<{
   debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
 
   env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` degrades to ASCII (I20)
+  capabilities?: Partial<TerminalCapabilities> | undefined;   // C02's overrides, wired (I49)
   clock?:    () => number;
   fs?:       FileSystem;
   stateDir?: string;                       // default ~/.prism; the app resolves PRISM_TUI_STATE_DIR (I20)
@@ -104,6 +105,38 @@ They arrive as config because that is where everything an app supplies arrives, 
 **`env` is the environment record, and the app supplies it** (I20). C02 takes one (`detectCapabilities(env, overrides)`) and C21 takes one (`ProcessRunnerDeps.env`, for `$SHELL`), and **no file under `src/` reads `process.env`** — not even C02, which is allow-listed for it and does not use the allowance. So the record enters through config, from the app's entry point, along with `stateDir` and `transport`.
 
 It is optional and defaults to `{}`, which costs something worth naming: an app that omits it gets a capability record for a terminal that declares nothing, so the shell degrades to ASCII and no colour. That is the right default — it is the safe direction, and the alternative is a fifth required field, which I17 forbids for a reason R01 §1 tests. It is not the right *silence*, so C02's warnings surface on the restored primary screen (C02 §2) and an empty record is one of them.
+
+**`capabilities` is C02's `overrides` argument, and it had no producer** (I49). C02 §2
+takes `detectCapabilities(env, overrides)`; I4 makes a valid override win unconditionally,
+including for `altScreen`; commitment 5 says config overrides win; T3.4, T3.5 and T1.9 test
+them, and T5.5 asserts one reaching the wire. Every one of those was satisfied while
+`construct.ts` called `detectCapabilities(config.env)` with one argument — so the parameter
+was **reachable from a test fixture and from nothing an application can call.** The two
+callers in the repository are that fixture and this line.
+
+That is A03 §2's vacuity class arriving through a **parameter** rather than an export:
+C24 I16 is written about exported declarations and MG25 scans free functions and constants,
+so neither could see an argument that nothing supplies.
+
+**The consumer that found it is S12, the degradation showcase**, and it found it at the one
+depth that matters most. Four of the five depths are reachable by environment —
+`COLORTERM=truecolor` gives 24, `xterm-256color` gives 8, `xterm` gives 4, `LANG=C` gives
+ASCII. **1-bit is reachable by none of them**: the only rule producing `colourDepth: 1` is
+the `dumb` gate, and that gate also clears `altScreen`, which C02 I7 makes the sole hard
+refusal. So the depth the whole degradation claim rests on could not be produced by any
+application, and the framework's own e2e row for it composes the frame by hand.
+
+The field takes the same untrusted-input treatment C02 already gives it: an unknown key is
+ignored, an out-of-range value is rejected with a warning, and the warnings surface where
+C02's always do.
+
+**`| undefined` on the annotation is load-bearing.** This tree compiles with
+`exactOptionalPropertyTypes`, under which an optional property and a property that may be
+undefined are different types — so an application computing the value conditionally could
+not supply the field at all: neither `capabilities: maybe` nor a spread type-checks, and
+only a cast gets past. Every other optional field on `TuiConfig` has the narrower shape and
+none has yet been wanted conditionally, which is why fifteen fields carry a defect one of
+them has. It is the consumer's problem exclusively: every internal caller passes a literal.
 
 **`PRISM_TUI_STATE_DIR` is resolved by the app's entry point, not here** (I20). An earlier draft of this section had C22 read it, which contradicts A03 SS10 — the scan bans `process.env` across all of `src/` with a one-file allow-list, C02's, because an exception list is the thing that grows. C06 I18 settled the same question for `PRISM_TUI_TRANSPORT` and the reasoning transfers whole: a variable named for one consumer has no business inside a framework that claims to serve others, and `tui-kit` ships no binary to read it from. `prism-tui` reads its own variable and passes the resolved path through `TuiConfig.stateDir`, exactly as it passes a constructed router through `TuiConfig.transport`.
 
@@ -764,6 +797,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I46** — **A pushed view is owned by a shell-side component holding one offset, and C15 holds none.** The owner windows at **block boundaries** and hands C15 a smaller sequence, which is C25 I18's shape generalised: C15 measures the result through the same registry as everything else, so there is no second height codepath and `Placed` gains no scroll offset. A plot is atomic within that window and always will be — C12 I1 puts its series out of the height's reach, so *granular where the kind divides, atomic where it does not* is the ceiling, and row-granular scroll is not on the path. C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
 - **I47** — **A pushed view whose content C15 truncated says so on screen.** I46's window falls on block boundaries and the projection emits at least one block whatever its height, so a block taller than the region is shown cut and cannot be scrolled — the offset indexes blocks, and with one block there is no second offset to move to. The owner's remedy is to split, and splitting has a floor: a leaf with no children to split by has no smaller form that is still that leaf, so a producer can promise zero unreachable rows for every document whose leaves fit and not in general. **The two are one ruling and neither half is sufficient** — split alone leaves a silent residue, and the indicator alone leaves a document nothing can cross. `Placed.truncated` carries the fact already and C19's menu reads it (C19 §5); the duty here is to read it for a view. Content stopping mid-object with no indicator is indistinguishable from content ending, which is why this is not decoration.
 - **I48** — **A verb declared both `view` and `streams` runs into the view, and its patches are applied through the owner.** The owner gains `patch(view: ViewPatch)` over C04's `applyPatch` — the same function C13 calls, so there is no second answer to what a patch means — and keeps `putBlock` for the refresh driver, whose contract is total where this one reports C13's three arms. The route releases the submission guard **before** its loop and registers its canceller in the live-stream set **before** awaiting it, exactly as the entry route does (C23 I6, C16 §5); omitting the second here loses the session rather than a cancellation, because the view's loop is the only thing on screen. **A view has no settlement**: `end`, a malformed patch and a failure each append a notice and leave the view open, because the stream ending is not the reader having finished with it and B03 §2 makes the pop the reader's. A **cancelled** view pops; a finished one does not. **An append holds the window at the bottom if it was at the bottom**, and leaves it alone otherwise — a follow whose window never moves shows its first screen for ever, and a window that moves under a reader who scrolled up is the same fault reversed.
+- **I49** — **C02's capability overrides have a producer, and it is `TuiConfig.capabilities`.** The parameter, its validation, its precedence rule (C02 I4) and its e2e row all existed while nothing an application could call supplied it; `construct.ts` passed one argument and the only other caller was a test fixture reaching in by deep import. A parameter with no producer passes every test written about it, which is why this survived: A03 §2's vacuity class reached through an argument, where C24 I16 is written about exports and MG25 scans functions and constants. **The measured consequence is that `colourDepth: 1` was unreachable by any application** — the only rule producing it is the `dumb` gate, which also clears `altScreen`, and C02 I7 makes that the one refusal that stops the shell. Overrides are still C02's to validate; C22's duty is to hand them over and to surface the warnings where it surfaces C02's others.
 
 ---
 
@@ -809,6 +843,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 20. A pushed view's offset belongs to its owner and never to C15, and its parts are released at the pop (I46, §13a).
 21. A view whose content C15 truncated reports it on screen, because a block taller than the region is shown cut and cannot be scrolled — and splitting, the owner's half of the remedy, has a floor at a leaf with no children (I47, §13a).
 22. A verb that is both a view and a stream patches through the view's owner, releases the guard before its loop and registers its canceller before awaiting it; its stream ending appends a notice rather than closing the view, and only a cancellation pops one (I48, §13a).
+23. C02's capability overrides reach C02, because a parameter no application can supply is tested and unreachable at once (I49, §2).
 
 ---
 

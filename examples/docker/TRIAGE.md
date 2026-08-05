@@ -1,6 +1,6 @@
-# F1–F44, triaged
+# F1–F55, triaged
 
-`FINDINGS.md` is a log: forty-four entries in the order they were hit, each accurate about
+`FINDINGS.md` is a log: fifty-five entries in the order they were hit, each accurate about
 what it found. Past thirty, *filed* stops meaning much — a reader cannot tell which entries
 are one change and which are forty, or which to do first.
 
@@ -18,16 +18,17 @@ error. Nothing else here is a judgement about importance.
 
 | rank | shape | findings | consumers | verdict |
 |---|---|---|---|---|
-| **1** | [The consumer cannot reach a fact the framework holds](#1) | F14, F28, F36, F37, F43 | **5** | real Calcium work |
+| **1** | [The consumer cannot reach a fact the framework holds](#1) | F14, F28, F36, F37, F43, F54 | **6** | real Calcium work |
 | **2** | [A drawing describes the framework rather than being checked against it](#2) | F4, F11, F30, F32, F38, F42, F44 | **7** | artefact discipline — no code |
-| **3** | [A complete mechanism, unreachable from the builder](#3) | F22, F27, F41 | **3** | real Calcium work · one line each |
+| **3** | [A complete mechanism, unreachable from the builder](#3) | F22, F27, F41, F48, F52 | **5** | real Calcium work · **2 of 5 fixed** |
 | **4** | [Something failed and nothing said so](#4) | F15, F29, F35, F40 | **4** | real Calcium work · **3 of 4 fixed** |
 | **5** | [The far side's shape is not the framework's contract](#5) | F1, F26, F39 | **3** | real Calcium work · absorbed by one shim |
-| **6** | [A block cannot express what the surface needs](#6) | F5, F16, F18, F30, F33, F34 | **6** | mixed — see below |
+| **6** | [A block cannot express what the surface needs](#6) | F5, F16, F18, F30, F33, F34, F49, F51 | **8** | mixed — see below |
 | **7** | [Rendered from data that has since moved](#7) | F24, F25 | **2** | real Calcium work |
 | **8** | [Two sources, and nothing to render when they agree](#8) | *unfiled until now* | **2** | app-side — a class, not a gap |
-| — | [Closed](#closed) | F2, F7, F9, F19, F21b, F17a | — | done |
-| — | [Singles](#singles) | F3, F6, F8, F10, F12, F13, F17, F20, F21, F23, F31 | 1 each | see each |
+| **9** | [Text the framework emits and does not substitute](#9) | F55 | **1** | real Calcium work · needs a ruling |
+| — | [Closed](#closed) | F2, F7, F9, F19, F21b, F17a, F40, F45, F47 | — | done |
+| — | [Singles](#singles) | F3, F6, F8, F10, F12, F13, F17, F20, F21, F23, F31, F46, F50, F53 | 1 each | see each |
 
 ---
 
@@ -242,7 +243,50 @@ and two disproved.
 
 ---
 
+<a id="9"></a>
+## 9 · Text the framework emits and does not substitute — **1 surface**
+
+**F55**, and it is here as its own group rather than inside group 6 because the shape is
+different: group 6 is a *block* that cannot carry something, and this is a *string* that
+carries fine and should not have been written as a character.
+
+`PROMPT = "❯ "` and `b.live`'s default `loading…` are constants concatenated into a frame
+with nothing between them and the terminal. C09 §4 argues at length that a glyph is a slot
+and never a character, *because* a block-supplied one was emitted verbatim and broke under
+`LANG=C`. These are outside the vocabulary that argument is about — they are L4 text — and
+they break the same way.
+
+One surface, and it is listed because **the prompt is on every frame the shell ever
+draws**, on the line the reader types into, and no application can replace it. Consumer
+count is the ranking here and it undercounts this one: there is exactly one prompt and
+every consumer has it.
+
+---
+
+## What the last eleven findings changed about the ranking
+
+Group 1 gained **F54** and is now six surfaces — and F54 is the one that priced it. The
+workaround is a boolean threaded by hand through eight functions, for a fact the framework
+computed at construction and hands to no consumer. Every previous instance of group 1 was
+an app *duplicating* a Calcium module; this one is an app *threading* a Calcium value, and
+it is worse, because a duplicate at least has one wrong copy to fix.
+
+Group 3 gained **F48** and **F52**, both fixed, and both were the same shape as F27: the
+mechanism complete, the surface the only thing in the way. That is now three fixes of one
+kind, which is the strongest evidence in this document that a shape generalises.
+
+Group 6 gained **F49** and **F51**, and they belong together: a change axis with no home in
+a health palette, and a health axis with no way onto a block. With F30 that is three
+findings about the same absent concept from three different blocks — which moves the group
+from *a block cannot express X* toward *the model has one axis and the surfaces want two*.
+
+---
+
 ## If only three things were done
+
+**Written up as `docs/ROADMAP.md`**, which is the deliverable version of this section: what
+to build, which surfaces proved it, what each costs, and which two need a ruling before a
+spec can be written. What follows is the summary it was drawn from.
 
 1. **Group 1's context** — five surfaces, five workarounds, each duplicating a Calcium
    module. F14's is already documented as wrong across a resize.
@@ -250,6 +294,12 @@ and two disproved.
    the precedent that shows it closes cleanly.
 3. **F15** — the mechanism through which F29, F35 and F40 were each invisible. Fixing the
    three instances did not fix the thing that hid them.
+
+And a fourth that was not on the list when it had three: **F30, F49 and F51 read together.**
+Separately each looks like one block's oddity. Together they are one absent concept — a
+change axis, and a severity that a block can carry — found by three surfaces that had no
+knowledge of each other. That is the ranking's own argument applied to a group whose
+members were filed apart.
 
 Group 2 costs no code at all and has the highest count; it is a habit, and it is first in
 practice because it is free.

@@ -115,6 +115,14 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     retainPayloads: config.debug === undefined ? 0 : (retain ?? DEFAULT_RETAIN_PAYLOADS),
 
     env: config.env ?? {},
+    // **Undefined, not `{}`** (C22 I49). C02 distinguishes an absent overrides
+    // argument from an empty one only in that the empty one iterates no fields,
+    // so the two behave alike — but defaulting here would put a producer in
+    // front of C02's own `overrides !== undefined` guard and make the parameter
+    // look supplied on every construction. Passing what the app passed keeps
+    // "the app said nothing" expressible, which is the state that was
+    // indistinguishable from "nothing can say anything" for two whole steps.
+    capabilities: config.capabilities,
     cwd: config.cwd ?? ambient.cwd,
     clock: config.clock ?? ambient.clock,
     schedule: ambient.schedule,
