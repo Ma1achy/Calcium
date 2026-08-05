@@ -9,6 +9,11 @@ with a scrollable transcript, history and live views.
 
 You do not write a terminal.
 
+![docker-tui, the reference application: a landing dashboard refreshing in place with CPU and memory bars per container, then a table of containers, then a single container's live view where a CPU plot fills one sample at a time, then a comparison, a unified diff and a streaming log tail](examples/docker/demo.gif)
+
+*[`docker-tui`](examples/docker/README.md) — the reference application, driven
+against real containers. Everything in it is blocks; none of its adapters draws.*
+
 ---
 
 ## What it is
@@ -298,13 +303,61 @@ guarantee you can switch off is not one.
 
 ---
 
+## The same view, on five terminals
+
+**This is the claim the rest of the README is making, in one picture.** The same
+document — a CPU plot, a memory bar, network and block totals, a details panel —
+rendered at five capability levels. Nothing is dropped, nothing is simplified, and
+no adapter knows which terminal it is on.
+
+Truecolour:
+
+![The live container view in truecolour: a braille CPU curve in olive green, a shaded memory bar, and panels bordered with box-drawing characters](docs/media/depth-24.gif)
+
+256 colours:
+
+![The same view at 256 colours: identical layout and identical characters, with the plot and labels drawn from the 256-colour cube](docs/media/depth-8.gif)
+
+16 colours:
+
+![The same view at 16 colours: identical layout, the plot now in the terminal's bright green](docs/media/depth-4.gif)
+
+**1-bit** — no colour at all:
+
+![The same view with no colour: the plot in white braille, panel titles and labels distinguished by bold and dim rather than by hue, the memory bar still a shaded block](docs/media/depth-1.gif)
+
+**1-bit and ASCII** — no colour, no Unicode:
+
+![The same view in ASCII only: the braille plot replaced by a density ramp of dots and dashes, the memory bar written as dots, the box borders as plus and minus, and the middle-dot separators as hyphens](docs/media/depth-ascii.gif)
+
+**Every element that carried meaning still carries it.** Where the colour goes, the
+meaning moves channel rather than disappearing — measured on the wire, 1010
+typographic sequences appear exactly where 1118 colour ones stop. The plot never
+carried meaning in colour at all, which is why it is the one element that barely
+changes. `examples/docker/DEGRADATION.md` has the byte counts and the three
+places something *was* lost.
+
+**An adapter writes `tone: "ok"` and `glyph: "running"` once.** What those become
+on each of these terminals is not its problem, and that is the entire argument for
+naming palette slots rather than colours.
+
+---
+
 ## The reference application
 
 `docker-tui` — a terminal interface over `docker`, and the app this framework was
-proved against. Twelve surfaces, every block type, and sixty-five findings logged
+proved against. Twelve surfaces, every block type, and sixty-nine findings logged
 while building it.
 
-![docker-tui](examples/docker/demo.gif)
+![docker-tui: a six-beat screencast — the landing dashboard refreshing in place, the /ps table, drilling into a container where a CPU plot fills one sample at a time, a comparison of container against image, a unified config diff, and a streaming log tail](examples/docker/demo.gif)
+
+The same table at 120 columns and at 80 — `PORTS` dropped by declared priority,
+`USAGE` dropped from the dashboard, the pills wrapped, and the wordmark fallen
+back to ASCII, none of which the adapter asked for:
+
+![docker-tui at 120 columns: a block-element wordmark, a dashboard with CPU, MEM and USAGE columns, and a /ps table including a PORTS column](docs/media/ps-120.gif)
+
+![docker-tui at 80 columns: an ASCII wordmark, the dashboard without its USAGE column, pills wrapped onto two lines, and the /ps table without PORTS](docs/media/ps-80.gif)
 
 [`examples/docker/`](examples/docker/README.md) has the recording, how to run it,
 and the ledger. [`docs/ROADMAP.md`](docs/ROADMAP.md) is what the ledger turned

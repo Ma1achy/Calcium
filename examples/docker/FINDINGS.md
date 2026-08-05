@@ -2291,3 +2291,46 @@ the frame-read could never have confirmed it.
 steps without a measurement is exactly the thing this project files findings about. It
 cost twenty minutes to check and it was wrong in both directions — the case was reachable,
 and the reason it is uninteresting is better than the reason given.
+
+---
+
+## F67 — below a certain terminal size the shell draws nothing, says nothing, and stays alive ★★★
+
+Found while shrinking a capture to make a compact README image. At **14 rows** the
+application produced an empty picture and the pipeline reported success.
+
+Measured, with the terminal size set on the PTY master before the child draws:
+
+| size | bytes to stdout | bytes to stderr | process |
+|---|---|---|---|
+| 100 × 12 | **0** | **0** | still running |
+| 100 × 15 | **0** | **0** | still running |
+| 30 × 16 | **0** | **0** | still running |
+| 100 × 16 | 11287 | 0 | still running |
+
+**It is not a crash and it is not a refusal.** There is no exception, no message on
+either channel, and no exit — the shell acquires the terminal and then draws nothing at
+all, for ever. A user on a short window gets a blank screen and a process they have to
+kill.
+
+**And the floor is two-dimensional**: 30 × 16 is as blank as 100 × 12, so it is not a row
+count but some minimum region that both axes feed. `frame.ts` computes
+`rows − HEADER_ROWS − FOOTER_ROWS − promptRows` and clamps at zero
+(`Math.max(0, …)`), and **nothing anywhere refuses a region too small to use.** C02 I7 is
+the framework's one hard refusal and it is about `altScreen`; there is no equivalent for
+size.
+
+**This is C02 I7's argument with a different subject.** That invariant exists because a
+terminal that cannot open the alternate screen must be told so on the primary screen
+rather than left dark — *"help on the primary screen and a clean exit, and nothing is
+constructed"*. A terminal that is too small to draw into is the same situation reached by
+a different route, and it gets the opposite treatment.
+
+Not isolated to the framework or to the app: `createTui` is all this application calls, so
+the fault is on that path, but which component owns the floor is not established here.
+Filed with what was measured.
+
+**The instrument found it and no assertion could have.** Golden frames are rendered at
+60 / 80 / 120 / 160 columns and a fixed height; the height axis has no equivalent sweep,
+and a document that renders to zero visible rows produces a frame that is *correct* — it
+is what was asked for. It took someone wanting a smaller picture.
