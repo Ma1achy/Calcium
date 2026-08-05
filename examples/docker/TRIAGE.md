@@ -284,6 +284,10 @@ from *a block cannot express X* toward *the model has one axis and the surfaces 
 
 ## If only three things were done
 
+**Written up as `docs/ROADMAP.md`**, which is the deliverable version of this section: what
+to build, which surfaces proved it, what each costs, and which two need a ruling before a
+spec can be written. What follows is the summary it was drawn from.
+
 1. **Group 1's context** — five surfaces, five workarounds, each duplicating a Calcium
    module. F14's is already documented as wrong across a resize.
 2. **Group 3's three builder fields** — one line each, all three with consumers, and F27 is

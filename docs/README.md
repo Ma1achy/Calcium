@@ -39,6 +39,19 @@ makes far more sense beside S08's steps and S10's code blocks.
 **`reference-app/` — R01.** Belongs to `docker-tui`. Read it to know what the public
 API has to support.
 
+---
+
+## Not a spec, and the one to read before proposing work
+
+**[`ROADMAP.md`](ROADMAP.md)** — four pieces of Calcium work, each with a real application
+hitting it. Derived from `docker-tui`'s fifty-five findings by grouping them by shape and
+ranking them by how many independent surfaces reached for the same thing.
+
+It is **not authoritative**: nothing in it has been ruled, and two of the four entries name
+a design question a spec edit has to answer first. It is here because it is the only
+document in this tree that says what is *missing*, and because every entry has a consumer
+behind it rather than a prediction.
+
 **`archive/`** — six scratchpads. Superseded, and kept because the *reasoning* behind
 several decisions is there and nowhere else. A01 records what was decided; these record
 why the alternatives were rejected. **Where a scratchpad and a spec disagree, the spec wins.**
