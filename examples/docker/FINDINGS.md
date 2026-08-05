@@ -2482,6 +2482,34 @@ left running after a batch of demo captures and tier 5 was run without a thought
 |---|---|---|
 | `T5.6` — a session with no far side installed | **timed out at 75 s** | **898 ms** |
 
+**And `make all` reproduces it with no load generator at all**, which is better
+evidence than either measurement above and was found by running the pipeline four
+times on one commit:
+
+| what ran before tier 5 | tier 5 duration | `T5.6` |
+|---|---|---|
+| nothing (`npm run e2e`) | 219 s | **passed** |
+| `golden` | 225 s | **passed** |
+| `test`, `golden` | 219 s | **passed** |
+| `check`, `enforce`, `audit` | 214 s | **passed** |
+| all six (`make all`) | **291–301 s** | **failed, three times for three** |
+
+No subset reproduces it and the whole does, every time. The suite is 35% slower
+in the failing runs with identical rows, which is what says this is the machine
+rather than an ordering defect: `make all` is simply the largest load this
+container ever carries, and `T5.6` is the row that goes first under one.
+
+**Its failure is a bare timeout on `pty.done()`**, with no frame printed, because
+that wait is unbounded — so the repair is a different one from the rest of F69's:
+a bounded wait on exit, which would fail with the last frame attached instead of
+with a stack pointing at the `it`.
+
+**Ruled out along the way, and worth recording so it is not re-checked:** the
+as-you-type menu (C19 I19) costs **0.15 ms per keystroke** where a keystroke that
+opens nothing costs 0.014 ms — eleven times, and four orders of magnitude below
+anything that could produce a 75-second timeout. Measured with 200 keystrokes
+through a constructed graph, `/h` against `xy`.
+
 **Eighty-three times, and it hangs rather than missing a threshold** — which is the
 worse failure mode, because a timeout reads as a deadlock in the code under test.
 The investigation opened on a change to the paint path that had nothing to do with
