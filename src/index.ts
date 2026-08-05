@@ -143,6 +143,24 @@ export type {
 } from "./interaction/completion/index.js";
 
 /**
+ * The producers of the context a source is handed (C24 I19, C24 §8b).
+ *
+ * **Exported because the second consumer could not test the hook it wrote.**
+ * `CompletionSource` invites an app to answer for a slot; the answer is a
+ * function of a `CompletionContext`, and until now nothing outside this package
+ * could build one — so a source's `complete()` was callable only by the shell
+ * that owns it. The alternatives are worse than the export: a hand-built
+ * context is a literal that agrees with the test rather than with the
+ * derivation, and a deep import is F7.
+ *
+ * `parseManifest` comes with it because `contextAt` takes a `Manifest` and an
+ * app hands `createTui` an unparsed document, so the type it needs had no
+ * producer either.
+ */
+export { contextAt } from "./interaction/completion/index.js";
+export { parseManifest } from "./data/manifest/index.js";
+
+/**
  * C23 §3b's declaration type, back on the list (C24 §3, I16).
  *
  * It was withheld for the whole of C22 and C23 because the mechanism beneath it

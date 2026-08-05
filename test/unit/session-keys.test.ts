@@ -671,8 +671,8 @@ describe("C22 §3 step 12 — the read loop", () => {
     // **Against the framework's own verbs**, because this harness's manifest
     // declares no tools — a probe asking for an app's flag would come back
     // empty, and an empty result about the *manifest* wears the shape of a
-    // finding about the wiring. The empty path commits too, so the menu below
-    // is what keeps this from passing vacuously.
+    // finding about the wiring. The empty path commits too, so the insertion
+    // below is what keeps this from passing vacuously.
     stdin.emit("/hel");
     const duringBatch = commit.mock.calls.length;
 
@@ -688,6 +688,13 @@ describe("C22 §3 step 12 — the read loop", () => {
       commit.mock.calls.slice(afterTab),
       "and the continuation commits its own, with no key pressed",
     ).toContainEqual(["completion"]);
-    expect(graph.overlays.top?.id, "the menu it drew").toBe(MENU_ID);
+    // **`/hel` is a unique match, so §5 rule 3 inserts it whole with its
+    // delimiter** (C19 I16) — this row used to assert a menu here, because the
+    // shell opened one in every case: `commonPrefix` was computed on every
+    // request and read by nothing outside C19's own tests. The frame the
+    // continuation commits is the claim; what it drew is now the completed
+    // verb rather than a menu over a set of one.
+    expect(graph.editor.text, "the unique match, inserted whole").toBe("/help ");
+    expect(graph.overlays.top, "and no menu over a set of one").toBeNull();
   });
 });

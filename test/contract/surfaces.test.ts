@@ -183,6 +183,8 @@ describe("the S-series' illustrated heights", () => {
       promptCursor: () => ({ row: 0, col: 2 }),
       promptFocused: () => true,
     spinning: () => false,
+    // C22 I50 — the ghost is a paint-time read like the spinner beside it.
+    ghost: () => null,
     });
     for (const [i, line] of painted.entries()) {
       expect(displayCells(line), `row ${String(i)}`).toBe(width);

@@ -31,6 +31,7 @@
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { SGR_RESET } from "../terminal/escapes.js";
 import { PROMPT, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
@@ -40,6 +41,7 @@ import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
+import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
 export type PaintDeps = Readonly<{
@@ -73,6 +75,19 @@ export type PaintDeps = Readonly<{
    * exactly like a correct read of a source that answered quickly.
    */
   spinning: () => boolean;
+  /**
+   * C19's ghost text, read **fresh on every paint** (I50).
+   *
+   * The same rule as `spinning` above and for the same reason: the suggestion
+   * changes with what is typed, and a value captured when it was computed shows
+   * a suggestion for a prefix the user has moved past.
+   *
+   * **It had no reader at all before this.** `ghost()` was called once in the
+   * whole tree — on the accept path, which *inserts* it — so it was computed on
+   * every keystroke and invisible until the key that consumed it. C22 T4.7 has
+   * claimed the compositing since C22 was written.
+   */
+  ghost: () => string | null;
 }>;
 
 /** The elision marker S01 §3 puts on a windowed prompt's edges. */
@@ -234,8 +249,37 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   if (row !== undefined && deps.spinning()) {
     const at = cells(row.trimEnd());
     if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${SPINNER}`, width);
+    return out;
+  }
+
+  // **Ghost text, on the same terms as the spinner** (I50): read fresh, written
+  // into padding the row already has, never lengthening it. `measure` therefore
+  // never sees it and `cap` is the same number with a suggestion and without
+  // one — a suggestion that changed the prompt's height would move the viewport
+  // underneath it on every keystroke.
+  //
+  // **The spinner returned above rather than falling through.** Both draw into
+  // the same cells and both are true whenever a `Tab` is in flight over a
+  // prefix that also has a static suggestion; showing a stale suggestion beside
+  // *still thinking* states two things, one of which is about to stop being
+  // true.
+  //
+  // Dropped rather than truncated when it does not fit. Half a suggestion is a
+  // different word, and `Tab` would insert the whole one.
+  const suggestion = deps.ghost();
+  if (row !== undefined && suggestion !== null && suggestion !== "") {
+    const at = cells(row.trimEnd());
+    if (at + cells(suggestion) <= width) {
+      const style = ghostStyle(deps);
+      out[last] = exact(`${sliceCells(row, 0, at)}${paintSpans([{ text: suggestion, style }])}`, width);
+    }
   }
   return out;
+}
+
+/** `muted`, resolved through the theme so the ghost degrades with everything else. */
+function ghostStyle(deps: PaintDeps): Style {
+  return tone("muted", deps.theme, deps.capabilities);
 }
 
 /**
@@ -343,14 +387,21 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   const placed = deps.overlays();
   const top = placed[placed.length - 1];
   if (top !== undefined) {
-    if (top.cursor === undefined) return null;
-    return {
-      row: frame.region.top + top.top + top.cursor.row,
-      col: top.left + top.cursor.col,
-    };
+    if (top.cursor !== undefined) {
+      return {
+        row: frame.region.top + top.top + top.cursor.row,
+        col: top.left + top.cursor.col,
+      };
+    }
+    // A layer with no cursor of its own hides it — **unless the prompt is still
+    // taking keys underneath**, which is the completion menu holding no
+    // selection (C22 §6a row 2a, C19 I20). `promptFocused` is the router's
+    // precedence rather than a second opinion about it, so the cursor cannot
+    // say the prompt is inert while the prompt is answering keys.
+    if (!deps.promptFocused()) return null;
+  } else if (!deps.promptFocused()) {
+    return null;
   }
-
-  if (!deps.promptFocused()) return null;
 
   const cell = deps.promptCursor();
   const window = promptWindow(frame, deps.promptRows());

@@ -25,6 +25,7 @@ import { commandRows, cursorFor, paint, FrameError, type PaintDeps } from "./pai
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
+import { contextAt } from "../interaction/completion/index.js";
 import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
 import {
@@ -386,7 +387,8 @@ class Session implements TuiInstance {
       // C16's derived focus, read rather than stored — the cursor belongs to
       // whatever holds the keys, and a second record of that would drift from
       // the display exactly as a stored focus does (C16 §3, C15 I19).
-      promptFocused: () => graph.router.target === "prompt",
+      promptFocused: () =>
+        graph.router.target === "prompt" || graph.promptUnderMenu(),
       // **Fresh on every paint, and that is the invariant rather than a style**
       // (C22 I38). `spinning` changes with the clock, not with the frame, so a
       // value captured when the request started can never become true — and
@@ -395,6 +397,18 @@ class Session implements TuiInstance {
       // read is what a frame *shows*, and the wake is what causes a frame to
       // exist 500 ms after a `Tab` that nothing else would have drawn.
       spinning: () => graph.completion.spinning,
+      // **Fresh at paint, like the spinner, and for the same reason** (C22
+      // I50). The suggestion changes with what is typed, so a value captured
+      // when it was computed shows one for a prefix the user has moved past.
+      //
+      // It had no reader at all before this: `ghost()` was called once in the
+      // tree, on the accept path, which *inserts* it. C22 T4.7 has claimed the
+      // compositing since C22 was written and `test/contract/editor.test.ts`
+      // recorded the other half as deferred "when C22 lands".
+      ghost: () =>
+        graph.completion.ghost(
+          contextAt(graph.editor.text, graph.editor.cursor, graph.manifest.manifest),
+        ),
       // **The region comes from the frame, not from a fresh one** (C22 I28).
       // `#frameQueries` serves the same value to the router, and a second
       // computation here is the two-records defect S01 §3 already produced once

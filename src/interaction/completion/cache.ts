@@ -42,16 +42,31 @@ type Entry = Readonly<{
 }>;
 
 /**
- * What identifies a slot for caching (§3).
+ * What identifies a slot for caching (§3, I24).
  *
  * **Not the prefix.** A UUID list does not change between `a` and `ab`, so
  * keying on what has been typed makes every keystroke after a `Tab` a fresh
- * fetch and the TTL never hits. Kind, tool and the flag or argument name are
- * everything a source's answer depends on; the engine filters the rest.
+ * fetch and the TTL never hits.
+ *
+ * **But the earlier arguments are in it**, because a source's answer may depend
+ * on them and the wording that said otherwise was true only while none did. The
+ * ordinary case is a path *inside a named container* — `/config <container>
+ * <path>` — where the paths are argument two and the container is argument one:
+ * under a key of kind, tool and argument name the second container is served
+ * the first's directory listing, inside the TTL, with nothing on screen to say
+ * why.
+ *
+ * The cost is a fresh fetch whenever an earlier argument changes, which is
+ * exactly when the answer changes. The token being *typed* is still excluded,
+ * so the narrowing keystrokes after a `Tab` remain one entry.
  */
 export function contextKey(ctx: CompletionContext): string {
   const tool = ctx.tool?.name ?? "-";
-  return [ctx.slot.kind, tool, slotSubject(ctx.slot)].join(SEP);
+  const before = ctx.tokens
+    .slice(0, ctx.tokenIndex) // graphemes-ok: a token array, not text
+    .map((t) => t.text)
+    .join(" ");
+  return [ctx.slot.kind, tool, slotSubject(ctx.slot), before].join(SEP);
 }
 
 function slotSubject(slot: Slot): string {

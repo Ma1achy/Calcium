@@ -103,7 +103,7 @@ Each is a `measure`/`render` pair. The measurement column restates C04 §3 as an
 
 | Kind | Measure | Notes on render |
 |---|---|---|
-| `rule` | 1 | Label, optional meta, then a fill to `width` |
+| `rule` | 1 | Label, optional meta, then a fill to `width`. **An empty label draws an unbroken line** (I21) |
 | `notice` | `ceil(cells(text) / w)` | Glyph, then wrapped text; `error`/`warn` require the glyph (C04 I5) |
 | `keyValue` | rows | Two columns; key column sized to the longest key, capped at 20 |
 | `table` | delegated to C11 | Registered by C11, not here |
@@ -375,6 +375,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I18** — Control characters are stripped from every text field before measurement and render, by C09 and not by its callers. A far side's output cannot inject escape sequences into the frame: `\x1b[2J` cannot clear the screen, a cursor-position query cannot get its answer typed into the prompt, and a stray `\r` cannot make a measured row and a rendered row disagree. Stripping happens once, at the last point before both, so measurement and render cannot see different text.
 - **I19** — Wrapping never deletes a cluster. A cluster wider than the line it must fit into is **substituted** by a one-cell `?`, never dropped: a row that silently loses a glyph is a frame that is arithmetically consistent and describing different content than it holds. Substitution rather than overflow, because a row wider than it was measured wraps into a row nobody counted — the one failure I1 exists to prevent. C17 I20 answers the same question the other way and says why: a block renders someone's data, an editor holds what the user typed.
 - **I20** — A cell window over a styled line composes and preserves width: for every `0 ≤ a ≤ b`, `displayCells(sliceCells(t, 0, a)) + displayCells(sliceCells(t, a, b))` equals `displayCells(sliceCells(t, 0, b))`. The window carries the skipped prefix's SGR forward, so a tail draws in the style that was in effect where it starts, and it never splits a cluster or half-draws a double-width glyph — I9's rule over a window rather than a cut. This is what makes compositing a layer into a painted row width-preserving by construction rather than by three separate measurements happening to agree: three pieces that each measure right and together measure `columns + 1` put the frame one cell into a row nobody counted (§5a).
+- **I21** — A `rule` with an empty label draws an unbroken line. The lead, the label and the fill are separated by spaces that exist to set a label apart from the line; with no label they are a two-cell gap at the left of a rule that is a boundary rather than a heading. Found by reading a frame — C19's menu edge (C19 I23) is the first unlabelled rule in the tree, and every assertion about it was about width and about the block being present, both of which held.
 
 ---
 
@@ -397,6 +398,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 15. **Control characters are stripped from every text field before measurement and render** (I18). This is the only thing standing between a far side's output and the frame: a tool that emits an escape sequence cannot clear the screen, move the cursor, or query the terminal and have the reply arrive as typed input. It belongs in the summary because a reader deciding whether to trust the framework with untrusted output will not find it by reading fifteen invariants.
 16. **Wrapping substitutes a cluster it cannot place rather than dropping it** (I19). It dropped, and both halves called the same function, so `measure` and `render` agreed and nothing failed — a frame arithmetically consistent and describing content it did not hold. The reach is a fact about child count rather than terminal width (§5).
 17. **A line that already carries SGR is measured, fitted and windowed here, not by its caller** (I20, §5a). `displayCells` and `fitStyled` exist because `cells()` counts an escape as printable text; `sliceCells` exists because the frame cannot draw a layer over a painted row without taking a cell window out of one, and a `slice` by code unit cuts inside an escape and bleeds colour down every row below. Three answers to "how wide is this line" is I1's divergence in the one place that moves the whole frame.
+18. **A `rule` with no label draws an unbroken line** (I21). The spaces around the label exist to set it apart from the fill, and with no label they are a gap in a boundary — found by reading a frame, which is the only instrument that reaches it: the block is present, the row is exactly the width, and every existing assertion holds.
 
 ---
 
@@ -423,6 +425,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.13** (§5): the five ways naïve length is wrong — CJK, fullwidth, combining marks, ZWJ clusters, variation selectors — each a different wrong answer from `.length`.
 - **T1.14** (I18): control characters are stripped before measuring, so a measured row and a rendered row cannot disagree.
 - **T1.15**: an empty string is zero cells. The floor at 1 is a rule over the block table (§3), not a property of the width function.
+- **T3.20** (I21): a `rule` with an empty label renders as an unbroken line at its full width, with a labelled rule beside it as the control. Reachable only by rendering: the block is present, `measure` says one row, and the row is exactly the width in both.
 - **T1.16** (I20, §5a): `sliceCells` over a line carrying SGR — the window measures exactly `to − from` cells by `displayCells`, the escapes in the skipped prefix are re-emitted at its head, and a cut that lands mid-escape is impossible because the escape is copied whole. The failure is not a wrong width: it is `[38;5` reaching the terminal as text with the SGR never terminated, so the colour bleeds down every row below.
 - **T1.16b** (I20): a double-width cluster straddling either boundary is dropped and its cell blanked, in both directions — the window is still exactly `to − from` cells and never `to − from ± 1`. Asserted at the left edge as well as the right, because the two are different code paths and only the right one resembles `truncate`.
 - **T1.16c** (I20): the composition law over a styled line, for every split point — `sliceCells(t, 0, a)` and `sliceCells(t, a, b)` measure `b` together. A property over the splits rather than three chosen ones, because the case that breaks it is whichever `a` lands inside a cluster and no chosen `a` is that one by construction.

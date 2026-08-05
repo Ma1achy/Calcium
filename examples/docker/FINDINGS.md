@@ -2474,3 +2474,159 @@ own pass over the neighbouring rows, several of which are the same shape.
 **And it is why `make load-down` keeps its place** on the asymmetry rather than
 the odds: a row that fails under contention will fail eventually whether or not
 anyone introduced the contention deliberately.
+
+**Reproduced, immediately afterwards, by forgetting the rule.** `dtui-load` was
+left running after a batch of demo captures and tier 5 was run without a thought:
+
+| | with `dtui-load` up | after `make load-down` |
+|---|---|---|
+| `T5.6` — a session with no far side installed | **timed out at 75 s** | **898 ms** |
+
+**And `make all` reproduces it with no load generator at all**, which is better
+evidence than either measurement above and was found by running the pipeline four
+times on one commit:
+
+| what ran before tier 5 | tier 5 duration | `T5.6` |
+|---|---|---|
+| nothing (`npm run e2e`) | 219 s | **passed** |
+| `golden` | 225 s | **passed** |
+| `test`, `golden` | 219 s | **passed** |
+| `check`, `enforce`, `audit` | 214 s | **passed** |
+| all six (`make all`) | **291–301 s** | **failed, three times for three** |
+
+No subset reproduces it and the whole does, every time. The suite is 35% slower
+in the failing runs with identical rows, which is what says this is the machine
+rather than an ordering defect: `make all` is simply the largest load this
+container ever carries, and `T5.6` is the row that goes first under one.
+
+**Its failure is a bare timeout on `pty.done()`**, with no frame printed, because
+that wait is unbounded — so the repair is a different one from the rest of F69's:
+a bounded wait on exit, which would fail with the last frame attached instead of
+with a stack pointing at the `it`.
+
+**Ruled out along the way, and worth recording so it is not re-checked:** the
+as-you-type menu (C19 I19) costs **0.15 ms per keystroke** where a keystroke that
+opens nothing costs 0.014 ms — eleven times, and four orders of magnitude below
+anything that could produce a 75-second timeout. Measured with 200 keystrokes
+through a constructed graph, `/h` against `xy`.
+
+**Eighty-three times, and it hangs rather than missing a threshold** — which is the
+worse failure mode, because a timeout reads as a deadlock in the code under test.
+The investigation opened on a change to the paint path that had nothing to do with
+it, and what ended it was stashing that change and watching the row fail
+identically without it.
+
+So the class is settled: **these rows are contention-sensitive, the load generator
+is a reliable way to demonstrate it, and step 8's "it did not reproduce" was a
+statement about that afternoon's machine.** Three measurements now, two of them
+failures, and the one that matters is the pair taken four minutes apart on the
+same commit.
+
+
+---
+
+## F70 — a completion source cannot be tested by the app that writes it
+
+`TuiConfig.completionSources` invites an application to answer for a slot. The
+answer is a function of a `CompletionContext`, and **nothing outside the package
+could build one**: `contextAt` derives a context and lived behind the boundary,
+and the `Manifest` it takes had no reachable parser either, since an app hands
+`createTui` an unparsed document. So a source's `complete()` was callable only by
+the shell that owns it.
+
+Found by writing `test/completion.test.ts` — the first thing anyone does after
+implementing a hook is try to run it — and the alternatives are each worse than
+the export. A hand-built context is a literal that agrees with the test rather
+than with the derivation, which is the class C19 §8b's rows exist to catch; a
+deep import is F7.
+
+Closed in Calcium: `contextAt` and `parseManifest` are on the public surface
+(C24 I19, §8b). **The fifth mechanism this month found complete on one side of a
+seam and unreachable from the other**, after C02's capability overrides, the
+ghost's compositing, `commonPrefix`'s missing caller, and the menu's remainder
+argument.
+
+---
+
+## F71 — the second Tab into a subdirectory draws nothing
+
+Read from a frame: `/config dtui-cfg /etc/ngin`, `Tab` — which completes to
+`/etc/nginx/` correctly — then `Tab` again, and **no menu appears at all**.
+
+C19's cache is keyed on the slot's identity and deliberately not on the prefix:
+a UUID list does not change between `a` and `ab`, and keying on what has been
+typed makes every keystroke after a `Tab` a fresh fetch. That premise is stated
+as *a dynamic source answers for the slot and the engine filters by prefix* —
+and it is **false for a path**, whose answer is a function of the directory part
+of the prefix. So the second `Tab` was served the first's listing of `/etc/`,
+filtered by `/etc/nginx/` to exactly one entry, which rule 3 then inserted
+without changing the buffer.
+
+**The framework's own `pathSource` has the same shape and had carried this since
+C19 landed.** No test reached it: completing one directory is enough for every
+row that existed. The app's source is what put a second directory in a frame.
+
+Closed in Calcium: a source may declare `cacheKey(ctx)` (C19 I25), and both path
+sources return the directory. A hook rather than a rule on the key, because only
+the source knows which part of a prefix it interpreted.
+
+---
+
+## F72 — `ls -p` does not mark a symlinked directory
+
+`/etc/nginx/modules` on the fixture container is a symlink to
+`/usr/lib/nginx/modules`. `ls -1p` appends `/` to real directories only, so the
+path source offered `modules` as a **finished word with a trailing space** — and
+the one thing a user wants to do with a directory, descend into it, is the thing
+that prevents.
+
+Measured out of the corpus rather than reasoned about: the listing was captured
+from a real container and read before it was asserted against. `ls -1pL`
+dereferences, and the corpus carries the marked form.
+
+Nothing about the candidate looks wrong. It is the delimiter, which is invisible
+until it is typed past — the same class as F68's withdrawal in reverse: there,
+the frame said a defect existed and the mechanism said otherwise; here the block
+list said nothing and only the trailing character did.
+
+---
+
+## F73 — contention fails the scan tests too, not only tier 5
+
+F69 records `dtui-load` making a tier-5 row time out. The same hazard was
+measured against **tier 2** while a build, a capture and a suite ran together:
+six rows failed, every one of them a source scan — SS10, SS19, SS44, C12's fuzz
+corpus — each timing out at 15 s having taken 24 s.
+
+| | load average 5.2 | quiet |
+|---|---|---|
+| `npm test` | **6 failed** | 2521 passed |
+
+The rows are unchanged between the two runs. It is worth recording because the
+failure names an *enforcement rule* — "SS10 finds no terminal env read outside
+capabilities.ts" — which reads as a real violation and sends a reader to look for
+one. The scans walk 174 files, and they are the slowest rows in tiers 1 to 4.
+
+
+---
+
+## F74 — the demo's completion beat never worked
+
+Beat 4 of `demo.cast` types `/co` and shows the menu. Read back frame by frame,
+**the prompt is empty for the whole beat** — and it has been since the beat was
+written, through every version of the gif that has shipped.
+
+Beat 3 walks the `/ps` table's rows with `↓`, which moves focus *into* the live
+block (C16 I22). A printable key arriving there does nothing: C16 §"unconsumed
+keys" says in as many words that it must not leak into the prompt behind it. So
+every character of the next beat was dropped, correctly, by a rule written to
+prevent exactly the thing that would have made the beat work by accident.
+
+`Esc` returns focus to the prompt and the beat now runs. What is worth recording
+is why it survived: **an empty prompt is what a prompt looks like.** There is no
+frame to compare against, no assertion that could have failed, and the beat is
+one of ten in a ninety-second recording. It took reading the beat at a settled
+point and asking where the menu was.
+
+The instrument that found it is the one `README.md` already names — a screencast
+is a frame-read with an audience — and it is now four for four on that recording.

@@ -56,10 +56,16 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     // `\u2500\u2500 label \u2500\u2500\u2500\u2500 meta`. The fill takes what the two ends leave; the
     // label truncates before the fill goes negative, so the row is exactly the
     // width at every width.
-    const lead = `${g.horizontal.repeat(2)} `;
-    const room = width - cells(lead) - 1 - cells(meta);
+    // **An empty label draws an unbroken line** (I21). The spaces either side
+    // of the label are what set it apart from the fill; with no label they are
+    // a two-cell gap at the left of a rule that is a boundary rather than a
+    // heading. Found by reading C19's menu edge in a frame — the block was
+    // present, the row was exactly the width, and every assertion held.
+    const lead = label === "" ? g.horizontal.repeat(2) : `${g.horizontal.repeat(2)} `;
+    const gap = label === "" ? 0 : 1;
+    const room = width - cells(lead) - gap - cells(meta);
     const shown = truncate(label, Math.max(0, room), ctx.capabilities);
-    const fill = Math.max(0, width - cells(lead) - cells(shown) - 1 - cells(meta));
+    const fill = Math.max(0, width - cells(lead) - cells(shown) - gap - cells(meta));
 
     const dim = tone("dim", ctx.theme, ctx.capabilities);
     return rows([
@@ -68,7 +74,7 @@ export const ruleDefinition: BlockDefinition<Rule> = {
           [
             { text: lead, style: dim },
             { text: shown, style: tone("accent", ctx.theme, ctx.capabilities) },
-            { text: ` ${g.horizontal.repeat(fill)}`, style: dim },
+            { text: `${" ".repeat(gap)}${g.horizontal.repeat(fill)}`, style: dim },
             { text: meta, style: tone("meta", ctx.theme, ctx.capabilities) },
           ],
           width,

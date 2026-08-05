@@ -38,6 +38,8 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     transcriptRows: () => [],
     promptRows: () => [""],
     spinning: () => false,
+    // C22 I50 — the ghost is a paint-time read like the spinner beside it.
+    ghost: () => null,
     overlays: () => [],
     promptCursor: () => ({ row: 0, col: 2 }),
     promptFocused: () => true,
@@ -226,5 +228,88 @@ describe("C22 §6 — the paint", () => {
     const cut = exact("\u001b[31mabcdef", 3);
     expect(cut).toBe("\u001b[31mabc\u001b[0m");
     expect(displayCells(cut)).toBe(3);
+  });
+});
+
+describe("C22 T4.7 (I50) — ghost text is composited, and is appearance not geometry", () => {
+  /**
+   * **The row C22 has claimed since it was written.** T4.7 sits in C22's test
+   * list — *"ghost text is composited into the prompt without entering the
+   * buffer"* — and did not exist. `test/contract/editor.test.ts` recorded the
+   * other half as deferred *"when C22 lands"*; C22 landed, and a deferral
+   * written as a comment cannot expire.
+   *
+   * `ghost()` had exactly one caller in the whole tree — the accept path in
+   * `keys.ts`, which *inserts* it — so the suggestion was computed on every
+   * keystroke and invisible until the key that consumed it.
+   */
+  const promptRow = (rows: readonly string[]): string => rows[rows.length - 2] ?? "";
+  /** The row's printable text — the file measures cells and never strips, so this is local. */
+  const plainOf = (row: string): string => row.replace(/\u001b\[[0-9;]*[a-zA-Z]/gu, "");
+
+  it("it appears after the text", () => {
+    const painted = paint(
+      frameAt(80, 24),
+      deps({ promptRows: () => ["/co"], ghost: () => "ntainer" }),
+    );
+    expect(plainOf(promptRow(painted))).toContain("/co");
+    expect(plainOf(promptRow(painted))).toContain("/container");
+  });
+
+  it("it does not enter the buffer — the prompt rows are the editor's", () => {
+    // The buffer is C17's and the ghost is not in it. Painting it *into* the
+    // row the editor supplied is the mistake this rules out: the text would
+    // then be indistinguishable from what the user typed, and the next
+    // keystroke would land after a word nobody wrote.
+    const supplied = ["/co"];
+    paint(frameAt(80, 24), deps({ promptRows: () => supplied, ghost: () => "ntainer" }));
+    expect(supplied, "the caller's array is untouched").toEqual(["/co"]);
+  });
+
+  it("it is styled apart from the text, or it reads as typed", () => {
+    const plain = paint(frameAt(80, 24), deps({ promptRows: () => ["/co"] }));
+    const ghosted = paint(
+      frameAt(80, 24),
+      deps({ promptRows: () => ["/co"], ghost: () => "ntainer" }),
+    );
+    // Not "contains an escape" — the row already has chrome. The claim is that
+    // the suggestion arrives with styling the same row did not have without it.
+    expect(promptRow(ghosted).length - plainOf(promptRow(ghosted)).length).toBeGreaterThan(
+      promptRow(plain).length - plainOf(promptRow(plain)).length,
+    );
+  });
+
+  it("**it never changes the frame's shape** — I50's half that is not decoration", () => {
+    // A suggestion that lengthened a row would wrap it, and a wrapped prompt
+    // moves the viewport underneath it on every keystroke.
+    for (const columns of [40, 80, 120]) {
+      const plain = paint(frameAt(columns, 24), deps({ promptRows: () => ["/co"] }));
+      const ghosted = paint(
+        frameAt(columns, 24),
+        deps({ promptRows: () => ["/co"], ghost: () => "ntainer" }),
+      );
+      expect(ghosted).toHaveLength(plain.length);
+      for (const row of ghosted) expect(displayCells(row)).toBe(columns);
+    }
+  });
+
+  it("a suggestion that does not fit is dropped, not truncated", () => {
+    // Half a suggestion is a different word, and `Tab` would insert the whole
+    // one — so the two would disagree about what was on offer.
+    const long = "x".repeat(200);
+    const painted = paint(frameAt(40, 24), deps({ promptRows: () => ["/co"], ghost: () => long }));
+    expect(plainOf(promptRow(painted))).not.toContain("xx");
+    expect(displayCells(painted[painted.length - 2] ?? "")).toBe(40);
+  });
+
+  it("the spinner wins the row, because both are true at once", () => {
+    // A `Tab` in flight over a prefix that also has a static suggestion. Showing
+    // a stale suggestion beside *still thinking* states two things, one of which
+    // is about to stop being true.
+    const painted = paint(
+      frameAt(80, 24),
+      deps({ promptRows: () => ["/co"], ghost: () => "ntainer", spinning: () => true }),
+    );
+    expect(plainOf(promptRow(painted))).not.toContain("ntainer");
   });
 });

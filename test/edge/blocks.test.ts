@@ -205,6 +205,24 @@ describe("C09 tier 3 — containment", () => {
     };
   }
 
+  it("T3.20 (I21): a rule with no label draws an unbroken line", () => {
+    // **Found by reading a frame, and reachable by nothing else here.** The
+    // block was present, `measure` said one row, and the row was exactly the
+    // width — the only wrong thing about it was a two-cell gap where a label
+    // would have gone, which is a heading's separator drawn into a boundary.
+    // C19's menu edge (C19 I23) is the tree's first unlabelled rule.
+    const registry = createBlockRegistry({ defaults: true });
+    const render = (label: string): string =>
+      renderToLines(registry, block({ kind: "rule", id: "r", label }), 40, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      }).map(visible)[0] ?? "";
+
+    expect(render(""), "no gap at the left of a boundary").toMatch(/^─{40}$/u);
+    // The control: a label still gets its spaces, which is what they are for.
+    expect(render("hunk"), "and a labelled rule is unchanged").toMatch(/^── hunk ─+$/u);
+  });
+
   it("T3.13 (I11): a throwing renderer is contained to its block", () => {
     const registry = createBlockRegistry({});
     registry.register(broken("render") as never);

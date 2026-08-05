@@ -107,6 +107,61 @@ describe("C19 §3 — the TTL on an injected clock (I9, I10)", () => {
     expect(source.calls()).toBe(2);
   });
 
+  it("T3.28 (I25): a path source is cached per directory, not per slot", async () => {
+    // **Found from a frame in the reference application**, whose own path
+    // source has this shape: `/config <c> /etc/ngin`, Tab, Tab — and the second
+    // draws nothing. §3's premise is that a dynamic source answers for the slot
+    // and the engine filters by prefix, which is exactly right for a UUID list
+    // and false for a path: `pathSource` reads the directory out of the prefix,
+    // so `/et` and `/etc/` are different answers under one key and the second
+    // is the first, filtered to nothing.
+    const clock = fakeClock();
+    const engine = createEngine({ now: clock.now });
+    const dirs = fakeDirs({
+      "/": [{ name: "etc", directory: true }],
+      "/etc/": [{ name: "hosts", directory: false }],
+    });
+    engine.register(pathSource(dirs.readDir));
+
+    const first = await engine.request(at("/tail /et‸"), 1);
+    expect(first.candidates.map((c) => c.value)).toEqual(["/etc"]);
+
+    const second = await engine.request(at("/tail /etc/‸"), 2);
+    expect(second.candidates.map((c) => c.value), "the directory's own entries").toEqual([
+      "/etc/hosts",
+    ]);
+
+    // **The control**, or this row passes against a source with no cache at
+    // all: two completions inside one directory are still one read.
+    const reads = dirs.reads().length;
+    await engine.request(at("/tail /etc/h‸"), 3);
+    expect(dirs.reads().length, "the same directory, inside the TTL").toBe(reads);
+  });
+
+  it("T3.27 (I24): an argument's answer is cached per earlier argument, not per slot", async () => {
+    // **The ordinary case, and the wording that denied it.** §3 read *everything
+    // a source's answer depends on except what the user has typed so far*, which
+    // holds only while no source reads another argument. `serving scale
+    // <service> <replicas>` is the shape — and the real one is a path inside a
+    // named container, where argument two is answered by asking argument one.
+    const clock = fakeClock();
+    const engine = createEngine({ now: clock.now });
+    const source = instantSource("replicas", ["positional"], [{ value: "3" }]);
+    engine.register(source);
+
+    await engine.request(at("/serving scale web ‸"), 1);
+    await engine.request(at("/serving scale api ‸"), 2);
+    expect(source.calls(), "two services are two answers").toBe(2);
+
+    // **The control, and without it this row passes against no cache at all.**
+    // The same earlier argument still shares an entry, which is what the cache
+    // is for — and the token being *typed* is still excluded, so the keystrokes
+    // that narrow a menu do not each cost a fetch.
+    await engine.request(at("/serving scale web ‸"), 3);
+    await engine.request(at("/serving scale web 1‸"), 4);
+    expect(source.calls(), "the same service, inside the TTL").toBe(2);
+  });
+
   it("the TTL runs from resolution, not from the call", async () => {
     const clock = fakeClock();
     const engine = createEngine({ now: clock.now });
@@ -194,8 +249,10 @@ describe("C19 §6 — the menu", () => {
   it("T3.13: a large set still produces one block tree and a declared width", () => {
     const many = Array.from({ length: 5_000 }, (_, i) => ({ value: `candidate-${String(i)}` }));
     const blocks = menuBlocks(many.slice(0, 40), 0, many.length - 40);
-    expect(blocks).toHaveLength(2);
+    // The body, the indicator, and the edge last (C19 I23).
+    expect(blocks).toHaveLength(3);
     expect(blocks[1]).toMatchObject({ kind: "raw", text: "… 4960 more" });
+    expect(blocks[2]).toMatchObject({ kind: "rule" });
     expect(menuWidth(many.slice(0, 40))).toBeGreaterThan(0);
   });
 
@@ -240,7 +297,11 @@ describe("C19 §6 — the menu", () => {
 
     for (const width of [menuWidth(detailed), 60, 100]) {
       const rows = rowsAt(detailed, width);
-      expect(rows, `${String(width)}: one row per candidate`).toHaveLength(2);
+      // One row per candidate, and the edge under them (C19 I23).
+      expect(rows, `${String(width)}: one row per candidate, plus the edge`).toHaveLength(3);
+      expect(rows[2], `${String(width)}: the last row is the edge, not a candidate`).toMatch(
+        /^[─-]/,
+      );
       for (const [i, candidate] of detailed.entries()) {
         expect(rows[i], `${String(width)}: ${candidate.value} is legible`).toContain(
           candidate.value,
@@ -274,9 +335,13 @@ describe("C19 §6 — the menu", () => {
   it("no candidates means no menu is built at all", () => {
     // C15 omits a zero-row layer and dismisses nothing (C15 I15), so the moment
     // the set empties is C19's to act on.
-    const blocks = menuBlocks([], 0, 0);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0]).toMatchObject({ kind: "pills", chips: [] });
+    //
+    // **This row found the edge's own edge case.** Adding the `rule` (I23) made
+    // an empty set measure one row, which is a bare line above the prompt in
+    // the exact moment there is nothing to show — and it also breaks C15 I15's
+    // reasoning, which is written about a layer measuring *zero*. The edge
+    // belongs to the candidates, so an empty set draws nothing at all.
+    expect(menuBlocks([], 0, 0)).toHaveLength(0);
   });
 });
 

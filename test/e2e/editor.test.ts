@@ -49,8 +49,13 @@ describe("C17 tier 5 — at a real prompt", () => {
       // frame it is about has been written — which is how the first draft
       // concluded `⌃w` was broken when it was not.
       pty.type("\u0017");
-      await pty.waitForFrame((f) => !f.join("").includes("--mine"), 15_000);
-      expect(pty.frame.join("\n"), "the word is gone from the screen").toContain("--limit=20");
+      // **The prompt row, not the whole frame**, and the difference arrived
+      // with C19 §6a. Killing back to `--` leaves a flag prefix, so the
+      // as-you-type menu opens on it and `--mine` is on the screen again — as a
+      // candidate, which is the menu doing its job. What this row is about is
+      // the buffer, and the buffer is the row the prompt is on.
+      await pty.waitForFrame((f) => !promptRow(f).includes("--mine"), 15_000);
+      expect(promptRow(pty.frame), "the word is gone from the line").toContain("--limit=20");
 
       // And put back by hand, then submitted — so the row ends where it began
       // and the correction is the thing under test rather than the typing.

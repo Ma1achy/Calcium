@@ -70,6 +70,8 @@ function deps(
     promptCursor: () => ({ row: 0, col: 2 }),
     promptFocused: () => true,
   spinning: () => false,
+  // C22 I50 — the ghost is a paint-time read like the spinner beside it.
+  ghost: () => null,
   };
 }
 
@@ -259,11 +261,23 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
     const f = frameAt();
     const overlays = createOverlayManager({ registry: measurer });
 
+    // **Both arms of row 2/2a, and `promptFocused` is what separates them**
+    // (C22 §6a, I51). A layer with no cursor of its own does not decide alone:
+    // it hides the cursor when nothing beneath is taking keys — a confirm, or a
+    // menu the user asked for and is choosing in — and yields to the prompt
+    // when the prompt is still answering, which is the menu that opened by
+    // itself (C19 I20). The predicate is the router's precedence rather than a
+    // second opinion about it, so the two cannot disagree.
     overlays.push(layerWith("menu"));
+    const inert = deps(() => overlays.layout(f.overlayRegion));
     expect(
-      cursorFor(f, deps(() => overlays.layout(f.overlayRegion))),
-      "a menu has no cursor: nothing is entered into it",
+      cursorFor(f, { ...inert, promptFocused: () => false }),
+      "a requested menu has no cursor: the choice is being made in it",
     ).toBeNull();
+    expect(
+      cursorFor(f, inert),
+      "a menu that opened by itself: the prompt still holds the keys and the row",
+    ).toEqual({ row: f.region.top + f.region.height, col: 2 });
 
     overlays.dismiss("menu");
     overlays.push(layerWith("search", { row: 0, col: 5 }));

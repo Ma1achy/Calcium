@@ -184,7 +184,7 @@ The effect table lives in `src/shell/keys.ts`, and it is **not** `src/shell/acti
 | Target | What the handler owns |
 |---|---|
 | `prompt` | printable keys and pastes into C17; `Enter` submits; the eight bound actions — newline ×3, `complete`, `acceptGhostOrForward`, `historyPrev`, `historyNext`, `reverseSearch` |
-| `overlay` | the six bound actions — `menuNext` ×2, `menuPrev`, `menuAccept`, `dismiss`, `searchOlder` |
+| `overlay` | the six bound actions — `menuNext` ×2, `menuPrev`, `menuAccept`, `dismiss`, `searchOlder` — and, for a layer that is chrome for the prompt, everything else forwarded to the `prompt` handler (I51) |
 | `liveBlock` | the block keymap C16 merges while the block is live (C16 §6), dispatched through C23 §3a |
 | `global` | scroll, which was already here |
 
@@ -589,7 +589,8 @@ layer's cursor if it has one* and *the prompt's if focus is `prompt`*.
 | # | Sequence | Frame draws |
 |---|---|---|
 | 1 | nothing open | the prompt's, from `editor.cursorCell` |
-| 2 | menu pushed | hidden — a menu has no cursor, and nothing is typed into one |
+| 2 | menu pushed by `Tab` | hidden — a requested menu has the keys, and nothing is typed into one |
+| 2a | menu opened by typing (C19 I20) | **the prompt's** — the menu takes no keys until `Tab` enters it, and the row is what the user is typing |
 | 3 | menu dismissed | the prompt's again |
 | 4 | search pushed over a menu | the search's — it is on top and text is being entered |
 | 5 | search cancelled, menu still open | hidden again, by row 2 |
@@ -611,6 +612,15 @@ C16 drops the rest — so a printable key does nothing while the menu is up. The
 cursor hiding is consistent with that: the prompt is not taking keys, and saying
 so is the point of I19. If typing is later allowed to filter an open menu, the
 cursor rule has to move with it, and this is where to look.
+
+**Typing was later allowed, and the rule moved — row 2a is where it went** (I51,
+C19 §8c). The paragraph above is the whole reason this was cheap: it named the
+mechanism, the consequence and the place to look, so the only work left was
+measuring which of the three was still true. All three were. What it could not
+say, because nothing had asked yet, is that the character is not taken by the
+menu but **dropped by nobody** — step 3's `global` binds no printable key either
+— so allowing typing is a route that has to be built rather than a precedence to
+adjust.
 
 ---
 
@@ -798,6 +808,12 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I47** — **A pushed view whose content C15 truncated says so on screen.** I46's window falls on block boundaries and the projection emits at least one block whatever its height, so a block taller than the region is shown cut and cannot be scrolled — the offset indexes blocks, and with one block there is no second offset to move to. The owner's remedy is to split, and splitting has a floor: a leaf with no children to split by has no smaller form that is still that leaf, so a producer can promise zero unreachable rows for every document whose leaves fit and not in general. **The two are one ruling and neither half is sufficient** — split alone leaves a silent residue, and the indicator alone leaves a document nothing can cross. `Placed.truncated` carries the fact already and C19's menu reads it (C19 §5); the duty here is to read it for a view. Content stopping mid-object with no indicator is indistinguishable from content ending, which is why this is not decoration.
 - **I48** — **A verb declared both `view` and `streams` runs into the view, and its patches are applied through the owner.** The owner gains `patch(view: ViewPatch)` over C04's `applyPatch` — the same function C13 calls, so there is no second answer to what a patch means — and keeps `putBlock` for the refresh driver, whose contract is total where this one reports C13's three arms. The route releases the submission guard **before** its loop and registers its canceller in the live-stream set **before** awaiting it, exactly as the entry route does (C23 I6, C16 §5); omitting the second here loses the session rather than a cancellation, because the view's loop is the only thing on screen. **A view has no settlement**: `end`, a malformed patch and a failure each append a notice and leave the view open, because the stream ending is not the reader having finished with it and B03 §2 makes the pop the reader's. A **cancelled** view pops; a finished one does not. **An append holds the window at the bottom if it was at the bottom**, and leaves it alone otherwise — a follow whose window never moves shows its first screen for ever, and a window that moves under a reader who scrolled up is the same fault reversed.
 - **I49** — **C02's capability overrides have a producer, and it is `TuiConfig.capabilities`.** The parameter, its validation, its precedence rule (C02 I4) and its e2e row all existed while nothing an application could call supplied it; `construct.ts` passed one argument and the only other caller was a test fixture reaching in by deep import. A parameter with no producer passes every test written about it, which is why this survived: A03 §2's vacuity class reached through an argument, where C24 I16 is written about exports and MG25 scans functions and constants. **The measured consequence is that `colourDepth: 1` was unreachable by any application** — the only rule producing it is the `dumb` gate, which also clears `altScreen`, and C02 I7 makes that the one refusal that stops the shell. Overrides are still C02's to validate; C22's duty is to hand them over and to surface the warnings where it surfaces C02's others.
+- **I50** — **Ghost text is composited into the prompt, and it is appearance rather than geometry.** T4.7 has claimed this since C22 was written and nothing implemented it: `ghost()` had exactly one caller in the tree — the accept path in `keys.ts`, which *inserts* it — so the suggestion existed, was computed on every keystroke, and was invisible until the key that consumed it. `test/contract/editor.test.ts` recorded the other half as deferred *"when C22 lands"*; C22 landed and the row was never written, which is a deferral expressed as a comment and therefore one that could not expire.
+- **I51** — **An overlay that is chrome for the prompt forwards what it does not bind to the `prompt` handler.** C19's menu is the case: `activeTarget` answers `overlay` for anything on the stack (C16 §3), the overlay handler consumes only its six actions, and step 3's `global` binds no printable key — so a character typed while the menu is up is dropped, measured against a control with no layer open. A menu that opens by itself (C19 I19) cannot live with that, because it would stop typing at the moment it appeared — and a menu the user requested must not either, since C19 §8's keystroke cell narrows it in place and that cell is unreachable while the character never arrives. So the forward is the menu's, whichever opened it, and **while it holds no selection the prompt's bindings resolve first** (C19 I20). **The decision is C22's rather than C16's**: the ladder is right, and which layers are an extension of the prompt is a fact about this shell's composition — L4 is where the menu's and the search's identities are both known. C20's reverse search is the same shape and is not wired here: its `type()` has no caller in `src/`, so a query typed after `⌃R` is dropped exactly as the character was, and the rules for narrowing to a hit are C20 §5's.
+
+  It follows I38's shape exactly and for the same reason. The ghost is **read fresh at paint** rather than captured when it was computed, and it is drawn into padding the prompt already has: it never lengthens a row, so `measure` does not see it, `promptRows` is the same number with a suggestion and without one, and a suggestion that would not fit is simply not drawn. **A suggestion that changed the prompt's height would move the viewport underneath it on every keystroke** — the geometry defect I38 exists to forbid, arriving through the other affordance that lives in the same row.
+
+  **The spinner wins the row when both would draw.** They occupy the same cells — immediately after the text — and both are true at once whenever a `Tab` is in flight over a prefix that also has a static suggestion. Showing a stale suggestion beside *still thinking* states two things, one of which is about to stop being true; the spinner is the one the reader needs.
 
 ---
 
@@ -844,6 +860,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 21. A view whose content C15 truncated reports it on screen, because a block taller than the region is shown cut and cannot be scrolled — and splitting, the owner's half of the remedy, has a floor at a leaf with no children (I47, §13a).
 22. A verb that is both a view and a stream patches through the view's owner, releases the guard before its loop and registers its canceller before awaiting it; its stream ending appends a notice rather than closing the view, and only a cancellation pops one (I48, §13a).
 23. C02's capability overrides reach C02, because a parameter no application can supply is tested and unreachable at once (I49, §2).
+24. **Ghost text reaches the frame**, composited into the prompt as appearance and never as geometry: the spinner wins the row, a suggestion that does not fit is dropped rather than truncated, and `measure` never sees it (I50, C19 I7).
+25. A layer that is chrome for the prompt does not stop typing. What the overlay handler does not bind is forwarded to the prompt's, because the alternative is measured and is not "the menu takes the key" but "nobody does" (I51, C19 I20).
 
 ---
 
@@ -948,6 +966,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.5** (with C20, C17): a history recall calls `setText`; C20 never touches the editor.
 - **T4.6** (with C18, C21): a `cd` built-in updates session `cwd`, and the next spawn lands there.
 - **T4.7** (with C19, C17): ghost text is composited into the prompt without entering the buffer.
+- **T4.7b** (I51, C19 I20): a printable key dispatched through the router with the completion menu open reaches C17, and `Enter` submits rather than accepting. **The control is the same key with no layer open**, because the defect is a dropped character and a row asserting only that the buffer is unchanged agrees with both.
 - **T4.8** (with C16, C06): Ctrl-C during a pass-through forwards `SIGINT`; during a verb it cancels.
 - **T4.9** (with C17): the gutter C22 passes matches the prompt it renders, so `displayRows` equals the rendered height.
 - **T4.11** (I13a): header and footer receive the same `now` within one frame, asserted with a clock that advances on every read — a fake returning a fresh value per call, so two reads cannot agree by accident. A monotonic fake would pass whether the value were sampled once or twice, which is the setup where both readings agree (A03 §2).
@@ -1002,6 +1021,7 @@ PTY harness.
 - **T6.31** (I35): restoring the truncation in the transcript region → T1.12f fails, and T6.30's defect goes back to being invisible. It is the pair that matters: the refusal is what makes a mis-sized viewport observable, and neither the refusal nor the drift test existed while the defect did.
 - **T6.32** (I38): composing the indicator from C19's `pending` rather than `spinning` → T1.18 fails at *not yet*, and the spinner appears the instant `Tab` is pressed, which is the one thing C19 §7's threshold exists to prevent. **This is the read half's mutation, and it is not the one the invariant was first written against.** Caching the value at request time turns out not to be expressible: `#paintDeps` is rebuilt on every render, so a cache inside it *is* a fresh read, and the mutation fails nothing. Recorded as a fact about the shell rather than repaired — the same disposal as C03 T5.4's width — and the wording above names *a fresh read on every paint* because that is what the code does, while the assertion that can fail is about the threshold.
 - **T6.35** (I40): writing the variant at exit instead of on the change → T1.19 still passes on a clean stop and the preference is lost to every crash, so the row drives the write and then constructs a second session **without stopping the first**.
+- **T6.37** (I51): removing the forward → T4.7b fails, and typing stops the moment the menu appears — which the as-you-type menu makes unavoidable and `Tab` alone made survivable.
 - **T6.36** (I40): treating an unreadable `theme` file as fatal, or as silently absent → T1.19b fails on the notice or on the session opening at all. The two halves of C20's repair, arriving one component up.
 - **T6.34** (I39): removing the `cancel()` from the printable path → C19 T5.2 fails on its last assertion, and a menu opens for a prefix the user has typed past. The effect table's own `mine !== seq` guard does not cover it: a printable keystroke does not advance that sequence, which is why the guard looked like the mechanism and was not.
 - **T6.33** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.

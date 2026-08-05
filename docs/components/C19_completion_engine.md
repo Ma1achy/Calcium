@@ -96,6 +96,10 @@ interface CompletionSource {
 
 **Static sources run on every keystroke; dynamic sources run only on `Tab`.**
 
+**That sentence is unchanged and §6a rests on its first half.** The static set has always been computed per keystroke and has only ever been *reduced* — to a single value, and only when there was exactly one, which is ghost text (I7). Showing the set instead of discarding it costs a menu, not a source call, so the as-you-type menu is a presentation change and the ruling it reverses is *the menu is a `Tab` affordance* rather than *dynamic sources are cheap*. The second half of the sentence is the boundary the obvious implementation crosses silently — "just call the engine on every keystroke" runs `request`, which runs the dynamic sources — and T2.1a is the row that keeps it real.
+
+**The engine exposes the set as `suggest(ctx)`**, synchronous and static-only, and `ghost` is defined in terms of it: the single-candidate case of the same computation. One function rather than two, because two would be two filters over two source lists that agree until someone edits one.
+
 **Path and executable completion are dynamic**, because both touch the filesystem. That is I/O, and I/O on every keystroke is exactly what the split exists to prevent. The consequence is stated rather than discovered: **there is no ghost text for paths or bare executables** — `Tab` is required. Ghost text is a manifest-backed affordance, and the manifest is the only source cheap enough to consult per keystroke.
 
 That split is what keeps typing cheap. Verb names, sub-verbs, flag names and enum values all come from the manifest and cost a filter over an in-memory array, so ghost text can update live. UUIDs, family names and deployment names require the far side, and recomputing them per keystroke would hammer the API for suggestions nobody asked for.
@@ -112,7 +116,19 @@ So C19 imports no `fs`. The seam is the whole of its filesystem knowledge.
 
 Dynamic results are cached on `(sourceId, contextKey)` with a 60-second TTL (`j22`). A source that throws or times out is **dropped from the result set for that request** — other sources still contribute, and completion degrades rather than failing.
 
-**`contextKey` is the slot's identity, not the prefix**, and the difference decides whether the cache is worth having. A slot is identified by its kind, the resolved tool, and the flag or argument it belongs to — everything a source's answer depends on except what the user has typed so far. Keyed on the prefix instead, `--family=a` and `--family=ab` are different entries, every keystroke after a `Tab` is a fresh fetch, and the 60-second TTL never hits anything. The far side would be hammered for suggestions nobody asked for, which is the outcome the static/dynamic split exists to prevent, arriving through the cache instead of through the keystroke path.
+**`contextKey` is the slot's identity, not the prefix**, and the difference decides whether the cache is worth having. A slot is identified by its kind, the resolved tool, the flag or argument it belongs to, **and the arguments already typed before it** — everything a source's answer depends on except the token being typed. Keyed on the prefix instead, `--family=a` and `--family=ab` are different entries, every keystroke after a `Tab` is a fresh fetch, and the 60-second TTL never hits anything. The far side would be hammered for suggestions nobody asked for, which is the outcome the static/dynamic split exists to prevent, arriving through the cache instead of through the keystroke path.
+
+**A source may declare what else its answer depends on, and the framework's own path source is why** (I25). §3's premise — *a dynamic source answers for the slot and the engine filters by prefix* — is exactly right for a UUID list and false for a path: `pathSource` reads the directory out of `ctx.prefix` and lists it, so its answer is a function of part of the prefix. Under a key that excludes the prefix entirely, `ls /et⇥` lists `/` and `ls /etc/⇥` is served that same listing, filtered to nothing. The second `Tab` appears to do nothing at all.
+
+**Only the source can say which part**, which is why this is a hook rather than a rule on the key. Including the whole prefix is the defect §3 warns about — every keystroke after a `Tab` a fresh fetch — and no generic rule can extract *the directory* from a string it is not allowed to interpret. `cacheKey(ctx)` is optional, absent on every source whose answer is the slot's, and the path sources return the directory.
+
+**Measured by the reference application before it was fixed here.** docker-tui's own path source has the same shape — `docker exec <c> ls <dir>` — and its frame is where this was found: `/config dtui-cfg /etc/ngin`, `Tab`, `Tab`, and the second one draws nothing. The framework's `pathSource` had carried it since C19 landed, unreachable by any test that completes one directory.
+
+**The earlier arguments are in the key because an answer can depend on them, and the first draft's wording denied it** (I24). It read *everything a source's answer depends on except what the user has typed so far*, which is true only while no source reads another argument — and the case that breaks it is the ordinary one: a path *inside a named container* is `/config <container> <path>`, where the container is argument one and the paths are argument two. Under a key of (kind, tool, argument name) both containers share one entry, so the second is offered the first's directory listing, inside the TTL, with nothing on screen to say why.
+
+**The cost is real and it is in the right place.** Keying on earlier tokens means a fresh fetch whenever an earlier argument changes — which is exactly when the answer changes. It is not the prefix problem returning: the token being *typed* is still excluded, so `--family=a` and `--family=ab` remain one entry and the TTL still does its work.
+
+**Stated as the key's rule rather than as an opt-in on the source**, because the two failure modes are not symmetrical. A source that needs a discriminator and does not declare one is served another argument's answer silently; a key that is finer than a source needs costs a fetch. The first is a defect no assertion about candidates would catch, and the second is a number.
 
 So **a dynamic source answers for the slot and the engine filters by prefix.** That is also what makes §6's narrowing possible: the menu filters the set it holds, and it can only do that if the set is the slot's rather than one prefix's. Static sources may filter internally — they are re-run per keystroke and an in-memory filter costs nothing — but the engine filters again regardless, so neither kind can be wrong about it.
 
@@ -242,6 +258,12 @@ Arrow keys move the selection, `Enter` accepts, `Esc` dismisses. Those bindings 
 
 **A keystroke that does not extend the current prefix dismisses the menu.** Filtering can only narrow, and backspace widens — there is no set to filter back out of. Stated because "narrow in place on a keystroke" reads as covering backspace, and the implementation that tries to serve it either re-runs a dynamic source on a keystroke (I3) or shows a set that no longer matches what is typed.
 
+**The menu's last content row is a `rule`, and that is the whole of its bottom edge** (I23). A prompt-anchored menu spanning the region sits directly on the prompt, so the last candidate and the line being typed are adjacent rows of text with nothing between them — read from a frame, `• /container` above `❯ /co` is one block, and a reader takes the two as a path. The top edge needs nothing: the transcript above is a different kind of content and reads as one.
+
+**A rule and not a panel**, decided on rows. A panel costs two of them in a region already competing with the transcript, and buys a boundary at the top that the reading defect never involved. `rule` is one row, it is in C04's vocabulary, it degrades with everything else, and it is the block C09 already draws for exactly this.
+
+**Adding it moved a number that was already wrong, which is how the second half was found.** The remainder is `total - shown`, and the shell was passing `layer.content.length` as `shown` — the count of *blocks*, not of rows. C15 truncates by clamping height (C15 §4), so a menu of sixty candidates clamped to ten rows reported fifty-nine missing rather than fifty. T4.5 passes the row count by hand and is right about the function; nothing asserted the argument the caller supplies. So `shown` is the placed height less the rows that are not candidates — the rule, and the indicator itself when there is one.
+
 **The menu spans the region, and declares no width.** C15 I16 resolves an overlay's width as `min(layer.width ?? region.width, region.width)`, so omitting the field is how a layer says *all of it* — and that is what the menu wants.
 
 **This reverses an earlier ruling, and the earlier one was right about the mechanism and wrong about the surface.** It read: *"C19 declares the menu's width. `Layer.width` exists because measurement answers height at a width and never the reverse, so nothing downstream can work out how wide the longest candidate is (C15 I16). It is the same division as the 'N more' indicator: C19 knows the candidates, C15 knows the region, and neither can supply the other's half."*
@@ -255,6 +277,30 @@ Every sentence of that is true and none of it argues for a narrow menu. `Layer.w
 The "N more" division is untouched: C19 still knows the remainder and C15 still reports only *that* it truncated.
 
 Narrowing to *no* candidates leaves a layer measuring zero rows. C15 omits it from the layout and dismisses nothing (C15 I15) — dismissing it is C19's, at the moment the candidate set empties.
+
+---
+
+## 6a. The menu opens as you type
+
+**Two or more static candidates open the menu with no `Tab`** (I19). One candidate is ghost text's case and opens nothing: the suggestion is already on the prompt row, and a one-row menu under it draws the same word twice. Zero closes it. The threshold is where the affordances divide rather than a taste — **a menu is for a choice, and ghost text is for the absence of one.**
+
+**A typed menu holds no selection** (I20), and that is the ruling everything else here follows from. It is a display of what is available, not a choice being made, so **the prompt's bindings resolve before the menu's** while it holds none: `Enter` submits the line, `↑` walks history, printable characters type, and `Esc` — which the prompt does not bind — falls through to the menu and dismisses it. `Tab` enters it, and from that moment it is an ordinary menu with a selection and the §6 bindings.
+
+**Entered by `Tab` alone, and `↓` is the reason the rule is a precedence rather than a list of keys.** `↓` at the prompt is history and then the live block (C16 I22), so a menu that opened unasked taking it would be the same theft as `Enter`. Two keys named as exceptions would also be a second keymap in the composition root, which C16 I23 exists to prevent — a precedence between two targets needs no key names at all.
+
+Without this ruling the menu is a trap rather than an affordance. `activeTarget` answers `overlay` for anything on the stack (C16 §3), so a menu that opened by itself would take `Enter` — a user typing `/ps` and pressing Enter would accept a candidate instead of running the command — and `↑` would move a selection they never asked for instead of recalling the last command. Neither is a defect in C16: a menu the user asked for should own those keys, and the difference is who asked.
+
+**`Tab` on a typed menu still means `Tab`** (I21). It runs §5's algorithm, dynamic sources and all — rules 3 and 4 insert and leave no menu, rule 5 leaves the menu open with the selection at 0. Worth stating because the keymap answers otherwise on its own: with a layer on the stack, `tab` resolves at `overlay` to `menuNext`, so the natural implementation makes `Tab` move a highlight and **never run a dynamic source again** — the menu having opened by itself would silently remove the only way to reach the app's own candidates.
+
+**The menu is pushed once, whoever opened it.** `complete` finding the menu already on the stack updates it; C15 throws on a duplicate id (C15 §4), so the alternative is not a doubled layer but an unhandled rejection inside a promise continuation.
+
+**A typed menu is rebuilt; a requested one is filtered** (I22). §6's rule — a keystroke that does not extend the prefix dismisses the menu — is about a menu that may hold candidates no static source can produce, and it holds for exactly that reason: widening it would mean re-running a dynamic source on a keystroke (I3). A typed menu holds only static candidates, so a keystroke recomputes it outright and backspace widens it back. **The two behave differently because their contents cost differently**, and the alternative — one rule, dismiss on backspace — would make backspace kill the affordance this section adds.
+
+A rebuild clears the selection. A set the user has not seen cannot have a row they chose in it, and the menu returns to being a display, which is what I20 already says about a menu with no selection.
+
+**`Esc` holds for the token** (I19). Dismissing a typed menu suppresses as-you-type opening until the cursor is in a different token, or the line is submitted or cleared. Without it the next character reopens what was just dismissed and `Esc` becomes a key that appears to do nothing — C22 I32's class, reached through the menu instead of through a timer. `Tab` is unaffected: an explicit request is the user asking again, and the suppression is about the menu opening *unasked*.
+
+**Nothing here runs a dynamic source.** Every recompute is `suggest`, which is static and synchronous. The row that keeps it true drives a real keystroke with a dynamic source whose `complete` throws if it is ever called (T2.1a), because the boundary is one refactor away from being lost and no assertion about candidates would notice.
 
 ---
 
@@ -284,9 +330,15 @@ The 500 ms threshold and the 60-second TTL both use an **injected clock**, so ev
 
 | From ↓ / event → | `Tab` | keystroke | result arrives | `Esc` |
 |---|---|---|---|---|
-| **idle** | → requesting (T1.9) | idle, ghost recomputed (T1.4) | — | — |
+| **idle** | → requesting (T1.9) | ghost recomputed; two or more static candidates → **typed menu** (T1.4, T3.20) | — | — |
+| **idle, suppressed** | → requesting; suppression cleared (T3.24) | ghost recomputed, no menu, until the token changes (T3.23) | — | — |
 | **requesting** | → requesting, new seq (T3.9) | → requesting, new seq; old superseded (T1.12) | matching seq → menu or insert (T1.10); stale seq → discarded (T1.11) | → idle, cancelled (T3.10) |
-| **menu open** | → next candidate (T3.11) | extends the prefix → menu open, narrowed in place, ghost recomputed (T3.12); does not extend → idle, dismissed (T3.12b); narrows to zero → idle, dismissed (T3.19) | stale → discarded | → idle (T1.14) |
+| **typed menu** | → requesting; §5 runs and the menu becomes requested (T3.22) | rebuilt from the static set; two or more → open, selection cleared; fewer → idle, dismissed (T3.21) | stale → discarded | → idle, **suppressed** (T3.23) |
+| **requested menu** | → next candidate (T3.11) | extends the prefix → menu open, narrowed in place, ghost recomputed (T3.12); does not extend → idle, dismissed (T3.12b); narrows to zero → idle, dismissed (T3.19) | stale → discarded | → idle (T1.14) |
+
+**The menu row split in two, and the split is the state's, not the presentation's.** The two look identical on screen and answer a keystroke differently, for the reason I22 gives: one holds candidates that cost a source call to recover and the other holds candidates that cost a filter. A single row would have to choose, and either choice is wrong for one of them.
+
+**A typed menu with a selection is a requested menu.** `↓` is what enters it (I20), and from there its answers are the last row's — which is why there is no fifth row for it.
 
 **The keystroke cell used to read "idle, menu dismissed", and it contradicted §6 two sections above it.** §6 requires `update(id, { content })` rather than a pop and a push, C15 T4.7b asserts C19's half of that as one `push`, N `content` and one `pop`, and C15 §4 reasons about a completion menu *narrowing to no candidates as the last character is typed* — which is only a moment that exists if the menu survives the characters before it. Three documents described narrowing and this table described dismissal, and both readings had a test.
 
@@ -452,6 +504,67 @@ Columns are the whole result, not the field the row is about.
 
 ---
 
+## 8c. The as-you-type walk
+
+§6a's rulings came from here, before any of it was built. **Both shapes again, and for the reason C19 already had to learn once**: the menu opening by itself is event-mediated — a key arrives and two rules both claim it — and *who owns a key while a layer is up* is structural, true at rest, with no event between the two rules that decide it.
+
+### Trace 7 — the keys a menu takes without being asked
+
+| Step | Event | buffer | menu | selection | who answers the key |
+|---|---|---|---|---|---|
+| 1 | type `/` | `/` | typed, N rows | none | prompt |
+| 2 | type `p` | `/p` | typed, 2 rows | none | prompt |
+| 3 | `Enter` | — | — | none | **prompt: submits `/p`** |
+| 3′ | `Tab` instead | `/ps` or menu | requested | **0** | menu |
+| 4 | `Enter` after 3′ | `/ps` | — | — | **menu: accepts** |
+| 5 | type `s` after 3′ | `/ps` | rebuilt, 1 row → dismissed | cleared | prompt |
+
+**Steps 3 and 4 are the same key with opposite meanings, and only the selection distinguishes them.** That is I20, and the alternative it rules out is the one that arrives by itself: with the layer on the stack `activeTarget` is `overlay` for both, so a menu opened by typing takes `Enter` from the user who never asked for it. Nothing in C16 is wrong — the ladder is right for a menu the user opened.
+
+### Trace 8 — `Tab` over a menu that opened itself
+
+| Step | Event | stack | what runs |
+|---|---|---|---|
+| 1 | type `/co` | menu (typed) | `suggest` — static only |
+| 2 | `Tab` | menu (typed) | **`complete`**, dynamic sources included (I21) |
+| 3 | the result arrives | menu (requested) | `update`, never a second `push` |
+
+**Step 2 is the row that would have been lost silently.** The keymap binds `overlay`/`tab` to `menuNext`, so the implementation that does nothing about this makes `Tab` move a highlight — and the app's own container names become unreachable the day the menu learns to open by itself. It is the C16-meets-C19 cell, and neither component is wrong on its own side.
+
+**Step 3 is a crash rather than a defect if it is missed**: C15 throws on a duplicate id, inside a promise continuation, so the failure is an unhandled rejection with no frame attached to it.
+
+### Trace 9 — `Esc`, and the key that appears to do nothing
+
+| Step | Event | menu | suppressed |
+|---|---|---|---|
+| 1 | type `/co` | typed | no |
+| 2 | `Esc` | dismissed | **yes** |
+| 3 | type `n` | **none** | yes |
+| 4 | `Tab` | requested | no — an explicit request clears it |
+| 5 | type ` ` (a new token) | idle | no |
+
+**Step 3 is why the suppression exists.** Without it the dismissal is undone by the next character, and `Esc` joins C22 I32's class — a key that appears to do nothing until you press another one — from the opposite direction.
+
+### The classification table — who owns a key while a layer is up
+
+Structural: no event mediates these, and a trace indexed by keystrokes reaches none of them.
+
+| # | The two rules | State | `Enter` | printable | `↑` | `Tab` |
+|---|---|---|---|---|---|---|
+| 1 | `activeTarget` × nothing open | no layer | submit | types | history | `complete` |
+| 2 | `activeTarget` × I20 | typed menu, no selection | **submit** | **types** | **history** | **`complete`** — the prompt's bindings resolve first |
+| 3 | `activeTarget` × §6's bindings | requested menu | accept | narrows it | `menuPrev` | `menuNext` |
+| 4 | C16 I8 × a modal | confirm | the confirm's | dropped | dropped | dropped |
+| 5 | C15 I1 × a text overlay | reverse search over a menu | the search's | the search's | the search's | the search's |
+
+**Row 2 is entirely new and every cell of it was a defect** — measured, not reasoned: with a dismissable layer on the stack, `router.dispatch` runs the overlay handler, which consumes only what it binds, and step 3's `global` binds no printable key, so **the character is dropped**. A control with no layer open types the same character. So row 2 is not "the menu takes the key from the prompt"; it is *nobody takes it*, and typing stops the moment the menu appears.
+
+**C22 §6 named this before it was reachable.** Its cursor trace records *"with a menu open, `activeTarget` is `overlay` … so a printable key does nothing while the menu is up"*, and then: *"If typing is later allowed to filter an open menu, the cursor rule has to move with it, and this is where to look."* This section is that moment. The routing is C22's — an overlay that is chrome for the prompt forwards what it does not bind (C22 I51) — and so is the cursor rule, which splits along the same line.
+
+**Row 5 is a second instance of the same missing route, and it is not fixed here.** C20's reverse search is a text overlay whose `type()` has no caller anywhere in `src/`, so a query typed after `⌃R` is dropped exactly as row 2's character was. It is filed rather than folded in: the rules for applying a hit as the query narrows are C20 §5's and it needs its own rows.
+
+---
+
 ## 9. Invariants
 
 - **I1** — A result is applied only when its sequence is the `active` token. A result arriving after `cancel()` is never applied, because `cancel()` invalidates the token rather than advancing it — under a plain latest-wins reading that result *is* the latest and lands.
@@ -472,6 +585,13 @@ Columns are the whole result, not the field the row is about.
 - **I16** — A unique match is inserted whole followed by its own `delimiter`; a common prefix is inserted without one. The delimiter is declared by the candidate, because only its source knows whether the value is a directory, a flag taking a value, or a finished word.
 - **I17** — C19 reads no filesystem. The `path` and `executable` sources take an injected directory reader, so every test runs without one.
 - **I18** — Every candidate the menu holds is legible in it. The table form declares a flex column, so C11 has somewhere to put residual width — it gives residual width only to columns declaring `flex: true` — and the value column's floor is the widest candidate label **plus the selection glyph**, which is on whichever row is selected. Without the flex column every cell rendered `…` at any width; without the glyph in the floor, exactly the selected row truncates, which reads as a flicker rather than as a width defect. It held for every verb carrying a summary and for no verb without one, because a candidate with no `detail` takes the pills path — so half the menu was correct and a row asserting the menu appears passed against both.
+- **I19** — Two or more static candidates open the menu with no `Tab`; one is ghost text's case and opens nothing; zero closes it. `Esc` on such a menu suppresses the opening until the cursor is in a different token or the line is submitted or cleared — otherwise the next character reopens what was just dismissed.
+- **I20** — A menu that opened by typing holds no selection, and while it holds none the prompt's bindings resolve first: `Enter` submits, `↑` walks history, printable characters type, `Esc` falls through and dismisses. `Tab` enters it, and it is an ordinary menu from then on.
+- **I21** — `Tab` over a typed menu runs §5's algorithm, dynamic sources included, rather than moving a selection; and it updates the open menu rather than pushing a second one.
+- **I22** — A typed menu is rebuilt from the static set on a keystroke and a requested one is filtered in place, because only the second may hold candidates that cost a source call to recover (I3). A rebuild clears the selection.
+- **I23** — The menu's last content row is a `rule`, so its bottom edge against the prompt is a line rather than a change of subject; and the "N more" remainder counts rows, because C15 truncates by clamping height and a count of blocks is off by however many candidates a block holds.
+- **I24** — A dynamic source's cache key carries the arguments typed *before* the current token as well as the slot's identity, because a source's answer may depend on them — a path inside a named container is the ordinary case. Only the token being typed is excluded, so the narrowing keystrokes after a `Tab` still share one entry.
+- **I25** — A dynamic source may declare `cacheKey(ctx)`, naming what its answer depends on beyond the slot's identity and the earlier arguments. A path source returns the directory it is about to list: its answer is a function of part of the prefix, which the engine may not interpret and no generic rule can extract.
 
 ---
 
@@ -492,6 +612,12 @@ Columns are the whole result, not the field the row is about.
 13. Static sources ship with the framework, and so do the two generic dynamic ones — `path` and `executable`, over an injected directory reader. Only **domain-backed** dynamic sources are the app's, because a filesystem is not a domain (I3, I17).
 14. **Completion never blocks input** (I2). The prompt stays fully responsive while a request is pending, and every other mechanism here exists to make that true: sequence numbers so a late result cannot land on a changed line, the static/dynamic split so per-keystroke work is synchronous, the spinner threshold so a slow source is visible rather than silent, and source-level failure containment so one hung source cannot take the prompt with it. Stated as a commitment because without it that machinery reads as complexity in service of nothing.
 15. The sequence is a token of validity rather than a counter: state outliving an event is tagged with it, `cancel()` invalidates it, and staleness is structural rather than remembered (I15). The spinner is the one named exception: it asks how long the earliest call still in flight has been outstanding (§7).
+16. **The menu opens as you type**, on two or more static candidates, and closes at one — where ghost text takes over — or at none (I19). `Esc` holds for the rest of the token, so dismissing it is not undone by the next character.
+17. A menu nobody asked for takes no keys from the prompt: it has no selection, the prompt's bindings resolve first, and `Tab` is how the user enters it (I20). `Tab` still means `Tab` there — §5's algorithm, dynamic sources and all — rather than moving a highlight (I21).
+18. **Nothing about typing runs a dynamic source.** The as-you-type path calls `suggest`, which is static and synchronous; the split I3 states is unchanged and T2.1a is the row that keeps it (I3, I22).
+19. The menu has a bottom edge, because it spans the region and sits on the prompt: a `rule` as its last row, one row rather than a panel's two. The remainder beside it counts rows and not blocks (I23).
+20. A dynamic source may depend on an argument already typed, so the cache key carries them (I24). The token being typed is still excluded, which is what the cache was for.
+21. A source whose answer depends on part of what is typed says so through `cacheKey` (I25). The framework's own path source is the case, and a whole-prefix key would be the defect the cache exists to prevent.
 
 ---
 
@@ -525,6 +651,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 ### Tier 2 — contract / interface
 
 - **T2.1** (I3): a spy proves dynamic sources are not invoked on keystrokes, only on `Tab`.
+- **T2.1a** (I3, §6a): a dynamic source whose `complete` **throws if it is ever called**, registered for the slot under test, and a real keystroke driven through the router — the boundary A2 is one refactor from losing, asserted rather than assumed. A row checking only the candidate set passes whether or not the source ran.
 - **T2.2** (I2): with a source that never resolves, a hundred keystrokes are processed with no added latency.
 - **T2.3** (I9): a source scan finds no clock reference in `completion/` — SS1's, which covers all of `src/` with one named exception. A03 inventoried this as SS8 scoped to `completion/`, and it is folded rather than built: a rule whose scope is contained by a broader rule with the same pattern can never fire on anything the broader one misses. The fourth instance of that fold, and the third whose blocking component turned out to be the proof it could never fire.
 - **T2.3b** (I17): a source scan finds no `fs` or `node:fs` import in `completion/`; the `path` source is driven entirely by a fake reader in every tier below 5.
@@ -562,6 +689,15 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T3.16**: unbalanced quotes in the input → context is `none`; nothing is offered rather than something wrong.
 - **T3.17**: cursor at position 0 of a non-empty line → verb or executable slot, as if empty.
 - **T3.18**: a dynamic source returning duplicates → deduplicated before display.
+- **T3.28** (I25): `pathSource` over a fake reader — complete `/et`, then `/etc/`, and the second is the directory's own entries rather than the first listing filtered to nothing. **The control is two completions in one directory**, which must be one read, or the row passes against a source that simply lost its cache.
+- **T3.27** (I24): two containers and one argument — `/config a /e` then `/config b /e`, with a source counting its calls. Both fetch. **The control is the same container twice**, which must fetch once, or the row passes against a cache that was simply removed.
+- **T3.25** (I23): the menu's rendered rows, with the last one asserted to be a rule and not a candidate — **read from the rows rather than from the block list**, because a block appended and never placed satisfies a test that counts blocks. The frame that argued for it is `/clear` sitting directly on `❯ /c`.
+- **T3.26** (I23): sixty candidates in a ten-row region, driven through the shell rather than through `remainderOf` — the indicator says what is missing in rows. T4.5 passes the row count by hand and agrees with the function; this one asks what the caller supplies, which is where the block count was.
+- **T3.20** (I19): typing to two static candidates → the menu is on the stack with no `Tab`; typing on to one → dismissed, and the ghost carries it. The one-candidate case is the control: a threshold of one draws the same word twice and passes any row that only asks whether the menu appeared.
+- **T3.21** (I22): backspace with a **typed** menu open → the menu widens rather than dismissing, and the change log shows `content` rather than `pop` then `push`. T3.12b is the same key over a **requested** menu and asserts the opposite, which is the pair I22 exists to keep apart.
+- **T3.22** (I21): `Tab` over a typed menu → the dynamic source runs and the layer is `update`d. The mutation that binds it to `menuNext` instead passes every candidate assertion and leaves the app's own sources unreachable; the assertion is on the source having been called, and on there being no second `push`.
+- **T3.23** (I19, I20): `Esc` on a typed menu, then a printable key → no menu. A further key in a **new token** → the menu opens again. Without the second half the suppression is a mute switch.
+- **T3.24** (I19): `Esc`, then `Tab` → the menu opens. An explicit request is the user asking again, and the suppression is only about opening unasked.
 - **T3.19** (I18): a candidate carrying a `detail` renders its label and its hint at every width from `menuWidth` upward, and the selected row renders its glyph without losing a character of the label. **Asserted on the rendered rows, not on the block**, because the block was correct throughout: the defect was `minWidth: 1` meeting C11's rule that only a `flex` column absorbs residual width, and every statement on either side of that was true. The control is a candidate with no `detail`, which takes the pills path and drew correctly all along — which is why a row asserting only that the menu appears passed against the defect.
 
 ### Tier 4 — integration
@@ -608,6 +744,14 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T6.14** (I16): appending the delimiter after a common prefix as well as after a unique match → T1.15 fails, and the second `Tab` never reaches the menu because the token it would have widened has been closed.
 - **T6.15** (I16): moving the delimiter into the engine as one rule → T1.15b fails on two of its three cases, since nothing outside the source knows a directory from a file.
 - **T6.11** (I14): offering verbs for bare text → T1.2 fails.
+- **T6.24** (I25): dropping `cacheKey` from `pathSource` → T3.28 fails, and the second `Tab` into a subdirectory draws nothing. Reachable from the prompt and by no test that completes one directory.
+- **T6.23** (I24): dropping the earlier arguments from the key → T3.27 fails, and a second container is offered the first's directory listing for as long as the TTL lasts.
+- **T6.21** (I23): dropping the rule → T3.25 fails, and the last candidate is adjacent to the prompt again.
+- **T6.22** (I23): passing the block count as `shown` → T3.26 fails, and a menu of sixty says fifty-nine are missing when fifty are.
+- **T6.17** (I19): recomputing the menu on a keystroke through `request` rather than `suggest` → T2.1a fails, a keystroke spawns a subprocess in every app that registers a domain source, and no assertion about the candidate set changes.
+- **T6.18** (I20): giving a typed menu a selection at index 0 on open → T3.20's Enter case fails: the user types `/ps`, presses Enter, and a candidate is accepted instead of the command being run.
+- **T6.19** (I21): letting `overlay`/`tab` answer for a typed menu → T3.22 fails and no dynamic source is ever reachable once the menu opens by itself.
+- **T6.20** (I19): dropping the `Esc` suppression → T3.23 fails, and the dismissal is undone by the next character.
 - **T6.16** (I18): removing `flex` from the detail column, or putting the value column's floor back to a literal → T3.19 fails on the first and on the second, and the menu goes back to a column of ellipses at any terminal width. The two are separate mutations because they truncate differently: without the flex every row is lost, and without the glyph in the floor exactly the selected one is.
 
 ---

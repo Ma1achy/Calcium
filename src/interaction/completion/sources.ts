@@ -136,11 +136,23 @@ export function positionalSource(): CompletionSource {
  *
  * A directory's delimiter is `/`, which only this source can know (I16).
  */
+/** The directory a prefix is inside, with its separator — the path cache's key. */
+function directoryOf(prefix: string): string {
+  const cut = prefix.lastIndexOf("/");
+  return cut === -1 ? "." : prefix.slice(0, cut + 1); // graphemes-ok: a path offset in the tokeniser's coordinate system
+}
+
 export function pathSource(readDir: ReadDir): CompletionSource {
   return {
     id: "paths",
     slots: ["path"],
     dynamic: true,
+    // **The directory, because that is what the answer is about** (I25). Under
+    // the slot's key alone, `ls /et⇥` lists `/` and `ls /etc/⇥` is served that
+    // listing filtered to nothing — the second `Tab` appears to do nothing.
+    // Found from a frame in the reference application, whose own path source
+    // has the same shape.
+    cacheKey: (ctx) => directoryOf(ctx.prefix),
     async complete(ctx) {
       const cut = ctx.prefix.lastIndexOf("/");
       const dir = cut === -1 ? "." : ctx.prefix.slice(0, cut + 1);

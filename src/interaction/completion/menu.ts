@@ -71,7 +71,8 @@ function widestLabel(candidates: readonly Candidate[]): number {
  */
 export function menuBlocks(
   candidates: readonly Candidate[],
-  selected: number,
+  /** `null` while the menu is a display rather than a choice (I20). */
+  selected: number | null,
   remainder: number,
 ): readonly Block[] {
   const detailed = candidates.some((c) => c.detail !== undefined);
@@ -134,13 +135,32 @@ export function menuBlocks(
         })),
       };
 
+  // **The bottom edge, and it is the last row whatever else is here** (I23).
+  // The menu spans the region and is anchored to the prompt, so without it the
+  // last candidate and the line being typed are adjacent rows of text: read
+  // from a frame, `• /container` over `❯ /co` is one block and a reader takes
+  // the two as a path. An empty label is a plain line — C09 draws `── ` and
+  // fills the rest, and it degrades to ASCII with the rest of the menu.
+  //
+  // The top edge needs nothing: the transcript above is a different kind of
+  // content and reads as one.
+  const edge: Block = { kind: "rule", id: `${MENU_ID}-edge`, label: "" };
+
+  // **An empty set draws nothing, edge included**, and an existing row is what
+  // said so. C15 omits a zero-row layer from the layout and dismisses nothing
+  // (C15 I15) — the moment the set empties is C19's to act on — and a menu that
+  // still measured one row would put a bare line above the prompt in the exact
+  // moment there is nothing to show. The edge belongs to the candidates.
+  if (candidates.length === 0) return Object.freeze([]); // graphemes-ok: a candidate count, not text
+
   // **C19 renders the indicator, because only C19 knows the remainder** (C15
   // I8). C15 reports *that* it truncated through `Placed.truncated`; it holds no
   // candidates and cannot say how many were lost.
-  if (remainder <= 0) return Object.freeze([body]);
+  if (remainder <= 0) return Object.freeze([body, edge]);
   return Object.freeze([
     body,
     { kind: "raw", id: `${MENU_ID}-more`, text: `… ${String(remainder)} more` } satisfies Block,
+    edge,
   ]);
 }
 
@@ -155,7 +175,7 @@ export function menuBlocks(
  */
 export function menuLayer(
   candidates: readonly Candidate[],
-  selected: number,
+  selected: number | null,
   remainder: number,
   anchor: Readonly<{ row: number; rows: number }>,
 ): Layer {
@@ -185,8 +205,31 @@ export function menuLayer(
   });
 }
 
-/** How many candidates a placement could not show, for the indicator. */
+/**
+ * How many candidates a placement could not show, for the indicator (I23).
+ *
+ * **`shown` is a count of rows.** C15 truncates by clamping height (C15 §4), so
+ * the blocks are all still there and only some of their rows are drawn — a
+ * caller passing `content.length` is counting boxes, and a table holding sixty
+ * candidates is one of them. `menuRowsShown` below is what a caller should
+ * hand it, and that is the half nothing asserted: this function has always been
+ * right and was being asked the wrong question.
+ */
 export function remainderOf(placed: Placed | null, total: number, shown: number): number {
   if (placed === null || !placed.truncated) return 0;
   return Math.max(0, total - shown);
+}
+
+/**
+ * The rows of a placement that hold candidates (I23).
+ *
+ * The rule always costs one, and the indicator costs one whenever it is drawn
+ * — which is whenever anything was cut, which is the case this is called in.
+ * Subtracting both here rather than at the call site keeps the menu's own
+ * chrome a fact of this file, where the blocks are built.
+ */
+export function menuRowsShown(placed: Placed | null): number {
+  if (placed === null) return 0;
+  const chrome = placed.truncated ? 2 : 1;
+  return Math.max(0, placed.height - chrome);
 }

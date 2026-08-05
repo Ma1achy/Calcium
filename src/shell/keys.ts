@@ -23,12 +23,17 @@ import {
   accept,
   contextAt,
   menuLayer,
+  menuRowsShown,
   remainderOf,
   MENU_ID,
   SPINNER_MS,
 } from "../interaction/completion/index.js";
 import { SEARCH_ID } from "../interaction/history/index.js";
-import type { CompletionEngine } from "../interaction/completion/index.js";
+import type {
+  Candidate,
+  CompletionContext,
+  CompletionEngine,
+} from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/index.js";
 import type { KeyAction } from "../interaction/router/types.js";
@@ -118,8 +123,24 @@ export type KeyEffect = () => void;
 
 export interface KeyEffects {
   readonly table: Readonly<Record<KeyAction, KeyEffect>>;
-  /** The menu's selected row, for the tests that drive it. */
-  readonly selected: number;
+  /**
+   * The menu's selected row, or `null` while it is a display (C19 I20).
+   *
+   * Read by the composition root to decide precedence, not only by tests: a
+   * menu holding no selection lets the prompt's bindings resolve first, which
+   * is how `Enter` still submits under a menu nobody asked for.
+   */
+  readonly selected: number | null;
+  /**
+   * The buffer changed by typing — recompute the as-you-type menu (C19 §6a).
+   *
+   * Called by the composition root after a printable key or a paste, and by the
+   * editing effects here. Static sources only: this path never runs a dynamic
+   * source (C19 I3, T2.1a).
+   */
+  afterEdit(): void;
+  /** The line went away — close the menu and forget `Esc`'s suppression (C19 I19). */
+  reset(): void;
 }
 
 /**
@@ -130,10 +151,35 @@ export interface KeyEffects {
  * the layer's blocks on each move is what `update` is for.
  */
 export function createKeyEffects(deps: KeyDeps): KeyEffects {
-  let candidates: readonly { value: string; delimiter?: string }[] = [];
-  let selected = 0;
+  let candidates: readonly Candidate[] = [];
+  /** `null` while the menu is a display of what is available (C19 I20). */
+  let selected: number | null = null;
+  /**
+   * Did a `Tab` open this menu (C19 I22)?
+   *
+   * The one bit that decides what a keystroke does to it. A requested menu may
+   * hold candidates no static source can produce, so it is *filtered* by what
+   * follows and dismissed by anything that does not extend the prefix —
+   * widening it would mean running a dynamic source on a keystroke (C19 I3). A
+   * typed menu holds only static candidates, which cost a filter over an array,
+   * so it is rebuilt outright and backspace widens it back.
+   */
+  let requested = false;
+  /** The prefix the open menu was built for — "does this keystroke extend it". */
+  let builtFor = "";
   let remainder = 0;
   let seq = 0;
+  /**
+   * Where `Esc` dismissed a typed menu, as the token's start offset (C19 I19).
+   *
+   * Without it the next character reopens what was just dismissed and `Esc`
+   * joins I32's class from the other direction — a key that appears to do
+   * nothing. Held per token, so moving on clears it.
+   */
+  let suppressedAt: number | null = null;
+
+  const ctxNow = (): CompletionContext =>
+    contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
 
   function redrawMenu(): void {
     if (candidates.length === 0) return;
@@ -142,28 +188,123 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     });
   }
 
+  /**
+   * Push it, or update the one already there (C19 I21).
+   *
+   * C15 throws on a duplicate id, and `complete` over a typed menu is exactly
+   * the case that reaches this twice — inside a promise continuation, where the
+   * throw is an unhandled rejection with no frame attached to it. `update`
+   * answering *whether the layer is on the stack* is the question; asking the
+   * top instead is wrong the moment anything sits above it.
+   *
+   * The placement goes with the content: the prompt grows rows as it is typed
+   * into, and an anchor left behind places the menu over the line below it.
+   */
+  function showMenu(next: readonly Candidate[], sel: number | null, prefix: string): void {
+    candidates = next;
+    selected = sel;
+    builtFor = prefix;
+    const layer = menuLayer(candidates, selected, remainder, deps.anchor());
+    if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
+      return;
+    }
+    remainder = 0;
+    deps.overlays.push(menuLayer(candidates, selected, 0, deps.anchor()));
+  }
+
+  function hasMenu(): boolean {
+    return candidates.length > 0;
+  }
+
   function closeMenu(): void {
     candidates = [];
-    selected = 0;
+    selected = null;
+    requested = false;
+    builtFor = "";
     remainder = 0;
     deps.overlays.dismiss(MENU_ID);
   }
 
-  function applyCandidate(whole: boolean): void {
-    const candidate = candidates[selected];
-    if (candidate === undefined) return;
+  /**
+   * How many the placement could not show (C15 I8).
+   *
+   * The indicator needs the placement and the placement needs the region — how
+   * many candidates fit is a fact about the frame, not about the list — and
+   * C15 answers it only once the layer is on the stack, so this is a second
+   * pass rather than an argument to the first.
+   */
+  function countRemainder(): void {
+    const placed = deps.overlays.layout(deps.overlayRegion()).find((p) => p.layer.id === MENU_ID);
+    // **Rows, not blocks** (C19 I23). `content.length` counts boxes, and the
+    // table holding sixty candidates is one of them — so a menu clamped to ten
+    // rows used to report fifty-nine missing where fifty are.
+    remainder = remainderOf(placed ?? null, candidates.length, menuRowsShown(placed ?? null));
+    redrawMenu();
+  }
 
-    const ctx = contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
+  /** One edit, so one undo unit (C19 I11). */
+  function applyEdit(ctx: CompletionContext, candidate: Candidate, whole: boolean): void {
     const edit = accept(ctx, candidate, whole);
     const before = deps.editor.text;
     deps.editor.setText(
       before.slice(0, edit.start) + edit.text + before.slice(edit.end),
       edit.start + edit.text.length,
     );
+  }
+
+  function applyCandidate(whole: boolean): void {
+    const candidate = selected === null ? undefined : candidates[selected];
+    if (candidate === undefined) return;
+    applyEdit(ctxNow(), candidate, whole);
     closeMenu();
   }
 
-  const table: Readonly<Record<KeyAction, KeyEffect>> = Object.freeze({
+  /**
+   * The as-you-type recompute (C19 §6a, I19, I22).
+   *
+   * **`suggest`, never `request`** — the whole boundary is this one call. The
+   * obvious implementation reaches for the engine's request path, which runs
+   * the dynamic sources, and every assertion about the candidate set agrees
+   * with both. C19 T2.1a is the row that does not.
+   */
+  function afterEdit(): void {
+    const ctx = ctxNow();
+
+    if (requested) {
+      // C19 §8's requested-menu row: filter what it holds, and dismiss when the
+      // keystroke does not extend the prefix, because filtering cannot widen.
+      const prefix = ctx.prefix;
+      if (prefix === builtFor) return;
+      if (!prefix.startsWith(builtFor)) {
+        closeMenu();
+        return;
+      }
+      const narrowed = candidates.filter((c) => c.value.startsWith(prefix));
+      if (narrowed.length === 0) {
+        closeMenu();
+        return;
+      }
+      showMenu(narrowed, selected === null ? null : 0, prefix);
+      countRemainder();
+      return;
+    }
+
+    if (suppressedAt !== null && suppressedAt !== ctx.replace.start) suppressedAt = null;
+
+    const next = deps.completion.suggest(ctx);
+    // **Two, and one is ghost text's case** (C19 I19). A one-row menu under a
+    // prompt already showing the suggestion draws the same word twice.
+    if (next.length < 2 || suppressedAt !== null) {
+      if (hasMenu()) closeMenu();
+      return;
+    }
+    // A rebuild clears the selection: a set the user has not seen cannot have a
+    // row they chose in it, so the menu is a display again (C19 I22).
+    showMenu(next, null, ctx.prefix);
+    countRemainder();
+  }
+
+  const raw: Readonly<Record<KeyAction, KeyEffect>> = Object.freeze({
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),
 
@@ -173,7 +314,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // input is never blocked on a fetch applies to every fetch. The menu appears
     // when the promise settles; the prompt stays live throughout.
     complete: () => {
-      const ctx = contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
+      const ctx = ctxNow();
+      // An explicit request is the user asking again, so `Esc`'s hold on the
+      // token is over (C19 I19). The suppression is about opening unasked.
+      suppressedAt = null;
       seq += 1;
       const mine = seq;
 
@@ -198,27 +342,44 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // work; this guards the *menu*, which is state the engine has never
         // seen.
         if (mine !== seq) return;
-        if (result.candidates.length === 0) {
+
+        // **C19 §5's algorithm, which had no caller until now** (C19 I16).
+        // `commonPrefix` was computed on every request and read by nothing
+        // outside C19's own tests, so `Tab` opened a menu in every case —
+        // including the unique match, where the answer is to insert it. The
+        // same shape as the ghost: a mechanism complete on its own side of a
+        // seam with nothing on the other.
+        //
+        // Rule 3 appends the candidate's delimiter and rule 4 does not, which
+        // is what makes a second `Tab` useful without a press counter: the
+        // first closes the token, so the second is in the next slot.
+        const found = result.candidates;
+        if (found.length === 0) {
           closeMenu();
           // The dismissal is a state change like the appearance is, and it
           // settles in the same place (I31).
           deps.redraw();
           return;
         }
-        candidates = result.candidates;
-        selected = 0;
-        remainder = 0;
-        deps.overlays.push(menuLayer(candidates, selected, 0, deps.anchor()));
+        const only = found[0];
+        if (found.length === 1 && only !== undefined) {
+          applyEdit(ctx, only, true);
+          closeMenu();
+          deps.redraw();
+          return;
+        }
+        if (result.commonPrefix.length > ctx.prefix.length) {
+          applyEdit(ctx, { value: result.commonPrefix }, false);
+          closeMenu();
+          deps.redraw();
+          return;
+        }
 
-        // **The indicator needs the placement, and the placement needs the
-        // region** — how many candidates fit is a fact about the frame, not
-        // about the list. C15 answers it only once the layer is on the stack,
-        // so this is a second pass rather than an argument to the first.
-        const placed = deps.overlays
-          .layout(deps.overlayRegion())
-          .find((p) => p.layer.id === MENU_ID);
-        remainder = remainderOf(placed ?? null, candidates.length, placed?.layer.content.length ?? 0);
-        redrawMenu();
+        // Rule 5. A `Tab` menu is a choice the user asked to make, so it opens
+        // with a selection and owns its keys from here (C19 I20, I22).
+        requested = true;
+        showMenu(found, 0, ctx.prefix);
+        countRemainder();
 
         // **The frame this continuation has no batch to be part of** (I31).
         deps.redraw();
@@ -237,13 +398,16 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.editor.insert(ghost);
     },
 
+    // A menu holding no selection never reaches these: the prompt's bindings
+    // resolve first while it is a display (C19 I20), so `↑` is history and
+    // `Tab` is `complete`. The `null` arm is the guard, not a fallback.
     menuNext: () => {
-      if (candidates.length === 0) return;
+      if (candidates.length === 0 || selected === null) return;
       selected = (selected + 1) % candidates.length;
       redrawMenu();
     },
     menuPrev: () => {
-      if (candidates.length === 0) return;
+      if (candidates.length === 0 || selected === null) return;
       selected = (selected + candidates.length - 1) % candidates.length;
       redrawMenu();
     },
@@ -256,7 +420,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const top = deps.overlays.top;
       if (top === null) return;
       if (top.id === MENU_ID) {
+        // **`Esc` holds for the token** (C19 I19). A menu that opens by itself
+        // must stay closed for more than one keystroke, or the dismissal is
+        // undone by the next character.
+        const at = ctxNow().replace.start;
         closeMenu();
+        suppressedAt = at;
         return;
       }
       if (top.id === SEARCH_ID) {
@@ -421,8 +590,50 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       ? deps.documentView.move(document)
       : deps.patchView.move(patch);
 
+  /**
+   * The actions after which the as-you-type menu is recomputed (C19 §6a).
+   *
+   * **An allow-list with its reason, not a prefix match**: a C17 operation
+   * added to the union joins this set deliberately or does not, and either way
+   * someone decided. What is *not* here is as load-bearing as what is —
+   * `historyPrev` and `historyNext` replace the whole line and a menu over a
+   * recalled command is noise, and `menuAccept` is an acceptance rather than
+   * typing, so recomputing there would reopen the menu it just closed.
+   */
+  const RECOMPUTES: ReadonlySet<KeyAction> = new Set<KeyAction>([
+    "backspace",
+    "delete",
+    "killWordLeft",
+    "killWordRight",
+    "killToStart",
+    "killToEnd",
+    "yank",
+    "undo",
+    "redo",
+    "insertNewline",
+  ]);
+
+  const table: Readonly<Record<KeyAction, KeyEffect>> = Object.freeze(
+    Object.fromEntries(
+      Object.entries(raw).map(([action, effect]) => [
+        action,
+        RECOMPUTES.has(action as KeyAction)
+          ? () => {
+              effect();
+              afterEdit();
+            }
+          : effect,
+      ]),
+    ) as Record<KeyAction, KeyEffect>,
+  );
+
   return {
     table,
+    afterEdit,
+    reset: () => {
+      closeMenu();
+      suppressedAt = null;
+    },
     get selected() {
       return selected;
     },

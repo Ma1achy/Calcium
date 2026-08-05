@@ -142,6 +142,14 @@ describe("C19 tier 5 — at a real prompt", () => {
       pty.type("ls pack");
       pty.type("\t");
 
+      // **Two Tabs, because §5's algorithm now has a caller.** `package.json`
+      // and `package-lock.json` share the prefix `package`, so the first Tab
+      // takes rule 4 — insert the common prefix, no delimiter, no menu — and
+      // the second takes rule 5 and opens it. That is the bash behaviour C19 §5
+      // describes and the state this row used to skip past, because the shell
+      // opened a menu in every case and read `commonPrefix` nowhere.
+      await pty.waitForFrame((f) => promptRow(f).includes("ls package"), 15_000);
+      pty.type("\t");
       await pty.waitFor(/package\.json/, 15_000);
     } finally {
       pty.kill();
@@ -169,11 +177,20 @@ describe("C19 tier 5 — at a real prompt", () => {
       // §6) — so three Tabs in a row were one request and two selection moves,
       // and the row would have asserted "one invocation" against a session that
       // only ever asked once. The menu is dismissed between them.
+      // **The candidate is inserted rather than shown, and that changed here
+      // rather than in the source.** The fixture answers with exactly one
+      // candidate, so §5 rule 3 completes the token whole — the count still
+      // leaves the process in the label, and the label now lands in the buffer
+      // instead of in a menu. Clearing the line and retyping the prefix is what
+      // makes each Tab a fresh *request* rather than a selection move, which is
+      // what this row measures.
       const ask = async (expected: string): Promise<void> => {
         pty.type("\t");
-        await pty.waitForFrame((f) => f.join("\n").includes(expected), 15_000);
-        pty.type("\u001b");
-        await pty.waitForFrame((f) => !f.join("\n").includes(expected), 15_000);
+        await pty.waitForFrame((f) => promptRow(f).includes(expected), 15_000);
+        pty.type("\u0015"); // ⌃u — clear the line
+        await pty.waitForFrame((f) => !promptRow(f).includes(expected), 15_000);
+        pty.type("/inv");
+        await pty.waitForFrame((f) => promptRow(f).includes("/inv"), 15_000);
       };
 
       // Three genuine requests inside the window, one invocation.
@@ -183,8 +200,8 @@ describe("C19 tier 5 — at a real prompt", () => {
       // label is how the count leaves the process.
       await new Promise((r) => setTimeout(r, 2_500));
       pty.type("\t");
-      await pty.waitForFrame((f) => f.join("\n").includes("invoked-2-times"), 15_000);
-      expect(pty.frame.join("\n"), "the second invocation, not a third").not.toContain(
+      await pty.waitForFrame((f) => promptRow(f).includes("invoked-2-times"), 15_000);
+      expect(promptRow(pty.frame), "the second invocation, not a third").not.toContain(
         "invoked-3-times",
       );
     } finally {

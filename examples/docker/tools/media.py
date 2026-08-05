@@ -119,8 +119,12 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
 
     # 6 — completion, which is the manifest's doing and no code's. The menu is
     #     an overlay (C15) drawn over the transcript, with each verb's summary
-    #     from the same table `/help` and dispatch use.
-    ("completion", 120, 34, b"/co", 8.0, TRUE, None),
+    #     from the same table `/help` and dispatch use — and it opens as the
+    #     verb is typed rather than on `Tab` (C19 I19), which is what the shot
+    #     shows. The rule under the last candidate is its bottom edge (I23): the
+    #     menu spans the region and sits on the prompt, so without it `/clear`
+    #     and `❯ /co` are adjacent rows of text and read as one path.
+    ("completion", 120, 34, b"/co", 8.0, TRUE, 4.0),
 
     # 7 — the light variant, **rendered on a light terminal on purpose.**
     #     C10 paints no background: §4a's channel exists for diff rows, and the
@@ -199,18 +203,20 @@ if __name__ == "__main__":
             if pre is not None
             else [(1.5, command), (3.5, b"\r")]
         )
-        # Completion needs the Tab instead of the Enter: the menu is the shot.
+        # **Completion needs no key at all now.** The menu opens on two or more
+        # static candidates as the verb is typed (C19 I19), so the command *is*
+        # the shot and the Enter is what has to go.
         #
-        # **Early, and that is a workaround for F68 rather than a timing
-        # preference.** The overlay paints no background, so anything already on
-        # screen reads through the gaps between its columns — measured, zero
-        # `48;2;` sequences in the whole capture while `/config`'s diff emits 72.
-        # Triggering it before the landing dashboard's first fetch lands means
-        # there is nothing underneath to bleed through.
+        # **The Tab is gone and so is the reason it was early.** That timing was
+        # a workaround for F68 — "the overlay paints no background, so the
+        # transcript reads through the gaps between its columns" — and F68 was
+        # withdrawn: the box is columns 0 to 81 on every row, measured with and
+        # without, and the passage that seemed to confirm it was the note
+        # explaining why the implementation does not have the defect. A
+        # justification the next person checks and cannot reproduce is one they
+        # delete, so it is deleted here rather than left to be found.
         if name == "completion":
-            script = [(0.8, command), (1.6, b"\t")]
-        for i, key in enumerate(AFTER.get(name, b"").split(b"\x1b")[1:] if False else []):
-            pass
+            script = [(1.5, command)]
         after = AFTER.get(name)
         if after:
             # Each key its own write, a second apart — two page-ups in one write

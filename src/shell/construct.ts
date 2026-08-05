@@ -47,7 +47,7 @@ import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
-import { createEngine, frameworkSources } from "../interaction/completion/index.js";
+import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
@@ -198,6 +198,8 @@ export type ConstructDeps = Readonly<{
 }>;
 
 export type Graph = Readonly<{
+  /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
+  promptUnderMenu: () => boolean;
   capabilities: TerminalCapabilities;
   capabilityWarnings: readonly string[];
   blocks: ReturnType<typeof createBlockRegistry>;
@@ -723,6 +725,18 @@ export async function constructGraph(
     redraw: () => void scheduler.commit("completion"),
   });
 
+  /**
+   * Is the prompt still answering keys under whatever is on the stack (I51)?
+   *
+   * **One definition, two readers.** The router's precedence and the cursor's
+   * both ask it, and a second copy of the rule is how a cursor comes to claim
+   * the prompt is inert while the prompt is taking keys. True for exactly one
+   * layer: a completion menu holding no selection, which is a display of what
+   * is available rather than a choice being made (C19 I20).
+   */
+  const promptUnderMenu = (): boolean =>
+    stores.overlays.top?.id === MENU_ID && keys.selected === null;
+
   /** A bound action, or `null` when the key is not bound at this target. */
   const bound = (target: FocusTarget, e: InputEvent): (() => void) | null => {
     if (e.kind !== "key") return null;
@@ -735,7 +749,18 @@ export async function constructGraph(
   };
 
   at("register", () => {
-    router.register("prompt", (e) => {
+    /**
+     * The prompt's own handler, named so the overlay's can call it (I51).
+     *
+     * **A layer that is chrome for the prompt does not stop typing.** With any
+     * dismissable layer on the stack `activeTarget` answers `overlay`, that
+     * handler consumes only what it binds, and step 3's `global` binds no
+     * printable key — so a character typed with the menu up is dropped. Not
+     * taken by the menu: dropped by nobody, measured against the same key with
+     * no layer open. `Tab` alone made that survivable; a menu that opens as you
+     * type (C19 I19) makes it typing stopping the moment it appears.
+     */
+    const promptKeys = (e: InputEvent): boolean => {
       const effect = bound("prompt", e);
       if (effect !== null) {
         effect();
@@ -748,6 +773,10 @@ export async function constructGraph(
       // It was invisible because no decoded event ever reached the router: the
       // two halves were each correct about a name and never compared.
       if (e.kind === "key" && e.key.name === "enter") {
+        // The line goes away, so the menu and `Esc`'s hold on the token go with
+        // it (C19 I19): suppression is per token, and the next line's first
+        // token starts at the same offset the dismissed one did.
+        keys.reset();
         pipeline?.submit(stores.editor.text);
         return true;
       }
@@ -766,23 +795,47 @@ export async function constructGraph(
       if (e.kind === "paste") {
         built.completion.cancel();
         stores.editor.insert(e.text, { atomic: true });
+        keys.afterEdit();
         return true;
       }
 
       if (e.kind === "key" && isPrintable(e.key)) {
         built.completion.cancel();
         stores.editor.insert(e.key.sequence);
+        // **The menu opens as you type** (C19 I19). `suggest` is static and
+        // synchronous, so this is a filter over an array and not a source call
+        // — the half of C19 I3 that has to survive the menu learning to open
+        // itself, and the one no assertion about candidates would notice.
+        keys.afterEdit();
         return true;
       }
 
       return false;
-    });
+    };
+
+    router.register("prompt", promptKeys);
 
     router.register("overlay", (e) => {
+      // **A completion menu holding no selection lets the prompt answer first**
+      // (C19 I20). It is a display of what is available rather than a choice
+      // being made, so `Enter` submits, `↑` is history, `Tab` is `complete` and
+      // printable keys type. A precedence between two targets rather than a
+      // list of key names, which would be a second keymap in the composition
+      // root (C16 I23) — and `Esc` needs no exception, because the prompt does
+      // not bind it and it falls through to `dismiss` below.
+      if (promptUnderMenu() && promptKeys(e)) return true;
+
       const effect = bound("overlay", e);
-      if (effect === null) return false;
-      effect();
-      return true;
+      if (effect !== null) {
+        effect();
+        return true;
+      }
+
+      // The forward (I51). A requested menu needs it too: C19 §8's keystroke
+      // cell narrows it in place, and that cell is unreachable while the
+      // character is dropped before it arrives.
+      if (stores.overlays.top?.id === MENU_ID) return promptKeys(e);
+      return false;
     });
 
     // **The target `↓` now leads to** (C16 I22). Registered for the same reason
@@ -889,6 +942,14 @@ export async function constructGraph(
   });
 
   return Object.freeze({
+    /**
+     * I51 — the router's precedence, for the one other reader of it.
+     *
+     * On the graph rather than recomputed in `session.ts`, because the cursor
+     * and the dispatch must not be able to disagree about whether the prompt is
+     * taking keys.
+     */
+    promptUnderMenu,
     capabilities: detection.capabilities,
     capabilityWarnings: detection.warnings,
     blocks: built.blocks,
