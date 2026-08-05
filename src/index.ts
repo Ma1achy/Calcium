@@ -92,6 +92,7 @@ export type {
   ComparisonRow,
   EventLine,
   KeyValueInput,
+  KeyValueRow,
   LiveSpec,
   LogLine,
   StepInput,

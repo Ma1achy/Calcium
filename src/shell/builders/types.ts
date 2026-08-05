@@ -63,6 +63,25 @@ export type CellInput = string | Cell;
 export type KeyValueInput = Readonly<{ text: string; tone?: Tone }>;
 
 /**
+ * A `b.kv` row, addressed positionally rather than by key (I18, §4).
+ *
+ * **A record cannot hold two rows with the same label, and `KeyValue.rows` is an
+ * array.** So the block has always been able to say a label twice and the
+ * builder could not — which went unnoticed through eleven builders and a whole
+ * application, because C24 already documents a narrowing here and it is a
+ * different one: `KeyValueInput` against `CellInput`, about a value with
+ * nowhere to go.
+ *
+ * The consumer that found it is docker-tui's `/port`. A published container
+ * port has one binding per address family, so `docker port` on `-p 8080:80`
+ * emits `80/tcp` twice, and a record built by `reduce` keeps the second.
+ *
+ * `value` takes the same union the record arm's does, so the two arms differ in
+ * their container and in nothing else.
+ */
+export type KeyValueRow = Readonly<{ label: string; value: string | KeyValueInput }>;
+
+/**
  * A step, with `state` defaulting to `"pending"` (§4).
  *
  * The block's `state` is required. Most callers building a checklist want every

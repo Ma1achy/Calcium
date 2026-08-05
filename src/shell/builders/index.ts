@@ -75,6 +75,7 @@ import type {
   ComparisonRow,
   EventLine,
   KeyValueInput,
+  KeyValueRow,
   LiveSpec,
   LogLine,
   StepInput,
@@ -180,12 +181,34 @@ const notice = Object.assign(noticeOf, {
   info: (text: string, opts?: BlockOpts): Notice => noticeOf("info", text, undefined, opts),
 });
 
-function kv(rows: Readonly<Record<string, string | KeyValueInput>>, opts?: BlockOpts): KeyValue {
+/**
+ * **Two arms with one body** (I18, §4).
+ *
+ * The record is the arm to reach for and stays first in the union: labels are
+ * unique on almost every surface, and `{ status: b.warn("degraded") }` is the
+ * shape this builder exists for. The array arm is for a surface whose labels
+ * come from the far side, which has not promised they are distinct — docker's
+ * `port`, whose every published port is listed once per address family.
+ *
+ * Both normalise to the same `{ label, value }` pair before the value is
+ * unwrapped, so the two arms cannot disagree about what a tone does. Writing the
+ * unwrap twice is how they would.
+ */
+function kv(
+  rows: Readonly<Record<string, string | KeyValueInput>> | readonly KeyValueRow[],
+  opts?: BlockOpts,
+): KeyValue {
+  const pairs: readonly KeyValueRow[] = Array.isArray(rows)
+    ? rows
+    : Object.entries(rows as Readonly<Record<string, string | KeyValueInput>>).map(
+        ([label, value]) => ({ label, value }),
+      );
+
   return finish<KeyValue>(
     {
       kind: "keyValue",
       id: idOf(opts, "kv"),
-      rows: Object.entries(rows).map(([label, value]) =>
+      rows: pairs.map(({ label, value }) =>
         typeof value === "string"
           ? { label, value }
           : { label, value: value.text, ...(value.tone === undefined ? {} : { tone: value.tone }) },
@@ -483,6 +506,7 @@ export type {
   ComparisonRow,
   EventLine,
   KeyValueInput,
+  KeyValueRow,
   LiveSpec,
   LogLine,
   StepInput,
