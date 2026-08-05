@@ -402,6 +402,18 @@ so. So `/compare` joins two sources per container — the same join S1's panel m
 from the other direction, which is the argument for building S1 first. The other five rows
 diff cleanly: two containers give two objects of the same shape. FINDINGS F11.
 
+**Ruled in, not dropped.** `docker stats --no-stream A B` takes both containers in one call,
+so the join costs one invocation rather than two, and S1 already makes exactly this join —
+the code that reads `CPUPerc` and `MemPerc` is written and tested. Dropping the rows would
+also drop the reason the surface is interesting: `docker diff` never showed a live figure
+beside a configured one. What the drawing owed and never paid is *saying* it joins two
+sources, and this paragraph is that debt settled.
+
+**`/compare` uses the container path on both sides**, so the `derived` field kind — where
+the two sides come from different paths, which is `ports` — collapses to a single path here.
+That is the whole of why `/compare` is cheap once `/drift`'s field map exists, and it is
+also why `/drift` is the harder surface despite looking like the simpler one.
+
 ---
 
 ## S7 — `/drift <c>` (comparison, image vs running) **(the comparison showcase)**
@@ -421,6 +433,26 @@ built from. `a` = image default, `b` = live container.
   entrypoint       nginx -g daemon off  nginx -g daemon off
 ```
 
+**The `▐ added` above is a verdict `Comparison` cannot express.** Its union is
+`"same" | "better" | "worse" | "changed"` (`viewmodel/types.ts`), with no `added` and no
+`removed` — the drawing showed a mark the block has never had. So **absence goes in the
+data, not in the verdict**: a field present on one side only renders `changed` with the
+absent side as `—`, which is expressible today and says the same thing to a reader. Filed
+rather than worked around by extending C04's union, because `same`/`changed` is a change
+axis and `better`/`worse` a judgement axis — the union already mixes two, and adding a
+third pair wants a ruling rather than a patch. FINDINGS F30.
+
+**And `env` is a keyed set, which the drawing implies and never states.** `env LOG_LEVEL` is
+one row for one variable; a container inherits every variable its image declares and adds a
+few. So a keyed field yields **one row per key that differs or exists on one side only, plus
+one muted `N identical` row** — the structural diff that is wrong at the top level is right
+*inside* a field, where both sides genuinely have the same shape. That distinction is the
+ruling; the row count follows from it.
+
+The tally row is not decoration. Without it a container identical to its image renders as an
+empty block, which is indistinguishable from a drift that failed — the same class as S3's
+*"no details — the container has gone"*, predicted here rather than found in a frame.
+
 `comparison` with a real before/after, differing rows carrying verdict tone. **The
 comparison block's `/stats`** — the surface that demonstrates the feature at its peak, the
 way S3 does for `b.live`.
@@ -431,11 +463,44 @@ The source line used to read *`docker inspect` the container, `docker image insp
 image, **diff the fields***. The two objects do not have the same fields, and the drawing's
 own headline row proves it.
 
-`docker image inspect`'s `Config` carries `ExposedPorts` and `StopSignal`. `docker
-inspect`'s carries `Hostname`, `Domainname`, `AttachStdin/out/err`, `Image`, `StopTimeout`
-— and `ExposedPorts: null`. A key-union diff invents a `changed` row for every key on one
-side only, which is most of them, and each would render as drift the container does not
-have.
+A key-union diff invents a `changed` row for every key on one side only, which is most of
+them, and each would render as drift the container does not have.
+
+**That was first written as *the image's `Config` carries `ExposedPorts` and `StopSignal`,
+the container's does not* — a true observation promoted to a general claim.** It is true of
+a *service* image and false of a *base* image, and the second measurement is what separates
+the two:
+
+| image | `ExposedPorts` | `StopSignal` | `Config` keys |
+|---|---|---|---|
+| `nginx:alpine` | `{"80/tcp":{}}` | `SIGQUIT` | 7 |
+| `mcr.microsoft.com/devcontainers/typescript-node:22` | absent | absent | 5 |
+
+**And the correction above was itself an inference from one measurement.** It read *the
+asymmetry is one-sided here and two-sided against nginx* — inferred from the image key
+counts without measuring nginx's **container** side. Measured, both pairs answer the same:
+
+| pair | image-only keys | container-only keys | image ⊆ container |
+|---|---|---|---|
+| `dtui-web` / `nginx:alpine` | **0** | 12 | yes |
+| devcontainer / `typescript-node:22` | **0** | 12 | yes |
+
+**A container's `Config` is the image's inherited, then filled with runtime fields.** That
+is the durable statement, and it is stronger than *the shape varies*: there are no
+image-only rows to worry about at all, and a key-union diff invents exactly the twelve
+daemon-filled ones — `Hostname`, `Domainname`, the three `Attach*`, `Image`, `StopTimeout`,
+`Tty`, `OpenStdin`, `StdinOnce`, `Volumes`, `User`.
+
+`ExposedPorts` proves it rather than contradicting it: `nginx:alpine` declares `80/tcp` and
+the container carries the *same* `80/tcp`, inherited and identical. **So the ports drift is
+not in `Config` at all** — it is `HostConfig.PortBindings`, which is why the row needs two
+paths and why no walk of `Config` reaches it however thorough.
+
+**Three passes on one sentence, and each pass was accurate about what it had measured.**
+That is the failure worth naming: not error, but a true observation written at the scope of
+a general claim. The rule that catches it is to measure the case that would falsify your own
+falsification — applied here, it caught the second pass one iteration after the first was
+corrected. FINDINGS F32.
 
 The `ports` row is the clearest case. `80` comes from the image's `Config.ExposedPorts`;
 `80→8080` comes from the container's `HostConfig.PortBindings` and `NetworkSettings.Ports`.

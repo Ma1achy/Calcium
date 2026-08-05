@@ -28,6 +28,7 @@ import { block, document } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
 import { expectDocument } from "../../src/testing/index.js";
+import { CORPUS, doc } from "../support/blocks.js";
 
 const docOf = (blocks: readonly Block[]): ViewDocument =>
   document({
@@ -169,6 +170,56 @@ describe("C24 §7 — expectDocument", () => {
     ]);
     // A glyph is a word's equal here, so this one passes.
     expect(() => expectDocument(bareCell).hasNoColourOnlyDistinction()).not.toThrow();
+  });
+
+  it("T2.13 (D29, A03 §2): every block kind is either swept or listed with a reason", () => {
+    // **The sweep ended `default: break`, so four kinds were checked and eleven
+    // passed in silence** — and silence in a compliance checker is
+    // indistinguishable from compliance. A consumer's `comparison` block is what
+    // surfaced it: a verdict rendered as a tone on one cell, in the method whose
+    // job is finding meaning carried by colour alone.
+    //
+    // `validate.ts` has solved this since T2.10 with `Record<BlockKind,
+    // KindCheck>` — *a new kind without a row here is a type error, not a silent
+    // pass*. This row is that property for the sweep: a kind added tomorrow and
+    // wired nowhere fails **here** rather than passing everywhere.
+    //
+    // Driven over `ONE_PER_KIND`, so the coverage is the corpus's rather than a
+    // list maintained beside it — a hand-written set of kinds in this file would
+    // go stale in exactly the way the `default` did.
+    const kinds = new Set(CORPUS.map((blk) => blk.kind));
+    expect(kinds.size, "the corpus must reach every kind or this proves little").toBeGreaterThan(
+      14,
+    );
+
+    // Panels and groups are traversal, so nesting the corpus inside one also
+    // proves the recursion reaches the same enumeration.
+    const nested = doc({
+      blocks: [
+        ...CORPUS,
+        block({ kind: "group", id: "g", direction: "column", children: [...CORPUS] }),
+      ],
+    });
+
+    expect(() => expectDocument(nested).hasNoColourOnlyDistinction()).not.toThrow();
+  });
+
+  it("T2.13b: a kind the sweep has never heard of fails loudly rather than passing", () => {
+    // **The property the row above cannot reach.** With every shipped kind
+    // accounted for, deleting the guard changes nothing — its subject is a kind
+    // that does not exist yet, so the mutation that removes it cannot be killed
+    // by any document built from the union.
+    //
+    // An app-registered kind is that subject, today: C09's registry takes kinds
+    // the union has never seen (§3), which is what makes the extension mechanism
+    // real. So this is not a synthetic case — it is the one an app hits first,
+    // and before this row the sweep would have reported it compliant without
+    // looking at it.
+    const alien = { kind: "app-gauge", id: "g1", tone: "error" } as unknown as Block;
+
+    expect(() => expectDocument(doc({ blocks: [alien] })).hasNoColourOnlyDistinction()).toThrow(
+      /neither swept .* nor listed/u,
+    );
   });
 
   it("hasNoColourOnlyDistinction walks into panels, groups and expanded rows", () => {

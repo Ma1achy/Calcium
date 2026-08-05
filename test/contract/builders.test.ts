@@ -281,6 +281,60 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
     expect(frame(expectedKv)).not.toBe(frame(expectedCmp));
   });
 
+  it("T2.12b (F27, C04 I29): b.plot passes the pin, read off the axis and not the field", () => {
+    // **The defect this rules out was found in a frame, not in a field.**
+    //
+    // Absent a pin the range is the data's, so a series that is genuinely flat
+    // is drawn against its own noise: a container held at 100% rendered a 0.2%
+    // wobble as a full-height mountain range. C12 has honoured `yMin` all along
+    // and `b.plot` did not pass it, so the block-level rows could not see this.
+    //
+    // Asserted on the **rendered y-axis labels**, because `yMin: 0` on the block
+    // is the code restated — what changed is the picture, and the picture is the
+    // reason the field exists.
+    const r = kit();
+    const axis = (blk: Block): string =>
+      renderSequenceToLines(r.registry, seq([blk]), 40, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      })
+        .map((line) => visible(line))
+        .join("\n");
+
+    const flat = [100.0, 100.2, 100.1, 100.2];
+    const unpinned = axis(b.plot({ id: "p", series: [{ values: flat }], height: 5, axes: true }));
+    const pinned = axis(
+      b.plot({ id: "p", series: [{ values: flat }], height: 5, axes: true, yMin: 0 }),
+    );
+
+    // The control: unpinned, the axis never reaches the floor the data implies.
+    expect(unpinned, "unpinned, the axis is the data's own range").not.toMatch(/(^|\s)0(\s|$)/u);
+    // Pinned, it does — which is the whole of what the reader gains.
+    expect(pinned, "pinned, the axis is anchored at zero").toMatch(/(^|\s)0(\s|$)/u);
+    expect(pinned, "and the two are different pictures").not.toBe(unpinned);
+  });
+
+  it("T2.12c (F27, C04 I29): b.plot passes yMax, and it clamps rather than dropping", () => {
+    // The pair lands together (C24 §4), so the second half is asserted rather
+    // than assumed. C04 I29: out-of-range values clamp to the edge and are never
+    // dropped — a pinned axis exists so two plots can be compared.
+    const r = kit();
+    const rows = (blk: Block): number =>
+      renderSequenceToLines(r.registry, seq([blk]), 40, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      }).length;
+
+    const over = [10, 250, 40];
+    const capped = b.plot({ id: "p", series: [{ values: over }], height: 5, axes: true, yMax: 100 });
+    expect((capped as { yMax?: number }).yMax, "the field reaches the block").toBe(100);
+    // The out-of-range point is still drawn — the plot keeps its height rather
+    // than losing the row the dropped value would have occupied.
+    expect(rows(capped)).toBe(
+      rows(b.plot({ id: "p", series: [{ values: over }], height: 5, axes: true })),
+    );
+  });
+
   it("b.steps gaps against what precedes it and b.spinner does not", () => {
     // Both return `Steps`, and they differ *only* on the default. A gap is a
     // blank row, so it is invisible in a single block's output — the separating

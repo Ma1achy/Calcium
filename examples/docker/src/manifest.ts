@@ -93,6 +93,34 @@ const containerStats: ToolDef = {
 };
 
 /**
+ * S7 and S6 — the comparison block's two surfaces.
+ *
+ * **Local, and forced rather than chosen.** `/drift` runs `docker inspect <c>`
+ * and *then* `docker image inspect` on the image that reports: two calls where
+ * the second depends on the first, and an adapter is handed one result. A01 D4
+ * makes them transcript entries rather than views — no letter keys, no claim on
+ * the whole screen.
+ */
+const drift: ToolDef = {
+  name: "drift",
+  local: true,
+  summary: "What a running container has changed from its image",
+  args: [{ name: "container", type: "string", required: true, summary: "Container id or name" }],
+  flags: [],
+};
+
+const compare: ToolDef = {
+  name: "compare",
+  local: true,
+  summary: "Two containers, side by side",
+  args: [
+    { name: "a", type: "string", required: true, summary: "First container" },
+    { name: "b", type: "string", required: true, summary: "Second container" },
+  ],
+  flags: [],
+};
+
+/**
  * `engineVersion` is the daemon's, read at startup rather than written down: the
  * field exists for skew reporting, and a manifest claiming a version the daemon
  * does not have reports the wrong skew — which is worse than reporting none.
@@ -106,6 +134,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [ps, dashboard, containerStats],
+    tools: [ps, dashboard, containerStats, drift, compare],
   };
 }

@@ -211,7 +211,8 @@ export const b: {
   logs(lines: LogLine[], opts?: BlockOpts): Logs;
   events(events: EventLine[], opts?: BlockOpts): Events;
   plot(spec: BlockOpts & { series: Series[]; height: number;
-                           axes?: boolean }): Plot;
+                           axes?: boolean;
+                           yMin?: number; yMax?: number }): Plot;
   spark(values: number[], opts?: BlockOpts): Plot; // the sparkline path; height 1
   progress(spec: BlockOpts & { label: string; current: number;
                                total: number }): Progress;
@@ -269,6 +270,42 @@ is indistinguishable from a block whose default happened to be false. `b.seq`
 could not tell *the consumer said no gap* from *no gap decided yet*. An argument
 is set-or-absent at construction, which is exactly the distinction the marker
 records.
+
+**`b.plot` narrowed and did not say so, and a consumer read the difference off a
+frame.** `Plot` carries `yMin`, `yMax`, `yFormat`, `xLabels` and `emptyMessage`;
+the builder passed `series`, `height` and `axes`. C12 implements all five — the
+pin reaches the shared scaling core, `yLabels` takes the format, and the
+definition renders both the labels and the empty message — so this was never a
+C12 gap. It was five fields the public surface did not carry, with nothing
+recording that as a decision.
+
+**The consequence is not cosmetic, which is why the pin lands and the rest
+does not.** Absent a pin the range is the data's, so a series that is genuinely
+flat is drawn against its own noise: docker-tui's CPU plot, watching a container
+pinned at 100%, rendered a 0.2% wobble as a full-height mountain range. A reader
+sees violent load; the load is flat. `yMin: 0` says the truth in one field and
+was unreachable.
+
+**`yMin` and `yMax` together, and neither alone.** C04 I29 makes them an
+independently-optional pair, and a builder that pins one end only is not a
+coherent surface — a consumer who can floor an axis and cannot cap it has to
+learn which half exists.
+
+The other three stay off the builder, each for its own reason, **written here
+rather than left as an omission** so the next consumer knows the cost of taking
+one:
+
+- **`yFormat` is a trap in the shape a caller wants it.** `percent` multiplies by
+  100, so it expects a fraction — and the far sides that emit a field called a
+  percentage mostly emit `100.2`, not `1.002`. The obvious call renders
+  `10020%`. Exposing it wants either a second format or a sentence at the call
+  site, and neither is a builder change.
+- **`xLabels` is a fixed three-tuple**, which cannot hold the one thing S3's plot
+  actually needed to say about its horizontal axis — that it counts ticks and how
+  many returned nothing. A surface whose axis is a sentence has to put it in a
+  block beside the plot whatever this field does.
+- **`emptyMessage` has no consumer**: no surface yet renders a plot that can be
+  empty. It is one line away the day one does.
 
 **`b.kv` narrows rather than discarding.** `KeyValue` rows are
 `{ label; value: string; tone? }` — no glyph, no spark — so a `CellInput`

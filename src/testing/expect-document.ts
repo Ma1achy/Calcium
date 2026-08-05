@@ -28,6 +28,7 @@
 import {
   validateDocument,
   type Block,
+  type BlockKind,
   type Tone,
   type ViewDocument,
 } from "../data/viewmodel/index.js";
@@ -53,6 +54,59 @@ import { DEFAULT_WIDTHS, checkAsciiParity, checkMeasurement, formatReport } from
  * cannot see colour must still be able to tell them apart — which is the whole
  * of D29.
  */
+/**
+ * The kinds this sweep has nothing to check, each with the fact that makes
+ * it nothing — **the enumeration a `default: break` used to hide**.
+ *
+ * Four kinds were checked and eleven passed silently, four of those eleven
+ * carrying a meaning-bearing field. A consumer's `comparison` block is what
+ * surfaced it: a verdict rendered as a tone on one cell, in a checker whose
+ * job is finding meaning carried by colour alone.
+ *
+ * Two of the eleven are checkable and are now checked (`rule`), or are a
+ * schema gap recorded as one (`comparison`). The rest are here:
+ *
+ * | kind | why nothing |
+ * |---|---|
+ * | `logs` | `level` is **printed**, padded to `LEVEL_WIDTH` — the word carries it |
+ * | `steps` | `state` selects a **glyph**; the mark is structural, not colour |
+ * | `plot` | C12 substitutes stacked strips at one bit (§5), which is D29 obeyed |
+ * | `rule`, `events`, `progress`, `code`, `patch`, `tip`, `raw` | no meaning-bearing field at all |
+ *
+ * **`rule` is in the last row because it was measured twice.** The first pass
+ * put it in the checkable column — a regex reading the type ran past
+ * `}> & Gap;` and attributed a neighbour's `tone` and `glyph` to it. `Rule` is
+ * `{ kind, id, label }`; the compiler is what said so. Two of eleven kinds
+ * carry a meaning-bearing field, not four.
+ */
+const KINDS_WITH_NOTHING_TO_CHECK = new Set<BlockKind>([
+  "rule",
+  "logs",
+  "steps",
+  "plot",
+  "events",
+  "progress",
+  "code",
+  "patch",
+  "tip",
+  "raw",
+]);
+
+/**
+ * The compile-time half. A kind that is neither checked above nor listed as
+ * having nothing to check makes this a type error, which is the whole point:
+ * `default: break` accepted a new kind in silence, and silence in a compliance
+ * checker is indistinguishable from compliance.
+ */
+function assertNothingToCheck(block: Block): void {
+  if (!KINDS_WITH_NOTHING_TO_CHECK.has(block.kind)) {
+    throw new Error(
+      `expectDocument: block kind "${block.kind}" is neither swept for colour-only meaning ` +
+        `nor listed in KINDS_WITH_NOTHING_TO_CHECK with a reason (D29, A03 §2)`,
+    );
+  }
+}
+
 const MEANING_TONES: ReadonlySet<Tone> = new Set<Tone>([
   "ok",
   "warn",
@@ -273,6 +327,26 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
               offences.push(`notice "${block.id}" is toned ${block.tone} with no glyph and no text`);
             }
             break;
+          case "comparison":
+            /**
+             * **A schema gap, recorded rather than enforced** — the same
+             * disposal `pills` and `keyValue` get above, and for the same
+             * reason: `ComparisonRow` has no glyph field, so D29 is
+             * unsatisfiable for it and flagging every use would make this
+             * method un-passable for any app that compares anything.
+             *
+             * **The two halves of the verdict are not alike.** `same` and
+             * `changed` are recoverable by a reader — the two cells are on
+             * screen side by side and either read alike or do not. `better` and
+             * `worse` are not: `200ms` against `150ms` says nothing about which
+             * is wanted, and the tone on the `b` cell is the only thing that
+             * does. That half is carried by colour alone and cannot be fixed
+             * from a document.
+             *
+             * Closing it means a glyph on `ComparisonRow`, which is a C04 spec
+             * change. FINDINGS F34.
+             */
+            break;
           case "keyValue":
             for (const r of block.rows) {
               if (bare(r.tone, undefined, r.value)) {
@@ -310,7 +384,24 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
           case "group":
             for (const child of block.children) visit(child);
             break;
+          /**
+           * **Every remaining kind is named, and `default` is gone** — a
+           * consumer's `comparison` block is what forced it.
+           *
+           * The switch ended `default: break`, so **four kinds were checked and
+           * eleven passed in silence**, four of them carrying a meaning-bearing
+           * field. `validate.ts` solves exactly this with
+           * `Record<BlockKind, KindCheck>` — *"a new kind without a row here is a
+           * type error, not a silent pass (T2.10)"* — and the compliance sweep,
+           * whose entire job is finding what a document fails to say, had the
+           * opposite property. A03 §2's vacuity class in the checker.
+           *
+           * Enumerated with `KINDS_WITH_NOTHING_TO_CHECK` below rather than
+           * folded back into a default, so adding a block kind is a compile
+           * error here and its reason has to be written down.
+           */
           default:
+            assertNothingToCheck(block);
             break;
         }
       };
