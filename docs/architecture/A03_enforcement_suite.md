@@ -756,6 +756,22 @@ It only means anything because the scan records what is unconsumed *before*
 consulting the list; checking membership first would make every entry
 permanently justified by its own presence.
 
+**A violation naming something that does not exist is the stalest entry a list
+can hold, and it is the one shape the equality arm cannot clear.** MG24's member
+pattern is line-oriented, so a parameter inside a multi-line signature matched
+it — `take(sourceId, key, ttlMs, run)` contributed four phantom members to one
+interface and two of them reached the violation list, reading exactly like an
+unwired seam. **A phantom cannot be wired and cannot be deleted**, so the only
+available resolution is an allow-list entry justifying a member that is not
+there; and because it is never consumed and never removed, the equality arm
+agrees with it forever. F95.
+
+So the rule is not only *every entry carries a reason* but **every entry names a
+thing that exists**. A reason can be checked by a reader; existence cannot, once
+the entry is what a reader consults instead of the source. The cheapest guard is
+the one that found it: keep the violation list short enough that someone opens
+the file it names.
+
 ### MG26 — the dev-only entry points stay out of the bundle
 
 C24 I8 says `@fmx/calcium/testing` and `@fmx/calcium/fixtures` are absent from a

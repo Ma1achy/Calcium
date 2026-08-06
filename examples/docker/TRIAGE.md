@@ -434,7 +434,8 @@ which is why four green rows and a dead field coexisted for as long as they did.
 **F83 is a definition too weak inside its scope.** A02 Seam 4 is about a component complete on
 its own side with nothing on the other — and the implementation is the *same* side. The file
 boundary was taken as a proxy for the seam and within a component it is not one. 28 members
-never cross their own component; `HistoryStore.rerun` has no caller at all, and
+never cross their own component; `HistoryStore.rerun` has no caller in `src/` — a test
+calls it, and that qualifier is the difference between a claim and a slogan — and
 `TransportRouter.busy` **survived its own removal** — `router.ts:64` says a guard *"replaced
 `busy`"* and `construct.ts:1024` counts *"seventeen until `busy`"*, so the tree records the
 deletion twice and the member is still there.

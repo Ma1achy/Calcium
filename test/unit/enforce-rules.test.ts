@@ -566,6 +566,65 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     expect([...implemented].sort()).toEqual([...covered].sort());
   });
 
+  it("MG24 fires: the file that IMPLEMENTS a member is not a consumer of it", () => {
+    // **F83's fix, and the row that pins it.** The rule matched a bare name
+    // until F83, so `store.ts` writing `rerun() { … }` counted as consuming the
+    // `rerun` that `types.ts` declares — declaration and implementation closing
+    // the loop with nothing calling anything. Every interface split across those
+    // two files passed by construction, which is most of `src/`.
+    //
+    // The fixture is the real shape: a declaration, an implementation that names
+    // the member without calling it, and one member that is genuinely called.
+    const split: Record<string, string> = {
+      "src/interaction/history/types.ts":
+        "export interface HistoryStore {\n" +
+        "  append(line: string): void;\n" +
+        "  rerun(n: number): void;\n" +
+        "}\n",
+      // The implementation. `rerun` appears as a definition, never as a call —
+      // which is exactly what the bare-name rule could not tell apart.
+      "src/interaction/history/store.ts":
+        "export const store = {\n" +
+        "  append(line: string) { rows.push(line); },\n" +
+        "  rerun(n: number) { void n; },\n" +
+        "};\n",
+      // A real consumer, so the fixture is not vacuous in the other direction.
+      "src/shell/keys.ts": "history.append(line);\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(split), (f) => split[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]);
+
+    expect(named, "rerun is implemented and never called; append is called").toEqual([
+      "HistoryStore.rerun",
+    ]);
+  });
+
+  it("MG24 does not report a method PARAMETER as an interface member", () => {
+    // **F95.** The member pattern is line-oriented, so a parameter inside a
+    // multi-line signature matched it — `take(sourceId, key, ttlMs, run)` gave
+    // `CompletionCache` four phantom members, two of which reached the violation
+    // list. A phantom is the worst shape a violation can take: it cannot be
+    // wired and it cannot be deleted, so an allow-list entry is the only
+    // resolution and it justifies something that does not exist.
+    const nested: Record<string, string> = {
+      "src/interaction/completion/cache.ts":
+        "export interface CompletionCache {\n" +
+        "  take(\n" +
+        "    sourceId: string,\n" +
+        "    key: string,\n" +
+        "  ): Promise<string>;\n" +
+        "}\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(nested), (f) => nested[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]);
+
+    expect(named, "only `take` is a member — sourceId and key are its parameters").toEqual([
+      "CompletionCache.take",
+    ]);
+  });
+
   it("MG24 fires: a published interface member no other file in src/ names", () => {
     // **Fabricated from the four real instances**, which is the only way to
     // exercise it now that each is wired. Every one was a component complete on

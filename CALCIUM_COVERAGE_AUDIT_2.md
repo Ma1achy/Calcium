@@ -13,7 +13,7 @@ could not. Against `main` at `d4ec331`, 25 specs, 174 source files.
 
 | | |
 |---|---|
-| **F83** ★★★ | MG24 counts the implementing module as a consumer — 28 members never cross their own component; `HistoryStore.rerun` has no caller, `TransportRouter.busy` survived its own removal |
+| **F83** ★★★ | MG24 counts the implementing module as a consumer — 28 members never cross their own component; `HistoryStore.rerun` has no caller in `src/`, `TransportRouter.busy` survived its own removal |
 | **F84** ★★★ | MG24 walks `export interface`; **798 members published as `export type` are outside every rule's scope** — 0 dead today, and 3 dead glyph slots after filtering |
 | **F85** ★★★ | `RenderContext` requires two fields the registry overwrites, one of which **throws if called** — F58b's class, second independent consumer |
 | **F86** ★★ | **F79 named a mechanism it did not measure.** Falsified; a different real `screen.py` defect found from the other end |

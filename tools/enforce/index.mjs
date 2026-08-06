@@ -8,6 +8,7 @@ import {
   checkModuleGraph,
   checkOneStorePerComponent,
   checkSeamConsumers,
+  componentSeamSignal,
 } from "./module-graph.mjs";
 import { checkSourceScans } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
@@ -65,10 +66,20 @@ const violations = [
 
 const RED = "\x1b[31m", DIM = "\x1b[2m", GREEN = "\x1b[32m", RESET = "\x1b[0m";
 
+// Computed only for the summary line — it gates nothing, and computing it beside
+// the violations would invite someone to push it into the list. F94.
+const seam = componentSeamSignal(files);
+
 if (violations.length === 0) {
   console.log(
     `${GREEN}✓${RESET} enforce · ${files.length} files · ${specs.length} specs · ` +
-      `${resolved} invariant references resolved · no violations`,
+      `${resolved} invariant references resolved · no violations\n` +
+      // **A reported signal, never a gate.** MG24 gates on a file boundary and
+      // A02 Seam 4 describes a component one; this is the difference, printed so
+      // the number is visible rather than buried in F94. It is a count and not a
+      // verdict — most of it is legitimate — so what it is good for is movement.
+      `  ${DIM}seam signal · ${seam.withinComponent.length}/${seam.members} published members ` +
+      `never called outside their own component (F94, reported not gated)${RESET}`,
   );
   process.exit(0);
 }

@@ -3642,3 +3642,170 @@ asymmetry as a factory you can import and cannot install.
 **Amend the comment rather than deleting it.** Its principle holds — the full 384 *is* most
 of the weight and none of the value. What changed is that *"actually needed"* was measured
 against two consumers and now has more.
+
+---
+
+## F94 — `export interface` does not mark a seam, and MG24's premise rests on it ★★★
+
+**One level past F83.** F83 said MG24's definition of a *consumer* was too weak.
+This says its definition of a *seam* is wrong, and it is the reason F83's fix could
+not be applied as written.
+
+MG24's header states the premise outright: *"A member of a published interface is
+the discriminator, and it is not a convenience: the interface **is** the seam."*
+Measured over 280 members with three definitions of consumed:
+
+| consumer is… | unconsumed |
+|---|---|
+| a bare name in another **file** — the rule before F83 | 15 |
+| a **call** in another file | 39 |
+| a **call** in another **component** — A02 Seam 4 read literally | **76** |
+
+**76 of 280 is 27% of the published surface**, and a rule whose violation describes a
+quarter of the tree is describing the architecture rather than a defect.
+
+**Re-measured after F95 removed the four phantom members: 73 of 276**, and the
+conclusion is unchanged. The figures above are recorded at the parser that produced
+them, because a table silently restated at a later measurement is how a document stops
+being checkable — and `componentSeamSignal` now prints the live number on every
+`make enforce`, so it is the summary line and not this paragraph that goes stale. Categorising
+the 38 that the component-scoped form produced says why:
+
+| | | |
+|---|---|---|
+| **2** | no call anywhere | the class MG24 exists for |
+| **24** | called inside their own component | an **internal contract**, not a seam |
+| **11** | called only by a test | a **diagnostic surface**, not a seam |
+| **1** | called by the reference app | an out-of-tree consumer (C24 I11's category) |
+
+**Three kinds of interface wear one keyword, and no textual rule separates them**,
+because `export` is per *module* and a component spans modules. An interface shared
+between two files of one component **must** be exported for TypeScript to permit it,
+so exporting is not evidence of anything.
+
+**A component barrel was tried as the discriminator and does not work either.** 21
+components have an `index.ts`; L4 has none, because nothing imports from the top —
+so every C22 and C23 interface would be exempted for the wrong reason.
+
+**Ruled: gate on the narrow half, report the wide half.** A consumer is a *call*
+outside the declaring file — which is F83's real defect, since the implementing file
+was counted as a consumer — and that produces **22 violations**, a list small enough
+to read, containing both of F83's own instances. The component-scoped measurement
+becomes a reported signal rather than a build gate, which is the line **C24 I11
+already draws** for the unused-export scan: *a reported signal rather than a build
+gate*. Reusing that disposal rather than inventing one is the point.
+
+**What this costs, stated rather than hidden:** the wide reading is the one A02 Seam
+4 actually describes, and it is not enforced. A member consumed only inside its own
+component still satisfies MG24. That is the same trade C24 I11 made and it should be
+re-read when a component's public surface becomes expressible.
+
+---
+
+## F95 — MG24 counted method parameters as interface members ★★
+
+`interfaceMembers` matched its member pattern against every line of an interface
+body, and a parameter inside a multi-line method signature is such a line:
+
+```ts
+take(
+  sourceId: string,        // ← matched as CompletionCache.sourceId
+  key: string,             // ← CompletionCache.key
+  ttlMs: number | undefined,
+  run: () => Promise<…>,
+): …
+```
+
+**Four of 280 in this tree, all from one signature, and two reached the violation
+list** — where they read exactly like an unwired seam, because no such member exists
+and therefore nothing can consume it. **A phantom is the worst shape a violation can
+take**: it cannot be fixed by wiring, it cannot be fixed by deleting, and the only
+resolution is an allow-list entry giving a reason for something that is not there.
+
+**Found by opening the file a violation named**, not by any assertion — the fix's own
+list was short enough to read, which is the argument for keeping it short.
+
+The fix is a nesting-depth counter: a member sits at depth 0 in the interface body.
+Four phantoms disappeared and the violation count went 24 → 22.
+
+**Its general form is the one to keep.** A line-oriented pattern over a nested
+structure is right about the line and wrong about the structure, and it fails
+*inward* — matching more than it should, never less — so it can only ever be found by
+reading what it produced. The same shape as the comment-stripping trap MG24's header
+records, and the third parsing defect in one rule.
+
+---
+
+## F96 — history persistence never creates its directory, and the member that would is uncalled ★★★
+
+**`FileSystem.mkdir` and `FileSystem.exists` are declared, implemented and never
+called.** Nothing anywhere in `src/` creates a directory:
+
+```
+src/shell/types.ts:100    mkdir(path: string): Promise<void>;     ← declared
+src/shell/session.ts:66   mkdir: async (path) => void (await mkdir(path, { recursive: true }))
+```
+
+That second line is the **implementation supplied into the seam**, and it is the only
+`mkdir` in the tree. There is no `mkdirSync`, no `recursive: true` anywhere else, and
+C20's writer uses exactly four members — `readFile`, `writeFile`, `appendFile`,
+`appendFileSync`.
+
+**So on any machine where the history directory does not already exist, history never
+persists.** `persist.ts:91` appends to `paths.commands`, the write fails ENOENT, and
+the catch at :94 does the right thing:
+
+```ts
+issued = from;                       // rewound, not dropped
+warn("history could not be written", err);
+```
+
+**It is not silent — it is permanent.** The rewind means the next append retries the
+same rows, and no code path ever creates the directory, so the retry fails identically
+forever. C20's error handling is correct and cannot help: it is built for a transient
+write failure, and this one never becomes transient.
+
+**Why no test catches it.** Every history test injects a fake `HistoryFs` whose writes
+succeed, which is right for testing the rewind and blind to the directory. **The fake
+supplies the behaviour** — the precondition the real filesystem imposes is exactly what
+a fake removes.
+
+**The fix is a call, not a feature**: ensure the directory before the first write. Both
+members already exist and are already supplied, which is what makes this a wiring gap
+rather than a missing capability.
+
+---
+
+## F97 — reverse search opens and cannot be typed into ★★★
+
+**`HistoryStore.searchType` and `searchBackspace` are declared, implemented,
+revert-tested, and never called from `src/`.**
+
+```
+src/interaction/history/types.ts:69   searchType(text: string): void;
+src/interaction/history/types.ts:70   searchBackspace(): void;
+src/interaction/history/store.ts:155  searchType(text) { … }        ← implemented
+test/revert/history.test.ts:107       store.searchType("ps");        ← the only callers
+```
+
+**The shell reaches ten of C20's members and not these two.** Measured over
+`src/shell/` and `src/interaction/router/`: `append` `drain` `entries` `next`
+`previous` `searchEnd` `searchLayer` `searchOlder` `searchOpen` `searchState`.
+
+And the overlay keymap has no printable-key row — `tab`, `down`, `up`, `enter`,
+`escape`, `⌃r`, and nothing else. **So `⌃r` opens a reverse search whose query can
+never become non-empty**, and `⌃r` again steps older through an unfiltered list.
+
+**This is MG24's founding class, arriving again.** C22 I38 was *C19 answered
+`spinning` and `src/shell` never read it*; this is the same shape with a keystroke on
+the end. And it is invisible in the way that class always is: **the producer is
+covered at revert tier**, which is the strongest protection this suite offers, so
+`searchType` is guarded against removal while nothing reaches it.
+
+**A revert test is the most misleading place for an unwired member to be covered.**
+Its whole promise is *removing this breaks a named test* — which is true, and says
+nothing about whether anything calls it. The protection reads as evidence of use.
+
+**Both defects together are the fixed rule's yield**, and it is worth stating as a
+number: MG24 over 276 real members produced **two user-visible defects**, F96 and
+this. Neither was reachable by any test in either suite.

@@ -1,6 +1,33 @@
 // A03 §3 — MG1..MG19. Imports go down only; L0's halves never touch.
 import { readFileSync } from "node:fs";
+import { OWNERS } from "./commitments.mjs";
 import { layerOf } from "./layers.mjs";
+
+/**
+ * Which component owns a file, by longest matching prefix.
+ *
+ * **`OWNERS` is reused rather than restated.** It is already the allow-list over
+ * directories that SP-class rules resolve an invariant's owner with, including
+ * the two exceptions a second map would have had to rediscover — `src/shell` is
+ * C22 except `src/shell/execution`, and `src/shell/builders` is C24's because
+ * `b` is L4's surface.
+ *
+ * **An unowned file is its own component**, returned as its own path rather than
+ * as `null`. Two files with no owner are then *different* components, which
+ * makes MG24 fire on them; collapsing them to one `null` component would make
+ * every unowned file a consumer of every other, which is this rule's defect one
+ * level up. `src/index.ts` and `src/data/*.ts` are the live cases.
+ */
+export function componentOf(file) {
+  let best = null;
+  for (const { path, spec } of OWNERS) {
+    if ((file === path || file.startsWith(`${path}/`) || file.startsWith(path)) &&
+        (best === null || path.length > best.path.length)) {
+      best = { path, spec };
+    }
+  }
+  return best === null ? file : best.spec;
+}
 
 /**
  * The rules this module actually implements — A03 §3 inventories twenty, and
@@ -719,6 +746,49 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 //
 // Scoped to `export interface`, which is where a component states what it
 // offers. A type alias is structural and can be satisfied without being named.
+//
+// --- THE GAP THIS RULE KNOWINGLY LEAVES, and it is deliberate ---------------
+//
+// **A consumer is a call in another FILE, not in another COMPONENT** — and the
+// seam A02 Seam 4 describes is the component one. That is a real gap, chosen
+// rather than overlooked, and it is here rather than only in FINDINGS because a
+// deliberate gap recorded only in a finding goes quiet.
+//
+// Measured over 280 members, three definitions of *consumed*:
+//
+//   a bare name in another file      15 unconsumed   ← before F83; counted the
+//                                                      implementing file as a
+//                                                      consumer, so most of the
+//                                                      tree passed vacuously
+//   a CALL in another file           39 unconsumed   ← what this rule now does
+//   a CALL in another component      76 unconsumed   ← A02 Seam 4 read literally
+//
+// **76 of 280 is 27% of the published surface** — 73 of 276 once F95 removed the
+// phantom members, which changes nothing. A rule whose violation
+// describes a quarter of the tree describes the architecture, not a defect, and
+// the reason is F94: `export interface` marks three different things. Of the 38
+// the component-scoped form produced, 24 were internal contracts called inside
+// their own component, 11 were diagnostics called only by a test, 1 had an
+// out-of-tree consumer, and **2 were the class this rule exists for**. An
+// interface shared between two files of one component *must* be exported for
+// TypeScript to permit it, so exporting is not evidence of anything.
+//
+// A component barrel was tried as the discriminator and fails on L4: 21
+// components have an `index.ts` and `src/shell` has none, because nothing
+// imports from the top — so every C22 and C23 interface would be exempted for
+// the wrong reason.
+//
+// **So: gate on the narrow half, and this comment is the wide half.** The same
+// line C24 I11 draws for the unused-export scan — *a reported signal rather than
+// a build gate*. What it costs: a member consumed only inside its own component
+// satisfies this rule. **Re-read it when a component's public surface becomes
+// expressible**, because at that point the wide reading becomes checkable and
+// this paragraph is the record of why it was not.
+//
+// **What it bought, stated so the trade can be judged:** 22 violations, and two
+// of them were real user-visible defects that no test in either suite could
+// reach — F96 (history never creates its directory, so it never persists on a
+// fresh machine) and F97 (reverse search opens and cannot be typed into).
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
@@ -798,6 +868,114 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "`retained` has no writer *and* no reader: `SessionSnapshot` carries the field, two " +
     "files initialise it to null, and nothing else in `src/` names it. The whole feature " +
     "is a field",
+
+  // --- diagnostics, second cohort: found when a CALL replaced a bare name ---
+  //
+  // **F83's fix is what surfaced these**, and the shape is worth stating once
+  // for the group: the rule used to accept the file that *implements* the
+  // interface as a consumer, so `types.ts` declaring `pending` and the
+  // implementation writing `pending` closed the loop with nothing calling
+  // anything. A property access is the discriminator.
+  //
+  // Every entry below is observable state or a probe that a test asserts and no
+  // component calls — the same category as the cohort above, arrived at by a
+  // rule that can now see it.
+  "Rng.int":
+    "C08 — the integer draw beneath the fixture generators. `rng.ts` uses it internally " +
+    "and `test/unit/corpus.test.ts` asserts the stream is reproducible, which is the only " +
+    "place a deterministic RNG is observable at all",
+  "TransportRouter.busy":
+    "C06 diagnostics — whether a route is in flight. **F83's own evidence, and it survived " +
+    "its own removal**: `router.ts` records that a guard replaced it and `construct.ts` " +
+    "counts seventeen call sites until it, so the tree documents the deletion twice and " +
+    "the member is still declared. Kept listed rather than deleted until C06 rules, because " +
+    "removing a member two comments describe as removed wants the spec edit first",
+  "CompletionEngine.pending":
+    "C19 diagnostics — whether a dynamic source is in flight, published so the spinner's " +
+    "sequence-as-token-of-validity is assertable. `src/shell` reads the spinner state C19 " +
+    "derives, not this",
+  "FrameScheduler.pending":
+    "C03 diagnostics — whether a commit is scheduled. Sibling of `contaminated` above and " +
+    "listed for the same reason: `frame-scheduler.ts` drives it and a revert test is the " +
+    "only outside reader",
+  "LineEditor.displayRows":
+    "C17 diagnostics — the wrapped row count, asserted by the prompt-window tests. The " +
+    "shell measures the prompt through C09 rather than asking the editor, which is C17 §1's " +
+    "rule that rendering stays outside the editor",
+  "LineEditor.undoDepth":
+    "C17 diagnostics — the undo stack's depth, so T2.x can assert `UNDO_LIMIT` without " +
+    "reaching into the buffer. Sibling of `killBuffer` above",
+  "LineEditor.redoDepth": "C17 diagnostics — the redo half of `undoDepth`, same disposal",
+  "OverlayManager.hasView":
+    "C15 diagnostics — whether a pushed view is on the stack. `src/shell` asks the overlay " +
+    "for its `Placed` and never for this; the tests use it to assert push/pop pairing",
+  "TranscriptStore.payloadOf":
+    "C13 — an entry's payload by id, for tests asserting what a patch actually wrote. The " +
+    "viewport reads entries through the view, not the store",
+  "MeasurableRegistry.renderToLines":
+    "C09 §7's conformance harness — its consumer is a *suite*, not a component. 34 test " +
+    "files call it and no component may, because a second render path is C09 I1's " +
+    "divergence. Same category as `DocumentAssertions.*` above",
+
+  // --- published for a consumer outside this tree ---------------------------
+  "Viewport.stats":
+    "C14 — offset, total height and region, published for a scrollbar that does not exist " +
+    "yet and **already consumed by the reference app**, which draws its own position " +
+    "indicator from it. C24 I11's category: named nowhere else in `src/` is what a " +
+    "published surface looks like from inside the package that publishes it",
+
+  // --- used only inside its own declaring file ------------------------------
+  "LocalRegistry.verbs":
+    "C22 — `registry.ts:128` reads it in the reconciliation walk, in the same file that " +
+    "declares it, and this rule skips the declaring file by design. Not a gap: a member " +
+    "used where it is declared has no seam to be unwired across, and widening the rule to " +
+    "see it would report every private helper on an exported interface",
+
+  // --- specified and unbuilt, second cohort: each names its finding ----------
+  //
+  // **These are gaps, not exemptions**, and the difference is that each cites a
+  // finding rather than a reason. They are listed so the suite is readable
+  // rather than red, and the citation is what stops the entry outliving the
+  // gap: when F96 and F97 close, the equality arm below fires on these the day
+  // a caller appears.
+  "FileSystem.mkdir":
+    "**FINDINGS F96** — declared, implemented at `session.ts:66`, never called. Nothing in " +
+    "`src/` creates a directory, so on a machine without the history directory every write " +
+    "fails ENOENT, C20 rewinds correctly, and it never becomes transient. A wiring gap: " +
+    "the capability exists and is already supplied",
+  "FileSystem.exists": "**FINDINGS F96** — the other half of the same uncalled pair",
+  "HistoryStore.searchType":
+    "**FINDINGS F97** — reverse search opens and cannot be typed into. The shell reaches " +
+    "ten of C20's members and not this one, and the overlay keymap has no printable-key " +
+    "row. Covered at revert tier, which protects it against removal and says nothing about " +
+    "whether anything calls it",
+  "HistoryStore.searchBackspace": "**FINDINGS F97** — the other half of the same gap",
+
+  // --- C20 publishes a wider surface than the shell wires -------------------
+  //
+  // The same shape as F97 and less sharp, because each of these has a working
+  // sibling the shell does call — `searchOlder` for `search`, `entries` for
+  // `list`. Listed separately from the pair above rather than folded in: F97 is
+  // a feature that cannot work, and these are alternatives to a path that does.
+  // **Not investigated one by one**, and saying so is the entry's honest form —
+  // a reason that overstates what was checked is how a list stops being read.
+  "HistoryStore.search":
+    "C20 — the query-setting entry point; the shell drives search through `searchOpen` and " +
+    "`searchOlder` instead. Unverified whether both are intended to remain. F97's group",
+  "HistoryStore.list":
+    "C20 — filtered listing; the shell reads `entries`. Unverified. F97's group",
+  "HistoryStore.listBlocks":
+    "C20 — listing grouped into blocks, for a `/history` rendering nothing builds. F97's group",
+  "HistoryStore.rerun":
+    "C20 — re-execute a numbered entry. **No caller in `src/`; one test calls it.** F83 " +
+    "reported this as *no caller at all*, which dropped the qualifier that makes the claim " +
+    "true — the class F86, F89 and F92 already are, in a finding about the rule that would " +
+    "have caught it. Needs the action dispatch route (F21) before anything can reach it",
+  "HistoryStore.resetNavigation":
+    "C20 — clears navigation state; the shell resets by submitting. Unverified. F97's group",
+  "HistoryStore.clearConfirmLayer":
+    "C20 — dismisses the clear-confirmation overlay; the shell dismisses via the router's " +
+    "`dismiss` action. Unverified. F97's group",
 });
 
 /** Every `export interface` member under `src/`, with its owner. */
@@ -816,9 +994,25 @@ function interfaceMembers(files, readFile) {
         i += 1;
       }
       const body = src.slice(head.lastIndex, i - 1);
-      const member = /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*(?:\??\s*[:(]|\()/gm;
-      let n;
-      while ((n = member.exec(body))) out.push({ owner: m[1], name: n[1], file });
+      // **Depth 0 only — a member sits directly in the interface body.**
+      //
+      // The line pattern alone also matches a *parameter* inside a multi-line
+      // method signature, so `take(sourceId, key, ttlMs, run)` contributed four
+      // phantom members to `CompletionCache` — and two of them reached the
+      // violation list, where they read exactly like an unwired seam because no
+      // such member exists to be consumed. Four of 280 in this tree, and every
+      // one of them a name that can never be wired. FINDINGS F95.
+      const member = /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*(?:\??\s*[:(]|\()/;
+      let depth2 = 0;
+      for (const line of body.split("\n")) {
+        const atTop = depth2 === 0;
+        for (const ch of line) {
+          if (ch === "(" || ch === "[" || ch === "{") depth2 += 1;
+          else if (ch === ")" || ch === "]" || ch === "}") depth2 -= 1;
+        }
+        const n = member.exec(line);
+        if (n !== null && atTop) out.push({ owner: m[1], name: n[1], file });
+      }
     }
   }
   return out;
@@ -862,10 +1056,28 @@ export function checkSeamConsumers(
   for (const { owner, name, file } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
     const key = `${owner}.${name}`;
 
+    // **A consumer CALLS the member; it does not merely name it.** F83.
+    //
+    // This matched a bare name until F83, so the file that *implements* the
+    // interface counted as consuming it: `types.ts` declares `rerun()`,
+    // `store.ts` writes `rerun() { … }`, and the rule read the implementation as
+    // a consumer. Every member of every interface split across those two files
+    // was consumed by construction — which is most of `src/`, and it is why the
+    // rule sat green over `HistoryStore.rerun`, a method nothing in `src/` calls
+    // at all.
+    //
+    // A property access is the discriminator, and it is the *narrow* half of
+    // F83's fix. The wide half — a consumer outside the **component** rather
+    // than the file — is A02 Seam 4 read literally and is reported by
+    // `componentSeamSignal` below rather than gated on, because measuring it put
+    // **76 of 280 members** outside a component boundary. A rule whose violation
+    // describes 27% of the published surface is describing the architecture, not
+    // a defect. C24 I11 already draws that line for the unused-export scan: a
+    // signal too broad to gate on is reported, not enforced. FINDINGS F94.
     let consumed = false;
     for (const [other, src] of stripped) {
       if (other === file) continue;
-      if (new RegExp(`\\b${name}\\b`).test(src)) {
+      if (new RegExp(`[.?]\\s*${name}\\b`).test(src)) {
         consumed = true;
         break;
       }
@@ -916,6 +1128,46 @@ export function checkSeamConsumers(
   }
 
   return violations;
+}
+
+/**
+ * **The wide reading of MG24, reported and not gated.** F94.
+ *
+ * A02 Seam 4 describes a *component* complete on its own side, and `checkSeamConsumers`
+ * gates on a *file* — the narrow half, because the wide one puts 76 of 280 members
+ * outside a component boundary and a rule that flags 27% of the published surface is
+ * describing the architecture. This returns that measurement so the number stays visible
+ * instead of living only in a finding, which is the disposal C24 I11 already uses for the
+ * unused-export scan.
+ *
+ * **It is a count, not a verdict.** Most of what it counts is legitimate: an interface
+ * shared between two files of one component must be exported for TypeScript to permit it.
+ * What the number is good for is movement — a jump means a component grew a surface
+ * nothing outside it reaches, and that is worth a look rather than a failure.
+ */
+export function componentSeamSignal(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const sources = new Map(files.map((f) => [f, readFile(f)]));
+  const stripped = new Map(
+    [...sources].map(([f, src]) => [
+      f,
+      src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1"),
+    ]),
+  );
+  const members = interfaceMembers(files, (f) => sources.get(f) ?? "");
+  const withinComponent = [];
+  for (const { owner, name, file } of members) {
+    const home = componentOf(file);
+    let crosses = false;
+    for (const [other, src] of stripped) {
+      if (componentOf(other) === home) continue;
+      if (new RegExp(`[.?]\\s*${name}\\b`).test(src)) {
+        crosses = true;
+        break;
+      }
+    }
+    if (!crosses) withinComponent.push(`${owner}.${name}`);
+  }
+  return { members: members.length, withinComponent };
 }
 
 // --- MG25 — a free function with no consumer --------------------------------

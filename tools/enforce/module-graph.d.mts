@@ -37,6 +37,18 @@ export declare function checkOneStorePerComponent(
 /** Members whose absence from the rest of `src/` is deliberate, each with why (MG24). */
 export declare const UNCONSUMED_MEMBERS: Readonly<Record<string, string>>;
 
+/** Which component owns a file, by longest `OWNERS` prefix; unowned files are their own. */
+export declare function componentOf(file: string): string;
+
+/**
+ * MG24's wide reading — members never called outside their own component.
+ * Reported in the summary, never gated on: 27% of the surface qualifies. F94.
+ */
+export declare function componentSeamSignal(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): { members: number; withinComponent: string[] };
+
 /**
  * MG24 — a member of an `export interface` under `src/` is named somewhere else
  * under `src/`. A component complete on its own side of a seam, with nothing on
