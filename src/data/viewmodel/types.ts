@@ -386,6 +386,22 @@ export type Code = Readonly<{
 export type Comparison = Readonly<{
   kind: "comparison";
   id: string;
+  /**
+   * What the two columns are, headed `a` and `b` when absent (I40, F18's
+   * sibling F33).
+   *
+   * **`a`/`b` is right about the type and was never right about the header.**
+   * The renderer's own comment defends them as *positional rather than
+   * directional*, which is the correct answer to *should the type call them
+   * `before` and `after`* — S07 compares two runs and neither is "before". It
+   * is not an answer to *may a consumer say which side is which*, and both
+   * shipped consumers said it in a `keyValue` block above the comparison,
+   * one block away from the columns it explains.
+   *
+   * Positional stays the default: a consumer that has nothing to say says
+   * nothing, and gets the header it had.
+   */
+  labels?: readonly [string, string];
   rows: readonly Readonly<{
     field: string;
     a: string;
@@ -479,6 +495,23 @@ export type Panel = Readonly<{
    * footer is one app-supplied row. The keys belong to the view.
    */
   footer?: string;
+  /**
+   * Whether this region refreshes (I39, F18).
+   *
+   * **A fact, not a character.** `Glyph` has carried a `live` slot with both
+   * renderings — `▌` and `|` — since C04 was written, S1 and S13 both draw it,
+   * and nothing in the tree consumed it: a slot reserved and unreachable, which
+   * is A03 §2's class in the glyph table.
+   *
+   * The remedy is not a glyph field on `Panel`. A panel is live or it is not, so
+   * the block names the fact and C09 derives the mark (I38) — which is what makes
+   * it degrade to `|` under ASCII, where a `▌` written into the `title` would
+   * not, and would be F6's mistake made deliberately.
+   *
+   * It changes no measurement: the mark rides in the top border, which is drawn
+   * either way.
+   */
+  live?: boolean;
   children: readonly Block[];
 }> & Gap;
 

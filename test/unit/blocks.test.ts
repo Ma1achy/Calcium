@@ -373,6 +373,78 @@ describe("C09 §6 — kinds", () => {
     expect(visible(toned[0] ?? "")).toContain("die");
   });
 
+  it("T1.4f (C04 I38): the verdict's mark is derived, and it is what survives ASCII", () => {
+    // **F34's measured half, and the frame is what settled it.** Before this,
+    // `better`, `worse` and no verdict at all rendered *identically* at every
+    // depth — the tone was the only difference and `200ms` against `150ms` says
+    // nothing about which is wanted, so unlike `same`/`changed` a reader could
+    // not recover it from the two cells.
+    const judged = block({
+      kind: "comparison",
+      id: "j",
+      rows: [
+        { field: "p99", a: "200ms", b: "150ms", verdict: "better" },
+        { field: "auprc", a: "0.912", b: "0.930", verdict: "worse" },
+        { field: "loss", a: "0.03", b: "0.04" },
+      ],
+    });
+
+    const uni = measurable().renderToLines(judged, 48).map(visible);
+    const asc = measurable({ capabilities: ASCII_CAPS }).renderToLines(judged, 48).map(visible);
+
+    expect(uni[1], "better").toContain("✓ 150ms");
+    expect(uni[2], "worse").toContain("✗ 0.930");
+    expect(uni[3], "and no verdict is no mark").not.toMatch(/[✓✗]/u);
+
+    // The mark is the carrier, so it has to survive the substitution — and it
+    // is 1:1 by cell count, which is why the rows stay the same width.
+    expect(asc[1]).toContain("+ 150ms");
+    expect(asc[2]).toContain("x 0.930");
+    for (const [i, line] of asc.entries()) expect(line, `row ${String(i)}`).toHaveLength(48);
+  });
+
+  it("T1.4g (C04 I39): a live panel says so, in a slot that degrades and costs no height", () => {
+    // **A slot reserved and unreachable since C04 was written** — `Glyph` has
+    // carried `live` with both renderings, two surfaces draw it, and nothing in
+    // the tree consumed it (F18). A03 §2's class in the glyph table.
+    const of = (live: boolean) =>
+      block({
+        kind: "panel",
+        id: live ? "p" : "q",
+        title: "containers",
+        ...(live ? { live: true } : {}),
+        children: [block({ kind: "rule", id: live ? "r" : "s", label: "x" })],
+      });
+
+    const kit = measurable();
+    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toContain("▌ containers");
+    expect(visible(kit.renderToLines(of(false), 40)[0] ?? "")).not.toContain("▌");
+
+    // The whole argument for a slot rather than a character in the title.
+    const ascii = measurable({ capabilities: ASCII_CAPS });
+    expect(visible(ascii.renderToLines(of(true), 40)[0] ?? "")).toContain("| containers");
+
+    // It rides in a border drawn either way, so the panel is children + 2 still.
+    expect(kit.measure(of(true), 40)).toBe(kit.measure(of(false), 40));
+    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toHaveLength(40);
+  });
+
+  it("T1.4h (C04 I40): a comparison names its columns, and says nothing when it has nothing to say", () => {
+    const rows = [{ field: "cmd", a: "nginx", b: "nginx" }];
+    const named = block({ kind: "comparison", id: "n", rows, labels: ["nginx:alpine", "dtui-web"] });
+    const bare = block({ kind: "comparison", id: "b", rows });
+
+    const kit = measurable();
+    const head = visible(kit.renderToLines(named, 60)[0] ?? "");
+    expect(head).toContain("nginx:alpine");
+    expect(head).toContain("dtui-web");
+
+    // Positional stays the default: absent labels are not `["a", "b"]` written
+    // in by a builder, they are absent, and the header is what it always was.
+    expect(visible(kit.renderToLines(bare, 60)[0] ?? "")).toMatch(/\ba\b.*\bb\b/u);
+    expect(kit.measure(named, 60)).toBe(kit.measure(bare, 60));
+  });
+
   it("T1.4d (C04 I36): a block using only the verdict half renders as it did before the split", () => {
     // **The regression the split could most easily have caused.** The marker
     // column is per-block, so a comparison that declares no change must be

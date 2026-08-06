@@ -407,6 +407,55 @@ verdict?: "better" | "worse";
 
 **`Hunk.lines[].kind` is deliberately left alone.** `add`/`remove`/`context` looks like the same vocabulary and is not: `context` is a *positional* fact — a line shown to situate a change — while `unchanged` is a fact about the line. Unifying them would make C25's window logic depend on a field that no longer means what it tests. Two vocabularies that overlap in two members are not one vocabulary, which is this section's own argument turned back on it.
 
+### A mark is derived from a named fact, or there is nothing to derive it from
+
+The sibling of the section above, and the same rule read the other way. I35 says a renderer
+derives appearance from a fact the block names. **The corollary is what happens when a block
+names no fact — only a tone.** Measured over every shape that carries one:
+
+| shape | names | can a mark be derived? |
+|---|---|---|
+| `Cell`, `Notice` | a tone **and** a glyph | — it is supplied |
+| `ComparisonRow` | `verdict` — a fact | **yes** |
+| `Panel` (live) | nothing; the driver knows and the block does not | **not yet** — one field away |
+| `KeyValue` row, `Pills` chip, `Events` line, `Series` | a tone, and nothing else | **no** |
+
+**Two of seven tone-bearing shapes carry a glyph slot and five do not**, which is why
+`hasNoColourOnlyDistinction` declines to enforce D29 for three of them and calls it *a gap in
+the vocabulary rather than a rule*. That disposal is right, and the reason it is right is
+sharper than "no field": for `ComparisonRow` the fact is already named and the renderer simply
+never used it, and for the other three there is genuinely nothing to derive from.
+
+So the ruling splits the five rather than treating them alike:
+
+> **Where a shape names a categorical fact, the renderer derives the mark and no field is
+> added. Where a shape names only a tone, a glyph slot is the only remedy — and it is added
+> when a surface needs one, not before.**
+
+**`ComparisonRow` is the first half and needs no type change.** `verdict` is already a named
+fact; `verdictTone` derived a colour from it and stopped there, so `better` and `worse` render
+identically to each other and to an unmarked row at every colour depth. That is FINDINGS F34's
+measured half — *`200ms` against `150ms` says nothing about which is wanted* — and it closes by
+deriving a glyph beside the tone, exactly as the change axis derives a marker.
+
+**`Panel` is the second half and needs one boolean.** `Glyph` has carried a `live` slot with
+both renderings since C04 was written, two surfaces draw it, and **nothing in `src/` consumes
+it** — a slot reserved and unreachable, which is A03 §2's class in the glyph table (F18). The
+remedy is not a glyph field: it is for the block to *name the fact*, because a panel is live or
+it is not, and the mark follows. `live?: boolean`, and C09 draws the slot.
+
+**The other four do not get a field yet, and the reason is an instrument rather than a
+preference.** MG24 refuses a published member nothing consumes, so four speculative glyph slots
+would arrive as four violations needing four allow-list entries — the rule correctly declining
+to let the schema grow ahead of a surface. When one needs it, the ruling above is already taken
+and the field is additive.
+
+**What this does not close, stated because the boundary is not where it looks.** D29 asks
+whether a distinction is carried by colour alone, and *does this text carry the state* is not
+decidable from a document: two chips reading `web` and `db`, toned `ok` and `error`, pass every
+check and mean nothing without the colour. **Expressibility is C04's to fix; decidability is
+nobody's.** A glyph slot makes D29 satisfiable, never satisfied.
+
 ### Actions
 
 ```typescript
@@ -619,6 +668,9 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I35** — A categorical axis other than `Tone` is never carried by colour. A block names the fact — a marker, a word, or a closed union a renderer maps — and the renderer derives any tone from it; no producer supplies a colour for such an axis, and none is representable. This is why `Tone` stays a judgement axis: the alternative is not a second palette but a distinction that survives `colourDepth: 1` because nothing else was ever available to carry it. Four surfaces reached the boundary independently (F30, F49, F51, F81) and three of them found it correctly by hand.
 - **I36** — `Comparison`'s row carries `change` and `verdict` as separate optional fields, never one union. `comparisonTone` has always coloured the verdict half and left the change half neutral, so one union names two axes that already render differently — and `added`/`removed` have no member of it to join (I35, F30).
 - **I37** — A block kind exempted from D29's sweep is exempted by the *fields it carries*, not by its name. Adding a meaning-bearing field to an exempted kind removes the exemption; the compile-time guard on `KINDS_WITH_NOTHING_TO_CHECK` catches a new kind and cannot catch a new field, so the reason is recorded per kind and re-read when the kind changes (F102).
+- **I38** — A mark is derived from a fact the block names, never invented by the renderer and never demanded of a producer that has already named the fact. `ComparisonRow.verdict` and `Panel.live` are named facts and carry no glyph slot; `Cell` and `Notice` supply one because the fact *is* the glyph. A shape carrying a tone and nothing else has nothing to derive from, and a glyph slot is its only remedy — added when a surface needs one, never speculatively, because MG24 refuses a published member nothing consumes (I35, F18, F34).
+- **I39** — `Panel.live` names whether a region is refreshing; C09 draws the `live` glyph from it. The block names the fact and the renderer owns the mark, so a live panel differs from a static one under ASCII and at one bit, where a character written into the title would not (F18, → C09 I5).
+- **I40** — `Comparison.labels` names what the two columns are, and their absence means positional. `a`/`b` is right about the *type* — S07 compares two runs and neither is "before" — and was never an answer to whether a consumer may say which side is which; both shipped consumers said it in a `keyValue` block above the block it explained (F33).
 
 ---
 
@@ -663,6 +715,9 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 33. A categorical axis other than `Tone` is a marker or a word with a renderer-derived tone, never a second palette and never a colour a producer supplies. Four surfaces found the boundary independently; three of them got it right unaided, which is the argument for naming the pattern rather than widening the vocabulary (I35).
 34. `Comparison` carries change and judgement in separate fields, because the renderer has always rendered them as separate axes (I36).
 35. D29's sweep exempts a kind for the fields it has, and the exemption is re-read when the fields change — the compile-time guard sees a new kind and is blind to a new field (I37).
+36. A mark is derived from a named fact. Where a shape names one, no field is added; where it names only a tone, a glyph slot is the remedy and it waits for a surface. Two of seven tone-bearing shapes carry a slot, and that asymmetry is a ruling rather than an oversight (I38).
+37. A panel says whether it is live, and C09 draws the slot that has existed unreachable since C04 was written (I39, → C09 I5).
+38. A comparison may name its two columns; absent, they are positional. The type's `a`/`b` was the right answer to a different question (I40).
 
 ---
 

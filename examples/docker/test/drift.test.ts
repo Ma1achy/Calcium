@@ -212,11 +212,19 @@ describe("the verbs", () => {
     // untagged image — which `docker rmi -f` produces, and which a re-pull
     // produces in the wild — made it fail. What the row must do is *identify*
     // the image; whether it does so by tag or by id is the daemon's business.
-    const head = doc.blocks.find((bl: Block) => bl.id === "drift-head") as KeyValue;
-    const image = head.rows.find((r) => r.label === "IMAGE")?.value ?? "";
-    expect(image, "the head names the image it compared against").not.toBe("");
-    expect(image, "by tag, or by the id it falls back to").toMatch(/nginx|^[0-9a-f]{12}$/u);
+    //
+    // **The claim survived and its carrier moved** (F33). It was a `keyValue`
+    // row above the block — the workaround F33 filed as *one block away from
+    // the columns it explains* — and it is now the `a` column's own label.
     const cmp = doc.blocks.find((bl: Block) => bl.kind === "comparison") as Comparison;
+    const image = cmp.labels?.[0] ?? "";
+    expect(image, "the column names the image it compared against").not.toBe("");
+    expect(image, "by tag, or by the id it falls back to").toMatch(/nginx|^[0-9a-f]{12}$/u);
+    expect(cmp.labels?.[1], "and the other column is the container").toBe("dtui-web");
+    expect(
+      doc.blocks.some((bl: Block) => bl.id === "drift-head"),
+      "and the block that used to carry it is gone",
+    ).toBe(false);
     expect(cmp.rows.some((r) => r.field === "ports 80/tcp")).toBe(true);
   });
 

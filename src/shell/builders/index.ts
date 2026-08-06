@@ -380,9 +380,20 @@ function code(language: string, text: string, opts?: BlockOpts & { wrap?: boolea
   );
 }
 
-function comparison(rows: readonly ComparisonRow[], opts?: BlockOpts): Comparison {
+function comparison(
+  rows: readonly ComparisonRow[],
+  opts?: BlockOpts & Readonly<{ labels?: readonly [string, string] }>,
+): Comparison {
   return finish<Comparison>(
-    { kind: "comparison", id: idOf(opts, "comparison"), rows } as Comparison,
+    {
+      kind: "comparison",
+      id: idOf(opts, "comparison"),
+      rows,
+      // Absent stays absent rather than defaulting to `["a", "b"]` — the header
+      // is C09's and a builder writing the default in would make every block
+      // claim a labelling it was never given (F33).
+      ...(opts?.labels === undefined ? {} : { labels: opts.labels }),
+    } as Comparison,
     opts,
     true,
   );

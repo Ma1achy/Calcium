@@ -150,6 +150,13 @@ describe("C23 §3b — part refresh", () => {
     expect((h.transcript.entries[0]?.rev ?? 0) - before, "exactly one rev").toBe(1);
     const p = h.transcript.entries[0]?.doc.blocks.find((b) => b.id === "a");
     expect(p?.kind, "still a panel").toBe("panel");
+    // **And it says it is live** (C04 I39, F18). Added because the mutation
+    // pass found nothing to kill: `livePanel` could stop setting the flag and
+    // unit, contract and integration all stayed green, because the renderer's
+    // row tests the *mechanism* and this seam is the only thing that tests the
+    // *wiring*. The local `panel()` fixture above builds one without the flag,
+    // so nothing here could ever have caught it by accident either.
+    expect(p?.kind === "panel" && p.live, "the only place that knows names it").toBe(true);
   });
 
   it("T1.35b (C04 I25): the refresh keeps the declared block's gapBefore", async () => {

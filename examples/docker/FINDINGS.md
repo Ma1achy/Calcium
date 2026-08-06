@@ -4137,6 +4137,15 @@ by `kind` would give `block()` the check its commitment claims. **Not attempted 
 blast radius is every block literal in the tree and it is not this item's scope. Filed with
 the fabricated violation so the next narrowing does not repeat the measurement.
 
+**What this means for the three narrowings already landed, and it has to be said here.**
+F85, F58b and F13 all narrowed a type at a construction boundary, and every producer they
+constrain reaches that boundary through `block()` or through a builder that delegates to it.
+So **those three are correct by inspection and not by the compiler**: they were verified by
+reading each call site and by the suites, which is weaker than what the diff appears to
+promise. Nothing about them is known to be wrong — but a reader who assumes the type is now
+enforcing them is assuming something this finding says is false, and the next narrowing
+should not be planned as though the check exists.
+
 **The generalisation, which is the fourth instance of one rule.** *A type narrowing needs
 something to bite on* — and the thing that removes the bite has now been, in order: a stub
 that throws, an unconditional overwrite, `as never` in a fixture, and **a generic constructor
@@ -4194,3 +4203,74 @@ carries is a complete description of what will be drawn"* — and for a table th
 is **not** true for the change axis, whose whole content is a marker the renderer derives: the
 rows say `added` and only the frame says `+`. So F37's cost has risen from ergonomic to
 evidential, and the app's own drift tests now assert a value whose rendering they cannot see.
+
+---
+
+## F106 — the block-expressiveness group is three findings and one visitor, and F34 was not half-answered ★★
+
+The triage ranked F33, F34, F18 and F50 as one item: *a block cannot express what the surface
+needs*, four consumers. Measured before ruling, as the change axis was:
+
+| | wants | is it expressiveness? |
+|---|---|---|
+| F33 | `Comparison` to label its columns | **yes** — no field exists |
+| F34 | a comparison's verdict to survive without colour | **yes** — nothing to derive a mark from |
+| F18 | a live panel to look live | **yes** — a slot exists and no field names it |
+| F50 | a non-flex column not to be truncated | **no** — its own text says *not a Calcium defect* |
+
+**F50 is a visitor.** `planColumns` does exactly what C11 says; the finding is that `flex` and
+`minWidth` are a shape a consumer gets wrong twice, and the block expresses the intent
+perfectly. It belongs with the group-7 artefact findings, not here. Three of four.
+
+**And F34 was not half-answered by the change axis, which is the correction worth recording.**
+The marker column carries `unchanged`/`changed`/`added`/`removed`. F34's own measured bound
+says `same` and `changed` were *already* recoverable — the two cells sit side by side — and
+that `better` and `worse` are not. So the marker closed the half that was never at risk.
+
+Frame-read, before the fix:
+
+```
+|field             a               b             |
+|p99               200ms           150ms         |     ← better
+|auprc             0.912           0.930         |     ← worse
+|loss              0.03            0.04          |     ← no verdict
+```
+
+**Three verdicts, one appearance, at every colour depth.** The split made it sharper rather
+than smaller: after I36, `verdict` is a standalone field whose only rendering is a tone —
+`ok` and `error` with no glyph, which is the shape C04 I6 forbids for `Cell` and `Notice` by
+name and cannot reach here because `ComparisonRow` is neither.
+
+**The ruling that came out of the measurement is narrower than the item.** Seven shapes carry
+a tone and **two carry a glyph slot**. The five without do not divide by "needs a field": for
+`ComparisonRow` the fact was already named and the renderer simply never used it, and for
+`KeyValue` rows, `Pills` chips, `Events` lines and `Series` there is genuinely nothing to
+derive from. So *where a shape names a categorical fact the renderer derives the mark; where
+it names only a tone a glyph slot is the remedy, and it waits for a surface.* C04 I38.
+
+**The four that wait are held back by an instrument, not a preference.** MG24 refuses a
+published member nothing consumes, so four speculative glyph slots arrive as four violations
+and four allow-list entries — the rule correctly declining to let a schema grow ahead of a
+surface. That is the second time in two items that MG24 has priced a design decision.
+
+## F107 — the wiring survived the mutation pass again, and the fixture is why
+
+`livePanel` is the one place in the tree that knows a region refreshes. Removing `live: true`
+from it — F18 unfixed, the whole point of the change — **failed nothing across unit, contract
+and integration.** `T1.4g` renders a panel with the flag and asserts the `▌`, so it tests the
+mechanism; nothing tested that the shell sets it.
+
+**The fixture is the sharp part.** `refresh.test.ts` builds its own `panel()` helper:
+
+```ts
+const panel = (id, title, child) => block({ kind: "panel", id, title, children: [child] });
+```
+
+— a panel **without** the flag, standing in for what the driver emits. So the suite that owns
+this seam holds a fixture that disagrees with the code it covers, and no assertion could have
+caught the regression by accident. *A fixture must be shown to respond to the thing under
+test*, and a stand-in written before the field existed cannot.
+
+Third instance of *a test that calls the mechanism verifies the mechanism, never the wiring*,
+and the second in two items — F51's tone reached the type, the builder and the D29 sweep with
+nothing asserting the paint. **Both were found by mutation and neither by review.**

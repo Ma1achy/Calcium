@@ -370,10 +370,15 @@ export function createDriftHandler(
         ? tagged[0]
         : imageRef.replace(/^sha256:/u, "").slice(0, 12) || "unknown";
 
+    // **The head block is gone: the columns say it themselves now** (F33). It
+    // named the two sides one block above the columns it explained, which was
+    // the workaround F33 recorded as *not the same thing*.
     const blocks: Block[] = [
-      b.kv({ CONTAINER: ref, IMAGE: label }, { id: "drift-head" }),
       ...missing,
-      b.comparison(driftRows(imageSide, container), { id: "drift-rows" }),
+      b.comparison(driftRows(imageSide, container), {
+        id: "drift-rows",
+        labels: [label, ref],
+      }),
     ];
 
     return {
@@ -411,8 +416,7 @@ export function createCompareHandler(): (
       command: ctx.command,
       status: "ok",
       blocks: [
-        b.kv({ A: left, B: right }, { id: "compare-head" }),
-        b.comparison(compareRows(a, bb), { id: "compare-rows" }),
+        b.comparison(compareRows(a, bb), { id: "compare-rows", labels: [left, right] }),
       ],
     };
   };

@@ -11,9 +11,9 @@
  */
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Comparison, Events, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
+import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { glyphs, spinnerFrames } from "../glyphs.js";
+import { glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -201,6 +201,29 @@ function verdictTone(verdict: "better" | "worse" | undefined): Tone {
 }
 
 /**
+ * The judgement half's mark, derived from the same field as its tone (C04 I38).
+ *
+ * **Without it `better` and `worse` render identically to each other and to an
+ * unmarked row, at every colour depth** — F34's measured half, and the reason
+ * it is the half that survived that finding's own correction: `200ms` against
+ * `150ms` says nothing about which is wanted, so unlike `same`/`changed` a
+ * reader cannot recover it from the two cells.
+ *
+ * Derived rather than supplied, because `verdict` already names the fact. A
+ * glyph field here would let a producer say `worse` and draw `✓`.
+ */
+function verdictGlyph(verdict: "better" | "worse" | undefined): Glyph | null {
+  switch (verdict) {
+    case "better":
+      return "ok";
+    case "worse":
+      return "error";
+    default:
+      return null;
+  }
+}
+
+/**
  * The change axis, carried without colour (C04 I35).
  *
  * The same construction as `patch`'s `MARKERS` and for the same reason: at
@@ -212,6 +235,24 @@ const CHANGE_MARKERS: Readonly<Record<"unchanged" | "changed" | "added" | "remov
 
 /** The marker column's width, or 0 when no row in the block declares a change. */
 const MARKER_WIDTH = 2;
+
+/**
+ * A verdict's mark, padded to the reserved width — blank when the block
+ * reserved none, and blank for a row with no verdict inside a block that did.
+ *
+ * `glyphFor` is the single place either character enters a frame (C09 §4), so
+ * the ASCII substitution is 1:1 by construction and this stays one cell wide at
+ * both depths.
+ */
+function markFor(
+  verdict: "better" | "worse" | undefined,
+  reserved: number,
+  ctx: RenderContext,
+): string {
+  if (reserved === 0) return "";
+  const token = verdictGlyph(verdict);
+  return pad(token === null ? "" : glyphFor(token, ctx.capabilities), reserved);
+}
 
 export const comparisonDefinition: BlockDefinition<Comparison> = {
   kind: "comparison",
@@ -228,6 +269,10 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
     // split. Per-block and deterministic: every row of one block agrees, which
     // is what keeps the field column aligned.
     const marked = block.rows.some((r) => r.change !== undefined) ? MARKER_WIDTH : 0;
+    // The verdict's mark, on the same terms and inside the `b` column: it
+    // qualifies one cell rather than the row, which is where the tone already
+    // sits (C04 I38).
+    const judged = block.rows.some((r) => r.verdict !== undefined) ? MARKER_WIDTH : 0;
     // Three equal columns (§3), the residual going to the field name.
     const column = Math.max(1, Math.floor((width - COLUMN_GAP * 2 - marked) / 3));
     const fieldWidth = Math.max(1, width - marked - column * 2 - COLUMN_GAP * 2);
@@ -245,9 +290,23 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
           // compares two runs, and calling one of them "before" is wrong for
           // half this kind's consumers. Nothing asserted these labels, which is
           // why the type carried `a`/`b` while the screen said otherwise.
-          { text: pad("a", column), style: dim },
+          // Truncated to the column like any other cell, so a long container
+          // name cannot push the header wider than the rows beneath it (F33).
+          {
+            text: pad(
+              truncate(stripControl(block.labels?.[0] ?? "a"), column, ctx.capabilities),
+              column,
+            ),
+            style: dim,
+          },
           { text: " ".repeat(COLUMN_GAP) },
-          { text: pad("b", column), style: dim },
+          {
+            text: pad(
+              truncate(stripControl(block.labels?.[1] ?? "b"), column, ctx.capabilities),
+              column,
+            ),
+            style: dim,
+          },
         ],
         width,
         ctx.capabilities,
@@ -280,7 +339,14 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
             },
             { text: " ".repeat(COLUMN_GAP) },
             {
-              text: pad(truncate(stripControl(entry.b), column, ctx.capabilities), column),
+              // The mark and the value share the column, so the block's width
+              // is what it was and `measure` — rows plus a header — is
+              // untouched either way.
+              text: pad(
+                markFor(entry.verdict, judged, ctx) +
+                  truncate(stripControl(entry.b), Math.max(1, column - judged), ctx.capabilities),
+                column,
+              ),
               style: tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities),
             },
           ],

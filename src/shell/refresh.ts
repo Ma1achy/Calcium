@@ -77,7 +77,10 @@ const keyOf = (host: RefreshHost): string => `${host.kind}:${String(host.id)}`;
 
 /** C23 I34 — a part is one block, and the block is a `panel`. */
 export function livePanel(id: string, title: string, child: Block): Panel {
-  return block({ kind: "panel", id, title, children: [child] } as Panel);
+  // `live` is what makes the panel say so (C04 I39, F18). Two surfaces draw the
+  // `▌` rail and the slot existed unreachable: this is the only place in the
+  // tree that knows a region refreshes, so it is the only place that can name it.
+  return block({ kind: "panel", id, title, live: true, children: [child] } as Panel);
 }
 
 /**
