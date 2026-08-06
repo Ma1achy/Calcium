@@ -48,6 +48,22 @@ import {
 } from "../src/verbs.ts";
 import { createEventsHandler } from "../src/events.ts";
 
+
+import { createAdapterRegistry } from "@fmx/calcium";
+import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
+/**
+ * An adapter's answer, completed by the registry — which is what a document is.
+ *
+ * **`Adapter.adapt` no longer returns a `ViewDocument`** (F58b): it carries the
+ * three `meta` keys an adapter owns and the registry fills the seven it does
+ * not. Validating an adapter's return directly asserts against a half-built
+ * artefact, and every row here is about what this app *produces*, which is the
+ * registry's output.
+ */
+function viaRegistry(adapter: Adapter, raw: RawResult, ctx: AdapterContext): ViewDocument {
+  return createAdapterRegistry({ v: adapter }).adapt(raw, ctx);
+}
+
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
 
@@ -62,7 +78,23 @@ const result = (over: Partial<Record<string, unknown>> = {}): never =>
     ...over,
   }) as never;
 
-const ctx = { command: "/x", verb: "x", transport: "subprocess", origin: "user", width: 120 } as never;
+// **`tool: null` is required, and `as never` is what let it be missing.**
+// `AdapterContext.tool` is `ToolDef | null` — required, nullable — and this
+// literal omitted it, so `ctx.tool` was `undefined`. `usageBlocks` guards
+// `tool === null` and `undefined !== null`, so the exit-2 route walked past the
+// guard into `tool.args` and threw. Nothing caught it while these rows called
+// adapters directly; routing them through the registry (F58b) reached the
+// registry's exit-2 branch for the first time. The cast is the mechanism: a
+// fixture narrower than the interface it stands for cannot fail on the
+// difference, and `as never` removes the compiler that would have said so.
+const ctx = {
+  command: "/x",
+  verb: "x",
+  transport: "subprocess",
+  origin: "user",
+  width: 120,
+  tool: null,
+} as never;
 
 /** S8's far side, injected — see the table below. */
 const FAR = (over: Partial<Far> = {}): Far => ({
@@ -85,21 +117,21 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   ["/drift — no argument", () => createDriftHandler()([], { command: "/drift" })],
   ["/compare — missing side", () => createCompareHandler()(["no-a", "no-b"], { command: "/compare no-a no-b" })],
   ["/compare — no arguments", () => createCompareHandler()([], { command: "/compare" })],
-  ["/ps — docker exited non-zero", () => createPsAdapter().adapt(result({ exitCode: 1, stderr: "boom" }), ctx)],
-  ["/ps — docker exited non-zero, silent", () => createPsAdapter().adapt(result({ exitCode: 2 }), ctx)],
-  ["/ps — ok", () => createPsAdapter().adapt(result({ stdoutRaw: read("ps-real.ndjson") }), ctx)],
-  ["container stats — non-zero", () => createContainerAdapter().adapt(result({ exitCode: 1, stderr: "no such container" }), ctx)],
-  ["container stats — zero rows", () => createContainerAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
-  ["container stats — ok", () => createContainerAdapter().adapt(result({ stdoutRaw: read("stats-real.ndjson") }), ctx)],
+  ["/ps — docker exited non-zero", () => viaRegistry(createPsAdapter(), result({ exitCode: 1, stderr: "boom" }), ctx)],
+  ["/ps — docker exited non-zero, silent", () => viaRegistry(createPsAdapter(), result({ exitCode: 2 }), ctx)],
+  ["/ps — ok", () => viaRegistry(createPsAdapter(), result({ stdoutRaw: read("ps-real.ndjson") }), ctx)],
+  ["container stats — non-zero", () => viaRegistry(createContainerAdapter(), result({ exitCode: 1, stderr: "no such container" }), ctx)],
+  ["container stats — zero rows", () => viaRegistry(createContainerAdapter(), result({ stdoutRaw: "" }), ctx)],
+  ["container stats — ok", () => viaRegistry(createContainerAdapter(), result({ stdoutRaw: read("stats-real.ndjson") }), ctx)],
   // **S5's arms, added with the verb rather than after it.** Step 4's lesson
   // was that three error documents shipped, two of them never run, and 91 rows
   // agreed with all three — so a new verb's failures join this table on the day
   // the verb exists, not on the day one is seen.
-  ["/inspect — docker exited non-zero", () => createInspectAdapter().adapt(result({ exitCode: 1, stderr: "No such object" }), ctx)],
-  ["/inspect — exit zero, empty array", () => createInspectAdapter().adapt(result({ stdoutRaw: "[]" }), ctx)],
-  ["/inspect — exit zero, unparseable", () => createInspectAdapter().adapt(result({ stdoutRaw: "<html>" }), ctx)],
-  ["/inspect --raw — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json"), argv: ["docker", "inspect", "x", "--raw"] }), ctx)],
-  ["/inspect — ok", () => createInspectAdapter().adapt(result({ stdoutRaw: read("inspect-raw-probe.json") }), ctx)],
+  ["/inspect — docker exited non-zero", () => viaRegistry(createInspectAdapter(), result({ exitCode: 1, stderr: "No such object" }), ctx)],
+  ["/inspect — exit zero, empty array", () => viaRegistry(createInspectAdapter(), result({ stdoutRaw: "[]" }), ctx)],
+  ["/inspect — exit zero, unparseable", () => viaRegistry(createInspectAdapter(), result({ stdoutRaw: "<html>" }), ctx)],
+  ["/inspect --raw — ok", () => viaRegistry(createInspectAdapter(), result({ stdoutRaw: read("inspect-raw-probe.json"), argv: ["docker", "inspect", "x", "--raw"] }), ctx)],
+  ["/inspect — ok", () => viaRegistry(createInspectAdapter(), result({ stdoutRaw: read("inspect-raw-probe.json") }), ctx)],
   // S8's arms. The far side is injected so every one of them is reachable —
   // three of these are daemon states that occur only sometimes, and an arm that
   // cannot be driven is an arm that never runs.
@@ -115,18 +147,18 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   // by accident**, which is why they arrive with the verbs rather than after
   // the first time one is seen — step 4's lesson, applied ahead of the defect
   // rather than behind it.
-  ["/diff — no such container", () => createDiffAdapter().adapt(result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
-  ["/diff — nothing changed", () => createDiffAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
-  ["/diff — ok", () => createDiffAdapter().adapt(result({ stdoutRaw: read("diff-real.txt") }), ctx)],
-  ["/images — daemon unreachable", () => createImagesAdapter().adapt(result({ exitCode: 1, stderr: "Cannot connect to the Docker daemon" }), ctx)],
-  ["/images — exit zero, unreadable", () => createImagesAdapter().adapt(result({ stdoutRaw: "<html>" }), ctx)],
-  ["/images — ok", () => createImagesAdapter().adapt(result({ stdoutRaw: read("images-real.ndjson") }), ctx)],
-  ["/top — container not running", () => createTopAdapter().adapt(result({ exitCode: 1, stderr: "container abc is not running" }), ctx)],
-  ["/top — exit zero, no header", () => createTopAdapter().adapt(result({ stdoutRaw: "\n" }), ctx)],
-  ["/top — ok", () => createTopAdapter().adapt(result({ stdoutRaw: read("top-real.txt") }), ctx)],
-  ["/port — no such container", () => createPortAdapter().adapt(result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
-  ["/port — nothing published", () => createPortAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
-  ["/port — ok", () => createPortAdapter().adapt(result({ stdoutRaw: read("port-real.txt") }), ctx)],
+  ["/diff — no such container", () => viaRegistry(createDiffAdapter(), result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
+  ["/diff — nothing changed", () => viaRegistry(createDiffAdapter(), result({ stdoutRaw: "" }), ctx)],
+  ["/diff — ok", () => viaRegistry(createDiffAdapter(), result({ stdoutRaw: read("diff-real.txt") }), ctx)],
+  ["/images — daemon unreachable", () => viaRegistry(createImagesAdapter(), result({ exitCode: 1, stderr: "Cannot connect to the Docker daemon" }), ctx)],
+  ["/images — exit zero, unreadable", () => viaRegistry(createImagesAdapter(), result({ stdoutRaw: "<html>" }), ctx)],
+  ["/images — ok", () => viaRegistry(createImagesAdapter(), result({ stdoutRaw: read("images-real.ndjson") }), ctx)],
+  ["/top — container not running", () => viaRegistry(createTopAdapter(), result({ exitCode: 1, stderr: "container abc is not running" }), ctx)],
+  ["/top — exit zero, no header", () => viaRegistry(createTopAdapter(), result({ stdoutRaw: "\n" }), ctx)],
+  ["/top — ok", () => viaRegistry(createTopAdapter(), result({ stdoutRaw: read("top-real.txt") }), ctx)],
+  ["/port — no such container", () => viaRegistry(createPortAdapter(), result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
+  ["/port — nothing published", () => viaRegistry(createPortAdapter(), result({ stdoutRaw: "" }), ctx)],
+  ["/port — ok", () => viaRegistry(createPortAdapter(), result({ stdoutRaw: read("port-real.txt") }), ctx)],
   ["/events — the daemon is unreachable", () => createEventsHandler(() => Promise.reject(new Error("down")))([], { command: "/events" })],
   ["/events — no lifecycle events at all", () => createEventsHandler(() => Promise.resolve(""))([], { command: "/events" })],
   ["/events — ok", () => createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { command: "/events" })],

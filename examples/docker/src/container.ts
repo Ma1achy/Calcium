@@ -23,7 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Adapter, Block, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
 import { bar, percent } from "./dashboard.ts";
 import { axisCaption, capFor, createRing, TICK_MS } from "./history.ts";
 import type { Ring } from "./history.ts";
@@ -336,7 +336,7 @@ export function containerView(row: Row, width: number, unicode = true): readonly
 export function createContainerAdapter(unicodeText: () => boolean = () => true): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       const failed = result.exitCode !== 0;
       const row = failed ? null : (parseNdjson(result.stdoutRaw).rows[0] ?? null);
 
@@ -361,17 +361,7 @@ export function createContainerAdapter(unicodeText: () => boolean = () => true):
         // FINDINGS F35.
         ...(row === null ? { error: { message: failure, stage: "adapter" as const } } : {}),
         blocks,
-        meta: {
-          verb: ctx.verb,
-          adapter: "container-stats",
-          exitCode: result.exitCode ?? 0,
-          durationMs: result.durationMs,
-          truncated: false,
-          argv: result.argv,
-          stderr: result.stderr,
-          transport: ctx.transport,
-          origin: ctx.origin,
-        },
+        meta: { adapter: "container-stats", truncated: false },
       };
     },
   };

@@ -13,6 +13,7 @@ import {
   createFallbackAdapter,
   fallbackBlocks,
 } from "../../src/data/adapters/fallback.js";
+import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import type { AdapterContext, RawResult } from "../../src/data/adapters/types.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import type { Block, ColumnDef } from "../../src/data/viewmodel/index.js";
@@ -58,7 +59,13 @@ function adapt(stdout: unknown, over: Partial<RawResult> = {}) {
   } catch {
     text = "";
   }
-  return createFallbackAdapter().adapt(raw({ stdout, stdoutRaw: text, ...over }), CTX);
+  // **Through the registry, not the adapter directly** (F58b). An adapter's
+  // return is no longer a complete `ViewDocument` — `AdapterMeta` carries the
+  // three keys it owns and the registry fills the other seven — so validating
+  // one straight from `adapt()` asserts against a half-built artefact. The
+  // registry with no adapters registered routes to the fallback, which is the
+  // production path this file is about.
+  return createAdapterRegistry({}).adapt(raw({ stdout, stdoutRaw: text, ...over }), CTX);
 }
 
 function kinds(blocks: readonly Block[]): readonly string[] {
@@ -130,7 +137,7 @@ describe("T1.14 (§5) — every shape in the table", () => {
   });
 
   it("empty stdout at exit 0 → a notice, not a blank document", () => {
-    const doc = createFallbackAdapter().adapt(raw({ stdout: undefined, stdoutRaw: "  \n" }), CTX);
+    const doc = createAdapterRegistry({}).adapt(raw({ stdout: undefined, stdoutRaw: "  \n" }), CTX);
     expect(kinds(doc.blocks)).toEqual(["notice"]);
     expect(validateDocument(doc).ok).toBe(true);
   });
@@ -165,7 +172,7 @@ describe("T1.15, T3.13b (§5) — the caps", () => {
     const table = doc.blocks[1];
     if (table?.kind !== "table") throw new Error("expected a table");
     expect(table.rows).toHaveLength(MAX_ROWS);
-    expect(doc.meta.truncated).toBe(true);
+    expect(doc.meta?.truncated).toBe(true);
 
     const notice = doc.blocks[2];
     if (notice?.kind !== "notice") throw new Error("truncation must be stated, never silent");
@@ -174,7 +181,7 @@ describe("T1.15, T3.13b (§5) — the caps", () => {
   });
 
   it("an untruncated table leaves `truncated` false", () => {
-    expect(adapt([{ id: "a" }]).meta.truncated).toBe(false);
+    expect(adapt([{ id: "a" }]).meta?.truncated).toBe(false);
   });
 });
 

@@ -13,6 +13,7 @@ import {
 } from "../../src/data/adapters/index.js";
 import { AdapterSchemaError } from "../../src/data/adapters/types.js";
 import type { Adapter, AdapterContext, RawResult } from "../../src/data/adapters/types.js";
+import type { AdapterMeta } from "../../src/data/viewmodel/types.js";
 import { createNdjsonReader } from "../../src/data/transport/index.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import type { ToolDef } from "../../src/data/manifest/index.js";
@@ -53,17 +54,7 @@ function markerAdapter(over: Partial<Adapter> = {}): Adapter {
       command: ctx.command,
       status: "ok",
       blocks: [{ kind: "raw", id: "marker", text: "adapted" }],
-      meta: {
-        verb: ctx.verb,
-        adapter: "marker",
-        exitCode: r.exitCode ?? 0,
-        durationMs: r.durationMs,
-        truncated: false,
-        argv: r.argv,
-        stderr: r.stderr,
-        transport: ctx.transport,
-        origin: ctx.origin,
-      },
+      meta: { adapter: "marker", truncated: false },
     }),
     ...over,
   };
@@ -118,6 +109,12 @@ describe("§2 (I2) — resolution order", () => {
     command: "/ps",
     status: "ok",
     blocks: [{ kind: "raw", id: "from-far-side", text: "already a document" }],
+    // **A full `DocumentMeta`, and deliberately so.** This is what the *far side*
+    // emitted on stdout, not what an adapter returned — a complete `ViewDocument`
+    // that the registry recognises and passes through. `AdapterMeta`'s narrowing
+    // is about the adapter's return type and says nothing about this path, which
+    // is the distinction a mechanical rewrite of every nine-field `meta:` block
+    // could not see. F58b.
     meta: {
       verb: "ps",
       adapter: "far-side",
@@ -372,18 +369,7 @@ describe("I13 (T1.18) — the registry owns meta", () => {
         command: "wrong",
         status: "ok",
         blocks: [{ kind: "raw", id: "x", text: "x" }],
-        meta: {
-          verb: "not-ps",
-          adapter: "declared-name",
-          exitCode: 999,
-          durationMs: 999,
-          truncated: true,
-          resultId: "run-42",
-          argv: ["nothing", "like", "reality"],
-          stderr: "invented",
-          transport: "local",
-          origin: "agent",
-        },
+        meta: { adapter: "declared-name", truncated: true, resultId: "run-42" },
       }),
     };
 
@@ -402,6 +388,20 @@ describe("I13 (T1.18) — the registry owns meta", () => {
     expect(doc.meta.resultId).toBe("run-42");
     expect(doc.meta.adapter).toBe("declared-name");
     expect(doc.meta.truncated).toBe(true);
+
+    // **And the seven are now unclaimable, not merely overwritten** (F58b).
+    // This adapter used to declare all ten and the row proved the registry
+    // discarded seven — which is a guarantee about the *registry*, and left the
+    // adapter author computing values that never reached a document. Both
+    // guarantees are asserted, because they fail independently: the type could
+    // narrow while `authoritativeMeta` stopped filling, and every assertion
+    // above would still pass.
+    //
+    // @ts-expect-error — `origin` is typed `never` on `AdapterMeta`. Widening it
+    // back to `DocumentMeta` makes this compile, the directive unused, and the
+    // file stops building.
+    const claimed: AdapterMeta = { origin: "agent" };
+    void claimed;
   });
 });
 

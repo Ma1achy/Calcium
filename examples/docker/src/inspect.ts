@@ -13,7 +13,7 @@
  */
 
 import { cells } from "@fmx/calcium";
-import type { Adapter, Block, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
 import { b } from "@fmx/calcium";
 import { str, type Row } from "./ndjson.ts";
 
@@ -182,7 +182,7 @@ const parseInspect = (raw: string): Row | null => {
 export function createInspectAdapter(): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       const failed = result.exitCode !== 0;
       const inspected = failed ? null : parseInspect(result.stdoutRaw);
       // **A container that answered nothing is a failure, not an empty view.**
@@ -210,17 +210,7 @@ export function createInspectAdapter(): Adapter {
             : raw
               ? splitRaw(inspected, ctx.width)
               : structuredBlocks(inspected),
-        meta: {
-          verb: ctx.verb,
-          adapter: "inspect",
-          exitCode: result.exitCode ?? 0,
-          durationMs: result.durationMs,
-          truncated: false,
-          argv: result.argv,
-          stderr: result.stderr,
-          transport: ctx.transport,
-          origin: ctx.origin,
-        },
+        meta: { adapter: "inspect", truncated: false },
       };
     },
   };

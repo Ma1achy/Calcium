@@ -8,7 +8,7 @@
 // which is what `todo-expiry` is for: the note nobody would otherwise send to the
 // person who could act on it.
 import { describe, expect, it } from "vitest";
-import { createFallbackAdapter } from "../../src/data/adapters/index.js";
+import { createAdapterRegistry, createFallbackAdapter } from "../../src/data/adapters/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import {
   applyPatch,
@@ -142,7 +142,9 @@ describe("C04 integration — the document lifecycle", () => {
     ];
 
     for (const stdout of shapes) {
-      const doc = createFallbackAdapter().adapt(
+      // Through the registry: an adapter's return carries only the three `meta`
+      // keys it owns, and this row validates a *document*. F58b.
+      const doc = createAdapterRegistry({}).adapt(
         {
           argv: ["prism", "ps", "--json"],
           exitCode: 0,

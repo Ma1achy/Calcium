@@ -11,6 +11,8 @@
  */
 
 export type {
+  AdapterDocument,
+  AdapterMeta,
   Glyph,
   Action,
   Block,

@@ -19,6 +19,7 @@
 
 import { b, cells } from "@fmx/calcium";
 import type {
+  AdapterDocument,
   Adapter,
   AdapterContext,
   Block,
@@ -39,20 +40,6 @@ import { parseNdjson, str } from "./ndjson.ts";
  * four are left alone, because a refactor of shipped adapters is not what this
  * step is.
  */
-function metaOf(result: RawResult, ctx: AdapterContext, adapter: string): ViewDocument["meta"] {
-  return {
-    verb: ctx.verb,
-    adapter,
-    exitCode: result.exitCode ?? 0,
-    durationMs: result.durationMs,
-    truncated: false,
-    argv: result.argv,
-    stderr: result.stderr,
-    transport: ctx.transport,
-    origin: ctx.origin,
-  };
-}
-
 /**
  * The failure arm, shared — **and it is shared because it is the arm that runs
  * least and is tested least.**
@@ -70,14 +57,14 @@ function failureDoc(
   ctx: AdapterContext,
   adapter: string,
   message: string,
-): ViewDocument {
+): AdapterDocument {
   return {
     schema: "tui.view/1",
     command: ctx.command,
     status: "error",
     error: { message, stage: "adapter" },
     blocks: [b.notice.error(message)],
-    meta: metaOf(result, ctx, adapter),
+    meta: { adapter },
   };
 }
 
@@ -90,12 +77,12 @@ const okDoc = (
   ctx: AdapterContext,
   adapter: string,
   blocks: readonly Block[],
-): ViewDocument => ({
+): AdapterDocument => ({
   schema: "tui.view/1",
   command: ctx.command,
   status: "ok",
   blocks,
-  meta: metaOf(result, ctx, adapter),
+  meta: { adapter },
 });
 
 /** Lines, without the trailing empty one a final newline produces. */
@@ -201,7 +188,7 @@ export function diffSummary(lines: readonly string[]): string {
 export function createDiffAdapter(): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       if (result.exitCode !== 0) return failureDoc(result, ctx, "diff", failureOf(result));
 
       const lines = linesOf(result.stdoutRaw);
@@ -274,7 +261,7 @@ const IMAGE_COLUMNS: readonly ColumnDef[] = [
 export function createImagesAdapter(): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       if (result.exitCode !== 0) return failureDoc(result, ctx, "images", failureOf(result));
 
       const { rows, skipped } = parseNdjson(result.stdoutRaw);
@@ -388,7 +375,7 @@ export function splitAtMost(line: string, n: number): string[] {
 export function createTopAdapter(): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       // **A stopped container is an error here and an empty list nowhere.**
       // `docker top` on one exits 1 with *"container … is not running"*, which
       // is the honest thing to show — the reader asked what is running inside
@@ -437,7 +424,7 @@ export function portRow(line: string): KeyValueRow | null {
 export function createPortAdapter(): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       if (result.exitCode !== 0) return failureDoc(result, ctx, "port", failureOf(result));
 
       const rows = linesOf(result.stdoutRaw)

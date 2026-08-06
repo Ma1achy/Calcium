@@ -33,6 +33,22 @@ import {
   createTopAdapter,
 } from "../src/verbs.ts";
 
+
+import { createAdapterRegistry } from "@fmx/calcium";
+import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
+/**
+ * An adapter's answer, completed by the registry — which is what a document is.
+ *
+ * **`Adapter.adapt` no longer returns a `ViewDocument`** (F58b): it carries the
+ * three `meta` keys an adapter owns and the registry fills the seven it does
+ * not. Validating an adapter's return directly asserts against a half-built
+ * artefact, and every row here is about what this app *produces*, which is the
+ * registry's output.
+ */
+function viaRegistry(adapter: Adapter, raw: RawResult, ctx: AdapterContext): ViewDocument {
+  return createAdapterRegistry({ v: adapter }).adapt(raw, ctx);
+}
+
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
 
@@ -66,14 +82,14 @@ const ctx = {
  * failure, which is the same reason it is first here.
  */
 const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewDocument])[] = [
-  ["S3 — the live single-container view", () => createContainerAdapter().adapt(result({ stdoutRaw: read("stats-real.ndjson") }), ctx)],
-  ["S3 — the container reports nothing", () => createContainerAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
-  ["/ps", () => createPsAdapter().adapt(result({ stdoutRaw: read("ps-real.ndjson") }), ctx)],
-  ["/diff", () => createDiffAdapter().adapt(result({ stdoutRaw: read("diff-real.txt") }), ctx)],
-  ["/diff — nothing changed", () => createDiffAdapter().adapt(result({ stdoutRaw: "" }), ctx)],
-  ["/images", () => createImagesAdapter().adapt(result({ stdoutRaw: read("images-real.ndjson") }), ctx)],
-  ["/top", () => createTopAdapter().adapt(result({ stdoutRaw: read("top-real.txt") }), ctx)],
-  ["/port", () => createPortAdapter().adapt(result({ stdoutRaw: read("port-real.txt") }), ctx)],
+  ["S3 — the live single-container view", () => viaRegistry(createContainerAdapter(), result({ stdoutRaw: read("stats-real.ndjson") }), ctx)],
+  ["S3 — the container reports nothing", () => viaRegistry(createContainerAdapter(), result({ stdoutRaw: "" }), ctx)],
+  ["/ps", () => viaRegistry(createPsAdapter(), result({ stdoutRaw: read("ps-real.ndjson") }), ctx)],
+  ["/diff", () => viaRegistry(createDiffAdapter(), result({ stdoutRaw: read("diff-real.txt") }), ctx)],
+  ["/diff — nothing changed", () => viaRegistry(createDiffAdapter(), result({ stdoutRaw: "" }), ctx)],
+  ["/images", () => viaRegistry(createImagesAdapter(), result({ stdoutRaw: read("images-real.ndjson") }), ctx)],
+  ["/top", () => viaRegistry(createTopAdapter(), result({ stdoutRaw: read("top-real.txt") }), ctx)],
+  ["/port", () => viaRegistry(createPortAdapter(), result({ stdoutRaw: read("port-real.txt") }), ctx)],
   ["/events", () => createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { command: "/events" })],
   ["/drift — no such container", () => createDriftHandler()(["no-such-xyz"], { command: "/drift no-such-xyz" })],
 ];

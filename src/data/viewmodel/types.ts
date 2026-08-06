@@ -46,6 +46,44 @@ export type DocumentMeta = Readonly<{
   origin: "user" | "action" | "agent" | "refresh";
 }>;
 
+/**
+ * The three `meta` keys an adapter's answer is honoured for.
+ *
+ * **`authoritativeMeta` keeps three of ten and overwrites seven** — `verb`,
+ * `exitCode`, `durationMs`, `argv`, `stderr`, `transport` and `origin` come from
+ * the raw result and the context, always. The adapter's return type demanded all
+ * ten anyway, so every adapter ever written computes seven values that are
+ * discarded, **with no signal that they are**: an adapter returning
+ * `exitCode: 999` produces a document reading `0`.
+ *
+ * **Narrower, not wider.** Making the seven optional would leave them discarded;
+ * removing them means supplying one fails to compile rather than fails to
+ * matter. The same move as `RenderContextInput` one layer up — two components
+ * with the same defect is what said the shape generalises. FINDINGS F58b, F85.
+ *
+ * **The seven are typed `never` rather than merely absent, and that is the half
+ * that does the work.** TypeScript's excess-property check only fires on a
+ * *fresh object literal*: a helper returning a full `DocumentMeta` is assignable
+ * to a `Pick` of it, so the app's own `metaOf()` — nine fields, duplicated in two
+ * files — compiled unchanged against the narrow type and kept computing the
+ * discarded seven. `never` makes the wrong state unbuildable through a helper
+ * too, which is the `Exclude<ParseResult, { kind: "empty" }>` trade one more
+ * time.
+ */
+type AdapterOwned = "adapter" | "truncated" | "resultId";
+
+export type AdapterMeta = Readonly<Partial<Pick<DocumentMeta, AdapterOwned>>> &
+  Partial<Record<Exclude<keyof DocumentMeta, AdapterOwned>, never>>;
+
+/**
+ * What an adapter returns: a document whose `meta` carries only what it owns.
+ *
+ * `command` stays the adapter's here, unlike the local route where C23 takes it
+ * (I15) — C07 I16 rules that an adapter states the command it ran, which may
+ * differ from the line submitted.
+ */
+export type AdapterDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: AdapterMeta }>;
+
 export type ErrorLike = Readonly<{
   message: string;
   code?: string;

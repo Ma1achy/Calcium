@@ -42,17 +42,7 @@ const marker: Adapter = {
     command: ctx.command,
     status: "ok",
     blocks: [{ kind: "raw", id: "marker", text: "adapted" }],
-    meta: {
-      verb: ctx.verb,
-      adapter: "marker",
-      exitCode: 0,
-      durationMs: r.durationMs,
-      truncated: false,
-      argv: r.argv,
-      stderr: r.stderr,
-      transport: ctx.transport,
-      origin: ctx.origin,
-    },
+    meta: { adapter: "marker", truncated: false },
   }),
 };
 
@@ -67,6 +57,9 @@ describe("C07 fail-on-revert", () => {
       command: "/ps",
       status: "ok" as const,
       blocks: [{ kind: "raw" as const, id: "from-far-side", text: "converged" }],
+      // A complete `DocumentMeta`: this is what the far side emitted, not what
+      // an adapter returned. `AdapterMeta` narrows the adapter's return and says
+      // nothing about the identity path. F58b.
       meta: {
         verb: "ps",
         adapter: "far-side",
@@ -199,21 +192,37 @@ describe("C07 fail-on-revert", () => {
   });
 
   it("T6.11 (I13): letting an adapter's meta through unmodified → T1.18 fails", () => {
+    // **The lie is now unwritable, and that is F58b's fix arriving in this row.**
+    // This used to construct an adapter that set `origin` and `transport`, assert
+    // the registry overwrote them, and then assert the adapter really had written
+    // them — the last line proving the guard was doing work rather than agreeing
+    // with a well-behaved double.
+    //
+    // `AdapterMeta` carries only the three keys the registry honours, so the
+    // adapter cannot express the lie at all. The runtime guard stays and this row
+    // now pins both halves: the type refuses, and `authoritativeMeta` still fills.
     const liar: Adapter = {
       schema: "tui.view/1",
       adapt: (r, ctx) => ({
         ...marker.adapt(r, ctx),
-        meta: { ...marker.adapt(r, ctx).meta, origin: "agent" as const, transport: "local" as const },
+        // @ts-expect-error — `origin` is the registry's (I13). Widening
+        // `AdapterMeta` back to `DocumentMeta` makes this line compile, the
+        // directive unused, and the file stops building.
+        meta: { origin: "agent" as const, transport: "local" as const },
       }),
     };
 
     const doc = createAdapterRegistry({ ps: liar }).adapt(raw(), CTX);
-    expect(doc.meta.origin).toBe("user");
+    expect(doc.meta.origin, "the registry fills it regardless").toBe("user");
     expect(doc.meta.transport).toBe("subprocess");
 
-    // Unmodified, provenance becomes whatever a hundred adapters happened to
-    // write — and the first feature that has to trust it is the one that finds out.
-    expect(liar.adapt(raw(), CTX).meta.origin).toBe("agent");
+    // And the honoured key still comes through, so the guard is not simply
+    // discarding everything an adapter says.
+    const honest: Adapter = {
+      schema: "tui.view/1",
+      adapt: (r, ctx) => ({ ...marker.adapt(r, ctx), meta: { adapter: "mine" } }),
+    };
+    expect(createAdapterRegistry({ ps: honest }).adapt(raw(), CTX).meta.adapter).toBe("mine");
   });
 
   it("T6.12 (I12): dropping the malformed patch before degraded → T3.19c fails", () => {

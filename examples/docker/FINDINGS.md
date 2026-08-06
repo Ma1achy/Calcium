@@ -3919,3 +3919,56 @@ the package that publishes it.
 **Disposition: wire or delete, and the glyphs are the ones to rule on first.** Six slots
 a theme can declare and nothing draws is the same shape as a spec promising registration
 with no registrar — the reader's evidence that the feature exists is the declaration.
+
+---
+
+## F100 — narrowing the adapter's return exposed three things the wide type hid ★★★
+
+**F58b landed**, and the interesting part is not the fix. `authoritativeMeta` honours
+`adapter`, `truncated` and `resultId` and overwrites the other seven on every route, so
+`AdapterMeta` now carries three keys and types the seven `never`.
+
+**Three defects surfaced that the wide type had been holding up.**
+
+### 1 · `Pick` alone does not narrow anything a helper returns
+
+The first version was `Partial<Pick<DocumentMeta, …>>`, and **the app compiled unchanged.**
+TypeScript's excess-property check fires only on a *fresh object literal*; a helper
+returning a full `DocumentMeta` is structurally assignable to a `Pick` of it. The app's
+`metaOf()` — **nine fields, duplicated verbatim in two files** — kept computing the
+discarded seven and kept type-checking.
+
+Typing the seven `never` is what forced it: `readonly string[]` is not assignable to
+`never` whether it arrives by literal or by helper. **A narrowing that only catches
+literals catches the easy half**, and the helper is where the duplication lives.
+
+### 2 · An app cannot obtain a document to test against
+
+`createAdapterRegistry` was not exported, so *"every document this app produces is valid"*
+— the app's own F35 closure — could only reach `adapter.adapt()`, which is no longer a
+document. **The suite failed the moment the narrowing landed**, which is C24 I19's
+`contextAt` argument arriving on the adapter surface: a producer the framework can test
+and a consumer cannot is one whose app-side tests assert against something the user never
+sees. Now exported.
+
+### 3 · A mechanical rewrite matched fourteen sites and seven were wrong
+
+The nine-field `meta:` block is uniform, so one regex rewrote every occurrence — and
+**half of them were not adapter returns**: `transcript/cap.ts`, four test-support
+fixtures, two app *local* handlers, and two far-side documents that arrive on stdout
+already complete. Every replacement matched. `tsc` stayed clean through the first pass and
+**166 tests failed at runtime**, because a document missing seven `meta` fields still
+satisfies a `Partial` type and fails validation.
+
+**Reverted by asking which files contain an `adapt`** — and the first version of that check
+was wrong too, grepping `adapt:` when the app uses method shorthand, so it reported *all
+seven real adapters as non-adapters*. Two bad filters in one repair.
+
+### And the fixture that had been lying
+
+`documents.test.ts` built its `AdapterContext` with `as never` and omitted `tool`, a
+**required** field. `usageBlocks` guards `tool === null`, `undefined !== null`, so routing
+through the registry reached the exit-2 branch and threw on `tool.args`. The rows had
+called adapters directly and never reached it. **`as never` is the mechanism**: a fixture
+narrower than the interface it stands for cannot fail on the difference, and the cast
+removes the compiler that would have said so.

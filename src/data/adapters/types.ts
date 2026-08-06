@@ -16,7 +16,7 @@
 
 import type { ToolDef } from "../manifest/types.js";
 import type { RawPatch, RawResult } from "../transport/types.js";
-import type { ViewDocument, ViewPatch } from "../viewmodel/types.js";
+import type { AdapterDocument, ViewDocument, ViewPatch } from "../viewmodel/types.js";
 
 export type { RawPatch, RawResult };
 
@@ -43,7 +43,16 @@ export type StreamContext = AdapterContext & Readonly<{ seq: number }>;
 
 export type Adapter = Readonly<{
   schema: "tui.view/1";
-  adapt: (raw: RawResult, ctx: AdapterContext) => ViewDocument;
+  /**
+   * **`meta` carries only the three keys the registry honours** (F58b).
+   * `authoritativeMeta` overwrites `verb`, `exitCode`, `durationMs`, `argv`,
+   * `stderr`, `transport` and `origin` from the raw result and the context on
+   * every route, so an adapter supplying them computed seven values that were
+   * discarded — and the return type required all ten, so there was no way to
+   * write a correct adapter that did not. An adapter returning `exitCode: 999`
+   * produced a document reading `0`.
+   */
+  adapt: (raw: RawResult, ctx: AdapterContext) => AdapterDocument;
   /** `null` = ignore this patch. Absent = stream through the fallback (I11, §6). */
   adaptPatch?: (patch: RawPatch, ctx: StreamContext) => ViewPatch | null;
 }>;

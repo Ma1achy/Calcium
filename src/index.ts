@@ -99,6 +99,33 @@ export type {
   ViewPatch,
 } from "./data/viewmodel/index.js";
 
+/**
+ * What an adapter returns, and the three `meta` keys it owns.
+ *
+ * **Published because an adapter cannot be written without them** (F58b).
+ * `Adapter.adapt` returns an `AdapterDocument`, so an app annotating its own
+ * adapter needs the name — and the seven keys the registry fills are typed
+ * `never`, so writing one is a compile error rather than a value that never
+ * reaches a document.
+ */
+export type { AdapterDocument, AdapterMeta } from "./data/viewmodel/index.js";
+
+/**
+ * The registry, so an app can test its own adapters.
+ *
+ * **An adapter's return is not a document** (F58b) — `AdapterMeta` carries the
+ * three keys it owns and the registry fills the seven it does not — so an app
+ * asserting *"every document this app produces is valid"* has no way to obtain
+ * one without opening a session. That is the gap C24 I19 already closed for
+ * completion sources by exporting `contextAt`, arriving on the adapter surface:
+ * a producer the framework can test and a consumer cannot is a producer whose
+ * app-side tests assert against something the user never sees.
+ *
+ * Found by the reference app's own suite failing the moment the narrowing
+ * landed, which is the second-consumer argument in one commit.
+ */
+export { createAdapterRegistry } from "./data/adapters/index.js";
+
 // --- builders — §4 ----------------------------------------------------------
 
 export { b } from "./shell/builders/index.js";
