@@ -42,6 +42,27 @@ export type RenderContext = Readonly<{
   renderChild: (block: Block, width: number) => ReactElement;
 }>;
 
+/**
+ * What a *caller* of the registry supplies — everything a renderer may read
+ * except the two fields the registry owns.
+ *
+ * **The registry overwrites `measureChild` and `renderChild` unconditionally**
+ * (`registry.ts`, `{ ...ctx, measureChild: this.measure, renderChild: … }`), so
+ * a caller's values were discarded on every call. The type demanded them anyway,
+ * and the only way to satisfy it was to write something untrue: `render-lines.ts`
+ * supplied `registry.measure` for one and a stub that **throws if called** for
+ * the other, with a comment explaining that the registry replaces both and *"a
+ * caller should not have to know that."*
+ *
+ * **The fix is a narrower type, not a wider one.** Making them optional would
+ * leave them discarded; removing them from the construction boundary means
+ * supplying one fails to compile rather than failing to matter. Second instance
+ * of F58b's shape — an adapter computes ten `meta` fields and the registry
+ * honours three — which is what says it generalises past one surface.
+ * FINDINGS F85.
+ */
+export type RenderContextInput = Omit<RenderContext, "measureChild" | "renderChild">;
+
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
@@ -53,10 +74,10 @@ export interface BlockRegistry {
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
   measure(block: Block, width: number): number;
-  render(block: Block, ctx: RenderContext): ReactElement;
+  render(block: Block, ctx: RenderContextInput): ReactElement;
   /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
   measureSequence(blocks: readonly Block[], width: number): number;
-  renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
+  renderSequence(blocks: readonly Block[], ctx: RenderContextInput): ReactElement;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }

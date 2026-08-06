@@ -13,7 +13,7 @@ import { normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { paint, rows, tone } from "./paint.js";
-import type { BlockDefinition, BlockRegistry, RenderContext } from "./types.js";
+import type { BlockDefinition, BlockRegistry, RenderContext, RenderContextInput } from "./types.js";
 
 /**
  * The definition of last resort: a registry with no `raw` at all, which is
@@ -152,7 +152,7 @@ class Registry implements BlockRegistry {
     return createElement(Box, { flexDirection: "column", width }, children);
   };
 
-  render = (block: Block, ctx: RenderContext): ReactElement => {
+  render = (block: Block, ctx: RenderContextInput): ReactElement => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
       ...ctx,

@@ -3,12 +3,41 @@ import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 
 describe("C09 §6 — the registry's transition table", () => {
+
+  it("T2.x (C09, F85): a caller cannot supply the two fields the registry owns", () => {
+    // **The narrowing, asserted where it has to hold: at compile time.**
+    // `registry.render` overwrote `measureChild` and `renderChild` on every call
+    // — `{ ...ctx, measureChild: this.measure, renderChild: … }` — while the type
+    // demanded them, so the only way to satisfy it was to write something untrue.
+    // `render-lines.ts` supplied a stub that **threw if called**, correct only
+    // because the overwrite is unconditional, with a comment as the whole of the
+    // guarantee.
+    //
+    // **The fix is narrower, not wider.** Optional fields would stay discarded;
+    // absent ones make supplying them fail to compile rather than fail to matter.
+    const ctx: RenderContextInput = {
+      width: 40,
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+      tick: 0,
+      onAction: () => undefined,
+    };
+    expect(ctx).not.toHaveProperty("renderChild");
+
+    // @ts-expect-error — the registry owns `renderChild`; a caller supplying one
+    // is what F85 is. Removing the `Omit` makes this line compile and the file
+    // stops building, which is the assertion.
+    const illegal: RenderContextInput = { ...ctx, renderChild: () => null as never };
+    void illegal;
+  });
   it("T1.1: register in the open state → get returns it, kinds includes it", () => {
     const registry = createBlockRegistry({});
     registry.register({

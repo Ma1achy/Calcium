@@ -278,6 +278,18 @@ Each of these produces code that compiles, passes review, and is wrong.
   see it. **Read the abstract against its own section before reading the section against
   the code.**
 
+- **A correct sentence justifying the wrong decision survives being read carefully.**
+  MG24 was scoped to `export interface` because *"a type alias is structural and can be
+  satisfied without being named"* — which is **true**, about satisfying a type, and
+  irrelevant to consuming a *member* of one. The distinction was real, correctly stated,
+  and not the one the rule needed, so the scope excluded three-quarters of its subject
+  while reading as deliberate. Twenty-five components went past it.
+
+  **This is harder to catch than a wrong sentence**, because review checks whether a
+  justification is true and this one is. The question that reaches it is *does this
+  sentence constrain the decision it is attached to* — the same question the mutation pass
+  asks of a test, and F84 is the measured case at 276 members against 1055.
+
 - **A citation reads as coverage, and that is how a finding gets planned once and fixed
   never.** The sibling of the rule above, and it fails in the other direction: not a claim
   weakened by compression, but a *reference* mistaken for a *disposition*. Roadmap entry 38
