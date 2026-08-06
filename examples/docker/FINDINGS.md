@@ -2805,3 +2805,91 @@ local route is where it lives, which is what the code already says three times.
 
 **What is not in doubt is that the count is now three.** Two instances is the
 threshold for noticing; the third is where a workaround stops being a workaround.
+
+---
+
+## F78 — `b.live`'s `stream` arm is declared, validated, and never driven ★★★
+
+`LiveSpec` offers two ways to feed a live part:
+
+```ts
+fetch?:  () => Promise<unknown>;
+stream?: () => AsyncIterable<unknown>;
+```
+
+`b.live` **validates the pair**: it throws with *"b.live needs a `fetch` or a
+`stream`"* when both are absent, and throws again when both are present because
+*"they are exclusive"*. Two throws that exist only to police a choice between two
+alternatives.
+
+**One of the two alternatives does nothing.** `partOf` (`src/shell/execution.ts`)
+builds the driver's part with:
+
+```ts
+fetch: spec.fetch ?? ((): Promise<unknown> => Promise.resolve(null)),
+```
+
+and never reads `spec.stream`. Nothing in `refresh.ts` reads it either. So a part
+declared with `stream` is registered, driven once with a `fetch` that resolves
+`null`, rendered as `render(null)`, and the generator **is never invoked**.
+
+Measured: the built block carries no reference to the stream at all — only the
+`loading…` notice — and no site in `src/` mentions `spec.stream`.
+
+**The validation is what makes this expensive.** An unimplemented field that
+nobody mentions is a field nobody uses. A field the constructor *insists* on —
+"supply one of these two" — reads as a decision the author is being asked to
+make, so choosing the unimplemented one is the natural outcome of following the
+API. Step 11 chose it first, for `docker build`, which is exactly the case it
+looks written for.
+
+**And it fails silently in the worst direction**: `render(null)` produces a
+plausible empty panel rather than an error, so a build that streams nothing looks
+like a build that produced nothing.
+
+The workaround is the one three other surfaces here already use: `fetch` plus
+`every`, polling a buffer the process fills. That is the dashboard's ring (gap 1)
+and the events window's, arriving a fourth time — see F77, which is the same
+shape one layer down.
+
+Filed rather than fixed: implementing it is C23 §3b's, and the ruling is whether
+a streamed part's ticks are patches like a fetched part's or something else. What
+should not survive either way is the pair of throws policing a choice where one
+option is inert — **that is A03 §2's vacuity class expressed as an API**.
+
+---
+
+## F79 — the frame-read instrument mis-renders a 256-colour sequence ★★
+
+Step 11's build frame showed a step named `38;5; RUN sleep 2 && echo two > /two`.
+The `[3/3]` prefix was gone and an SGR fragment stood in its place, exactly six
+cells wide where `[3/3] ` is six cells wide.
+
+**The application is correct.** The raw capture holds:
+
+```
+\x1b[38;5;188m[3/3] RUN sleep 2 && echo two > /two
+```
+
+— a well-formed CSI followed by the right name. `tools/screen.py` renders it
+wrongly. Its `CSI` pattern (`\x1b\[([0-9;?]*)([a-zA-Z])`) matches this sequence,
+so the fault is elsewhere in the replay — the `OSC` substitution runs first over
+the whole stream and an unterminated `\x1b]` anywhere will consume an arbitrary
+span, which is the shape that produces a localised corruption like this one.
+
+**Why it is worth ★★ rather than a note: it is the instrument.** Every frame-read
+in steps 9, 10 and 11 went through `screen.py`, and this is the first time its
+output has been checked against the bytes it was replaying. A capture tool that
+silently mangles one cell is a tool that can also silently mangle the cell an
+assertion is about — and a frame-read exists precisely because it is the thing
+that sees what assertions cannot.
+
+The practice that caught it generalises: **when a frame shows something
+surprising, read the raw bytes before believing the render.** It was noticed only
+because `38;5;` is obviously not something this application would print. A subtler
+corruption — a digit, a truncation mark — would have read as an app defect and
+been "fixed" in the app.
+
+Not repaired here: it is a tool in `examples/docker/tools/`, the app's output is
+verified correct by the bytes, and repairing a replay parser mid-step is how a
+step stops being about its subject. Filed with the reproducer above.

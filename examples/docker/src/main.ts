@@ -31,6 +31,7 @@ import { argv as eventsArgv, createEventsHandler } from "./events.ts";
 import { dockerSources } from "./completion.ts";
 import { mutationHandlers } from "./mutation.ts";
 import { destructiveHandlers } from "./destructive.ts";
+import { progressHandlers } from "./progress.ts";
 
 const run = promisify(execFile);
 
@@ -171,6 +172,9 @@ const tui = createTui({
     // The destructive family (step 10). Ruling C's weight: the question
     // carries what it will remove, and the zero case does not ask.
     ...destructiveHandlers(),
+    // The registry family (step 11). Local because progress needs state that
+    // outlives one result — gap 1's ring a fourth time (F77, F78).
+    ...progressHandlers(),
   },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).
