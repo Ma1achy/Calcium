@@ -2893,3 +2893,40 @@ been "fixed" in the app.
 Not repaired here: it is a tool in `examples/docker/tools/`, the app's output is
 verified correct by the bytes, and repairing a replay parser mid-step is how a
 step stops being about its subject. Filed with the reproducer above.
+
+---
+
+## F80 — `interactive` is a property of the verb, and `docker run` is not ★★
+
+`ToolDef.interactive` declares that a verb takes the terminal (C05 I19), and C23
+§4 routes on it: `suspend` → `handoff` → `resume` → `invalidate`. The flag is on
+the **tool**, and `FlagDef` has no equivalent.
+
+`docker run` attaches by default and detaches with `-d`. Same verb, two terminal
+contracts, chosen per invocation:
+
+```
+/run -it alpine sh      needs the terminal
+/run -d nginx           must not take it
+```
+
+C05's own comment argues the declaration belongs to the app author because
+*"whether a child wants a TTY is not knowable before running it"* — and that is
+right about detection. **For this verb the author cannot know either**, because
+it is not a property of the verb. The declaration has one slot and the verb has
+two behaviours.
+
+**Declared `interactive: true` here, which is the safe direction of a choice with
+no right answer.** Wrong that way, `/run -d nginx` suspends and resumes around a
+call that returns at once — a flicker on a detached run. Wrong the other way,
+`/run -it alpine sh` spawns a shell with no terminal and the session waits on a
+child nothing can answer. One is cosmetic and one is a hung session.
+
+`exec` and `attach` are unambiguous and take the flag honestly; `create` never
+touches the terminal. **`run` is the only verb in this family the type cannot
+describe**, which is what makes it a finding rather than a preference.
+
+The fix is not obviously a per-flag `interactive` — that would let two flags
+disagree, and C05 already rejects that shape for `view`. More likely the
+declaration wants to be a predicate over the invocation, which is a larger change
+than it looks and is C05's to rule on. Filed with the consumer that needed it.

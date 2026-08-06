@@ -75,4 +75,86 @@ const importVerb: ToolDef = {
   flags: [],
 };
 
-export const EXEC_TOOLS: readonly ToolDef[] = [cp, commit, exportVerb, save, load, importVerb];
+/**
+ * The handoff verbs — the first consumers of `/tty`'s route since it was built.
+ *
+ * **`interactive: true` is the whole declaration.** C23 §4 already implements
+ * `lifecycle.suspend` → `runner.handoff` → `lifecycle.resume` →
+ * `scheduler.invalidate`; nothing here writes any of it. These verbs are
+ * `local: false` because C05 I19 refuses `interactive` with `local` — a local
+ * verb is never spawned, so there is no child to hand the terminal to.
+ *
+ * ## `run` is interactive or not depending on its flags, and the type cannot say so
+ *
+ * `interactive` is on `ToolDef` and not on `FlagDef`, so a verb is interactive
+ * whole. `docker run` attaches by default and detaches with `-d` — the same verb,
+ * two terminal contracts, chosen per invocation. C05's comment says the app
+ * author is the only party who can know; for this verb the author cannot know
+ * either, because it is not a property of the verb. FINDINGS F80.
+ *
+ * **Declared interactive, which is the safe direction of a choice with no right
+ * answer.** Wrong that way, `/run -d nginx` suspends and resumes around a call
+ * that returns at once — a flicker. Wrong the other way, `/run -it alpine sh`
+ * spawns a shell with no terminal and the session waits on a child that will
+ * never be answered.
+ */
+const runVerb: ToolDef = {
+  name: "run",
+  local: false,
+  interactive: true,
+  summary: "Create a container and start it",
+  args: [{ name: "image", type: "string", required: true, summary: "Image reference" }],
+  flags: [
+    { name: "detach", short: "d", type: "bool", summary: "Run in the background" },
+    { name: "rm", type: "bool", summary: "Remove it when it exits" },
+    { name: "name", type: "string", summary: "Name for the container" },
+    { name: "interactive", short: "i", type: "bool", summary: "Keep stdin open" },
+    { name: "tty", short: "t", type: "bool", summary: "Allocate a terminal" },
+  ],
+};
+
+const exec: ToolDef = {
+  name: "exec",
+  local: false,
+  interactive: true,
+  summary: "Run a command inside a running container",
+  args: [
+    { name: "container", type: "string", required: true, summary: "Container id or name" },
+    { name: "command", type: "string", required: false, summary: "What to run — defaults to the image's shell" },
+  ],
+  flags: [
+    { name: "interactive", short: "i", type: "bool", summary: "Keep stdin open" },
+    { name: "tty", short: "t", type: "bool", summary: "Allocate a terminal" },
+    { name: "user", short: "u", type: "string", summary: "Run as this user" },
+  ],
+};
+
+const attach: ToolDef = {
+  name: "attach",
+  local: false,
+  interactive: true,
+  summary: "Attach to a running container's terminal",
+  args: [{ name: "container", type: "string", required: true, summary: "Container id or name" }],
+  flags: [],
+};
+
+const create: ToolDef = {
+  name: "create",
+  local: false,
+  summary: "Create a container without starting it",
+  args: [{ name: "image", type: "string", required: true, summary: "Image reference" }],
+  flags: [{ name: "name", type: "string", summary: "Name for the container" }],
+};
+
+export const EXEC_TOOLS: readonly ToolDef[] = [
+  cp,
+  commit,
+  exportVerb,
+  save,
+  load,
+  importVerb,
+  runVerb,
+  exec,
+  attach,
+  create,
+];
