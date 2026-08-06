@@ -49,6 +49,23 @@ export type {
   TuiInstance,
 } from "./shell/types.js";
 
+/**
+ * The local-handler contract (C23 §2, I36).
+ *
+ * **`TuiConfig.localHandlers` has been public since C22 and its context type was
+ * not**, which was invisible while `LocalContext` held one field: an app wrote
+ * `(argv, ctx: { command: string })` and structural typing agreed. `ctx.ask`
+ * makes that impossible — a handler that asks cannot name the type of the thing
+ * it is asking through, and the workaround is to re-declare the signature by
+ * hand and drift from it.
+ */
+export type {
+  AskOptions,
+  Choice,
+  LocalContext,
+  LocalHandler,
+} from "./shell/local/registry.js";
+
 // --- blocks — the type a consumer returns -----------------------------------
 
 export type {

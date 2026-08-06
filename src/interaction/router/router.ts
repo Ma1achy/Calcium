@@ -336,6 +336,27 @@ export function createRouter(
     if (e.kind === "mouse") return routeMouse(e);
 
     if (isCtrlC(e)) {
+      // **A verb waiting for an answer is not a verb to cancel** (I25).
+      //
+      // Rungs 1 and 2 read `inFlight`, and a local verb awaiting `ctx.ask` is in
+      // flight for the whole time its question is on screen — so `⌃c` was taken
+      // by rung 1 and the question never saw it. The outcome looked right, which
+      // is why only a frame-read found it: the container was untouched and the
+      // layer was gone, and a test asserting both passes. What the frame showed
+      // is that **the submitted line vanished** — cancellation discards the
+      // entry, so there was no record the command had been run at all, where
+      // declining settles one saying nothing changed.
+      //
+      // Ruling A's own argument decides it. `Esc` and `⌃c` collapse *because*
+      // declining and cancelling produce the same outcome — and when they do,
+      // the one that leaves a record is the one to keep. So a question outranks
+      // the cancel rungs, which is the only place the ladder's newest-first
+      // order is not enough on its own: both rungs have a claim, and the older
+      // one is higher.
+      if (deps.overlayAnswerCallback() !== null) {
+        stages.push("question");
+        return run("overlay", e);
+      }
       // Rungs 1 and 2, discriminated by route rather than by two sources.
       const route = deps.inFlight();
       if (route === "app" || route === "local") {

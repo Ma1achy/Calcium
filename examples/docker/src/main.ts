@@ -29,6 +29,7 @@ import {
 } from "./verbs.ts";
 import { argv as eventsArgv, createEventsHandler } from "./events.ts";
 import { dockerSources } from "./completion.ts";
+import { mutationHandlers } from "./mutation.ts";
 
 const run = promisify(execFile);
 
@@ -163,6 +164,9 @@ const tui = createTui({
     // shim: this is a local handler, so nothing appends `--json` and there is
     // nothing to translate.
     events: createEventsHandler(async () => (await run("docker", [...eventsArgv()], { maxBuffer: 8 << 20 })).stdout),
+    // The mutation family (step 9). **Local because `ctx.ask` is**, not because
+    // any of them needs state across calls — see `mutation.ts` and FINDINGS F67.
+    ...mutationHandlers(),
   },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).

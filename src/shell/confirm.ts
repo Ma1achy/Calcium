@@ -28,6 +28,15 @@ import type { AskOptions, Choice } from "./local/registry.js";
 
 export const CONFIRM_LAYER_ID = "confirm";
 
+/**
+ * How wide the question asks to be.
+ *
+ * A request rather than a measurement: C15 clamps it to the region, and a
+ * producer that measured its own content would need the block registry, which
+ * this file deliberately does not have.
+ */
+export const CONFIRM_WIDTH = 56;
+
 export type ConfirmDeps = Readonly<{
   overlays: OverlayManager;
   /** The frame is L4's to commit; C15 never paints (A02 Seam 4). */
@@ -116,6 +125,15 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         placement: { kind: "centred" },
         content: render(opts, selected),
         dismissable: false,
+        // **Declared, and the frame-read is why.** Without it C15 gives a
+        // centred layer the region's width, so `Placed.left` is always 0 and
+        // the box reads as `fill` however it was placed — which is the
+        // appearance the ruling was talking about when it said the question
+        // covers its region, and the reason that reading was tempting. C15
+        // clamps this to the region, so a narrow terminal still gets a box that
+        // fits (C15 I16: width is declared because the registry answers height
+        // at a width and never the reverse).
+        width: CONFIRM_WIDTH,
       };
 
       const disposable = deps.overlays.push(layer);

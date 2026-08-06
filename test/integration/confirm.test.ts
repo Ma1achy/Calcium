@@ -56,13 +56,14 @@ const YES_NO = [
 ];
 
 /** Real C13, C14, C15, a real confirm host and a real router. */
-function world() {
+function world(over: Partial<RouterDeps> = {}) {
   const store = createTranscriptStore();
   const viewport = createViewport(store, { width: 80, height: 10, measureSequence });
   const overlays = createOverlayManager({ registry });
   const focus = createFocusStore();
   const invalidate = vi.fn();
   const globalSeen: InputEvent[] = [];
+  let cancels = 0;
 
   const confirm = createConfirmHost({ overlays, invalidate });
 
@@ -82,13 +83,14 @@ function world() {
     inFlight: () => null,
     liveStreams: () => 0,
     cancelNewestStream: () => false,
-    cancel: () => undefined,
+    cancel: () => void (cancels += 1),
     signalShellChild: () => undefined,
     promptHasText: () => false,
     clearPrompt: () => undefined,
     region: () => ({ top: 0, height: 10 }),
     mouseEnabled: () => false,
     raiseExitConfirm: () => undefined,
+    ...over,
   } as unknown as RouterDeps;
 
   const router = createRouter({ focus, keymap: createKeymap(defaultKeymap), now: () => 0, deps });
@@ -99,7 +101,16 @@ function world() {
     return false;
   });
 
-  return { overlays, confirm, router, invalidate, globalSeen, viewport, store };
+  return {
+    overlays,
+    confirm,
+    router,
+    invalidate,
+    globalSeen,
+    viewport,
+    store,
+    cancels: () => cancels,
+  };
 }
 
 describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
@@ -226,6 +237,36 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 
     w.router.dispatch(key("n"));
     await answer;
+  });
+
+  it("T4.10 (C16 I25): ⌃c answers the question rather than cancelling the verb", async () => {
+    // **The state the other rows could not construct.** `world()` reports
+    // `inFlight: () => null`, and a local verb awaiting `ctx.ask` is in flight
+    // for the whole time its question is up — so rung 1 took `⌃c` and the
+    // question never saw it. T4.3 passed throughout, because its harness was the
+    // one arrangement where both readings agree.
+    //
+    // Found by a frame-read and by nothing else: the container was untouched and
+    // the layer was gone, which is what a test asserts, and the frame showed the
+    // submitted line had **disappeared** — cancellation discards the entry.
+    const w = world({ inFlight: () => "local" });
+    const cancelled = w.cancels;
+
+    const answer = w.confirm.ask({ question: "Stop api-gateway?", choices: YES_NO });
+    expect(w.router.dispatch(ctrlC)).toBe(true);
+
+    await expect(answer).resolves.toBe("n");
+    expect(cancelled(), "the verb must not be cancelled — it was waiting for us").toBe(0);
+    expect(w.router.lastStages).toContain("question");
+  });
+
+  it("T4.11 (C16 I25): with no question open, ⌃c still cancels a running verb", async () => {
+    // The control. Without it the row above is satisfied by a router that never
+    // cancels anything, which is the rung C16 §5 spends a paragraph on.
+    const w = world({ inFlight: () => "local" });
+    expect(w.router.dispatch(ctrlC)).toBe(true);
+    expect(w.cancels()).toBe(1);
+    expect(w.router.lastStages).toContain("cancel");
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {

@@ -12,7 +12,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: fixtures fixtures-down load-down fixtures-status help
+.PHONY: fixtures fixtures-down load-down fixtures-status throwaway-sweep help
 
 # ── The host path, and it is not a detail ────────────────────────────────────
 #
@@ -109,6 +109,27 @@ fixtures-down:      ## remove all four, running or not
 load-down:          ## remove ONLY the load generator — run this before any timing tier
 	@docker rm -f dtui-load >/dev/null 2>&1 || true
 	@echo "dtui-load removed — tier 5 is safe to run"
+
+# **Two prefixes, and the split is the whole safety argument** (step 9).
+#
+# `dtui-fixture-*` and the four named above are the standing set: read-only
+# surfaces read them, and they are never mutated. `dtui-throwaway-*` is created
+# by a test that is about to stop, kill or remove something, and removed in that
+# test's `finally`.
+#
+# **A mutation test must never touch the standing set**, because the next read
+# test asserts against it and a `/ps` fixture that is sometimes stopped is a
+# suite that fails for the previous test's reasons. The prefix is what makes that
+# checkable rather than remembered.
+#
+# This target sweeps what a crashed run left behind. It is idempotent and it
+# matches on the prefix only — a bare `docker rm -f $(docker ps -aq)` in a repo
+# that also runs the reader's own containers is exactly the accident this naming
+# exists to make impossible.
+throwaway-sweep:    ## remove orphaned dtui-throwaway-* left by a crashed test
+	@n=$$(docker ps -aq --filter 'name=dtui-throwaway-' | wc -l | tr -d ' '); \
+	 docker rm -f $$(docker ps -aq --filter 'name=dtui-throwaway-') >/dev/null 2>&1 || true; \
+	 echo "swept $$n throwaway container(s)"
 
 fixtures-status:    ## what is up
 	@docker ps -a --filter 'name=dtui-' \
