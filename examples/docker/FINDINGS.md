@@ -3414,3 +3414,201 @@ which is exactly enough ambiguity for a summariser to take the wrong half.
 **What a triage cannot see, stated plainly**: this was not reachable from `FINDINGS.md`
 at all. It came from resolving the Order list's summary against its own body, which is
 *going to find where the claim was written down* pointed at a roadmap.
+
+---
+
+## F90 — the frame is recomputed and rewritten whole, and the four fixes are one chain ★★★
+
+**Filed as one finding because they are not independently actionable.** Each stage
+pays off only once the one before it lands, and landing them out of order converts
+continuous lag into a single long stall rather than fixing it. Four ids would invite
+exactly that.
+
+**Measured in the source, not profiled.** Two multiplicative costs on one keystroke:
+
+| | |
+|---|---|
+| `shell/session.ts:368` | `write(`${hide}${HOME}${lines.join("\r\n")}${cursor}`)` — **no comparison against the previous frame.** On 200×50 that is ~10,000 cells of styled output to change one character |
+| `shell/paint.ts:152` | `renderSequenceToLines(...)` per visible entry **per frame**, and nothing caches rendered lines. Only `measure` is cached — C14, on `(entryId, rev, width)` |
+
+**`region()` is the sharper statement**, and it is three lines below the call:
+
+```ts
+const lines = renderSequenceToLines(deps.registry, blocks, width, {...});
+const out: string[] = [];
+for (let i = 0; i < n; i += 1) out.push(exact(lines[i] ?? "", width));
+```
+
+**Every line past `n` is computed and discarded.** A 5,000-line patch renders 5,000
+lines, keeps thirty, and with highlighting `lowlight` tokenises all 5,000 first — per
+keystroke. The virtualisation is at *entry* granularity; C14 selects which entries are
+visible and the renderer then renders each one whole.
+
+### The chain, and the order is the finding
+
+| | stage | why it cannot move |
+|---|---|---|
+| **1** | **output diffing** — keep the last frame as rows, write only those that differ | Cuts every frame regardless of block size. Smallest, contained to one file, and **the invalidation story already exists**: `contaminated` forces a full repaint when the screen's contents are unknown |
+| **2** | **render caching** on `(entryId, rev, width)` | The frame *after* the first becomes free. **Alone it is not enough** — the first frame still renders 50,000 lines, so this converts continuous lag into one long stall |
+| **3** | **window the block** — reduce a block to a valid smaller block of the same kind | The one that actually fixes it. `windowPatch` proves the pattern at `shell/patch-view.ts:97`, but **only inside a pushed view** — the transcript has no equivalent. Per divisible kind: `patch` `table` `keyValue` `logs` `code`. The plot does not divide, and that is permanent (C12 I1) |
+| **4** | **cap with a visible marker** | Even windowed, `measure` walks the whole block once to know its height. `MAX_ROWS = 2_000` at `data/adapters/fallback.ts:39` is **the fallback adapter's own limit** and D40's cap bounds *blocks per document*, not rows within one — so an app adapter has no bound at all |
+
+**Stage 4's marker is what keeps it honest.** `fallback.ts:251` already writes
+*"Showing the first 2,000 rows; N more were not rendered"* for its own cap; a silent
+truncation is the empty-block class, and D40's eviction carries a marker for the same
+reason.
+
+**Anticipated in a comment and never built.** `terminal/frame-scheduler.ts:175` reasons
+about *"diffing against a screen whose contents nobody knows"* — a sentence that only
+means something if diffing is the normal case. **Specified in prose, absent in code**,
+which is this project's most-instantiated shape and the reason stage 1 is first.
+
+**Independent confirmation of the diagnosis, from the other side.** `code.ts:69` memoises
+tokenisation because *"a transcript re-renders on every frame; tokenising it on every
+frame…"* — **someone already knew rendering repeats and mitigated its most expensive
+part** rather than the repetition. The memo stays correct after stage 2 and stops being
+load-bearing.
+
+**Why it was never filed.** It is not a docker-tui finding: no surface *failed*, and the
+app's own documents are small. It was found by reading `session.ts` and `paint.ts`
+against each other, which is the instrument no triage contains.
+
+**The acceptance test is a frame-read, not a benchmark** — type into a 5,000-line diff
+and watch. A microbenchmark that improves while the frame still stutters has measured
+something other than what a reader experiences.
+
+---
+
+## F91 — every `b.live` part owns its own fetch, and two views of one source disagree ★★★
+
+**The optimisation is the weaker half.** The landing dashboard, `/stats` and a
+single-container panel each spawn `docker stats --no-stream` on their own interval —
+three subprocesses, one endpoint, no coordination.
+
+**The correctness half is the finding.** Two parts polling the same source at different
+moments **hold different data**: one plot and one sparkline each keep their own history
+and the two diverge on screen. Two renderings of one fact showing different numbers is a
+defect, not a cost — and it is the two-records-of-one-fact class, which this project has
+now found in a type, in a document and here in a clock.
+
+**The split that fixes it, and it is a design rather than a cache:**
+
+```
+SOURCE       fetch, shared, versioned            one poll per tick
+DERIVATION   pure, shared, memoised              the ring buffer · the parse · averages
+PART         view state + render, per instance   one expanded, one collapsed
+```
+
+> **Per-part state is view state only. Anything that accumulates belongs in a derivation.**
+
+That rule is what makes the rest safe. Expanded/collapsed and which-tab do not need
+updating while nobody is looking; a ring buffer does — so **a paused part cannot fall
+behind, because it holds nothing that could.**
+
+**`assignOffsets` and `backoffOf` are the existing seam** (`shell/refresh.ts:93,108`).
+They stagger *parts*; with shared sources there are far fewer things to stagger and parts
+sharing one are aligned by construction rather than by arithmetic. The stagger gets
+simpler and has less to do.
+
+**Its second consumer is already written down and depends on it.** `refresh.ts` holds
+**no visibility check of any kind** — its only `viewport/` import is `TranscriptStore`,
+and the two occurrences of *"visible"* in the file are comments about something else. So
+a part ticks whether or not its entry is on screen: scroll past a `/stats` entry and it
+**keeps spawning `docker stats` every two seconds for a panel nobody can see.** Unlike
+the render cost, this one spawns processes and hits the far side.
+
+**I9 is not violated by pausing, and the distinction is the ruling.** I9 protects a
+*frozen* entry — a newer entry appeared, the thing is still running, patches keep
+arriving. **Scrolled-off is a different state**: nobody is looking now, and the data must
+be fresh when they look. Pause and catch up on re-entry; with a shared source, one visible
+part keeps the source polling for everything sharing it, so returning is frequently free.
+
+**Where to stop: two levels, not a reactive graph.** `source → derivation → part` covers
+every case here. That is the same call as `b.row` being a container rather than a layout
+engine, and windowing being block-boundary rather than mid-row — **three rulings with one
+shape**, which is the evidence it is the right one.
+
+---
+
+## F92 — `usageBlocks` renders per-verb help and only an exit code can ask for it ★★
+
+**The claim this was filed from was wrong and the correction is the finding's shape.**
+`CALCIUM_ROADMAP.md` states *"`usageBlocks(tool, id)` is built, exported, and has no
+caller in `src/`"* and its Order entry compresses that to *"built, exported, and
+uncallable"*. **Measured:**
+
+```
+src/data/adapters/mapping.ts:159   export function usageBlocks(tool, id): readonly Block[]
+src/data/adapters/mapping.ts:237     ...usageBlocks(ctx.tool, id("usage-block"))   ← inside `if (raw.exitCode === 2)`
+```
+
+**It has a caller and it is not uncallable.** The roadmap's own body says as much two
+paragraphs later — *"it exists as the far side's usage-error path"* — so the summary
+overstates a body that is correct, which is F89's shape in a second entry of the same
+document.
+
+**The true gap is narrower and still real: the only thing that can ask for it is the far
+side exiting 2.** A reader who wants to know what a verb takes cannot get this document.
+`/ps --help` reaches the far side instead, because **every declared flag is transmitted**
+— which is F39, and `--help` is now its **second independent consumer**.
+
+**Its own comment argues for a trigger it does not have:**
+
+> *Exit 2 is an invocation problem, so the document says what a correct invocation looks
+> like — generated from the manifest, because a hardcoded usage string is wrong the first
+> time a flag is added and nobody notices until someone reads it.*
+
+**Two rulings when it is built.** Reserve `--help` framework-side rather than making apps
+declare it — C05 already appends the framework's six verbs to every parsed manifest, and a
+per-app discipline means one app forgetting it is a verb with no help. And it **shrinks**
+`/help`: verbs with summaries at the top level, detail behind `/verb --help`, so the
+fifty-verb wall becomes two levels and the second one is already written.
+
+**Blocked on F39.** Filing it separately is the point — F39 was one consumer and a shim
+absorbed it; it is now two, and the second is the framework's own.
+
+---
+
+## F93 — C09 §4a promises a registration path that was never built ★★★
+
+`src/presentation/blocks/kinds/code.ts:31` is `createLowlight({ json, yaml })`. Everything
+else renders flat: TypeScript, Python, a stack trace, a diff, SQL.
+
+**This is a regression against a stated design, not a scoping choice.** The file's own
+header commits to languages *arriving*:
+
+> *"measures identically whether or not its language is registered — a grammar shipping
+> tomorrow does not reflow yesterday's transcript"*
+>
+> *"An unregistered language renders as plain text, not an error"* — readable today and
+> **highlighted whenever someone registers it**
+>
+> *"The fallback is a fallback, not a filter."*
+
+**Every one of those sentences is pointless under a fixed two-language set.** `measure`
+ignores tokenisation *so that* adding a grammar later is safe; unregistered renders as text
+*so that* it is readable until someone registers it. Then the constructor shipped with **no
+registration path**, so *"whenever someone registers it"* has no someone. The spec's own
+promise is unreachable.
+
+**The recorded objection does not survive measurement.** Grammars import individually —
+`diff` 1.2 KB, `python` 9 KB, `typescript` 21 KB — and **24 mainstream grammars total
+180 KB**. The 9.3 MB figure is the whole package: 384 grammars, minified duplicates and CSS
+themes, none of which is pulled in. For a Node CLI that is noise, and a highlighter that
+flattens the language you actually use reads as broken rather than as economical.
+
+**Why nothing caught it, and this is the part worth keeping.** C09 was built when the only
+consumers were `docker inspect` (JSON) and an nginx config (YAML). **Two grammars satisfied
+every test, and nothing in the suite could distinguish *we ship two* from *we ship two for
+now*** — §4a's promises about future languages are prose, and no rule checks prose against
+behaviour. That is the standing gap named by both coverage audits and by the step-3a
+partition, arriving with a consumer.
+
+**Two changes, and the second is the one the spec obliges.** Ship the mainstream set, and
+**expose registration** — which matters more at 24 than at 2, because a mainstream set never
+covers a consumer's own domain. Exported block kinds with unexported grammars is the same
+asymmetry as a factory you can import and cannot install.
+
+**Amend the comment rather than deleting it.** Its principle holds — the full 384 *is* most
+of the weight and none of the value. What changed is that *"actually needed"* was measured
+against two consumers and now has more.

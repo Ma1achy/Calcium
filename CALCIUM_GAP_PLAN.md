@@ -272,7 +272,10 @@ triage's is why this one does.
 
 ## 6 · Step 3b
 
-Three things, in this order, and the first is not the largest:
+**Done — `CALCIUM_FIX_PLAN.md`.** The blind spot below was filed first, as F90–F93, so the
+plan was built from a complete ledger: 96 findings, 58 open. Two of the six did not survive
+transcription, which is recorded there. Three things, in this order, and the first is not the
+largest:
 
 1. **The instruments** — F83, F84, and a fixture per instrument. Cheapest, and every later
    verdict is measured through them.
