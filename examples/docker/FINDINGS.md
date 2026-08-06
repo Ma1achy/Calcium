@@ -4025,3 +4025,75 @@ three are on the adapter route, so nothing on the local route could see it.
 `adapter` is one of the three keys a producer owns, so each builder names itself again.
 The catch is the argument for the read: the last mechanical rewrite was caught by 166
 runtime failures, and this one had none to be caught by.
+
+---
+
+## F102 — D29's sweep exempts a *kind*, and the guard against that catches only a new kind ★★★
+
+`expectDocument().hasNoColourOnlyDistinction()` ends in a `default` arm that calls
+`assertNothingToCheck`, and its comment is the strongest self-description in the file:
+
+> `default: break` accepted a new kind in silence, and silence in a compliance checker is
+> indistinguishable from compliance. A03 §2's vacuity class in the checker.
+
+That repair is real and it closed the case it named. **It does not close the neighbouring
+one.** `KINDS_WITH_NOTHING_TO_CHECK` is a `Set<BlockKind>`, so membership is earned once,
+by the fields a kind had on the day it was listed, and nothing re-reads it when the fields
+change. A new *kind* is a compile error; a new meaning-bearing *field* on an exempted kind
+is silence.
+
+**Verified by fabricated violation**, because a claim about a hole is worth nothing
+asserted:
+
+```ts
+// `events` is exempt. F51's remedy is a tone on EventLine. Land it and sweep:
+{ kind: "events", id: "e", events: [{ ts: "12:00", type: "", message: "", tone: "error" }] }
+expect(() => expectDocument(d).hasNoColourOnlyDistinction()).not.toThrow();  // passes
+```
+
+A bare `error` tone with no glyph and no text — the exact shape the `notice`, `keyValue`,
+`pills` and `table` arms each throw on — passes, because the kind carrying it was exempted
+before it could carry one. **Four arms enforce the rule and the fifth kind is outside its
+subject**, and the difference is invisible from a green run.
+
+**The class, and it is why this is three stars rather than one.** A03 §2 says a rule with
+nothing to be wrong about passes like a rule that is satisfied. The repair above understood
+that and built a guard — and the guard has the same property one axis over. **An exemption
+is a claim about what the excluded set contains, and it is never re-checked, because the
+whole point of exempting was to stop looking.** That is the count-an-exemption rule arriving
+in a compliance checker rather than in a grep.
+
+**The fix is not a wider sweep.** Keying the set on the fields rather than the name — a
+kind is exempt while it declares no `tone`, no `glyph` and no other meaning-bearing slot —
+makes the exemption expire when its premise does. C04 I37.
+
+**And it did not fire on the change-axis ruling, which is the useful negative.** I35 forbids
+a producer supplying a colour for a categorical axis, so the case D29 would have to catch is
+unbuildable and the sweep needs no new arm. The hole is real and this ruling does not widen
+it; those are two findings and only one of them is a bug.
+
+---
+
+## F103 — three renderers implement one pattern and none of them names it ★★
+
+`patch`'s `TONES`/`MARKERS`/`SURFACES`, `structured.ts`'s `levelTone`, and the same file's
+`comparisonTone` are the same construction: a frozen map from a domain vocabulary to a
+palette slot, owned by the renderer, with the distinction carried in text or a marker so
+that losing the colour loses nothing.
+
+**Three instances in one layer, two of them in one file, and no shared name** — so when a
+fourth surface needed it, it was not found. F30, F49, F51 and F81 are four independent
+reports of *the model has one axis and needs two*, filed across four steps by surfaces that
+knew nothing of each other, and the answer was in `src/presentation/` the whole time.
+
+**What the absence cost is measurable and it is not code.** Each of the four solved it
+correctly by hand — the app's `+`/`-`/`~`, the `HOW` column, the exit code in the message —
+so nothing shipped wrong. What it cost was **four findings, one of which sat open for four
+steps as a ranked gap in the triage**, and a plan entry reading *a change axis distinct from
+`Tone`, 4 consumers, ⚠ C04 · C09 · C10* for work that turns out to be one type split and a
+sentence.
+
+**The pattern is now C04 I35 and the ruling is the deliverable**, but the finding is about
+how it stayed invisible: **a pattern with three implementations and no name reads as three
+local decisions**, and a fourth surface has nothing to search for. `levelTone` and
+`comparisonTone` sit forty lines apart.
