@@ -111,15 +111,35 @@ export function checkFindings(io) {
   // must resolve too. It is included rather than excused: the entry that cites a
   // finding renumbered out from under it is the likeliest wrong citation there
   // is, and excusing the file would leave the largest source of them unchecked.
+  //
+  // **`examples/docker`, not its two code directories** — an allow-list over the
+  // directory rather than a glob at the files thought to matter. The first
+  // version named `examples/docker/src` and `examples/docker/test`, which left
+  // every top-level document out: thirteen files and ~250 citations, `TRIAGE.md`
+  // alone holding 175. That is the *most*-cited artefact after the ledger, and it
+  // is the one whose whole job is to cite.
+  //
+  // Found by fixing `citations` and comparing the number against the tree, which
+  // is the argument for the counter in one line: 415 was checkable and 0 was not.
+  // Same mechanism as this rule's first vacuity — a scope that excludes its
+  // subject — so it is the third instance of one class, and the fix is the shape
+  // that stops it recurring: cover the directory and name the exceptions.
+  // FINDINGS F82.
+  //
+  // **Deduplicated, because the ledger is now reached twice** — once by the walk
+  // and once by being named. Without the `Set` it is scanned twice and its 116
+  // self-citations are counted twice, which inflates the very number a caller
+  // asserts against. Caught by arithmetic: 415 + 250 is 665 and the run said 781.
   const inScope =
     io?.files ??
     [
-      ...walk("src"),
-      ...walk("docs"),
-      ...walk("examples/docker/src"),
-      ...walk("examples/docker/test"),
-      LEDGER,
-      "CLAUDE.md",
+      ...new Set([
+        ...walk("src"),
+        ...walk("docs"),
+        ...walk("examples/docker"),
+        LEDGER,
+        "CLAUDE.md",
+      ]),
     ].filter((f) => f === LEDGER || CITED_FROM.some((p) => f.startsWith(p)));
   let scanned = 0;
   let citations = 0;
@@ -143,8 +163,20 @@ export function checkFindings(io) {
         // Only ids in the ledger's range are citations of it. `F1` in a
         // hexadecimal dump or a version string is not, and the ledger starting
         // at F1 means the range is "anything declared, or above the maximum".
-        if (known.has(id)) continue;
         const n = Number(id.replace(/[a-z]$/u, "").slice(1));
+        if (n < 1) continue;
+
+        // **Counted here, before the resolution check, and that ordering is the
+        // whole point of the field.** It used to be incremented inside the
+        // violation branch below, which made `citations` a second name for
+        // `violations.length`: always 0 on a clean tree, whether the rule had
+        // walked past six hundred citations or had matched nothing at all. That is
+        // precisely the "clean is indistinguishable from did-not-run" signal the
+        // counter was added to destroy, so the rule shipped vacuous a third time
+        // *in the instrument built because it shipped vacuous twice*. FINDINGS F82.
+        citations += 1;
+        if (known.has(id)) continue;
+
         const max = Math.max(
           ...[...known].map((k) => Number(k.replace(/[a-z]$/u, "").slice(1))),
         );
@@ -162,8 +194,6 @@ export function checkFindings(io) {
         // twice in step 9 — while a gap requires someone to have deleted a
         // finding. The upper bound is now checked and only a nonsensical `F0`
         // is excused.
-        if (n < 1) continue;
-        citations += 1;
         violations.push({
           rule: "SP5",
           file: `${file}:${String(i + 1)}`,

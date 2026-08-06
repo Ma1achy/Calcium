@@ -2930,3 +2930,187 @@ The fix is not obviously a per-flag `interactive` — that would let two flags
 disagree, and C05 already rejects that shape for `view`. More likely the
 declaration wants to be a predicate over the invocation, which is a larger change
 than it looks and is C05's to rule on. Filed with the consumer that needed it.
+
+---
+
+## F81 — a cache hit is a kind and `Tone` is a grade, found a fourth time ★★★
+
+`docker build --progress=rawjson` reports `vertexes[].cached === true`. A step that
+was cached and a step that ran are **different kinds of thing**, and `Tone` is a
+goodness axis — `ok`, `warn`, `error`. Reaching for it would say a cache hit is
+*better* than work, which is not what a reader wants to know; they want to know
+which steps ran.
+
+So `renderBuild` carries the distinction in a **column, in words** (`HOW`:
+`cached` / `ran` / `…`), and leaves `Tone` alone.
+
+**This is F30/F49/F51's absent concept reached a fourth time, by a surface built in
+a different step for a different reason** — which is the threshold the triage ranks
+on. F30 wanted `added`/`removed` on a comparison, F49 wanted `+ - ~` to mean change
+kind, F51 wanted a lifecycle event to say which event is bad. None of the three
+knew about the others, and none of them is a build.
+
+**The surface found the axis boundary by hand, and the boundary is the useful
+part.** The same block *does* take a tone, on the same row, for the neighbouring
+column:
+
+```ts
+step: s.error !== undefined
+  ? { text: s.name, tone: "error", glyph: "error" }
+  : s.name,
+how:  s.cached ? "cached" : s.completed !== undefined ? "ran" : "…",
+```
+
+**Failure is a goodness axis and caching is not**, so one cell takes a tone and the
+one beside it cannot — in a single row, built by a single expression. That is the
+sharpest statement of the gap in the repository: not *this block needs a colour it
+does not have*, but *this row needs two axes and the model has one*, demonstrated
+by a cell of each sitting side by side. C04 I6 then required a glyph for the
+`error` tone, correctly, and there is no equivalent obligation available for the
+axis that has no home.
+
+### Why it is filed now and not in step 11
+
+**It was written down and it was written down in the wrong place.** The reasoning
+above existed the whole time as a comment at `src/progress.ts:31` and again at
+`:160`, and the first of them ends:
+
+> This is F30/F49/F51's fourth consumer, **filed rather than worked around**.
+
+It was not filed. The comment is a claim about a record, and there was no record —
+so the strongest group on the triage's list looked like three consumers rather than
+four for a whole step, and a reader of `FINDINGS.md` had no way to know otherwise.
+
+**That is the sixth blind spot in its cheapest form.** F58 was a claim restated
+across four documents that never held a measurement; F66 was one carried across four
+steps that was never written down at all. This is the inverse of both: the *content*
+was correct, complete, and measured — and it sat somewhere no mechanism reads. SP5
+checks that every citation resolves to a finding that exists. **Nothing checks the
+other direction: whether something that should have been a finding is one.**
+
+The generalisation is not "grep comments for findings", which would be noise. It is
+that **a comment is the natural place to explain a decision and the wrong place to
+record a gap**, because the two read identically at the point of writing. The
+decision — *use a column, not a tone* — belongs exactly where it is. The gap it was
+taken in response to belongs here, and only the author, at that moment, can tell
+which they have just written.
+
+---
+
+## F82 — the counter added because the rule shipped vacuous twice, shipped vacuous ★★★ — **fixed**
+
+SP5 returns `scanned` and `citations` beside its violations, and `findings.d.mts`
+says why in as many words:
+
+> A count is the only thing that tells "clean" from "did not run", so it is part
+> of the return rather than something a caller could forget to ask for.
+
+`citations` was incremented **inside the violation branch**, after the
+`if (known.has(id)) continue` that skips every citation which resolves. So it
+counted failures, which is what `violations.length` already counts, and the two
+were equal on every input SP5 has ever seen.
+
+Measured on the tree at F81:
+
+| | |
+|---|---|
+| `citations`, as reported | **0** |
+| resolving citations actually walked past | **412, across 66 files** |
+
+**Zero is what it reports on a clean tree, and zero is what it would report if the
+regex matched nothing, if `CITED_FROM` excluded every citing file, or if the walk
+returned an empty list.** Those are the exact two failures SP5 had already shipped,
+and the field existed to tell them apart. It could not: a clean run and a dead run
+were the same number, which is the property it was built to destroy.
+
+**Third time, inside the instrument built after the second.** The rule was vacuous
+once by scope (`walk("src")` holds none of the files that cite this ledger) and once
+by range (a guard that skipped every number past the maximum, on a gapless ledger).
+The counter was the response to both — and it was written in a way that could not
+report either.
+
+### The test agreed, in a way that is worth reading twice
+
+```ts
+expect(v).toHaveLength(0);
+expect(v.citations, "it looked at the citation and accepted it").toBe(0);
+```
+
+**The message states the intent and the number asserts the opposite.** If it looked
+at a citation and accepted it, `citations` is 1. Both halves were written in one
+sitting, from the same understanding, and neither was checked against the other —
+which is F65's shape, an artefact wrong about itself, arriving in a test rather than
+in a drawing. Nothing in a review distinguishes the two: a message and an assertion
+that disagree read exactly like a message and an assertion that agree.
+
+**And the corpus row asserted the wrong count.** It checked
+`scanned > 50` — *files opened* — which stays high when the regex matches nothing and
+when the scope holds the wrong files entirely. `scanned` proves the walk ran;
+**only `citations` proves the regex and the scope work together**, and that pair is
+what failed both earlier times.
+
+### How it was found, which is not by looking for it
+
+Verifying the F81 triage's own claim — *"`make enforce` resolves every `Fnn` cited
+above"* — by running the rule and reading its counters rather than its exit status.
+`enforce` was green, as it has been through all three vacuities. The number beside
+the green is what disagreed with the tree.
+
+**That is the frame-read applied to an enforcement rule**: the exit status is the
+assertion, and the counters are the frame. Three vacuities in one rule, none of them
+visible from a passing run, is the strongest case in this repository for the habit —
+and `citations: 0` is a fact a reader can check against a tree in one command, which
+is what makes it worth returning at all.
+
+Fixed: `citations` is incremented before the resolution check, so it counts every
+citation walked past. The corpus row now asserts `citations > 200` — a floor well
+under 412 so that filing findings does not move it — and the row above asserts `1`
+under its original message.
+
+**Mutation**, reverting the increment to the violation branch:
+
+| row | killed |
+|---|---|
+| the corpus row (`citations > 200`) | ✓ — *expected 0 to be greater than 200* |
+| a live number passes (`citations === 1`) | ✓ — *expected +0 to be 1* |
+| SP5 fires: past the end of the ledger | unaffected, correctly |
+| SP5 fires: a gap in the middle | unaffected, correctly |
+
+The two `fires` rows are untouched because they never depended on the counter, which
+is why four green rows and a broken field coexisted for as long as they did.
+
+### The second half, which the first half found within a minute
+
+**A working counter is a number you can check against a tree, and the first thing
+it said was that the scope was wrong again.** `415` looked low, so it was compared
+against what the repository actually holds:
+
+| | scanned | citations |
+|---|---|---|
+| the scope as written | `src`, `docs`, `examples/docker/src`, `examples/docker/test`, the ledger, `CLAUDE.md` | **415** |
+| what it was missing | **13 top-level documents under `examples/docker/`** | **250** |
+| `TRIAGE.md` alone | — | **175** |
+
+**The most-cited artefact after the ledger was outside the rule's scope**, and it is
+the one whose entire job is to cite. So were `VERIFYING.md`, `README.md`, and every
+`*_WALK.md` — the by-hand walks, which cite findings constantly because that is what
+a walk produces.
+
+**That is this rule's first vacuity repeating**, three instances of one class now: a
+scope naming the directories thought to matter rather than covering the directory and
+naming its exceptions. Fixed by walking `examples/docker` and letting `CITED_FROM`
+filter, which is the shape that stops it recurring — a new document is covered on the
+day it is written rather than on the day someone remembers the rule exists.
+
+**No violation was hidden.** All 250 resolve; the gap was in what could have been
+caught, not in what was. That is worth stating plainly rather than implying a near
+miss: the cost was a guarantee nobody had, not a defect nobody saw.
+
+**And the dedupe was caught by arithmetic, not by a test.** Widening the walk put the
+ledger in scope twice — once walked, once named — so it was scanned twice and its 116
+self-citations counted twice. `415 + 250 = 665` and the run reported **781**. The
+difference is exactly 116. A counter that can be checked against a sum is a counter
+that catches its own double-count, which is the second argument this finding makes for
+returning numbers rather than a boolean.
+
+Final: **306 files, 665 citations, 0 violations.**

@@ -18,6 +18,15 @@ export type Violation = {
  * indistinguishable from success. A count is the only thing that tells "clean"
  * from "did not run", so it is part of the return rather than something a
  * caller could forget to ask for.
+ *
+ * **`citations` counts every citation walked past, resolving or not** — not the
+ * failures, which are `length`. It was implemented as the latter and was
+ * therefore always equal to `violations.length`, reporting **0** on a tree
+ * holding 412 real citations across 66 files: the third vacuity, inside the
+ * counter built to prevent the first two. So a caller asserting `citations > 0`
+ * is asserting that the regex and the scope work *together*, which is the pair
+ * that failed both earlier times and which `scanned` alone cannot show.
+ * FINDINGS F82.
  */
 export type FindingsResult = Violation[] & {
   scanned: number;

@@ -35,7 +35,12 @@
  * and reaching for it here would say a cache hit is *better* than work, which is
  * not what a reader wants to know. They want to know which steps ran. So the
  * distinction is carried in a column, in words, and `Tone` is left alone. This is
- * F30/F49/F51's fourth consumer, filed rather than worked around.
+ * F30/F49/F51's fourth consumer, filed as **F81** rather than worked around.
+ *
+ * **That citation was absent for a step**, and this comment claimed the filing
+ * without it — which is F81's own second half: a comment is the right place for
+ * the decision and the wrong place for the gap, and the two read identically at
+ * the point of writing.
  */
 
 import { spawn } from "node:child_process";
@@ -158,7 +163,7 @@ const seconds = (s: Step): string => {
 const STEP_COLUMNS = [
   b.col("step", { label: "STEP", priority: 90, minWidth: 20, flex: true, truncateFrom: "end" }),
   // **A column, not a tone.** Cached and ran are different kinds of thing; a
-  // tone would rank them. F30/F49/F51's fourth consumer.
+  // tone would rank them. F30/F49/F51's fourth consumer, and F81.
   b.col("how", { label: "HOW", priority: 60, minWidth: 7, maxWidth: 7 }),
   b.col("took", { label: "TOOK", priority: 40, minWidth: 6, maxWidth: 6, align: "right" }),
 ];

@@ -626,9 +626,21 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
   // number past the maximum on a ledger with no gaps. Four fabricated violations,
   // zero firings. `scanned` and `citations` exist so a test can tell "clean" from
   // "did not run", which is the only difference that mattered.
+  //
+  // **And a third time, in the counter itself.** `citations` was incremented
+  // inside the violation branch, so it was a second name for `violations.length`
+  // — 0 on a clean tree whether the rule had walked past 412 citations or none.
+  // This row asserted only `scanned`, which counts *files opened* and stays high
+  // when the regex matches nothing and when the scope holds the wrong files. The
+  // pair that failed both earlier times is regex-and-scope *together*, and only
+  // `citations` can show it. F82.
   it("SP5: the real tree is clean, and the rule actually read it", () => {
     const v = checkFindings();
     expect(v.scanned, "files scanned").toBeGreaterThan(50);
+    // A floor well under the true count (412 across 66 files at F82) so that
+    // adding or removing findings does not move it, and far enough above zero
+    // that a scope or regex regression cannot slip beneath it.
+    expect(v.citations, "citations resolved — the rule saw its subject").toBeGreaterThan(200);
     expect(v.map((x) => x.message), "SP5").toEqual([]);
   });
 
@@ -665,7 +677,13 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
       read: () => "see F2",
     });
     expect(v).toHaveLength(0);
-    expect(v.citations, "it looked at the citation and accepted it").toBe(0);
+    // **This assertion used to read `toBe(0)` under this exact message.** The
+    // message states the intent — *it looked at the citation and accepted it* —
+    // and the number asserted the opposite, because `citations` only counted
+    // failures. Both were written in one sitting and neither was checked against
+    // the other, which is F65's shape (an artefact wrong about itself) arriving
+    // in a test rather than in a drawing. F82.
+    expect(v.citations, "it looked at the citation and accepted it").toBe(1);
   });
 
   it("SP4 fires: a Seam 4 row its owner does not name", () => {
