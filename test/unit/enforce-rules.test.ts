@@ -600,6 +600,36 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ]);
   });
 
+  it("MG24 walks `export type X = Readonly<{…}>`, and a record is consumed by being BUILT", () => {
+    // **F84.** The walk was anchored on `export interface`, and this codebase
+    // publishes object types both ways — 276 members behind one keyword and 798
+    // behind the other, outside the reach of every rule in the suite. The old
+    // header justified the scope with *a type alias is structural and can be
+    // satisfied without being named*, which is true about satisfying a type and
+    // irrelevant to consuming a member of one.
+    //
+    // **And the consumer test has to differ with the keyword.** An interface is
+    // called into; a record is built. `{ dots: … }` names a member with no dot
+    // in front of it, and dot-access alone reported 82 over the widened walk.
+    const rec: Record<string, string> = {
+      "src/presentation/plot/raster.ts":
+        "export type Grid = Readonly<{\n" +
+        "  rows: number;\n" +
+        "  dots: readonly number[];\n" +
+        "}>;\n",
+      // A consumer that BUILDS one — `rows` is supplied and must not be
+      // reported; `dots` is named nowhere and must be.
+      "src/presentation/plot/render.ts": "const g = { rows: 4 };\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(rec), (f) => rec[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]);
+
+    expect(named, "a supplied field is consumed; an unsupplied one is not").toEqual([
+      "Grid.dots",
+    ]);
+  });
+
   it("MG24 does not report a method PARAMETER as an interface member", () => {
     // **F95.** The member pattern is line-oriented, so a parameter inside a
     // multi-line signature matched it — `take(sourceId, key, ttlMs, run)` gave

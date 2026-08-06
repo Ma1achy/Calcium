@@ -964,16 +964,113 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "HistoryStore.clearConfirmLayer":
     "C20 — dismisses the clear-confirmation overlay; the shell dismisses via the router's " +
     "`dismiss` action. Unverified. F97's group",
+
+  // === F84: the `export type` cohort ======================================
+  //
+  // The walk covers `export type X = Readonly<{ … }>` from F84, so 276 members
+  // became 1055. Everything below was outside every rule in the suite until
+  // then, and the group divides cleanly in two.
+
+  // --- a reporting record whose consumer is a suite -------------------------
+  //
+  // **The `DocumentAssertions` category, arriving in the shape that produces
+  // most of it.** A conformance report or a fixture diff exists to be asserted
+  // against; a component reading one would be a second implementation of the
+  // check. Each is consumed by `test/` or `tools/` and by no component, which is
+  // what a reporting type looks like from inside the package that publishes it.
+  "Delta.after": "C08 — a fixture diff's new value; `test/unit/fixtures.test.ts` asserts pairs",
+  "FixtureDiff.deltas": "C08 — the diff's payload, read by the corpus tests",
+  "CorpusDiff.matched": "C08 — corpus comparison tally, asserted by the corpus tests",
+  "CorpusDiff.changed": "C08 — as `matched`",
+  "CorpusDiff.removed": "C08 — as `matched`",
+  "CorpusDiff.deltaCount": "C08 — as `matched`",
+  "FixtureHandlerOptions.world": "C08 — the world a fixture handler runs against; `tools/` supplies it",
+  "ProvenanceProblem.fixtureId": "C08 — which fixture a provenance problem names, asserted in test",
+  "VerbRatio.recorded": "C08 — provenance tally, asserted in test. **Three siblings are dead: F99**",
+  "VerbRatio.flagged": "C08 — as `recorded`",
+  "CompletionResult.superseded": "C19 — the token-of-validity outcome; asserted at three tiers and never branched on by a component, which is C19 I13's whole point",
+  "EngineOptions.onSourceError": "C19 — the injected error sink; supplied by tests and defaulted in the engine",
+  "Graph.log": "C22 — the construction log, read by `tools/` and by seven test files. A component reading it would be a second record of construction order",
+  "Identity.user": "C22 — the identity record's fields, asserted by the identity tests. `SessionSnapshot` carries it and no component destructures it",
+  "Identity.email": "C22 — as `user`",
+  "Identity.groups": "C22 — as `user`",
+  "SgrStyle.inverse": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
+  "SgrStyle.underline": "C01 — as `inverse`",
+  "FrameSchedulerOptions.windows": "C03 — per-reason coalescing windows, injected by six test files to drive the scheduler deterministically",
+  "ViewRefresh.offsetMs": "C23 — the stagger `assignOffsets` writes; never chosen by the declarer, which is the field's own comment",
+  "Finding.subject": "C09 §7 — boundary-conformance report field, asserted by the suite it exists for",
+  "Finding.assertion": "C09 §7 — as `subject`",
+  "Finding.means": "C09 §7 — as `subject`",
+  "ConformanceReport.findings": "C09 §7 — as `subject`",
+  "ConformanceReport.skipped": "C09 §7 — as `subject`, and the reference app reads it in five places",
+  "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
+  "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",
+  "Failure.expected": "C09 §7 — as `check`",
+  "ToolDef.oneShot":
+    "C05 — **already documented at length as having no subject** (C22 §4). Correct " +
+    "disposal, independently confirmed: the coverage audit reached it from the " +
+    "`export type` side and C22 had ruled on it from the spec side",
+
+  // --- dead everywhere, and each names its finding --------------------------
+  //
+  // **Eleven members named nowhere in `src/`, `test/`, `tools/` or the reference
+  // app.** Gaps, not exemptions — listed so the suite is readable rather than
+  // red, and the citation is what makes the entry expire: the equality arm fires
+  // the day any of them gains a consumer. FINDINGS F99.
+  "GlyphSet.teeLeft": "**F99** — a declared glyph slot with no drawer. Box-drawing",
+  "GlyphSet.teeRight": "**F99** — as `teeLeft`",
+  "GlyphSet.hollow": "**F99** — as `teeLeft`",
+  "GlyphSet.blocked":
+    "**F99** — and this one is *semantic* rather than box-drawing, so a theme declaring " +
+    "it gets nothing and the absence reads as a theme error rather than a missing renderer",
+  "GlyphSet.warning": "**F99** — as `blocked`, semantic",
+  "GlyphSet.bar": "**F99** — as `teeLeft`",
+  "VerbRatio.derived":
+    "**F99** — three of a five-field record are dead while `recorded` and `flagged` are " +
+    "read, so the arithmetic producing them runs on every call and is discarded. A " +
+    "partially-consumed record is invisible to every rule that asks about a *type*",
+  "VerbRatio.authored": "**F99** — as `derived`",
+  "VerbRatio.ratio": "**F99** — as `derived`, and it is the computed one",
+  "EngineOptions.cache": "**F99** — an injectable cache nothing injects; C19 constructs its own",
+  "Grid.dots": "**F99** — C12's raster grid payload, written by nothing that reads it",
+  "Failure.actual":
+    "**F99** — the measured value beside `expected`, which *is* read. A failure report " +
+    "naming what was expected and not what happened is the half that makes it actionable",
 });
 
-/** Every `export interface` member under `src/`, with its owner. */
+/**
+ * Every published object-type member under `src/`, with its owner.
+ *
+ * **Both keywords, since F84.** This walked `export interface` only, and the
+ * codebase publishes object types both ways: 280 members behind `interface` and
+ * **798 behind `export type X = Readonly<{ … }>`**, nearly three times as many,
+ * outside the reach of every rule in the suite.
+ *
+ * Its own header used to justify the narrow scope — *a type alias is structural
+ * and can be satisfied without being named* — which is true about **satisfying**
+ * a type and irrelevant to **consuming a member of one**. The distinction the
+ * sentence drew was real and it was not the one the rule needed, so the scope
+ * excluded three-quarters of its subject while reading as deliberate. That is
+ * this rule's scope failing the same way SP5's did three times: naming the form
+ * thought to matter instead of covering the subject and excusing what does not
+ * belong.
+ *
+ * Filed for the scope rather than the contents — the day it landed the widened
+ * walk found no dead members at all, and **a rule whose clean result covers a
+ * quarter of its subject means much less than it reads**, whatever it happens to
+ * contain today.
+ */
 function interfaceMembers(files, readFile) {
   const out = [];
   for (const file of files) {
     const src = readFile(file);
-    const head = /export\s+interface\s+([A-Za-z_$][\w$]*)\s*(?:extends[^{]*)?\{/g;
+    const head =
+      /export\s+(?:interface\s+([A-Za-z_$][\w$]*)\s*(?:extends[^{]*)?|type\s+([A-Za-z_$][\w$]*)\s*=\s*(?:Readonly<)?)\{/g;
     let m;
     while ((m = head.exec(src))) {
+      const owner = m[1] ?? m[2];
+      // Which keyword published it — the two are consumed differently (F94).
+      const record = m[1] === undefined;
       let depth = 1;
       let i = head.lastIndex;
       while (i < src.length && depth > 0) {
@@ -999,7 +1096,7 @@ function interfaceMembers(files, readFile) {
           else if (ch === ")" || ch === "]" || ch === "}") depth2 -= 1;
         }
         const n = member.exec(line);
-        if (n !== null && atTop) out.push({ owner: m[1], name: n[1], file });
+        if (n !== null && atTop) out.push({ owner, name: n[1], file, record });
       }
     }
   }
@@ -1041,7 +1138,7 @@ export function checkSeamConsumers(
     ]),
   );
 
-  for (const { owner, name, file } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
+  for (const { owner, name, file, record } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
     const key = `${owner}.${name}`;
 
     // **A consumer CALLS the member; it does not merely name it.** F83.
@@ -1062,10 +1159,38 @@ export function checkSeamConsumers(
     // describes 27% of the published surface is describing the architecture, not
     // a defect. C24 I11 already draws that line for the unused-export scan: a
     // signal too broad to gate on is reported, not enforced. FINDINGS F94.
+    // **Two shapes of use, because F84 widened the walk to `export type`.**
+    //
+    // A property access is how an *interface* member is consumed — the producer
+    // hands over an object and the consumer calls into it. A published **record**
+    // is consumed the other way round: the consumer *builds* one, and
+    // `{ placed: …, popLayer: … }` names the member without a dot in front of
+    // it. Dot-access alone reported 82 violations over the widened walk, and
+    // the great majority were deps records supplied by object literal — the same
+    // false positive that a skip rule carried from interfaces produced during
+    // the coverage audit, arriving again from the other end.
+    //
+    // So a construction counts. It is the looser of the two and it is the right
+    // looseness: a member nobody accesses *and* nobody supplies is dead by both
+    // routes, which is what the rule is asking.
+    // **The test differs with the keyword, and that is F94's finding applied.**
+    // An `interface` is implemented and *called into*: a property access is the
+    // consumer. A `Readonly<{ … }>` record is *built*: `{ placed: …, popLayer: … }`
+    // names the member with no dot in front of it, and dot-access alone reported
+    // 82 over the widened walk, mostly deps records supplied by object literal.
+    //
+    // **Using both tests everywhere was measured and is worse.** The construction
+    // pattern is loose — a bare `pending:` anywhere counts — and applying it to
+    // interface members made four allow-listed entries read as consumed, which
+    // the equality arm caught immediately. One test each, matched to how the
+    // keyword is actually used.
+    const consumer = record
+      ? new RegExp(`[.?]\\s*${name}\\b|(?:^|[{,(\\s])${name}\\s*:`, "m")
+      : new RegExp(`[.?]\\s*${name}\\b`);
     let consumed = false;
     for (const [other, src] of stripped) {
       if (other === file) continue;
-      if (new RegExp(`[.?]\\s*${name}\\b`).test(src)) {
+      if (consumer.test(src)) {
         consumed = true;
         break;
       }

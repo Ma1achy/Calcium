@@ -3825,3 +3825,97 @@ nothing about whether anything calls it. The protection reads as evidence of use
 **Both defects together are the fixed rule's yield**, and it is worth stating as a
 number: MG24 over 276 real members produced **two user-visible defects**, F96 and
 this. Neither was reachable by any test in either suite.
+
+---
+
+## F98 — the suite leaves eleven sessions' process handlers attached ★★
+
+`npm test` prints, twice per worker:
+
+```
+MaxListenersExceededWarning: 11 uncaughtException listeners added to [process]
+MaxListenersExceededWarning: 11 unhandledRejection listeners added to [process]
+… and the same for SIGINT · SIGTERM · SIGHUP · SIGWINCH · SIGTSTP · SIGCONT
+```
+
+**Measured before assuming, and it inverted the guess.** The pairing in `src/` is
+correct and the asymmetry is *specified*:
+
+```
+lifecycle.ts:561   register()          ← at CONSTRUCTION, all eight events
+lifecycle.ts:374   disposeHandlers()   ← only inside release()
+```
+
+> **C01 I3** — handlers exist before `acquire()` is reachable. **Construction has side
+> effects deliberately**: a two-call API invites the ordering bug it exists to prevent.
+
+So this is not a lifecycle gap. **`buildGraph()` never calls `release()`**, and neither
+does any session test — so every constructed lifecycle leaves eight process-global
+handlers attached, and a vitest worker running many files accumulates them until Node
+complains at eleven.
+
+**The consequence is not the warning.** `SIGWINCH` on an abandoned session is latent,
+because the suite sends no real signals. **`uncaughtException` and `unhandledRejection`
+are not latent**: they fire on any unhandled error anywhere in the worker, so a single
+stray rejection in one test would be routed into eleven dead sessions' fatal paths, each
+running `fault()` against a fake stdout and an `onFatal` whose test finished. The failure
+would surface in whichever test was unlucky, attributed to it, with the cause eleven
+files away.
+
+**Node's warning is the whole of the detection**, and it is a warning about a count —
+the same shape as reading a green gate's counters. Nothing asserts it, so raising
+`MaxListeners` would silence the only signal there is.
+
+**What is unmeasured, stated rather than guessed:** whether the harness should call
+`release()` or dispose explicitly. `release()` does more than drop handlers — it unwinds
+the terminal, and a fake terminal's unwind may assert. That is the question a fix has to
+answer, and it is why this is filed rather than patched.
+
+**Filed because it was a real observation living in a report.** It surfaced while reading
+the F96 and F97 suite output, was set aside as harness noise, and *harness noise* is what
+F62 and F79 also looked like. **F81 is the measured cost of the alternative**: a finding
+that stayed a comment for a whole step, so the strongest group on the triage read as three
+consumers rather than four.
+
+---
+
+## F99 — eleven published members no rule could see, and six of them are one shape ★★★
+
+**F84's widening, landed and measured.** MG24 now walks `export type X = Readonly<{ … }>`
+as well as `export interface`: **276 members → 1055**. Of the 41 violations that
+produced, **eleven are named nowhere at all** — not in `src/`, not in `test/`, not in
+`tools/`, not in the reference app:
+
+| | |
+|---|---|
+| `GlyphSet.teeLeft` `teeRight` `hollow` `blocked` `warning` `bar` | **six declared glyph slots with no drawer** |
+| `VerbRatio.derived` `authored` `ratio` | C08 provenance — three of a five-field record; `recorded` and `flagged` are read |
+| `EngineOptions.cache` · `Grid.dots` · `Failure.actual` | one each |
+
+**The coverage audit predicted three of these** (`teeLeft`, `teeRight`, `hollow`) and
+stopped there, because it filtered by hand. The rule found six in the same record — and
+the three it added are the ones that matter more: `warning` and `blocked` are *semantic*
+slots, not box-drawing, so a theme declaring them gets nothing and the absence looks like
+a theme error rather than a missing renderer.
+
+**`VerbRatio` is the sharper instance.** Two of its five fields are read and three are
+not, in one record, computed together — so the arithmetic that produces `ratio` runs on
+every call and the answer is discarded. **A partially-consumed record is invisible to
+every rule that asks about a type**: the type is used, the file is imported, and the
+member is dead. That is the class F84 was filed for, and it needed the widening plus a
+consumer definition that fits how records are actually used.
+
+**The consumer test differs by keyword now, and that is F94 applied.** An `interface` is
+implemented and *called into*, so a property access is its consumer. A record is *built*,
+so `{ placed: …, popLayer: … }` names the member with no dot. **Measured: dot-access
+alone reported 82 over the widened walk**, mostly deps records supplied by object literal;
+using both tests everywhere made four allow-listed interface members read as consumed,
+which the equality arm caught in the same run. One test each, matched to the keyword.
+
+**The other thirty are the diagnostics category** — conformance reports and fixture-diff
+records whose consumer is a suite, which is what a reporting type looks like from inside
+the package that publishes it.
+
+**Disposition: wire or delete, and the glyphs are the ones to rule on first.** Six slots
+a theme can declare and nothing draws is the same shape as a spec promising registration
+with no registrar — the reader's evidence that the feature exists is the declaration.
