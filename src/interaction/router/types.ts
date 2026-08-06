@@ -106,6 +106,13 @@ export type KeyAction =
   | "focusPrompt"
   | "rowUp"
   | "rowDown"
+  // `enter` on a focused row, and the union's gap was the whole of F21: a row
+  // could be moved to and not acted on. `actions.ts` implements all five arms
+  // and nothing in `src/` reached it, so an app could declare a `view` action,
+  // have C04 validate it and C09 render its label, and no keystroke would ever
+  // arrive. Entry with no exit was already a binding (I22); entry with no
+  // *effect* was not, and reads the same from the table.
+  | "rowActivate"
   // --- scrolling (I23) -----------------------------------------------------
   //
   // C14's four operations, named here because every key that scrolls is a

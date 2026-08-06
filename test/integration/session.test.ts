@@ -400,4 +400,100 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     // its far side is not a startup fault and must not become an error entry.
     expect(stdout.chunks.join(""), "and said nothing about it").not.toContain("far side is down");
   });
+
+  it("T4.x (C23 I37, C16 I26, F21): `enter` on a focused row reaches the dispatcher", async () => {
+    // **The mutation that matters is removing the wiring and watching a real
+    // keystroke fail**, not removing the handler. `actions.ts` implemented all
+    // five arms and `pipeline.onAction` was called only from a unit test, so
+    // eleven rows said nothing about whether anything reached it — a suite that
+    // builds its own version of the thing under test cannot see whether
+    // production builds it correctly.
+    //
+    // So this drives bytes into a real session and reads the frame. A `fill`
+    // action puts its command in the prompt (C04 I19's default kind), which is
+    // visible without asserting on any internal.
+    const stdin = fakeStdin();
+    const { stdout } = await buildSession(
+      {
+        stdin: stdin as never,
+        // **The verb is declared here, because C23 I27 refuses a handler with
+        // no manifest row** — which is the reconciliation working, and the
+        // reason the first draft of this test would not construct at all.
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [
+            {
+              name: "rows",
+              local: true,
+              summary: "a table with an action on a row",
+              args: [],
+              flags: [],
+            },
+          ],
+        },
+        localHandlers: {
+          rows: () => ({
+            schema: "tui.view/1",
+            status: "ok",
+            blocks: [
+              {
+                kind: "table",
+                id: "t",
+                columns: [
+                  { key: "name", label: "NAME", align: "left", priority: 1, minWidth: 6 },
+                ],
+                rows: [
+                  {
+                    id: "r1",
+                    cells: { name: { text: "alpha" } },
+                    // **Two, and the second exists to make the ruling
+                    // falsifiable.** With one action, *first* and *last* are the
+                    // same row and the mutation that takes the wrong one
+                    // survives — the convenient setup is the one where both
+                    // readings agree (C23 I37, C04 I19).
+                    actions: [
+                      { kind: "fill", label: "inspect", command: "/inspect alpha" },
+                      { kind: "fill", label: "logs", command: "/logs alpha" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        },
+      } as never,
+      { columns: 80, rows: 20 },
+    );
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    const promptOf = (): string => {
+      const frame = lastFrame(stdout.chunks);
+      return [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
+    };
+
+    await type("/rows\r");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The subject before the claim: without a rendered row there is nothing to
+    // focus, and every assertion below would hold on an empty screen.
+    expect(lastFrame(stdout.chunks).join("\n"), "the row is on screen").toContain("alpha");
+    expect(promptOf(), "and the prompt is empty before the action").not.toContain("/inspect");
+
+    // `↓` from the bottom of history enters the live block (C16 I22), then
+    // `enter` activates — the binding that did not exist.
+    await type("\u001b[B");
+    await type("\r");
+
+    expect(promptOf(), "the fill action reached C23's dispatcher").toContain("/inspect alpha");
+    expect(promptOf(), "the *first* action, not whichever the array ends with").not.toContain("/logs");
+  });
+
 });

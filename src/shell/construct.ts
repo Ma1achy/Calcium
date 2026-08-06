@@ -776,6 +776,32 @@ export async function constructGraph(
       }
       return out;
     },
+    /**
+     * **Beside `liveRows`, because it is the same question** (C23 I37, F21).
+     * That comment says this is the one place that knows a live entry's blocks;
+     * a second walk elsewhere would be a second answer to *what is here*, and
+     * the two would disagree the first time a block kind became navigable.
+     *
+     * The first action, per C23 I37 — C04 I19 makes `fill` the default kind, so
+     * a well-formed row's first action is the one `enter` should do.
+     */
+    liveRowAction: (rowId: string) => {
+      const id = stores.transcript.liveId;
+      if (id === null) return null;
+      const entry = stores.transcript.entries.find((e) => e.id === id);
+      if (entry === undefined) return null;
+      for (const blk of entry.doc.blocks) {
+        if (blk.kind !== "table") continue;
+        const row = blk.rows.find((r) => r.id === rowId);
+        const action = row?.actions?.[0];
+        if (action !== undefined) return { action, from: id };
+      }
+      return null;
+    },
+    // C23 I16 — the dispatcher is C23's and is supplied, never built here.
+    onAction: (action, from) => {
+      pipeline.onAction(action, from);
+    },
     // **I31 — an effect that settles after its batch commits its own frame.**
     // `"completion"` because its window is zero (C03 I2): by the time this
     // fires the screen is already showing a state that no longer holds, which

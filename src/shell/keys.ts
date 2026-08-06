@@ -37,6 +37,8 @@ import type {
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/index.js";
 import type { KeyAction } from "../interaction/router/types.js";
+import type { Action } from "../data/viewmodel/index.js";
+import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
@@ -97,6 +99,30 @@ export type KeyDeps = Readonly<{
    * with nothing in it.
    */
   liveRows: () => readonly string[];
+  /**
+   * The action a focused row fires, and the entry it fires from (C23 I37, F21).
+   *
+   * **Answered from the block, exactly as `liveRows` is**, and for the same
+   * reason: C16 takes row ids as data and holds no opinion about what a row is,
+   * so the one place that knows a live entry's blocks answers both. Two
+   * functions rather than one returning pairs, because `liveRows` is asked on
+   * every arrow keystroke and this only on `enter`.
+   *
+   * **The first action, and C04 I19 is why that is safe.** A row lists its
+   * actions in order and `fill` is the default kind — populating the prompt
+   * rather than running — so the first action of a well-formed row is the one a
+   * reader would expect `enter` to do. A row declaring `exec` first has declared
+   * a reversible operation, which is what I19 reserves that kind for.
+   *
+   * `null` for a row with no actions, which is most of them: `focusableRowIds`
+   * returns every row, because navigating to read is worth doing on its own.
+   */
+  liveRowAction: (rowId: string) => Readonly<{ action: Action; from: EntryId }> | null;
+  /**
+   * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
+   * a submission by another route, and L4's routing component owns routes.
+   */
+  onAction: (action: Action, from: EntryId | null) => void;
   /**
    * Commit a frame for something that settled after its batch (C22 I31).
    *
@@ -509,6 +535,30 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const i = rows.indexOf(current.rowId ?? "");
       const next = rows[i + 1];
       if (next !== undefined) deps.focus.focusRow(next);
+    },
+    /**
+     * **F21's whole subject: the route from a keystroke to `actions.ts`.**
+     *
+     * `src/shell/actions.ts` implemented all five `Action` arms and nothing in
+     * `src/` called the dispatcher — `pipeline.onAction` was reached only from a
+     * unit test. So an app could build a `view` action, have C04 validate it and
+     * C09 render its label into a row, and no keystroke would ever arrive. C24
+     * I16's subject arriving on `Action`.
+     *
+     * Silent on a row with no action, rather than a notice. Pressing `enter` on
+     * a row that does nothing is a question, not a mistake, and a refusal per
+     * keystroke on a table where most rows have no action is noise the reader
+     * cannot act on. The refusals that matter — a frozen entry, a bad scheme —
+     * are the dispatcher's and are unaffected.
+     */
+    rowActivate: () => {
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const rowId = current.rowId;
+      if (rowId === null || rowId === undefined) return;
+      const found = deps.liveRowAction(rowId);
+      if (found === null) return;
+      deps.onAction(found.action, found.from);
     },
     rowUp: () => {
       const rows = deps.liveRows();

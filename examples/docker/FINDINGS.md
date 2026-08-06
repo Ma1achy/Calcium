@@ -4373,3 +4373,56 @@ above it — the title is what a reader sees when it fails.
 
 Companion to F92's shape. There, a summary kept a body's claim and dropped its condition; here
 a test kept a mechanism and dropped the reason it existed.
+
+---
+
+## F112 — F21's four claims all held, and the fix was a tenth the size the report implied ★★
+
+Measured at HEAD before building, because the report's three compounding facts read as a
+design problem and two of them are not.
+
+| claim | at HEAD |
+|---|---|
+| `paint.ts` builds contexts without `onAction` | **holds** — `capabilities` and `theme` only |
+| `liveBlock` has three bindings and no `enter` | **holds** — `escape`, `down`, `up` |
+| `KeyAction` is a closed union with no `rowActivate` | **holds** |
+| `TuiConfig` has no keymap seam | **holds** — `createKeymap(defaultKeymap)`, nothing merged |
+
+**And then the thing the report did not say.** A focus model already exists and works:
+`focus.current.at === "liveBlock"`, `focus.rowId`, `focusRow`, and `liveRows()` walking the
+live entry's tables through C11's `focusableRowIds`. `TableRow.actions` exists. `actions.ts`
+exists. **Every piece of the route was built and one link was missing** — `enter` had no
+`KeyAction` to resolve to.
+
+So the fix is a union member, a binding, an effect, and a lookup beside the one that already
+answers *which rows are focusable*. **Not the navigation model, and not the render context.**
+The render-context half is the mouse route, which is a second path with its own question —
+cell→element resolution — and it stays open.
+
+**Why the report read bigger than it was.** Its three compounding facts are each true and
+they are not the same size: no `enter` binding is one line, no keymap seam is a feature, and
+`BlockKeymap` being dead is a third thing again. Listed together under one finding they read
+as one problem, and the smallest of them was the one blocking the other two consumers.
+*Compounding facts are not a difficulty estimate*, and the one that is load-bearing is worth
+separating from the ones that merely also hold.
+
+## F113 — a one-action fixture cannot falsify a first-action rule
+
+C23 I37 rules that `enter` fires a row's **first** action. The test drove real bytes through a
+real session and read the frame, which is the right shape — and the row it built had **one**
+action, so *first* and *last* are the same element and the mutation taking the wrong one
+survived the pass.
+
+Two of five mutations mattered here and this is the second: the other four died immediately
+because they break the route outright. This one is about a *choice inside* the route, and the
+fixture had made the choice unobservable.
+
+**Same class as the fifth-victim shapes and F73's ratio**: a setup where two readings agree is
+a setup that tests neither. Fixed by giving the row a second action and asserting the first
+fires *and the second does not* — the negative half is what has teeth, because a version that
+fired both would satisfy the positive one.
+
+**And the general form is worth stating, because the walk artefacts do not reach it.** A
+ruling of the form *the Nth of a collection* needs a fixture with at least two members and an
+assertion about the ones not chosen. Neither a sequence trace nor a classification table
+indexes that: it is not two rules meeting, it is one rule with a degenerate input.

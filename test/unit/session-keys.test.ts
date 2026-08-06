@@ -275,6 +275,12 @@ describe("C22 §3 step 11 — the effect table", () => {
       redraw: () => undefined,
       focus: createFocusStore(),
       liveRows: () => ["row-0", "row-1"],
+      // A stand-in, and it must not supply the behaviour: this suite drives the
+      // editing bindings, and whether `enter` on a row reaches C23's dispatcher
+      // is a wiring question a file that builds its own deps cannot answer.
+      // T4.x in session.test.ts is where that is asserted.
+      liveRowAction: () => null,
+      onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
         return { [Symbol.dispose]: () => undefined };
@@ -651,6 +657,8 @@ describe("C22 §3 step 12 — the read loop", () => {
       redraw: () => undefined,
       focus: createFocusStore(),
       liveRows: () => [],
+      liveRowAction: () => null,
+      onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
         return { [Symbol.dispose]: () => undefined };
