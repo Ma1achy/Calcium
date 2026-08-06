@@ -442,10 +442,38 @@ class Session implements TuiInstance {
         return { row: f.region.height, rows: f.promptRows };
       },
       mouseEnabled: () => this.#graph?.capabilities.mouse ?? false,
-      // Ctrl-C and Ctrl-D raise a confirm; answering it is what stops. Until
-      // C15's confirm layer is composed here, the rung stops directly, which is
-      // the behaviour minus the question.
-      raiseExitConfirm: () => void this.stop("eof"),
+      // Ctrl-C and Ctrl-D raise a confirm; answering it is what stops.
+      //
+      // **The same `ask` a local handler gets** (C23 I36). The session's own
+      // question is not a special case, and giving it a private confirm would be
+      // two renderings of one thing — with the session's being the one nobody
+      // looks at and therefore the one that rots. This rung raised no question at
+      // all until now: it called `stop` directly, which was the behaviour minus
+      // the question.
+      //
+      // `stay` is the default, so `Esc` and a second `⌃c` both leave the session
+      // running (C23 I36). That is the safe answer, and the arming machine above
+      // has already required two presses to get here.
+      raiseExitConfirm: () => {
+        const graph = this.#graph;
+        // The rung can fire before the graph exists only in a harness, and
+        // answering nothing is right there: no session, nothing to exit.
+        if (graph === null || graph === undefined) return;
+        // Not awaited: `dispatch` is synchronous and the question outlives the
+        // keystroke that raised it. The promise is the answer's path, not this
+        // rung's.
+        void graph.confirm
+          .ask({
+            question: "Exit the session?",
+            choices: [
+              { key: "y", label: "exit" },
+              { key: "n", label: "stay", default: true },
+            ],
+          })
+          .then((answer) => {
+            if (answer === "y") void this.stop("eof");
+          });
+      },
     };
   }
 

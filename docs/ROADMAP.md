@@ -248,6 +248,14 @@ is `number | null`; `DocumentMeta.exitCode` is `number`. Every adapter in the re
 application writes `?? 0` — six of them — which reports *killed by a signal* as *exited
 cleanly*, with `RawResult.signal` sitting beside the coercion and no field to go to.
 
+> **Measured 2026-08-05, and the paragraph above is wrong.** It never reports anything:
+> `authoritativeMeta` overwrites `exitCode` on every route, so an adapter returning `999`
+> yields `0` and a `SIGTERM` death yields `143` — C07 §85's table working as written. The
+> count is five, not six. `DocumentMeta` is **not** widened; the surviving defect is that
+> the type requires ten `meta` fields and the registry honours three, filed as F58b. The
+> claim was carried across four documents without ever holding a measurement, which is
+> what made it read as settled.
+
 By the ranking rule it is a single: one consumer, so it waits for a second. **The ranking
 is the wrong instrument here for a reason worth naming.** Consumer count measures whether
 a gap generalises, and it works because independent surfaces reaching for the same thing is

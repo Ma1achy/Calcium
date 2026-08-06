@@ -2,6 +2,7 @@
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
 import { readdirSync, statSync } from "node:fs";
+import { checkFindings } from "./findings.mjs";
 import {
   checkFunctionConsumers,
   checkModuleGraph,
@@ -55,6 +56,10 @@ const violations = [
   // several components write to and none owns, wrong at every one that touched
   // it, because every row exists twice and nothing compared the copies.
   ...checkSeamFour(),
+  // SP5 — the findings ledger is the most-cited document in the app and was the
+  // only one with no citation check. Written after a wrong number resolved
+  // against a real, unrelated finding with enforce green.
+  ...checkFindings(),
   ...refViolations,
 ];
 

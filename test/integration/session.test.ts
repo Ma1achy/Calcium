@@ -40,10 +40,16 @@ function lastFrame(chunks: readonly string[]): readonly string[] {
 
 describe("C22 integration — the frame's viewport", () => {
   it("T4.12 (I34, with C14): a document taller than the region stays pinned to its last row at every prompt height", async () => {
-    // **`/help` is the tall document, and it needs no transport.** It is a local
-    // route rendering the keymap (C23 I26), so this row exercises the height
-    // without a far side, a fixture corpus or a spawn — the three things that
-    // would put someone else's failure in this test.
+    // **`/help keys` is the tall document, and it needs no transport.** It is a
+    // local route rendering the keymap (C23 I26), so this row exercises the
+    // height without a far side, a fixture corpus or a spawn — the three things
+    // that would put someone else's failure in this test.
+    //
+    // It was `/help`, and the keymap moving behind an argument made that
+    // document short enough to fit — so the last row became padding and the row
+    // failed on its own control (`content, not padding`). **That control is why
+    // this was a red test rather than a green one measuring nothing**, which is
+    // exactly what it was written for.
     const stdin = fakeStdin();
     const { stdout } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 16 });
 
@@ -55,7 +61,7 @@ describe("C22 integration — the frame's viewport", () => {
       await Promise.resolve();
     };
 
-    await type("/help\r");
+    await type("/help keys\r");
     await Promise.resolve();
 
     // **The subject before the claim** — a session that failed to draw would
@@ -204,7 +210,12 @@ describe("C22 integration — the frame's viewport", () => {
     const stdin = fakeStdin();
     const { stdout } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
 
-    stdin.emit("/help\r");
+    // **`/help keys`, not `/help`.** The keymap moved behind an argument when
+    // `/help` was measured at thirty verbs: it emitted every binding last, and
+    // the visible frame was entirely bindings with the verbs scrolled off. The
+    // claim this row makes — that a scroll key is a binding in the table and is
+    // rendered from it (C16 I23) — is unchanged; only which question shows it.
+    stdin.emit("/help keys\r");
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
@@ -215,7 +226,7 @@ describe("C22 integration — the frame's viewport", () => {
 
     // The control: help arrived at all. Without it every assertion below is
     // about an empty screen and the row passes when nothing rendered.
-    expect(text, "the help document is on the frame").toContain("c+r");
+    expect(text, "the keymap document is on the frame").toContain("c+r");
 
     for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
       expect(text, `/help shows ${shown}`).toContain(shown);

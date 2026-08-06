@@ -985,4 +985,4 @@ export function checkReferences(
 }
 
 /** SP1, SP2, SP3 — the ids A03 §7a inventories, so 14b's equality can see them. */
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4"];
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5"];

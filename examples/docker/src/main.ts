@@ -29,6 +29,11 @@ import {
 } from "./verbs.ts";
 import { argv as eventsArgv, createEventsHandler } from "./events.ts";
 import { dockerSources } from "./completion.ts";
+import { mutationHandlers } from "./mutation.ts";
+import { destructiveHandlers } from "./destructive.ts";
+import { progressHandlers } from "./progress.ts";
+import { resourceAdapters } from "./resources.ts";
+import { transferHandlers } from "./transfer.ts";
 
 const run = promisify(execFile);
 
@@ -153,6 +158,9 @@ const tui = createTui({
     images: createImagesAdapter(),
     top: createTopAdapter(),
     port: createPortAdapter(),
+    // The resource tail (step 12). **Adapted, not local** — the first family
+    // since step 8 that gets to be, because nothing here asks or accumulates.
+    ...resourceAdapters(),
   },
   localHandlers: {
     dashboard: createDashboardHandler(engine, width, unicodeText),
@@ -163,6 +171,18 @@ const tui = createTui({
     // shim: this is a local handler, so nothing appends `--json` and there is
     // nothing to translate.
     events: createEventsHandler(async () => (await run("docker", [...eventsArgv()], { maxBuffer: 8 << 20 })).stdout),
+    // The mutation family (step 9). **Local because `ctx.ask` is**, not because
+    // any of them needs state across calls — see `mutation.ts` and FINDINGS F67.
+    ...mutationHandlers(),
+    // The destructive family (step 10). Ruling C's weight: the question
+    // carries what it will remove, and the zero case does not ask.
+    ...destructiveHandlers(),
+    // The registry family (step 11). Local because progress needs state that
+    // outlives one result — gap 1's ring a fourth time (F77, F78).
+    ...progressHandlers(),
+    // The file-transfer tail (step 12). Local because the guard that refuses
+    // a tar-to-stdout is the app's — only the author knows the verb's shape.
+    ...transferHandlers(),
   },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).

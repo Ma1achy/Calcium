@@ -38,6 +38,7 @@ function harness(over: Partial<RouterDeps> = {}, start = 1_000) {
   const calls: string[] = [];
   const layer = { top: null as Placed["layer"] | null, placed: [] as Placed[] };
   const deps: RouterDeps = {
+    overlayAnswerCallback: () => null,
     overlayTop: () => layer.top,
     overlayRegion: () => ({ width: 80, height: 24 }),
     placed: () => layer.placed,

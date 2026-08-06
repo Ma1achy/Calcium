@@ -1986,9 +1986,8 @@ meta: { exitCode: raw.exitCode, … }
 ```
 
 **Every adapter in this repository writes `result.exitCode ?? 0`** — `ps.ts:176`,
-`verbs.ts:46`, and four more. `null` means *the process was killed by a signal
-and never exited*, and `?? 0` reports that as a clean success. `RawResult` even
-carries `signal` beside it, and `DocumentMeta` has no field for it, so the
+`logs.ts:106`, `verbs.ts:46`, `container.ts:367`, `inspect.ts:216`. `RawResult`
+carries `signal` beside it and `DocumentMeta` has no field for it, so the
 information is available at the coercion and has nowhere to go.
 
 **Found by the second consumer, which is the whole argument for having one.**
@@ -1997,10 +1996,69 @@ above it already contain. `examples/minimal` is forty lines written from the
 public surface with no house style to copy, and it hit the same wall on its first
 compile — which is the evidence that this is the API's shape rather than a habit.
 
-Filed rather than fixed. The choices are all Calcium's: widen `DocumentMeta` to
-`number | null`, add `signal`, or say in C04 that a signalled process is exit 0
-and mean it. **The third is defensible and is not what the type says today** — it
-is what six call sites say, silently, one `??` at a time.
+### Corrected 2026-08-05, measured — right about the wall, wrong about the damage
+
+Step 9 went to build on this and went looking for the record first. Two claims
+were carried, neither measured, and **both are false**:
+
+| carried claim | measured |
+|---|---|
+| `?? 0` reports signal-death as a clean success | an adapter returning `exitCode: 999` yields **`0`**; a `SIGTERM` death yields **`143`** |
+| `docker stop` produces a null exit code | `docker stop` exits **`0`**; the container's `137` is a field in the payload |
+
+`authoritativeMeta` (`registry.ts:84`) is applied on **every** route and sets
+`exitCode: exitCodeOf(raw)` unconditionally, ignoring what the adapter supplied.
+`exitCodeOf` maps `SIGTERM → 143` and never-started → `-1`, which is C07 §85's
+table working exactly as written. So `meta.exitCode` was comparable across apps
+the whole time, and the five coercions never reached a document.
+
+The second claim was a conflation of two different exit codes. `RawResult.exitCode`
+is the **docker binary's**; the 137 a stopped container reports is the
+**container's**, and it is data in the JSON envelope. They were being read as one
+number. Nothing in the mutation family produces a null `RawResult.exitCode` at
+all — that path belongs to cancellation and timeout, which C07 §4 already maps.
+
+**Wrong in both directions, which is the shape to watch for.** The field was not
+broken for the reason given, and there *is* a defect nobody had stated — see F58b,
+which is what is left of this once the false half is removed. `DocumentMeta` is
+**not** widened to `number | null`: the ruling C24 §8a and ROADMAP F58 were both
+waiting for would have been taken on a premise that measurement falsifies.
+
+Twenty minutes to check, against a change to a public type that is expensive to
+reverse after publication. This is CLAUDE.md's sixth blind spot: the claim was
+re-stated across four documents and never held a measurement, and re-stating is
+what made it feel settled.
+
+---
+
+## F58b — the type demands ten fields and the registry honours three ★★★
+
+What is left of F58 once the falsified half is removed, and it is the reason the
+five dead coercions exist.
+
+`Adapter.adapt` returns a `ViewDocument`, so the compiler requires a complete
+`meta` — ten fields. `authoritativeMeta` then keeps exactly **three** of them
+(`resultId`, `adapter`, `truncated`, per C07 §3's "the three the registry cannot
+know") and overwrites the other seven from the `RawResult` and the context.
+
+So an adapter author is **required to compute seven values that are discarded**,
+with no signal that they are. That is the whole of F58's real content: the
+compiler does not merely force a false line, it forces a false line *and throws it
+away*, which is why nobody noticed the value was wrong — nothing downstream ever
+showed it.
+
+Measured: an adapter returning `exitCode: 999` produces a document reading `0`.
+
+**The count is five and they are one consumer only in the sense that one
+repository contains them** — the same argument F58 made and the same one that
+holds here. Every adapter that will ever be written hits this, because the type
+requires it.
+
+The fix is a type rather than a field: the adapter's return wants a `meta` narrowed
+to the three honoured keys, so that supplying `exitCode` does not compile instead
+of not mattering. That is a C07 and C24 surface change, it belongs before the
+freeze, and it is **not** taken here — step 9 is the consumer that found it, not
+the step that rules on it.
 
 ---
 
@@ -2259,6 +2317,26 @@ docker image inspect dtui-probe:latest -> fails: the name is gone
 survives because the container references it, and the *tag* does not. So a container whose
 `Config.Image` names something unresolvable is trivially constructible, and the read was
 available the whole time.
+
+> **Amended 2026-08-06, step 10 — the sentence above is true of the case it measured and
+> too general by one word.** `rmi` *does* refuse; what decides it is whether the tag being
+> removed is the image's **last** reference:
+>
+> | `rmi` target, container running | exit | says |
+> |---|---|---|
+> | a non-last tag (`dtui-probe-tag:v1`) | 0 | `Untagged: …` |
+> | the last tag (`alpine:latest`) | 1 | `conflict: … (must be forced) - container … is using its referenced image` |
+>
+> The original claim — *docker refuses and it cannot be forced* — remains wrong on both
+> counts, and the probe's setup made the distinction invisible because it had tagged the
+> image twice and removed the second tag. So the correction was right about the read being
+> available and generalised one measurement into a rule about `rmi`.
+>
+> **This is the finding's own lesson arriving a second time, in the correction rather than
+> in the claim.** F66 exists because nobody measured the case that would falsify the
+> belief; the amendment exists because the measurement that falsified it was not itself
+> falsified. Measure the case that would break your own counter-example — the second tag is
+> exactly the variable the probe happened to set and never varied.
 
 **The read was then run, and `/drift` worked.** It printed `IMAGE alpine:latest` against a
 container created from a tag that no longer exists — because the app resolves the image
@@ -2688,3 +2766,167 @@ said the deliberate scroll-to-top beat was *not* at the top while an ordinary on
 was. Nothing was wrong with the recording. A settled frame is one followed by a
 pause, so the pauses in the script are exactly the frames worth reading, and
 taking them from the script means the two cannot disagree.
+
+---
+
+## F77 — a verb that asks a question cannot be an adapter ★★★
+
+`ctx.ask` is on `LocalContext` (C23 I36) and nowhere else. An adapter is handed
+one `RawResult` and returns one document; it has no way to suspend, so **any verb
+that confirms must be a local handler**.
+
+Five of step 9's eight verbs confirm, and every one of them would otherwise have
+been an adapted verb of about fifteen lines. Instead the family is 185 lines of
+local handler, and the difference is not the confirm itself — it is everything an
+adapter gets for free and a local handler must do by hand: `meta` (F13), the
+failure arm, the invocation record, and the spawn.
+
+**This is the third distinct reason this application has reached for `local`**,
+and the first two were about state rather than input:
+
+| surface | why local |
+|---|---|
+| the dashboard | a ring that has to outlive a fetch |
+| the events window | the same |
+| the mutation family | `ctx.ask` is not on `AdapterContext` |
+
+Three different needs, one escape hatch, and the escape hatch costs the whole of
+C07 each time. The pattern F14, F36 and F43 describe from the other side — a fact
+the consumer needs and is not offered — with the consequence made structural: it
+is not that a local handler is missing something, it is that **asking anything at
+all forces a route change**.
+
+Filed rather than fixed, because the fix is a ruling and not a field. An adapter
+that could ask would need a suspension point in C07's contract, which is a much
+larger thing than it looks and may well be the wrong shape — an adapter is
+specified as a pure mapping from result to document, and that is worth keeping.
+The alternative is to say plainly that interaction belongs to L4 and that the
+local route is where it lives, which is what the code already says three times.
+
+**What is not in doubt is that the count is now three.** Two instances is the
+threshold for noticing; the third is where a workaround stops being a workaround.
+
+---
+
+## F78 — `b.live`'s `stream` arm is declared, validated, and never driven ★★★
+
+`LiveSpec` offers two ways to feed a live part:
+
+```ts
+fetch?:  () => Promise<unknown>;
+stream?: () => AsyncIterable<unknown>;
+```
+
+`b.live` **validates the pair**: it throws with *"b.live needs a `fetch` or a
+`stream`"* when both are absent, and throws again when both are present because
+*"they are exclusive"*. Two throws that exist only to police a choice between two
+alternatives.
+
+**One of the two alternatives does nothing.** `partOf` (`src/shell/execution.ts`)
+builds the driver's part with:
+
+```ts
+fetch: spec.fetch ?? ((): Promise<unknown> => Promise.resolve(null)),
+```
+
+and never reads `spec.stream`. Nothing in `refresh.ts` reads it either. So a part
+declared with `stream` is registered, driven once with a `fetch` that resolves
+`null`, rendered as `render(null)`, and the generator **is never invoked**.
+
+Measured: the built block carries no reference to the stream at all — only the
+`loading…` notice — and no site in `src/` mentions `spec.stream`.
+
+**The validation is what makes this expensive.** An unimplemented field that
+nobody mentions is a field nobody uses. A field the constructor *insists* on —
+"supply one of these two" — reads as a decision the author is being asked to
+make, so choosing the unimplemented one is the natural outcome of following the
+API. Step 11 chose it first, for `docker build`, which is exactly the case it
+looks written for.
+
+**And it fails silently in the worst direction**: `render(null)` produces a
+plausible empty panel rather than an error, so a build that streams nothing looks
+like a build that produced nothing.
+
+The workaround is the one three other surfaces here already use: `fetch` plus
+`every`, polling a buffer the process fills. That is the dashboard's ring (gap 1)
+and the events window's, arriving a fourth time — see F77, which is the same
+shape one layer down.
+
+Filed rather than fixed: implementing it is C23 §3b's, and the ruling is whether
+a streamed part's ticks are patches like a fetched part's or something else. What
+should not survive either way is the pair of throws policing a choice where one
+option is inert — **that is A03 §2's vacuity class expressed as an API**.
+
+---
+
+## F79 — the frame-read instrument mis-renders a 256-colour sequence ★★
+
+Step 11's build frame showed a step named `38;5; RUN sleep 2 && echo two > /two`.
+The `[3/3]` prefix was gone and an SGR fragment stood in its place, exactly six
+cells wide where `[3/3] ` is six cells wide.
+
+**The application is correct.** The raw capture holds:
+
+```
+\x1b[38;5;188m[3/3] RUN sleep 2 && echo two > /two
+```
+
+— a well-formed CSI followed by the right name. `tools/screen.py` renders it
+wrongly. Its `CSI` pattern (`\x1b\[([0-9;?]*)([a-zA-Z])`) matches this sequence,
+so the fault is elsewhere in the replay — the `OSC` substitution runs first over
+the whole stream and an unterminated `\x1b]` anywhere will consume an arbitrary
+span, which is the shape that produces a localised corruption like this one.
+
+**Why it is worth ★★ rather than a note: it is the instrument.** Every frame-read
+in steps 9, 10 and 11 went through `screen.py`, and this is the first time its
+output has been checked against the bytes it was replaying. A capture tool that
+silently mangles one cell is a tool that can also silently mangle the cell an
+assertion is about — and a frame-read exists precisely because it is the thing
+that sees what assertions cannot.
+
+The practice that caught it generalises: **when a frame shows something
+surprising, read the raw bytes before believing the render.** It was noticed only
+because `38;5;` is obviously not something this application would print. A subtler
+corruption — a digit, a truncation mark — would have read as an app defect and
+been "fixed" in the app.
+
+Not repaired here: it is a tool in `examples/docker/tools/`, the app's output is
+verified correct by the bytes, and repairing a replay parser mid-step is how a
+step stops being about its subject. Filed with the reproducer above.
+
+---
+
+## F80 — `interactive` is a property of the verb, and `docker run` is not ★★
+
+`ToolDef.interactive` declares that a verb takes the terminal (C05 I19), and C23
+§4 routes on it: `suspend` → `handoff` → `resume` → `invalidate`. The flag is on
+the **tool**, and `FlagDef` has no equivalent.
+
+`docker run` attaches by default and detaches with `-d`. Same verb, two terminal
+contracts, chosen per invocation:
+
+```
+/run -it alpine sh      needs the terminal
+/run -d nginx           must not take it
+```
+
+C05's own comment argues the declaration belongs to the app author because
+*"whether a child wants a TTY is not knowable before running it"* — and that is
+right about detection. **For this verb the author cannot know either**, because
+it is not a property of the verb. The declaration has one slot and the verb has
+two behaviours.
+
+**Declared `interactive: true` here, which is the safe direction of a choice with
+no right answer.** Wrong that way, `/run -d nginx` suspends and resumes around a
+call that returns at once — a flicker on a detached run. Wrong the other way,
+`/run -it alpine sh` spawns a shell with no terminal and the session waits on a
+child nothing can answer. One is cosmetic and one is a hung session.
+
+`exec` and `attach` are unambiguous and take the flag honestly; `create` never
+touches the terminal. **`run` is the only verb in this family the type cannot
+describe**, which is what makes it a finding rather than a preference.
+
+The fix is not obviously a per-flag `interactive` — that would let two flags
+disagree, and C05 already rejects that shape for `view`. More likely the
+declaration wants to be a predicate over the invocation, which is a larger change
+than it looks and is C05's to rule on. Filed with the consumer that needed it.

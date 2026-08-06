@@ -38,6 +38,19 @@ export type Placed = Readonly<{
  */
 export type RouterDeps = Readonly<{
   overlayTop: () => Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null;
+  /**
+   * The top layer's answer handler, or null — I25.
+   *
+   * A pull like every other dep, and it answers for the **top layer only**. C15
+   * `pop()` gives the reason: a question raised over a completion menu that
+   * searched downwards would be answered by the menu.
+   *
+   * C16 does not know what a key means to a question. It offers the event and
+   * honours the boolean, which is the same contract `register` already has — so
+   * `Esc`, `⌃c`, an accelerator and an arrow are one path here and four rules
+   * over in L4, where the question lives.
+   */
+  overlayAnswerCallback: () => ((e: InputEvent) => boolean) | null;
   placed: () => readonly Placed[];
   popLayer: () => void;
   copyMode: () => boolean;
@@ -180,6 +193,16 @@ export function createRouter(
   /** Rungs 3–7, installed as handlers so the ladder has no order of its own. */
   function installLadder(): void {
     register("overlay", (e) => {
+      // **I25 — a layer that must be answered gets its keys first, and the order
+      // is the invariant.** The clause below answers `⌃c` at a non-dismissable
+      // top with *consumed, and nothing happens*, which was the whole truth when
+      // no layer could be answered. Against a question it is a hang: the key
+      // vanishes and the handler awaiting it waits forever. `Esc` and `⌃c` are
+      // handed over rather than decided here, because what they mean belongs to
+      // the question (C23 I36) and half a rule in each place is how they drift.
+      const answer = deps.overlayAnswerCallback();
+      if (answer !== null && answer(e)) return true;
+
       if (!isCtrlC(e)) return false;
       const top = deps.overlayTop();
       if (top === null) return false;
@@ -313,6 +336,27 @@ export function createRouter(
     if (e.kind === "mouse") return routeMouse(e);
 
     if (isCtrlC(e)) {
+      // **A verb waiting for an answer is not a verb to cancel** (I25).
+      //
+      // Rungs 1 and 2 read `inFlight`, and a local verb awaiting `ctx.ask` is in
+      // flight for the whole time its question is on screen — so `⌃c` was taken
+      // by rung 1 and the question never saw it. The outcome looked right, which
+      // is why only a frame-read found it: the container was untouched and the
+      // layer was gone, and a test asserting both passes. What the frame showed
+      // is that **the submitted line vanished** — cancellation discards the
+      // entry, so there was no record the command had been run at all, where
+      // declining settles one saying nothing changed.
+      //
+      // Ruling A's own argument decides it. `Esc` and `⌃c` collapse *because*
+      // declining and cancelling produce the same outcome — and when they do,
+      // the one that leaves a record is the one to keep. So a question outranks
+      // the cancel rungs, which is the only place the ladder's newest-first
+      // order is not enough on its own: both rungs have a claim, and the older
+      // one is higher.
+      if (deps.overlayAnswerCallback() !== null) {
+        stages.push("question");
+        return run("overlay", e);
+      }
       // Rungs 1 and 2, discriminated by route rather than by two sources.
       const route = deps.inFlight();
       if (route === "app" || route === "local") {

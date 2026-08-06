@@ -97,6 +97,42 @@ shift "$original"
 # blanket append would put an unknown flag on `ps`, and overriding an explicit
 # `--no-stream` is not this file's business.
 #
+# A handoff verb with no `-i -t` is a handoff to nothing.
+#
+# `exec`, `run` and `attach` are declared `interactive: true`, so C23 suspends the
+# terminal and gives the child the screen (C23 §4). Docker will not allocate a TTY
+# unless it is told to, so `/exec c sh` hands over a screen to a shell reading EOF
+# from a pipe: it exits at once and the session resumes having shown nothing. The
+# round trip is correct and the session is fine — it is the child that never had a
+# terminal to use.
+#
+# **There is no way to say this from the manifest.** `ToolDef.interactive` tells
+# Calcium the verb takes the terminal; it does not reach docker, and an app-route
+# verb has no handler to inject argv from. So the shim supplies what the
+# declaration implies. Fifth translation in this file, and the same shape as
+# `--json`: the far side's default does not match the framework's contract.
+#
+# **Only when the caller has not said otherwise**, and never for a detached run —
+# `-d` and `-t` together is docker's own error, and `/run -d nginx` is the
+# invocation F80 says this verb cannot distinguish in its declaration.
+wants_tty=0
+case "${1:-}" in
+  exec | attach) wants_tty=1 ;;
+  run) wants_tty=1 ;;
+esac
+for arg in "$@"; do
+  case "$arg" in
+    -i | -t | -it | -ti | --interactive | --tty | -d | --detach) wants_tty=0 ;;
+  esac
+done
+if [ "$wants_tty" -eq 1 ]; then
+  # After the verb, not at the end: `run` takes the image and its command after
+  # the flags, and a flag past them belongs to the child rather than to docker.
+  verb=$1
+  shift
+  set -- "$verb" -i -t "$@"
+fi
+
 # `if`, not `[ … ] && …`: under `set -e` a false test as the last command of the
 # script is a non-zero exit, so the short form would make the shim fail for every
 # verb that is not `stats`.

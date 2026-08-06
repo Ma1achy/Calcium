@@ -272,12 +272,12 @@ describe("F3: a value the far side already truncated", () => {
   // exercises — `cells()` against a real pre-elided string — is not.
   const PRE_ELIDED = "/host_mnt/User…";
 
-  it("F3a: U+2026 measures as one cell, not three", () => {
+  it("F3 (a): U+2026 measures as one cell, not three", () => {
     expect(cells("…")).toBe(1);
     expect(cells(PRE_ELIDED)).toBe(PRE_ELIDED.length);
   });
 
-  it("F3b: a pre-elided value passes through the adapter with exactly one ellipsis", () => {
+  it("F3 (b): a pre-elided value passes through the adapter with exactly one ellipsis", () => {
     const line = JSON.stringify({
       ID: "m1",
       Names: "mounted",
@@ -291,7 +291,7 @@ describe("F3: a value the far side already truncated", () => {
     expect(image).toBe(PRE_ELIDED);
   });
 
-  it("F3c: the real corpus carries pre-elided values, so this is not hypothetical", () => {
+  it("F3 (c): the real corpus carries pre-elided values, so this is not hypothetical", () => {
     const raw = readFileSync(new URL("./corpus/ps-real.ndjson", import.meta.url), "utf8");
     expect(raw).toContain("…");
   });

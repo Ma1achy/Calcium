@@ -16,6 +16,9 @@
  */
 
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
+import { createConfirmHost } from "../../src/shell/confirm.js";
+import { createOverlayManager } from "../../src/viewport/overlay/index.js";
+import { registry as overlayRegistry } from "./overlay.js";
 import { createSessionStore } from "../../src/shell/state.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { loadTheme, defaultTheme, type ThemeStore } from "../../src/presentation/theme/index.js";
@@ -110,6 +113,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   let now = 0;
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
+  const harnessOverlays = createOverlayManager({ registry: overlayRegistry });
   const deps = {
     session: () => session.snapshot,
     writes: session.execution,
@@ -150,7 +154,20 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     // defect with a smaller surface. C17 has no dependencies to fake around, so
     // there is nothing bought by standing in for it.
     editor: createEditor(),
-    overlays: {} as never,
+    // **Real, and the confirm host below is why.** `{} as never` stood here
+    // until C23 I36 landed: `ctx.ask` pushes a layer, so a local handler that
+    // asks anything reaches C15 through this field. The stub cost four suites a
+    // runtime `Cannot read properties of undefined (reading 'ask')`, which the
+    // compiler could not see past the cast at the bottom of this function.
+    overlays: harnessOverlays,
+    /**
+     * The real host (C23 I36), for the same reason as `editor` above.
+     *
+     * A stub returning a fixed key would make every confirming verb take that
+     * answer, so a handler that asks and ignores the reply would pass — and the
+     * one test that matters is whether declining stops the command.
+     */
+    confirm: createConfirmHost({ overlays: harnessOverlays, invalidate: () => undefined }),
     theme,
     // `append` is real, because C23 I29 records every settled submission
     // through it — a fake without it throws inside the append funnel and the

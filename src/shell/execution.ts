@@ -424,7 +424,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         );
         return;
       }
-      const produced = await handler(argv, { command: line });
+      const produced = await handler(argv, {
+        command: line,
+        // **The host's own `ask`, not a per-call wrapper** (C23 I36). One layer
+        // id and one answer handler exist at a time, so a question asked while
+        // one is open would replace the layer under the first handler's promise
+        // — the host owns that, not this call site.
+        ask: deps.confirm.ask,
+      });
       // **C23 states the command, not the handler** (I15, C22 I33) — the same
       // argument as C07 I16 makes for `doc.command` on the adapter side, and the
       // same one I13 makes for `meta`: the framework knows what was submitted

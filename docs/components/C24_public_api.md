@@ -643,6 +643,15 @@ cannot make on its own.**
   C07 together — either `meta.exitCode` becomes nullable, or the framework names
   the sentinel — and nothing here should choose it silently.
 
+  **Measured 2026-08-05: the comparability claim is false and the ruling is not
+  needed.** `authoritativeMeta` discards the adapter's `exitCode` on every route
+  and states it from the `RawResult` via `exitCodeOf`, so every app already gets
+  C07 §85's table — `SIGTERM → 143` — whatever it wrote. The invented number goes
+  nowhere. What survives is a different defect: the adapter's return type requires
+  ten `meta` fields and the registry honours three, so seven are computed and
+  thrown away with nothing saying so. That wants the ruling this entry was
+  reserving, and it is a narrower type rather than a wider one (FINDINGS F58b).
+
 - **Nothing lets a consumer look at a frame.** `expectDocument().rendersAt()`
   asserts and returns `this`; no export across the three entry points returns
   rendered lines, and `createTui` needs a terminal. For an adapter author

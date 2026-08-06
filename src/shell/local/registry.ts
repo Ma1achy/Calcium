@@ -17,11 +17,36 @@
  */
 
 import type { Manifest } from "../../data/manifest/index.js";
-import type { ViewDocument } from "../../data/viewmodel/index.js";
+import type { Block, ViewDocument } from "../../data/viewmodel/index.js";
+
+export type Choice = Readonly<{ key: string; label: string; default?: true }>;
+
+/**
+ * C23 §2's question — a choice list, never a yes/no box.
+ *
+ * The two-choice case is the degenerate one, and ruling it general costs a field:
+ * the second consumer needs single-select and free text and would otherwise get a
+ * second mechanism.
+ */
+export type AskOptions = Readonly<{
+  question: string;
+  /** What the answer will affect — a dry-run, or the matching `ls`. */
+  detail?: Block;
+  choices: readonly Choice[];
+}>;
 
 export type LocalContext = Readonly<{
   /** As typed, for `doc.command`. */
   command: string;
+  /**
+   * Ask, and await the answer (C23 I36).
+   *
+   * **Resolves with a choice on every path and never with null.** Declining is
+   * the choice marked `default`, and `Esc` and `⌃c` resolve with it too — so
+   * there is no second representation of *nothing happened* for a caller to
+   * handle and no path by which it could tell the two apart if there were.
+   */
+  ask: (opts: AskOptions) => Promise<string>;
 }>;
 
 export type LocalHandler = (
