@@ -70,10 +70,23 @@ export type DocumentMeta = Readonly<{
  * too, which is the `Exclude<ParseResult, { kind: "empty" }>` trade one more
  * time.
  */
-type AdapterOwned = "adapter" | "truncated" | "resultId";
+type ProducerOwned = "adapter" | "truncated" | "resultId";
 
-export type AdapterMeta = Readonly<Partial<Pick<DocumentMeta, AdapterOwned>>> &
-  Partial<Record<Exclude<keyof DocumentMeta, AdapterOwned>, never>>;
+/**
+ * The three `meta` keys a *producer* owns, on either route.
+ *
+ * **Named for the producer rather than the adapter because both routes reached
+ * the same three independently** (F58b, F13). The adapter route discards the
+ * other seven — `authoritativeMeta` overwrites them — and the local route
+ * *invents* them, four eleven-line helpers writing `durationMs: 0`, a
+ * `transport` that is a constant and an `origin` the shell already knows. One
+ * defect, two directions, one honoured set.
+ */
+export type ProducedMeta = Readonly<Partial<Pick<DocumentMeta, ProducerOwned>>> &
+  Partial<Record<Exclude<keyof DocumentMeta, ProducerOwned>, never>>;
+
+/** @deprecated the adapter-route name for {@link ProducedMeta}. */
+export type AdapterMeta = ProducedMeta;
 
 /**
  * What an adapter returns: a document whose `meta` carries only what it owns.
@@ -82,7 +95,20 @@ export type AdapterMeta = Readonly<Partial<Pick<DocumentMeta, AdapterOwned>>> &
  * (I15) — C07 I16 rules that an adapter states the command it ran, which may
  * differ from the line submitted.
  */
-export type AdapterDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: AdapterMeta }>;
+export type AdapterDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: ProducedMeta }>;
+
+/**
+ * What a local handler returns.
+ *
+ * **The mirror of `AdapterDocument`, and the fix runs the other way.** On the
+ * adapter route the seven are computed and thrown away; here nothing overwrites
+ * them, so a handler has to make them up — `verb` re-derived from `argv[0]`,
+ * `durationMs: 0` on a route the shell could time, `stderr: ""` on a route with
+ * no far side. C23 already takes `command` from the handler for exactly this
+ * reason (I15, C22 I33), *"the same one I13 makes for `meta`"* — an argument
+ * written for this case and never applied to it. FINDINGS F13.
+ */
+export type LocalDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: ProducedMeta }>;
 
 export type ErrorLike = Readonly<{
   message: string;

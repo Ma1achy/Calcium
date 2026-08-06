@@ -24,7 +24,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
 import { banner } from "./banner.ts";
-import type { Block, ColumnDef, Glyph, TableRow, Tone, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone, ViewDocument } from "@fmx/calcium";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
@@ -483,22 +483,12 @@ export function createDashboardHandler(
    * which is also the only file allowed to look at the environment.
    */
   blocks: () => boolean = () => true,
-): (argv: readonly string[], ctx: { command: string }) => Promise<ViewDocument> {
+): (argv: readonly string[], ctx: { command: string }) => Promise<LocalDocument> {
   return async (_argv, ctx) => ({
     schema: "tui.view/1",
+    meta: { adapter: "dashboard" },
     command: ctx.command,
     status: "ok",
     blocks: dashboard(await fetchSnapshot(), width(), engine, blocks()),
-    meta: {
-      verb: "dashboard",
-      adapter: "dashboard",
-      exitCode: 0,
-      durationMs: 0,
-      truncated: false,
-      argv: ["docker", "ps", "-a"],
-      stderr: "",
-      transport: "local",
-      origin: "user",
-    },
   });
 }

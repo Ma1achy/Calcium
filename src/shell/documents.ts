@@ -15,6 +15,7 @@
 
 import { block, document } from "../data/viewmodel/index.js";
 import type {
+  LocalDocument,
   Block,
   DocumentMeta,
   DocumentStatus,
@@ -70,7 +71,15 @@ export type DocSpec = Readonly<{
   blocks: readonly Block[];
   status?: DocumentStatus;
   error?: ErrorLike;
-  meta: MetaSpec;
+  /**
+   * **Optional since F13**, because the local route no longer supplies one:
+   * `runLocal` fills every field of a local document's `meta` itself, so a
+   * handler passing `origin` and `transport` here was inventing two values the
+   * shell already holds. Callers that append directly — the refusal notice, the
+   * error arms — still pass one, and the default below is what an empty spec
+   * means rather than a value anyone chose.
+   */
+  meta?: MetaSpec;
 }>;
 
 export function compose(spec: DocSpec): ViewDocument {
@@ -80,8 +89,47 @@ export function compose(spec: DocSpec): ViewDocument {
     status: spec.status ?? "ok",
     blocks: spec.blocks,
     ...(spec.error === undefined ? {} : { error: spec.error }),
-    meta: meta(spec.meta),
+    meta: meta(spec.meta ?? { origin: "user" }),
   });
+}
+
+/**
+ * A local handler's answer, completed — which is what makes it a document.
+ *
+ * **The local route's `authoritativeMeta`** (F13). C07's registry fills seven
+ * `meta` fields on the adapter route; nothing filled them here, so four handlers
+ * in the reference app each carried an eleven-line helper inventing them. This
+ * is that fill, named and exported for the same reason `createAdapterRegistry`
+ * is: an app asserting *"every document this app produces is valid"* has no
+ * other way to obtain one, and a producer the framework can test and a consumer
+ * cannot is a producer whose app-side tests assert against something the user
+ * never sees (C24 I19's `contextAt` argument, third instance).
+ *
+ * `exitCode` is derived from `status` rather than taken — the two agreed at
+ * every one of the reference app's eight sites, so carrying both was two records
+ * of one fact. `stderr` is empty because a local route has no far side; the
+ * failure message belongs in `error.message`, where it already is. F101.
+ */
+export function completeLocal(
+  produced: LocalDocument,
+  where: Readonly<{ command: string; verb: string | null; argv: readonly string[]; durationMs: number }>,
+): ViewDocument {
+  return {
+    ...produced,
+    command: where.command,
+    meta: {
+      verb: where.verb,
+      adapter: produced.meta?.adapter ?? "local",
+      exitCode: produced.status === "error" ? 1 : 0,
+      durationMs: where.durationMs,
+      truncated: produced.meta?.truncated ?? false,
+      ...(produced.meta?.resultId === undefined ? {} : { resultId: produced.meta.resultId }),
+      argv: where.argv,
+      stderr: "",
+      transport: "local",
+      origin: "user",
+    },
+  };
 }
 
 /**

@@ -196,7 +196,28 @@ const tui = createTui({
    * scrolled out of view is still running. S1's drawing said it froze; the
    * drawing was wrong about Calcium's own rules (FINDINGS F17a).
    */
-  greeting: () => createDashboardHandler(engine, width, unicodeText)([], { command: "" }),
+  greeting: async () => {
+    // **The one producer that is both.** As a local handler the dashboard's
+    // answer is a `LocalDocument` and `runLocal` fills its `meta` (F13); as the
+    // greeting it is appended directly, so nothing fills anything and the app
+    // owns the whole of it. Wrapped here rather than widening the handler,
+    // because the handler's route is the one with a framework behind it.
+    const produced = await createDashboardHandler(engine, width, unicodeText)([], { command: "" });
+    return {
+      ...produced,
+      meta: {
+        verb: null,
+        adapter: "dashboard",
+        exitCode: 0,
+        durationMs: 0,
+        truncated: false,
+        argv: [],
+        stderr: "",
+        transport: "local",
+        origin: "refresh",
+      },
+    } as const;
+  },
   /**
    * A02 §6 hook 4 — the domain half of completion, which no app had supplied.
    *

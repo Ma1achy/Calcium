@@ -108,7 +108,12 @@ export type {
  * `never`, so writing one is a compile error rather than a value that never
  * reaches a document.
  */
-export type { AdapterDocument, AdapterMeta } from "./data/viewmodel/index.js";
+export type {
+  AdapterDocument,
+  AdapterMeta,
+  LocalDocument,
+  ProducedMeta,
+} from "./data/viewmodel/index.js";
 
 /**
  * The registry, so an app can test its own adapters.
@@ -125,6 +130,16 @@ export type { AdapterDocument, AdapterMeta } from "./data/viewmodel/index.js";
  * landed, which is the second-consumer argument in one commit.
  */
 export { createAdapterRegistry } from "./data/adapters/index.js";
+
+/**
+ * The local route's completion, so an app can test its own handlers.
+ *
+ * Symmetric with `createAdapterRegistry` above and published for the same
+ * reason: after F13 a local handler returns a `LocalDocument`, and the only
+ * thing that turns one into a document is `runLocal`, which an app cannot
+ * reach without opening a session.
+ */
+export { completeLocal } from "./shell/documents.js";
 
 // --- builders — §4 ----------------------------------------------------------
 

@@ -620,7 +620,16 @@ describe("C22 §2a — the app's local handlers", () => {
     const { graph } = await build({
       manifest: local,
       localHandlers: {
-        guide: () => Promise.resolve(noticeDoc("guide", "the app's own verb", "info", { origin: "user" })),
+        // `meta` stripped: a local handler's answer is not a document (F13) —
+        // `runLocal` fills all seven fields, so a double supplying `origin` is
+        // inventing one the shell holds.
+        guide: () => {
+          const { meta, ...rest } = noticeDoc("guide", "the app's own verb", "info", {
+            origin: "user",
+          });
+          void meta;
+          return Promise.resolve(rest);
+        },
       },
     });
     expect(graph.pipeline.sealed, "and the registry still seals").toBe(true);

@@ -36,6 +36,18 @@ import {
 
 import { createAdapterRegistry } from "@fmx/calcium";
 import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
+import { completeLocal } from "@fmx/calcium";
+import type { LocalDocument } from "@fmx/calcium";
+
+/** A local handler's answer, completed the way `runLocal` completes it (F13). */
+async function viaLocal(
+  produced: LocalDocument | Promise<LocalDocument>,
+  command: string,
+  argv: readonly string[],
+): Promise<ViewDocument> {
+  return completeLocal(await produced, { command, verb: argv[0] ?? null, argv, durationMs: 0 });
+}
+
 /**
  * An adapter's answer, completed by the registry — which is what a document is.
  *
@@ -90,8 +102,18 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
   ["/images", () => viaRegistry(createImagesAdapter(), result({ stdoutRaw: read("images-real.ndjson") }), ctx)],
   ["/top", () => viaRegistry(createTopAdapter(), result({ stdoutRaw: read("top-real.txt") }), ctx)],
   ["/port", () => viaRegistry(createPortAdapter(), result({ stdoutRaw: read("port-real.txt") }), ctx)],
-  ["/events", () => createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { command: "/events" })],
-  ["/drift — no such container", () => createDriftHandler()(["no-such-xyz"], { command: "/drift no-such-xyz" })],
+  [
+    "/events",
+    () =>
+      viaLocal(
+        createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], {
+          command: "/events",
+        }),
+        "/events",
+        [],
+      ),
+  ],
+  ["/drift — no such container", () => viaLocal(createDriftHandler()(["no-such-xyz"], { command: "/drift no-such-xyz" }), "/drift no-such-xyz", ["no-such-xyz"])],
 ];
 
 describe("B04: the same information at every depth", () => {

@@ -20,7 +20,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Block, Hunk, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, Hunk, ViewDocument } from "@fmx/calcium";
 
 const run = promisify(execFile);
 
@@ -204,26 +204,14 @@ const realFar: Far = {
   },
 };
 
-const META: ViewDocument["meta"] = {
-  verb: "config",
-  adapter: "config",
-  exitCode: 0,
-  durationMs: 0,
-  truncated: false,
-  argv: ["docker", "exec"],
-  stderr: "",
-  transport: "local",
-  origin: "user",
-};
-
-const errorDoc = (command: string, text: string, extra: readonly Block[] = []): ViewDocument => ({
+const errorDoc = (command: string, text: string, extra: readonly Block[] = []): LocalDocument => ({
   schema: "tui.view/1",
   command,
   status: "error",
   // C04 I3 — required, and its absence is silent (F35).
   error: { message: text, stage: "local" },
   blocks: [b.notice.error(text), ...extra],
-  meta: META,
+  meta: { adapter: "config" },
 });
 
 /** The candidate list, which is what the verb offers instead of guessing (B1). */
@@ -253,7 +241,7 @@ const languageOf = (path: string): string => {
 
 export function createConfigHandler(
   far: Far = realFar,
-): (argv: readonly string[], ctx: { command: string }) => Promise<ViewDocument> {
+): (argv: readonly string[], ctx: { command: string }) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const container = argv[0];
     if (container === undefined || container === "") {
@@ -323,6 +311,7 @@ export function createConfigHandler(
 
     return {
       schema: "tui.view/1",
+      meta: { adapter: "config" },
       command: ctx.command,
       status: "ok",
       blocks: [
@@ -370,7 +359,6 @@ export function createConfigHandler(
               { gapBefore: true },
             ),
       ],
-      meta: META,
     };
   };
 }

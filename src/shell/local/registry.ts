@@ -17,7 +17,7 @@
  */
 
 import type { Manifest } from "../../data/manifest/index.js";
-import type { Block, ViewDocument } from "../../data/viewmodel/index.js";
+import type { Block, LocalDocument, ViewDocument } from "../../data/viewmodel/index.js";
 
 export type Choice = Readonly<{ key: string; label: string; default?: true }>;
 
@@ -52,7 +52,7 @@ export type LocalContext = Readonly<{
 export type LocalHandler = (
   argv: readonly string[],
   ctx: LocalContext,
-) => ViewDocument | Promise<ViewDocument>;
+) => LocalDocument | Promise<LocalDocument>;
 
 export interface LocalRegistry {
   register(verb: string, handler: LocalHandler): void;

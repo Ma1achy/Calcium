@@ -29,7 +29,7 @@ import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
+import { blockId, completeLocal, compose, errorDoc, noticeDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
@@ -408,6 +408,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   /** C23 §2's `local` route. §8b B3's missing-handler cell is closed by `seal()`. */
   const runLocal = async (line: string, verb: string, argv: readonly string[]): Promise<void> => {
     guard.take("local", verb);
+    const startedAt = deps.clock();
     try {
       const handler = local.get(verb);
       if (handler === undefined) {
@@ -438,7 +439,27 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // and the handler does not need to say. Six handlers each named their own,
       // and `/theme light` said `/theme` — a displayed command that dropped its
       // argument, which nothing could see while nothing was displayed.
-      const doc = { ...produced, command: line };
+      // **`meta` the same way, and the comment above was already the argument.**
+      // *"The framework knows what was submitted and the handler does not need
+      // to say"* was written for `command` and never applied to `meta`, so four
+      // handlers in the reference app each carried an eleven-line helper writing
+      // `verb` re-derived from `argv[0]`, `durationMs: 0` on a route the shell
+      // times, a `transport` that is a constant and an `origin` it already
+      // holds. Nothing overwrote them, so they were invented rather than
+      // discarded — the mirror of the adapter route, where the same seven are
+      // computed and thrown away. FINDINGS F13.
+      //
+      // `exitCode` is derived from `status` rather than taken: every local
+      // document in the reference app pairs `status: "error"` with `1` and
+      // `"ok"` with `0`, at eight sites, so carrying both is two records of one
+      // fact. **`stderr` is empty because a local route has no far side** — the
+      // failure message belongs in `error.message`, where it already is. F101.
+      const doc = completeLocal(produced, {
+        command: line,
+        verb,
+        argv,
+        durationMs: deps.clock() - startedAt,
+      });
       appendAndCommit(doc, line);
       // A02 Seam 4's theme row: `theme.setVariant` → `scheduler.invalidate`.
       // C10 never invalidates; the sequence is L4's, which is the seam.

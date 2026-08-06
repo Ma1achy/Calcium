@@ -45,7 +45,7 @@
 
 import { spawn } from "node:child_process";
 import { b } from "@fmx/calcium";
-import type { Block, LocalContext, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, LocalContext, ViewDocument } from "@fmx/calcium";
 
 /** One build step, as buildkit reports it. */
 export type Step = {
@@ -229,25 +229,13 @@ export function renderPull(p: Progress): Block {
 
 // ── the handlers ────────────────────────────────────────────────────────────
 
-const meta = (argv: readonly string[], exitCode: number): ViewDocument["meta"] => ({
-  verb: argv[0] ?? null,
-  adapter: "progress",
-  exitCode,
-  durationMs: 0,
-  truncated: false,
-  argv,
-  stderr: "",
-  transport: "local",
-  origin: "user",
-});
-
-const errorDoc = (command: string, argv: readonly string[], message: string): ViewDocument => ({
+const errorDoc = (command: string, argv: readonly string[], message: string): LocalDocument => ({
   schema: "tui.view/1",
   command,
   status: "error",
   error: { message, stage: "local" },
   blocks: [b.notice.error(message)],
-  meta: meta(argv, 1),
+  meta: { adapter: "progress" },
 });
 
 function flagValue(args: readonly string[], name: string): string | undefined {
@@ -262,7 +250,7 @@ type Kind = "pull" | "push" | "build";
 export function createProgressHandler(
   kind: Kind,
   spawner: Spawner = realSpawner,
-): (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument> {
+): (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (args, ctx) => {
     const target = args[0];
     if (target === undefined || target === "") {
@@ -301,6 +289,7 @@ export function createProgressHandler(
 
     return {
       schema: "tui.view/1",
+      meta: { adapter: "progress" },
       command: ctx.command,
       status: "ok",
       blocks: [
@@ -316,14 +305,13 @@ export function createProgressHandler(
           render: (data) => render(data as Progress),
         }),
       ],
-      meta: meta(argv, 0),
     };
   };
 }
 
 export function progressHandlers(
   spawner: Spawner = realSpawner,
-): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument>> {
+): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument>> {
   return {
     pull: createProgressHandler("pull", spawner),
     push: createProgressHandler("push", spawner),

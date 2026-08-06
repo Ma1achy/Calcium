@@ -51,6 +51,33 @@ import { createEventsHandler } from "../src/events.ts";
 
 import { createAdapterRegistry } from "@fmx/calcium";
 import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
+import { completeLocal } from "@fmx/calcium";
+import type { LocalDocument } from "@fmx/calcium";
+
+/**
+ * A row's answer as a *document*, completing the local ones.
+ *
+ * **A local handler no longer returns a document** (F13): it returns a
+ * `LocalDocument` and `runLocal` fills the seven `meta` fields the shell owns.
+ * `completeLocal` is that fill, exported for exactly this — validating a
+ * half-built document proves nothing about what a reader sees.
+ *
+ * Done once here rather than at each row: the rows differ in shape and a
+ * per-row rewrite is how a mechanical edit matches everywhere and is wrong in
+ * half the places.
+ */
+function complete(produced: LocalDocument | ViewDocument): ViewDocument {
+  if ("meta" in produced && produced.meta !== undefined && "origin" in produced.meta) {
+    return produced as ViewDocument;
+  }
+  return completeLocal(produced as LocalDocument, {
+    command: produced.command,
+    verb: null,
+    argv: [],
+    durationMs: 0,
+  });
+}
+
 /**
  * An adapter's answer, completed by the registry — which is what a document is.
  *
@@ -112,7 +139,10 @@ const FAR = (over: Partial<Far> = {}): Far => ({
  * error document is validated by nothing until docker misbehaves in front of a
  * human.
  */
-const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewDocument])[] = [
+const DOCUMENTS: readonly (readonly [
+  string,
+  () => Promise<LocalDocument | ViewDocument> | LocalDocument | ViewDocument,
+])[] = [
   ["/drift — no such container", () => createDriftHandler()(["no-such-xyz"], { command: "/drift no-such-xyz" })],
   ["/drift — no argument", () => createDriftHandler()([], { command: "/drift" })],
   ["/compare — missing side", () => createCompareHandler()(["no-a", "no-b"], { command: "/compare no-a no-b" })],
@@ -167,7 +197,7 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
 describe("F35: every document this app produces is one C13 will accept", () => {
   it.each(DOCUMENTS.map(([name]) => name))("%s", async (name) => {
     const make = DOCUMENTS.find(([n]) => n === name)?.[1];
-    const doc = await (make as () => Promise<ViewDocument>)();
+    const doc = complete(await (make as () => Promise<LocalDocument | ViewDocument>)());
     const v = validateDocument(doc);
     // The message carries the errors, because "expected false to be true" on a
     // document is a fault you then have to reproduce by hand.

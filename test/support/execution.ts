@@ -25,7 +25,7 @@ import { loadTheme, defaultTheme, type ThemeStore } from "../../src/presentation
 import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { fixture } from "./manifest.js";
-import { doc } from "./blocks.js";
+import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
@@ -246,8 +246,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   // The fixture manifest's own local verbs. The framework's six register
   // themselves; `seal()` reconciles both (C23 I27), so omitting either fails
   // construction rather than producing a verb nothing can route to.
-  pipeline.register("guide", () => doc({ command: "/guide" }));
-  pipeline.register("debug dump", () => doc({ command: "/debug dump" }));
+  pipeline.register("guide", () => localDoc({ command: "/guide" }));
+  pipeline.register("debug dump", () => localDoc({ command: "/debug dump" }));
   pipeline.seal();
 
   return {

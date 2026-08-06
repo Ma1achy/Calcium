@@ -24,7 +24,7 @@ import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createSessionStore } from "../../src/shell/state.js";
 import { fixture } from "../support/manifest.js";
-import { doc } from "../support/blocks.js";
+import { doc, localDoc } from "../support/blocks.js";
 import { result } from "../support/transport.js";
 import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { assignOffsets, backoffOf, BACKOFF_CAP_MS } from "../../src/shell/refresh.js";
@@ -235,10 +235,10 @@ function harness(script: Scripted = {}) {
   // are the fixture manifest's, and `seal()` reconciles both (C23 I27).
   pipeline.register("guide", () =>
     script.localLive === undefined
-      ? doc({ command: "/guide" })
-      : doc({ command: "/guide", blocks: [script.localLive()] }),
+      ? localDoc({ command: "/guide" })
+      : localDoc({ command: "/guide", blocks: [script.localLive()] }),
   );
-  pipeline.register("debug dump", () => doc({ command: "/debug dump" }));
+  pipeline.register("debug dump", () => localDoc({ command: "/debug dump" }));
   
   
   pipeline.seal();

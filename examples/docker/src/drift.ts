@@ -23,7 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Block, ComparisonRow, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, ComparisonRow, ViewDocument } from "@fmx/calcium";
 import type { Row } from "./ndjson.ts";
 
 const run = promisify(execFile);
@@ -285,18 +285,6 @@ async function inspectOne(kind: "container" | "image", ref: string): Promise<Ins
   }
 }
 
-const META = (verb: string): ViewDocument["meta"] => ({
-  verb,
-  adapter: verb,
-  exitCode: 0,
-  durationMs: 0,
-  truncated: false,
-  argv: ["docker", "inspect"],
-  stderr: "",
-  transport: "local",
-  origin: "user",
-});
-
 /**
  * **`error` is required when `status` is `"error"`** (C04 I3), and omitting it
  * does not fail loudly — it fails *silently*.
@@ -310,13 +298,13 @@ const META = (verb: string): ViewDocument["meta"] => ({
  * Found by reading the frame for `/drift no-such-container` and seeing an empty
  * transcript. FINDINGS F35.
  */
-const errorDoc = (command: string, verb: string, text: string): ViewDocument => ({
+const errorDoc = (command: string, verb: string, text: string): LocalDocument => ({
   schema: "tui.view/1",
   command,
   status: "error",
   error: { message: text, stage: "local" },
   blocks: [b.notice.error(text)],
-  meta: META(verb),
+  meta: { adapter: "drift" },
 });
 
 // ── The handlers ────────────────────────────────────────────────────────────
@@ -340,7 +328,7 @@ export type Lookup = (kind: "container" | "image", ref: string) => Promise<Insp 
  */
 export function createDriftHandler(
   lookup: Lookup = inspectOne,
-): (argv: readonly string[], ctx: { command: string }) => Promise<ViewDocument> {
+): (argv: readonly string[], ctx: { command: string }) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const ref = argv[0];
     if (ref === undefined || ref === "") {
@@ -384,10 +372,10 @@ export function createDriftHandler(
 
     return {
       schema: "tui.view/1",
+      meta: { adapter: "drift" },
       command: ctx.command,
       status: "ok",
       blocks,
-      meta: META("drift"),
     };
   };
 }
@@ -395,7 +383,7 @@ export function createDriftHandler(
 export function createCompareHandler(): (
   argv: readonly string[],
   ctx: { command: string },
-) => Promise<ViewDocument> {
+) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const [left, right] = argv;
     if (left === undefined || right === undefined) {
@@ -413,13 +401,13 @@ export function createCompareHandler(): (
 
     return {
       schema: "tui.view/1",
+      meta: { adapter: "drift" },
       command: ctx.command,
       status: "ok",
       blocks: [
         b.kv({ A: left, B: right }, { id: "compare-head" }),
         b.comparison(compareRows(a, bb), { id: "compare-rows" }),
       ],
-      meta: META("compare"),
     };
   };
 }

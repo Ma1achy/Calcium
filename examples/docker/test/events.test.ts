@@ -12,7 +12,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, Events, Group, Notice, Panel, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, Events, Group, Notice, Panel, ViewDocument } from "@fmx/calcium";
 import {
   ACTIONS,
   CAP,
@@ -255,7 +255,10 @@ describe("the rendering", () => {
 
   it("R6: an empty daemon still produces a document, and it says so", async () => {
     const handler = createEventsHandler(() => Promise.resolve(""));
-    const doc: ViewDocument = await handler([], { command: "/events" });
+    // `LocalDocument`: a handler's answer is not a document until `runLocal`
+    // fills the seven `meta` fields the shell owns (F13). This row asserts
+    // `status` and a block, neither of which the fill touches.
+    const doc: LocalDocument = await handler([], { command: "/events" });
     expect(doc.status).toBe("ok");
     expect(noticeIn(doc.blocks[0] as Block).text).toContain("no container lifecycle events");
   });

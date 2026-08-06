@@ -15,7 +15,7 @@
 import { visibleTools } from "../../data/manifest/index.js";
 import type { Manifest } from "../../data/manifest/index.js";
 import { block } from "../../data/viewmodel/index.js";
-import type { Block, ViewDocument } from "../../data/viewmodel/index.js";
+import type { Block, LocalDocument, ViewDocument } from "../../data/viewmodel/index.js";
 import type { TranscriptStore } from "../../viewport/transcript/index.js";
 import type { HistoryEntry } from "../../interaction/history/types.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
@@ -40,8 +40,22 @@ export type HandlerDeps = Readonly<{
   stop: (reason: StopReason) => Promise<number>;
 }>;
 
-const doc = (command: string, blocks: readonly Block[]): ViewDocument =>
-  compose({ command, blocks, meta: { origin: "user", transport: "local" } });
+/**
+ * **`origin` and `transport` left off since F13** — the shell fills both, along
+ * with `verb`, `argv`, `durationMs`, `exitCode` and `stderr`, so supplying them
+ * here was the same invention the reference app's four helpers were making.
+ * `command` is likewise the shell's (I15) and stays only because `compose`
+ * wants one to build with.
+ */
+const doc = (command: string, blocks: readonly Block[]): LocalDocument => {
+  // `compose` still runs, because it is what validates and normalises; only its
+  // `meta` is dropped, since `runLocal` fills every field of it. Building the
+  // document here instead would trade one invented `meta` for a second
+  // construction path, which is the trade C04 I1 exists to refuse.
+  const { meta, ...rest } = compose({ command, blocks });
+  void meta;
+  return rest;
+};
 
 /**
  * The six, as one map so registration cannot miss one.

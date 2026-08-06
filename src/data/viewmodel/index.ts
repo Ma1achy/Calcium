@@ -13,6 +13,8 @@
 export type {
   AdapterDocument,
   AdapterMeta,
+  LocalDocument,
+  ProducedMeta,
   Glyph,
   Action,
   Block,

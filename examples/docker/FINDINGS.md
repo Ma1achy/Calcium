@@ -3972,3 +3972,56 @@ through the registry reached the exit-2 branch and threw on `tool.args`. The row
 called adapters directly and never reached it. **`as never` is the mechanism**: a fixture
 narrower than the interface it stands for cannot fail on the difference, and the cast
 removes the compiler that would have said so.
+
+---
+
+## F101 — `stderr` and `exitCode` on a route with no far side ★★
+
+**Measured while fixing F13**, which asked which of the seven `meta` fields the
+framework can compute on the local route. Five are straightforward — `verb`, `argv`,
+`durationMs`, `transport`, `origin`. Two are not, and they fail differently.
+
+### `stderr` has no source, and the app used it as a second error channel
+
+A local handler spawns nothing, so there is no standard error stream to report. Three of
+the four helpers wrote `stderr: ""` — an invented constant. The fourth passed the failure
+message, and **the same string appears three times in one document**:
+
+```ts
+error: { message, stage: "local" },     // C04 I3 — required when status is "error"
+blocks: [b.notice.error(message)],
+meta: meta(argv, 1, message),           // ← and again, as stderr
+```
+
+**So nothing is lost by emptying it**, and something is gained: `meta.stderr` meant *what
+the far side printed* on one route and *what the handler decided to say* on the other,
+which makes it incomparable between entries in exactly the way F58 wrongly claimed
+`exitCode` was.
+
+**The residue, and it is a type question rather than a bug**: `stderr: ""` is still
+written, so the field is a constant on one of two routes. Removing it from
+`DocumentMeta` is not available — the spawn route needs it — so the honest options are a
+route-tagged union or leaving it empty and saying why. **Left empty with the reason
+recorded**, because a union here changes a public type for a field nothing currently
+misreads, and the freeze argument cuts the other way: making it a union later is additive.
+
+### `exitCode` is derivable, and carrying both is two records of one fact
+
+Every local document in the reference app pairs `status: "error"` with `exitCode: 1` and
+`status: "ok"` with `0` — **eight sites, no exceptions**, checked rather than assumed. So
+the handler was choosing a number that its own `status` already determined, and the two
+could disagree with nothing to notice.
+
+`runLocal` now derives it. **The disagreement was reachable**: a handler returning
+`status: "ok"` with `exitCode: 1` produced a document C13 accepts, and `$?`-style
+consumers would have read the two differently.
+
+**And the diff-read caught one thing the suite could not.** Removing the four helpers
+removed `adapter: "destructive"` with them, so every local verb's `meta.adapter` fell back
+to `completeLocal`'s `"local"` default — eight handlers that used to name themselves,
+anonymous. **Both suites stayed green**: `meta.adapter` is asserted three times and all
+three are on the adapter route, so nothing on the local route could see it.
+
+`adapter` is one of the three keys a producer owns, so each builder names itself again.
+The catch is the argument for the read: the last mechanical rewrite was caught by 166
+runtime failures, and this one had none to be caught by.
