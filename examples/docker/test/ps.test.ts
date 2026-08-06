@@ -38,6 +38,7 @@ const ctx = {
   verb: "ps",
   width: 120,
   userRequestedJson: false,
+  flags: {},
   transport: "subprocess",
   origin: "user",
   tool: null,

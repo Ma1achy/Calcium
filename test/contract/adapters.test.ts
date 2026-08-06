@@ -18,6 +18,7 @@ const CTX: AdapterContext = Object.freeze({
   verb: "ps",
   width: 100,
   userRequestedJson: false,
+  flags: {},
   transport: "subprocess",
   origin: "user",
   tool: null,

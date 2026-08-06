@@ -4274,3 +4274,102 @@ test*, and a stand-in written before the field existed cannot.
 Third instance of *a test that calls the mechanism verifies the mechanism, never the wiring*,
 and the second in two items — F51's tone reached the type, the builder and the D29 sweep with
 nothing asserting the paint. **Both were found by mutation and neither by review.**
+
+---
+
+## F108 — `FlagDef.view` has been usable on local verbs only, and its own comment says why ★★
+
+`FlagDef.view` declares that an invocation is a pushed view. Its comment records, correctly,
+that the example it was written for cannot be built:
+
+> **S3 was named here too, as `ps <uuid> --watch`, and cannot be built that way.** `docker ps`
+> takes no positional argument, `--watch` is not a docker flag, and **C06 I4 sends argv to the
+> far side verbatim** — so the declaration would have put a flag docker rejects on a verb that
+> rejects the id.
+
+**Two reasons are given and only one is about docker.** The positional argument is a fact
+about `docker ps`. *Argv goes over verbatim* is a fact about **Calcium**, and it applies to
+every `view` flag on every spawned verb, not to that example — so the arm has been usable only
+on `local: true` tools since it was written, and nothing anywhere says so. The comment ends
+*"no consumer outside a test fixture reaches this arm yet"*, which is true and reads as
+caution about an untested feature rather than as a bound on which verbs can use it.
+
+**This is F39 with the finding already written down beside the mechanism.** F39 was filed from
+`--raw` on `/inspect` and reads as one verb's problem; the same sentence sits in `types.ts`
+describing the same defect for a different field, and the two were never connected because one
+is a finding and the other is a comment.
+
+**Closed by the same change.** `shellOnly` gives a `view` flag on a spawned verb somewhere to
+go: declare both, and the flag decides the tier without reaching the binary. The arm is now as
+wide as its type — and the entry stays because *the reason a feature is narrow should be in
+the invariant, not in a parenthesis about the example that revealed it*.
+
+## F109 — a proxy that stopped measuring its property, caught by the property still being true
+
+C18's `T2.9 (I19): validateInvocation runs exactly once per parse` counts reads of
+`tool.flags` through a `Proxy`, with a control establishing reads-per-call first — *"a fixture
+must be shown to respond to the thing under test"*, which that test does better than most.
+
+The first version of this change derived the transmitted argv in C18 by reading `tool.flags`,
+and T2.9 failed: **4 reads against 3**. Validation still ran exactly once. The invariant held
+and the proxy for it did not.
+
+**The fix was the design, not the test.** A second reader of `tool.flags` in the parser was
+also a second copy of the flag grammar — where a value is inline or the next token, where `--`
+terminates — which is the drift a shared implementation prevents. Moving the split into
+`validateInvocation`, which already walks those tokens, made T2.9 pass **unchanged** and
+removed the duplication at the same time.
+
+**Worth an entry because the failure was informative in a way a stricter test would not have
+been.** A row asserting `perCall + 1` would have absorbed the change silently and kept the
+duplicate grammar. The proxy's fragility is what asked the question — and the answer was that
+the extra read should not exist, not that the count should be updated.
+
+---
+
+## F110 — `as never` in a fixture, fourth instance, and this time the count is exact ★★
+
+`inspect.test.ts` declared its adapter context as
+
+```ts
+const ctx = { command: "/inspect x", verb: "inspect", transport: "subprocess",
+              origin: "user", width: 120 } as never;
+```
+
+Five fields of an eight-field type, and `as never` satisfies every parameter, so the fixture
+had stopped tracking the type it stands for — `userRequestedJson` and `tool` were already
+missing and nothing said so.
+
+Adding `AdapterContext.flags` surfaced it as **three runtime failures instead of one compile
+error**, and the framework's own fixtures — which are typed — surfaced it as **nine compile
+errors that were fixed in one pass before a test ever ran.** Same change, same day, both sides
+of one repository: that is the cast's cost measured rather than argued.
+
+**Fourth instance of the class and the first with a control.** The earlier three were each a
+cast hiding a gap; this one had a typed cohort going through the identical narrowing at the
+same moment, so the comparison is not a judgement about how much the cast costs — it is nine
+against three, compile against runtime.
+
+Replaced with `ctxWith(flags)`, typed. The remaining two `as never` casts in that file are
+`registry`, which is a different question and already tsc-flagged (three pre-existing errors,
+unrelated).
+
+## F111 — a test named for a workaround outlives the workaround, and passes
+
+`shim.test.ts` carried `describe("F39: the shim strips a flag that selects a rendering")` with
+two rows asserting the strip. The strip was correct while F39 was open and is wrong now: C05
+I21 removes `--raw` before the transport is invoked, so a shim that strips it is **a second
+answer to a settled question**, and two mechanisms answering one question is how they drift.
+
+**The test would have kept the workaround alive.** Deleting the shim's `case inspect)` made
+`S4.1` fail — which is the suite working — but the obvious repair is to restore the strip,
+because the row's *name* says the strip is the feature. Nothing in the test says it is a
+workaround for a framework gap, even though its own file comment cites F39.
+
+Rewritten to assert the opposite and to name why: the shim passes `--raw` through untouched
+because it never arrives, and the declaration is what does the work. **A row asserting a
+workaround should name the finding it is waiting on in its title**, not only in a comment
+above it — the title is what a reader sees when it fails.
+
+Companion to F92's shape. There, a summary kept a body's claim and dropped its condition; here
+a test kept a mechanism and dropped the reason it existed.

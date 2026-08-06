@@ -186,6 +186,8 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
   const occurrences: Occurrence[] = [];
   const positionals: string[] = [];
+  /** The argv the far side gets: everything except the shell's own switches. */
+  const transmitted: string[] = [];
   let terminated = false;
 
   /** Is this token a flag the tool actually declares, long or short? */
@@ -232,6 +234,25 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] ?? "";
+
+    // **`transmitted` is built by the walk that already understands the
+    // grammar** (I21, F39). C18 needs the argv with the shell's own switches
+    // removed, and deriving it there would be a second copy of the rules below
+    // — where a value is inline or the next token, where `--` terminates. It is
+    // built here, from one pass, and returned on the success arm.
+    //
+    // A switch spans exactly one token, which is why C05 refuses `shellOnly` on
+    // anything else, and why this is a skip rather than a span.
+    if (!terminated && token.startsWith("--") && !token.includes("=")) {
+      const f = byName.get(token.slice(2));
+      if (f?.shellOnly === true) {
+        // Recorded as an occurrence still: `--help` sets `args.help`, which is
+        // how the shell learns it was asked for.
+        occurrences.push({ flag: f, raw: null });
+        continue;
+      }
+    }
+    transmitted.push(token);
 
     // T3.7 — everything after `--` is positional, including tokens that look
     // like flags. A path named `--weird` is why this exists.
@@ -462,7 +483,11 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
     return errors.length > 0
       ? Object.freeze({ ok: false as const, errors: Object.freeze(errors) })
-      : Object.freeze({ ok: true as const, args: Object.freeze(args) });
+      : Object.freeze({
+          ok: true as const,
+          args: Object.freeze(args),
+          transmitted: Object.freeze([...transmitted]),
+        });
   }
 
   function readPositionals(args: Record<string, unknown>): void {

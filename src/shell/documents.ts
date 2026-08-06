@@ -14,6 +14,8 @@
  */
 
 import { block, document } from "../data/viewmodel/index.js";
+import { usageBlocks } from "../data/adapters/index.js";
+import type { ToolDef } from "../data/manifest/index.js";
 import type {
   LocalDocument,
   Block,
@@ -175,6 +177,26 @@ export function noticeDoc(
       }),
     ],
     meta: metaSpec,
+  });
+}
+
+/**
+ * `/verb --help` — what the verb takes, from the manifest (C05 I22, F92).
+ *
+ * **`usageBlocks` had one caller and it was `raw.exitCode === 2`**, so the only
+ * way to see this document was to invoke the verb wrongly and let the far side
+ * say so. The generator was right and the trigger was missing; this is the
+ * trigger, and the generator is unchanged.
+ *
+ * `status: "ok"` because asking what a verb takes is not an error — the exit-2
+ * route's document is a failure that happens to contain the same blocks.
+ */
+export function usageDoc(command: string, tool: ToolDef): ViewDocument {
+  return compose({
+    command,
+    status: "ok",
+    blocks: [...usageBlocks(tool, blockId("usage"))],
+    meta: { origin: "user" },
   });
 }
 

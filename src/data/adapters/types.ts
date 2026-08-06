@@ -28,6 +28,25 @@ export type AdapterContext = Readonly<{
   width: number;
   /** The user typed `--json` explicitly (I9, A01 O3). */
   userRequestedJson: boolean;
+  /**
+   * The invocation's validated flag values — C05's `ValidationResult.args`
+   * (C05 I21, F39).
+   *
+   * **The half `shellOnly` needs to be usable.** A flag the shell consumes is
+   * absent from `argv` by construction, so an adapter reading `raw.argv` cannot
+   * see it — and `--raw` is exactly that: it selects a rendering, docker exits
+   * 125 on it, and the adapter is what has to know. Without this the mechanism
+   * removes the flag and gives its only consumer no way to read it.
+   *
+   * **`userRequestedJson` is this field, hardcoded for one flag**, and it stays
+   * because `--json` is not the same case: it is transmitted, C06 appends it,
+   * and the far side understands it. Two fields for two axes rather than one
+   * that means both.
+   *
+   * Values, not tokens: `args.raw` is `true`, not `"--raw"`. What the user typed
+   * is `meta.argv`; what it meant is here.
+   */
+  flags: Readonly<Record<string, unknown>>;
   /** Provenance, for `meta` — not derivable from a `RawResult` (C04 I13). */
   transport: "emulated" | "fixture" | "subprocess" | "local";
   origin: "user" | "action" | "agent" | "refresh";

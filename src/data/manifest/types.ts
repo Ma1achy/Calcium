@@ -66,6 +66,26 @@ export type FlagDef = Readonly<{
    * the verb arm's claim on purpose.
    */
   view?: boolean;
+  /**
+   * The shell consumes this flag; it never reaches the far side (I21, F39).
+   *
+   * **The axis is transmission, not presentation, and the two do not coincide.**
+   * `--json` selects a rendering *and* is understood by the far side — C06
+   * appends it — so it stays transmitted. `--raw` selects a rendering and means
+   * nothing to the binary: `/inspect <c> --raw` ran `docker inspect <c> --raw`
+   * and docker exited 125. Naming the field for presentation would have put
+   * `--json` on the wrong side of it.
+   *
+   * **This is what `view` already needed and never had.** The comment above
+   * records that `ps <uuid> --watch` "cannot be built that way" because argv
+   * goes over verbatim — so the `view` arm has been usable only on `local`
+   * tools since it was written, and nothing said so. A `view` flag on a spawned
+   * tool wants `shellOnly` too; F108 is the arm being narrower than its type.
+   *
+   * Validated exactly as any other flag: it is in `residual`, so `requires`,
+   * `conflicts` and type-checking are unchanged. Only `argv` drops it.
+   */
+  shellOnly?: boolean;
   summary: string;
 }>;
 
@@ -193,7 +213,20 @@ export type ToolMatch = Readonly<{
 }>;
 
 export type ValidationResult =
-  | Readonly<{ ok: true; args: Readonly<Record<string, unknown>> }>
+  | Readonly<{
+      ok: true;
+      args: Readonly<Record<string, unknown>>;
+      /**
+       * The invocation minus the shell's own switches (I21, F39).
+       *
+       * Returned from here rather than derived by C18, because the walk that
+       * knows where a flag ends is this one — a second copy in the parser is the
+       * drift a shared implementation prevents. `args` still carries the value,
+       * so a `shellOnly` flag is validated and readable and simply does not
+       * travel.
+       */
+      transmitted: readonly string[];
+    }>
   | Readonly<{ ok: false; errors: readonly ErrorLike[] }>;
 
 /** A parse failure, addressed by JSON path: `tools[3].flags[1].values`. */

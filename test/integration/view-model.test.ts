@@ -163,6 +163,7 @@ describe("C04 integration — the document lifecycle", () => {
           verb: "ps",
           width: 100,
           userRequestedJson: false,
+          flags: {},
           transport: "fixture",
           origin: "user",
           tool: null,

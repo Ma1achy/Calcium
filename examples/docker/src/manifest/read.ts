@@ -105,6 +105,13 @@ const inspect: ToolDef = {
     {
       name: "raw",
       type: "bool",
+      // **The flag F39 was filed from, and the field that closes it.** Every
+      // declared flag was transmitted, so this ran `docker inspect <c> --raw`
+      // and docker exited 125; the shim stripped it, which was honest and was
+      // not a fix. `shellOnly` means it never leaves the shell, and the adapter
+      // reads it from `ctx.flags` rather than from an argv it was filtered out
+      // of (C05 I21).
+      shellOnly: true,
       summary: "The literal docker inspect JSON, syntax-highlighted",
     },
   ],

@@ -23,6 +23,7 @@ const CTX: AdapterContext = Object.freeze({
   verb: "ps",
   width: 100,
   userRequestedJson: false,
+  flags: {},
   transport: "subprocess",
   origin: "user",
   tool: null,
@@ -525,6 +526,7 @@ describe("I9 (T1.13) — explicit --json", () => {
     const doc = registry.adapt(raw({ stdout: undefined, stdoutRaw: "not json" }), {
       ...CTX,
       userRequestedJson: true,
+      flags: {},
     });
     const code = doc.blocks[0];
     if (code?.kind !== "code") throw new Error("expected a code block");

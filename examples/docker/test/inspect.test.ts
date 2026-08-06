@@ -12,6 +12,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import type { AdapterContext } from "@fmx/calcium";
 // F37: no public measurer. Resolved through the package — see `deep.ts`.
 import { createBlockRegistry } from "./deep.ts";
 import type { Block, Code, KeyValue, Notice } from "@fmx/calcium";
@@ -37,13 +38,24 @@ const result = (over: Partial<Record<string, unknown>> = {}): never =>
     ...over,
   }) as never;
 
-const ctx = {
+/**
+ * **Typed, not `as never`.** The cast is why the `flags` field arrived as three
+ * runtime failures rather than one compile error: `as never` satisfies any
+ * parameter, so the fixture stopped tracking the type it stands for. Fourth
+ * instance of the same cast hiding the same class.
+ */
+const ctxWith = (flags: Readonly<Record<string, unknown>> = {}): AdapterContext => ({
   command: "/inspect x",
   verb: "inspect",
   transport: "subprocess",
   origin: "user",
   width: 120,
-} as never;
+  userRequestedJson: false,
+  flags,
+  tool: null,
+});
+
+const ctx = ctxWith();
 
 // ── The arithmetic the app had to write itself ──────────────────────────────
 
@@ -145,10 +157,18 @@ describe("splitRaw", () => {
 // ── The two modes, and the failure arms ─────────────────────────────────────
 
 describe("the adapter", () => {
-  it("I8: --raw is read from argv, and its absence is the structured mode", () => {
+  it("I8 (F39): --raw is read from ctx.flags, and its absence is the structured mode", () => {
+    // **It was `result.argv`, and that was the defect.** Every declared flag
+    // was transmitted, so the flag reaching the adapter was the same token that
+    // reached docker — which exited 125. `shellOnly` removes it from argv by
+    // construction (C05 I21), so reading argv here would now always be false
+    // and the raw mode would be unreachable from the shell.
+    //
+    // The argv below is deliberately *without* `--raw`, because that is what
+    // the transport now receives: if the read regressed to argv, this fails.
     const raw = createInspectAdapter().adapt(
-      result({ stdoutRaw: JSON.stringify([BIG]), argv: ["docker", "inspect", "x", "--raw"] }),
-      ctx,
+      result({ stdoutRaw: JSON.stringify([BIG]), argv: ["docker", "inspect", "x"] }),
+      ctxWith({ raw: true }),
     );
     expect(raw.blocks.every((bl: Block) => bl.kind === "code")).toBe(true);
     expect(raw.blocks.length).toBeGreaterThan(50);

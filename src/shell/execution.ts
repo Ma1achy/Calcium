@@ -29,7 +29,7 @@ import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { blockId, completeLocal, compose, errorDoc, noticeDoc } from "./documents.js";
+import { blockId, completeLocal, compose, errorDoc, noticeDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
@@ -565,7 +565,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           },
         });
         try {
-          await streamIntoView(displayed, verb, transport.stream(invocation));
+          await streamIntoView(displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {});
         } finally {
           forgetStream(DOCUMENT_VIEW_ID);
         }
@@ -578,6 +578,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         verb,
         width: deps.lifecycle.size().columns,
         userRequestedJson: result.argv.includes("--json"),
+        // C05 I21 — the validated values, so a `shellOnly` flag is readable by
+        // the thing that has to act on it. Empty on the failure arm, which
+        // cannot be reached here: a malformed invocation never spawns.
+        flags: result.validation.ok ? result.validation.args : {},
         transport: "subprocess",
         origin: "user",
         tool: result.tool,
@@ -742,7 +746,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // run for a subscription that had already finished.
         liveStreams.push({ id: pendingId, cancel: cancelThis });
         try {
-          await streamInto(pendingId, displayed, verb, transport.stream(invocation));
+          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {});
         } finally {
           forgetStream(pendingId);
         }
@@ -756,6 +760,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         verb,
         width: deps.lifecycle.size().columns,
         userRequestedJson: result.argv.includes("--json"),
+        // C05 I21 — the validated values, so a `shellOnly` flag is readable by
+        // the thing that has to act on it. Empty on the failure arm, which
+        // cannot be reached here: a malformed invocation never spawns.
+        flags: result.validation.ok ? result.validation.args : {},
         transport: "subprocess",
         origin: "user",
         tool: result.tool,
@@ -821,6 +829,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     displayed: string,
     verb: string,
     patches: AsyncIterable<RawPatch>,
+    /** The invocation's validated flags, for `adaptPatch` (C05 I21, F39). */
+    flags: Readonly<Record<string, unknown>>,
   ): Promise<void> => {
     let seq = 0;
 
@@ -884,6 +894,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           verb,
           width: deps.lifecycle.size().columns,
           userRequestedJson: false,
+          flags,
           transport: "subprocess",
           origin: "user",
           tool: null,
@@ -928,6 +939,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     displayed: string,
     verb: string,
     patches: AsyncIterable<RawPatch>,
+    /** The invocation's validated flags, for `adaptPatch` (C05 I21, F39). */
+    flags: Readonly<Record<string, unknown>>,
   ): Promise<void> => {
     // **The stream's own counter** (I30, C07 I15). Not decoration: C07 spends it
     // as the namespace for generated block ids *and* as the per-stream reset,
@@ -955,6 +968,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           verb,
           width: deps.lifecycle.size().columns,
           userRequestedJson: false,
+          flags,
           transport: "subprocess",
           origin: "user",
           tool: null,
@@ -1065,6 +1079,26 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * never run — a dead branch being A03 §2's class in code rather than in a rule.
    */
   const route = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
+    // **`--help` is answered here, before the local/app split** (C05 I22, F92).
+    //
+    // Both routes have it, because C05 reserves it on every tool — so putting
+    // the check inside either arm would give half the verbs help and leave the
+    // other half spawning `docker ps --help`, which is F39 with a different
+    // flag. It never travels either way (C05 I21), so this is the only thing
+    // that can answer it.
+    //
+    // `validation.ok` guards it because a malformed invocation should say what
+    // is wrong rather than what is possible: `/ps --nonsense --help` is a
+    // misspelling, and answering with usage hides the error that caused it.
+    if (
+      (result.kind === "app" || result.kind === "local") &&
+      result.validation.ok &&
+      result.validation.args["help"] === true
+    ) {
+      appendAndCommit(usageDoc(line, result.tool), line);
+      return;
+    }
+
     switch (result.kind) {
       case "error":
         appendAndCommit(errorDoc(line, result.error, { origin: "user" }), line);

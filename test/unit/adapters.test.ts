@@ -23,6 +23,7 @@ const CTX: AdapterContext = Object.freeze({
   verb: "ps",
   width: 100,
   userRequestedJson: false,
+  flags: {},
   transport: "fixture",
   origin: "user",
   tool: null,

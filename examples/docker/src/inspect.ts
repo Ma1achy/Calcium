@@ -194,7 +194,9 @@ export function createInspectAdapter(): Adapter {
           ? "docker inspect returned nothing that could be read"
           : "";
 
-      const raw = result.argv.includes("--raw");
+      // `ctx.flags`, not `result.argv`: a shellOnly flag is absent from argv by
+      // construction, which is the whole of what F39 asked for (C05 I21).
+      const raw = ctx.flags["raw"] === true;
 
       return {
         schema: "tui.view/1",

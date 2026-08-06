@@ -31,7 +31,7 @@ import {
   type Result,
   type ToolDef,
 } from "./types.js";
-import { FRAMEWORK_NAMES, FRAMEWORK_TOOLS } from "./framework.js";
+import { FRAMEWORK_FLAGS, FRAMEWORK_NAMES, FRAMEWORK_TOOLS, RESERVED_FLAGS } from "./framework.js";
 
 const ARG_TYPE_SET: ReadonlySet<string> = new Set<string>(ARG_TYPES);
 
@@ -232,6 +232,7 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
   const requires = takeStringArray(raw, "requires", e, at);
   const conflicts = takeStringArray(raw, "conflicts", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
+  const shellOnly = takeOptionalBoolean(raw, "shellOnly", e, at);
 
   return {
     name,
@@ -242,6 +243,7 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
     ...(requires === undefined ? {} : { requires }),
     ...(conflicts === undefined ? {} : { conflicts }),
     ...(view === undefined ? {} : { view }),
+    ...(shellOnly === undefined ? {} : { shellOnly }),
     summary,
   };
 }
@@ -393,9 +395,56 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   });
 
   const flags: FlagDef[] = [];
+  const reserved = new Set(RESERVED_FLAGS);
   rawFlags.forEach((f, i) => {
     const parsed = parseFlag(f, e, `${at}.flags[${i}]`);
-    if (parsed !== null) flags.push(parsed);
+    if (parsed === null) return;
+    // **The tool-name collision above, one level down** (I22, F92). Reserving a
+    // name and letting an app declare it anyway is the worse of both: the app's
+    // definition is silently unreachable, or the framework's is, and which one
+    // wins is an ordering detail nobody should have to know.
+    // **`shellOnly` is bool-only and long-form-only, and the narrowness is the
+    // ruling** (I21, F39). Dropping a flag from `argv` means knowing which
+    // tokens it spans, and that grammar lives in `validateInvocation` — a value
+    // may be inline or the next token, a short may be clustered with three
+    // others. A second copy of it here is the drift this codebase has a memory
+    // against, and threading token spans out of the validator is a bigger change
+    // than either consumer needs: `--help` and `--raw` are both switches.
+    //
+    // A switch spans exactly one token, so the strip is a token comparison. If a
+    // surface ever needs `--format=wide` shell-side, the validator grows spans
+    // and this restriction lifts — and until then it fails loudly rather than
+    // stripping half a flag and sending the value on alone.
+    if (parsed.shellOnly === true) {
+      if (parsed.type !== "bool") {
+        fail(
+          e,
+          `${at}.flags[${i}].type`,
+          `"--${parsed.name}" is shellOnly, which is supported for switches only — a flag ` +
+            `with a value spans tokens the shell cannot drop without re-deriving the grammar`,
+        );
+        return;
+      }
+      if (parsed.short !== undefined) {
+        fail(
+          e,
+          `${at}.flags[${i}].short`,
+          `"--${parsed.name}" is shellOnly and cannot have a short form — a short clusters ` +
+            `with others in one token, and dropping it would drop theirs too`,
+        );
+        return;
+      }
+    }
+    if (reserved.has(parsed.name)) {
+      fail(
+        e,
+        `${at}.flags[${i}].name`,
+        `"--${parsed.name}" is a flag Calcium reserves on every verb (C05 §3) — ` +
+          `choose another name, or the framework's handling of it becomes unreachable`,
+      );
+      return;
+    }
+    flags.push(parsed);
   });
 
   checkFlagRelations(flags, e, at);
@@ -543,7 +592,16 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
       // Appended rather than prepended so no index an app could read is shifted:
       // `fail` reports `tools[3]`, and a parse error pointing at a row nobody
       // wrote is worse than no path at all.
-      tools: [...tools, ...FRAMEWORK_TOOLS],
+      // **And every tool gains the reserved flags here**, for the same reason
+      // and with the same consequence: `appTools` is what the app wrote, so the
+      // round-trip re-derives them rather than re-parsing them. Doing it inside
+      // `parseTool` put `--help` into `appTools`, and T2.7 caught it on the
+      // second parse — the reserved-name check cannot tell an app declaring
+      // `--help` from a re-parse of output that already carries it, which is
+      // §3's collision problem one level down and the same test finding it.
+      tools: [...tools, ...FRAMEWORK_TOOLS].map((t) =>
+        Object.freeze({ ...t, flags: Object.freeze([...t.flags, ...FRAMEWORK_FLAGS]) }),
+      ),
       // What the app wrote (§3). `serialise` emits this, so the round-trip
       // property holds exactly: parse re-derives the framework's six.
       appTools: tools,
