@@ -557,14 +557,25 @@ a triage is a thing asserted. Specifically:
 ## How this file was checked
 
 **The inventory is derived, not hand-copied.** `grep '^## F' FINDINGS.md` yields 89 ids and
-every one appears in **exactly one** group above — 10 + 12 + 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 + 6
-+ 2 + 1 + 6 = 89.
+every one is keyed in a group above — 10 + 12 + 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 + 6 + 2 + 1 + 6
+= 89.
+
+**The groups are not disjoint, and an earlier version of this paragraph claimed they were.**
+F30 is keyed in group 4 and again in group 7 — it genuinely is both a verdict the union lacks
+and a drawing that asserted one — so group 7 names fifteen ids and counts fourteen, excluding
+the one already counted. **The sum reaches 89 either way**, which is the point: a total over
+group sizes cannot see a duplicate that was placed twice and counted once. That is F87, and it
+is this document's own check failing the rule it was built from — *assert the artefact, not a
+proxy*. A disjointness claim wants `sort | uniq -d`, which is one line and was never run.
 
 That check exists because the F55 version had a heading reading *5 surfaces* over a row listing
-six, and F30 appeared in two groups. **A count that disagrees with its own row reads as
-authority and is the cheapest possible error to make** — which is also F65's finding, one
-document out. Deriving the list rather than transcribing it is the pattern for any future
-inventory here.
+six. **A count that disagrees with its own row reads as authority and is the cheapest possible
+error to make** — which is also F65's finding, one document out. Deriving the list rather than
+transcribing it is the pattern for any future inventory here; deriving it does not make it a
+partition.
+
+**F87, F88 and F89 are filed and not yet grouped above** — they arrived from the step-3a
+partition, which is `CALCIUM_GAP_PLAN.md`. Regrouping is 3b's, with the roadmap rewrite.
 
 **Dispositions were checked against the repository where they move**, not against `FINDINGS.md`'s
 prose — that being the record whose authority is in question. Scoped to findings whose

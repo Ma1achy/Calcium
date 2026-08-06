@@ -3285,3 +3285,132 @@ whole of F58 and F66 restated.
 reproduce* is not a tidying exercise: the two commands above are the entire cost, and
 they turn one unreproducible anecdote into one falsified mechanism and one reproducible
 defect. Neither was available while the tool had no fixture.
+
+---
+
+## F87 — the triage's partition is claimed, and the count that checks it cannot see the claim ★★
+
+`TRIAGE.md` §*How this file was checked* states the property and the check in one
+breath:
+
+> The inventory is derived, not hand-copied. `grep '^## F' FINDINGS.md` yields 89 ids
+> and every one appears in **exactly one** group above — 10 + 12 + … = 89.
+
+**The sum is right and the property is false.** F30 is a bolded key in group 4 (a
+change axis) *and* in group 7 (an artefact wrong about the framework). Measured:
+
+| | |
+|---|---|
+| ids in the ledger | 89 |
+| distinct ids keyed in the triage's groups | **89** |
+| ids keyed in **two** groups | **1** — F30 |
+| ids group 7's rows name | **15** |
+| ids group 7's heading claims | **14** |
+
+**The two errors cancel exactly.** Group 7 declares 14 because it silently excludes
+the id already counted under group 4, so `10 + 12 + 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 +
+6 + 2 + 1 + 6` reaches 89 whether the partition holds or not.
+
+**The count is a proxy and it agrees with itself.** A sum over group sizes tests that
+the sizes add up; it cannot test that the groups are disjoint, because a duplicate
+placed once and counted once is arithmetically invisible. The check was built against
+the F55 version's failure — a heading reading *5 surfaces* over six rows — and it
+catches that shape and only that shape.
+
+**F30's placement is not the defect.** It genuinely is both: a verdict the union
+lacks, and a drawing that asserted one. **The sentence claiming a strict partition is
+the defect**, and the remedy is to state that groups may overlap and to mark the
+second appearance as a cross-reference — not to move the finding.
+
+This is F65 arriving in the document written to sort F65, and *assert the artefact,
+not a proxy* is the rule it fails: a disjointness claim wants a duplicate check, which
+is one `sort | uniq -d` and was never run.
+
+---
+
+## F88 — `CALCIUM_ROADMAP.md`'s own cross-references point at the wrong entries ★★
+
+The roadmap's body refers to Order entries by number — *"the same mechanism as
+selection's full-row background (#22)"*, *"see #16, which supersedes an earlier
+draft"*. Every such reference was resolved against the Order list:
+
+| | |
+|---|---|
+| `#NN` references in the body | 31 |
+| resolving to the entry the sentence means | 17 |
+| **resolving to a different entry** | **12** |
+| ambiguous (a section, not an entry) | 2 |
+
+Not near-misses. A sample, each checked by reading both the sentence and the entry it
+lands on:
+
+| written | means | lands on |
+|---|---|---|
+| `#20` — *"appears in `/theme --help` for free once #20 lands"* | 21, `--help` per verb | off-screen live parts |
+| `#16` — *"see #16, which supersedes an earlier draft"* | 18, shared pollers | one popup |
+| `#24` — *"With ranking (#24), 'best' becomes meaningful"* | 31, completion ranking | more default themes |
+| `#26` — *"it pairs with `b.row` (#26)"* | 38, horizontal composition | view trace in transcript |
+| `#25` — *"worth doing with the scroll-anchor rule (#25's neighbourhood)"* | 8, the scroll-anchor rule | ghost text |
+| `#32` — *"a theme declares the background it assumes (#32's ruling)"* | 39, theme background | prefix-out |
+
+**The cause is a renumbering that did not propagate**, and it is the edit-script
+discipline stated in `CLAUDE.md` — *an edit script asserts every replacement matched* —
+failing in the direction that leaves no trace: the Order list was reordered, every
+`#NN` in 2,000 lines of body kept its old target, and each one still resolves to a
+real entry. **A dangling reference would have been visible; a wrong one is not.**
+
+**Why it matters beyond tidiness.** Several of these are dependency statements — *do
+ranking before ghosting*, *build the wash with the background* — so a reader following
+them builds in the wrong order. `#20` and `#16` are the sharpest: both are read as
+prerequisites, and both name an unrelated entry.
+
+**The general form is worth more than the fix.** A reference into a numbered list is
+checkable exactly as `Fnn` citations are, and this repository already has SP5 for the
+one and nothing for the other. The difference is not importance; it is that one
+document's numbers were noticed and the other's were not.
+
+---
+
+## F89 — an Order entry carries a claim its own document records as corrected ★★
+
+`CALCIUM_ROADMAP.md`'s Order list, entry 32:
+
+> `32 prefix-out / defaultRoute` — **CommandPolicy is exported and unreachable — a
+> config field.** And prefix-OUT (prose by default) is a separate ruling that
+> `agent-tui` needs
+
+The body of the same document, forty lines apart, says both things:
+
+| | |
+|---|---|
+| *"~~The command prefix is unreachable~~ — **CORRECTED: it is wired**"* | `TuiConfig` has `commandPolicy?`, threaded `config.ts:108 → construct.ts:673 → execution.ts:174 → parse` |
+| *"~~superseded~~"* (struck heading, live body) | *"`TuiConfig` has no policy field… there is no way to get one into a session — the eleventh instance of exported-and-unreachable"* |
+
+**Measured at HEAD, and the correction is the true one:**
+
+```
+src/shell/types.ts:318      commandPolicy?: CommandPolicy;     ← the field exists
+src/shell/config.ts:108     commandPolicy: config.commandPolicy ?? slashPolicy
+src/shell/construct.ts:699  commandPolicy: config.commandPolicy
+src/shell/execution.ts:174  policy: deps.commandPolicy
+src/interaction/parser/parse.ts:51   const policy = ctx.policy ?? slashPolicy
+```
+
+An app can supply its own prefix today. **The struck section's body was never amended
+and the Order list was drawn from it**, so the summary a reader acts on carries the
+falsified half while the correction sits above it in the same file.
+
+**The surviving half is real and different.** Prefix-*out* — prose by default, verbs
+by exception — is genuinely inexpressible: `prefixPolicy("")` makes every token a verb.
+That is a live gap with a named consumer, and it is not *"a config field"*; it is a
+ruling about whether the default route belongs inside `CommandPolicy` or beside it.
+
+**So the entry does not earn its stated place, and the reason is F66's shape one
+document out.** A claim was corrected in place and the correction did not reach the
+summary that cites it. Repetition inside a single document is not corroboration either:
+the strikethrough marks the *heading* as superseded and the body reads as current,
+which is exactly enough ambiguity for a summariser to take the wrong half.
+
+**What a triage cannot see, stated plainly**: this was not reachable from `FINDINGS.md`
+at all. It came from resolving the Order list's summary against its own body, which is
+*going to find where the claim was written down* pointed at a roadmap.

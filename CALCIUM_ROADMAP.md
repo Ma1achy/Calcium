@@ -1,0 +1,2216 @@
+# Calcium — roadmap
+
+Two destinations, decided: **prism-tui**, the ML platform TUI this was always for, and
+**Calcium as an open-source framework** other people use. Both, and the plan below serves
+them in that order.
+
+One principle overrides ordering by value or by enthusiasm:
+
+> **The API freezes at publication.** Anything that changes a public type, a signature, or
+> what a consumer is handed must land before the first publish, or it becomes a breaking
+> change with users attached.
+
+That is the `comparison`-rename-before-C24 argument at repo scale, and it puts the fixes
+docker-tui proved ahead of every feature in this document.
+
+**The work splits into two lists, and the first one wins on evidence:**
+
+```
+the triage    what docker-tui proved BROKEN — F1–F55, with real consumers behind each
+the features  what Calcium should GAIN — the rest of this document
+```
+
+`examples/docker/TRIAGE.md` is authoritative for the findings. The features start at
+"Already shipped" below.
+
+---
+
+## The second consumer, and why it comes before publishing
+
+**prism-tui's first surfaces land before the freeze, not after.**
+
+docker-tui found fifty-five findings by being a real consumer. **prism-tui is a genuinely
+different consumer** — not a second instance of the same one. docker-tui exercised container
+inspection: tables, comparisons, patches. prism-tui exercises ML output: tensors, heatmaps,
+training curves, long-running jobs. Different blocks, different producers, different failure
+modes. There is no reason to expect it finds nothing.
+
+And every finding it produces after publication is a breaking change with users attached.
+
+**Not the whole app** — enough surfaces to shake out second-consumer findings. An experiment
+table, a training curve, one live job monitor. Weeks, not months.
+
+Two things follow from it:
+
+- **The ML output package moves up**, from post-publication to phase 2. prism-tui requires
+  it, and it is the feature with the clearest consumer — tensors with shape/dtype headers,
+  heatmaps for attention and confusion matrices. Built against prism-tui, which is the
+  pattern that has worked throughout.
+- **`b.live`'s `stream` arm finally gets a consumer.** F10 records that docker-tui never
+  exercised it — `docker stats` streams as a screen redraw, so `/stats` polls. **A training
+  job streaming metrics is exactly that arm's consumer**, so prism-tui closes a coverage gap
+  docker-tui structurally could not. That is the strongest single argument for a second
+  consumer before the freeze.
+
+It also improves phase 3's outside-reader test. Same author, but a different domain written
+against the *published* surface rather than alongside the framework — a much better proxy
+than docker-tui was, though not a substitute for an actual stranger.
+
+---
+
+## Phase 1 — shape-changing. Before any publish.
+
+### 1.1 The producer-context contract — F14, F43, F37, F36, F28
+
+**The most important item in the whole list, and public release is why.**
+
+Five surfaces could not reach a fact the framework holds, and **every one was worked around
+by the app duplicating a Calcium module** — `codeRows` reimplementing the measurer, `main.ts`
+sniffing `TERM` and `LANG` to redo C02, deep imports to reach the validator.
+
+For an app whose author wrote the framework, that is a finding. **For a stranger, it is a
+broken package** — they hit the same wall, cannot reach around it because the seal stops
+them, and conclude the framework cannot do the thing. This is the single largest difference
+between "works for us" and "works for them".
+
+The contract question, as the triage frames it: **three of the five are about what a
+producer is handed, not what is exported.** `AdapterContext` has width and no height and no
+capabilities. `LocalContext` has only `command`. `LiveSpec.render` has neither.
+
+The counter-argument is recorded and must be answered rather than ignored:
+`AdapterContext.width` says *"never a layout decision"*. So the ruling is not "hand
+producers everything" — it is **what may a producer legitimately know, and why is width
+different from capabilities?** Answer it once, for all three producer kinds, or the next
+consumer duplicates a sixth module.
+
+This is a signature change on three public types. It cannot wait.
+
+### 1.2 A change axis distinct from `Tone` — F30, F49, F51
+
+**Three surfaces that knew nothing of each other converging on one absent concept** — the
+comparison verdict, the diff marker, the event type. That is the highest-quality evidence a
+framework gap can have.
+
+`Tone` is a judgement axis (`ok`/`warn`/`error`). Added/deleted/modified, same/changed,
+start/die are a **change axis**, and C04 I6 correctly refuses to carry them as tone — twice,
+which is why F49's refusal *was right*.
+
+Adds to a public type. Cheaper now than ever again.
+
+### 1.3 The builder-surface audit — F27's shape
+
+Three instances, **one closed with a frame as evidence** (`yMin`/`yMax`), so this is a
+precedent rather than a guess. `collapsedAfter` and `gapBefore`-on-the-view-arm both have
+consumers.
+
+But the fix is not three more fields. It is **an audit with a rule**: every builder exposes
+what its block can express, or the spec says why not. `b.plot` omitting `yFormat` *with the
+reason written down* (percent expects a fraction — F31) is the model; omitting it silently
+is the defect.
+
+Additive per field, but the **audit** belongs before publication, because a builder surface
+that is 80% of its block is a surface people work around.
+
+### 1.4 The prompt — F55
+
+`PROMPT = "❯ "`, hardcoded, on every frame the shell draws, on the line the reader types
+into, **with nothing an application can do about it.** C22 §6 owns it and gives it no
+capability-dependent form.
+
+Small, and it is the kind of thing that reads badly in a framework others theme: a
+degradation story that is complete except for the one character always on screen.
+
+---
+
+## Phase 2 — additive. Can follow the first publish.
+
+### 2.1 The empty-block convention — F15, F35, C22 I47, `/drift`, `/config`
+
+**Absence of output is the same picture as failure to produce output.** Four instances
+across three layers, and `/drift` predicted it while `/config` reached it independently —
+which is the threshold for calling it general.
+
+Mostly a **documented convention**, possibly one helper: any block computed from two sources
+needs a rendering for *"they agree"*. Cheap, and no public shape changes.
+
+### 2.2 Flags that select a rendering — F39
+
+There is no way to declare a flag that chooses a presentation rather than an invocation, so
+`--raw` reached docker and it exited 125. Every declared flag is transmitted. The shim
+absorbed it, which is honest and not a fix.
+
+Additive (a field on `FlagDef`), so it can follow — but it is a real capability gap and any
+app with a `--raw`, `--wide` or `--json` mode hits it immediately.
+
+---
+
+## Phase 3 — the things a public framework needs that neither list contains
+
+These are not in the roadmap or the triage, and for the stated destination they matter more
+than most of what is.
+
+**The error path is the first-run experience.** Step 4 found three error documents, two
+shipped, none ever run, 91 rows agreeing with all three. A stranger's first encounter with
+Calcium is a misconfiguration — a manifest that will not parse, a missing adapter, a verb
+with no transport. **Read every error message the framework can emit and ask whether it
+tells someone how to fix it.** F7's *"the manifest is missing tui-kit's own verbs"* names
+the problem and not the remedy.
+
+**R01's own test has never been run by anyone who is not the author.** *"Someone who is not
+its author builds a working TUI from the README."* docker-tui was written by the framework's
+author, so it is not that test. Before publishing: **hand the README's smallest example to
+someone who has not seen the codebase and watch.** That is the only way to find the F7 class
+in advance rather than from an issue.
+
+**Version 0.x, deliberately.** It does not remove the freeze — it makes breaking honest.
+Say so in the README rather than implying stability the surface has not earned.
+
+**And the docs are the product.** Eight drawings in the surfaces document were wrong about
+the far side or the framework, corrected in place at ten sites — F11 is the most-instantiated
+class in the project. For a public framework, a wrong doc is worse than a missing one,
+because it costs a stranger an afternoon before they distrust it. **Every example in the
+README must be run from the packaged tarball**, not the workspace, by CI.
+
+---
+
+---
+
+# The features
+
+## Already shipped, and the demo just hasn't shown them
+
+- **Code block rendering with syntax highlighting** — `lowlight` is in, S5's `--raw`
+  exercises it. Nothing to build.
+- **Built-in commands** — `/help`, `/clear`, `/theme`, `/history`, `/debug`, `/exit` ship
+  as framework verbs; C05 appends them to every parsed manifest.
+- **Jump to bottom** — `⌃End` is already bound to `scrollBottom`, `⌃Home` to `scrollTop`.
+
+---
+
+## Already designed, not built
+
+### Images — `docs/notes/TUI_NOTE_images.md`
+
+The hard problem is solved and the note has it. C02 already detects `imageProtocol`
+(`iterm2` | `kitty` | `sixel` | `none`) and C09 §4 has its degradation row.
+
+**Kitty's Unicode placeholders (0.28.0+) are what make this tractable**, and the mechanism
+fits the architecture exactly: transmit once, create a virtual placement, then print
+`U+10EEEE` characters whose diacritics encode row and column and whose foreground colour
+carries the image ID. The terminal sees ordinary text in its grid and draws the image tile
+there.
+
+| | |
+|---|---|
+| **Measurement is free** | the placeholder grid *is* `rows` × `cols` of ordinary characters, so `measure` returns `rows` because that is literally how many rows were emitted |
+| **Scrolling is free** | placeholders are text; C14's virtualisation moves them like any content |
+| **Resize is free** | they reflow, and C03's `contaminated` repaint re-emits them |
+| **No probe** | quiet mode (`q=2`) exists to avoid responses, the same reason C02 refuses interactive probes |
+
+Works through tmux. Supported: kitty, WezTerm, Ghostty, Rio, Konsole (partial).
+
+**Phasing per the note: kitty-with-placeholders first**, because it is the only protocol
+that composes with a scrolling transcript at all. iTerm2's character-like model is second
+and only viable in a fixed layout. **Sixel needs a real encoder and is the whole expense.**
+
+`rows` must be exact or measurement breaks; `cols` is advisory and clamped at plan time
+like any other block's width.
+
+**Four consumers for one mechanism**, which is what makes it worth building: pasted
+screenshots, agent tool output, ML plots, and high-fidelity Mermaid.
+
+---
+
+## Cheap — fits the architecture as it stands
+
+### Mermaid (text path) — much cheaper than it looks
+
+Not a layout problem, because someone else solved it in TypeScript.
+**`beautiful-mermaid`** renders Mermaid as ASCII with zero DOM dependencies, no browser or
+Puppeteer, 100+ diagrams in under 500 ms, covering flowcharts, state, sequence, class and
+ER. It is what OpenCode's mermaid plugin uses. `termaid` (Python, 18 diagram types) and
+`mermaid-ascii` (Go) are the other prior art.
+
+So a `mermaid` block is **a code block with a transform in front**: parse the source, call
+the renderer, measure the lines. **No new mechanism.** Same dependency shape as `lowlight`.
+
+*Vet the dependency first, as `lowlight` was vetted* — repo, licence, maintenance, and
+output quality against real diagrams. If it does not hold up, `mermaid-ascii`'s approach
+(parse to a grid, A* the edges) is reimplementable, but *that* is the component-sized
+version and only worth it if the dependency fails.
+
+Honest about quality: every text renderer's layout is approximate — grid-based barycenter
+heuristics, Manhattan-only edge routing, dense graphs still cross. Diagrams render *well
+enough to read*, not beautifully. Which is why the image path exists for when it matters.
+
+**High-fidelity path is free once images land** — `mmdc` or headless Chrome to PNG, then
+the image block. Only where `imageProtocol !== "none"`.
+
+### Markdown
+
+A translator producing `Block[]`, not one block that renders a document — headings, lists,
+emphasis, code spans all map to blocks Calcium already draws, so measure/degrade/window
+work for free. Prefer that over a monolithic markdown block for exactly that reason.
+
+### Themes cannot be light — and `/help`'s verb list came back empty
+
+**Both found while making the README gifs**, which is step 8's distribution one more time:
+every finding came from a way of looking, not a test written to look for it.
+
+#### ★ A theme must be able to paint its own background — RULED
+
+C10 **paints no background**, so `/theme light` sets dark foregrounds and emits nothing
+behind them: **on a dark terminal it is dark-on-dark and unreadable.** The name is the lie —
+`light` implies the app changes the background, and the implementation assumes the terminal
+*already is* light.
+
+**The strongest argument is not usability, it is that C10's own invariant is unprovable
+without it.**
+
+C10 enforces a **contrast floor**. Against what? If the theme does not paint the background,
+the floor is computed against an *assumed* background that may not be the real one — so the
+guarantee holds only when the terminal happens to match the assumption, **which is exactly
+the case that is broken.** A framework that guarantees contrast and controls one end is
+guaranteeing a guess.
+
+**And the usual objection is weaker here than it reads.** *"Respect the terminal's colour
+scheme"* is right for a line-oriented tool. **Calcium is in the alternate screen and already
+owns every cell** — painting a background is not fighting the scrollback or another tab, it
+is a full-screen app colouring its own screen, which is what every vim colorscheme, `htop`
+and `k9s` do.
+
+**But "always paint" is wrong too, for one real reason: transparency.** Plenty of people run
+translucent or blurred terminals, and a painted background destroys that. **That is not a
+preference to override.**
+
+**Ruled: per-theme declaration, not a framework default.**
+
+```
+background: "terminal"     inherit — today's behaviour. Preserves transparency, and is
+                           correct for a theme designed to sit in a dark terminal
+background: <colour>       paint it. Required for any theme that cannot assume its host
+```
+
+**Which makes the contrast floor provable in both cases** — against the painted colour, or
+against the *declared assumption* when inheriting. That declaration is also what lets C10
+warn on a mismatch where `COLORFGBG` is available (non-interactive, so C02's refusal of
+probes is untouched; OSC 11 stays out on the same grounds the image protocol's quiet mode was
+chosen).
+
+**And it resolves the bug directly**: the light theme **paints, because it cannot work
+otherwise**. A dark theme sitting in a dark terminal keeps inheriting and keeps your
+transparency.
+
+#### And the user overrides it: `/theme <theme> --no-bg`
+
+**The transparency argument is not the theme author's to make.** Someone running a blurred
+terminal wants transparency across *every* theme they try — a per-theme declaration cannot
+express that, and they would have to avoid every painting theme including the light one that
+genuinely needs it.
+
+**So two orthogonal things:**
+
+```
+the THEME declares    background: "terminal" | <colour>     what it was designed for
+the USER overrides    /theme <theme> --no-bg                 never paint, whatever it says
+```
+
+**A flag on `/theme` rather than an env var**, and it costs nothing: `/theme` is one of the
+framework's six verbs, so this is a `FlagDef` on that `ToolDef` — **and it appears in
+`/theme --help` for free** once #20 lands. No argv parser, no environment convention.
+
+**Per invocation, not sticky.** `/theme light --no-bg` then `/theme dark` paints again.
+A sticky flag is invisible state: you would switch themes later, get no background, and have
+nothing on screen explaining why — whereas repeating it is one keystroke and `↑` recalls the
+whole line.
+
+**That argues for a second thing rather than against the flag**: once theme persistence lands
+(C22 §12a, still assigned and unbuilt), **the persisted setting is where "I always want
+transparency" belongs.** Flag for trying, preference for keeping.
+
+#### Warn and comply, because the override re-enters the broken state
+
+`/theme light --no-bg` on a dark terminal produces **exactly the unreadable state this ruling
+exists to fix**, deliberately, at the user's request.
+
+**Ruled: warn and comply.** A notice saying *"light assumes a light terminal; without a
+background it may be unreadable"*, and then do it. The user asked, transparency is a real
+reason, and **a framework refusing a preference because it knows better is worse than a
+legible warning.**
+
+**And the consequence must be written down rather than discovered:** the contrast floor is
+**provable when painting, best-effort against the declared assumption when overridden.** That
+is honest as long as it is stated.
+
+**One mechanical note, and it is shared work:** painting means **padding every row to the
+full region width**, or the wash ends ragged where the text does. That is the same mechanism
+as selection's full-row background (#22), one scope up — **build them together rather than
+twice.**
+
+#### `/help` returned no verb summaries — narrow this before filing it
+
+The report was *"`/help` emits zero verb summaries, contradicting the README's 'help
+rendered from the same table dispatch uses'."* **That is one step too wide.**
+`handlers.ts:80,86` maps app tools and shell tools to `{ label: "/name", value: summary }`,
+so the mechanism exists and is wired.
+
+**The finding is why both buckets came back empty**, not that summaries are unrendered.
+Same shape as nearly filing "nothing reads `truncated`" when T4.5 falsified it — the field
+was fine, the *view's use of it* was absent.
+
+Check the bucketing first: the framework's six are `local: true` and may fall outside both
+maps, and a session whose manifest carries only those would render exactly what was
+observed. If that is it, the finding is about which tools `/help` considers rather than
+about summaries at all.
+
+**And the README's claim needs checking either way.** *"Help rendered from the same table
+dispatch uses"* is the anti-drift property the keymap-derived help exists for. If `/help`
+renders keybindings from the keymap and verbs from the manifest, the sentence describes
+half of it — which is F11's class arriving in the framework's own front door.
+
+### ★★ The frame is written whole, every time — no output diffing
+
+**The larger of the two performance defects, and the one to fix first.**
+
+`session.ts:367` writes `HOME` followed by every row joined, on every frame. **There is no
+comparison against the previously written frame.** On a 200×50 terminal that is ~10,000
+cells of styled output pushed to the terminal per keystroke, even when a single character
+changed.
+
+**And diffing was anticipated in the prose and never built.** `frame-scheduler.ts:175`
+reasons about *"diffing against a screen whose contents nobody knows"* — a sentence that
+only makes sense if diffing is the normal case. Specified in a comment, absent in the code:
+the same shape as `copyMode`, `frameworkSources` and the rest.
+
+**What it costs together with the render defect above:** a large diff renders 5,000 lines to
+show 30, then writes 10,000 cells to change one. **Two multiplicative costs on the same
+keystroke**, which is why the symptom is "unusable" rather than "slow".
+
+**The fix is the standard one and it is contained:**
+
+- keep the last frame as an array of rows
+- write only the rows that differ, each preceded by a cursor move to its line
+- **the `contaminated` flag already exists** for the case where the screen's contents are
+  unknown — a child wrote over it, a resize happened — and forces a full repaint. That is
+  precisely the invalidation story a diffing writer needs, **already built and already
+  tested.**
+
+**Row granularity is enough; cell granularity is not worth it.** A changed row is one cursor
+move and one write; chasing changed *cells* within a row costs more arithmetic than it saves
+bytes, and it interacts badly with SGR state which is per-row already.
+
+**Ordering: this before the render cache.** It is smaller, it is contained to one file, the
+invalidation mechanism exists, and it cuts the per-frame cost for *every* frame rather than
+only for large blocks.
+
+### `cells()` has no ASCII fast path — the hottest function in the tree
+
+**Read, not guessed.** `cells()` is:
+
+```ts
+if (text === "") return 0;
+let total = 0;
+for (const { segment } of GRAPHEMES.segment(stripControl(text))) total += clusterCells(segment);
+return total;
+```
+
+So every call **allocates a new string** (`stripControl`) and then **runs `Intl.Segmenter`
+over every character** — for every string, in every row, of every frame. And it is called
+everywhere: column planning, truncation, wrapping, padding, the compositor's splice.
+
+**Virtually all of it is ASCII**, where the answer is `text.length` and the segmenter is
+pure overhead. A guarded fast path — no character above `0x7e` and none below `0x20` → return
+the length — is a few lines and correct by construction, because the two things the slow
+path exists for (control characters and multi-cell clusters) are exactly what the guard
+excludes.
+
+**Measure it after the render cache lands**, not before: most calls disappear with the
+cache, so profiling now would attribute the cost to the wrong layer. But the fast path is
+cheap enough to be worth taking on the reading alone.
+
+### Two candidates checked and cleared — recorded so nobody checks again
+
+**Syntax highlighting is already memoised**, on `(text, language)`, and the comment says
+precisely why: *"A transcript re-renders on every frame; tokenising it on every frame…"*.
+So someone already knew about the per-frame re-render and mitigated its most expensive part.
+
+**That is independent confirmation of the render diagnosis** — the memo exists *because*
+rendering repeats, which is the defect above stated from the other side. Fixing the render
+cache does not remove the memo's value; it makes it redundant on the hot path and leaves it
+correct.
+
+**And C14's Fenwick index is incremental.** `#rebuild()` is reserved for width changes,
+with a comment arguing that a rebuild per change *"would make the Fenwick tree pointless"*.
+The structure is right and it is used right.
+
+**Recorded as checked-and-clear**, with the date, because a checked assumption that held is
+worth not checking twice — the same disposal as C14's no-settled-fast-path result.
+
+### Remaining, unmeasured — profile, do not build on suspicion
+
+- **`lines.join("\r\n")` allocates the whole frame as one string every write.** Irrelevant
+  once only changed rows are written; do not fix it separately.
+- **`stripControl` allocating on every `cells()` call** — subsumed by the fast path above
+  for the common case, still present for the rest.
+- **Per-frame object allocation in the paint path** — plausible and unmeasured. The GC cost
+  of a frame's worth of intermediate arrays is the kind of thing that shows in a profile and
+  nowhere else.
+
+**Measure, then fix.** The four defects above were found by reading the code and are
+certain; these are hypotheses, and a performance fix aimed at the wrong layer is the same
+class as a rule scoped to the wrong artefact.
+
+**And a frame-read is the acceptance test, not a benchmark.** *"Type into a 5,000-line diff
+and watch"* is what a user experiences; a microbenchmark that improves while the frame still
+stutters has measured the wrong thing.
+
+### ★ Rendering is not cached, and a large block makes the app unusable
+
+**A performance defect, measured in the code rather than guessed at.** `paint.ts:137` calls
+`renderSequenceToLines(registry, blocks, width, …)` on every visible entry **every frame**,
+and nothing anywhere caches rendered lines. Only `measure` is cached — C14, keyed on
+`(entryId, rev, width)`.
+
+So **the virtualisation is at entry granularity, not row granularity**: C14 selects *which
+entries* are visible, and the renderer then renders each one **whole**. A 5,000-line patch
+renders 5,000 lines per frame to show thirty — and with syntax highlighting, lowlight
+tokenises all 5,000, per keystroke.
+
+That is the reported symptom exactly: fine normally, unusable on a large diff.
+
+**Three candidate fixes, and they are not alternatives — the first is necessary and the
+others compound it:**
+
+- **Cache rendered lines**, keyed the same way `measure` already is —
+  `(entryId, rev, width)`. The invalidation story is solved; it is the same key. This is
+  the smallest change with the largest effect, because the frame after the first is free.
+- **Render only the visible window of a block.** Harder, and it is the heterogeneous-
+  windowing question already recorded from step 3 — `windowPatch` reduces a `Patch` to a
+  valid smaller `Patch`, and that pattern is available for the divisible kinds. This is
+  where that finding's consumer arrives.
+- **Highlight at construction, not at render.** If lowlight runs inside
+  `renderSequenceToLines`, it runs per frame. Tokenising once when the block is built and
+  caching the styled text moves it off the hot path entirely.
+
+**Measure before choosing.** Time one frame with a small patch and with a large one, then
+bisect: `measure` / `render` / `highlight`. The three fixes have very different costs and
+the profile decides the order.
+
+**This is phase-1-shaped, not a feature.** It changes no public type, but a framework that
+degrades to unusable on a large document has a correctness problem in the thing it exists
+to do, and every consumer hits it — docker-tui's `/config` on a real diff, `agent-tui`'s
+streamed code, prism's long training logs.
+
+### Text selection, copy and paste — and `copyMode` already exists with no producer
+
+**`copyMode` is a focus target that nothing can enter.** It is in `FocusTarget`, ordered in
+the ladder, `register("copyMode", …)` is wired at `router.ts:192` — and `session.ts:409`
+supplies `copyMode: () => false`, unconditionally. Routed, ordered, unreachable: the
+eighteen-structural-gaps shape one more time, and this one was *anticipated by name*.
+
+**The problem it exists for is real.** In the alternate screen with mouse tracking on, the
+terminal's native selection is disabled — mouse events go to the app — so a reader cannot
+drag-select and copy the way they can in any other terminal program.
+
+**Three mechanisms, and they are complementary rather than alternatives:**
+
+- **`copyMode`** — a mode that turns mouse tracking *off*, so the terminal's own selection
+  works normally. The target exists; it needs a producer, a binding to enter it, and a
+  visible indicator (the mode belongs in the chrome, exactly as the navigation model's
+  `NAV`/`EDIT` does).
+- **OSC 52** — the terminal clipboard escape, so the app can copy *programmatically*.
+  Works over ssh and through tmux, which drag-select often does not.
+- **Shift-click passthrough** — most terminals bypass mouse tracking while Shift is held.
+  Free, undiscoverable, and worth documenting rather than building.
+
+**And there is a Calcium-specific opportunity that is better than character selection.**
+Because the transcript is *structured blocks*, the app knows what a thing **is** — so
+`y` on a focused code block copies the code, `y` on a table row copies the row, `y` on a
+patch copies the diff. **Semantic copy, which a raw terminal cannot offer**, and it serves
+the actual use case (copy this command, copy this diff) better than dragging ever does.
+
+That pairs with the navigation model: **copy is a verb on a focused thing**, which is what
+focus is for. Build it there rather than as a separate mechanism.
+
+### Animation — and the one rule that makes it safe
+
+Animated text, colour transitions, a pulse on something new. Genuinely nice, and it collides
+with two things already decided — so it needs a ruling before it needs a design.
+
+**Rule: animation is decoration, never information.**
+
+If a pulsing colour *means* "urgent", a 1-bit reader loses the meaning entirely — which is
+**information carried by colour alone**, the exact thing `degradesTo1Bit` exists to catch and
+the exact argument F49 and F34 already made twice. So animation may draw the eye to a fact
+**that is already stated some other way**, and may never be the only statement of it.
+
+That rule makes the degradation story free: at 1-bit and ASCII the animation simply does not
+run, and nothing is lost because nothing was carried.
+
+**Two mechanical consequences:**
+
+- **It must ride the refresh driver, not a new timer.** Same as the spinner: C03 commits on
+  events, and this layer must not grow a clock. An animated element is a `b.live` part or a
+  driver tick.
+- **It fights output diffing, and that is a real cost.** Every animated cell changes every
+  frame, so those rows diff to nothing useful. Fine for a spinner glyph; **bad for a whole
+  block pulsing**, which would defeat the fix that made the app fast. So: animate *small*
+  things, and treat a full-block animation as a performance decision rather than a style one.
+
+### Change highlighting — the distinctive one, and it is nearly free
+
+**In a live dashboard the reader's real question is "what changed since I looked away", and
+no terminal tool answers it well.**
+
+Calcium can, because **it already knows.** `rev` moves when an entry changes; the refresh
+driver knows which part it patched; the diff of two documents is computable. A brief
+highlight on the rows that moved — a value that ticked, a container that appeared, a state
+that flipped — is information the framework holds and currently throws away.
+
+**A raw terminal cannot do this at all**, which puts it in the same category as semantic copy:
+a capability that follows from structured blocks rather than from drawing characters.
+
+And it obeys the animation rule cleanly — the *value* is the information; the highlight only
+says *look here*.
+
+### Notify when a long thing finishes — cheap, and almost nobody does it
+
+A five-minute `build` finishes while the reader is in another window. **Nothing tells them.**
+
+Terminals support this: `OSC 9` for a desktop notification, `\a` for a bell, and many
+terminals mark a tab as having activity. **A few bytes on the wire**, gated on a threshold —
+notify only if the operation ran longer than N seconds *and* the terminal is unfocused, where
+that is knowable.
+
+It is the kind of polish that is invisible when it works and conspicuous by its absence, and
+it costs almost nothing.
+
+### Structured export — copy as data, not as characters
+
+`b.table` has rows and columns; `b.patch` has hunks; `b.comparison` has pairs. **So "copy
+this as CSV" or "save this as JSON" is a projection the framework can already perform**, and
+a terminal tool that only ever offers you characters cannot.
+
+Pairs with semantic copy — the same focused-thing, a different verb — and it is the second
+capability that exists *because* the transcript is structured rather than painted.
+
+### Error remedies as `fill` actions — generalise a pattern already found
+
+Step 10 found the case: `docker rm` on a running container refuses **and names the remedy**,
+and the right response is a `fill` action writing `/rm <name> --force` into the prompt.
+
+**That is a pattern, not a special case.** Any far side whose errors name a fix — most
+mature CLIs do — can offer it as one keystroke instead of a re-type. The adapter recognises
+the error and attaches the action; the framework already has `fill`.
+
+### Empty states that teach
+
+*"no containers"* is correct. *"no containers running — `/ps -a` shows 6 stopped"* answers the
+question the reader actually has, and *"no volumes — `/volume create <name>`"* teaches the
+verb.
+
+**And the empty-block class says the same thing from the correctness side**: absence of
+output and failure to produce output must not look alike. An empty state that *teaches* is
+that rule paying a dividend rather than just avoiding a defect.
+
+### Progress feedback while something is slow — the spinner is static, and deliberately so
+
+**It exists and is frozen on purpose.** `paint.ts:89` is a single `⠋`, with the reasoning
+written beside it:
+
+> *One frame of it rather than an animation: C03 commits on events, not on a ticker, so a
+> rotating spinner would need a timer this layer does not own and must not grow. The claim
+> C19 §7 makes is that the wait is visible, and one glyph is that.*
+
+A considered decision, not an oversight. **But the argument has a hole, and it is exactly
+the one the feedback names.**
+
+**A static glyph proves a wait *began*. It does not prove anything is still *happening*.**
+After three seconds, a frozen `⠋` and a hung process are indistinguishable — and *"is it
+working or is it dead"* is the question a user actually has. C19 §7's claim, that the wait
+is visible, is satisfied; the claim a slow operation needs is different.
+
+**And the timer objection no longer holds.** C23 §3b's refresh driver **is** a ticker — built,
+shipped, with `schedule` as an ambient and `b.live` parts driven off it. The comment was true
+when written and is not now. **Animating the spinner is a consumer of a mechanism that already
+exists**, not a timer C03 has to grow.
+
+**What "feedback" should mean, in three tiers — because motion alone is the weakest of them:**
+
+- **Motion** — the spinner rotates, so the reader knows the process is alive. Cheapest, and
+  it is what the feedback literally asks for.
+- **Elapsed time** — `running · 4s`. Strictly better than motion: it distinguishes *slow*
+  from *stuck* by a number rather than by a vibe, and it needs the same tick.
+- **What it is doing**, where the far side says so. `docker pull` emits per-layer progress;
+  a tool call knows its own name. **This is the tier that turns a wait into information**,
+  and step 11's progress work is its first real consumer.
+
+**The stall notice is the fourth tier and it is already built** — C23 §3b fires one when a
+stream goes quiet past a threshold, and step 3's frame-read caught its default `renderError`
+being unconstructable. So the machinery for *"this has been quiet too long"* exists; what is
+missing is the ordinary case of *"this is still going."*
+
+**One thing to get right:** the tick must not be a second scheduler. C03 commits on events
+and the refresh driver already owns the clock — so an animated spinner is a `b.live` part or
+it is a refresh-driver tick, **not a `setInterval` in `paint.ts`**. The comment's real point
+survives even though its premise does not: this layer must not grow a timer.
+
+### A scrollbar — the terminal cannot provide one, and C14 already has the numbers
+
+**The terminal's scrollbar is not available, and not for a fixable reason.** The app runs in
+the **alternate screen**, which by definition has no scrollback — the terminal shows exactly
+the rows the app draws and nothing sits behind them. That is why vim, less and htop all draw
+their own.
+
+And even where one appeared it would be wrong: it scrolls the *terminal's* buffer, while the
+transcript is a **virtual list of thousands of rows that were never sent to the terminal**.
+
+**C14 already holds everything a scrollbar needs.** The Fenwick index knows the total height
+of all entries, the current offset and the region height — so `thumb position = offset /
+total` and `thumb size = region / total`. **Nothing needs computing. It needs drawing.**
+
+**One ruling, and it is not the obvious choice: reserve the column always, never
+conditionally.**
+
+A scrollbar that appears only when the content overflows changes the available width when it
+appears — which changes wrapping, which changes heights, which changes the total, **which
+changes whether it overflows.** A feedback loop, and it would present as text reflowing while
+you scroll. One cell of two hundred is not worth that.
+
+So `measure` is called at `columns - 1` always, and the column is empty when there is nothing
+to scroll.
+
+**Degradation is trivial** and follows the existing pattern: `│` track with a `█` thumb at
+depth, `|` and `#` at ASCII. Nothing structural changes, which is the easy case B04 is for.
+
+**Mouse drag-to-seek pairs with motions that already exist.** The router hit-tests by region,
+so a click or drag in the scrollbar column can seek — and `PgUp`/`PgDn`/`⌃Home`/`⌃End` are
+already bound, which satisfies C02's rule that *every mouse affordance has a keyboard
+equivalent*.
+
+### And a cheaper partial fix that may matter more
+
+The report is that the absence is **confusing**, and the confusing part is not the missing
+bar — it is that **nothing says there is content above.** A reader cannot tell a short
+session from a long one scrolled to the bottom.
+
+**That indicator already exists as a pattern.** Step 5 built `▲ 8 more rows` for the document
+view when a block exceeds its region — *"content stopping mid-object with no indicator is
+indistinguishable from content ending"*, which is the same sentence one region over.
+
+So: **the transcript's edges gain the same treatment**, and it is a fraction of a
+scrollbar's cost. Worth doing first, and possibly worth doing *instead*, if the scrollbar's
+reserved column turns out to be the more contentious half.
+
+### Region separators — the frame marks none of its four regions
+
+**Seen in a real frame**, not reasoned about: the header runs straight into the banner, the
+transcript's last line runs straight into the prompt, and nothing says where one region ends
+and the next begins.
+
+**The layout, and the dividers are the point:**
+
+```
+HEADER  (optional)
+──────────────────────────────────────────────────────
+
+
+
+CONTENT
+
+
+
+──────────────────────────────────────────────────────
+❯ PROMPT
+──────────────────────────────────────────────────────
+FOOTER  (optional)
+```
+
+**The prompt is bracketed on both sides**, which is the part that matters and the part an
+earlier version of this entry missed. One divider below the transcript is not enough — the
+prompt is a *region*, and a region with a line above it and nothing below it reads as the
+bottom of the content rather than as its own space. **Both, or neither.**
+
+It matters because **the regions behave differently.** The transcript scrolls; the prompt does
+not. Without the brackets a long transcript's last line reads as part of the prompt, and the
+header's status line reads as content.
+
+**And a drawn line is the only tool that works at every setting.** A theme *may* now paint its
+background (#39), but `background: "terminal"` remains legitimate — and a transparent
+terminal has no fill to distinguish regions with. So separators cannot depend on a background
+being present. **A drawn separator is not a workaround — it is the
+consequence of a choice already made**, and the entry should say so rather than presenting it
+as an addition.
+
+**Cost, and it is the thing to weigh honestly.** Three dividers on a 40-row terminal is 7.5%
+of the screen, and every row taken from the transcript is a row of content. So:
+
+- **the prompt's two are the ones that earn it** — they mark the region whose behaviour
+  differs most
+- **the header's is the arguable one**, and it is the one to make optional alongside the
+  header itself
+- **the footer, if present, brackets the same way** — a footer with a line above it is
+  chrome; one without reads as a trailing content row
+
+**Belongs to C22 §6 and S01 §3**, with the optional-header/footer work and the chrome row
+budget (#23) — all three are about what the frame's chrome may contain, and deciding them
+separately is how four features end up fighting over one row.
+
+### Horizontal composition — every block is full width, and the banner paid for it
+
+**A row container: `b.row([a, b], { gap })`.** Its height is the tallest child at its
+allotted width; children share the width. One block kind, not a layout engine — the same
+containment `panel` and `group` already have, on the other axis.
+
+**The consumer already exists, and it is instructive: the banner.** The whale and the
+wordmark had to be **hand-composed into a single `raw` block** because Calcium cannot put
+two blocks side by side. Everything that went wrong there is downstream of that:
+
+- the whale had to be **padded to a uniform 40** by hand, and trimmed as well as padded
+- the wordmark had to be **top-padded by one row** by hand, because the two arts have
+  different heights
+- a **tab character** in the art would have measured 1 and drawn 8 — a hazard that only
+  exists because the app is doing its own cell arithmetic
+- the composed width had to be **measured three times** before it was right
+
+**Every one of those is work the framework would have done.** A `row` container measures its
+children, aligns them, and pads to the tallest — which is precisely the list above.
+
+Beyond the banner: side-by-side panels, a label and a value that are separate blocks, a
+sparkline beside its number.
+
+**Alignment and padding come with it**, and only with it — a full-width block has nothing to
+align against. So `align: left | centre | right` on a row's children, and padding as a
+general property rather than `gapBefore` being the only spacing that exists.
+
+**The risk, stated plainly:** this complicates `measure`. Today a block's height is a
+function of `(block, width)` and nothing else — which is the invariant every cache,
+compositor and degradation path rests on. A row makes a child's width depend on its
+siblings. **Containment is what keeps that safe**: the row computes its children's widths
+and calls the same `measure` on each, so the function's shape never changes and no second
+height codepath appears. A general 2D layout engine would not have that property, which is
+why the ruling is a row container and not a layout engine.
+
+### Dynamic sizing — two problems, and only one is cheap
+
+*"Things fill the space they are given, or shrink down — a fraction of the width or the
+height."* Those are two different features and they should not be planned as one.
+
+#### Width fractions — cheap, and they ship with the row container
+
+**A fraction of the width only means anything inside a row.** Outside one, a block is
+full-width, so there is nothing to take a fraction of. So this is a property of a row's
+children, and it is **the same `flex` concept C11 already has for table columns**, one level
+up:
+
+```
+b.row([plot, stats], { flex: [2, 1] })     the plot takes two thirds
+```
+
+C11's precedent is worth following exactly, including its lesson: **F50 found that a column
+with no `flex` gets its minimum and nothing more** — so a row's children need the same
+opt-in, and the same care about where slack goes. The `/ps` NAME column carried that comment
+three lines from where it was written again.
+
+**Ships with `b.row`. No new concept, no measurement change.**
+
+#### Height flexibility — real, and it collides with two open things
+
+*"Fill the remaining height"* is much harder, and the reasons are already on this list.
+
+- **In a scrolling transcript it is meaningless.** There is no remaining height — the
+  transcript is unbounded and a block's height is its content's. "Fill" has no referent.
+- **It only means something in a pushed view**, where the content is the region's worth.
+  S3's dashboard is the case: the plot is fixed at five rows and would rather grow into
+  whatever the view has spare.
+- **The producer cannot see the height.** `AdapterContext` carries width and no height —
+  that is **F37**, and it is exactly the producer-context contract question phase 1.1 is
+  about. So this is that contract's second consumer.
+- **And it must not change `measure`'s shape.** A height that depends on the region breaks
+  `measure(block, width)`, which every cache, compositor and degradation path rests on.
+
+**Ruled, if it is built: the block declares flexibility, the owner resolves it, and
+`measure` never sees it.**
+
+```
+b.plot({ height: "fill" })      the producer declares intent
+                                the VIEW OWNER — which knows the region — rewrites it to
+                                height: 12 before measuring
+                                measure(block, width) is called unchanged
+```
+
+**Resolve, then measure** — the same containment principle that ruled the view windowing a
+block-boundary operation rather than a mid-row slice, and that keeps `b.row` a container
+rather than a layout engine. Three rulings now with the same shape, which is a good sign it
+is the right one.
+
+**Shrink-to-fit is the same mechanism from the other side** — a block declaring it *may* be
+smaller, resolved by whoever knows the space. Do not plan it separately.
+
+### A bar at 0% reads as a broken element
+
+Small, and visible in the same frame. A CPU bar at `0.0%` renders as an **empty box** — and
+an empty box is visually indistinguishable from a component that failed to draw. Four rows
+of empty boxes beside four numbers reads as a defect.
+
+Options: a minimum visible fill, a different glyph for zero, or no bar at all below a
+threshold. **The empty-block class in miniature** — absence of a value is drawn the same as
+absence of a component, which is the fifth instance of that pattern.
+
+### ★ Syntax highlighting covers two languages — ship the mainstream set
+
+`code.ts:31` is `createLowlight({ json, yaml })`. Everything else renders flat: TypeScript,
+Python, a stack trace, a diff, SQL.
+
+**The recorded objection is bundle weight, and it does not survive measurement.** Grammars
+import individually — `diff` is 1.2 KB, `python` 9 KB, `typescript` 21 KB — and **24
+mainstream grammars total 180 KB**. The 9.3 MB figure is the whole package, including 384
+grammars, minified duplicates and CSS themes, none of which gets pulled in.
+
+For a Node CLI that is noise, and **a highlighter that flattens the language you actually use
+reads as broken rather than as economical.**
+
+**Ship**: `json` `yaml` `diff` `bash` `typescript` `javascript` `python` `go` `rust` `java`
+`c` `cpp` `csharp` `ruby` `php` `sql` `html` `xml` `css` `markdown` `toml` `ini` `dockerfile`
+`nginx`.
+
+**And expose registration** — it matters more with 24 than with 2, because the mainstream set
+never covers a consumer's own domain. Prism wants its DSLs; an `agent-tui` user pastes
+whatever they work in. **Exported block kinds, unexported grammars** is the same asymmetry as
+`CommandPolicy` being pluggable and unreachable.
+
+Amend the comment rather than deleting it: its principle holds — the full 384 *is* most of the
+weight and none of the value. What changed is that *"actually needed"* was measured against
+two consumers and now has more.
+
+**And this is a regression against a stated design, not a scoping choice.** C09 §4a builds
+the whole `code` block around languages *being added*:
+
+> *"Measurement ignores syntax entirely… a `code` block measures identically whether or not
+> its language is registered, so **a language shipping tomorrow does not reflow yesterday's
+> transcript**."*
+>
+> *"An unregistered language renders as plain text, not an error… readable today and
+> **highlighted whenever someone registers it**."*
+>
+> *"The fallback is a fallback, **not a filter**."*
+
+Those sentences are pointless under a fixed two-language set. `measure` ignores tokenisation
+**so that** adding a grammar later is safe; unregistered renders as text **so that** it is
+readable until someone registers it. **The design assumed more would arrive.**
+
+Then `createLowlight({ yaml, json })` shipped with no registration path, so *"whenever
+someone registers it"* has **no someone**. The spec's own promise is unreachable.
+
+**Why it happened:** C09 was built when the only consumers were `docker inspect` (JSON) and
+an nginx config (YAML). Two grammars satisfied every test, and **nothing in the suite could
+distinguish "we ship two" from "we ship two for now"** — §4a's promises about future
+languages are prose, which no rule checks. The same class as `/help`'s README claim and
+F58's four documents with no measurement behind them.
+
+**So this is phase-1-shaped, not a feature.** The spec commits to registration; the
+implementation shipped without it, and a stated extension point that does not exist is the
+gap this project has now found eleven times.
+
+### ~~The command prefix is unreachable~~ — CORRECTED: it is wired
+
+**This entry was wrong and the correction is recorded rather than deleted.** `TuiConfig` has
+`commandPolicy?: CommandPolicy`, threaded `config.ts:108 → construct.ts:673 →
+execution.ts:174 → parse`. An app can supply its own prefix today.
+
+I concluded otherwise from grepping `config.ts` for "policy", finding a comment about size
+policy, and reading a miss as an absence — **a correct conclusion from incomplete evidence,
+which is still wrong.** Same shape as F9 grepping for a field when the seam was a step.
+
+**What survives is the prefix-*out* question below**, which is a genuine gap and a different
+one.
+
+### ~~superseded~~
+
+**The mechanism exists and is well designed.** `CommandPolicy` is documented as *"the whole
+of what is pluggable"* — a policy answers one question, *is this token the app's verb and
+what is it*, while built-ins, operators and refusals stay identical under every policy,
+*"which is what stops a replaceable prefix from becoming a replaceable parser."*
+`prefixPolicy(":")` gives `:ps`. **And `CommandPolicy` and `prefixPolicy` are both exported
+from `src/index.ts`.**
+
+**No app can supply one.** `parse.ts:51` reads `ctx.policy ?? slashPolicy`, and `TuiConfig`
+has no policy field. So the type is public, the factory is public, and **there is no way to
+get one into a session** — the eleventh instance of exported-and-unreachable, and a worse
+one than most, because exporting the factory *is a promise that you can plug one in*.
+
+**Fix: a `policy` field on `TuiConfig`, threaded to `parse`.** Small, additive, and
+freeze-relevant — it changes a public config type, so it belongs before publication.
+
+### Prefix-*out*: prose by default, verbs by exception — and `agent-tui` needs it
+
+**A different question, and only one of the two shapes is expressible today.**
+
+```
+prefix-in    "/ps is a verb, everything else goes to the shell"     slashPolicy — works
+prefix-out   "everything is prose, /help is the exception"          nothing expresses it
+```
+
+`prefixPolicy("")` does not do it — an empty prefix makes *every* token a verb, so `ls -la`
+gets looked up in the manifest.
+
+**This is not a prefix change; it is an inversion of the default route.** A shell sends an
+unrecognised line to `sh`; an agent harness sends it to the model. **`agent-tui`'s A1 needs
+exactly this** — typing a message must not be parsed as a command — and it is the first
+consumer that has ever wanted it.
+
+**So the ruling to take is whether `CommandPolicy` can express it, or whether the default
+route is a separate concern**: `defaultRoute: "shell" | "app" | (line) => …`, alongside the
+policy rather than inside it. The second is likelier — the policy answers *"which verb is
+this"* and the default route answers *"what if it is none"*, which are different questions.
+
+### Completion is prefix-matched and unranked — both are fixable and one is nearly free
+
+**`engine.ts:115` is `candidates.filter(c => c.value.startsWith(prefix))`**, and nothing
+sorts. Two consequences a user feels immediately:
+
+- **`/con` finds `/container stats` and never `/compare`… but `/stats` is unreachable from
+  `/st`+anything if the verb is `container stats`.** Prefix matching cannot find a word in
+  the middle of a name, and sub-verbs put words in the middle by construction.
+- **Order is source order.** The most-used verb and the one you have never run rank
+  identically, so the useful candidate is wherever the manifest happened to put it.
+
+**Three improvements, in increasing cost:**
+
+- **Rank before filtering matters — sort by recency, then by usage, then alphabetically.**
+  C20's history already holds what was run and when, so recency costs a lookup and no new
+  state. **This is the cheapest and the most felt**: the verb you ran a minute ago should be
+  first.
+- **Substring, then subsequence.** Prefix → substring is one line and fixes the sub-verb
+  problem (`stats` finds `container stats`). Subsequence — `cstats` → `container stats` — is
+  the fuzzy-finder behaviour people expect from `fzf` and every editor's command palette, and
+  it needs a scorer so that better matches sort higher. **Score the match quality; do not
+  just accept more candidates**, or fuzzy matching makes the list worse rather than better.
+- **Show *why* a candidate matched** — highlighting the matched characters, which every good
+  fuzzy finder does and which is the difference between trusting the ranking and second-
+  guessing it.
+
+**And it compounds with as-you-type completion** (below): a menu that opens itself is only an
+improvement if what it shows is ordered usefully. **Rank first, then trigger** — an
+unranked menu appearing on every keystroke is worse than a ranked one on `Tab`.
+
+### ★ One popup, four consumers — see `CALCIUM_POPUP_DESIGN.md`
+
+The confirm, the completion menu, the paste peek and `agent-tui`'s question are **the same
+thing**: a layer anchored to the prompt, showing content, answered with keys, dismissed with
+`esc`. Built separately they drift — different flip logic, different truncation, different key
+handling — which is the two-records-of-one-fact class in UI form.
+
+```
+              content            selection       resolves by            router may pop?
+completion    candidates         arrow / type    inserting into buffer   yes
+confirm       2–4 choices        arrow / letter  a promise               NO — would hang
+question      choices or text    arrow / typing  a promise               NO — would hang
+peek          content only       none            esc, or ⏎ to open       yes
+```
+
+**Ruling A already pushed the confirm most of the way there** — it is a *choice list, not a
+yes/no box*, general enough for A3. A prompt-anchored choice list **is** the completion menu
+with different content and a different resolution.
+
+**Two parameters are the whole difference:**
+
+```
+onSelect       insert | resolve(key) | resolve(text) | none
+dismissable    true for advisory layers, FALSE where an owner awaits an answer
+```
+
+#### What it unifies, concretely
+
+C19's menu **already has** the list, the selection, keyboard navigation, the above/below flip,
+width from the widest entry plus padding, and **`… N more` truncation reading
+`Placed.truncated`** — which C19 renders because only C19 knows the remainder.
+
+**The confirm reimplements or lacks all of it**, and the peek and the question would each
+reimplement it again. The truncation matters most: a `/prune` confirm listing twenty
+containers does not fit above a prompt, and **`… 5 more` with `⏎` to open the full list is
+already the menu's convention.** Without it the popup grows unboundedly.
+
+#### Anchored, not centred — and the reason is where the eye already is
+
+**The confirm arrives because you just typed something**, so attention is at the prompt. A
+centred box makes you look away and come back.
+
+**Weight moves from position to content**: the `▲` glyph, the title, the safe default first
+and selected, and **the prompt being unavailable while a question is open** — typing does
+nothing, which is itself a strong signal.
+
+#### Two things it must not lose
+
+**`dismissable: false` stays false.** That ruling was about the *router* not popping a layer
+whose owner is awaiting an answer — a silent pop hangs the verb forever, the layer vanishes,
+the prompt stays unavailable, and nothing says why. **Only the anchor changes, not the flag**,
+and it is worth one assertion because the symptom reads as *"the shell froze"* and the cause
+is three components away.
+
+**And the centred version's gravity**, replaced by the content above rather than lost.
+
+### ★★ The worst case is one enormous block, and nothing bounds it
+
+**Large patches, large command output, long lists — the requirement is that they render
+quickly and do not lag the whole TUI.** Today they do lag it, and the reason is that
+**nothing bounds a single block's size.**
+
+```
+D40's cap          bounds BLOCKS PER DOCUMENT — not rows within a block
+MAX_ROWS = 2000    is the FALLBACK adapter's own limit — an app adapter has none
+```
+
+So one `patch` block from a 50,000-line `git diff`, one `code` block from a large file, one
+`table` an app built without capping — each is a single block, and **every frame renders all
+of it to show thirty rows.**
+
+#### The four fixes are one chain, and their order matters
+
+They are not independent items; each only pays off once the one before it lands.
+
+**1. Output diffing (#12) — write only changed rows.** Cuts the cost of *every* frame
+regardless of block size. Smallest change, and the `contaminated` flag is already the
+invalidation story it needs.
+
+**2. Render caching (#13) — key on `(entryId, rev, width)`.** The frame *after* the first
+becomes free. But the first frame still renders 50,000 lines, so on its own this converts
+*continuous* lag into *one long stall* — better, and not enough.
+
+**3. Render only the visible window of a block.** This is the one that actually fixes it, and
+it is the heterogeneous-windowing finding from step 3 with its consumer finally present.
+`windowPatch` already proves the pattern: **reduce a `Patch` to a valid smaller `Patch`**, so
+the standard measurer measures it normally and no second height codepath appears.
+
+**Per divisible kind** — `patch`, `table`, `keyValue`, `logs`, `code` all reduce cleanly. The
+plot does not, and that is permanent (C12 I1: reducing a plot's data changes nothing about
+its height). **Granular where the kind divides, atomic where it does not.**
+
+**4. `cells()`'s ASCII fast path (#14).** Only worth measuring after 1–3, because most calls
+disappear with the cache.
+
+#### And a bound, because a fix is not a guarantee
+
+**Even windowed, `measure` still walks the whole block once** to know its height — and a
+50,000-row table has to be measured before C14 can place it.
+
+**So bound it, and make the bound the app's to raise.** `MAX_ROWS` exists for the fallback
+adapter and nothing generalises it: a default cap per block with a visible marker
+(*"2,000 of 50,000 rows"*), overridable where an app genuinely wants more. **The marker is
+what keeps it honest** — D40's eviction already carries one, for exactly this reason, and a
+silent truncation is the empty-block class again.
+
+#### The acceptance test is a frame-read, not a benchmark
+
+**Type into a 5,000-line diff and watch.** A microbenchmark that improves while the frame
+still stutters has measured something other than what a user experiences — and the three
+findings above were all found by reading code and frames, not by profiling.
+
+### ★★ Shared pollers — a correctness fix that happens to be an optimisation
+
+**Every `b.live` part owns its own `fetch`.** The landing dashboard, `/stats`, and a
+single-container panel each spawn `docker stats --no-stream` on their own interval. Three
+subprocesses, one endpoint, no coordination.
+
+**And the correctness half is the stronger argument.** Two parts polling the same source at
+different moments hold **different data** — one plot and one sparkline each keep their own
+history and the two diverge. **Two views of the same thing showing different numbers is a
+bug, not a cost.**
+
+#### Three layers, and the split is the design
+
+```
+SOURCE       fetch, shared, versioned            one docker stats per tick
+  ↓
+DERIVATION   pure computation, shared, memoised  the ring buffer · window averages · the parse
+  ↓
+PART         view state + render, per instance   one expanded, one collapsed
+```
+
+**Different states, different views, different renderings — one fetch and one computation.**
+Parts sharing a `source` key share both; only what is *drawn* is per-instance.
+
+#### The rule that makes it clean
+
+> **Per-part state is view state only. Anything that accumulates belongs in a derivation.**
+
+Expanded/collapsed, selected, which tab — those are per part, and they are exactly the things
+that **do not need updating when nobody is looking.** A ring buffer, a running average, a
+count — those accumulate, so they are shared and they keep going.
+
+**That is what makes "off screen does nothing" safe**: a paused part cannot fall behind,
+because it holds nothing that could.
+
+#### What falls out — four more wins, and they are consequences rather than additions
+
+**1. Render is memoised on `(sourceVersion, viewState, width)`.** If none of the three moved,
+the previous `Block` is still correct — **so skip the render, the measure and the diff.** This
+is #13's render cache keyed more precisely, and it means a collapsed part on a ticking source
+costs almost nothing.
+
+**2. A derivation runs only if a visible part needs it.** If every consumer of the ring
+buffer is off screen, the buffer's maintenance is skipped too — the source may still poll for
+someone else, but nothing computes for nobody.
+
+**3. All parts sharing a source patch in ONE batch.** Today three parts on the same data
+patch independently and commit three frames. Shared, they tick together by construction, so
+it is **one batch and one commit** — which the frame scheduler already coalesces, but only if
+the patches arrive together.
+
+**4. Stagger sources, not parts.** `assignOffsets` spreads parts to avoid a thundering herd.
+With shared sources there are **far fewer things to stagger**, and parts sharing one are
+aligned by construction rather than by arithmetic. The stagger gets simpler *and* has less to
+do.
+
+#### Off screen: pause, and catch up on return
+
+**Ruled: pause.** No poll, no derivation, no render, no measure, no state update — and
+nothing is lost, because per-part state does not accumulate.
+
+**I9 is not violated**, and the distinction belongs in the ruling: I9 protects a *frozen*
+entry — a newer entry appeared, the thing is still running — and says patches keep arriving.
+**Scrolled-off is a different state**: nobody is looking, and the moment they look the part
+refreshes. The `--watch` is still declared, still live, still in the transcript; it is not
+polling for an empty room.
+
+**With sharing this compounds**: one visible part keeps the source polling for everything
+that shares it, so returning to a scrolled-off panel is frequently free.
+
+#### Where to stop
+
+**Two levels, not a general reactive graph.** `source → derivation → part` covers every case
+here, and arbitrary dependency depth is a different and much larger thing — the same call as
+`b.row` being a container rather than a layout engine, and block-boundary windowing rather
+than mid-row slicing. **Three rulings with the same shape now.**
+
+**And do not chase structural sharing of rendered blocks.** Two parts rendering identically
+is rare, and the equality check costs more than the render it would save.
+
+### Resize is never delayed, and it rebuilds the index every time
+
+**C03 I2 makes `resize` immediate** — *"input, completion and resize are never delayed"* —
+alongside the two reasons that genuinely cannot wait.
+
+**But dragging a window emits dozens of SIGWINCHes**, and each one forces an immediate frame
+*and* a **full Fenwick rebuild**: `viewport.ts:202` calls `#rebuild()` on a width change,
+which is correct (heights change with width) and is the one operation the incremental index
+cannot do incrementally.
+
+**So a resize drag is: N full index rebuilds, N full re-renders, N full frame writes.** The
+render cache and output diffing (#13, #12) do not help — every row genuinely changed.
+
+**A short coalescing window is the fix, and it is a C03 I2 amendment rather than a bug fix.**
+I2's reasoning is that a delayed resize means a visibly wrong frame; **the counter is that a
+delayed resize by 16 ms means one correct frame instead of thirty wrong ones**, and the final
+size is the only one anyone sees. Immediate for the *first* resize, coalesced for a run of
+them, is the shape — which is what a terminal emulator does with its own repaints.
+
+**Measure a real drag first.** If a rebuild at a realistic transcript size is sub-millisecond
+the whole thing is moot, and the honest answer is a recorded negative.
+
+### Checked and clear — recorded so nobody re-derives them
+
+- **Frame commits coalesce.** C03 has `idle | pending | writing` with per-reason windows and
+  a strictness ordering. Working as designed.
+- **Completion cancels in flight.** Sequence-as-token-of-validity — a superseded request's
+  result is discarded rather than raced.
+- **Theme resolution is cached**, with a serial that invalidates on override so a warm cache
+  cannot serve stale styles.
+- **Entries scrolled off are not rendered.** C14 selects visible rows before `paint` sees
+  them; the off-screen problem is *inside* a visible block, not between entries.
+
+### ★ Off-screen work — three layers, and only one is handled
+
+*"Do not redraw what is not on screen"* is three separate questions with three different
+answers.
+
+```
+entries scrolled off       ✓ HANDLED — C14 virtualises; paint gets rows already selected
+rows off-screen INSIDE
+  a visible block          ✗ a 5,000-line patch renders whole to show 30 (#13)
+b.live parts scrolled off  ✗ THEY KEEP TICKING — no visibility check exists anywhere
+```
+
+**The third is new and nobody has raised it.** `refresh.ts` has **no reference to the
+viewport, no visibility check, nothing**. A part ticks on its interval whether or not its
+entry is on screen.
+
+So scroll up past a `/stats` entry and it **keeps spawning `docker stats` every two seconds**
+for a panel nobody can see. Ten live entries in a session is ten subprocesses a tick, most of
+them invisible — and unlike the render cost, this one **spawns processes and hits the far
+side**, which is the expensive kind.
+
+#### Why it is not simply "pause when off screen"
+
+**I9 is the constraint, and it was ruled deliberately**: *a frozen entry keeps receiving
+patches*, because **a `--watch` scrolled out of view is still running** — that is the whole of
+what I9 protects, and step 3's F17 nearly re-broke it.
+
+**Scrolled-off is not the same as frozen**, though, and that distinction is the opening:
+
+- **freeze** means a newer entry appeared. The thing is still *running* and the reader may
+  scroll back to it — I9 says keep going.
+- **scrolled off** means nobody is looking *right now*, and the reader may scroll back at any
+  moment — so the data must be fresh **when they do**.
+
+**Ruled: pause, and catch up on return** — see #16, which supersedes an earlier draft of this
+paragraph that proposed throttling. Pausing is simpler, and the catch-up fetch on re-entry
+means the reader never sees stale data either way.
+
+**With a shared source (#16) this compounds**: one visible part keeps the source polling for
+everything that shares it, so returning to a scrolled-off panel is frequently free.
+
+#### What it needs
+
+**The driver would have to know what is visible**, and today it does not — C14 selects
+visible rows inside `paint`, and the result goes to the writer rather than back to the
+driver. **That is a new seam**, and it should be one-directional: the driver *asks*
+(`isVisible(entryId)`), rather than the viewport pushing changes, or every scroll becomes a
+driver event.
+
+**Measure before choosing an interval.** Slow-by-10× is a guess; the right number depends on
+how expensive the fetch is, which is the app's business and not the framework's — so it is
+probably a `b.live` field with a default rather than a constant.
+
+### ★ `--help` on every verb — the renderer exists and nothing can ask for it
+
+**`usageBlocks(tool, id)` is built, exported, and has no caller in `src/`.** It generates
+exactly the per-verb help you would want, from the manifest:
+
+```
+/stop <container> [flags]
+
+Arguments:
+  container  id or name
+
+Flags:
+  -t, --time  seconds to wait before killing
+      --force  do not ask
+```
+
+And its own comment argues for it:
+
+> *Exit 2 is an invocation problem, so the document says what a correct invocation looks
+> like — **generated from the manifest, because a hardcoded usage string is wrong the first
+> time a flag is added and nobody notices until someone reads it.***
+
+**So it exists as the far side's usage-error path** — something for exit 2 — **and there is
+no way for a user to ask for it.** Thirteenth instance of the class: the renderer built, the
+reasoning written down, the trigger absent.
+
+#### `--help` is the right trigger, and it hits F39
+
+**Every declared flag is transmitted to the far side.** That is how `--raw` reached docker
+and it exited 125 — **there is no way to declare a flag that selects a rendering rather than
+an invocation** (F39, #32's neighbourhood).
+
+So `--help` would be forwarded rather than intercepted. **Two consumers for one gap now**,
+which is the strongest argument F39 has.
+
+#### Two rulings
+
+**Reserve `--help` framework-side; do not make apps declare it.** `/ps --help` should work on
+every verb without the manifest listing it, the same way C05 appends the framework's six
+verbs to every parsed manifest. **Otherwise it is a per-app discipline, and one app
+forgetting it is a verb with no help** — which is exactly the failure the "generated from the
+manifest" reasoning exists to prevent.
+
+**And it shrinks `/help`'s problem rather than adding to it.** At fifty verbs a flat list is a
+wall (#39). But if `/help` lists verbs with their summaries and `/verb --help` gives the
+detail, **`/help` never needs to show flags at all** — two levels, and the second one is
+already written.
+
+**Check `/help`'s bucketing finding first** (#39): a two-level help built over a broken
+bucket inherits it.
+
+### ASCII art and banners — sparse variants, graceful fallback, validation per variant
+
+**The banner work is the evidence.** Three of the seven things it needed went wrong, two of
+them in the spec I wrote: a tab that would have measured 1 and drawn 8, ragged line widths
+that compose wrong against anything, and a composed width measured three times before it was
+right. **All four failures were silent** — the art looked fine on the machine that made it.
+
+**Art cannot be degraded automatically, and that is the premise.** A table drops columns; a
+plot becomes stacked strips. Art has no structure to degrade *from* — a block-element
+wordmark and an ASCII one are **two designs, not one design at two fidelities**. So the
+framework's job is **the shape of the declaration and what happens when a variant is
+missing**, never transformation.
+
+#### Sparse variants, and one variant is a complete banner
+
+```ts
+b.art({
+  text: "Docker",                    // the always-available fallback
+  variants: {
+    blocks: "▄▄▄▄▄   …",             // optional
+    ascii:  " ____    …",            // optional
+  },
+})
+```
+
+**A variant declares its tier, not its capability requirements.** `ascii` and `blocks` is how
+an app already thinks about its own art; mapping a tier to capabilities is a lookup the
+framework owns, and it keeps the declaration from restating what the framework knows.
+
+#### The fallback chain, and Calcium has already ruled on its shape
+
+C09 §4a: *"an unregistered language renders as plain text, not an error"* and **"the fallback
+is a fallback, not a filter."** Missing art degrades the same way — something readable,
+never nothing and never a throw.
+
+```
+declared at this tier      use it
+a LOWER tier is declared   use that — ASCII art is always safe at a higher depth
+nothing declared           the text, styled. `Docker` in bold beats no banner
+```
+
+**The middle rung is what makes the API forgiving in the direction people use it.** Declare
+only the ASCII variant and it works everywhere; declare only the fancy one and it works where
+it can and falls to text where it cannot. **Neither is an error.**
+
+#### Validation per variant — the cheap half, and the half that pays
+
+Each variant is checked at construction, and each check catches a failure that is otherwise
+silent:
+
+| check | the failure it prevents |
+|---|---|
+| **no tab characters** | a tab measures 1 to `cells()` and draws 8 — **and the draw width varies by terminal**, so the art renders differently on different machines with no way to predict it |
+| **uniform line width** | ragged art composes wrong against anything beside it. The whale was 40, 31, 31, 33, 40, 29, 26, 23 |
+| **report measured cells** | so a tier threshold is a measurement, not an estimate. Mine was wrong twice |
+| **row-count alignment** | two arts of different heights need explicit padding, and **a build step that trims blank lines silently undoes it** |
+
+**Roughly thirty lines, and it would have caught every banner defect.** Worth having whether
+or not anything else here is built.
+
+#### Composition and tiers come free from work already planned
+
+`b.row` (#38) does the side-by-side that had to be hand-padded — measuring children, aligning
+them, padding to the tallest, which *is* the list above. And **tier selection by measured
+width is the block-boundary window's shape**: pick the variant that fits from a declared set,
+rather than computing one.
+
+#### Generated art, later and only for the text case
+
+A wordmark is **text plus a font** — figlet's model, and figlet has hundreds of fonts, some
+pure ASCII and some using block elements. So `banner("Docker", { font: byTier })` genuinely
+*can* produce every tier from one source.
+
+**A nicety, not the point**, and only worth it once a second app wants a banner. The
+hand-drawn case is the one that needs the API to be good.
+
+### Selection in the prompt — and `⌃a` stays where readline put it
+
+**Select-all in the prompt does not exist**, and neither does selection: grep finds no
+anchor, no mark, no region in C17. So there is nothing to select *into* — the binding is the
+small half.
+
+#### `⌃a` keeps line-start; select-all takes `⌃⇧a`
+
+**`⌃a` is line-start in bash, zsh, fish, every readline app, tmux's prefix, screen and
+Emacs.** Changing it makes Calcium the one shell where it does something else, and the cost
+lands on exactly the people most likely to try it.
+
+The clash is real — **`⌘a`/`⌃a` is select-all in every GUI app** — but `Home` already does
+line-start, so a user who does not know readline is not stuck. And moving `⌃a` alone would
+break the `⌃a`/`⌃e` pair, since `⌃e` has no GUI conflict: **an asymmetric pair is worse than
+either consistent choice.**
+
+**Readline has no select-all because readline has no selection**, so there is no convention
+to honour and the field is open. `⌃⇧a` reads as "the bigger `⌃a`", which is what it is, and
+it is the same family as `⌃z`/`⌥z`.
+
+**Check it against the decoder first**, per T2.13: `⌃⇧a` and `⌃a` are frequently **the same
+byte** (`0x01`) — exactly the collision that ruled out `⌃_` for undo. If they are, `⌥a` is
+the fallback, on the ESC-prefixed path `⌥b`/`⌥d`/`⌥f` already use.
+
+**And rebindable keys (#42) is the real answer to "which default is right."** The keymap is
+declarative data and this is one row either way — ship a default, let people change it.
+
+#### The work is the selection, not the binding
+
+C17 would need a **selection range**, every motion a shifted variant that extends it, typing
+to replace it, and the renderer to show it — which is the full-row background from #23, at
+character granularity.
+
+**That is the same concept the copy story needs at two other scopes**: a selection in the
+editor, a selection in the transcript (`copyMode`, #15), and semantic copy of a focused
+block. **One mechanism, three scopes — do not build it as a one-off for `⌃⇧a`.**
+
+**And be precise about what is actually missing.** *Deleting* everything already works:
+`⌃u` kills to start, `⌃a ⌃k` kills the line. What does not exist is **selecting** it — to
+copy, or to replace by typing. If the want is "clear the prompt fast", that ships today.
+
+### Selection needs a background, not just a tone — and that is free
+
+**Correction to an earlier version of this entry**, which read C11 I14 too widely and ruled
+out more than it forbids.
+
+**I14 and I17 forbid anything that changes *size*:**
+
+> *"A height that varied with focus would move without `rev` moving, so C14's cache could not
+> invalidate it — I9 broken in the one way measurement cannot catch, since **`measure` never
+> sees focus at all**."*
+
+**A background colour changes no dimensions.** It is a style over the same cells, exactly as
+free as the tone change already happening — and **the patch renderer proves it**, since
+added and removed lines get a background wash today and nothing about that touches
+measurement.
+
+So an *outline that grows a box* is out, and **a full-row background wash is in** — and it is
+the strongest signal available without touching the cell grid.
+
+#### The ladder, with a real answer at every depth
+
+```
+truecolour / 256   a background wash, foreground adjusted for contrast
+16-colour          a coarser wash, or reverse video
+1-bit              REVERSE VIDEO — swap fg and bg; needs no colour and works everywhere
+ASCII              the reserved gutter glyph carries it alone
+```
+
+**Reverse video is the rung that makes this work**, because *"swap foreground and background"*
+needs no colour at all and is supported essentially universally. So the degradation does not
+fall straight from colour to a glyph — there is a strong middle.
+
+#### The foreground must move with the background
+
+**A wash under text that keeps its colour can drop below the contrast floor** C10 already
+enforces everywhere else. So a selection style is **a pair, not a token**.
+
+**Which argues for selection being a palette with `carries: "meaning"`** rather than an ad-hoc
+style: it then gets the contrast floor and the required typographic fallback *for free*, from
+machinery that exists, and C10 checks the pair the way it checks every other palette entry.
+
+#### The glyph becomes the fallback, not the primary
+
+**Better division than the earlier version had it.** Colour does the visible work where it
+exists; the always-reserved gutter cell carries the distinction where it does not. Same rule
+as F34 — a distinction must survive without colour — with colour doing the job when present.
+
+The gutter cell is still **reserved always, filled only when focused**, so width never
+changes. Same trick as the scrollbar's column.
+
+#### One thing to get right when it is built
+
+**Whether the wash spans the full row width or only the text.** Full-width reads as
+*selected*; text-width reads as *highlighted* — and for a table row you almost certainly want
+the former. That means **padding the row to the region width before styling**, which is a
+rendering decision rather than a measurement one, so it stays inside I14.
+
+**And it pairs with the navigation model (#38's neighbourhood)**, where *selected* becomes a
+state worth showing strongly because the reader is moving through things deliberately.
+
+### Two themes ship, and one of them is broken
+
+`ThemeSet = { dark: ThemeTokens; light: ThemeTokens }`. **Two, and `light` is the one that
+renders dark-on-dark** on a dark terminal (#39) because it sets foregrounds and paints
+nothing behind them — which the background ruling fixes.
+
+**More defaults, and the reason is not variety.** A theme is the framework's most visible
+surface and the first thing anyone customises — shipping two, one of which is subtly wrong,
+reads as an afterthought in a framework whose entire pitch includes a five-depth degradation
+story.
+
+**Worth shipping**: a high-contrast set (accessibility, and it is the one a degradation story
+obliges), a solarised or gruvbox-alike (what people already use), and a genuinely neutral
+low-saturation one for long sessions.
+
+**Two things to get right, and both are already-decided rules:**
+
+- **Every shipped theme passes the contrast floor and the 4-bit injectivity test** (C10 T2.3
+  — the tones whose confusion is misleading rather than dull). A shipped theme that fails its
+  own framework's checks is worse than not shipping it.
+- **A theme declares the terminal background it assumes** (#32's ruling). With more themes
+  the naming problem multiplies — half of any popular set are light variants, and each will
+  be dark-on-dark without that declaration.
+
+**And `ThemeSet` being a two-field record is the structural half.** More than two means it
+becomes a collection, which is a public type change — **freeze-relevant**, so it belongs
+before publication rather than after.
+
+### ★ Ghost text is computed, acceptable, and never drawn
+
+**The twelfth instance of the class, and the sharpest form of it: a suggestion you can accept
+but cannot see.**
+
+```
+engine.ts:149      ghost(ctx) → the completion text
+keys.ts:232        deps.completion.ghost(ctx) → editor.insert(ghost)     ← the ACCEPT path
+paint.ts           no reference to ghost
+frame.ts           no reference to ghost
+```
+
+`→` inserts a suggestion that was never displayed. The editor's own comment says rendering is
+deliberately outside it — *"keeping rendering out is what makes the editor testable as a pure
+[structure]"* — which is correct, and **no layer picked it up.**
+
+**Three separate improvements, and the first is the finding:**
+
+#### 1. Draw it
+
+Confirm the paint path is genuinely absent rather than elsewhere, then add it: the ghost is
+dim text after the cursor, and the cursor stays before it. **`Placed.cursor`'s reasoning
+applies** — the cursor belongs where the user is typing, not after text they have not
+accepted.
+
+#### 2. Ghost the *best* candidate, not the *only* one
+
+`engine.ts:152` is `candidates.length === 1 ? candidates[0] : undefined`. So with `stop`,
+`start` and `stats` in the manifest, typing `/s` ghosts **nothing** — and it only starts
+ghosting once you have typed enough to reach a single candidate, **which is exactly when you
+no longer need the hint.**
+
+The rule is *safe* rather than useful: it only ghosts when it cannot be wrong.
+
+**With ranking (#24), "best" becomes meaningful** — the most recently used match — and
+`/s` → `stats` in dim text is the affordance people expect. **Do ranking first**; ghosting an
+arbitrary candidate from an unsorted list would be worse than ghosting nothing.
+
+#### 3. Ghost dynamic sources
+
+`ghost()` is **static-only, and says so**: *"static only, which means manifest-backed only —
+so `path` and `executable` have no ghost text and `Tab` is required."* So completing a
+container name never ghosts.
+
+Dynamic ghosting means waiting on a source, which needs the **sequence-as-token-of-validity**
+machinery — and that exists; it is what the spinner and `frameworkSources` were built around.
+A stale ghost from a superseded request is the failure it guards.
+
+#### And ghost and the menu are two answers to one question
+
+**Design them together (#25, #40), not separately.** Every good shell ghosts the top
+candidate *while* the menu shows the rest — one hint with two levels of detail. Built apart,
+they compete: a ghost saying one thing and a menu highlighting another is worse than either
+alone.
+
+### As-you-type completion — the trigger, not the engine
+
+Type `/th` and the menu appears, showing `/theme`. A search-bar feel over the manifest.
+
+**Almost all of it exists.** C19 sources candidates from the manifest — every verb, flag,
+enum value and sub-verb, *"adding a flag on the far side makes it completable with no
+TypeScript change"* — and there is a menu layer, ghost text, prefix filtering that
+understands quoting and command position, and `Tab`/`→` bound to invoke and accept.
+
+**What is missing is only the trigger.** Today completion is `Tab`-invoked. As-you-type is
+one behaviour change, not a new subsystem: same engine, same menu, same acceptance path,
+different moment.
+
+And it is the feature that makes Calcium's central claim *visible*. Tab-completion assumes
+you know the verb exists; as-you-type **teaches the verb set**. For a framework whose pitch
+is "the manifest describes your app", a menu that surfaces the manifest while you type is
+where that stops being an assertion.
+
+**Three rulings, and they are why it is not trivial:**
+
+- **When does it open?** On the bare `/` shows every verb, which is the discoverability
+  case and arguably right — but the menu is then up constantly. Likely: **open on `/`,
+  close when the prefix matches nothing, never open for `executable` slots** (bare words
+  completing `PATH` would flood).
+- **Does it steal keys?** Today `Tab` is a user action, so focus moving to the overlay is
+  asked for. If the menu opens itself, `↑`/`↓` silently stop meaning history — the exact
+  collision the navigation model's two modes exist to solve. Likely: **the menu appears
+  but does not take focus until `Tab` or `↓`**, advisory until you reach for it.
+- **Latency.** C19's sources can be async, and a filesystem or far-side source on every
+  keystroke is a different cost profile from once per `Tab`. The debounce and the
+  sequence-as-token-of-validity machinery already exist — so this is measurable rather than
+  new, but it wants measuring.
+
+**It largely subsumes typo detection** (below): that catches `/clea` after you submit; this
+means you never typed it. Same manifest, same source.
+
+**Second consumer, unprompted:** slash commands in an agent harness are exactly where
+discoverability matters, and OpenCode's Ink-migration checklist names "slash command UI" as
+something they had to build.
+
+### Typo detection on commands
+
+Levenshtein against the manifest's verb list, surfaced as a notice: `/clea` → *did you
+mean `/clear`?*. Trivial, high value, and the verb list is already in hand for completion.
+
+### Optional / customisable header and footer
+
+C22 already takes an app-supplied `ChromeFn`. Making each optional is a config field plus
+region arithmetic. Small and clearly right.
+
+### Rebindable keys — precedence, not refusal, and unbind must be a value
+
+The keymap is declarative data — that was C16's whole design. **The merge step is small; the
+two rulings are the work**, and the current behaviour is the opposite of graceful in one
+specific way.
+
+#### A duplicate throws today, and that is right for exactly one case
+
+I10 refuses a duplicate `(target, key)` at construction, reasoning that *"a duplicate here is
+a programming error… a duplicate in the default keymap must not reach a user's session before
+anyone notices."*
+
+**Correct for the framework's own keymap, where a collision is a bug. Wrong the moment a user
+supplies bindings** — because a user's override *is* a collision by definition: you rebind
+`⌃k` precisely because something already has it. A construction throw says *"your config is
+invalid"* when the user meant *"mine wins."*
+
+**Ruled: a precedence ladder, not a refusal.**
+
+```
+framework default    lowest
+app-supplied         overrides the default      an app knows its own domain
+user-supplied        overrides both             it is their keyboard
+two at the SAME level   still throws — that IS a programming error
+```
+
+**Which is the shape C10's theme resolution and C05's manifest merge already use** — global →
+kind → override, by priority. A familiar mechanism rather than a new one.
+
+**And `mergeBlock`'s existing refusal is a precedent to keep, not to change.** A block binding
+colliding with a `global` slot is refused loudly — that is a *lower* priority shadowing a
+*higher* one, which is genuinely an error, and it is a different situation from a user
+overriding a default.
+
+#### Unbinding has to be a distinct value, and this is where it goes wrong if undesigned
+
+```ts
+{ target: "prompt", key: { name: "k", ctrl: true }, action: null }   // an explicit UNBIND
+```
+
+**Omission cannot mean unbind**, because a user's keymap is a **patch, not a replacement** —
+otherwise supplying one binding would silently drop the other thirty. **So absence means
+inherit and `null` means remove**, and the two must be different values rather than the same
+missing key.
+
+**And an unbound key falls through to the next rung; it does not go inert.** Unbind `escape`
+at `prompt` and it reaches `global`. That is what makes unbinding useful — you are not
+disabling a key, you are **declining it at that level**, which is the only reading that
+composes with a ladder.
+
+**`KeyAction` is a closed union with a total effect table**, so an unbind cannot orphan an
+action's implementation — the effect stays, nothing reaches it. Worth stating, because "the
+action still exists and is unreachable" would otherwise read as the vacuity class rather than
+as the intended result.
+
+### Todo lists / tasks
+
+A block kind with checkbox state. Rendering is easy; the interesting part is that ticking
+one is a **mutation**, so it needs the action dispatch route (F21) that docker-tui found
+missing. Build after that lands.
+
+---
+
+## Navigation — the biggest design opportunity, and mouse is already built
+
+### What exists today
+
+**Mouse is built, not planned.** SGR decoding (`decode.ts:394`), a `mouse` capability that
+is off under tmux, lifecycle enter/leave, and a routing table that hit-tests layers by
+`Placed` then falls through to the viewport (`router.ts:221`). Wheel scrolling works.
+
+And it ships with its own constitution, which is the right rule:
+
+> *"Every mouse affordance has a keyboard equivalent, so nothing is lost — only
+> convenience"* — `capabilities.ts:65`
+
+So the **plumbing** is done and the **affordances** are not. A click lands in the correct
+component and nothing consumes it — the same shape as F21, where `Action` has an `open`
+arm and `onAction` has no route from a keystroke, so none from a click either.
+
+**Keyboard is thinner than it looks:**
+
+| | |
+|---|---|
+| `prompt` | 28 bindings — full readline |
+| `overlay` | 6 · `global` 4 |
+| `liveBlock` | **3 only** — `escape`, `up`, `down`. Row movement within one block |
+| `pushedView` | **zero.** A focus target with no keys — docker-tui's S3 hit this |
+| between blocks | no mechanism at all |
+| horizontal | nothing — no column or cell movement |
+
+Row navigation inside the current live block works. **Navigating the transcript as a
+structure — block to block, cell to cell — does not exist.**
+
+### The model worth building: scopes + modes, from principia-ii
+
+`principia-ii`'s `SMART_NAV_IMPLEMENTATION.md` has a navigation system whose core ideas
+transfer well, and one that should be taken verbatim.
+
+**The navigation / interaction split is the big one.** *Navigation mode* moves focus
+between things; *interaction mode* sends keys **to** the thing. Calcium has no such split,
+which is precisely why `liveBlock` has three bindings — there is nowhere for a richer set
+to live. With modes, `↓` navigates, `⏎` enters interaction, `↓` then does whatever the
+block does with it, `esc` leaves.
+
+It also **solves key collision structurally**: a block in interaction owns its keys and the
+prompt does not compete. Same trade as the `⌃Home` ruling, general rather than per-key.
+
+**Two-level escape** — first escape exits interaction, second exits scope — is what makes
+drilling in non-frustrating; you are never one keypress from losing your position. Same
+shape as the Ctrl-C ladder, which the project already has as a pattern.
+
+**`ArrowPolicy` and `EscapePolicy` as declarative per-kind metadata is the piece to take
+verbatim:**
+
+```
+ArrowPolicy   navigate · escape-vertical · escape-horizontal · escape-all · custom
+EscapePolicy  auto (two-level) · bubble · modal · custom
+```
+
+A small closed vocabulary answering *"what does `↓` do at the edge of this thing"* per
+block kind, with no conditional in any handler. Calcium's keymap is already declarative
+data and `KeyAction` is closed with a total effect table, so this sits in exactly the slot
+`gapBefore` defaults per builder occupy. **Capability resolution by priority** — global →
+kind → per-node override — is the same shape as C10's theme resolution and C05's manifest
+merge.
+
+### What the terminal changes
+
+**Scopes are shallow, which is easier.** A transcript is `entry → block → row → cell` —
+three or four levels, not an arbitrary DOM tree. The drill gesture has a small learnable
+set of levels.
+
+**Focus memory is closer to required than optional.** principia lists it as a *future*
+enhancement; in a terminal, re-entering a table at row 1 every time is punishing. Entry
+policy — which element you land on, and whether the scope remembers — matters more here.
+
+**The visual language must respect C11 I14**: focus is *rendered, never owned* — it changes
+tone and nothing else, no marker, no extra row, no width. That invariant is load-bearing
+(focus changes without `rev` moving, so anything altering height breaks C14's cache).
+
+So: **the chrome says the mode, the block says the focus.** A `NAV` / `EDIT` indicator in
+the footer the way vim shows `-- INSERT --`, tone-only focus on the element, and the gutter
+optionally marking the active scope. Expressible within I14, and a terminal idiom people
+already read.
+
+**Mouse becomes a first-class input in the same model** — clicking is *jump directly to
+this scope or element*, the keyboard is *walk there*. Same target set, two routes, with the
+keyboard-equivalent rule as the constraint. Two pieces are genuinely missing:
+
+- **cell → element resolution.** The router knows which *block* a click hit, not which row
+  or action label. Blocks must report their interactive regions — **which is the same
+  information the keyboard model needs.** Build them together, from one declaration, or
+  they will disagree.
+- **click-to-focus versus click-to-activate** — probably focus on click, invoke on the
+  action label or a second click. A ruling the mode model should own, not each block.
+
+### Why this goes before the small navigation items
+
+It is a **navigation model**, not a feature: it replaces the `FocusTarget` union with a
+scope stack plus modes, so it is component-sized and wants designing before any bindings
+are written — or they get written twice.
+
+It also **subsumes** several roadmap items rather than sitting beside them: block-to-block
+movement, horizontal/column navigation, the focusable-block concept, `pushedView`'s missing
+bindings, and clickable buttons/links all fall out of it. And every future interactive
+block — todo checkboxes, the question/menu primitive — gets a coherent home instead of
+inventing its own keys.
+
+### The scroll-anchor rule — do this regardless, and first
+
+**If the user is scrolled up, a new entry must not move their viewport. If they are at the
+bottom, it follows.** An anchor-preservation rule in C14, and the difference between a
+transcript usable during streaming and one that is not.
+
+The floating jump-to-bottom button with a new-entry indicator is chrome on top of it.
+Optional. **The rule underneath is not**, and it is small enough to do before the model.
+
+---
+
+## Medium — needs a real design pass
+
+### Question / menu primitive for agents (highest value for agent UIs)
+
+Single-select, multi-select, free-text — one abstraction, as you said. The layer machinery
+exists (the completion menu is already a pushed layer), so rendering is solved.
+
+**What is missing is a blocking input primitive**: the app asks, the transcript waits, the
+answer arrives. Everything today is user-initiated. That is genuinely new and touches C23's
+execution model — a verb that suspends pending an answer, and a ruling on Ctrl-C during it.
+
+The single most useful thing on this list for agent-facing TUIs.
+
+### A full-screen view leaves no trace in the transcript
+
+**Scroll back and there is no record you ever opened one.** `/logs` pushes a view, you read,
+you `esc`, and the transcript shows nothing — the same for `/inspect` and for the `/tty`
+handoff. A session's history is missing every screen the reader actually looked at.
+
+**Default behaviour for any full-screen command:**
+
+```
+❯ /logs api-gateway
+  ⟩ logs opened
+  ✓ logs closed · 2m14s · 342 lines
+```
+
+#### Why this shape and not a trace on pop
+
+**B03's pop row rules a trace out explicitly**: a view appends nothing on return, because
+*"a trace would freeze the block the pop returns to and clear the selection A01 D7
+preserves."* That ruling stands.
+
+**The two-line form sidesteps it entirely**, which is what makes it buildable:
+
+- **The entry is appended at submission**, before anything is pushed — so it freezes exactly
+  what an ordinary command freezes, and nothing surprising happens on return.
+- **The exit line is a patch to that entry, not a new one.** `patch` with `origin: "shell"`
+  is the mechanism, and it exists — it was built for the refusal notice, and C13's origin
+  gate is what allows the shell to write to an entry after the far side has finished.
+
+**One entry, no trace, no freeze on pop, D7 intact.**
+
+#### Scope: every verb whose result is a view, plus the handoff
+
+`/logs`, `/inspect`, C25's fullscreen patch view, and `/tty` — which today reports
+`✓ exec exited 0` and could equally say what it opened. **Framework default rather than a
+per-app choice**, since the gap is in the record and every app has the same one.
+
+#### Two decisions when it is built
+
+**What the exit line carries.** Duration is obvious and weak. The useful part is what
+happened *in* there — `342 lines`, `exited 0`, `no changes`, `12 hunks` — which is
+**per-verb rather than framework-generic**, so the view's owner supplies it and the
+framework supplies the shape.
+
+**And whether the record is re-enterable.** If the entry says *"logs closed"*, `⏎` on it
+reopening the view is nearly free — the drill-in path exists and the view producer is built.
+**That turns the transcript from a log of things you cannot get back to into navigable
+history**, and it is the difference between this feeling designed and feeling dutiful.
+
+### The prompt windows but does not scroll — and the fix is already named
+
+**Multi-line input works and the window exists.** `promptWindow` caps at `frame.promptRows`
+and draws `⋯` plus the tail, so a fifty-line paste does not eat the screen. **The cap is
+built; what is missing is where the window sits.**
+
+The comment says so outright:
+
+> *Around the end rather than around the cursor, until C17's `cursorCell` is threaded
+> through: the cursor is at the end for every case but a mid-buffer edit, and showing the
+> wrong window is worse than showing the last rows. **Named here so it is a known
+> simplification rather than a silent one.***
+
+**So "the prompt should scroll independently" is not a new feature — it is threading
+`cursorCell`**, which the code already identifies as the fix. Edit line three of a fifty-line
+buffer today and the window stays at the bottom while the cursor is off-screen; the editor
+knows where the cursor is and the window does not ask.
+
+**And the tail-anchor is right for the common case**, which is why it was chosen — so the
+change is *cursor-following when the cursor is not at the end*, not a replacement.
+
+Worth doing with the scroll-anchor rule (#25's neighbourhood): both are *"the window should
+follow the thing the reader is attending to"*, one in the transcript and one in the prompt.
+
+### Chrome is one row each, by design — and four features now want more
+
+`frame.ts:4`: *"Calcium owns the structure — **one chrome row each, fixed, never scrolling**."*
+Deliberate, and it is now the constraint several things are queuing behind:
+
+```
+the navigation model    NAV / EDIT, vim-style
+progress feedback       running · 4s
+queueing                ✳ 2 queued · 1 running
+region separators       a rule between chrome and content
+```
+
+**Four features wanting the same one row is the signal to rule on it once**, rather than
+letting them fight. The options:
+
+- **Multi-row chrome**, app-declared height. Simple, and it costs transcript rows —
+  which is the thing density was chosen against.
+- **A composed single row**, with the framework owning the layout of segments the way a
+  status bar does. Keeps the row count and needs a segment model.
+- **Chrome as blocks**, so it composes like everything else and `b.row` gives it horizontal
+  layout for free.
+
+**The third is the interesting one** and it pairs with `b.row` (#26): if chrome is a block
+sequence, then multi-row, segmented and composed are all the same thing, and the framework
+does not grow a second layout system for the header.
+
+### Pasted content — Claude Code's idea, and Calcium can do it better
+
+Claude Code collapses a large paste to a reference — `[Pasted text #1 +47 lines]` — so the
+prompt stays legible and the content survives. **Good, and the right instinct: a paste is
+*content*, not fifty lines of typing.**
+
+**Calcium can go further, because the prompt is not the only structured thing.**
+
+- **Detect what it is.** A paste that parses as JSON, or looks like a unified diff, or is a
+  file path, is a *known kind* — and the framework already has a block for each. `[JSON ·
+  47 lines]` is more useful than `[Pasted text]`, and it is one parse attempt.
+- **Reference a block, not a string.** The chip in the prompt stands for a real `Block`, so
+  submitting sends structured content and **the transcript can render it as what it is** — a
+  code block with highlighting, a patch with hunks — rather than as a wall of text. That is
+  the thing a text-only prompt cannot do.
+- **Expand it in place** to check what you pasted, using the `expand` action that exists.
+- **Several chips**, each referenced — `[JSON #1] [diff #2]` — which an agent harness wants
+  immediately and a shell wants for `/config <this>`.
+
+**And the paste path already has its own timing exception**, which matters here: C17's paste
+window is the one place A01's immediate-feedback rule is relaxed to *fast enough* (30 ms).
+Collapsing to a chip makes that cheaper rather than harder, because the editor holds a
+reference instead of fifty lines of text to re-wrap on every keystroke.
+
+**Worth checking before designing**: whether bracketed paste is detected, since chip-on-paste
+needs to know a paste *was* a paste rather than fast typing.
+
+### ★ Queueing, background work, and what agent harnesses already solved
+
+**Agent harnesses have solved several transcript problems Calcium will hit**, and it is worth
+stealing them deliberately rather than rediscovering them. Four things, and the first is a
+stated must.
+
+#### Queued commands ★ — submit while something runs
+
+**Today the guard refuses.** `guard.take("app", verb)` and a second submit gets *"a command
+is still running"* — deliberate, and the opposite of what every agent harness does. They
+accept the input and hold it.
+
+The queue itself is small. **The rulings are the work:**
+
+- **What the prompt shows while queued.** `2 queued` in the chrome, or the queued lines
+  visible somewhere? Agent harnesses show them, which is better — a queue you cannot see is
+  a queue you forget you typed into.
+- **Can a queued item be cancelled**, and how? It has no entry yet, so there is nothing to
+  focus. Probably a chrome affordance rather than a transcript one.
+- **What Ctrl-C means** — this is the sharp one. It is now ambiguous between *cancel the
+  running verb* and *clear the queue*, and **step 9 has already had exactly this class**: two
+  rungs with a genuine claim, where newest-first picks the wrong one. Rule it the same way —
+  by asking which outcome leaves a record.
+- **A queued command sees state after its predecessor**, which is the whole point and needs
+  saying, because it means the queue is strictly sequential and cannot be reordered.
+
+#### Background execution — related, larger, and a different thing
+
+Queueing is *sequential*: it waits. Background is *concurrent*: it runs while you do
+something else. Agent harnesses do both — Claude Code queues messages **and** shows a
+running-tasks count for work continuing in the background.
+
+**That is a real change to C23's model**, not a feature: the guard becomes per-something
+rather than global, multiple entries are live at once, Ctrl-C must pick which, and the chrome
+needs to say what is running. **Plan it separately from queueing** and do not let one block
+the other — queueing alone is worth having.
+
+#### Auto-collapse by age — the density fix the transcript needs
+
+**Agent harnesses collapse old tool calls to a line.** The AI SDK TUI's default is
+`auto-collapsed`: *show the latest tool expanded until another visible section appears.*
+
+Calcium has **eviction** — an old entry is deleted at the cap — and nothing between "full
+height forever" and "gone". **A conversation produces hundreds of entries** (agent-tui's A5
+is the predicted case, and a long docker session is the real one), and scrolling back through
+two hundred full-height entries is unusable where scanning two hundred one-line summaries is
+easy.
+
+Collapsing is gentler than eviction and answers a different pressure: eviction is about
+memory, **collapse is about screen**. The `expand` action already exists, so a collapsed
+entry is expandable by a mechanism that is built.
+
+#### Block display modes — the AI SDK's four, generalised
+
+`full` · `collapsed` · `auto-collapsed` · `hidden`, applied per block kind. That is really
+**"a block declares it may be collapsed, and something decides"** — and the something is the
+transcript's age policy above, or the app's preference, or the user's.
+
+Worth taking as one concept rather than four features, and it is the same slot the
+`expand` action already occupies.
+
+#### A running-tasks indicator
+
+`✳ 1 running task` in the chrome. Trivial once anything is in flight or queued, and it is the
+piece that makes background work legible rather than mysterious. **The chrome is where "what
+is happening" lives** — the same slot the navigation model wants for `NAV`/`EDIT` and the
+progress work wants for elapsed time.
+
+### Session resume / history
+
+The transcript is already a store with a cap and eviction; persisting it is C20's shape one
+level up. Tractable.
+
+**Rewind / undo / redo is a different project** — it means every mutation is reversible, and
+nothing currently is. Split these; do not let the second block the first.
+
+### Auto-update
+
+For Calcium and for apps built on it. Packaging and distribution rather than framework
+design, and more interesting than it sounds: it is how a TUI ships to people who are not
+developers.
+
+---
+
+## Plots and ML output — the biggest single opportunity
+
+This is Prism's actual use case, so it is where Calcium earns its place over a general
+framework.
+
+By how much each fights the character grid:
+
+```
+easy       bar · histogram · line (exists) · sparkline (exists) · HEATMAP
+medium     candlestick · pie (circle approximation, looks rough)
+hard       sankey (edge routing — the same problem as Mermaid layout)
+no         3D — perspective in a character grid is a novelty, not a tool
+```
+
+**Heatmap is the sleeper.** A grid of coloured cells is *exactly* what a terminal is. It
+needs colour maps, and it degrades beautifully — colour → `░▒▓█` shading at 1-bit. For ML
+output (attention matrices, confusion matrices, correlation) it is the highest-value plot
+on the list and among the easiest.
+
+**On wrapping matplotlib: don't.** The impedance mismatch is severe — matplotlib thinks in
+pixels and DPI, you would render to a raster and downsample to characters, and you would
+inherit a Python dependency into a TypeScript framework. **Take the colour maps** (viridis,
+magma are lookup tables) **and the layout conventions. Leave the dependency.**
+
+### The ML output package
+
+Worth treating as one coherent piece rather than scattered features:
+
+- **tensors / matrices / vectors** — shape and dtype headers, sensible truncation
+  (`[2, 64, 768] float32`, corners shown, middle elided), the same discipline C11 applies to
+  rows applied to axes
+- **heatmaps** for attention and confusion matrices
+- **plots** for training curves — exists, wants the history buffer docker-tui is building
+- **images** for sample outputs, once the image block lands
+
+That package is most of the easy tier and it is what makes Calcium the obvious choice for
+an ML platform's TUI.
+
+---
+
+## Fights the architecture — deliberately not doing
+
+- **Video / GIF.** Redrawing a rectangle at 15 fps inside a frame scheduler built around
+  *one frame per input batch* fights the architecture at its root. **A GIF's first frame as
+  an image, with a note, gets 90% of the value for 5% of the work.**
+- **3D plots.** Perspective in a character grid is a novelty.
+- **An embedded text editor.** `/tty vim` already hands the terminal over, vim runs, you
+  come back — the handoff is built and correct. An embedded editor is a much larger thing
+  for less.
+- **Wrapping matplotlib** — above.
+
+---
+
+## Order
+
+```
+0  step 8                    docker-tui packaged — README, play environment, screencast, CI
+1  PHASE 1                   producer context · change axis · builder audit · the prompt
+                             ↑ serves both destinations, must precede the freeze
+2  prism-tui's first         experiment table · training curve · one live job
+   surfaces                  ↑ the second consumer, and b.live's stream arm's first
+3  the ML package            tensors, heatmaps — built with prism-tui as the consumer
+4  what 2 and 3 found        phase 1's equivalent, second round
+5  publication prep          error messages · the outside-reader test · 0.x · CI from the
+                             tarball
+—  PUBLISH 0.x               with two real consumers behind it
+6  phase 2                   the empty-block convention · rendering flags
+7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
+                             the small navigation items rather than sitting beside them
+8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
+9  mermaid (text path)       cheap once the dependency is vetted, distinctive
+10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
+11 markdown                  translates to existing blocks
+12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
+                             to change one. Anticipated in a comment, never built.
+                             Smallest fix, biggest effect, invalidation already exists
+13 RENDER CACHING          ★ a large diff renders 5,000 lines to show 30. Multiplicative
+                             with the above, which is why it is "unusable" not "slow"
+                             (highlighting is already memoised — that memo exists BECAUSE
+                              rendering repeats, which confirms the diagnosis)
+14 cells() ASCII fast path  the hottest function walks Intl.Segmenter over ASCII. Cheap,
+                             but measure after the render cache — most calls vanish with it
+15 text selection + copy    copyMode exists with no producer; OSC 52; and semantic copy,
+                             which pairs with the navigation model
+16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
+                             two parameters. C19's menu already has the flip, the selection
+                             and `… N more`; the confirm reimplements or lacks all of it
+17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
+                             MAX_ROWS is the fallback adapter's alone. #12 → #13 → window
+                             the block → cap with a marker. A CHAIN, in that order
+18 SHARED POLLERS ★★       source → derivation → part. One fetch AND one computation per
+                             source; only the render is per instance. A CORRECTNESS fix
+                             first. Render memoised on (sourceVersion, viewState, width),
+                             one batch per source, and the stagger gets less to do
+19 resize coalescing        never delayed by C03 I2, and every SIGWINCH rebuilds the Fenwick
+                             index. A drag is N rebuilds + N renders + N writes
+20 off-screen live parts ★  b.live keeps ticking when scrolled off — no visibility check
+                             exists. Throttle, not pause (I9 protects a scrolled-away
+                             --watch), and fetch on re-entry. Spawns processes for nobody
+21 --help per verb ★        usageBlocks() is built, exported, and uncallable. Reserve
+                             --help framework-side, and it makes /help's fifty-verb wall
+                             a two-level problem instead. Needs F39's render-selecting flag
+22 b.art — banners          sparse variants, fallback ends at styled text, and VALIDATION
+                             PER VARIANT (no tabs, uniform width, measured cells) — ~30
+                             lines that would have caught every banner defect
+23 selection styling        a full-row BACKGROUND WASH — free, since it changes no size
+                             (the patch renderer already does it). Reverse video at 1-bit,
+                             gutter glyph as the fallback. Selection as a `meaning` palette
+                             so C10's contrast floor checks the fg/bg pair
+24 more default themes      two ship and `light` is dark-on-dark. ThemeSet is a two-field
+                             record, so more is a PUBLIC TYPE change — freeze-relevant
+25 ghost text ★            computed, acceptable by →, NEVER DRAWN. And it only ghosts a
+                             sole candidate, which is when the hint is least needed.
+                             Design with as-you-type (#31) — one hint, two levels
+26 view trace in transcript a full-screen view leaves no record. Append on push, PATCH on
+                             pop — sidesteps B03's no-trace-on-pop ruling, one entry, D7
+                             intact. And ⏎ to re-enter is nearly free
+27 syntax highlighting ★    a REGRESSION against C09 §4a, not a scoping choice — the spec
+                             promises "highlighted whenever someone registers it" and there
+                             is no someone. 24 mainstream = 180 KB, measured. Phase-1-shaped
+28 prompt cursor-following  the window exists and is tail-anchored; the fix is threading
+                             cursorCell, which the code already names
+29 chrome row budget        one row each by design, and four features now want it. Rule
+                             once — chrome-as-blocks pairs with b.row
+30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
+                             a string, so the transcript renders what it actually is
+31 completion ranking       prefix-matched and unranked today. Recency-first is nearly
+                             free (C20 has it) and is the most-felt. RANK BEFORE
+                             as-you-type, or the menu is worse for opening itself
+32 prefix-out / defaultRoute      CommandPolicy is exported and unreachable — a config field.
+                             And prefix-OUT (prose by default) is a separate ruling that
+                             agent-tui needs
+33 QUEUEING ★              submit while something runs — a stated must. Small queue,
+                             real rulings, and Ctrl-C is ambiguous the way step 9's was
+34 UX polish set            animation (decoration never information) · change highlighting ·
+                             finish notifications · structured export · error remedies as
+                             fill actions · empty states that teach
+35 progress feedback        the spinner is static by a ruling whose premise expired — the
+                             refresh driver IS the ticker now. Motion, then elapsed time,
+                             then what it is doing
+36 scrollbar + edge markers the terminal cannot provide one (alt screen has no scrollback)
+                             and C14 already has the numbers. The edge marker is the cheap
+                             half and may matter more than the bar
+37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
+                             bracketed with them. C10's no-background choice means a drawn
+                             line is the only tool available       the frame marks none of its four boundaries — and C10's
+                             no-background choice means a drawn line is the only tool left
+38 horizontal composition   b.row — the banner already paid for its absence by hand
+                             (width fractions ship with it; height fill is separate and
+                              waits on phase 1.1's producer-context contract)
+39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
+                             overrides with `/theme <theme> --no-bg` (a FlagDef, free in
+                             --help, per-invocation not sticky; warn and comply). Painting
+                             makes
+                             C10's contrast floor provable rather than assumed against a
+                             guess; inheriting preserves transparency. The light theme
+                             paints, because it cannot work otherwise. Shares row-padding
+                             with selection's wash (#22). Plus: /help's verb list came
+                             back empty — both found by looking
+40 as-you-type completion    the trigger, not the engine — and it makes the manifest
+                             claim visible. Largely subsumes the next line
+41 typo detection            trivial, delightful — smaller once 40 lands
+42 rebindable keys          precedence ladder (framework < app < user), not a refusal —
+                             a user override IS a collision. Unbind is `action: null`, a
+                             VALUE not an absence, and it falls through to the next rung
+43 images (kitty)            designed already; unlocks mermaid HD + ML samples
+44 session resume            tractable half of the persistence story
+—  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
+```
+
+**Step 8 stays at the top** because the README and the play environment are prerequisites
+for the outside-reader test, and because CI running examples from the tarball is the
+mechanism that keeps the docs true — which matters more than usual, since eight drawings in
+the surfaces document were wrong about the far side or the framework.
+
+**Phase 1 is the same work for both destinations.** prism-tui will hit the producer-context
+contract exactly as docker-tui did; so will a stranger. It is not destination-dependent, it
+is simply before the freeze.
