@@ -2318,6 +2318,26 @@ survives because the container references it, and the *tag* does not. So a conta
 `Config.Image` names something unresolvable is trivially constructible, and the read was
 available the whole time.
 
+> **Amended 2026-08-06, step 10 — the sentence above is true of the case it measured and
+> too general by one word.** `rmi` *does* refuse; what decides it is whether the tag being
+> removed is the image's **last** reference:
+>
+> | `rmi` target, container running | exit | says |
+> |---|---|---|
+> | a non-last tag (`dtui-probe-tag:v1`) | 0 | `Untagged: …` |
+> | the last tag (`alpine:latest`) | 1 | `conflict: … (must be forced) - container … is using its referenced image` |
+>
+> The original claim — *docker refuses and it cannot be forced* — remains wrong on both
+> counts, and the probe's setup made the distinction invisible because it had tagged the
+> image twice and removed the second tag. So the correction was right about the read being
+> available and generalised one measurement into a rule about `rmi`.
+>
+> **This is the finding's own lesson arriving a second time, in the correction rather than
+> in the claim.** F66 exists because nobody measured the case that would falsify the
+> belief; the amendment exists because the measurement that falsified it was not itself
+> falsified. Measure the case that would break your own counter-example — the second tag is
+> exactly the variable the probe happened to set and never varied.
+
 **The read was then run, and `/drift` worked.** It printed `IMAGE alpine:latest` against a
 container created from a tag that no longer exists — because the app resolves the image
 from the container's top-level `Image`, which is `sha256:…`, and asks the daemon for the

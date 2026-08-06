@@ -13,6 +13,7 @@
 // Commitments section produces no findings and looks compliant.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { checkFindings } from "../../tools/enforce/findings.mjs";
 import {
   checkCommitments,
   checkOrdering,
@@ -615,6 +616,57 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
   // arriving inside the check built to close a duplication. One fabrication per
   // direction is the only arrangement where a one-directional implementation
   // fails, and the third test below is what makes that explicit.
+
+  // --- SP5 — the findings ledger's citations --------------------------------
+  //
+  // **The corpus assertion comes first and it is not a formality here.** This
+  // rule shipped vacuous twice, and both times `enforce` printed success: once
+  // taking `index.mjs`'s file list, which is `walk("src")` and holds none of the
+  // files that cite the ledger, and once with a range guard that skipped every
+  // number past the maximum on a ledger with no gaps. Four fabricated violations,
+  // zero firings. `scanned` and `citations` exist so a test can tell "clean" from
+  // "did not run", which is the only difference that mattered.
+  it("SP5: the real tree is clean, and the rule actually read it", () => {
+    const v = checkFindings();
+    expect(v.scanned, "files scanned").toBeGreaterThan(50);
+    expect(v.map((x) => x.message), "SP5").toEqual([]);
+  });
+
+  it("SP5 fires: a citation past the end of the ledger", () => {
+    const known = new Set(["F1", "F2", "F3"]);
+    const v = checkFindings({
+      known,
+      files: ["fake.ts"],
+      read: () => "see FINDINGS F99 for why",
+    });
+
+    expect(v).toHaveLength(1);
+    expect(v[0]?.rule).toBe("SP5");
+    expect(v[0]?.message).toContain("F99");
+  });
+
+  it("SP5 fires: a gap in the middle, which is the other way to be wrong", () => {
+    const v = checkFindings({
+      known: new Set(["F1", "F3"]),
+      files: ["fake.ts"],
+      read: () => "as F2 established",
+    });
+    expect(v).toHaveLength(1);
+    expect(v[0]?.message).toContain("F2");
+  });
+
+  it("SP5: a live number passes — it checks existence, not aim", () => {
+    // The stated limit, asserted so it is a decision rather than an oversight.
+    // The citation that prompted this rule pointed at a real, unrelated finding
+    // and still resolves.
+    const v = checkFindings({
+      known: new Set(["F1", "F2", "F3"]),
+      files: ["fake.ts"],
+      read: () => "see F2",
+    });
+    expect(v).toHaveLength(0);
+    expect(v.citations, "it looked at the citation and accepted it").toBe(0);
+  });
 
   it("SP4 fires: a Seam 4 row its owner does not name", () => {
     // The C15–C20 shape inverted: the table knows about a sequence and the spec

@@ -93,30 +93,45 @@ function walk(dir, out = []) {
   return out;
 }
 
-export function checkFindings() {
-  const known = declared();
+/**
+ * SP4's reader seam, for the same reason: a rule that can only read the real
+ * tree can only be tested by damaging it.
+ *
+ * `scanned` is returned alongside the violations so a test can assert the rule
+ * **looked at something**. This one was vacuous twice — once scanning no files,
+ * once unable to fire on any number — and both times the output was identical to
+ * success. A count is the only thing that tells "clean" from "did not run".
+ */
+export function checkFindings(io) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const known = io?.known ?? declared();
   const violations = [];
 
   // The ledger cites itself constantly — "see F58b", "F66's shape" — and those
   // must resolve too. It is included rather than excused: the entry that cites a
   // finding renumbered out from under it is the likeliest wrong citation there
   // is, and excusing the file would leave the largest source of them unchecked.
-  const inScope = [
-    ...walk("src"),
-    ...walk("docs"),
-    ...walk("examples/docker/src"),
-    ...walk("examples/docker/test"),
-    LEDGER,
-    "CLAUDE.md",
-  ].filter((f) => f === LEDGER || CITED_FROM.some((p) => f.startsWith(p)));
+  const inScope =
+    io?.files ??
+    [
+      ...walk("src"),
+      ...walk("docs"),
+      ...walk("examples/docker/src"),
+      ...walk("examples/docker/test"),
+      LEDGER,
+      "CLAUDE.md",
+    ].filter((f) => f === LEDGER || CITED_FROM.some((p) => f.startsWith(p)));
+  let scanned = 0;
+  let citations = 0;
 
   for (const file of inScope) {
     let text;
     try {
-      text = readFileSync(file, "utf8");
+      text = readText(file);
     } catch {
       continue;
     }
+    scanned += 1;
     if (!text.includes("F")) continue;
 
     const lines = text.split("\n");
@@ -148,6 +163,7 @@ export function checkFindings() {
         // finding. The upper bound is now checked and only a nonsensical `F0`
         // is excused.
         if (n < 1) continue;
+        citations += 1;
         violations.push({
           rule: "SP5",
           file: `${file}:${String(i + 1)}`,
@@ -162,5 +178,7 @@ export function checkFindings() {
     }
   }
 
+  violations.scanned = scanned;
+  violations.citations = citations;
   return violations;
 }

@@ -30,6 +30,7 @@ import {
 import { argv as eventsArgv, createEventsHandler } from "./events.ts";
 import { dockerSources } from "./completion.ts";
 import { mutationHandlers } from "./mutation.ts";
+import { destructiveHandlers } from "./destructive.ts";
 
 const run = promisify(execFile);
 
@@ -167,6 +168,9 @@ const tui = createTui({
     // The mutation family (step 9). **Local because `ctx.ask` is**, not because
     // any of them needs state across calls — see `mutation.ts` and FINDINGS F67.
     ...mutationHandlers(),
+    // The destructive family (step 10). Ruling C's weight: the question
+    // carries what it will remove, and the zero case does not ask.
+    ...destructiveHandlers(),
   },
   /**
    * S1's whole point: the dashboard is there before you type anything (C22 I44).

@@ -20,6 +20,7 @@
 import type { ManifestDocument } from "@fmx/calcium";
 import { READ_TOOLS } from "./manifest/read.ts";
 import { LIFECYCLE_TOOLS } from "./manifest/lifecycle.ts";
+import { DESTRUCTIVE_TOOLS } from "./manifest/destructive.ts";
 
 /**
  * F1's shim, not `docker`.
@@ -42,6 +43,6 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [...READ_TOOLS, ...LIFECYCLE_TOOLS],
+    tools: [...READ_TOOLS, ...LIFECYCLE_TOOLS, ...DESTRUCTIVE_TOOLS],
   };
 }

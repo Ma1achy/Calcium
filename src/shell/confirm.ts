@@ -34,8 +34,14 @@ export const CONFIRM_LAYER_ID = "confirm";
  * A request rather than a measurement: C15 clamps it to the region, and a
  * producer that measured its own content would need the block registry, which
  * this file deliberately does not have.
+ *
+ * **72 rather than 56, and the frame decided it.** A destructive confirm carries
+ * a table of what it will remove (Ruling C), and at 56 the second column
+ * truncated to `Exited …` — losing when the container stopped and whether it had
+ * failed, which is exactly the information a reader is being asked to weigh. The
+ * question fitted; the evidence did not.
  */
-export const CONFIRM_WIDTH = 56;
+export const CONFIRM_WIDTH = 72;
 
 export type ConfirmDeps = Readonly<{
   overlays: OverlayManager;
