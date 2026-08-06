@@ -1,6 +1,6 @@
-# F1–F82, triaged
+# F1–F86, triaged
 
-`FINDINGS.md` is a log: eighty-five entries in the order they were hit, each accurate about
+`FINDINGS.md` is a log: eighty-nine entries in the order they were hit, each accurate about
 what it found. Past thirty, *filed* stops meaning much — a reader cannot tell which entries
 are one change and which are forty, or which to do first.
 
@@ -29,7 +29,7 @@ type change.
 
 | rank | mechanism | findings | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
-| **1** | [The consumer cannot reach a fact the framework holds](#1) | 9 | **9 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
+| **1** | [The consumer cannot reach a fact the framework holds](#1) | 10 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
 | **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 12 | **5 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 12 fixed** |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
@@ -37,9 +37,9 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 14 | **14** | — | artefact discipline — **no code** |
 | **8** | [Absence indistinguishable from failure](#8) | 8 | **3 open** (5 closed) | partly | real Calcium work · **5 of 8 fixed** |
-| **9** | [**The instrument was wrong**](#9) | 6 | **6** | — | **new at F80** · tooling, and it has no test |
+| **9** | [**The instrument was wrong**](#9) | 7 | **7** | — | **new at F80** · tooling, and it has no test |
 | **10** | [**A claim carried without a record**](#10) | 5 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 4 | **4** | — | closed, all four |
+| **11** | [A gate that passes without checking](#11) | 6 | **6** | — | 4 closed · **2 open, both about a rule's reach** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits and does not substitute](#13) | 1 | 1, *and every consumer has it* | — | real Calcium work · needs a ruling |
 | — | [Singles](#singles) | 6 | 1 each | — | see each |
@@ -51,7 +51,7 @@ than the software.
 ---
 
 <a id="1"></a>
-## 1 · The consumer cannot reach a fact the framework holds — **9 open** ⚠
+## 1 · The consumer cannot reach a fact the framework holds — **10 open** ⚠
 
 **Still the largest open group, and steps 9–13 changed what kind of group it is.** At F55
 every instance was an app *duplicating* a Calcium module. It is now three shapes.
@@ -67,6 +67,7 @@ every instance was an app *duplicating* a Calcium module. It is now three shapes
 | **F13** | who owns `meta` on a local route | every local handler | hand-writes nine fields, seven of them fiction |
 | **F58b** | who owns `meta` on an adapter route | every adapter ever written | computes **seven values the registry discards**, with no signal that it does |
 | **F77** | anything at all, from an adapter | the mutation family | **changes route** — 185 lines of local handler for five verbs that would have been fifteen each |
+| **F85** | who owns a `RenderContext` field | every caller of `render-lines.ts` | supplies **two fields the registry overwrites**, one a stub that **throws if called** |
 
 **F77 is what makes the group structural rather than incidental.** Every earlier entry says
 *a producer is missing a fact*. F77 says **asking anything at all forces a route change**,
@@ -78,6 +79,14 @@ window's, and `ctx.ask` — and the escape hatch charges full price each time.
 returns a `ViewDocument`, so the compiler demands ten `meta` fields; `authoritativeMeta` keeps
 three. The local route hand-writes nine and means none of them. Measured: an adapter returning
 `exitCode: 999` produces a document reading `0`.
+
+**F85 is F58b reached by a second component, which is what says the shape generalises.** An
+adapter must compute ten `meta` fields and the registry honours three; a caller must supply
+eight `RenderContext` fields and the registry honours six. Both times the compiler demands a
+value the consumer discards, so the only way to satisfy the type is to write something untrue
+— a `?? 0` in one case, a throwing stub in the other. **The throwing stub is the more honest
+and the more dangerous**: it is correct only because the overwrite is unconditional, and a
+comment is the whole of the guarantee.
 
 **The fix is not nine exports, and F58b's is a *narrower* type, not a wider one.** The adapter's
 return wants a `meta` restricted to the three honoured keys, so that supplying `exitCode` fails
@@ -298,7 +307,7 @@ and the claim has to be one the producer can support.*
 ---
 
 <a id="9"></a>
-## 9 · The instrument was wrong — **6 surfaces** · new at F80
+## 9 · The instrument was wrong — **7 surfaces** · new at F80
 
 **Six findings about the measuring apparatus, and this group did not exist at F55.** It is
 listed high despite one open entry because of what the count means: every frame-read in steps
@@ -313,6 +322,7 @@ against the bytes it was replaying.**
 | **F62** | `make fixtures` | `while :; do :; done` produced a **flat line at 100%** in the headline plot of a demo about plots. Correct, honest, the least interesting figure C12 can draw. **Fixed** — bursts |
 | **F74** | `demo.cast` | the completion beat had never worked: beat 3 moved focus into a live block and every character of beat 4 was correctly dropped. **Fixed** |
 | **F75** | `demo.cast` | three `view: true` verbs append nothing, so the recording went transcript → fullscreen → *the same transcript*, three times. **Fixed** |
+| **F86** | `tools/screen.py`, again | **F79's stated mechanism, measured and falsified.** An unterminated OSC consumes nothing — the regex is anchored to a terminator — and the quoted bytes render correctly in isolation. A *different* real defect: the OSC leaks as visible text. Open |
 
 **The disposition is not "fix the tools".** Five of six are already fixed and the sixth is a
 replay parser. The gap is that **the instruments have no test** — `screen.py` was trusted for
@@ -377,7 +387,7 @@ through a menu in as many words — as the reason the implementation writes ever
 ---
 
 <a id="11"></a>
-## 11 · A gate that passes without checking — **4, all closed**
+## 11 · A gate that passes without checking — **6: 4 closed, 2 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
@@ -385,6 +395,8 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F56** | `package.json`'s `bin` | a claim about an executable, accepted by install, pack, `publish --dry-run` and `make proof`. Three consumers existed and **all three reached around the entry point** |
 | **F60** | `make proof` | red on `main` for two merged PRs, because it is the one target CI does not run |
 | **F82** | **SP5's own `citations` counter** | itself — **the field added because the rule had shipped vacuous twice, shipped vacuous** |
+| **F83** | **MG24's definition of a consumer** | the implementing module counts as one, so an interface in `types.ts` implemented in `store.ts` gives every member a consumer by construction. **Open** |
+| **F84** | **MG24's scope** | it walks `export interface` only. **798 members published as `export type` are outside every rule in the suite** — nearly three times the 280 it watches. **Open** |
 
 **F82 was found producing this file** and it is the group's sharpest instance, because the
 gate that failed is the one verifying the sentence three sections down. `citations` was
@@ -416,6 +428,26 @@ failure modes; only `citations` shows that the regex and the scope work **togeth
 
 Fixed, and mutated: reverting the increment kills both new rows and neither `fires` row —
 which is why four green rows and a dead field coexisted for as long as they did.
+
+### The two open ones are about a rule's *reach*, and they fail in opposite directions
+
+**F83 is a definition too weak inside its scope.** A02 Seam 4 is about a component complete on
+its own side with nothing on the other — and the implementation is the *same* side. The file
+boundary was taken as a proxy for the seam and within a component it is not one. 28 members
+never cross their own component; `HistoryStore.rerun` has no caller at all, and
+`TransportRouter.busy` **survived its own removal** — `router.ts:64` says a guard *"replaced
+`busy`"* and `construct.ts:1024` counts *"seventeen until `busy`"*, so the tree records the
+deletion twice and the member is still there.
+
+**F84 is a scope too narrow with a definition that works.** Its present contents are almost
+empty — 0 members dead outright, and the 67 that never cross a component are dominated by
+deferrals already documented, `ToolDef.oneShot` having three paragraphs in C22 §4. Three
+survive: `GlyphSet.teeLeft`, `teeRight` and `hollow`, declared glyph slots with no drawer.
+
+**Filed anyway, and this is the group's argument in one line: a rule whose scope excludes
+three-quarters of its subject is a rule whose clean result means much less than it reads,
+whatever it happens to contain today.** That is F82's sentence about a counter, applied to a
+scope — and it is why this group's disposition is never "fix the instance".
 
 **F60 is three findings stacked and only the third is new.** F36 and F37 are why the deep
 imports exist; this is that the reach was aimed at a *repository*, so a workaround for a
@@ -524,9 +556,9 @@ a triage is a thing asserted. Specifically:
 
 ## How this file was checked
 
-**The inventory is derived, not hand-copied.** `grep '^## F' FINDINGS.md` yields 85 ids and
-every one appears in **exactly one** group above — 9 + 12 + 6 + 4 + 6 + 2 + 14 + 8 + 6 + 5 + 4
-+ 2 + 1 + 6 = 85.
+**The inventory is derived, not hand-copied.** `grep '^## F' FINDINGS.md` yields 89 ids and
+every one appears in **exactly one** group above — 10 + 12 + 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 + 6
++ 2 + 1 + 6 = 89.
 
 That check exists because the F55 version had a heading reading *5 surfaces* over a row listing
 six, and F30 appeared in two groups. **A count that disagrees with its own row reads as

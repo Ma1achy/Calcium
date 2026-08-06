@@ -40,15 +40,44 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 
 const LEDGER = "examples/docker/FINDINGS.md";
 
-/** Where a citation may appear. Anything else is prose about the number. */
+/**
+ * Where a citation may appear. Anything else is prose about the number.
+ *
+ * **The repository root is a location, not a list of filenames.** `CLAUDE.md`
+ * was named individually and the five other root documents that cite this
+ * ledger were not — 92 citations across `CALCIUM_COVERAGE_AUDIT*.md`,
+ * `DOCKER_TUI_COMPLETION.md`, `DOCKER_TUI_START_HERE.md` and
+ * `DOCKER_TUI_SURFACES.md`, none of them checked. Every one resolves, so
+ * nothing was hidden; what was missing was the guarantee.
+ *
+ * That is this rule's scope failing for the **third** time, and the third time
+ * the same way: naming the places thought to matter instead of covering the
+ * place and excluding what does not belong. F82 widened it from two code
+ * directories to `examples/docker`; F84 is the same sentence about MG24. A
+ * document written tomorrow at the root is covered on the day it is written
+ * rather than on the day someone remembers this list exists.
+ */
 const CITED_FROM = [
-  "examples/docker/src/",
-  "examples/docker/test/",
   "examples/docker/",
   "docs/",
   "src/",
-  "CLAUDE.md",
 ];
+
+/**
+ * In scope: one of the directories above, or a document at the repository root.
+ *
+ * **A root file has no prefix**, which the first version of this widening got
+ * wrong — it added `"./"` to the list, and `readdirSync(".")` returns bare
+ * names, so nothing matched it *and* `CLAUDE.md` stopped matching the literal
+ * entry it used to have. `scanned` fell 306 → 305 and `citations` 687 → 682.
+ *
+ * A five-citation regression, invisible in the exit status and obvious in the
+ * counters, one commit after F82 was filed for exactly that. Kept as the
+ * comment rather than tidied away because it is the finding's own argument
+ * arriving unprompted.
+ */
+const inCitedScope = (f) =>
+  f === LEDGER || !f.includes("/") || CITED_FROM.some((p) => f.startsWith(p));
 
 /** The headings, which are the only declaration of what exists. */
 function declared() {
@@ -137,10 +166,14 @@ export function checkFindings(io) {
         ...walk("src"),
         ...walk("docs"),
         ...walk("examples/docker"),
+        // The root's own documents, not recursed — `walk` would descend into
+        // every example and package. The five that cite this ledger live here
+        // beside `CLAUDE.md`, which used to be the only one named. F84.
+        ...readdirSync(".").filter((e) => e.endsWith(".md")),
         LEDGER,
         "CLAUDE.md",
       ]),
-    ].filter((f) => f === LEDGER || CITED_FROM.some((p) => f.startsWith(p)));
+    ].filter(inCitedScope);
   let scanned = 0;
   let citations = 0;
 

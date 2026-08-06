@@ -3114,3 +3114,174 @@ that catches its own double-count, which is the second argument this finding mak
 returning numbers rather than a boolean.
 
 Final: **306 files, 665 citations, 0 violations.**
+
+---
+
+## F83 — MG24 counts the implementing module as a consumer ★★★
+
+MG24 asks whether an `export interface` member is *"named somewhere else under
+`src/`"*. An interface declared in `types.ts` and implemented in `store.ts` is two
+files, so **every member of it has a consumer by construction** — the implementation.
+
+Measured over 280 interface members:
+
+| | |
+|---|---|
+| MG24 sees a consumer for | **265** |
+| ...of which **no** consumer outside the declaring component | **28** |
+
+Two of the 28 are real and neither is allow-listed:
+
+```
+HistoryStore.rerun     types.ts:65 declares it, store.ts:136 implements it, nothing calls it
+TransportRouter.busy   types.ts:74 declares it, router.ts:71 implements it, nothing reads it
+```
+
+**`busy` is the sharper one, because the tree says so out loud.** `router.ts:64`
+comments that a guard *"replaced `busy` and `shellChild`"*, and `construct.ts:1024`
+counts *"seventeen until `busy` and…"*. The member survived its own removal, and
+MG24 could not see it because `router.ts` implements the interface `types.ts`
+declares.
+
+**This is the class MG24 exists for, hiding inside MG24's own definition of a
+consumer.** A02 Seam 4 is about a component complete on its own side with nothing on
+the other — and the *implementation* is the same side. The file boundary was taken as
+a proxy for the seam, and within a component it is not one.
+
+The fix is a boundary rather than a rule: count a consumer only outside the declaring
+component. 28 candidates is a reviewable number, and the remainder disposes the same
+way `UNCONSUMED_MEMBERS` already does — an entry with a reason, and the equality arm
+that stops it outliving that reason.
+
+---
+
+## F84 — MG24 walks `export interface`; this codebase publishes with `export type` ★★★
+
+MG24's member walk is anchored on `export\s+interface`. Every object type published
+as `export type X = Readonly<{…}>` is outside it, and that is how most of this
+codebase declares a contract:
+
+| | members | inspected by any rule |
+|---|---|---|
+| `export interface` | 280 | **yes** — MG24 |
+| `export type` object types (163 of them) | **798** | **no** |
+
+`AdapterContext`, `LocalContext`, `RenderContext`, `ToolDef`, `Layer`, `ThemeTokens`
+and `GlyphSet` are all in the unwatched 798. **Nearly three times as many published
+members are unwatched as watched.**
+
+**The current yield is low, and saying so is the finding's other half.** Measured
+both ways:
+
+- **no use anywhere in `src/` at all: 0.** The literal version of the gap is empty.
+- **never named outside the declaring component: 67**, and they are dominated by
+  deferrals already recorded — `ToolDef.oneShot` has three paragraphs in C22 §4
+  explaining that it has no subject because `createTui` takes no argv, and
+  `ThemeTokens.palettes` is `ThemeStore.applyOverrides`' known gap seen from the
+  other side. **A documented deferral is the correct disposal and not a finding**,
+  which is C04's `status: "proposed"` model.
+
+**What is left after that filter is small and real:** `GlyphSet.teeLeft`,
+`GlyphSet.teeRight` and `GlyphSet.hollow` are declared glyph slots with **zero uses
+outside `glyphs.ts`** — three characters in a vocabulary with a degradation path and
+no drawer.
+
+So the scope hole is large and its present contents are not. **That is worth filing
+precisely because the two are usually confused**: a rule whose scope excludes 74% of
+its subject is a rule whose clean result means much less than it reads, whatever it
+happens to contain today. F82 is the same sentence about a counter.
+
+**And the measurement itself needed correcting mid-flight**, which is recorded because
+it is the same trap: the first version inherited MG24's *skip the declaring file* rule
+and reported `EngineOptions.onSourceError`, `FrameSchedulerOptions.windows` and
+`ViewRefresh.offsetMs` as dead. All three are used in the file that declares them.
+MG24's skip is right for interfaces, which live apart from their implementations, and
+wrong for `export type` objects, which are usually declared beside their use. **A
+filter carried from one shape to another produces confident false positives**, and
+the only thing that caught it was opening the three files.
+
+---
+
+## F85 — a context requires two fields whose supplier cannot supply them ★★★
+
+`RenderContext` has eight fields. Every construction site supplies all eight, so the
+partial-context pass reports it clean. Two of them are ceremonial, and the code says
+so:
+
+```ts
+// The registry replaces both of these with itself; they are here because
+// the type requires them, and a caller should not have to know that.
+measureChild: registry.measure,
+renderChild: () => {
+  throw new Error("renderChild is supplied by the registry");
+},
+```
+
+`render-lines.ts` builds a `RenderContext` at two sites and both write a `renderChild`
+that **throws if it is ever called**, because `BlockRegistry.render` overwrites it
+before any renderer sees it (`registry.ts:157`).
+
+**This is F58b's class, reached independently by a second component.** There, an
+adapter must compute ten `meta` fields and `authoritativeMeta` honours three. Here, a
+caller must supply eight context fields and the registry honours six. Both times the
+compiler demands a value, the consumer discards it, and the only way to satisfy the
+type is to write something untrue — a `?? 0` in one case, a throwing stub in the other.
+
+**A throwing stub is the more honest of the two and the more dangerous.** F58b's
+false value was silently discarded and nothing downstream ever showed it; this one
+is a live landmine that is correct only because the overwrite is unconditional. The
+comment is the whole of the guarantee.
+
+**The fix is the same shape and it is a narrower type**: the fields the registry owns
+do not belong in what a caller constructs. `Omit<RenderContext, "measureChild" |
+"renderChild">` at the construction boundary makes supplying them fail to compile
+rather than fail to matter — which is exactly F58b's disposition, and the second
+instance is what says it generalises beyond the adapter surface.
+
+Two independent consumers is this project's threshold for a shape being real.
+
+---
+
+## F86 — F79 named a mechanism it did not measure ★★
+
+F79 recorded that `tools/screen.py` mis-rendered a build step, quoting the raw bytes,
+and proposed a cause:
+
+> the `OSC` substitution runs first over the whole stream and an unterminated `\x1b]`
+> anywhere will consume an arbitrary span
+
+**Measured against the tool, which is unchanged since before F79 was filed:**
+
+| input | rendered |
+|---|---|
+| the exact quoted bytes, alone | **correctly** — `[3/3] RUN sleep 2 && echo two > /two` |
+| an unterminated `\x1b]0;docker-tui` earlier in the stream | the SGR line **still correct**; the OSC leaks as visible text |
+
+```python
+OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+```
+
+**The pattern is anchored to a terminator, so an unterminated OSC matches nothing and
+consumes nothing** — the opposite of the proposed mechanism. `[^\x07\x1b]*` cannot
+cross an ESC either, so the span it can eat is bounded by the next escape in any case.
+
+**Two results, and they point in different directions:**
+
+1. **F79's symptom is not reproducible at HEAD** from the bytes it recorded. It was
+   real — the bytes are quoted and the frame was read — but the cause is unestablished
+   and the reproducer in the finding does not reproduce it.
+2. **A different, real `screen.py` defect exists**: an unterminated OSC is printed as
+   text rather than consumed, so a title-set sequence appears in a frame as
+   `0;docker-tui`. That is a corruption of exactly the kind F79 argues about, arrived
+   at from the other end.
+
+**This is the sixth blind spot inside the finding that founded the instrument group.**
+F79's own text says *"when a frame shows something surprising, read the raw bytes
+before believing the render"* — and then names a mechanism without running it. A
+hypothesis in a finding reads exactly like a measurement in a finding, which is the
+whole of F58 and F66 restated.
+
+**It also prices the group's disposition.** *Every instrument gets a fixture it must
+reproduce* is not a tidying exercise: the two commands above are the entire cost, and
+they turn one unreproducible anecdote into one falsified mechanism and one reproducible
+defect. Neither was available while the tool had no fixture.
