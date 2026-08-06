@@ -278,6 +278,20 @@ Each of these produces code that compiles, passes review, and is wrong.
   see it. **Read the abstract against its own section before reading the section against
   the code.**
 
+- **A citation reads as coverage, and that is how a finding gets planned once and fixed
+  never.** The sibling of the rule above, and it fails in the other direction: not a claim
+  weakened by compression, but a *reference* mistaken for a *disposition*. Roadmap entry 38
+  quotes F50 — *a column with no `flex` gets its minimum and nothing more* — as the precedent
+  its width fractions should follow, and fixes nothing about C11's columns. A partition
+  reading generously drops it; a reader skimming for coverage sees the number and moves on.
+
+  **So the test is never *does this mention the finding*. It is *would landing this close
+  it*** — and the three answers are **closes**, **reframes** (the entry restates it as a
+  question still owed) and **partial** (some instances, not the class). Only the first
+  removes it from the remainder, and the residue is named in the other two.
+  `CALCIUM_GAP_PLAN.md` is that test run over 51 entries: three that read as fixes are
+  questions, and **six findings of fifty-four are closed by a document citing twenty-four.**
+
 - **Where the findings actually came from, measured over one step.** Eleven findings across
   docker-tui's step 8, and **not one came from a test written to look for it**:
 
