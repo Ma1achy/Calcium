@@ -6,7 +6,7 @@ import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 
 describe("C09 §6 — the registry's transition table", () => {
@@ -309,6 +309,80 @@ describe("C09 §6 — kinds", () => {
     expect(header, "both of them").toMatch(/\bb\b/);
     expect(header, "and not directional ones").not.toContain("before");
     expect(header, "either of them").not.toContain("after");
+  });
+
+  it("T1.4c (C04 I35, C04 I36): the change axis is a marker, and it survives one bit", () => {
+    // **The ruling's whole content, asserted where it is decidable.** C04 I35 says a
+    // categorical axis is carried by a marker and only *emphasised* by a tone.
+    // The check that it holds is not that the marker is drawn — it is that
+    // nothing is lost when the colour goes, so both depths are rendered and the
+    // markers compared.
+    //
+    // Read off a frame rather than off `CHANGE_MARKERS`, because a test that
+    // reads the renderer's own table agrees with it by construction.
+    const changed = block({
+      kind: "comparison",
+      id: "c",
+      rows: [
+        { field: "image", a: "nginx:1.2", b: "nginx:1.3", change: "changed" },
+        { field: "env.NEW", a: "", b: "on", change: "added" },
+        { field: "env.OLD", a: "off", b: "", change: "removed" },
+        { field: "ports", a: "80", b: "80", change: "unchanged" },
+      ],
+    });
+
+    const full = measurable().renderToLines(changed, 56).map(visible);
+    const mono = measurable({ capabilities: MONO_CAPS }).renderToLines(changed, 56).map(visible);
+
+    // Right-trimmed on both sides: at one bit a run of trailing spaces carries
+    // no background and is dropped, which is a difference about padding rather
+    // than about meaning. Comparing raw made this row fail for the one reason
+    // it is not testing.
+    expect(mono.map((l) => l.trimEnd()), "the axis is not carried by colour").toEqual(
+      full.map((l) => l.trimEnd()),
+    );
+    expect(full[1]?.startsWith("~"), "changed").toBe(true);
+    expect(full[2]?.startsWith("+"), "added — the member F30 had nowhere to put").toBe(true);
+    expect(full[3]?.startsWith("-"), "removed").toBe(true);
+    expect(full[4]?.startsWith(" "), "unchanged is blank, not a fourth mark").toBe(true);
+  });
+
+  it("T1.4e (C04 I35, F51): an event's tone reaches the paint, and the word survives without it", () => {
+    // **Added because the mutation pass found nothing to kill.** Removing
+    // `event.tone ?? ` from the renderer left 33 rows green: the field was in
+    // the type, the builder and the D29 sweep, and no row asserted that
+    // anything painted it. A checker that inspects a document agrees with the
+    // document, not with the screen.
+    const events = (tone?: "error") =>
+      block({
+        kind: "events",
+        id: "e",
+        events: [{ ts: "12:00:01", type: "die", message: "exit 137", ...(tone ? { tone } : {}) }],
+      });
+
+    const kit = measurable();
+    const toned = kit.renderToLines(events("error"), 60);
+    const plain = kit.renderToLines(events(), 60);
+
+    // Raw, not `visible` — the difference under test is the escape sequence.
+    expect(toned, "the tone changes what is emitted").not.toEqual(plain);
+    expect(toned.map(visible), "and changes nothing about the text").toEqual(plain.map(visible));
+
+    // D29's half: the type word is on screen either way, so the colour
+    // emphasises rather than carries (C04 I35).
+    expect(visible(toned[0] ?? "")).toContain("die");
+  });
+
+  it("T1.4d (C04 I36): a block using only the verdict half renders as it did before the split", () => {
+    // **The regression the split could most easily have caused.** The marker
+    // column is per-block, so a comparison that declares no change must be
+    // untouched — and every shipped consumer of this kind is one, which is why
+    // the suite stayed green through a layout change and why this row exists.
+    const kit = measurable();
+    const lines = kit.renderToLines(ONE_PER_KIND.comparison, 56).map(visible);
+
+    expect(lines[0]?.startsWith("field"), "no marker column, no leading pad").toBe(true);
+    for (const l of lines) expect(l, "and the width is unchanged").toHaveLength(56);
   });
 
   it("T1.12b (I5): under ASCII every glyph is one cell and the row count is unchanged", () => {

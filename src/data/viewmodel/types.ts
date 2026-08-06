@@ -314,7 +314,21 @@ export type Logs = Readonly<{
 export type Events = Readonly<{
   kind: "events";
   id: string;
-  events: readonly Readonly<{ ts: string; type: string; message: string }>[];
+  /**
+   * `tone` is optional here and absent from `Logs` on purpose (I35, F51).
+   *
+   * A fixed vocabulary the renderer knows needs no field — `logs` has levels,
+   * and `levelTone` maps them. A container's actions are open-ended, so no
+   * renderer can know whether `die` outranks `start`, and the producer that
+   * does is the only one able to say. The two kinds differ because their
+   * vocabularies differ, which is the consistent rule rather than a breach of
+   * one: `/events` painted every type `accent`, so a `die · exit 137` read as
+   * a `start`.
+   *
+   * The `type` column carries the word regardless, so the tone emphasises and
+   * never carries alone (D29).
+   */
+  events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
 }> & Gap;
 
 export type Series = Readonly<{
@@ -376,7 +390,17 @@ export type Comparison = Readonly<{
     field: string;
     a: string;
     b: string;
-    comparison?: "same" | "better" | "worse" | "changed";
+    /**
+     * The change axis — neutral, and carried by a marker (I35, I36).
+     *
+     * Split from the old single `comparison` union because the renderer had
+     * already split it: `comparisonTone` coloured `better`/`worse` and left
+     * `same`/`changed` at `muted`/`default`. One union naming two axes that
+     * render differently is why `added` and `removed` had nowhere to go (F30).
+     */
+    change?: "unchanged" | "changed" | "added" | "removed";
+    /** The judgement axis, and the only half that takes a colour. */
+    verdict?: "better" | "worse";
   }>[];
 }> & Gap;
 

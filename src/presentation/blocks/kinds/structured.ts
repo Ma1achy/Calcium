@@ -161,7 +161,10 @@ export const eventsDefinition: BlockDefinition<Events> = {
             [
               { text: ts, style: tone("meta", ctx.theme, ctx.capabilities) },
               { text: " ".repeat(COLUMN_GAP) },
-              { text: type, style: tone("accent", ctx.theme, ctx.capabilities) },
+              // `accent` when the producer says nothing — the behaviour before
+              // the field existed, so an app that does not set it sees no
+              // change (C04 I35, F51).
+              { text: type, style: tone(event.tone ?? "accent", ctx.theme, ctx.capabilities) },
               { text: " ".repeat(COLUMN_GAP) },
               {
                 text: truncate(stripControl(event.message), room, ctx.capabilities),
@@ -179,19 +182,36 @@ export const eventsDefinition: BlockDefinition<Events> = {
 
 // --- diff ------------------------------------------------------------------
 
-/** A comparison's tone. `changed` is deliberately neutral: it is not a verdict. */
-function comparisonTone(comparison: string | undefined): Tone {
-  switch (comparison) {
+/**
+ * The judgement half, and the only half that takes a colour (C04 I36).
+ *
+ * The change half is rendered by {@link CHANGE_MARKERS} instead — it was always
+ * neutral here (`same`→`muted`, `changed`→`default`), which is the renderer
+ * having split the union before the type did.
+ */
+function verdictTone(verdict: "better" | "worse" | undefined): Tone {
+  switch (verdict) {
     case "better":
       return "ok";
     case "worse":
       return "error";
-    case "same":
-      return "muted";
     default:
       return "default";
   }
 }
+
+/**
+ * The change axis, carried without colour (C04 I35).
+ *
+ * The same construction as `patch`'s `MARKERS` and for the same reason: at
+ * `colourDepth: 1` the marker is all that is left, so the distinction survives
+ * by construction rather than by a lint.
+ */
+const CHANGE_MARKERS: Readonly<Record<"unchanged" | "changed" | "added" | "removed", string>> =
+  Object.freeze({ unchanged: " ", changed: "~", added: "+", removed: "-" });
+
+/** The marker column's width, or 0 when no row in the block declares a change. */
+const MARKER_WIDTH = 2;
 
 export const comparisonDefinition: BlockDefinition<Comparison> = {
   kind: "comparison",
@@ -203,14 +223,20 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
 
   render(block: Comparison, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
+    // The marker column appears only when a row declares a change, so a block
+    // that uses the verdict half alone renders exactly as it did before the
+    // split. Per-block and deterministic: every row of one block agrees, which
+    // is what keeps the field column aligned.
+    const marked = block.rows.some((r) => r.change !== undefined) ? MARKER_WIDTH : 0;
     // Three equal columns (§3), the residual going to the field name.
-    const column = Math.max(1, Math.floor((width - COLUMN_GAP * 2) / 3));
-    const fieldWidth = Math.max(1, width - column * 2 - COLUMN_GAP * 2);
+    const column = Math.max(1, Math.floor((width - COLUMN_GAP * 2 - marked) / 3));
+    const fieldWidth = Math.max(1, width - marked - column * 2 - COLUMN_GAP * 2);
 
     const dim = tone("dim", ctx.theme, ctx.capabilities);
     const header = paint(
       clampSpans(
         [
+          ...(marked > 0 ? [{ text: " ".repeat(marked) }] : []),
           { text: pad("field", fieldWidth), style: dim },
           { text: " ".repeat(COLUMN_GAP) },
           // **`a` and `b`, not `before` and `after`** — the rename's ruling,
@@ -232,6 +258,14 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
       paint(
         clampSpans(
           [
+            ...(marked > 0
+              ? [
+                  {
+                    text: pad(CHANGE_MARKERS[entry.change ?? "unchanged"], marked),
+                    style: tone("muted", ctx.theme, ctx.capabilities),
+                  },
+                ]
+              : []),
             {
               text: pad(
                 truncate(stripControl(entry.field), fieldWidth, ctx.capabilities),
@@ -247,7 +281,7 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
             { text: " ".repeat(COLUMN_GAP) },
             {
               text: pad(truncate(stripControl(entry.b), column, ctx.capabilities), column),
-              style: tone(comparisonTone(entry.comparison), ctx.theme, ctx.capabilities),
+              style: tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities),
             },
           ],
           width,

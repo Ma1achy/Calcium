@@ -206,7 +206,13 @@ const row = (field: string, a: string | null, bb: string | null): ComparisonRow 
   field,
   a: a ?? NONE,
   b: bb ?? NONE,
-  comparison: a === bb ? "same" : "changed",
+  // **The two members F30 asked for, now that they exist.** This row said
+  // `changed` for a field the container adds and for one it drops, because the
+  // union had nowhere else to put them — the finding's own words were *absence
+  // goes in the data*, which left `—` in a cell and the verdict silent about
+  // which side was missing. The marker now says it (C04 I35, I36).
+  change:
+    a === bb ? "unchanged" : a === null ? "added" : bb === null ? "removed" : "changed",
 });
 
 /**
@@ -246,7 +252,7 @@ export function rowsFor(field: Field, imageSide: Insp | null, containerSide: Ins
     // The tally, and it is not decoration: without it a container identical to
     // its image renders nothing for this field at all, and nothing reads exactly
     // like a lookup that failed.
-    out.push({ field: field.label, a: `${String(identical)} identical`, b: "", comparison: "same" });
+    out.push({ field: field.label, a: `${String(identical)} identical`, b: "", change: "unchanged" });
   }
   return out;
 }

@@ -93,6 +93,20 @@ renders `changed` with the absent side as `—`.
 it sorts and truncates as part of the name. The em dash is already how every other block in
 this app says *nothing here*.
 
+> **Superseded — the first sentence was the premise, and it expired.** C04 I35/I36 split
+> `Comparison`'s union into a change axis and a judgement axis, and `added`/`removed` are
+> members of the neutral half (FINDINGS F30, closed). This walk is one of the four surfaces
+> that produced that ruling, so it is the first to collect on it: a one-sided key now renders
+> `added` or `removed`, marked `+` or `-` in the block's own column.
+>
+> **The second half of the ruling stands unchanged and is why the remedy is a marker rather
+> than a label.** No verdict rides in a `field` label; the test still asserts it over every
+> row. The em dash also stays — absence is still in the data, and the marker now says which
+> side is absent instead of leaving the reader to infer it from which cell is empty.
+>
+> **`env LOG_LEVEL` moves with it**: the container sets it and the image does not, which is
+> an addition and was called a change because nothing else was available to call it.
+
 ### B3 · the ports row, and why no walk of `Config` reaches it — R5
 
 ```

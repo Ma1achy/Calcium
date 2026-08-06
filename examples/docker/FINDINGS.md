@@ -4097,3 +4097,100 @@ sentence.
 how it stayed invisible: **a pattern with three implementations and no name reads as three
 local decisions**, and a fourth surface has nothing to search for. `levelTone` and
 `comparisonTone` sit forty lines apart.
+
+---
+
+## F104 — `block()` is transparent to excess properties, so every C04 narrowing lands unenforced ★★★
+
+C04 commitment 29: *"C04's constructors enforce the shape invariants and C24's `b` delegates
+to them. One enforcement point."* The signature is
+
+```ts
+export function block<B extends Block>(spec: B): B
+```
+
+and **`B` is inferred from the argument**, so the literal's own type *becomes* `B`. There is
+no fresh-literal check against `Block`, because nothing is ever checked against `Block` — the
+constraint is satisfied structurally by a type that already has the extra keys.
+
+**Verified by fabricated violation:**
+
+```ts
+block({ kind: "rule", id: "r", label: "x", utterGarbage: 42, anotherOne: { deeply: "wrong" } });
+// tsc --noEmit: zero errors
+```
+
+**How it was found, and it is the more useful half.** Splitting `Comparison`'s verdict union
+(F30) removed the field `comparison` from the type. `tsc` came back clean across `src`,
+`test` and `tools` — 175 files — with **eleven fixtures still supplying `comparison: "same"`**.
+A narrowing that removes a field from a public type should break every producer of it, and it
+broke none, because all eleven go through `block()`.
+
+**This is F85 and F58b's class arriving in the framework's own constructor**, and it is worse
+than either: those were single boundaries with a stub or an overwrite behind them, and this is
+the boundary *every* block passes through. Both suites were green either side, because a
+fixture carrying a dead key renders identically to one that does not.
+
+**The remedy has a precedent in the tree.** `ProducedMeta` makes forbidden keys unbuildable
+with `Partial<Record<Exclude<keyof T, K>, never>>`; the same idiom distributed over the union
+by `kind` would give `block()` the check its commitment claims. **Not attempted here** — the
+blast radius is every block literal in the tree and it is not this item's scope. Filed with
+the fabricated violation so the next narrowing does not repeat the measurement.
+
+**The generalisation, which is the fourth instance of one rule.** *A type narrowing needs
+something to bite on* — and the thing that removes the bite has now been, in order: a stub
+that throws, an unconditional overwrite, `as never` in a fixture, and **a generic constructor
+that infers its constraint instead of checking against it.** The first three were call sites.
+This one is shipped framework code sitting under all of them.
+
+---
+
+## F105 — MG24 matches member names globally, and a frozen marker table flipped two unrelated members ★★
+
+`CHANGE_MARKERS` in C09 was added with the keys `unchanged`, `changed`, `added`, `removed`.
+MG24's record arm counts `(?:^|[{,(\s])name\s*:` as a consumer, so `CorpusDiff.changed` and
+`CorpusDiff.removed` — dead members of C08's corpus diff, two layers away — read as consumed,
+and the bidirectional equality arm failed the build.
+
+**The arm was right and the consumer test was wrong**, which is the good half: an exemption
+that stops being true is exactly what that arm exists to catch, and it caught one within
+minutes of an unrelated table being added.
+
+**The obvious remedy was measured and is worse.** Scoping the shorthand match to files that
+also name the owning type — a file building a `CorpusDiff` surely writes `CorpusDiff` — was
+implemented and produced **19 new violations**, and they share one shape:
+
+```
+ConstructDeps.repaint · KeyDeps.anchor · RefreshDeps.viewBlock · ActionDeps.pushView
+```
+
+A `*Deps` record is built inline at a call site whose type comes from the callee's signature
+and **is never written down**. That is the dominant legitimate use of the record arm, so the
+scoping trades one false consumer for nineteen false violations. Reverted, and the figure is
+recorded in the rule so the next person does not re-derive it.
+
+**What was done instead**: the two `CorpusDiff` entries left `UNCONSUMED_MEMBERS` with the
+reason in a comment. They are still genuinely unconsumed; if the collision ever goes, MG24
+fires again and they come back — the entry re-earning its place rather than outliving its
+reason.
+
+**The residue, stated rather than left implied.** MG24's subject is a *name*, not an
+`owner.name`, and no regex over stripped source can close that. F94 already says the rule is
+textual; this is the first measured instance of the collision, and it went in the direction
+nobody expected — a false *consumer*, silently weakening the rule, surfaced only because a
+second arm disagreed with the first.
+
+---
+
+## F37 confirmed at a cost — an app cannot read the frame of a block it just built
+
+Not a new finding; a measurement against an existing one. The change axis' first consumer is
+`/drift`, and reading its rendered block from the app took **four attempts, each blocked by a
+different unexported symbol**: `renderToLines`, `block`, `resolveTheme`, then the theme store's
+shape. Abandoned, and the marker column was read from the framework's own harness instead.
+
+`test/verbs.test.ts` already records the workaround as a decision — *"what a `Table` row
+carries is a complete description of what will be drawn"* — and for a table that is true. It
+is **not** true for the change axis, whose whole content is a marker the renderer derives: the
+rows say `added` and only the frame says `+`. So F37's cost has risen from ergonomic to
+evidential, and the app's own drift tests now assert a value whose rendering they cannot see.

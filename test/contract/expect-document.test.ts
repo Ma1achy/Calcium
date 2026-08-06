@@ -222,6 +222,55 @@ describe("C24 §7 — expectDocument", () => {
     );
   });
 
+  it("T2.13c (C04 I37): an exemption whose premise has expired fails, not passes", () => {
+    // **The half T2.13b cannot reach, and it is the one that fired.** That row
+    // catches a kind the sweep has never heard of. It cannot catch a kind it
+    // knows, exempted on the premise that it carries nothing meaning-bearing,
+    // that has since grown a field — because the set was keyed by *kind*, and
+    // membership was earned once by the fields the kind had that day.
+    //
+    // `events` is the measured instance: it gained a `tone` for F51 and the
+    // exemption did not notice. Verified by fabricated violation before the fix
+    // existed — a bare `error`-toned event passed a sweep whose other four arms
+    // throw on exactly that shape (FINDINGS F102).
+    //
+    // The subject here is a kind still listed under the `no-field` premise, so
+    // the row keeps its teeth after `events` moved out.
+    const contradiction = {
+      kind: "tip",
+      id: "t1",
+      text: "x",
+      tone: "error",
+    } as unknown as Block;
+
+    expect(() => expectDocument(doc({ blocks: [contradiction] })).hasNoColourOnlyDistinction())
+      .toThrow(/premise has expired/u);
+  });
+
+  it("T2.13d (C04 I35, F51): a toned event with no word is caught; with one it passes", () => {
+    // `events` left the exemption when it gained the field, which is the point
+    // of the premise check above. This is the arm it landed in.
+    const bare = block({
+      kind: "events",
+      id: "e1",
+      events: [{ ts: "12:00:01", type: "", message: "", tone: "error" }],
+    });
+    expect(() => expectDocument(doc({ blocks: [bare] })).hasNoColourOnlyDistinction()).toThrow(
+      /empty type/u,
+    );
+
+    // The real shape: `die` is printed in the type column, so the tone
+    // emphasises a word rather than replacing one.
+    const worded = block({
+      kind: "events",
+      id: "e2",
+      events: [{ ts: "12:00:01", type: "die", message: "exit 137", tone: "error" }],
+    });
+    expect(() =>
+      expectDocument(doc({ blocks: [worded] })).hasNoColourOnlyDistinction(),
+    ).not.toThrow();
+  });
+
   it("hasNoColourOnlyDistinction walks into panels, groups and expanded rows", () => {
     // A container that did not recurse would pass every document whose only
     // offence is nested — which is most real ones, since a detail row is where

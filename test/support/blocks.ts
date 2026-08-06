@@ -95,7 +95,7 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
   comparison: block({
     kind: "comparison",
     id: "comparison-1",
-    rows: [{ field: "p99", a: "120ms", b: "98ms", comparison: "better" }],
+    rows: [{ field: "p99", a: "120ms", b: "98ms", verdict: "better" }],
   }),
 
   patch: block({

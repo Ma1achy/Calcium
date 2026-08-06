@@ -96,8 +96,14 @@ export type StepInput = Readonly<{
 /** A log line, exactly as the block carries it (§4). */
 export type LogLine = Readonly<{ ts: string; level: string; message: string }>;
 
-/** An event line, exactly as the block carries it (§4). */
-export type EventLine = Readonly<{ ts: string; type: string; message: string }>;
+/**
+ * An event line, exactly as the block carries it (§4).
+ *
+ * **`tone` is here and absent from `LogLine`** — a fixed vocabulary the renderer
+ * knows needs no field, and an open one does (C04 I35, F51). `levelTone` maps a
+ * log level; nothing can map a container's actions.
+ */
+export type EventLine = Readonly<{ ts: string; type: string; message: string; tone?: Tone }>;
 
 /** A chip for `b.pills` (§4). */
 export type ChipInput = Readonly<{
@@ -107,12 +113,13 @@ export type ChipInput = Readonly<{
   active?: boolean;
 }>;
 
-/** A row for `b.comparison` (§4). */
+/** A row for `b.comparison` (§4). Two axes, never one (C04 I36). */
 export type ComparisonRow = Readonly<{
   field: string;
   a: string;
   b: string;
-  comparison?: "same" | "better" | "worse" | "changed";
+  change?: "unchanged" | "changed" | "added" | "removed";
+  verdict?: "better" | "worse";
 }>;
 
 /** Re-exported for the builders' own signatures; C04 owns them. */

@@ -61,7 +61,7 @@ describe("the field map", () => {
     // reporting drift on a container that has drifted in no way.
     const rows = driftRows(IMAGE, CONTAINER);
     expect(rows.map((r) => r.field)).not.toContain("user");
-    expect(rows.filter((r) => r.comparison === "changed").map((r) => r.field)).not.toContain(
+    expect(rows.filter((r) => r.change === "changed").map((r) => r.field)).not.toContain(
       "user",
     );
   });
@@ -77,7 +77,7 @@ describe("the field map", () => {
     const row = find(driftRows(IMAGE, CONTAINER), "ports 80/tcp");
     expect(row?.a, "the image declares the port").toBe("exposed");
     expect(row?.b, "the container publishes it").toContain("8080");
-    expect(row?.comparison).toBe("changed");
+    expect(row?.change).toBe("changed");
   });
 
   it("N3 (walk B5): a field neither side has is omitted, and the tally does not count it", () => {
@@ -97,22 +97,30 @@ describe("the field map", () => {
     const rows = driftRows(IMAGE, CONTAINER);
     const envRows = rows.filter((r) => String(r.field).startsWith("env"));
 
-    // Measured on this pair: one variable differs, seven agree.
-    expect(envRows.filter((r) => r.comparison === "changed")).toHaveLength(1);
+    // Measured on this pair: one variable is set by the container and not the
+    // image, and seven agree. It read as `changed` until C04 I36 gave the axis
+    // a member for it (F30) — a container-only variable is an addition.
+    expect(envRows.filter((r) => r.change === "added")).toHaveLength(1);
+    expect(envRows.filter((r) => r.change === "changed"), "and nothing is a two-sided change").toHaveLength(0);
     expect(find(rows, "env LOG_LEVEL")?.b).toBe("info");
     expect(find(rows, "env")?.a).toBe("7 identical");
     // The whole point of the ruling: the one that moved is not buried.
     expect(envRows).toHaveLength(2);
   });
 
-  it("N5 (walk B2): a one-sided key is `changed` with an em dash, never a verdict in the label", () => {
-    // `Comparison`'s union has no `added`/`removed`, so absence lives in the
-    // data. Encoding it in the field label would put a verdict in the column
-    // that names the field, where it sorts and truncates as part of the name.
+  it("N5 (walk B2, revised): a one-sided key is `added`/`removed`, never a verdict in the label", () => {
+    // **B2's first sentence was its premise and it expired.** The ruling read
+    // *`Comparison` has no `added`/`removed`, so absence lives in the data* —
+    // and C04 I36 split the union, putting both in the neutral half (F30).
+    //
+    // Its second half is untouched and is why the remedy is a marker rather
+    // than a label: a verdict in the `field` column sorts and truncates as part
+    // of the name. The em dash stays too — the marker says *which* side is
+    // absent, which the reader previously had to infer from the empty cell.
     const row = find(driftRows(IMAGE, CONTAINER), "mounts /data");
-    expect(row?.a, "absent side is an em dash").toBe("—");
+    expect(row?.a, "absent side is still an em dash").toBe("—");
     expect(row?.b).toContain("/tmp");
-    expect(row?.comparison).toBe("changed");
+    expect(row?.change, "and the axis now names which side").toBe("added");
     for (const r of driftRows(IMAGE, CONTAINER)) {
       expect(String(r.field), "no verdict rides in a field label").not.toMatch(
         /added|removed|changed/u,
@@ -142,7 +150,7 @@ describe("the field map", () => {
     // comparison reads exactly like a lookup that failed.
     const rows = driftRows(IMAGE, PLAIN);
     expect(rows.length, "an undrifted container still fills the block").toBeGreaterThan(0);
-    expect(rows.filter((r) => r.comparison !== "same"), "and nothing reads as drift").toEqual([]);
+    expect(rows.filter((r) => r.change !== "unchanged"), "and nothing reads as drift").toEqual([]);
     // Every tally arm is exercised by this one container.
     expect(rows.map((r) => r.a)).toContain("7 identical");
     expect(rows.map((r) => r.field)).toContain("ports");
@@ -217,10 +225,10 @@ describe("the verbs", () => {
     // `/compare` is cheap once the map exists: both sides read
     // `HostConfig.PortBindings`, so an identical pair shows no port drift.
     const rows = compareRows(CONTAINER, CONTAINER);
-    expect(rows.every((r) => r.comparison === "same")).toBe(true);
+    expect(rows.every((r) => r.change === "unchanged")).toBe(true);
 
     const drifted = driftRows(IMAGE, CONTAINER);
-    expect(find(drifted, "ports 80/tcp")?.comparison, "where /drift does see it").toBe("changed");
+    expect(find(drifted, "ports 80/tcp")?.change, "where /drift does see it").toBe("changed");
   });
 
   it("N12: /compare refuses a missing container by name", async () => {
@@ -239,6 +247,6 @@ describe("rowsFor", () => {
     const field = FIELDS.find((f) => f.label === "entrypoint");
     const rows = rowsFor(field as never, IMAGE, CONTAINER);
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.comparison).toBe("same");
+    expect(rows[0]?.change).toBe("unchanged");
   });
 });

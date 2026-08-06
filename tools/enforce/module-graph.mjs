@@ -981,8 +981,11 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Delta.after": "C08 — a fixture diff's new value; `test/unit/fixtures.test.ts` asserts pairs",
   "FixtureDiff.deltas": "C08 — the diff's payload, read by the corpus tests",
   "CorpusDiff.matched": "C08 — corpus comparison tally, asserted by the corpus tests",
-  "CorpusDiff.changed": "C08 — as `matched`",
-  "CorpusDiff.removed": "C08 — as `matched`",
+  // `CorpusDiff.changed` and `.removed` were here and are gone: `CHANGE_MARKERS`
+  // in C09 has keys of both names, so this rule now reads them as consumed
+  // (F105 — a name collision, not wiring). They remain genuinely unconsumed.
+  // If the collision goes, MG24 fires again and they come back, which is the
+  // entry re-earning its place rather than outliving its reason.
   "CorpusDiff.deltaCount": "C08 — as `matched`",
   "FixtureHandlerOptions.world": "C08 — the world a fixture handler runs against; `tools/` supplies it",
   "ProvenanceProblem.fixtureId": "C08 — which fixture a provenance problem names, asserted in test",
@@ -1184,6 +1187,18 @@ export function checkSeamConsumers(
     // interface members made four allow-listed entries read as consumed, which
     // the equality arm caught immediately. One test each, matched to how the
     // keyword is actually used.
+    // **The looseness above has a measured instance and no cheap remedy
+    // (F105).** A frozen marker table gained the keys `changed` and `removed`,
+    // and two unrelated `CorpusDiff` members read as consumed — a name
+    // collision, since this test matches names and not owners. The equality arm
+    // caught it, which is the arm working.
+    //
+    // **Scoping the shorthand half to files that name the owner was tried and
+    // is worse**: 19 new violations, and the pattern they share is the one this
+    // arm exists for — a `*Deps` record built inline at a call site whose type
+    // comes from the callee's signature and is never written down.
+    // `ConstructDeps.repaint`, `KeyDeps.anchor`, `RefreshDeps.viewBlock`. The
+    // obvious fix trades one false consumer for nineteen false violations.
     const consumer = record
       ? new RegExp(`[.?]\\s*${name}\\b|(?:^|[{,(\\s])${name}\\s*:`, "m")
       : new RegExp(`[.?]\\s*${name}\\b`);
