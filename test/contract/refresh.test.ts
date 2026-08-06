@@ -76,9 +76,14 @@ function harness() {
       );
       return true;
     },
-    viewBlock: (id, blockId) => {
+    // **This double reproduced the defect it was standing in for** (F22). It
+    // returned the panel's child, exactly as production did, so no row here
+    // could have seen that the view arm was rebuilding the panel and losing
+    // `gapBefore` — a fake narrower than the interface cannot fail on the
+    // difference, and this one was not narrower, it was wrong in the same way.
+    viewPanel: (id, blockId) => {
       const found = views.get(id)?.find((b) => b.id === blockId);
-      return found !== undefined && found.kind === "panel" ? (found.children[0] ?? null) : null;
+      return found !== undefined && found.kind === "panel" ? found : null;
     },
   });
 
@@ -537,6 +542,35 @@ describe("C23 §3b — part refresh", () => {
     expect(order).toEqual(["a", "b"]);
     await h.tick(10_000);
     expect(order).toEqual(["a", "b", "c"]);
+  });
+
+  it("T4.21b (C24 I12, F22): the view arm carries gapBefore, as the entry arm does", async () => {
+    // **T1.35b's property, on the arm that could not hold it.** That row asserts
+    // a refresh keeps the declared block's `gapBefore` and it drives a
+    // *transcript entry*, where `currentPanel` reads the real block. The view
+    // arm reconstructed the panel through `livePanel`, which sets no gap — so
+    // `existing?.gapBefore === true` was structurally false here and only here,
+    // and C24 I12 says `b.live` behaves identically in both.
+    //
+    // **Neither half of the suite could see it**: this file's `viewPanel` double
+    // and `document-view.test.ts`'s both returned the panel's child, reproducing
+    // the production defect rather than standing in for the interface. A fake
+    // that is wrong in the same way as the code cannot fail on the difference.
+    const h = harness();
+    const declared = { ...panel("p", "panel", raw("p-c", "…")), gapBefore: true } as Block;
+    h.views.set("dash", [declared]);
+
+    h.driver.declare({ kind: "view", id: "dash" }, [part({ id: "p" })]);
+    await h.tick();
+
+    const after = h.views.get("dash")?.find((b) => b.id === "p");
+    // The control first: a refresh that did not happen satisfies the claim below
+    // by leaving the declared block in place, gap and all.
+    expect(
+      after?.kind === "panel" && after.children[0]?.kind === "raw" && after.children[0].text,
+      "the control: it really did refresh",
+    ).toBe("ok");
+    expect(after?.gapBefore, "and the rhythm survived the replacement").toBe(true);
   });
 
   it("T4.21 (C24 I12): a pushed view is driven by the same loop, and release stops it", async () => {

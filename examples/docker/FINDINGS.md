@@ -4426,3 +4426,123 @@ fired both would satisfy the positive one.
 ruling of the form *the Nth of a collection* needs a fixture with at least two members and an
 assertion about the ones not chosen. Neither a sequence trace nor a classification table
 indexes that: it is not two rules meeting, it is one rule with a degenerate input.
+
+---
+
+## F114 — the builder-coverage rule already existed, correctly stated, with nothing reading it ★★★
+
+The audit was scoped as *four fields added one at a time closes four findings and leaves the
+fifth to be discovered*, and the rule was to be the deliverable. **The rule turned out to be
+already written, twice, and to have been true and unread for as long as it had existed.**
+
+C24 I18, in the tree before this pass:
+
+> A builder narrower than its block is **either a ruling with a reason written down or a
+> defect; there is no third state**, and the reason is what tells them apart.
+
+And commitment 16 says the same thing. Both correct, both general, both stating exactly the
+rule this item was asked to produce — and underneath them:
+
+| kind | field | disposition |
+|---|---|---|
+| `patch` | `collapsedAfter` | filed as F41 by a consumer who wanted it |
+| `patch` | `actions` | **absent and unnoticed** |
+| `table` | `sort` | **absent and unnoticed** |
+| `plot` | `yFormat`, `xLabels`, `emptyMessage` | deliberately not, reason recorded — the model working |
+
+**Two of six were the third column**, which is what an audit produces and four fixes cannot.
+Both had been walked past: `patch` was audited by hand when `collapsedAfter` was filed, and
+`table` is the most-used builder in the tree.
+
+**`table.sort` is the instructive one.** `ColumnDef.sortable` is reachable from `b.col`, so a
+surface can mark a column sortable and cannot say which one the data arrived sorted on. **The
+pair reads as covered because half of it is** — a reader checking *can this table express
+sorting* finds `sortable` and stops.
+
+**So the deliverable is the mechanism, and the finding is that the prose was never the gap.**
+MG27 compares every block type's fields against the builder that constructs it, with reasons
+in `BUILDER_OMISSIONS` keyed `Kind.field` and the bidirectional arm `UNCONSUMED_MEMBERS` has.
+It fired three violations on the run that created it.
+
+**This is C09 §4a's lesson arriving in the document that states the lesson.** A rule with
+nothing reading it passes exactly like a rule that is satisfied — A03 §2's vacuity class,
+applied not to a rule with no subject but to a *correct* rule with no reader. The instrument
+that finds the first kind is `make enforce`; the instrument that finds this one is asking
+**which mechanism reads this sentence**, and the answer had been *none* for twenty-four
+components.
+
+**Two parsing corrections before the rule was trustworthy**, both of which produced false rows
+on the first run and both worth recording because a rule that over-reports is not a rule
+anyone keeps. `Hunk.lines[].kind` is `"add" | "remove" | "context"`, so scanning for a
+`kind: "x"` literal invented three block kinds that do not exist — the `Block` union is the
+authority. And `export type Rule = Readonly<{ … }> & Gap;` is one line, which a body regex
+written for the multi-line form read straight past, attributing `Notice`'s fields to `Rule`.
+The first run reported 28 unreachable fields across 16 kinds; the true figure is **6 across 3**.
+
+---
+
+## F115 — the coverage rule was blind to its own findings regressing, and had documented why ★★★
+
+MG27's blind spots were written into A03 before the mutation pass ran, and the first of them
+reads:
+
+> It matches a field **name** in the builder's text, so a builder that mentions a field
+> without setting it counts as covering it.
+
+True, recorded, and its consequence not followed through. **A builder's text names a field
+three times** — in the spec parameter's type annotation, in the destructure, and in the
+constructed literal — and only the third sets anything. So deleting
+`...(sort === undefined ? {} : { sort })` left two mentions standing, and **MG27 stayed green
+on precisely the defect it had been written to find.**
+
+The rule would have reported its three gaps once, on the run that created it, and then gone
+blind to all three regressing. **A rule that fires once is indistinguishable from a rule that
+works**, and this one had a green run and three closed findings as its evidence.
+
+Fixed by scoping the search to the text from `finish<` onward — the annotation and the
+destructure are both above it, so the split needs no parser.
+
+**Recording a limit is not the same as following it through**, and that is the finding. The
+blind-spot list is written to satisfy *state a rule's blind spot*, and it did: the sentence is
+accurate. What it does not do is ask **what that limit means for the rule's own subject**, and
+here it meant the rule could not defend its own fixes. The instrument that asked was the
+mutation pass, and nothing else would have.
+
+## F116 — a mutation surviving located the guard, not a hole
+
+M20 and M21 — deleting `collapsedAfter` and `sort` from their builders — survived a `vitest`
+run and died under `make enforce`. Both readings were available and only one is right: the
+suite has no hole, MG27 is the guard, and **its only reader was a Makefile target.**
+
+That is worth a row rather than a shrug. `npm test` excludes tier 5 already, and a rule whose
+sole reader is `make enforce` is one a test-script refactor silences without failing anything.
+Every other MG rule with a real-tree arm has one in the suite — `MG19` in `process.test.ts`,
+`MG23` in `enforce-module-graph.test.ts` — and MG27 did not, because it was written straight
+into `checkModuleGraph` and inherited its wiring.
+
+Added, with the counters read rather than the exit status: the row asserts the violation list
+is empty **and** that both subject files are in the walked set, because a rule handed a file
+list missing `builders/index.ts` returns `[]` and passes.
+
+**The general form**: when a mutation survives, ask *which mechanism was supposed to catch
+this* before concluding the tests are thin. Three of this session's surviving mutations were
+missing assertions; this one was a correctly-guarded mechanism whose guard ran somewhere the
+mutation script did not look.
+
+## F117 — a blanket rename hit a rule id that was already taken, twice
+
+`MG26` was taken by the dev-only-entry-point rule and `C16 I24` by an existing invariant;
+both were chosen by writing *the next number after the one I had just read* rather than by
+reading the high-water mark. SP2 and A03's inventory caught both, which is those rules working.
+
+**The repair is where the finding is.** Renaming MG26 → MG27 with a blanket replace of
+`rule: "MG26"` also rewrote **the dev-entry rule's own emission**, so that rule started
+reporting itself as MG27 and its two fabricated violations failed with *"MG26 matched
+nothing — it would pass on a real violation"*. The rename fixing my rule broke a rule I had
+not touched.
+
+Same shape as this pass's own audit script, which invented three block kinds from a `kind:`
+literal before the `Block` union was made the authority: **a textual rewrite over a shared
+vocabulary hits every user of the token, and the ones you did not write are the ones you do
+not check.** The fabricated-violation rows are what found it, which is the third thing in this
+session that A03 commitment 14 has caught.

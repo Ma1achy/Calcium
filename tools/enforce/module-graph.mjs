@@ -35,7 +35,7 @@ export function componentOf(file) {
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -510,12 +510,171 @@ function checkForbiddenEdges(files, readFile) {
   return violations;
 }
 
+// --- MG27: a block field no builder can set -------------------------------
+
+/**
+ * **Every builder exposes what its block can express, or the reason is written
+ * down where this rule can find it** (C24 I18, FINDINGS F114).
+ *
+ * **The rule is not new here. Only the mechanism is.** C24 I18 already ends
+ * *"a builder narrower than its block is either a ruling with a reason written
+ * down or a defect; there is no third state"*, and commitment 16 restates it.
+ * Both were correct and nothing read them: `patch.collapsedAfter`,
+ * `patch.actions` and `table.sort` were unreachable underneath. That is C09
+ * §4a's lesson about prose, arriving in the document that states the lesson.
+ *
+ * The model was already in the tree twice before it was a rule. `b.plot` gained
+ * `yMin`/`yMax` and left `yFormat`, `xLabels` and `emptyMessage` out **with the
+ * reason recorded for each** — `percent` multiplies by 100 and a CLI's numbers
+ * are already percentages, `xLabels` is a fixed three-tuple that cannot hold a
+ * caption, no surface has an empty plot. That is a decision. The same omission
+ * with no reason is a gap the next consumer rediscovers, which is how
+ * `collapsedAfter` (F41) and `Hunk.collapsedBefore` were both found *after* the
+ * same builder had been audited by hand.
+ *
+ * **Prose is what no rule reads** — C09 §4a's lesson — so the reasons live in
+ * `BUILDER_OMISSIONS` below, keyed by `Kind.field`, and the bidirectional arm
+ * applies here exactly as it does to `UNCONSUMED_MEMBERS`: an entry naming a
+ * field the builder now sets is itself a violation.
+ *
+ * **The blind spot, stated because an unrecorded limit reads as strength.** This
+ * matches a field *name* in the builder's text, so a builder that mentions a
+ * field without setting it counts as covering it — the check is that the name
+ * is reachable, never that it is wired correctly. It also cannot see a field
+ * exposed with the wrong shape. Both are the frame-read's job, and neither is
+ * why a field goes missing: the measured cases are all a field nobody typed.
+ */
+export const BUILDER_OMISSIONS = Object.freeze({
+  "plot.yFormat":
+    "C24 §4 — `percent` multiplies by 100 and every far side that emits a percentage emits 84, not 0.84 (F31)",
+  "plot.xLabels":
+    "C24 §4 — a fixed three-tuple, and no surface has wanted one; a caption sentence does not fit it",
+  "plot.emptyMessage":
+    "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
+});
+
+/** `Kind.field` for every block field, and whether a builder mentions it. */
+export function checkBuilderCoverage(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  omissions = BUILDER_OMISSIONS,
+) {
+  const typesFile = files.find((f) => f.endsWith("src/data/viewmodel/types.ts"));
+  const buildersFile = files.find((f) => f.endsWith("src/shell/builders/index.ts"));
+  if (typesFile === undefined || buildersFile === undefined) return [];
+
+  const types = readFile(typesFile);
+  const builders = readFile(buildersFile);
+
+  // **The `Block` union is the authority, never a `kind: "x"` literal.** The
+  // first run of this scanned for the literal and invented three kinds:
+  // `Hunk.lines[].kind` is `"add" | "remove" | "context"`, which is a line's
+  // kind and not a block's (C04 I35's neighbour).
+  const union = /export type Block =\n([\s\S]*?);\n/u.exec(types);
+  if (union === null) return [];
+  const typeNames = [...union[1].matchAll(/\|\s*(\w+)/gu)].map((m) => m[1]);
+
+  const fieldsOf = (name) => {
+    // `export type Rule = Readonly<{ … }> & Gap;` is one line, and a body regex
+    // written for the multi-line form silently attributed a neighbour's fields
+    // to it. Non-greedy to the first closing brace at column 0, or the line's.
+    const m = new RegExp(`export type ${name} = Readonly<\\{([\\s\\S]*?)\\n?\\}>`, "u").exec(types);
+    if (m === null) return [];
+    let depth = 0;
+    const out = [];
+    for (const line of m[1].split("\n")) {
+      const atTop = depth === 0;
+      for (const ch of line) {
+        if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+        else if (ch === ")" || ch === "]" || ch === "}") depth -= 1;
+      }
+      const f = /^\s*(\w+)\??\s*:/u.exec(line);
+      if (f !== null && atTop && f[1] !== "kind" && f[1] !== "id") out.push(f[1]);
+    }
+    return out;
+  };
+
+  // Every builder returns through `finish`, which is where `gapBefore` is set,
+  // so its body is part of each builder's reachable surface.
+  const bodies = new Map();
+  const starts = [...builders.matchAll(/^function (\w+)/gmu)].map((m) => [m.index, m[1]]);
+  for (const [i, [pos, name]] of starts.entries()) {
+    const end = i + 1 < starts.length ? starts[i + 1][0] : builders.length;
+    bodies.set(name, builders.slice(pos, end));
+  }
+  const shared = (bodies.get("finish") ?? "") + (bodies.get("idOf") ?? "");
+
+  // **From `finish<` onward, never the whole body** — the correction the
+  // mutation pass forced, and without it this rule reports a gap once and then
+  // goes blind to its own findings regressing.
+  //
+  // A builder's text mentions a field three times: in the spec parameter's type
+  // annotation, in the destructure, and in the constructed literal. Only the
+  // third sets anything. Deleting `...(sort === undefined ? {} : { sort })`
+  // leaves the first two in place, so a whole-body search still saw the name and
+  // MG27 stayed green on exactly the defect it was written for.
+  //
+  // The construction begins at `finish<`, and the annotation and destructure are
+  // both above it, so the split needs no parser.
+  const byKind = new Map();
+  for (const [name, body] of bodies) {
+    if (name === "finish" || name === "idOf") continue;
+    const at = body.indexOf("finish<");
+    const constructed = at === -1 ? body : body.slice(at);
+    for (const m of constructed.matchAll(/kind: "(\w+)"/gu)) {
+      byKind.set(m[1], (byKind.get(m[1]) ?? "") + constructed);
+    }
+  }
+
+  const violations = [];
+  const unreached = new Set();
+  for (const typeName of typeNames) {
+    const kindMatch = new RegExp(
+      `export type ${typeName} = Readonly<\\{[\\s\\S]*?kind: "(\\w+)"`, "u",
+    ).exec(types);
+    if (kindMatch === null) continue;
+    const kind = kindMatch[1];
+    const body = shared + (byKind.get(kind) ?? "");
+    for (const field of [...fieldsOf(typeName), "gapBefore"]) {
+      if (new RegExp(`\\b${field}\\b`, "u").test(body)) continue;
+      const key = `${kind}.${field}`;
+      unreached.add(key);
+      if (omissions[key] !== undefined) continue;
+      violations.push({
+        rule: "MG27",
+        file: "src/shell/builders/index.ts",
+        message:
+          `\`${kind}\` carries \`${field}\` and no builder sets it — a block field a consumer ` +
+          `cannot reach is a surface the spec describes and the API does not. Expose it, or ` +
+          `name it in BUILDER_OMISSIONS with the reason`,
+        spec: "A03 §3, MG27",
+      });
+    }
+  }
+
+  // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry that is no
+  // longer an omission is itself a violation, or the list stops being read.
+  for (const key of Object.keys(omissions)) {
+    if (unreached.has(key)) continue;
+    violations.push({
+      rule: "MG27",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `BUILDER_OMISSIONS names ${key}, which the builder now sets. Remove the entry: an ` +
+        `exemption that outlives its reason is how the list stops being read`,
+      spec: "A03 §3, MG27",
+    });
+  }
+  return violations;
+}
+
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [
     ...checkModeOwnership(files, readFile),
     ...checkPresentationEdges(files, readFile),
     ...checkForbiddenEdges(files, readFile),
      ...checkDevEntryIsolation(files, readFile),
+    ...checkBuilderCoverage(files, readFile),
   ];
   for (const file of files) {
     const from = layerOf(file);
@@ -1478,7 +1637,7 @@ export function checkDevEntryIsolation(files, readFile = (f) => readFileSync(f, 
         message:
           `imports ${spec} — \`testing/\` and \`fixtures/\` are dev-only entry points, and a ` +
           `module outside them that imports one puts it in the production bundle (C24 I8)`,
-        spec: "A03 §3, MG26 · C24 I8, T2.3",
+        spec: "A03 §3, MG27 · C24 I8, T2.3",
       });
     }
   }

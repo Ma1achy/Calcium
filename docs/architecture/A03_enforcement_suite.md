@@ -233,6 +233,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG23 | A component in L1–L3 imports at most one **store**; several at once is L4's, through C23 | C23 §2, C23 I14, A02 Seam 4 |
 | MG24 | A member of an `export interface` under `src/` is named somewhere else under `src/` — a component complete on its own side of a seam, with nothing on the other | A02 Seam 4, C16 I23, C22 I38, I39 |
 | MG25 | An exported **function or class** under `src/` is named somewhere else under `src/`, comments excluded. MG24's blind spot: a producer expressed as free functions rather than as an interface | A02 Seam 4, C23 §3b, C24 I16 |
+| MG27 | A field a **block type** carries that no builder sets. The reasons live in `BUILDER_OMISSIONS`, keyed `Kind.field`, with the bidirectional arm `UNCONSUMED_MEMBERS` has: an entry the builder now sets is itself a violation | C24 I18, C24 commitment 16, FINDINGS F41 · F114 |
 | MG26 | No module under `src/` outside `testing/` and `fixtures/` value-imports either of them | C24 I8, T2.3 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
@@ -707,6 +708,52 @@ They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, be
 **Run before C24 deliberately.** C24's whole job is exporting things for external consumption, so a rule landing after it would fire on every public export and need either an allow-list the size of the API or a scope carved around the façade. Run now, the baseline is meaningful and C24 lands into a tree where the rule already holds.
 
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
+
+### MG27 — a block field no builder can set
+
+**The rule existed and the mechanism did not**, which is the whole of why this
+rule is worth its lines. C24 I18 ends *"a builder narrower than its block is
+either a ruling with a reason written down or a defect; there is no third state,
+and the reason is what tells them apart"*, and commitment 16 says the same. Both
+are correct, both were written before the builders were finished, and **three
+block fields were unreachable underneath them** — `patch.collapsedAfter` (F41,
+filed by a consumer who wanted it), `patch.actions` and `table.sort` (found by
+this rule and by nothing else).
+
+**The model it enforces was already in the tree, twice.** `b.plot` exposes
+`yMin`/`yMax` and leaves `yFormat`, `xLabels` and `emptyMessage` out with the
+reason recorded for each. That is the shape: an omission with a reason is a
+decision, and an omission without one is a gap the next consumer rediscovers.
+
+**Its blind spots, because an unrecorded limit reads as strength.**
+
+- It matches a field **name** in the constructed literal — the text from
+  `finish<` onward — so a builder that mentions a field without setting it counts
+  as covering it. The check is reachability, not correctness, and a field exposed
+  with the wrong shape is invisible to it.
+
+  **The scoping is the mutation pass's correction and it is not cosmetic.** The
+  first version searched the whole body, and a builder's text names a field three
+  times: in the spec parameter's type annotation, in the destructure, and in the
+  literal. Only the third sets anything. So deleting
+  `...(sort === undefined ? {} : { sort })` left two mentions standing and **MG27
+  stayed green on precisely the defect it had been written to find** — the rule
+  reported its three gaps once and would then have gone blind to all of them
+  regressing. The blind spot was written down in this section before it was
+  noticed to have that consequence, which is its own small lesson: recording a
+  limit is not the same as following it through.
+- It cannot see a field that should exist and does not — the block type is the
+  authority, so a gap in *C04* is outside its subject.
+- Both are the frame-read's job. Neither is how a field has actually gone
+  missing: every measured case is a field nobody typed into the builder.
+
+**Two parsing corrections it needed before it was trustworthy**, and both had
+produced false rows on the first run. `Hunk.lines[].kind` is
+`"add" | "remove" | "context"`, so scanning for a `kind: "x"` literal invented
+three block kinds — the `Block` union is the authority. And
+`export type Rule = Readonly<{ … }> & Gap;` is one line, which a body regex
+written for the multi-line form silently read past, attributing a neighbour's
+fields to it. A rule that over-reports is not a rule anyone keeps.
 
 ### MG25 — a free function with no consumer
 

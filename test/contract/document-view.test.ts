@@ -368,9 +368,11 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
       // have.
       updateView: (id, blockId, next) =>
         id === DOCUMENT_VIEW_ID ? view.putBlock(blockId, next) : false,
-      viewBlock: (id, blockId) => {
+      // The panel, not its child (F22) — the second double that reproduced the
+      // production defect rather than standing in for the interface.
+      viewPanel: (id, blockId) => {
         const found = id === DOCUMENT_VIEW_ID ? view.blockAt(blockId) : null;
-        return found !== null && found.kind === "panel" ? (found.children[0] ?? null) : null;
+        return found !== null && found.kind === "panel" ? found : null;
       },
     });
 

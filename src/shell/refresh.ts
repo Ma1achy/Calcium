@@ -131,7 +131,17 @@ export type RefreshDeps = Readonly<{
    */
   updateView: (id: string, blockId: string, next: Block) => boolean;
   /** The block a pushed view currently shows for a part, so staleness can retitle. */
-  viewBlock: (id: string, blockId: string) => Block | null;
+  /**
+   * The part's **panel** as the view currently holds it (F22).
+   *
+   * It returned the panel's child, so `currentPanel` had to rebuild the panel
+   * through `livePanel` — which sets no `gapBefore`, making `existing?.gapBefore
+   * === true` structurally false on this arm and only this arm. The entry arm
+   * reads the real block and carries the gap; C24 I12 says `b.live` behaves
+   * identically in a transcript entry and in a pushed view, and here it could
+   * not. Returning the panel makes both arms one code path with one answer.
+   */
+  viewPanel: (id: string, blockId: string) => Panel | null;
 }>;
 
 export interface RefreshDriver {
@@ -368,10 +378,11 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
 
   /** The part's panel as the host currently holds it, or `null` if it has gone. */
   const currentPanel = (host: RefreshHost, part: Part): Panel | null => {
-    if (host.kind === "view") {
-      const child = deps.viewBlock(host.id, part.spec.id);
-      return child === null ? null : livePanel(part.spec.id, titleOf(part), child);
-    }
+    // **The real block on both arms** (F22). This reconstructed on the view arm
+    // and read on the entry arm, so every field the reconstruction did not set
+    // was invisible here — `gapBefore` measurably, and anything added to `Panel`
+    // later by construction.
+    if (host.kind === "view") return deps.viewPanel(host.id, part.spec.id);
     const entry = deps.transcript.entries.find((e) => e.id === host.id);
     const found = entry?.doc.blocks.find((b) => b.id === part.spec.id);
     return found !== undefined && found.kind === "panel" ? found : null;

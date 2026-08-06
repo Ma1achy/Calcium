@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { readdirSync, statSync } from "node:fs";
 import {
   checkModuleGraph,
+  checkBuilderCoverage,
+  BUILDER_OMISSIONS,
   checkOneStorePerComponent,
   STORE_SYMBOLS,
   storeNamesAreReal,
@@ -93,6 +95,31 @@ describe("A03 MG23 — one store per component, above L0", () => {
       });
     return walk("src");
   };
+
+  it("MG27: the real tree is clean, and the rule can see it", () => {
+    // **The row the mutation pass asked for.** Deleting
+    // `...(sort === undefined ? {} : { sort })` from `b.table` is caught by
+    // `make enforce` and by nothing in the suite, so the mutation survived a
+    // vitest run — which is a finding about where the guard lives, not about
+    // the guard. A rule whose only reader is a Makefile target is a rule a
+    // `npm test` refactor can silence.
+    //
+    // The counter is read, not the exit status: a rule matching nothing passes
+    // exactly like a rule that is satisfied (A03 §2), and this is the arm that
+    // tells them apart.
+    const files = srcFiles();
+    const violations = checkBuilderCoverage(files);
+    expect(violations, "run `make enforce` for the detail").toEqual([]);
+
+    // The subject exists, or the row above holds trivially. Both files must be
+    // in `SOURCES` for the rule to have anything to compare.
+    expect(files).toContain("src/data/viewmodel/types.ts");
+    expect(files).toContain("src/shell/builders/index.ts");
+
+    // And the reason list is non-empty, so the excusing arm is exercised by the
+    // real tree rather than only by the fabrication.
+    expect(Object.keys(BUILDER_OMISSIONS).length).toBeGreaterThan(0);
+  });
 
   it("MG23: the real tree is clean, and the rule can see it", () => {
     // Corpus before cleanliness, for SP2's reason: a rule whose scopes stopped

@@ -1231,7 +1231,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     title: spec.title,
     intervalMs: spec.every ?? 0,
     staleAfterMs: spec.staleAfter ?? (spec.every ?? 0) * 2,
-    fetch: spec.fetch ?? ((): Promise<unknown> => Promise.resolve(null)),
+    // **No `?? Promise.resolve(null)` fallback** (F78). It existed to cover the
+    // `stream` arm, which nothing drove, so its whole effect was to turn an
+    // undriven declaration into a part that rendered `render(null)` once — a
+    // plausible empty panel rather than a failure. `fetch` is required now.
+    fetch: spec.fetch,
     render: spec.render,
     renderError:
       spec.renderError ??
@@ -1359,14 +1363,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       const content = layer.content.map((b) => (b.id === blockId ? next : b));
       return deps.overlays.update(id, { content });
     },
-    viewBlock: (id, blockId) => {
+    // Returns the panel itself, not its child (F22). The caller wants the block
+    // as the view holds it, and handing back a child forced a reconstruction
+    // that silently dropped every field it did not know to set.
+    viewPanel: (id, blockId) => {
       const found =
         id === DOCUMENT_VIEW_ID
           ? deps.documentView.blockAt(blockId)
           : deps.overlays.stack.find((l) => l.id === id)?.content.find((b) => b.id === blockId);
-      return found !== undefined && found !== null && found.kind === "panel"
-        ? (found.children[0] ?? null)
-        : null;
+      return found !== undefined && found !== null && found.kind === "panel" ? found : null;
     },
   });
 

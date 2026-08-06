@@ -74,3 +74,20 @@ export declare function checkFunctionConsumers(
   readFile?: (f: string) => string,
   allowed?: Readonly<Record<string, string>>,
 ): Violation[];
+
+/**
+ * MG27 — a field a block type carries that no builder sets (C24 I20, F114).
+ *
+ * `omissions` is a parameter rather than only a module constant so the
+ * fabricated violation can drive both arms: a field with a recorded reason must
+ * be excused, and an entry naming a field the builder now sets must itself
+ * fire. A rule tested only against its real allow-list tests one of the two.
+ */
+export declare function checkBuilderCoverage(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+  omissions?: Readonly<Record<string, string>>,
+): Violation[];
+
+/** MG27's reasons, keyed `Kind.field`. */
+export declare const BUILDER_OMISSIONS: Readonly<Record<string, string>>;

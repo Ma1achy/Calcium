@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import { block, validateBlock } from "../../src/data/viewmodel/index.js";
 import type { Block, BlockKind } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
+import type { LiveSpec } from "../../src/shell/builders/types.js";
 import { defaulted, seq, wasDefaulted } from "../../src/shell/builders/seq.js";
 import { checkMeasurement, formatMeasurementReport } from "../../src/testing/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
@@ -472,16 +473,32 @@ describe("C24 §5 — b.live", () => {
     expect(part.children[0]).toMatchObject({ kind: "raw", text: "warming up" });
   });
 
-  it("T3.4, T3.5: fetch and stream are exclusive, and one is required", () => {
-    expect(() => b.live({ ...base, every: 1_000 })).toThrow(/needs a `fetch` or a `stream`/u);
-    expect(() =>
-      b.live({
-        ...base,
-        every: 1_000,
-        fetch: () => Promise.resolve(1),
-        stream: () => (async function* () {})(),
-      }),
-    ).toThrow(/not both/u);
+  it("T3.4, T3.5 (C24 I21, F78): `fetch` is required by the type, and `stream` is gone", () => {
+    // **The two throws are deleted and the guarantee is stronger, not weaker.**
+    // They policed a choice between `fetch` and `stream` where `stream` did
+    // nothing: `partOf` read `spec.fetch ?? (() => Promise.resolve(null))` and
+    // nothing anywhere read `spec.stream`, so a part declared with it rendered
+    // `render(null)` once — a part that streams nothing looking exactly like a
+    // part that produced nothing.
+    //
+    // A required field is a compile error where the pair was a runtime throw,
+    // which is the make-it-unbuildable trade this repository has won on five
+    // times. Asserted with `@ts-expect-error` rather than a `toThrow`, because
+    // there is no longer a runtime moment to catch: an unused directive is
+    // TS2578 and the file stops building, so the assertion checks itself.
+
+    // @ts-expect-error — `fetch` is required (C24 I21). Restoring the optional
+    // marker makes this line compile and this file stop building.
+    const noFetch: LiveSpec = { ...base, every: 1_000 };
+    void noFetch;
+
+    // @ts-expect-error — `stream` no longer exists on the type at all.
+    const streaming: LiveSpec = { ...base, fetch: () => Promise.resolve(1), stream: 1 };
+    void streaming;
+
+    // And the ordinary declaration still builds, so the two rows above are
+    // about the narrowing rather than about the type being broken.
+    expect(b.live({ ...base, every: 1_000, fetch: () => Promise.resolve(1) }).kind).toBe("panel");
   });
 
   it("T3.6: staleAfter below every throws, because a builder cannot warn", () => {

@@ -225,9 +225,22 @@ function table(
     rows: readonly TableRow[];
     showHeader?: boolean;
     emptyMessage?: string;
+    /**
+     * Which column the rows are already ordered by, and which way (F114).
+     *
+     * **Found by MG27 and by nothing else.** `ColumnDef.sortable` was reachable
+     * from `b.col` throughout, so a surface could mark a column sortable and
+     * never say which one the data arrived sorted on — the indicator C11 draws
+     * had no way to be told. The pair reads as covered because half of it is,
+     * which is why a hand audit walked past it twice.
+     *
+     * It is a statement about the data, not an instruction: C11 renders the
+     * marker and reorders nothing.
+     */
+    sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;
   },
 ): Table {
-  const { id: _id, gapBefore: _gap, columns, rows, showHeader, emptyMessage } = spec;
+  const { id: _id, gapBefore: _gap, columns, rows, showHeader, emptyMessage, sort } = spec;
   return finish<Table>(
     {
       kind: "table",
@@ -236,6 +249,7 @@ function table(
       rows,
       ...(showHeader === undefined ? {} : { showHeader }),
       ...(emptyMessage === undefined ? {} : { emptyMessage }),
+      ...(sort === undefined ? {} : { sort }),
     } as Table,
     spec,
     true,
@@ -405,9 +419,28 @@ function patch(
     language: string;
     hunks: readonly Hunk[];
     layout?: "unified" | "split";
+    /**
+     * What was elided **below the last hunk** (F41).
+     *
+     * `Hunk.collapsedBefore` was already reachable, so a patch could say what it
+     * skipped above each hunk and never what it skipped below the last one — a
+     * 44-line file with one hunk near the top ended in thirty lines that simply
+     * stopped. The block documented the field at length; the builder passed four
+     * of its six.
+     */
+    collapsedAfter?: number;
+    /**
+     * Row actions, found by MG27 rather than by a consumer (F114).
+     *
+     * `Patch` has carried them since C25 and no builder passed them, so no app
+     * could put `↗ open in editor` on a diff. Nothing reached for it, which is
+     * the point of the rule: an omission nobody has tripped over yet is exactly
+     * the one a hand audit walks past.
+     */
+    actions?: readonly Action[];
   },
 ): Patch {
-  const { path, language, hunks, layout } = spec;
+  const { path, language, hunks, layout, collapsedAfter, actions } = spec;
   return finish<Patch>(
     {
       kind: "patch",
@@ -416,6 +449,8 @@ function patch(
       language,
       hunks,
       ...(layout === undefined ? {} : { layout }),
+      ...(collapsedAfter === undefined ? {} : { collapsedAfter }),
+      ...(actions === undefined ? {} : { actions }),
     } as Patch,
     spec,
     true,
@@ -546,12 +581,6 @@ export type {
  * `retryInMs` only the backoff can supply.
  */
 function live(spec: LiveSpec): Panel {
-  if (spec.fetch === undefined && spec.stream === undefined) {
-    throw new Error("b.live needs a `fetch` or a `stream`");
-  }
-  if (spec.fetch !== undefined && spec.stream !== undefined) {
-    throw new Error("b.live takes `fetch` or `stream`, not both — they are exclusive");
-  }
   // **Thrown, not warned** (C24 T3.6). The row said *warns* and a builder has no
   // sink: SS33 bans `console.*`, C02's warnings are C22's channel, and putting a
   // notice where the loading render goes lets a cosmetic mistake change the first

@@ -129,12 +129,6 @@ export type { Action, Block, Cell, Glyph, Tone };
  * C24 §5 — what `b.live` declares.
  *
  * Looser than what C23 drives, in the way every type here is looser than the
- * field it feeds: `every` and `staleAfter` are optional and the drivers
-
-/**
- * C24 §5 — what `b.live` declares.
- *
- * Looser than what C23 drives, in the way every type here is looser than the
  * field it feeds: `every` and `staleAfter` are optional and the driver's are not,
  * because the defaults are the framework's to choose — one-shot, and twice the
  * interval. `render` returns **one** block (C23 I34), and `title` is required
@@ -147,8 +141,27 @@ export type LiveSpec = BlockOpts &
     title: string;
     /** Omitted -> one-shot: rendered once, never retried (A02 §7 rule 3). */
     every?: number;
-    fetch?: () => Promise<unknown>;
-    stream?: () => AsyncIterable<unknown>;
+    /**
+     * **Required, and `stream` is gone** (C24 I21, F78).
+     *
+     * `LiveSpec` offered two ways to feed a part and `b.live` threw twice to
+     * police the choice — once when neither was given, once when both were. One
+     * of the two did nothing: `partOf` built the driver's part with
+     * `fetch: spec.fetch ?? (() => Promise.resolve(null))` and **nothing
+     * anywhere read `spec.stream`**, so a part declared with it was registered,
+     * driven once with a fetch resolving null, and rendered `render(null)`.
+     *
+     * The failure direction is the worst available — a part that streams
+     * nothing looked exactly like a part that produced nothing. A plausible
+     * empty panel, not an error.
+     *
+     * **Two throws guarding a choice is the symptom; a declared option with no
+     * implementation is the disease**, and the remedy is to make the state
+     * unbuildable rather than reported. A required `fetch` is a compile error
+     * where the pair was a runtime throw, and both throws go with it. A
+     * streaming part is additive to re-add the day something drives one.
+     */
+    fetch: () => Promise<unknown>;
     render: (data: unknown) => Block;
     renderError?: (err: ErrorLike, retryInMs: number | null) => Block;
     renderLoading?: () => Block;

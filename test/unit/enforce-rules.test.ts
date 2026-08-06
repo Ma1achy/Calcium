@@ -29,6 +29,7 @@ import {
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
   checkFunctionConsumers,
+  checkBuilderCoverage,
   checkSeamConsumers,
 } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
@@ -556,6 +557,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // allow-list rather than about the tree, and that half needs two runs of
       // the same fixture with different lists.
       "MG25",
+      // MG27 likewise: its subject is two whole files read together — a block
+      // type and the builder that constructs it — so the shared `FABRICATED`
+      // shape, which is one file's text, cannot express it.
+      "MG27",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -717,6 +722,85 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "CompletionEngine.spinning": "why",
     });
     expect(exempted, "a named member is exempt").toEqual([]);
+  });
+
+  it("MG27 fires: a block field no builder sets, and the reason list expires", () => {
+    // **Fabricated from the real first run**, where the three below came back:
+    // `patch.collapsedAfter` (filed as F41 by a consumer who wanted it),
+    // `patch.actions` and `table.sort` (found by this rule and nothing else).
+    //
+    // The fixture carries both corrections the rule needed before it was
+    // trustworthy, because a rule that over-reports is not a rule anyone keeps:
+    // a `Hunk` whose line `kind` is `"add"` — which the first version read as a
+    // block kind that does not exist — and a single-line `Readonly<{…}> & Gap`
+    // declaration, which a multi-line body regex read straight past.
+    const types = [
+      'export type Hunk = Readonly<{ lines: readonly Readonly<{ kind: "add"; text: string }>[] }>;',
+      'export type Rule = Readonly<{ kind: "rule"; id: string; label: string }> & Gap;',
+      "export type Widget = Readonly<{",
+      '  kind: "widget";',
+      "  id: string;",
+      "  shown: string;",
+      "  hidden: number;",
+      "  excused: boolean;",
+      "}> & Gap;",
+      "",
+      "export type Block =",
+      "  | Rule",
+      "  | Widget;",
+      "",
+    ].join("\n");
+
+    const builders = [
+      "function finish(spec, opts, gapDefault) { return gapBefore; }",
+      "function widget(spec) {",
+      '  return finish({ kind: "widget", id: idOf(spec), shown: spec.shown }, spec, true);',
+      "}",
+      "function rule(label) {",
+      '  return finish({ kind: "rule", id: idOf(), label }, undefined, true);',
+      "}",
+    ].join("\n");
+
+    const files = ["src/data/viewmodel/types.ts", "src/shell/builders/index.ts"];
+    const read = (f: string): string =>
+      f.endsWith("types.ts") ? types : f.endsWith("builders/index.ts") ? builders : "";
+
+    // With `excused` accounted for and `hidden` not, exactly one field is a
+    // violation — which is the discriminator: a rule reporting both would be
+    // ignoring the reason list, and one reporting neither would be vacuous.
+    const violations = checkBuilderCoverage(files, read, { "widget.excused": "no surface has one" });
+    expect(
+      violations.map((v) => v.message.match(/`(\w+)` and no builder/u)?.[1]),
+      "`hidden` alone — `shown` is set, `excused` has a reason, `rule` is intact",
+    ).toEqual(["hidden"]);
+    expect(violations[0]?.rule).toBe("MG27");
+
+    // **The `Hunk` control.** `kind: "add"` is a *line's* kind, and the first
+    // version of this rule invented three block kinds from literals like it.
+    expect(
+      violations.some((v) => v.message.includes("`add`")),
+      "a line kind is not a block kind",
+    ).toBe(false);
+
+    // **The single-line control.** `Rule` is `{ kind, id, label }` and `label`
+    // is set; a body regex that ran past `}> & Gap;` would attribute `Widget`'s
+    // fields to it and report them here.
+    expect(
+      violations.some((v) => v.message.includes("`rule` carries")),
+      "a one-line declaration is read as its own",
+    ).toBe(false);
+
+    // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry naming a
+    // field the builder now sets is itself a violation, or the list stops being
+    // read the first time someone closes a gap without tidying up.
+    const stale = checkBuilderCoverage(files, read, {
+      "widget.excused": "no surface has one",
+      "widget.shown": "this one is set, so the entry has outlived its reason",
+    });
+    expect(
+      stale.some((v) => v.message.includes("which the builder now sets")),
+      "an exemption that outlives its reason is a violation of its own",
+    ).toBe(true);
   });
 
   it("MG25 fires: an exported function no other file in src/ names", () => {
