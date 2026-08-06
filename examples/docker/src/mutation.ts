@@ -7,7 +7,7 @@
  * `ctx.ask` lives on `LocalContext` (C23 I36) and an adapter is handed one
  * result with no way to suspend, so **a verb that confirms must be local**. Five
  * of these eight would otherwise be adapted verbs of about fifteen lines each.
- * That is a finding rather than a design — FINDINGS F67 — and it is the third
+ * That is a finding rather than a design — FINDINGS F77 — and it is the third
  * distinct reason this app has reached for `local` (the dashboard needed a ring
  * that outlives a fetch, the events window the same).
  *

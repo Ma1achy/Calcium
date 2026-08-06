@@ -9,7 +9,7 @@
  * window local, arriving for a third reason.
  *
  * That is a finding rather than a design: an adapted verb is the cheaper thing to
- * write and five of these eight would otherwise be one. See FINDINGS F67.
+ * write and five of these eight would otherwise be one. See FINDINGS F77.
  *
  * **Which verbs confirm** is a judgement about reversibility, not about danger:
  *

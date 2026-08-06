@@ -2746,3 +2746,42 @@ said the deliberate scroll-to-top beat was *not* at the top while an ordinary on
 was. Nothing was wrong with the recording. A settled frame is one followed by a
 pause, so the pauses in the script are exactly the frames worth reading, and
 taking them from the script means the two cannot disagree.
+
+---
+
+## F77 — a verb that asks a question cannot be an adapter ★★★
+
+`ctx.ask` is on `LocalContext` (C23 I36) and nowhere else. An adapter is handed
+one `RawResult` and returns one document; it has no way to suspend, so **any verb
+that confirms must be a local handler**.
+
+Five of step 9's eight verbs confirm, and every one of them would otherwise have
+been an adapted verb of about fifteen lines. Instead the family is 185 lines of
+local handler, and the difference is not the confirm itself — it is everything an
+adapter gets for free and a local handler must do by hand: `meta` (F13), the
+failure arm, the invocation record, and the spawn.
+
+**This is the third distinct reason this application has reached for `local`**,
+and the first two were about state rather than input:
+
+| surface | why local |
+|---|---|
+| the dashboard | a ring that has to outlive a fetch |
+| the events window | the same |
+| the mutation family | `ctx.ask` is not on `AdapterContext` |
+
+Three different needs, one escape hatch, and the escape hatch costs the whole of
+C07 each time. The pattern F14, F36 and F43 describe from the other side — a fact
+the consumer needs and is not offered — with the consequence made structural: it
+is not that a local handler is missing something, it is that **asking anything at
+all forces a route change**.
+
+Filed rather than fixed, because the fix is a ruling and not a field. An adapter
+that could ask would need a suspension point in C07's contract, which is a much
+larger thing than it looks and may well be the wrong shape — an adapter is
+specified as a pure mapping from result to document, and that is worth keeping.
+The alternative is to say plainly that interaction belongs to L4 and that the
+local route is where it lives, which is what the code already says three times.
+
+**What is not in doubt is that the count is now three.** Two instances is the
+threshold for noticing; the third is where a workaround stops being a workaround.
