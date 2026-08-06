@@ -3334,12 +3334,24 @@ The roadmap's body refers to Order entries by number — *"the same mechanism as
 selection's full-row background (#22)"*, *"see #16, which supersedes an earlier
 draft"*. Every such reference was resolved against the Order list:
 
-| | |
-|---|---|
-| `#NN` references in the body | 31 |
-| resolving to the entry the sentence means | 17 |
-| **resolving to a different entry** | **12** |
-| ambiguous (a section, not an entry) | 2 |
+| | first count | **amended** |
+|---|---|---|
+| `#NN` references in the body | 31 | **32** |
+| resolving to the entry the sentence means | 17 | 17 |
+| **resolving to a different entry** | 12 | **13** |
+| ambiguous (a section, not an entry) | 2 | 2 |
+
+**The first count was one low, and how it was missed is the useful part.** Line 2152
+is `#31` *inside Order entry 25* — *"Design with as-you-type (#31)"* — and as-you-type
+is entry 40; 31 is completion ranking. The roadmap's own body says the right thing
+forty lines above it. Thirty references were resolved against the Order list and
+**that one was waved through as "inside the Order block"**, because its position made
+it look like bookkeeping rather than a claim.
+
+**A count that agrees with its own rows and is one short of the tree — in the finding
+written about a count that agreed with its own rows.** F87's shape, in the document
+about it, produced by the same move: a category exempted rather than resolved. **An
+exemption is where the next instance hides**, and this one exempted by position.
 
 Not near-misses. A sample, each checked by reading both the sentence and the entry it
 lands on:
@@ -3364,10 +3376,28 @@ ranking before ghosting*, *build the wash with the background* — so a reader f
 them builds in the wrong order. `#20` and `#16` are the sharpest: both are read as
 prerequisites, and both name an unrelated entry.
 
-**The general form is worth more than the fix.** A reference into a numbered list is
-checkable exactly as `Fnn` citations are, and this repository already has SP5 for the
-one and nothing for the other. The difference is not importance; it is that one
-document's numbers were noticed and the other's were not.
+**The general form is worth more than the fix, and the disposition is *not* a rule.**
+A reference into a numbered list is checkable exactly as `Fnn` citations are, and the
+tempting fix is an SP-class rule resolving `#NN` against the Order list. **That would
+make a fragile scheme checkable rather than removing the fragility.**
+
+**Ruled: anchors, not numbers.** A `#NN` encodes a *position*; an anchor encodes the
+*thing*, and a renumber cannot invalidate it. That is *make the wrong state
+unbuildable rather than corrected* — the trade this project has now taken five times,
+after the TDZ `const`, `Exclude<ParseResult, {kind:"empty"}>`, glyphs-as-tokens and
+`origin` over `viewState`. **Enforcement is for classes that cannot be designed away,
+and this one can.**
+
+**The Order list keeps its numbers**, because a sequence is what they are good for.
+Numbers for the list, anchors for references — only the reference use was ever
+harmful. Inside the list's own code fence, where a link cannot render, a cross-entry
+reference becomes the entry's *name*.
+
+**Fixed at `80bd50b`+**: 32 references converted, 18 anchors added, and **each of the
+13 resolved by reading the sentence rather than retargeting the number** — a stale
+reference lands *somewhere*, so a mechanical retarget preserves the defect in a new
+form. Several were dependency statements, and a dependency pointing confidently at the
+wrong entry is worse than one pointing nowhere.
 
 ---
 

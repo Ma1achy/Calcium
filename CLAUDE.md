@@ -262,6 +262,22 @@ Each of these produces code that compiles, passes review, and is wrong.
   belief and not a ruling, and the cheapest moment to find that out is before something is
   built on it.
 
+  **The instrument's running total, because a habit that costs twenty minutes deserves a
+  number**: it has now **disproved three findings and produced three** — F58b, F66's
+  replacement reason, and F92. It is the only one that checks the *record* rather than an
+  artefact; the frame-read checks output, the mutation pass checks tests, the audit checks
+  code.
+
+  **And where to point it: compression is where the falsification enters.** F86, F89 and
+  F92 are one mechanism three times — a summary that kept a body's claim and dropped the
+  condition making it true. F86's finding named a mechanism it never ran; F89's retraction
+  never reached the Order list that cited it; F92's *"no caller in `src/`"* sat above a
+  body correctly saying *"it exists as the far side's usage-error path"*. **A claim is
+  falsified by being summarised, not by being wrong**, which is why the summary is where
+  to look — the body usually still reads as correct, and does not have to be re-derived to
+  see it. **Read the abstract against its own section before reading the section against
+  the code.**
+
 - **Where the findings actually came from, measured over one step.** Eleven findings across
   docker-tui's step 8, and **not one came from a test written to look for it**:
 

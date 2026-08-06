@@ -133,6 +133,7 @@ which is the threshold for calling it general.
 Mostly a **documented convention**, possibly one helper: any block computed from two sources
 needs a rendering for *"they agree"*. Cheap, and no public shape changes.
 
+<a id="rendering-flags"></a>
 ### 2.2 Flags that select a rendering — F39
 
 There is no way to declare a flag that chooses a presentation rather than an invocation, so
@@ -257,6 +258,7 @@ work for free. Prefer that over a monolithic markdown block for exactly that rea
 **Both found while making the README gifs**, which is step 8's distribution one more time:
 every finding came from a way of looking, not a test written to look for it.
 
+<a id="theme-background"></a>
 #### ★ A theme must be able to paint its own background — RULED
 
 C10 **paints no background**, so `/theme light` sets dark foregrounds and emits nothing
@@ -317,7 +319,7 @@ the USER overrides    /theme <theme> --no-bg                 never paint, whatev
 
 **A flag on `/theme` rather than an env var**, and it costs nothing: `/theme` is one of the
 framework's six verbs, so this is a `FlagDef` on that `ToolDef` — **and it appears in
-`/theme --help` for free** once #20 lands. No argv parser, no environment convention.
+`/theme --help` for free** once [per-verb `--help`](#help-per-verb) lands. No argv parser, no environment convention.
 
 **Per invocation, not sticky.** `/theme light --no-bg` then `/theme dark` paints again.
 A sticky flag is invisible state: you would switch themes later, get no background, and have
@@ -344,9 +346,10 @@ is honest as long as it is stated.
 
 **One mechanical note, and it is shared work:** painting means **padding every row to the
 full region width**, or the wash ends ragged where the text does. That is the same mechanism
-as selection's full-row background (#22), one scope up — **build them together rather than
+as [selection's full-row background](#selection-wash), one scope up — **build them together rather than
 twice.**
 
+<a id="help-bucketing"></a>
 #### `/help` returned no verb summaries — narrow this before filing it
 
 The report was *"`/help` emits zero verb summaries, contradicting the README's 'help
@@ -368,6 +371,7 @@ dispatch uses"* is the anti-drift property the keymap-derived help exists for. I
 renders keybindings from the keymap and verbs from the manifest, the sentence describes
 half of it — which is F11's class arriving in the framework's own front door.
 
+<a id="output-diffing"></a>
 ### ★★ The frame is written whole, every time — no output diffing
 
 **The larger of the two performance defects, and the one to fix first.**
@@ -403,6 +407,7 @@ bytes, and it interacts badly with SGR state which is per-row already.
 invalidation mechanism exists, and it cuts the per-frame cost for *every* frame rather than
 only for large blocks.
 
+<a id="cells-fast-path"></a>
 ### `cells()` has no ASCII fast path — the hottest function in the tree
 
 **Read, not guessed.** `cells()` is:
@@ -464,6 +469,7 @@ class as a rule scoped to the wrong artefact.
 and watch"* is what a user experiences; a microbenchmark that improves while the frame still
 stutters has measured the wrong thing.
 
+<a id="render-caching"></a>
 ### ★ Rendering is not cached, and a large block makes the app unusable
 
 **A performance defect, measured in the code rather than guessed at.** `paint.ts:137` calls
@@ -501,6 +507,7 @@ degrades to unusable on a large document has a correctness problem in the thing 
 to do, and every consumer hits it — docker-tui's `/config` on a real diff, `agent-tui`'s
 streamed code, prism's long training logs.
 
+<a id="text-selection"></a>
 ### Text selection, copy and paste — and `copyMode` already exists with no producer
 
 **`copyMode` is a focus target that nothing can enter.** It is in `FocusTarget`, ordered in
@@ -735,8 +742,8 @@ It matters because **the regions behave differently.** The transcript scrolls; t
 not. Without the brackets a long transcript's last line reads as part of the prompt, and the
 header's status line reads as content.
 
-**And a drawn line is the only tool that works at every setting.** A theme *may* now paint its
-background (#39), but `background: "terminal"` remains legitimate — and a transparent
+**And a drawn line is the only tool that works at every setting.** A theme *may* now paint
+[its own background](#theme-background), but `background: "terminal"` remains legitimate — and a transparent
 terminal has no fill to distinguish regions with. So separators cannot depend on a background
 being present. **A drawn separator is not a workaround — it is the
 consequence of a choice already made**, and the entry should say so rather than presenting it
@@ -752,10 +759,11 @@ of the screen, and every row taken from the transcript is a row of content. So:
 - **the footer, if present, brackets the same way** — a footer with a line above it is
   chrome; one without reads as a trailing content row
 
-**Belongs to C22 §6 and S01 §3**, with the optional-header/footer work and the chrome row
-budget (#23) — all three are about what the frame's chrome may contain, and deciding them
+**Belongs to C22 §6 and S01 §3**, with the optional-header/footer work and the [chrome row
+budget](#chrome-row-budget) — all three are about what the frame's chrome may contain, and deciding them
 separately is how four features end up fighting over one row.
 
+<a id="horizontal-composition"></a>
 ### Horizontal composition — every block is full width, and the banner paid for it
 
 **A row container: `b.row([a, b], { gap })`.** Its height is the tallest child at its
@@ -811,6 +819,11 @@ C11's precedent is worth following exactly, including its lesson: **F50 found th
 with no `flex` gets its minimum and nothing more** — so a row's children need the same
 opt-in, and the same care about where slack goes. The `/ps` NAME column carried that comment
 three lines from where it was written again.
+
+**F50 is cited here as precedent and is not fixed here.** It is an open finding against C11's
+*columns*; a row container inherits the lesson and leaves the defect where it is. Saying so
+matters because the citation reads as coverage — which is how a finding gets planned once and
+fixed never.
 
 **Ships with `b.row`. No new concept, no measurement change.**
 
@@ -925,22 +938,30 @@ which is still wrong.** Same shape as F9 grepping for a field when the seam was 
 **What survives is the prefix-*out* question below**, which is a genuine gap and a different
 one.
 
-### ~~superseded~~
+### ~~No app can supply a `CommandPolicy`~~ — RETRACTED, and the Order list carried it anyway
 
-**The mechanism exists and is well designed.** `CommandPolicy` is documented as *"the whole
-of what is pluggable"* — a policy answers one question, *is this token the app's verb and
-what is it*, while built-ins, operators and refusals stay identical under every policy,
-*"which is what stops a replaceable prefix from becoming a replaceable parser."*
-`prefixPolicy(":")` gives `:ps`. **And `CommandPolicy` and `prefixPolicy` are both exported
-from `src/index.ts`.**
+**The mechanism exists, is well designed, and is reachable.** `CommandPolicy` is documented
+as *"the whole of what is pluggable"* — a policy answers one question, *is this token the
+app's verb and what is it*, while built-ins, operators and refusals stay identical under every
+policy, *"which is what stops a replaceable prefix from becoming a replaceable parser."*
+`prefixPolicy(":")` gives `:ps`, and both are exported from `src/index.ts`.
 
-**No app can supply one.** `parse.ts:51` reads `ctx.policy ?? slashPolicy`, and `TuiConfig`
-has no policy field. So the type is public, the factory is public, and **there is no way to
-get one into a session** — the eleventh instance of exported-and-unreachable, and a worse
-one than most, because exporting the factory *is a promise that you can plug one in*.
+**This section used to claim no app could supply one. Measured at HEAD, that is false:**
 
-**Fix: a `policy` field on `TuiConfig`, threaded to `parse`.** Small, additive, and
-freeze-relevant — it changes a public config type, so it belongs before publication.
+```
+src/shell/types.ts:318      commandPolicy?: CommandPolicy;
+src/shell/config.ts:108     commandPolicy: config.commandPolicy ?? slashPolicy
+src/shell/construct.ts:699  commandPolicy: config.commandPolicy
+src/shell/execution.ts:174  policy: deps.commandPolicy
+```
+
+**Kept rather than deleted, because the deletion is the failure.** The section above already
+corrected this once and **the correction never reached the Order list**, which summarised the
+retracted half as *"CommandPolicy is exported and unreachable — a config field."* A struck
+heading over a live body is exactly enough ambiguity for a summariser to take the wrong half.
+FINDINGS F89.
+
+**What survives is the next section, and it is a ruling rather than a field.**
 
 ### Prefix-*out*: prose by default, verbs by exception — and `agent-tui` needs it
 
@@ -964,6 +985,7 @@ route is a separate concern**: `defaultRoute: "shell" | "app" | (line) => …`, 
 policy rather than inside it. The second is likelier — the policy answers *"which verb is
 this"* and the default route answers *"what if it is none"*, which are different questions.
 
+<a id="completion-ranking"></a>
 ### Completion is prefix-matched and unranked — both are fixable and one is nearly free
 
 **`engine.ts:115` is `candidates.filter(c => c.value.startsWith(prefix))`**, and nothing
@@ -1069,11 +1091,11 @@ of it to show thirty rows.**
 
 They are not independent items; each only pays off once the one before it lands.
 
-**1. Output diffing (#12) — write only changed rows.** Cuts the cost of *every* frame
+**1. [Output diffing](#output-diffing) — write only changed rows.** Cuts the cost of *every* frame
 regardless of block size. Smallest change, and the `contaminated` flag is already the
 invalidation story it needs.
 
-**2. Render caching (#13) — key on `(entryId, rev, width)`.** The frame *after* the first
+**2. [Render caching](#render-caching) — key on `(entryId, rev, width)`.** The frame *after* the first
 becomes free. But the first frame still renders 50,000 lines, so on its own this converts
 *continuous* lag into *one long stall* — better, and not enough.
 
@@ -1086,7 +1108,7 @@ the standard measurer measures it normally and no second height codepath appears
 plot does not, and that is permanent (C12 I1: reducing a plot's data changes nothing about
 its height). **Granular where the kind divides, atomic where it does not.**
 
-**4. `cells()`'s ASCII fast path (#14).** Only worth measuring after 1–3, because most calls
+**4. [`cells()`'s ASCII fast path](#cells-fast-path).** Only worth measuring after 1–3, because most calls
 disappear with the cache.
 
 #### And a bound, because a fix is not a guarantee
@@ -1106,6 +1128,7 @@ silent truncation is the empty-block class again.
 still stutters has measured something other than what a user experiences — and the three
 findings above were all found by reading code and frames, not by profiling.
 
+<a id="shared-pollers"></a>
 ### ★★ Shared pollers — a correctness fix that happens to be an optimisation
 
 **Every `b.live` part owns its own `fetch`.** The landing dashboard, `/stats`, and a
@@ -1145,7 +1168,7 @@ because it holds nothing that could.
 
 **1. Render is memoised on `(sourceVersion, viewState, width)`.** If none of the three moved,
 the previous `Block` is still correct — **so skip the render, the measure and the diff.** This
-is #13's render cache keyed more precisely, and it means a collapsed part on a ticking source
+is [the render cache](#render-caching) keyed more precisely, and it means a collapsed part on a ticking source
 costs almost nothing.
 
 **2. A derivation runs only if a visible part needs it.** If every consumer of the ring
@@ -1197,7 +1220,7 @@ which is correct (heights change with width) and is the one operation the increm
 cannot do incrementally.
 
 **So a resize drag is: N full index rebuilds, N full re-renders, N full frame writes.** The
-render cache and output diffing (#13, #12) do not help — every row genuinely changed.
+[render cache](#render-caching) and [output diffing](#output-diffing) do not help — every row genuinely changed.
 
 **A short coalescing window is the fix, and it is a C03 I2 amendment rather than a bug fix.**
 I2's reasoning is that a delayed resize means a visibly wrong frame; **the counter is that a
@@ -1227,7 +1250,7 @@ answers.
 ```
 entries scrolled off       ✓ HANDLED — C14 virtualises; paint gets rows already selected
 rows off-screen INSIDE
-  a visible block          ✗ a 5,000-line patch renders whole to show 30 (#13)
+  a visible block          ✗ a 5,000-line patch renders whole to show 30 — render caching
 b.live parts scrolled off  ✗ THEY KEEP TICKING — no visibility check exists anywhere
 ```
 
@@ -1253,11 +1276,11 @@ what I9 protects, and step 3's F17 nearly re-broke it.
 - **scrolled off** means nobody is looking *right now*, and the reader may scroll back at any
   moment — so the data must be fresh **when they do**.
 
-**Ruled: pause, and catch up on return** — see #16, which supersedes an earlier draft of this
+**Ruled: pause, and catch up on return** — see [shared pollers](#shared-pollers), which supersedes an earlier draft of this
 paragraph that proposed throttling. Pausing is simpler, and the catch-up fetch on re-entry
 means the reader never sees stale data either way.
 
-**With a shared source (#16) this compounds**: one visible part keeps the source polling for
+**With a [shared source](#shared-pollers) this compounds**: one visible part keeps the source polling for
 everything that shares it, so returning to a scrolled-off panel is frequently free.
 
 #### What it needs
@@ -1272,6 +1295,7 @@ driver event.
 how expensive the fetch is, which is the app's business and not the framework's — so it is
 probably a `b.live` field with a default rather than a constant.
 
+<a id="help-per-verb"></a>
 ### ★ `--help` on every verb — the renderer exists and nothing can ask for it
 
 **`usageBlocks(tool, id)` is built, exported, and has no caller in `src/`.** It generates
@@ -1302,7 +1326,7 @@ reasoning written down, the trigger absent.
 
 **Every declared flag is transmitted to the far side.** That is how `--raw` reached docker
 and it exited 125 — **there is no way to declare a flag that selects a rendering rather than
-an invocation** (F39, #32's neighbourhood).
+an invocation** (F39 — [flags that select a rendering](#rendering-flags)).
 
 So `--help` would be forwarded rather than intercepted. **Two consumers for one gap now**,
 which is the strongest argument F39 has.
@@ -1316,11 +1340,11 @@ forgetting it is a verb with no help** — which is exactly the failure the "gen
 manifest" reasoning exists to prevent.
 
 **And it shrinks `/help`'s problem rather than adding to it.** At fifty verbs a flat list is a
-wall (#39). But if `/help` lists verbs with their summaries and `/verb --help` gives the
+wall — [`/help`'s empty verb list](#help-bucketing). But if `/help` lists verbs with their summaries and `/verb --help` gives the
 detail, **`/help` never needs to show flags at all** — two levels, and the second one is
 already written.
 
-**Check `/help`'s bucketing finding first** (#39): a two-level help built over a broken
+**Check `/help`'s bucketing finding first** ([the bucketing finding](#help-bucketing)): a two-level help built over a broken
 bucket inherits it.
 
 ### ASCII art and banners — sparse variants, graceful fallback, validation per variant
@@ -1385,7 +1409,7 @@ or not anything else here is built.
 
 #### Composition and tiers come free from work already planned
 
-`b.row` (#38) does the side-by-side that had to be hand-padded — measuring children, aligning
+[`b.row`](#horizontal-composition) does the side-by-side that had to be hand-padded — measuring children, aligning
 them, padding to the tallest, which *is* the list above. And **tier selection by measured
 width is the block-boundary window's shape**: pick the variant that fits from a declared set,
 rather than computing one.
@@ -1424,23 +1448,24 @@ it is the same family as `⌃z`/`⌥z`.
 byte** (`0x01`) — exactly the collision that ruled out `⌃_` for undo. If they are, `⌥a` is
 the fallback, on the ESC-prefixed path `⌥b`/`⌥d`/`⌥f` already use.
 
-**And rebindable keys (#42) is the real answer to "which default is right."** The keymap is
+**And [rebindable keys](#rebindable-keys) is the real answer to "which default is right."** The keymap is
 declarative data and this is one row either way — ship a default, let people change it.
 
 #### The work is the selection, not the binding
 
 C17 would need a **selection range**, every motion a shifted variant that extends it, typing
-to replace it, and the renderer to show it — which is the full-row background from #23, at
+to replace it, and the renderer to show it — which is the [full-row background](#selection-wash), at
 character granularity.
 
 **That is the same concept the copy story needs at two other scopes**: a selection in the
-editor, a selection in the transcript (`copyMode`, #15), and semantic copy of a focused
+editor, a selection in the transcript ([`copyMode`](#text-selection)), and semantic copy of a focused
 block. **One mechanism, three scopes — do not build it as a one-off for `⌃⇧a`.**
 
 **And be precise about what is actually missing.** *Deleting* everything already works:
 `⌃u` kills to start, `⌃a ⌃k` kills the line. What does not exist is **selecting** it — to
 copy, or to replace by typing. If the want is "clear the prompt fast", that ships today.
 
+<a id="selection-wash"></a>
 ### Selection needs a background, not just a tone — and that is free
 
 **Correction to an earlier version of this entry**, which read C11 I14 too widely and ruled
@@ -1498,13 +1523,13 @@ changes. Same trick as the scrollbar's column.
 the former. That means **padding the row to the region width before styling**, which is a
 rendering decision rather than a measurement one, so it stays inside I14.
 
-**And it pairs with the navigation model (#38's neighbourhood)**, where *selected* becomes a
+**And it pairs with the [navigation model](#navigation-model)**, where *selected* becomes a
 state worth showing strongly because the reader is moving through things deliberately.
 
 ### Two themes ship, and one of them is broken
 
 `ThemeSet = { dark: ThemeTokens; light: ThemeTokens }`. **Two, and `light` is the one that
-renders dark-on-dark** on a dark terminal (#39) because it sets foregrounds and paints
+renders dark-on-dark** on a dark terminal ([the background ruling](#theme-background)) because it sets foregrounds and paints
 nothing behind them — which the background ruling fixes.
 
 **More defaults, and the reason is not variety.** A theme is the framework's most visible
@@ -1521,7 +1546,7 @@ low-saturation one for long sessions.
 - **Every shipped theme passes the contrast floor and the 4-bit injectivity test** (C10 T2.3
   — the tones whose confusion is misleading rather than dull). A shipped theme that fails its
   own framework's checks is worse than not shipping it.
-- **A theme declares the terminal background it assumes** (#32's ruling). With more themes
+- **A theme declares the terminal background it assumes** ([the background ruling](#theme-background)). With more themes
   the naming problem multiplies — half of any popular set are light variants, and each will
   be dark-on-dark without that declaration.
 
@@ -1529,30 +1554,17 @@ low-saturation one for long sessions.
 becomes a collection, which is a public type change — **freeze-relevant**, so it belongs
 before publication rather than after.
 
-### ★ Ghost text is computed, acceptable, and never drawn
+### ★ Ghost text ghosts only a sole candidate — and *never drawn* is now closed
 
-**The twelfth instance of the class, and the sharpest form of it: a suggestion you can accept
-but cannot see.**
+**~~Computed, acceptable, and never drawn~~ — CLOSED.** `paint.ts:269` reads the ghost; it
+landed in `95fedee` (PR #27), which is one merge after the coverage audit that recorded it as
+open. **Recorded rather than deleted**: this entry's headline was the sharpest instance of
+exported-and-unreachable in the document, and an entry that quietly loses its headline reads
+as though the rest was always the point.
 
-```
-engine.ts:149      ghost(ctx) → the completion text
-keys.ts:232        deps.completion.ghost(ctx) → editor.insert(ghost)     ← the ACCEPT path
-paint.ts           no reference to ghost
-frame.ts           no reference to ghost
-```
+**Two of the three improvements survive, and the second is the one a user feels.**
 
-`→` inserts a suggestion that was never displayed. The editor's own comment says rendering is
-deliberately outside it — *"keeping rendering out is what makes the editor testable as a pure
-[structure]"* — which is correct, and **no layer picked it up.**
-
-**Three separate improvements, and the first is the finding:**
-
-#### 1. Draw it
-
-Confirm the paint path is genuinely absent rather than elsewhere, then add it: the ghost is
-dim text after the cursor, and the cursor stays before it. **`Placed.cursor`'s reasoning
-applies** — the cursor belongs where the user is typing, not after text they have not
-accepted.
+#### 1. ~~Draw it~~ — done
 
 #### 2. Ghost the *best* candidate, not the *only* one
 
@@ -1563,7 +1575,7 @@ no longer need the hint.**
 
 The rule is *safe* rather than useful: it only ghosts when it cannot be wrong.
 
-**With ranking (#24), "best" becomes meaningful** — the most recently used match — and
+**With [ranking](#completion-ranking), "best" becomes meaningful** — the most recently used match — and
 `/s` → `stats` in dim text is the affordance people expect. **Do ranking first**; ghosting an
 arbitrary candidate from an unsorted list would be worse than ghosting nothing.
 
@@ -1579,11 +1591,12 @@ A stale ghost from a superseded request is the failure it guards.
 
 #### And ghost and the menu are two answers to one question
 
-**Design them together (#25, #40), not separately.** Every good shell ghosts the top
+**Design ghost and [as-you-type](#as-you-type) together, not separately.** Every good shell ghosts the top
 candidate *while* the menu shows the rest — one hint with two levels of detail. Built apart,
 they compete: a ghost saying one thing and a menu highlighting another is worse than either
 alone.
 
+<a id="as-you-type"></a>
 ### As-you-type completion — the trigger, not the engine
 
 Type `/th` and the menu appears, showing `/theme`. A search-bar feel over the manifest.
@@ -1634,6 +1647,7 @@ mean `/clear`?*. Trivial, high value, and the verb list is already in hand for c
 C22 already takes an app-supplied `ChromeFn`. Making each optional is a config field plus
 region arithmetic. Small and clearly right.
 
+<a id="rebindable-keys"></a>
 ### Rebindable keys — precedence, not refusal, and unbind must be a value
 
 The keymap is declarative data — that was C16's whole design. **The merge step is small; the
@@ -1697,6 +1711,7 @@ missing. Build after that lands.
 
 ---
 
+<a id="navigation-model"></a>
 ## Navigation — the biggest design opportunity, and mouse is already built
 
 ### What exists today
@@ -1803,6 +1818,7 @@ bindings, and clickable buttons/links all fall out of it. And every future inter
 block — todo checkboxes, the question/menu primitive — gets a coherent home instead of
 inventing its own keys.
 
+<a id="scroll-anchor"></a>
 ### The scroll-anchor rule — do this regardless, and first
 
 **If the user is scrolled up, a new entry must not move their viewport. If they are at the
@@ -1896,9 +1912,10 @@ knows where the cursor is and the window does not ask.
 **And the tail-anchor is right for the common case**, which is why it was chosen — so the
 change is *cursor-following when the cursor is not at the end*, not a replacement.
 
-Worth doing with the scroll-anchor rule (#25's neighbourhood): both are *"the window should
+Worth doing with the [scroll-anchor rule](#scroll-anchor): both are *"the window should
 follow the thing the reader is attending to"*, one in the transcript and one in the prompt.
 
+<a id="chrome-row-budget"></a>
 ### Chrome is one row each, by design — and four features now want more
 
 `frame.ts:4`: *"Calcium owns the structure — **one chrome row each, fixed, never scrolling**."*
@@ -1921,7 +1938,7 @@ letting them fight. The options:
 - **Chrome as blocks**, so it composes like everything else and `b.row` gives it horizontal
   layout for free.
 
-**The third is the interesting one** and it pairs with `b.row` (#26): if chrome is a block
+**The third is the interesting one** and it pairs with [`b.row`](#horizontal-composition): if chrome is a block
 sequence, then multi-row, segmented and composed are all the same thing, and the framework
 does not grow a second layout system for the header.
 
@@ -2124,7 +2141,7 @@ an ML platform's TUI.
                              two parameters. C19's menu already has the flip, the selection
                              and `… N more`; the confirm reimplements or lacks all of it
 17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
-                             MAX_ROWS is the fallback adapter's alone. #12 → #13 → window
+                             MAX_ROWS is the fallback adapter's alone. diffing → caching → window
                              the block → cap with a marker. A CHAIN, in that order
 18 SHARED POLLERS ★★       source → derivation → part. One fetch AND one computation per
                              source; only the render is per instance. A CORRECTNESS fix
@@ -2147,9 +2164,9 @@ an ML platform's TUI.
                              so C10's contrast floor checks the fg/bg pair
 24 more default themes      two ship and `light` is dark-on-dark. ThemeSet is a two-field
                              record, so more is a PUBLIC TYPE change — freeze-relevant
-25 ghost text ★            computed, acceptable by →, NEVER DRAWN. And it only ghosts a
-                             sole candidate, which is when the hint is least needed.
-                             Design with as-you-type (#31) — one hint, two levels
+25 ghost text ★            drawn since PR #27. What remains: it ghosts only a SOLE
+                             candidate, which is when the hint is least needed, and it
+                             is static-only. Design with as-you-type — one hint, two levels
 26 view trace in transcript a full-screen view leaves no record. Append on push, PATCH on
                              pop — sidesteps B03's no-trace-on-pop ruling, one entry, D7
                              intact. And ⏎ to re-enter is nearly free
@@ -2165,9 +2182,9 @@ an ML platform's TUI.
 31 completion ranking       prefix-matched and unranked today. Recency-first is nearly
                              free (C20 has it) and is the most-felt. RANK BEFORE
                              as-you-type, or the menu is worse for opening itself
-32 prefix-out / defaultRoute      CommandPolicy is exported and unreachable — a config field.
-                             And prefix-OUT (prose by default) is a separate ruling that
-                             agent-tui needs
+32 prefix-out / defaultRoute      prefix-IN is expressible and CommandPolicy is reachable
+                             (retracted — F89). Prefix-OUT is not: prose by default, verbs
+                             by exception. A RULING on defaultRoute, not a config field
 33 QUEUEING ★              submit while something runs — a stated must. Small queue,
                              real rulings, and Ctrl-C is ambiguous the way step 9's was
 34 UX polish set            animation (decoration never information) · change highlighting ·
@@ -2193,7 +2210,7 @@ an ML platform's TUI.
                              C10's contrast floor provable rather than assumed against a
                              guess; inheriting preserves transparency. The light theme
                              paints, because it cannot work otherwise. Shares row-padding
-                             with selection's wash (#22). Plus: /help's verb list came
+                             with selection's wash. Plus: /help's verb list came
                              back empty — both found by looking
 40 as-you-type completion    the trigger, not the engine — and it makes the manifest
                              claim visible. Largely subsumes the next line
