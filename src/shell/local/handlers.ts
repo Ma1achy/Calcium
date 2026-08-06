@@ -60,9 +60,38 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
      * reading the raw list here would make `/help` the one surface that ignores
      * it.
      */
-    help: () => {
+    /**
+     * **`/help` answers about verbs; `/help keys` answers about keys.**
+     *
+     * It emitted both, verbs first and every binding last — and the bindings are
+     * the longer half by a distance. Measured at thirty app verbs on a 44-row
+     * terminal: the visible frame was **entirely bindings**, with every verb
+     * scrolled off the top. The section a reader almost never wants is the only
+     * one they can see, and it gets worse with each binding added rather than
+     * with each verb.
+     *
+     * That is not the failure the grouping ruling was written against, which
+     * assumed the verb list was the wall. Grouping thirty verbs into panels
+     * leaves the forty binding rows exactly where they were.
+     *
+     * So the split is by *question asked* rather than by length. `/help` with no
+     * argument is the front door and stays one answer; the keymap is a second
+     * question with its own name. Both still render from the manifest and C16's
+     * keymap and never from a maintained list (I26).
+     */
+    help: (argv) => {
       const manifest = deps.manifest();
       const visible = manifest === null ? [] : visibleTools(manifest);
+
+      if (argv[0] === "keys") {
+        return doc("/help keys", [
+          block({
+            kind: "keyValue",
+            id: blockId("help-keys"),
+            rows: deps.bindings().map((bnd) => ({ label: bnd.keys, value: bnd.does })),
+          }),
+        ]);
+      }
 
       // **Grouped by C05 §3's partition**, and this is its second consumer.
       // `/clear` and `/exit` are different in kind from `/ps` and `/promote`,
@@ -85,11 +114,14 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
           gapBefore: true,
           rows: shell.map((t) => ({ label: `/${t.name}`, value: t.summary })),
         }),
+        // **A pointer, not the payload.** One line naming the other question,
+        // so the keymap is discoverable without being the whole answer.
         block({
-          kind: "keyValue",
-          id: blockId("help-keys"),
+          kind: "tip",
+          id: blockId("help-more"),
           gapBefore: true,
-          rows: deps.bindings().map((b) => ({ label: b.keys, value: b.does })),
+          text: "/help keys",
+          actions: [{ kind: "fill", label: "Use", command: "/help keys" }],
         }),
       ]);
     },

@@ -169,7 +169,18 @@ describe("C05 integration", () => {
       expect(rendered, `${t.name} is hidden and must not`).not.toContain(`/${t.name}`);
     }
 
-    // And the keymap half: every binding shown is one C16 will dispatch.
-    expect(rendered, "bindings come from the same table dispatch uses").toContain("c+c");
+    // **The keymap is `/help keys` now, and this row asserts the split.**
+    // `/help` emitted every binding last, and measured at thirty verbs on a
+    // 44-row terminal the visible frame was entirely bindings with the verbs
+    // scrolled off. The front door answers about verbs; the keymap is a second
+    // question with its own name. Both still come from the live sources (C23 I26).
+    expect(rendered, "the front door points at the other question").toContain("/help keys");
+    expect(rendered, "and does not carry the keymap itself").not.toContain("c+c");
+
+    h.pipeline.submit("/help keys");
+    await settled();
+    const keys = JSON.stringify(h.transcript.entries.at(-1)?.doc.blocks);
+    expect(keys, "bindings come from the same table dispatch uses").toContain("c+c");
+    expect(keys, "and the verb list is not repeated there").not.toContain("/promote");
   });
 });

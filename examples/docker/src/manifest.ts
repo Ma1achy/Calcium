@@ -22,6 +22,8 @@ import { READ_TOOLS } from "./manifest/read.ts";
 import { LIFECYCLE_TOOLS } from "./manifest/lifecycle.ts";
 import { DESTRUCTIVE_TOOLS } from "./manifest/destructive.ts";
 import { REGISTRY_TOOLS } from "./manifest/registry.ts";
+import { RESOURCE_TOOLS } from "./manifest/resources.ts";
+import { EXEC_TOOLS } from "./manifest/exec.ts";
 
 /**
  * F1's shim, not `docker`.
@@ -44,6 +46,13 @@ export function buildManifest(engineVersion: string): ManifestDocument {
     schema: "tui.manifest/1",
     binary: "docker",
     version: engineVersion,
-    tools: [...READ_TOOLS, ...LIFECYCLE_TOOLS, ...DESTRUCTIVE_TOOLS, ...REGISTRY_TOOLS],
+    tools: [
+      ...READ_TOOLS,
+      ...LIFECYCLE_TOOLS,
+      ...DESTRUCTIVE_TOOLS,
+      ...REGISTRY_TOOLS,
+      ...RESOURCE_TOOLS,
+      ...EXEC_TOOLS,
+    ],
   };
 }

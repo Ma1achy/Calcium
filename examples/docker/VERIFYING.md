@@ -17,6 +17,18 @@ what is installed**, and the framework's has no docker socket by design.
 | the app's `npm test` | either | it runs against `test/corpus/`, which is why CI can run it without docker |
 | `make fixtures` · `docker-tui` · `tools/capture.py` | `docker-tui` | the socket is only here |
 
+**And the load is not only other containers — it is vitest's own parallelism.**
+Measured in step 12: `npx vitest run --dir test` reported 5, then 7, then 8 failures on
+three consecutive runs of identical code, **with a completely different set each time** and
+never including anything the change had touched. Every one of those files passed when run
+alone. The same tree with `--no-file-parallelism` reported **one** failure — `T5.6`, which
+is independently known to be pre-existing.
+
+So a rotating failure set is a diagnosis, not a mystery: when the failures differ run to
+run and the union is the timing-sensitive files, the answer is contention. Re-run serially
+before reading anything into it. It costs about four times the wall clock and it is the
+difference between a report and a guess.
+
 **A frame-read and a timing tier must not share a container run.** `make fixtures` brings
 up a load container so the CPU plot has a shape to draw, and a busy container made tier 5's
 `T5.3a` fail during step 4 — it passed alone, and `make all` went green once it was removed.

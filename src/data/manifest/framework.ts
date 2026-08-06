@@ -30,8 +30,11 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
   Object.freeze({
     name: "help",
     local: true,
-    summary: "list verbs and key bindings",
-    args: [],
+    summary: "list the verbs; `/help keys` lists the key bindings",
+    // **Declared, or `/help keys` is not completable and reads as a typo.** The
+    // argument is optional and the only value it takes is `keys`; C18 does not
+    // enforce a value set, so this is what `/help` and completion have to go on.
+    args: [Object.freeze({ name: "topic", type: "string" as const, required: false, summary: "`keys`, for the key bindings" })],
     flags: [],
   }),
   Object.freeze({
