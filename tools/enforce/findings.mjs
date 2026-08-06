@@ -1,0 +1,166 @@
+/**
+ * SP5 — every `Fnn` citation resolves against a finding that exists.
+ *
+ * **The findings ledger is the most-cited document in the application and the
+ * only one with no citation check.** SP3 proves that every `Inn` reference
+ * resolves; specs, source and tests are all covered. `FINDINGS.md` is cited from
+ * source comments, from four specs, and from itself, and nothing looked.
+ *
+ * It was written after step 9 cited `F67` for a finding about local handlers.
+ * F67 exists and is about the shell drawing nothing below a certain terminal
+ * size — so the citation **resolved, against something real and unrelated**,
+ * which is the version that survives review. The replacement was chosen by
+ * grepping `^## F6[0-9]`, which cannot see `F70` and above; the true maximum was
+ * `F76`, and that number was taken too. `make enforce` was green throughout.
+ *
+ * This is A03 §2's vacuity class in the one document that had no mechanism at
+ * all: a wrong citation reads exactly like a right one, and the cost of checking
+ * is a file read.
+ *
+ * **Known limits, stated because an unrecorded limit reads as strength:**
+ *
+ *   - It checks that the number **exists**, not that it is the right one. A
+ *     citation pointing at a real but unrelated finding — which is precisely
+ *     what happened — still passes if the number is live. Nothing can catch
+ *     that; `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says why one
+ *     should not be built.
+ *   - It reads the literal `F` followed by digits. A number held in a variable
+ *     or built by hand is invisible, which is the blind spot every textual rule
+ *     in this suite has.
+ *   - **Prose about a bad citation contains the bad citation**, and this cannot
+ *     tell discussion from use. Writing A03's rationale for this rule made it
+ *     fire on that rationale. Describe such an id rather than spelling it; an
+ *     exception list would excuse the file that most needs checking.
+ *   - Sub-findings (`F17a`, `F58b`) resolve against their own heading,
+ *     and a citation of `F58` resolves whether or not `F58b` exists. They are
+ *     separate entries and are indexed separately.
+ */
+
+import { readFileSync, readdirSync, statSync } from "node:fs";
+
+const LEDGER = "examples/docker/FINDINGS.md";
+
+/** Where a citation may appear. Anything else is prose about the number. */
+const CITED_FROM = [
+  "examples/docker/src/",
+  "examples/docker/test/",
+  "examples/docker/",
+  "docs/",
+  "src/",
+  "CLAUDE.md",
+];
+
+/** The headings, which are the only declaration of what exists. */
+function declared() {
+  const text = readFileSync(LEDGER, "utf8");
+  const ids = new Set();
+  for (const m of text.matchAll(/^##\s+(F\d+[a-z]?)\b/gmu)) ids.add(m[1]);
+  return ids;
+}
+
+/**
+ * A citation, and the shape is deliberately narrow.
+ *
+ * `FINDINGS F70`, `(F58b)`, `see F14` — a bare `F1` inside an identifier or a
+ * hex string is not one, so the number must be delimited and must not be part of
+ * a longer word.
+ */
+const CITATION = /(?<![A-Za-z0-9_])(F\d+[a-z]?)(?![A-Za-z0-9_])/gu;
+
+/**
+ * Its own walk, and that is the whole reason this rule works.
+ *
+ * `index.mjs` builds `files` from `walk("src")`, so a rule taking that list can
+ * only ever see framework source — and every citation of this ledger is in
+ * `examples/docker/`, `docs/` or `CLAUDE.md`. The first draft took `files`,
+ * scanned nothing, and passed: four fabricated violations, zero firings. A rule
+ * whose scope excludes its subject is A03 §2's vacuity class wearing a scan's
+ * clothes, and it is invisible because the output is identical to success.
+ */
+function walk(dir, out = []) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    if (e === "node_modules" || e === ".git" || e === "dist" || e === "out") continue;
+    const full = `${dir}/${e}`;
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (/\.(?:ts|mjs|md)$/u.test(e)) out.push(full);
+  }
+  return out;
+}
+
+export function checkFindings() {
+  const known = declared();
+  const violations = [];
+
+  // The ledger cites itself constantly — "see F58b", "F66's shape" — and those
+  // must resolve too. It is included rather than excused: the entry that cites a
+  // finding renumbered out from under it is the likeliest wrong citation there
+  // is, and excusing the file would leave the largest source of them unchecked.
+  const inScope = [
+    ...walk("src"),
+    ...walk("docs"),
+    ...walk("examples/docker/src"),
+    ...walk("examples/docker/test"),
+    LEDGER,
+    "CLAUDE.md",
+  ].filter((f) => f === LEDGER || CITED_FROM.some((p) => f.startsWith(p)));
+
+  for (const file of inScope) {
+    let text;
+    try {
+      text = readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    if (!text.includes("F")) continue;
+
+    const lines = text.split("\n");
+    for (const [i, line] of lines.entries()) {
+      // A heading declares; it does not cite.
+      if (/^##\s+F\d/u.test(line)) continue;
+      for (const m of line.matchAll(CITATION)) {
+        const id = m[1];
+        // Only ids in the ledger's range are citations of it. `F1` in a
+        // hexadecimal dump or a version string is not, and the ledger starting
+        // at F1 means the range is "anything declared, or above the maximum".
+        if (known.has(id)) continue;
+        const n = Number(id.replace(/[a-z]$/u, "").slice(1));
+        const max = Math.max(
+          ...[...known].map((k) => Number(k.replace(/[a-z]$/u, "").slice(1))),
+        );
+        // **A number past the end fires, and the first draft skipped it.**
+        //
+        // The guard read `n < 1 || n > max` — "out of range, so not a citation"
+        // — and the ledger is dense from F1 to F77 with no gaps, so the only
+        // thing that could fire was a gap and there were none. The rule was
+        // vacuous on the day it was written: three fabricated violations, zero
+        // firings, `enforce` green. A03 §2's class in the check meant to close
+        // it.
+        //
+        // And the skipped half was the important one. Inventing a number past
+        // the end is the likeliest wrong citation there is — it is what happened
+        // twice in step 9 — while a gap requires someone to have deleted a
+        // finding. The upper bound is now checked and only a nonsensical `F0`
+        // is excused.
+        if (n < 1) continue;
+        violations.push({
+          rule: "SP5",
+          file: `${file}:${String(i + 1)}`,
+          message:
+            `cites ${id}, and ${LEDGER} has no such finding. The ledger runs to F${String(max)}. ` +
+            `A number chosen by grepping a prefix — \`^## F6[0-9]\` cannot see F70 — is how ` +
+            `this one arrived. Note that a citation resolving against a real but unrelated ` +
+            `finding passes here: this rule checks existence, not aim.`,
+          spec: "A03 §7a · FINDINGS",
+        });
+      }
+    }
+  }
+
+  return violations;
+}
