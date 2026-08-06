@@ -3770,9 +3770,25 @@ succeed, which is right for testing the rewind and blind to the directory. **The
 supplies the behaviour** — the precondition the real filesystem imposes is exactly what
 a fake removes.
 
-**The fix is a call, not a feature**: ensure the directory before the first write. Both
-members already exist and are already supplied, which is what makes this a wiring gap
-rather than a missing capability.
+**The fix is a call, not a feature**: ensure the directory before the first write. It
+belongs to **C22, not C20** — `HistoryFs` deliberately omits `mkdir`, and its own
+declaration says a wider type would let a later edit reach for something the component
+never needed. Widening it would trade this defect for F58b's and F85's shape. C22 owns
+`FileSystem` and owns `stateDir`.
+
+**It has a second consumer, and the fixture found it rather than the reasoning.** Once
+`fakeFs` modelled directories, removing the `mkdir` call turned **T4.5 — `/theme light`
+persists and survives a restart** — red, not a history row. Theme persistence writes to
+the same directory and was equally broken on a fresh machine; the test had passed since
+it was written because the double allowed it. **So the defect was never about history**:
+it was *nothing in the shell creates the directory every persisted thing writes into*,
+and history was simply where it was noticed.
+
+**`FileSystem.exists` was removed rather than wired.** It was declared, implemented over
+`fs.access`, supplied by both fakes and called by nothing, and there was nothing to wire
+it to — `mkdir` is `recursive: true`, so a prior existence check is a call whose answer
+changes nothing. MG24's disposition is *wire it or remove it*, and narrowing a public
+type is cheap now and a breaking change after the freeze.
 
 ---
 

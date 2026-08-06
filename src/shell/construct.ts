@@ -58,7 +58,7 @@ import { createKeyEffects } from "./keys.js";
 import { createDocumentView } from "./document-view.js";
 import { createPatchView } from "./patch-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
-import { openHistory } from "../interaction/history/index.js";
+import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { createFrameScheduler } from "../terminal/frame-scheduler.js";
 import {
@@ -420,6 +420,40 @@ export async function constructGraph(
       chromeRows: (entry, width) => commandRows(entry.doc.command, width).length,
     });
     const overlays = createOverlayManager({ registry: built.blocks });
+    // **The state directory has to exist before anything writes into it**, and
+    // nothing created it. `FileSystem.mkdir` was declared, implemented at
+    // `session.ts`, and called by nowhere in `src/` — so on a machine without
+    // the directory every history write failed ENOENT, C20 rewound correctly
+    // rather than dropping the row, and the retry failed identically forever.
+    // Correct error handling one layer up is what turned a missing call into a
+    // permanent silent failure. FINDINGS F96.
+    //
+    // **C22's, not C20's.** `HistoryFs` deliberately omits `mkdir` — its own
+    // declaration says a wider type would let a later edit reach for something
+    // the component never needed — so widening it to fix this would trade one
+    // defect for the shape F58b and F85 are about. C22 owns `FileSystem` and
+    // owns `stateDir`, and directory management belongs with both.
+    //
+    // **Warn and continue, never throw**, which is the precedent thirty lines
+    // below: history repairs a corrupt file at open rather than failing,
+    // because a session that refuses to start over a preference file has made a
+    // preference into a dependency. An unwritable state directory costs
+    // persistence, not the session.
+    // `mkdir` is `recursive: true` at the one place it is implemented, so the
+    // ordinary case — the directory already exists — succeeds silently and no
+    // notice is drawn. Only a genuinely unwritable path reaches the catch.
+    try {
+      await config.fs.mkdir(config.stateDir);
+    } catch {
+      transcript.append(
+        noticeDoc(
+          "",
+          `history will not persist: \`${config.stateDir.slice(0, 60)}\` could not be created`,
+          "warn",
+          { origin: "refresh" },
+        ),
+      );
+    }
     const history = await openHistory({
       fs: config.fs,
       clock: config.clock,
@@ -859,6 +893,23 @@ export async function constructGraph(
       // cell narrows it in place, and that cell is unreachable while the
       // character is dropped before it arrives.
       if (stores.overlays.top?.id === MENU_ID) return promptKeys(e);
+
+      // **A reverse search narrows as you type** (C20 §7), and this branch is
+      // the one that did not exist. The forward above is the menu's, so a
+      // printable key under a *search* matched no overlay binding, reached the
+      // `return false` below, and was dropped — C20 declared `searchType` and
+      // `searchBackspace`, `store.ts` implemented them, a revert test covered
+      // them, and no caller existed anywhere in `src/`. FINDINGS F97.
+      if (stores.overlays.top?.id === SEARCH_ID && e.kind === "key") {
+        if (e.key.name === "backspace") {
+          keys.searchTyped(null);
+          return true;
+        }
+        if (isPrintable(e.key)) {
+          keys.searchTyped(e.key.sequence);
+          return true;
+        }
+      }
       return false;
     });
 

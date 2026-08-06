@@ -69,11 +69,6 @@ const nodeFileSystem: FileSystem = {
       name: e.name,
       directory: e.isDirectory(),
     })),
-  exists: (path) =>
-    access(path).then(
-      () => true,
-      () => false,
-    ),
 };
 
 /** The ambient reads, in the one file allowed to perform them. */

@@ -42,7 +42,6 @@ function fakeFs(): FileSystem {
     },
     appendFileSync: (p, d) => void files.set(p, (files.get(p) ?? "") + d),
     mkdir: () => Promise.resolve(),
-    exists: (p) => Promise.resolve(files.has(p)),
     // A real answer, not an empty list: C19's path and executable sources take
     // this, and a fake returning nothing makes a completion assertion pass for
     // the wrong reason (`test/support/README.md`).

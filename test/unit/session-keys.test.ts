@@ -418,6 +418,36 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(graph.overlays.top?.id).not.toBe(MENU_ID);
   });
 
+  it("T1.4h3a (C20 §7, F97): a search narrows as you type, and backspace widens it", async () => {
+    // **The row F97 did not have.** `searchType` and `searchBackspace` were
+    // declared, implemented and covered by `test/revert/history.test.ts` — which
+    // calls the store *directly*, so it proved the machine worked and said
+    // nothing about whether a keystroke reached it. Nothing did: the overlay
+    // handler forwarded printable keys only for the completion menu, so `⌃r`
+    // opened a search whose query could never become non-empty.
+    //
+    // **This dispatches a key rather than calling the store**, which is the
+    // whole difference — a test that calls the mechanism verifies the mechanism
+    // and never the wiring.
+    const { graph } = await buildGraph();
+    graph.history.append("git push origin", 0);
+    graph.history.append("npm test", 0);
+
+    graph.router.dispatch(press({ name: "r", ctrl: true }));
+    expect(graph.overlays.top?.id).toBe(SEARCH_ID);
+    expect(graph.history.searchState?.query, "opens empty").toBe("");
+
+    graph.router.dispatch(press({ name: "p" }));
+    graph.router.dispatch(press({ name: "u" }));
+    expect(graph.history.searchState?.query, "the keystrokes reached C20").toBe("pu");
+    expect(graph.history.searchState?.hit?.command, "and narrowed to the match").toContain(
+      "git push",
+    );
+
+    graph.router.dispatch(press({ name: "backspace" }));
+    expect(graph.history.searchState?.query, "backspace widens it").toBe("p");
+  });
+
   it("T1.4h4 (C16 I21): each editing action's effect, not merely that C17 was called", async () => {
     // **T2.14 asks which method a binding reaches and this asks what it does.**
     // Rewiring `killWordLeft` to `killTo("wordRight")` passes T2.14 exactly —

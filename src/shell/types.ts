@@ -92,13 +92,22 @@ export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
  * `beforeRelease` cannot await, and the append in flight at exit is the command
  * the user has just typed.
  */
+/**
+ * **`exists` was removed rather than allow-listed.** It was declared here,
+ * implemented in `session.ts` over `fs.access`, supplied by both test fakes,
+ * and called by nothing anywhere — MG24's own disposition is *wire it or remove
+ * it*, and there was nothing to wire it to: `mkdir` is `recursive: true`, so a
+ * prior existence check would be a call whose answer changes nothing.
+ *
+ * Narrowing a public type is cheap now and a breaking change after the freeze,
+ * which is the whole argument for doing it here. FINDINGS F96.
+ */
 export interface FileSystem {
   readFile(path: string): Promise<string>;
   writeFile(path: string, data: string): Promise<void>;
   appendFile(path: string, data: string): Promise<void>;
   appendFileSync(path: string, data: string): void;
   mkdir(path: string): Promise<void>;
-  exists(path: string): Promise<boolean>;
   /**
    * C19's `ReadDir`, for the path and executable completion sources (§2b).
    *

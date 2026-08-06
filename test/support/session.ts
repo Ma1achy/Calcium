@@ -37,6 +37,28 @@ export const MANIFEST: TuiConfig["manifest"] = {
 
 export function fakeFs(): FileSystem {
   const files = new Map<string, string>();
+  /**
+   * **Directories, because `mkdir: () => Promise.resolve()` is a fake that
+   * supplies the behaviour.** F96 was a missing `mkdir` call that no test could
+   * see: every write here succeeded whether or not anything had created the
+   * directory, so the one precondition the real filesystem imposes was the one
+   * the double removed. The suite was correct about the interface and silent
+   * about the world.
+   *
+   * A write to a path whose parent was never created now rejects ENOENT, as
+   * `node:fs` does. That is `test/support/README.md`'s rule — *a fixture must be
+   * shown to respond to the thing under test* — applied to the filesystem.
+   */
+  const dirs = new Set<string>();
+  const parentOf = (p: string) => p.slice(0, Math.max(0, p.lastIndexOf("/")));
+  const ensure = (p: string) => {
+    const dir = parentOf(p);
+    if (dir !== "" && !dirs.has(dir)) {
+      throw Object.assign(new Error(`ENOENT: no such file or directory, open '${p}'`), {
+        code: "ENOENT",
+      });
+    }
+  };
   return {
     // **Throws when absent, as `node:fs` does.** It used to answer `""`, which
     // collapses *no file* into *an empty file* — and C22 I40 is the one caller
@@ -56,16 +78,31 @@ export function fakeFs(): FileSystem {
       return Promise.resolve(held);
     },
     writeFile: (p, d) => {
+      try {
+        ensure(p);
+      } catch (err) {
+        return Promise.reject(err);
+      }
       files.set(p, d);
       return Promise.resolve();
     },
     appendFile: (p, d) => {
+      try {
+        ensure(p);
+      } catch (err) {
+        return Promise.reject(err);
+      }
       files.set(p, (files.get(p) ?? "") + d);
       return Promise.resolve();
     },
-    appendFileSync: (p, d) => void files.set(p, (files.get(p) ?? "") + d),
-    mkdir: () => Promise.resolve(),
-    exists: (p) => Promise.resolve(files.has(p)),
+    appendFileSync: (p, d) => {
+      ensure(p);
+      files.set(p, (files.get(p) ?? "") + d);
+    },
+    mkdir: (p) => {
+      dirs.add(p);
+      return Promise.resolve();
+    },
     // A real answer, not an empty list: C19's path and executable sources take
     // this, and a fake returning nothing makes a completion assertion pass for
     // the wrong reason (`test/support/README.md`).

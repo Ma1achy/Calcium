@@ -139,6 +139,21 @@ export interface KeyEffects {
    * source (C19 I3, T2.1a).
    */
   afterEdit(): void;
+  /**
+   * A character was typed into an open reverse search, or one was deleted
+   * (C20 §7, `searchType` / `searchBackspace`).
+   *
+   * **Here rather than in the keymap for the same reason `afterEdit` is here**:
+   * a printable key is not a `KeyAction`, so the composition root is its only
+   * caller and a table row could never reach it. C16 I23 forbids a second
+   * keymap in the root, not a second entry point for the keys the keymap does
+   * not name.
+   *
+   * `null` is a backspace. One method rather than two because the two differ
+   * only in which C20 call they make and share the whole of the layer refresh —
+   * `searchEnd` takes its action for the same reason (C20 §7).
+   */
+  searchTyped(text: string | null): void;
   /** The line went away — close the menu and forget `Esc`'s suppression (C19 I19). */
   reset(): void;
 }
@@ -267,6 +282,27 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * the dynamic sources, and every assertion about the candidate set agrees
    * with both. C19 T2.1a is the row that does not.
    */
+  /**
+   * Redraw the search overlay after its query or its hit moved (C15 I19).
+   *
+   * **The cursor goes with the content.** The caret sits at the end of the
+   * query and the query is what just changed, so an update carrying only
+   * `content` leaves it where the previous keystroke put it — a caret that
+   * stops following the text being typed into it.
+   *
+   * Shared by `searchOlder` and `searchTyped` rather than written twice: they
+   * are two ways to move the same overlay, and a second copy is the arm that
+   * gets updated alone.
+   */
+  function refreshSearchLayer(): void {
+    if (deps.history.searchState === null) return;
+    const next = deps.history.searchLayer(deps.anchor());
+    deps.overlays.update(SEARCH_ID, {
+      content: next.content,
+      ...(next.cursor !== undefined && { cursor: next.cursor }),
+    });
+  }
+
   function afterEdit(): void {
     const ctx = ctxNow();
 
@@ -561,17 +597,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     },
     searchOlder: () => {
       deps.history.searchOlder();
-      const state = deps.history.searchState;
-      if (state === null) return;
-      // **The cursor goes with the content** (C15 I19). The caret sits at the
-      // end of the query and the query is what just changed, so an update
-      // carrying only `content` leaves it where the previous keystroke put it —
-      // a caret that stops following the text being typed into it.
-      const next = deps.history.searchLayer(deps.anchor());
-      deps.overlays.update(SEARCH_ID, {
-        content: next.content,
-        ...(next.cursor !== undefined && { cursor: next.cursor }),
-      });
+      refreshSearchLayer();
     },
   });
 
@@ -630,6 +656,16 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   return {
     table,
     afterEdit,
+    // **C20 built both of these and nothing called them** — `⌃r` opened a search
+    // whose query could never become non-empty, because the composition root's
+    // overlay handler forwards printable keys only for the completion menu and
+    // dropped them for everything else. FINDINGS F97.
+    searchTyped: (text) => {
+      if (deps.history.searchState === null) return;
+      if (text === null) deps.history.searchBackspace();
+      else deps.history.searchType(text);
+      refreshSearchLayer();
+    },
     reset: () => {
       closeMenu();
       suppressedAt = null;

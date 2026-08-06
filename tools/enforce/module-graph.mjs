@@ -938,18 +938,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   // rather than red, and the citation is what stops the entry outliving the
   // gap: when F96 and F97 close, the equality arm below fires on these the day
   // a caller appears.
-  "FileSystem.mkdir":
-    "**FINDINGS F96** — declared, implemented at `session.ts:66`, never called. Nothing in " +
-    "`src/` creates a directory, so on a machine without the history directory every write " +
-    "fails ENOENT, C20 rewinds correctly, and it never becomes transient. A wiring gap: " +
-    "the capability exists and is already supplied",
-  "FileSystem.exists": "**FINDINGS F96** — the other half of the same uncalled pair",
-  "HistoryStore.searchType":
-    "**FINDINGS F97** — reverse search opens and cannot be typed into. The shell reaches " +
-    "ten of C20's members and not this one, and the overlay keymap has no printable-key " +
-    "row. Covered at revert tier, which protects it against removal and says nothing about " +
-    "whether anything calls it",
-  "HistoryStore.searchBackspace": "**FINDINGS F97** — the other half of the same gap",
 
   // --- C20 publishes a wider surface than the shell wires -------------------
   //
