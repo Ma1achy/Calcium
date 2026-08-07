@@ -5411,3 +5411,91 @@ nobody has run, and four commits went past.
 through the registry, and the sixteen snapshots were regenerated after reading the diff —
 every one is the single line `p99 120ms 98ms` becoming `p99 120ms ✓ 98ms` or `+ 98ms`, which
 is row 4's ruling working. `npm run golden` is 59 passed.
+
+---
+
+## F132 — the grant is untestable from the side that consumes it, and deleting the workaround is what showed it
+
+`ProducerContext.measure` is the frame's own measurer, which is the whole point of granting it
+— one arithmetic, or a split decided in a producer and the rows drawn on screen disagree. But
+`BlockRegistry` stays interior (C24 §3), so **a consumer whose adapter or handler takes a
+context has no way to call it outside a session.**
+
+**Invisible until `codeRows` was deleted, because the workaround was also the fixture.** The
+app's own suite measured with its reimplementation of the measurer; removing the
+reimplementation removed the only measurer the app had. The same for `LocalContext`: four
+handler families now name the type, and every test that calls one has to build a context with
+an `ask` in it.
+
+It is C24 I19's argument a second time — *a producer the framework can test and a consumer
+cannot is a producer whose app-side tests assert against something the user never sees* —
+which is why `createAdapterRegistry`, `completeLocal` and `contextAt` are exported. Closed the
+same way: `producerContext()` and `localContext()` on `@fmx/calcium/testing`, C24 I26.
+
+**`ask` defaults to declining**, and that is C23 I36's own semantics rather than a stub's: a
+question resolves with the choice marked `default` on `Esc`, so a handler tested without a
+scripted answer takes the route a user takes by pressing escape. A test meaning to exercise
+the other arm has to name the choice, which is the thing it should be saying out loud.
+
+**The class**: a grant lands complete on the producing side and incomplete on the consuming
+one, and the gap is hidden for exactly as long as the workaround it replaces is still there.
+
+---
+
+## F37 closed — the frame-read, and the numbers the split now produces
+
+`splitRaw` takes `ctx.measure` and `codeRows` is deleted. Read through
+`expectDocument().lines()` — the export this row added — against the 245-line inspect probe at
+width 120:
+
+| | |
+|---|---|
+| blocks after the split | **114** — the figure F37 recorded |
+| blocks over `SPLIT_FLOOR` (21) | **1**, at 24 rows |
+| rows, summed per block | 263 |
+| rows drawn | **377** |
+
+**The residue of one is walk B2's floor working** — a leaf with no children to divide by,
+which the ruling says is not zero and I47's indicator carries.
+
+**And 377 − 263 = 114 exactly**, which is the separator: a rendered sequence puts one row
+between blocks, so *n* blocks occupy *n* rows more than the sum of their heights. That is
+F40's lesson holding from the other side — the per-block measurer is the right one for
+*deciding a split*, and the frame adds the separators. Had the two disagreed by anything other
+than the block count, the deletion would have changed behaviour rather than only removing a
+duplicate.
+
+**What the deletion removed, measured both ways.** Comments stripped, per the rule that prose
+inflates a textual signal:
+
+| workaround | with prose | code only |
+|---|---|---|
+| `width()` — F14 | 44 | 6 |
+| `unicodeText()` — F43, F124 | 30 | 5 |
+| `codeRows()` — F37 | 27 | 8 |
+| `test/deep.ts` — F36, F37 | 43 | 11 |
+| four hand-declared contexts — F125 | 5 | 5 |
+| **total** | **149** | **35** |
+
+**The column fell, and the honest denominator is the smaller number.** Step 9 measured ~65
+lines in the *exists because Calcium is missing something* column; 35 lines of code — and 149
+lines of file — leave it here. The gap between the two figures is the point of the rule: four
+of these five carry more explanation than implementation, because **an unbuilt mechanism is
+documented more than a working one**, and a ratio computed on raw lines would have claimed
+more than the ruling did.
+
+### And the diff of the mechanical rewrite had one in it
+
+Thirty-five call sites gained `...producerContext()` or `...localContext()` by script. **One
+landed in the wrong argument**: `completeLocal(produced, { … })`'s second parameter is a
+*where* — command, verb, argv, durationMs — and the rewrite put four context fields into it.
+
+**It compiled.** A spread's extra keys are not an excess-property error, so the four went in
+silently and `npm test` was green either way. Nothing about the values was wrong; they were in
+a record that has no use for them, which is the version of this mistake that survives.
+
+Found by reading the diff rather than by a failure — the rule that assertions verify the
+*transformation* and not whether each site still means what it did. Two leftover
+`as unknown as LocalContext` casts came out with it: they satisfied the type by **erasure**,
+which is the double-narrower-than-its-interface class, and the published fixture makes the
+real record available so the cast has nothing left to hide.

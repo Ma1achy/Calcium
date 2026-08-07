@@ -26,6 +26,7 @@ import { b } from "@fmx/calcium";
 import type { LocalDocument, Block, ComparisonRow, ViewDocument } from "@fmx/calcium";
 import type { Row } from "./ndjson.ts";
 
+import type { LocalContext } from "@fmx/calcium";
 const run = promisify(execFile);
 
 /** One `docker inspect` object — a container's or an image's. */
@@ -334,7 +335,7 @@ export type Lookup = (kind: "container" | "image", ref: string) => Promise<Insp 
  */
 export function createDriftHandler(
   lookup: Lookup = inspectOne,
-): (argv: readonly string[], ctx: { command: string }) => Promise<LocalDocument> {
+): (argv: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const ref = argv[0];
     if (ref === undefined || ref === "") {
@@ -393,7 +394,7 @@ export function createDriftHandler(
 
 export function createCompareHandler(): (
   argv: readonly string[],
-  ctx: { command: string },
+  ctx: LocalContext,
 ) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const [left, right] = argv;

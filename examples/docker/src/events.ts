@@ -31,6 +31,7 @@ import type { LocalDocument, Block, EventLine, ViewDocument } from "@fmx/calcium
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 
+import type { LocalContext } from "@fmx/calcium";
 /** The tick, the window, and the ring — three numbers, and they are ordered. */
 export const TICK_MS = 3000;
 /**
@@ -273,7 +274,7 @@ export type Fetch = () => Promise<string>;
 
 export function createEventsHandler(
   fetchWindow: Fetch,
-): (argvIn: readonly string[], ctx: { command: string }) => Promise<LocalDocument> {
+): (argvIn: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   const ring = createRing();
 
   const tick = async (): Promise<unknown> => {

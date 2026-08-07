@@ -27,6 +27,7 @@ import {
 } from "../src/drift.ts";
 import type { Row } from "../src/ndjson.ts";
 
+import { localContext } from "@fmx/calcium/testing";
 const read = (name: string): Row =>
   JSON.parse(readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8")) as Row;
 
@@ -183,7 +184,7 @@ describe("the verbs", () => {
     const handler = createDriftHandler((kind) =>
       Promise.resolve(kind === "container" ? CONTAINER : null),
     );
-    const doc = await handler(["dtui-web"], { command: "/drift dtui-web" });
+    const doc = await handler(["dtui-web"], { ...localContext(), command: "/drift dtui-web" });
 
     expect(doc.status, "the container's facts are still worth showing").toBe("ok");
     const cmp = doc.blocks.find((bl: Block) => bl.kind === "comparison") as Comparison;
@@ -195,9 +196,7 @@ describe("the verbs", () => {
   });
 
   it("N9: /drift reports a container it cannot find, and does not render an empty comparison", async () => {
-    const doc = await createDriftHandler()(["no-such-container-xyz"], {
-      command: "/drift no-such-container-xyz",
-    });
+    const doc = await createDriftHandler()(["no-such-container-xyz"], { ...localContext(), command: "/drift no-such-container-xyz", });
     expect(doc.status).toBe("error");
     expect(doc.blocks.some((bl: Block) => bl.kind === "comparison")).toBe(false);
     expect((doc.blocks[0] as Notice).text).toContain("no such container");
@@ -206,7 +205,7 @@ describe("the verbs", () => {
   it("N10: /drift against the live fixture names the image it compared with", async () => {
     // Through the **handler**, so the two calls and the id-to-tag resolution are
     // covered rather than the map alone.
-    const doc = await createDriftHandler()(["dtui-web"], { command: "/drift dtui-web" });
+    const doc = await createDriftHandler()(["dtui-web"], { ...localContext(), command: "/drift dtui-web" });
     if (doc.status !== "ok") return; // the fixture is not running; N9 still holds
     // **Not asserted as a tag.** The first version expected `nginx`, and an
     // untagged image — which `docker rmi -f` produces, and which a re-pull
@@ -240,9 +239,7 @@ describe("the verbs", () => {
   });
 
   it("N12: /compare refuses a missing container by name", async () => {
-    const doc = await createCompareHandler()(["dtui-web", "no-such-xyz"], {
-      command: "/compare dtui-web no-such-xyz",
-    });
+    const doc = await createCompareHandler()(["dtui-web", "no-such-xyz"], { ...localContext(), command: "/compare dtui-web no-such-xyz", });
     expect(doc.status).toBe("error");
     expect((doc.blocks[0] as Notice).text).toContain("no-such-xyz");
   });

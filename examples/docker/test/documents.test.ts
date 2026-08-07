@@ -33,7 +33,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // F36: no public validator. Resolved through the package — see `deep.ts`,
 // which is also the reason `make proof` was red for two PRs.
-import { validateDocument } from "./deep.ts";
+import { expectDocument, localContext, producerContext } from "@fmx/calcium/testing";
 import type { ViewDocument } from "@fmx/calcium";
 import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
@@ -70,6 +70,11 @@ function complete(produced: LocalDocument | ViewDocument): ViewDocument {
   if ("meta" in produced && produced.meta !== undefined && "origin" in produced.meta) {
     return produced as ViewDocument;
   }
+  // **Not a producer context.** This second argument is `completeLocal`'s
+  // *where* — command, verb, argv, durationMs — and the mechanical rewrite that
+  // added the four context fields everywhere put them here too, where they mean
+  // nothing. It type-checked, because the parameter is read structurally and
+  // four extra keys on a spread are not an excess-property error.
   return completeLocal(produced as LocalDocument, {
     command: produced.command,
     verb: null,
@@ -115,6 +120,7 @@ const result = (over: Partial<Record<string, unknown>> = {}): never =>
 // fixture narrower than the interface it stands for cannot fail on the
 // difference, and `as never` removes the compiler that would have said so.
 const ctx = {
+  ...producerContext(),
   command: "/x",
   verb: "x",
   transport: "subprocess",
@@ -143,10 +149,10 @@ const DOCUMENTS: readonly (readonly [
   string,
   () => Promise<LocalDocument | ViewDocument> | LocalDocument | ViewDocument,
 ])[] = [
-  ["/drift — no such container", () => createDriftHandler()(["no-such-xyz"], { command: "/drift no-such-xyz" })],
-  ["/drift — no argument", () => createDriftHandler()([], { command: "/drift" })],
-  ["/compare — missing side", () => createCompareHandler()(["no-a", "no-b"], { command: "/compare no-a no-b" })],
-  ["/compare — no arguments", () => createCompareHandler()([], { command: "/compare" })],
+  ["/drift — no such container", () => createDriftHandler()(["no-such-xyz"], { ...localContext(), command: "/drift no-such-xyz" })],
+  ["/drift — no argument", () => createDriftHandler()([], { ...localContext(), command: "/drift" })],
+  ["/compare — missing side", () => createCompareHandler()(["no-a", "no-b"], { ...localContext(), command: "/compare no-a no-b" })],
+  ["/compare — no arguments", () => createCompareHandler()([], { ...localContext(), command: "/compare" })],
   ["/ps — docker exited non-zero", () => viaRegistry(createPsAdapter(), result({ exitCode: 1, stderr: "boom" }), ctx)],
   ["/ps — docker exited non-zero, silent", () => viaRegistry(createPsAdapter(), result({ exitCode: 2 }), ctx)],
   ["/ps — ok", () => viaRegistry(createPsAdapter(), result({ stdoutRaw: read("ps-real.ndjson") }), ctx)],
@@ -165,14 +171,14 @@ const DOCUMENTS: readonly (readonly [
   // S8's arms. The far side is injected so every one of them is reachable —
   // three of these are daemon states that occur only sometimes, and an arm that
   // cannot be driven is an arm that never runs.
-  ["/config — no container", () => createConfigHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { command: "/config nope /x" })],
-  ["/config — no path, with candidates", () => createConfigHandler(FAR())(["dtui-cfg"], { command: "/config dtui-cfg" })],
-  ["/config — no path, no mounts", () => createConfigHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { command: "/config c" })],
-  ["/config — no arguments", () => createConfigHandler(FAR())([], { command: "/config" })],
-  ["/config — the running file is unreadable", () => createConfigHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { command: "/config c /x" })],
-  ["/config — the image side is unavailable", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { command: "/config c /x" })],
-  ["/config — the files agree", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { command: "/config c /x" })],
-  ["/config — ok", () => createConfigHandler(FAR())(["c", "/x.conf"], { command: "/config c /x.conf" })],
+  ["/config — no container", () => createConfigHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { ...localContext(), command: "/config nope /x" })],
+  ["/config — no path, with candidates", () => createConfigHandler(FAR())(["dtui-cfg"], { ...localContext(), command: "/config dtui-cfg" })],
+  ["/config — no path, no mounts", () => createConfigHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { ...localContext(), command: "/config c" })],
+  ["/config — no arguments", () => createConfigHandler(FAR())([], { ...localContext(), command: "/config" })],
+  ["/config — the running file is unreadable", () => createConfigHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
+  ["/config — the image side is unavailable", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
+  ["/config — the files agree", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
+  ["/config — ok", () => createConfigHandler(FAR())(["c", "/x.conf"], { ...localContext(), command: "/config c /x.conf" })],
   // S10 and S11's arms. **Four verbs is four more failure arms nobody reaches
   // by accident**, which is why they arrive with the verbs rather than after
   // the first time one is seen — step 4's lesson, applied ahead of the defect
@@ -189,19 +195,22 @@ const DOCUMENTS: readonly (readonly [
   ["/port — no such container", () => viaRegistry(createPortAdapter(), result({ exitCode: 1, stderr: "No such container: nope" }), ctx)],
   ["/port — nothing published", () => viaRegistry(createPortAdapter(), result({ stdoutRaw: "" }), ctx)],
   ["/port — ok", () => viaRegistry(createPortAdapter(), result({ stdoutRaw: read("port-real.txt") }), ctx)],
-  ["/events — the daemon is unreachable", () => createEventsHandler(() => Promise.reject(new Error("down")))([], { command: "/events" })],
-  ["/events — no lifecycle events at all", () => createEventsHandler(() => Promise.resolve(""))([], { command: "/events" })],
-  ["/events — ok", () => createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { command: "/events" })],
+  ["/events — the daemon is unreachable", () => createEventsHandler(() => Promise.reject(new Error("down")))([], { ...localContext(), command: "/events" })],
+  ["/events — no lifecycle events at all", () => createEventsHandler(() => Promise.resolve(""))([], { ...localContext(), command: "/events" })],
+  ["/events — ok", () => createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { ...localContext(), command: "/events" })],
 ];
 
 describe("F35: every document this app produces is one C13 will accept", () => {
   it.each(DOCUMENTS.map(([name]) => name))("%s", async (name) => {
     const make = DOCUMENTS.find(([n]) => n === name)?.[1];
     const doc = complete(await (make as () => Promise<LocalDocument | ViewDocument>)());
-    const v = validateDocument(doc);
-    // The message carries the errors, because "expected false to be true" on a
-    // document is a fault you then have to reproduce by hand.
-    expect(v.ok, `${name}: ${v.ok ? "" : v.error.join("; ")}`).toBe(true);
+    // **`expectDocument().isValid()`, not a deep import** (F36). The workaround
+    // reached past `exports` into `dist/` because "an app cannot validate a
+    // document it built" — and it could: the assertion has been public in
+    // `@fmx/calcium/testing` since C24 §7, and nobody re-checked the finding
+    // against the surface. It throws with the errors in the message, which is
+    // what the hand-rolled message was for.
+    expect(() => expectDocument(doc).isValid(), name).not.toThrow();
   });
 
   it("the failure arms are actually failures, or the rows above prove nothing", () => {
@@ -215,10 +224,15 @@ describe("F35: every document this app produces is one C13 will accept", () => {
   it("and an error document without its `error` is refused, which is the defect", async () => {
     // The control for the whole file: this is what all three shipped arms
     // looked like, and it is what C13 throws on and C23 discards.
-    const doc = await createDriftHandler()(["no-such-xyz"], { command: "/drift x" });
+    const doc = await createDriftHandler()(["no-such-xyz"], { ...localContext(), command: "/drift x" });
     const stripped = { ...(doc as Record<string, unknown>) };
     delete stripped["error"];
 
-    expect(validateDocument(stripped).ok, "C04 I3 is what makes this file necessary").toBe(false);
+    // The control, and it survives the throw: what it asserts is that the
+    // framework refuses, and a throw is how `expectDocument` says so.
+    expect(
+      () => expectDocument(stripped as never).isValid(),
+      "C04 I3 is what makes this file necessary",
+    ).toThrow();
   });
 });

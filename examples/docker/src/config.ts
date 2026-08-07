@@ -22,6 +22,7 @@ import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
 import type { LocalDocument, Block, Hunk, ViewDocument } from "@fmx/calcium";
 
+import type { LocalContext } from "@fmx/calcium";
 const run = promisify(execFile);
 
 /** Lines of context either side of a change — the usual three. */
@@ -241,7 +242,7 @@ const languageOf = (path: string): string => {
 
 export function createConfigHandler(
   far: Far = realFar,
-): (argv: readonly string[], ctx: { command: string }) => Promise<LocalDocument> {
+): (argv: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const container = argv[0];
     if (container === undefined || container === "") {

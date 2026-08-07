@@ -584,6 +584,8 @@ interface DocumentAssertions {
 }
 
 export function liveParts(doc: ViewDocument): readonly LivePart[];   // I24 — what `b.live` declared
+export function producerContext(over?: Partial<ProducerContext>): ProducerContext;   // I26 — with the real measurer
+export function localContext(over?: Partial<LocalContext>): LocalContext;            // I26 — plus `ask`, defaulting to decline
 
 export function adaptFixture(id: string, adapter: Adapter): ViewDocument;
 export function fakeClock(): FakeClock;
@@ -780,6 +782,7 @@ carries the state — and §7 records what that changed.
 - **I23** — **A consumer can obtain a frame, and it is the frame the shell draws.** `expectDocument().lines()` returns what `renderSequenceToLines` produced rather than asserting about it; the registry it needs is the one `expectDocument` already holds, which is why this is publishable where `renderToLines` was not. Every other method on that interface measures or asserts a *property*, and a property of a document is not a picture of one — which is why the surface could not have caught the class the change axis produced, where the rows say `added` and only the frame says `+` (F37, F81, F126).
 - **I24** — **What `b.live` declared is readable from the testing entry and not from the runtime one.** A `fetch` exercisable only by running the whole refresh driver pushes every consumer toward whole-stack tests or none — the shape that let four defects survive a green suite — and a *production* consumer reading its own declaration back holds a second record of the document (F28).
 - **I25** — **No component composes a frame twice.** The composition `session.ts` performs is a named unit that `session.ts` calls, and a source scan says so, because the render chain's four coming stages — diffing, caching, windowing, capping — would diverge silently from any copy. **The class is one level up from an unreachable member**: every prior instance was *a member nobody could call*, this was *a sequence nobody named*, and no rule that walks members can see it — MG24 counts consumers, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree where every member is consumed and only the order is missing. A private method is the perfect hiding place, because the composition **is** consumed, sixty times a second, by the one caller inside the class (F126).
+- **I26** — **A consumer can build a `ProducerContext`**, with the real measurer in it. `ProducerContext.measure` is the frame's own — one arithmetic, or a split decided in a producer and the rows drawn on screen disagree — and `BlockRegistry` stays interior (§3), so a consumer whose adapter or handler *takes* a context could not call it outside a session. That is I19's argument a second time: a producer the framework can test and a consumer cannot is a producer whose app-side tests assert against something the user never sees. **Found by deleting the reference app's reimplementation of the measurer** (F37), which was also the fixture its own suite measured with. `localContext` comes with it for the same reason and adds `ask`, defaulting to the **decline** path — C23 I36's own semantics, so a handler tested without a scripted answer takes the route `Esc` takes rather than a stub's.
 
 ---
 
@@ -809,6 +812,7 @@ carries the state — and §7 records what that changed.
 22. What `b.live` declared is exercisable from the testing entry without a shell, a transport or a clock (I24).
 23. The composition exists once. A named unit `session.ts` calls, checked by a scan, because the coming render chain would diverge from a copy in silence (I25).
 24. Each refused export names the mechanism that replaces it, and the one that replaces nothing says which component already does the work (§3, C07 I17).
+25. A consumer can build the context its own producer receives, measurer included — the grant is testable from the side that consumes it (I26).
 
 ---
 

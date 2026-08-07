@@ -18,7 +18,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { expectDocument } from "@fmx/calcium/testing";
+import { expectDocument, localContext, producerContext } from "@fmx/calcium/testing";
 import type { ViewDocument } from "@fmx/calcium";
 import { containerView, createContainerAdapter } from "../src/container.ts";
 import { dashboard } from "../src/dashboard.ts";
@@ -78,6 +78,7 @@ const SNAP = {
 } as never;
 
 const ctx = {
+  ...producerContext(),
   command: "/x",
   verb: "x",
   transport: "subprocess",
@@ -106,14 +107,12 @@ const DOCUMENTS: readonly (readonly [string, () => Promise<ViewDocument> | ViewD
     "/events",
     () =>
       viaLocal(
-        createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], {
-          command: "/events",
-        }),
+        createEventsHandler(() => Promise.resolve(read("events-real.ndjson")))([], { ...localContext(), command: "/events", }),
         "/events",
         [],
       ),
   ],
-  ["/drift — no such container", () => viaLocal(createDriftHandler()(["no-such-xyz"], { command: "/drift no-such-xyz" }), "/drift no-such-xyz", ["no-such-xyz"])],
+  ["/drift — no such container", () => viaLocal(createDriftHandler()(["no-such-xyz"], { ...localContext(), command: "/drift no-such-xyz" }), "/drift no-such-xyz", ["no-such-xyz"])],
 ];
 
 describe("B04: the same information at every depth", () => {

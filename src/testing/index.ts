@@ -42,6 +42,17 @@ export { expectDocument, type DocumentAssertions, type RenderOpts } from "./expe
  */
 export { liveParts, type LivePart } from "./live-parts.js";
 
+/**
+ * A `ProducerContext` a consumer can build (C24 §7).
+ *
+ * The same argument as `createAdapterRegistry` and `contextAt`: a producer the
+ * framework can test and a consumer cannot is a producer whose app-side tests
+ * assert against something the user never sees. `measure` is the real measurer,
+ * because a fixture with an arithmetic of its own is the fake supplying the
+ * behaviour under test.
+ */
+export { producerContext, localContext, FULL_CAPABILITIES } from "./producer-context.js";
+
 // --- the conformance suites, C24 §7 -----------------------------------------
 
 export {

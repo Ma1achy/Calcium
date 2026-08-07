@@ -15,7 +15,7 @@ import { promisify } from "node:util";
 import { createTui, defaultTheme } from "@fmx/calcium";
 import { BINARY, buildManifest } from "./manifest.ts";
 import { createPsAdapter } from "./ps.ts";
-import { createDashboardHandler } from "./dashboard.ts";
+import { createDashboardHandler, dashboardBlocks } from "./dashboard.ts";
 import { createContainerAdapter } from "./container.ts";
 import { createInspectAdapter } from "./inspect.ts";
 import { createLogsAdapter } from "./logs.ts";
@@ -151,7 +151,7 @@ const tui = createTui({
     ps: createPsAdapter(),
     // The same flag the banner uses, for the same reason and a second time —
     // which is what makes F43 a finding rather than a one-off inconvenience.
-    "container stats": createContainerAdapter(unicodeText),
+    "container stats": createContainerAdapter(),
     inspect: createInspectAdapter(),
     logs: createLogsAdapter(),
     diff: createDiffAdapter(),
@@ -163,7 +163,7 @@ const tui = createTui({
     ...resourceAdapters(),
   },
   localHandlers: {
-    dashboard: createDashboardHandler(engine, width, unicodeText),
+    dashboard: createDashboardHandler(engine),
     drift: createDriftHandler(),
     compare: createCompareHandler(),
     config: createConfigHandler(),
@@ -196,15 +196,24 @@ const tui = createTui({
    * scrolled out of view is still running. S1's drawing said it froze; the
    * drawing was wrong about Calcium's own rules (FINDINGS F17a).
    */
-  greeting: async () => {
+  greeting: async (ctx) => {
     // **The one producer that is both.** As a local handler the dashboard's
     // answer is a `LocalDocument` and `runLocal` fills its `meta` (F13); as the
     // greeting it is appended directly, so nothing fills anything and the app
     // owns the whole of it. Wrapped here rather than widening the handler,
     // because the handler's route is the one with a framework behind it.
-    const produced = await createDashboardHandler(engine, width, unicodeText)([], { command: "" });
+    //
+    // **The context comes from the framework now** (C22 I53). This line used to
+    // read `([], { command: "" })` — an object literal that is not a
+    // `LocalContext`, has no `ask`, and compiled, which is F125's sharpest
+    // instance. It stopped compiling the moment the handler named its type, with
+    // no rule walking call sites: the obligation reached here through the
+    // declaration.
     return {
-      ...produced,
+      schema: "tui.view/1",
+      command: "",
+      status: "ok",
+      blocks: await dashboardBlocks(ctx, engine),
       meta: {
         verb: null,
         adapter: "dashboard",

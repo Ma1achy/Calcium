@@ -333,7 +333,13 @@ export function containerView(row: Row, width: number, unicode = true): readonly
  * screen by the time this runs (C22 I45 pushes at step 3), so returning nothing
  * useful would leave a reader looking at a spinner that stopped.
  */
-export function createContainerAdapter(unicodeText: () => boolean = () => true): Adapter {
+/**
+ * **The `unicodeText` parameter is gone** (F54, F124). It was one boolean
+ * threaded through eight functions because `AdapterContext` carried `width` and
+ * no capabilities; `ctx.capabilities` is the resolved record now, so the adapter
+ * asks rather than being told by an app that computed it wrongly.
+ */
+export function createContainerAdapter(): Adapter {
   return {
     schema: "tui.view/1",
     adapt(result, ctx): AdapterDocument {
@@ -349,7 +355,7 @@ export function createContainerAdapter(unicodeText: () => boolean = () => true):
       const blocks: readonly Block[] =
         row === null
           ? [b.notice.error(failure)]
-          : containerView(row, ctx.width, unicodeText());
+          : containerView(row, ctx.width, ctx.capabilities.unicode !== "ascii");
 
       return {
         schema: "tui.view/1",

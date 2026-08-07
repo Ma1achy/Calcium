@@ -13,6 +13,7 @@ import { cells } from "@fmx/calcium";
 import type { RawResult, Table, TableRow } from "@fmx/calcium";
 import { COLUMNS, createPsAdapter, parseNdjson, stateOf } from "../src/ps.ts";
 
+import { producerContext } from "@fmx/calcium/testing";
 const CORPUS = readFileSync(new URL("./corpus/ps-real.ndjson", import.meta.url), "utf8");
 
 const result = (over: Partial<RawResult> = {}): RawResult => ({
@@ -34,6 +35,7 @@ const result = (over: Partial<RawResult> = {}): RawResult => ({
 });
 
 const ctx = {
+  ...producerContext(),
   command: "/ps",
   verb: "ps",
   width: 120,

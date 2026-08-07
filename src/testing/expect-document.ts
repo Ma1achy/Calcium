@@ -182,7 +182,7 @@ const ASCII: TerminalCapabilities = Object.freeze({ ...TRUECOLOUR, unicode: "asc
  * that fell back to `raw` would still produce rows, still measure, and quietly
  * assert nothing about the kind under test.
  */
-function fullRegistry(): BlockRegistry {
+export function fullRegistry(): BlockRegistry {
   const r = createBlockRegistry({});
   for (const definition of [tableDefinition, plotDefinition, patchDefinition]) {
     r.register(definition as unknown as BlockDefinition);
