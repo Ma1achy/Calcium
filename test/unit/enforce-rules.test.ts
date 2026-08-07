@@ -228,6 +228,15 @@ const FABRICATED: readonly Fabrication[] = [
     source: "if (process.stdin.isRaw) throw new Error('suspend first');",
   },
   {
+    // SS48 — the second composition. The shape someone would actually write is
+    // the old `#render()` body pasted into a file that has a `Composed` in
+    // hand, which is why the pattern is the `paint(` call rather than anything
+    // structural about frames.
+    rule: "SS48",
+    file: "src/shell/chrome-preview.ts",
+    source: "const lines = paint(frame, deps);",
+  },
+  {
     rule: "MG1",
     file: "src/presentation/table.ts",
     source: 'import { scroll } from "../viewport/viewport.js";',

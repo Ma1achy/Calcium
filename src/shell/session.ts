@@ -17,11 +17,11 @@ import { appendFileSync } from "node:fs";
 import { access, appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
-import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
 import { drawFallback, tooSmall } from "./fallback.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
-import { commandRows, cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
+import { commandRows, type PaintDeps } from "./paint.js";
+import { composeFrame } from "./render-frame.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
@@ -324,49 +324,29 @@ class Session implements TuiInstance {
     const graph = this.#graph;
     if (graph === null || !graph.lifecycle.acquired) return;
 
-    const frame = this.#composed();
+    // **The composition is `render-frame.ts`'s and this calls it** (C22 I54,
+    // C24 I25). It lived here as a private method returning `void`, which made
+    // it a sequence nobody could name — and the reason that matters now rather
+    // than in the abstract is the render chain: diffing, caching, block
+    // windowing and a cap arrive as one change, and a consumer reading frames
+    // through `expectDocument().lines()` stays on the production path across
+    // all four only if there is one composition. A03's SS48 says so.
+    const result = composeFrame({
+      composed: () => this.#composed(),
+      paintDeps: (frame) => this.#paintDeps(graph, frame),
+      resizeViewport: (size) => void graph.viewport.resize(size),
+      cursorSequence: (cursor) => graph.lifecycle.cursorSequence(cursor),
+    });
 
-    // **C22 I34 — the viewport is as tall as the region, and this is where the
-    // region's height is known.** It is `rows − header − footer − promptRows`,
-    // and the prompt's height changes with what is typed rather than with the
-    // terminal, so no handler on a terminal event can compute it. Set from the
-    // composed frame, before the visible rows are read from it.
-    //
-    // Per frame, and cheap because C14 refuses a resize to the size it holds
-    // (C14 I21) — the guard is what makes one owner affordable.
-    //
-    // It was `size.rows` in the resize handler: three rows too tall from the
-    // first frame, so `#maxTop()` stopped short by exactly the chrome and the
-    // last rows of a tall entry were unreachable by `End`, `PageDown` or `↓`.
-    // Nothing could see it, because the surplus rows were discarded below.
-    graph.viewport.resize({ width: frame.size.columns, height: frame.region.height });
-
-    let lines: readonly string[];
-    try {
-      lines = paint(frame, this.#paintDeps(graph, frame));
-    } catch (err) {
-      if (!(err instanceof FrameError)) throw err;
-      drawFallback(frame.size, (s) => void graph.lifecycle.writer.write(s));
+    // The two side effects the unit deliberately does not perform: the write is
+    // C01's writer, and the fallback is a side effect rather than a frame.
+    // Where the seam falls between *compose* and *put on a terminal* is a
+    // question C22 §4a leaves open, and this is the boundary it had.
+    if (result.kind === "fallback") {
+      drawFallback(result.size, (s) => void graph.lifecycle.writer.write(s));
       return;
     }
-
-    // **Hide, move, show — and the order is not made moot by the sync window**
-    // (C15 I19). `synchronisedUpdate` is a capability, so the unwrapped path is
-    // real: on a terminal without DECSET 2026 a visible cursor is dragged
-    // across the frame by `HOME` and every row after it, which is a cursor
-    // racing over the screen sixty times a second. So the hide leads the write
-    // and the position and show close it, all inside one `write` — one string,
-    // so it cannot straddle the scheduler's window either.
-    // **The sequence is C01's** (C01 I19, MG20). The cursor's visibility is a
-    // mode C01 holds and restores at release, so this file may not write it —
-    // and the bytes still have to land inside the one `write`, because a
-    // separate call cannot be kept inside C03's synchronised-update window. The
-    // owner yields them; the frame embeds them.
-    const cursor = cursorFor(frame, this.#paintDeps(graph, frame));
-    const hide = graph.lifecycle.cursorSequence(null);
-    graph.lifecycle.writer.write(
-      `${hide}${HOME}${lines.join("\r\n")}${graph.lifecycle.cursorSequence(cursor)}`,
-    );
+    graph.lifecycle.writer.write(result.write);
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {

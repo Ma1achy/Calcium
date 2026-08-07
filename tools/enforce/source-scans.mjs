@@ -696,6 +696,30 @@ export const SCANS = [
   // the same blind spot every textual rule in this suite has, and the reason it
   // is acceptable here is that all four sites are literals and a computed origin
   // would be a change worth noticing on its own.
+  // SS48 — one composition, one caller (C22 I54, C24 I25, FINDINGS F126).
+  //
+  // The composition `session.ts` performs is `render-frame.ts`'s `composeFrame`,
+  // and `session.ts` calls it. What this forbids is a second one: any file under
+  // `src/shell/` calling `paint(` other than the unit that owns it.
+  //
+  // **Why a scan rather than a comment.** The render chain gains output
+  // diffing, render caching, block windowing and a cap as one change (F90). A
+  // consumer reading frames through `expectDocument().lines()` is on the
+  // production path across all four **only** while there is one composition, and
+  // a copy would diverge on the first of them in silence — no test fails,
+  // because both paths are individually correct.
+  //
+  // **Known limit, stated because an unrecorded one reads as strength.** It
+  // finds the textual call. A second composition assembled by calling
+  // `renderSequenceToLines` directly, or by aliasing `paint` through a variable,
+  // passes — this catches the shape someone would actually write, which is the
+  // old `#render()` body pasted somewhere new, and not a determined evasion.
+  { id: "SS48", spec: "C22 I54 · C24 I25",
+    pattern: /(?<![\w.])paint\s*\(/,
+    scope: "src/shell/",
+    allow: ["src/shell/render-frame.ts", "src/shell/paint.ts"],
+    why: "a second frame composition — `composeFrame` in `render-frame.ts` is the one, and `session.ts` calls it. Two would diverge silently the first time the render chain changes (C22 I54)" },
+
   { id: "SS46", spec: "C23 §3a · C23 I22",
     pattern: /origin:\s*"refresh"/,
     scope: "src/",
