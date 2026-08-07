@@ -59,7 +59,15 @@ interface BlockDefinition<B extends Block = Block> {
   kind:    string;
   measure: Measure<B>;                // contract from C04; receives measureChild
   render:  (block: B, ctx: RenderContext) => ReactElement;
+  // §2a — a valid smaller block covering rows [from, to). Optional: a kind that
+  // does not divide omits it and is atomic by having no member.
+  window?: (block: B, width: number, from: number, to: number) => Windowed<B>;
 }
+
+type Windowed<B extends Block = Block> = Readonly<{
+  block:    B;       // a real block of the same kind, measured the ordinary way
+  skipRows: number;  // leading rows of it the caller drops
+}>;
 
 interface BlockRegistry {
   register(def: BlockDefinition): void;
@@ -92,6 +100,59 @@ side, so a gap before one of them is ignored rather than being an error.
 **`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close. **`footer` sits in the bottom border for the same reason `title` sits in the top**, and changes nothing about measurement: the row is drawn either way, so this is a use for a row that already exists rather than a new one. S12 §2 and S13 §2 both draw it, and neither can put those keys in the frame's footer — a pushed view leaves header and footer untouched (C15 T4.4).
 
 **Animation state arrives through `ctx.tick`.** `steps` shows a spinner, and a renderer must stay pure, so the frame index cannot come from a clock inside the block. `tick` is a monotonic counter incremented by C03's `spinner` commit; a renderer computes `frames[tick % frames.length]`. Nothing else in C09 reads it, and `measure` never does — animation must never change height.
+
+### 2a. `window` — a block reduced to a valid smaller block
+
+**The transcript virtualises at *entry* granularity and then renders each entry
+whole.** A 5,000-line patch renders 5,000 lines, keeps thirty, and with
+highlighting tokenises all 5,000 first — per keystroke, at 2.8 seconds a frame
+(`docs/notes/TUI_NOTE_render_chain_baseline.md`). `window` is what bounds it.
+
+**A window is a block, never a list of rows** (C25 I18's rule, generalised).
+`Layer.content` and `TranscriptEntry.doc.blocks` are both `Block[]`, so nobody
+can hand back a slice of rendered output — they hand back a smaller block, which
+the registry measures and draws through the same path as everything else. That
+is what keeps I1 whole and stops a second height codepath appearing.
+
+**`windowPatch` proves the shape and not the contract.** `presentation/patch/window.ts`
+returns a valid smaller `Patch`, which is the part that generalises. But its
+window is *a slice plus sticky headers* (C25 I18): the path header and each
+touched hunk's header are forced, and they cost rows the full rendering already
+counted. A transcript window may not do that — C14 measured the entry at its full
+height and addresses rows inside it, so an inserted row makes the rendered entry
+disagree with the index, which is drift three components from its cause.
+
+**So the seam returns a block *and* a residual offset.** The caller renders the
+returned block and drops `skipRows` leading rows. Three things fall out and each
+would otherwise be a defect:
+
+- **An indivisible unit is expressible.** A run of changed lines in a split patch
+  is one unit (C25 I19); a window opening inside it returns the whole unit and a
+  `skipRows` that steps over what the caller did not ask for.
+- **A sticky header is expressible.** A `table`'s header row and a `patch`'s path
+  row are part of what makes the smaller block *valid*; they are paid for in
+  `skipRows` rather than smuggled into the caller's row count.
+- **Exactness survives both.** The rows the caller keeps are the rows the full
+  rendering would have produced, which is what makes the window invisible.
+
+**The height property carries `skipRows`, or it is not the property:**
+
+```
+measure(w.block, width) − w.skipRows  ===  to − from
+```
+
+Not `measure(...) === to − from`, which is the form the seam invites and which is
+false for every window that costs slack. It is checked **generically over every
+kind that declares `window`** by `src/testing/measurement-conformance.ts` — the
+same suite a consumer runs for `measure`/`render` — so an app's own arm is held
+to it too. Without that, a consumer's window can be silently short and the frame
+describes a document nobody holds.
+
+**A plot has no `window` and never will.** C12 I1 makes a plot's height a
+function of the block alone: reducing its series changes nothing and reducing its
+`height` rescales the curve rather than windowing it. **Atomicity is expressed by
+the absence of a member**, not by a branch — a branch is something a later edit
+removes, and an absent member is not.
 
 **No block renderer reads the environment.** Capabilities arrive through `ctx`, never from `process.env` — C02's I5 extends here, and a renderer probing for itself is the bug that produces a table in ASCII beside a sparkline in Unicode.
 
@@ -496,6 +557,9 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 
 - **I23** — **A grammar can be registered after construction, and registering one invalidates the memo.** §4a promised that an unregistered language is readable now and highlighted *whenever someone registers it*; the constructor shipped with a fixed pair and no registration path, so the promise had no mechanism (F93). The invalidation is half the invariant rather than an implementation note: `tokenise` caches the plain-text fallback under the same key, so registration without it leaves every block already rendered flat until an unrelated cap eviction. **Measurement is unaffected by both**, which is what makes registration safe at any time — tokens change appearance and never line count (I8, T2.13).
 - **I24** — **A grammar in the default set has its emitted classes mapped, or the omission has a reason.** Shipping a grammar whose classes `SLOTS` does not carry is indistinguishable from not shipping it — measured: `markdown` emitted four runs and coloured none. Three classes are unmapped deliberately: `hljs-params` is ordinary identifiers, `hljs-strong` and `hljs-emphasis` are appearance rather than a rôle, and **`hljs-addition` / `hljs-deletion` are a change axis, which C04's ruling says is a marker and never a tone** (F30, F81).
+- **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
+- **I26** — **`measure(window(b, w, from, to).block, w) − skipRows === to − from`, checked generically over every kind that declares `window`.** The form without `skipRows` is the one the seam invites and it is false for any window that costs slack. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
+- **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
 
 ---
 
@@ -523,6 +587,9 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 20. **A grammar registers at any time and the transcript reflows for nobody** (I23). The promise was in §4a from the beginning and the constructor took a fixed pair; the memo is why exposing registration alone would not have made it true (F93).
 21. **A shipped grammar's classes are mapped or the gap has a reason** (I24). Two of sixteen were measured as shipping nothing, and the change axis is refused a slot on C04's ruling rather than on this file's judgement.
 
+11. A kind that divides declares `window`; a window is a valid block of the same kind plus a residual offset, and never a list of rows (I25, C25 I18).
+12. The window's height property carries the offset and is checked generically, so an application's own arm is held to it (I26).
+13. A kind that does not divide omits the member rather than branching, which is how `plot` stays atomic permanently (I27, C12 I1).
 ---
 
 ## 9. Tests
