@@ -2931,6 +2931,50 @@ disagree, and C05 already rejects that shape for `view`. More likely the
 declaration wants to be a predicate over the invocation, which is a larger change
 than it looks and is C05's to rule on. Filed with the consumer that needed it.
 
+### Amended when it was ruled on — three of its four claims were unmeasured
+
+Ruled as C05 I23. **Two premises and the severity argument were wrong**, and the
+finding survives because its subject was right: the type cannot describe `run`.
+Amended rather than restated, on F66's terms.
+
+**1 · "C05 already rejects that shape for `view`."** It does the opposite. C05 I20
+declares `view` on a `ToolDef` **and** on a `FlagDef`, and *an invocation is a view
+if either declares it* — a disjunction, under which two declarations cannot
+disagree. The objection was raised against the precedent that answers it.
+
+Where the claim came from is the useful part: I19 and I20 each refuse `view`
+**with** `interactive`, two *fields* on one tool. That is a refusal of a pair, read
+here as a refusal of *the same field declared twice*. Both readings are about
+"C05 refusing a combination", nothing in the prose forces a choice, and it went
+into a finding unchecked — the conflation F58 had, one document earlier.
+
+**2 · "The declaration wants to be a predicate."** It cannot be one. §1 of C05:
+the manifest is JSON the app ships, and T2.7 asserts `parseManifest` accepts its
+own serialised output. **A function does not survive that round trip**, so the
+shape this finding recommended is unimplementable in the transport it must cross.
+What works is a declaration per flag, resolved by the walk that knows which flags
+are present.
+
+**3 · The severity asymmetry, which chose the direction — measured, and inverted:**
+
+| | this finding said | measured |
+|---|---|---|
+| `/run -it alpine sh` not declared interactive | the session waits on a child nothing can answer | `docker run -it` with non-terminal stdin exits **1** at once — *cannot attach stdin to a TTY-enabled container*. An ordinary error document |
+| any REPL spawned without a handoff | the same hang | C21 spawns `stdio: ["ignore", "pipe", "pipe"]`. **stdin is `/dev/null`**, so a child reading it gets EOF and exits. The named mechanism does not exist |
+| `/run -d nginx` declared interactive | a flicker on a detached run | C23 §4 suspends, docker writes the container id to the **real** terminal, `resume()` and `invalidate()` repaint over it, and the transcript reads `run finished`. The invocation's only output is gone |
+
+So the direction called cosmetic is the one that discards the result, and the
+direction called catastrophic is a reported error. **Wrong in both directions**,
+and both halves were one line of C21 and one docker invocation away — twenty
+minutes, the figure that instrument keeps earning.
+
+**And the defect it concealed is the one nobody stated**: not that `run` is
+mis-declared, but that a handoff's document *cannot carry output at all*. Every
+correctly-declared interactive verb is fine with that, because a REPL's output
+belongs on the screen it owns. `run -d` is not a REPL. The old reason would be
+falsified by a docker release changing how `-it` fails; this one only by a
+handoff learning to capture.
+
 ---
 
 ## F81 — a cache hit is a kind and `Tone` is a grade, found a fourth time ★★★
@@ -4546,3 +4590,74 @@ literal before the `Block` union was made the authority: **a textual rewrite ove
 vocabulary hits every user of the token, and the ones you did not write are the ones you do
 not check.** The fabricated-violation rows are what found it, which is the third thing in this
 session that A03 commitment 14 has caught.
+
+---
+
+## F118 — a refusal covered one of the two ways to write the pair it forbids ★★★
+
+C05 I20 says `view` is declarable on a `ToolDef` **and** on a `FlagDef`, and that it
+is *refused with `interactive`*. Both halves are implemented. They do not meet:
+
+```js
+parseManifest({ …, tools: [{ name: "both", local: false, interactive: true,
+  flags: [{ name: "watch", type: "bool", view: true, summary: "s" }] }] })
+```
+
+| declared | result |
+|---|---|
+| `view` on the tool, `interactive` on the tool | **refused** |
+| `view` on a **flag**, `interactive` on the tool | **parses** |
+
+`parseTool`'s refusal reads the tool's own `view` — `if (view === true)` is the
+local `const`, not any flag's. So the invariant is enforced against the way its
+first consumer wrote it and open the other way, and I20's own sentence is what
+says the other way exists.
+
+**Found by checking a claim in F80, not by looking for it.** F80 asserted C05
+rejects a per-flag declaration disagreeing with a tool-level one; going to read
+I20 to confirm turned up the disjunction that makes disagreement impossible, and
+reading the code that implements it turned up a refusal that had never been
+extended past the tool. The probe above is a fabricated violation for a rule that
+did not fire.
+
+**The class is worth more than the instance.** A cross-field refusal is written
+when the first consumer declares the combination, and it is written against *that
+consumer's* way of declaring it. Every field with two homes has this shape
+available: I20's `view`, and now I23's `interactive`. Ruled as C05 I24 — a
+refusal reads every declaration of each field it names — with the deliberately
+conservative reading and its limit recorded, since an arm resolving `interactive`
+to `false` beside a `view` flag would in principle be legal and no app declares
+one.
+
+---
+
+## F119 — the pre-spawn gate was above the route, and the route was above the gate ★★★
+
+C23's `route` chose the `app` path on `result.tool.interactive` and handed the
+whole line to `runHandoff`. The `validation.ok` check lives **inside** `runApp`,
+the other arm. So a malformed invocation of an interactive verb was spawned
+without being validated at all:
+
+```
+/exec                 → docker exec, no container, no command
+```
+
+C05 §1's D17 is that a malformed invocation costs nothing rather than 300 ms of
+interpreter startup to be told the same thing, and C05 §6 is a gate built for it.
+Neither is reached on this route. **The verbs that stepped over the gate are the
+ones whose failure takes the screen** — a handoff suspends the alternate screen
+before the child starts, so the reader watches their session go away and come
+back to learn that they mistyped an argument.
+
+**Two guards, and neither is where it looks.** `runHandoff` has a guard: C21 I6
+refuses a handoff with stdin still in raw mode. That is a check on *this side's*
+state and it passes here, so the route reads as gated when nothing about the
+invocation has been examined.
+
+**Found by the ruling rather than by a test**, and it is the reason the ruling
+lands as an ordering as well as a field. Resolving `interactive` in the validator
+raises the question *what is the contract when validation failed*, and the honest
+answer is that the question should not arise: gate, then route. C23 I38. The
+fallback C18 I28 keeps for the failed arm has no reader, and saying so is what
+stops it becoming a policy someone later relies on.
+

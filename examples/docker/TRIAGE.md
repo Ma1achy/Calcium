@@ -199,18 +199,33 @@ surfaces solving it the same way without coordinating is worth more than either.
 | **F26** | `docker stats` streams by default | app — the shim |
 | **F46** | the stdout/stderr split is a JSON-CLI assumption, and a log verb inverts it | app — the shim |
 | **F45** | an app cannot render a stream that is not JSON | **fixed** in Calcium |
-| **F39** | a **rendering** flag (`--raw`) is transmitted to the far side, which exited 125 | open — Calcium's |
-| **F80** | **`interactive` is a property of the verb, and `docker run` is not** | open — Calcium's ⚠ C05 |
+| **F39** | a **rendering** flag (`--raw`) is transmitted to the far side, which exited 125 | **fixed** in Calcium — `shellOnly`, C05 I21 |
+| **F80** | **`interactive` is a property of the verb, and `docker run` is not** | **ruled** in Calcium — C05 I23 |
 
-**F80 is the new one and it is a type that cannot describe its subject.** `ToolDef.interactive`
+**F80 is a type that cannot describe its subject**, and that half held. `ToolDef.interactive`
 has one slot; `docker run` has two terminal contracts chosen per invocation — `/run -it alpine
-sh` needs the terminal and `/run -d nginx` must not take it. Declared `true` here, which is the
-safe direction of a choice with no right answer: wrong that way is a flicker, wrong the other
-way is a hung session waiting on a child nothing can answer.
+sh` needs the terminal and `/run -d nginx` must not take it. Ruled as C05 I23: `FlagDef` carries
+`interactive` too, and an arm equal to the tool's default is refused at parse, so the arms on a
+verb cannot disagree and there is nothing to arbitrate.
 
-The fix is **not** a per-flag `interactive` — that lets two flags disagree, and C05 already
-rejects that shape for `view`. More likely a predicate over the invocation, which is C05's to
-rule on.
+**Three of the finding's claims did not survive being measured, and this paragraph carried all
+three.** It is amended here rather than left as written, because a summary that keeps a body's
+claim after the body has been corrected is F86, F89 and F92's mechanism — and this is the file
+those three are about.
+
+- *"a per-flag `interactive` lets two flags disagree, and C05 already rejects that shape for
+  `view`."* C05 I20 does the opposite: `view` is declarable on both and an invocation is a view
+  if **either** says so — a disjunction, under which disagreement is impossible.
+- *"more likely a predicate over the invocation."* The manifest is JSON and T2.7 round-trips it;
+  a predicate does not survive that.
+- *"wrong that way is a flicker, wrong the other way is a hung session."* Both measured, both
+  false, and **inverted**: `docker run -it` without a terminal exits 1 at once, C21 gives every
+  non-handoff child `/dev/null` on stdin so the named hang cannot happen, and the *safe*
+  direction is the one that writes a container id to a screen repainted a frame later.
+
+Two further findings came out of checking those claims rather than out of looking for anything:
+**F118** — I20's refusal covers one of the two ways to declare the pair it forbids — and
+**F119** — an interactive verb was routed above the validation gate and spawned unvalidated.
 
 **F39 stays separate from the shim for the same reason it always did**: no shim makes it go
 away for the next app, and it was invisible to twelve passing rows because they hand argv to
