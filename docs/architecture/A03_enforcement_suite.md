@@ -273,7 +273,11 @@ So the arm is on, and the one edge that survives it is named rather than tolerat
 
 **The runtime edge stays forbidden in both directions**, which is what keeps A02 §1's parallel-build claim true: the halves still build independently as *modules*, and one name crosses as a *declaration*.
 
-**One entry is the number to distrust, not to celebrate.** The walk found zero cross-half edges of either kind before this one, so the arm ships with a subject of one and a rule that has never fired in anger is indistinguishable from a rule that works. It is believable because the fabricated pair was run, not because the tree came back clean.
+**What the arm sees, measured, and it is not one thing.** Twenty-two type-only edges reach `terminal/` from above L0 — eleven from `presentation/`, nine from `shell/`, one each from `src/index.ts` and `src/testing/` — and thirteen files above L0 name both halves. **The arm forbids none of them**, because none is MG3's subject: L1 and L4 importing L0 is *downward*, and `presentation/` could not render C04's blocks onto a terminal without seeing both at once.
+
+**The rule's own name is what makes those look like violations.** MG3 forbids `data/` ↔ `terminal/`, and *"cross-half"* reads as forbidding any module that touches both. Third instance in this pass of a rule whose **name** did work its **body** did not, after MG24's *"unconsumed member"* and MG27's *"coverage"*.
+
+MG3's actual subject — an L0 half importing the other — is **zero runtime edges and one type-only**, which is the entry above. **Zero violations from an arm that can see is a different result from zero from an arm that cannot**, and the figures are what tell them apart: before this, the number was zero because nothing was looked at.
 
 ---
 

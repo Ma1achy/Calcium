@@ -472,6 +472,14 @@ export type TuiConfig = Readonly<{
  * narrowing landed correctly and changed nothing at four call sites, because a
  * hand-written shape was structurally assignable.
  *
+ * **A check on the declaration, not on assignability.** *The parameter is
+ * invariant* would be the wrong description: variance governs whether a function
+ * is assignable to `LocalHandler`, and this never asks that — it recovers the
+ * declared type through `infer` and tests it directly. Which is why the shape
+ * variance would have let through is refused too: an **object method**, whose
+ * parameters are bivariant, is rejected exactly as an arrow is. Probed across a
+ * named const, an inline arrow, an object method and a pre-typed record.
+ *
  * **Only one direction is new, and the mutation pass is what said so.** A
  * handler declaring `LocalContext & { extra }` is *already* refused by
  * assignability alone — a parameter wider than what is passed has never been

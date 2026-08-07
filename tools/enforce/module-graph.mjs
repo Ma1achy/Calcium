@@ -680,11 +680,30 @@ export function checkBuilderCoverage(
 
 // --- MG3's type-only arm — the edge the rule could not see ------------------
 //
-// **One entry, and that is the number to distrust.** The walk over `src/` finds
-// zero cross-half edges of either kind besides this one, so the arm ships having
-// never fired in anger — indistinguishable from a rule that works, which is
-// exactly F83's lesson one rule over. It is believable because the fabricated
-// pair was run, not because the tree came back clean.
+// **The arm sees twenty-two type-only edges into `terminal/` and forbids none of
+// them, which is the answer rather than a gap.** Measured when the arm was
+// written, so the next person to widen it does not re-derive it — or worse, read
+// legal edges as tolerated ones:
+//
+//     type-only imports into terminal/ from above L0     22
+//       src/presentation  11 · src/shell  9 · src/index.ts  1 · src/testing  1
+//     files above L0 type-importing BOTH halves          13
+//       src/presentation   8 · src/shell  4 · src/index.ts  1
+//     MG3's actual subject: an L0 half → the other half
+//       runtime  0 · type-only  1   ← the entry below
+//
+// **None of the twenty-two is MG3's business and the rule's own name is why they
+// look like they are.** MG3 forbids `data/` ↔ `terminal/`. L1 and L4 importing
+// L0 is *downward* — MG1 permits it and `presentation/` could not do its job
+// otherwise, since rendering C04's blocks onto a terminal means seeing both
+// halves at once. A rule named for the class it forbids, read as forbidding a
+// broader one. Third instance this pass of a rule whose **name** did work its
+// **body** did not: MG24's "unconsumed member", this, and MG27's "coverage".
+//
+// **Zero violations from an arm that can see is a different result from zero
+// from an arm that cannot** (F83, F127), and the count is what tells them apart.
+// The one entry below is the only sideways edge in the tree; the fabricated pair
+// in `enforce-rules.test.ts` is what makes its silence mean anything.
 //
 // The runtime edge stays forbidden in both directions. What crosses is a *name*,
 // not a module: `data/` still builds without `terminal/` present as JavaScript,

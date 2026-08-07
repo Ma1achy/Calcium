@@ -5206,7 +5206,31 @@ the rule was silent, the suite agreed, and the reason given was correct about a 
 pair. *A true observation promoted to a general claim* — and the measurement that would have
 falsified it is the one nobody ran, because there was nothing that looked wrong.
 
-The arm is on, with the runtime edge still forbidden and `CROSS_HALF_TYPES` shipping **empty**:
+### What the arm sees, once it can see
+
+| relation | count |
+|---|---|
+| type-only imports into `terminal/` from above L0 | **22** — `presentation/` 11, `shell/` 9, `index.ts` 1, `testing/` 1 |
+| files above L0 naming **both** halves type-only | **13** — `presentation/` 8, `shell/` 4, `index.ts` 1 |
+| **MG3's actual subject** — an L0 half → the other | **0 runtime, 1 type-only** |
+
+**The arm forbids none of the twenty-two, and that is the answer rather than a gap.** L1 and
+L4 importing L0 is *downward*: MG1 permits it, and `presentation/` could not render C04's
+blocks onto a terminal without seeing both halves at once.
+
+**The rule's own name is what makes them look like violations.** MG3 forbids `data/` ↔
+`terminal/`; *"cross-half"* reads as forbidding any module that touches both. **Third instance
+in one pass of a rule whose *name* did work its *body* did not** — MG24's *"unconsumed
+member"* (F84), this, and MG27's *"coverage"*. The pattern is worth more than any of the
+three: a name that generalises correctly-scoped behaviour is read as the scope, and the
+reading survives review because the name is apt for what the rule *should* cover.
+
+**Zero violations from an arm that can see is a different result from zero from an arm that
+cannot**, and the figures are what distinguish them. Before this, the number was zero because
+nothing was walked.
+
+The arm is on, with the runtime edge still forbidden and `CROSS_HALF_TYPES` carrying exactly
+one entry — the sideways edge `ProducerContext` needs:
 the bidirectional arm refuses an exemption that excuses nothing, so the entry lands with the
 import it excuses rather than ahead of it. See A03 §3 and C07 I10.
 
