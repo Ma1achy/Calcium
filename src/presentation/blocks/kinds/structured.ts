@@ -15,7 +15,7 @@ import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../
 import { cells, stripControl, truncate } from "../../text.js";
 import { glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
 
 /** §3: the key column is sized to the longest key and capped here. */
 const KEY_COLUMN_CAP = 20;
@@ -97,6 +97,32 @@ export const logsDefinition: BlockDefinition<Logs> = {
   kind: "logs",
 
   measure: (block: Logs): number => atLeastOne(block.lines.length), // cells-ok
+
+  /**
+   * C09 I25 — rows `[from, to)`, as a smaller `logs`.
+   *
+   * **`logs` is the one divisible kind whose rows are independent of each
+   * other**, which is what makes the window exact rather than merely the right
+   * height. The level column is a constant `LEVEL_WIDTH` and the message takes
+   * the residual and truncates; nothing here is derived from lines outside the
+   * slice. Every other divisible kind fails that test — `numberWidth` walks a
+   * whole patch, `widest` a whole `keyValue`, `planColumns` a whole table, and
+   * `tokenise` a whole code block — and a layout that changes with the scroll
+   * position is the drift C14 exists to prevent (C09 §2a).
+   *
+   * `atLeastOne` is why the empty slice is refused rather than returned: a
+   * `logs` with no lines measures 1, so a zero-row window would break I26. The
+   * viewport never asks for one (`takeRows ≥ 1`), and the clamp says so here
+   * rather than relying on it.
+   */
+  window: (block: Logs, _width: number, from: number, to: number): Windowed => {
+    const lo = Math.max(0, Math.min(Math.trunc(from), block.lines.length)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), block.lines.length)); // cells-ok
+    return Object.freeze({
+      block: { ...block, lines: block.lines.slice(lo, hi) },
+      skipRows: 0,
+    });
+  },
 
   render(block: Logs, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);

@@ -56,6 +56,20 @@ export interface MeasurableRegistry {
   /** Rendered output at `width`, as the lines it actually occupies. */
   renderToLines(block: Block, width: number): readonly string[];
   readonly kinds: readonly string[];
+  /**
+   * A kind's window, when it has one (C09 I25, I26).
+   *
+   * **Optional on the shape as it is on the definition**, so a registry with no
+   * divisible kinds — or an older one — is conformant by having nothing to
+   * check. A kind that *declares* a window and gets it wrong is what this
+   * exists for, and that includes an application's own.
+   */
+  window?(
+    block: Block,
+    width: number,
+    from: number,
+    to: number,
+  ): Readonly<{ block: Block; skipRows: number }> | undefined;
 }
 
 export type Failure = Readonly<{
@@ -133,6 +147,58 @@ export function checkMeasurement(
       const again = safeMeasure(registry, block, width);
       if (again !== measured) {
         failures.push({ ...at, check: "pure", expected: measured, actual: again ?? "threw" });
+      }
+
+      // **C09 I26 — the window's height property, and it carries `skipRows`.**
+      //
+      //     measure(w.block, width) − w.skipRows === to − from
+      //
+      // Not `measure(...) === to − from`, which is the form the seam invites and
+      // which is false for every window that costs slack — an indivisible run
+      // (C25 I19) or a sticky header (C25 I18). Checked here rather than per
+      // kind so an **application's** arm is held to it: without this a
+      // consumer's window can be silently short, and the frame then describes a
+      // document nobody holds.
+      //
+      // Every start and length inside the block, because the interesting cells
+      // are the ones where a window boundary lands inside something indivisible,
+      // and those are not at the ends.
+      const windowOf = registry.window;
+      if (windowOf !== undefined && measured !== null && measured > 1) {
+        for (let from = 0; from < measured; from += 1) {
+          for (let to = from + 1; to <= measured; to += 1) {
+            let out: Readonly<{ block: Block; skipRows: number }> | undefined;
+            try {
+              out = windowOf(block, width, from, to);
+            } catch (err) {
+              failures.push({
+                ...at,
+                check: "window",
+                expected: `[${String(from)}, ${String(to)})`,
+                actual: "threw",
+                detail: err instanceof Error ? err.message : String(err),
+              });
+              continue;
+            }
+            if (out === undefined) continue; // the kind does not divide
+            const inner = safeMeasure(registry, out.block, width);
+            if (inner === null) {
+              failures.push({ ...at, check: "window-measures", expected: "a height", actual: "threw" });
+              continue;
+            }
+            if (inner - out.skipRows !== to - from) {
+              failures.push({
+                ...at,
+                check: "window-height",
+                expected: to - from,
+                actual: inner - out.skipRows,
+                detail:
+                  `window [${String(from)}, ${String(to)}) measured ${String(inner)} ` +
+                  `with skipRows ${String(out.skipRows)}`,
+              });
+            }
+          }
+        }
       }
 
       if (options.measureOnly === true) continue;

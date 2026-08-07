@@ -560,10 +560,28 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     const focus = focusFor(graph, entry.id);
     const key = focusKey(focus);
     const theme = graph.theme.current.name;
-    const held = graph.rendered.get(entry.id, entry.rev, width, key, theme);
+
+    // **The window, and the range is the entry's rows less its chrome** (C09
+    // I25, §2a). C14 measured `chrome ++ blocks` (C14 I20) and addresses rows in
+    // that space, so the blocks' own range starts where the chrome ends. A
+    // window that forgot the offset would be short by exactly the command line.
+    //
+    // `windowSequence` keeps a kind that declares no window whole and pays for
+    // it out of `skipRows`, so this is correct for every document and cheaper
+    // only for the ones holding a kind that divides.
+    const from = Math.max(0, ve.skipRows - chrome.length);
+    const to = Math.max(from, ve.skipRows + ve.takeRows - chrome.length);
+    const windowed = graph.blocks.windowSequence(entry.doc.blocks, width, from, to);
+
+    // The key carries the range, because the cached lines are now the *window's*
+    // (I58). A small entry windows to itself and its key is stable, which is the
+    // common case; a large one re-renders as it scrolls, and only the rows on
+    // screen.
+    const range = `${String(from)}\u0000${String(to)}`;
+    const held = graph.rendered.get(entry.id, entry.rev, width, `${key}\u0000${range}`, theme);
     const lines =
       held ??
-      renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
+      renderSequenceToLines(graph.blocks, windowed.blocks, width, {
         theme: graph.theme.current,
         capabilities: graph.capabilities,
         // **The third field, and the context was shipped with two** (C16 §3).
@@ -574,11 +592,24 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
         // references cannot see.
         focus,
       });
-    if (held === undefined)
-      graph.rendered.set(entry.id, entry.rev, width, key, theme, lines);
+    if (held === undefined) {
+      graph.rendered.set(entry.id, entry.rev, width, `${key}\u0000${range}`, theme, lines);
+    }
 
-    const rows = [...chrome, ...lines];
-    out.push(...rows.slice(ve.skipRows, ve.skipRows + ve.takeRows));
+    // **The chrome is unwindowed and the blocks are**, so the slice is taken
+    // over the chrome at its own offset and over the window's rows at theirs.
+    // `windowed.skipRows` is the slack the seam could not remove — an
+    // indivisible unit or a sticky header — and dropping it here is what makes
+    // the window invisible.
+    // **The offsets are already spent, so the slice starts at zero.** The
+    // chrome is dropped by `skipRows` directly; the blocks were windowed *from*
+    // `skipRows − chrome.length`, so their rows already begin where the viewport
+    // asked. Slicing the concatenation by `ve.skipRows` a second time — which is
+    // what the unwindowed version correctly did — takes the same offset twice
+    // and drops the top of a tall entry. T4.12 is what said so.
+    const keptChrome = chrome.slice(Math.min(ve.skipRows, chrome.length));
+    const rows = [...keptChrome, ...lines.slice(windowed.skipRows)];
+    out.push(...rows.slice(0, ve.takeRows));
   }
   return out;
 }

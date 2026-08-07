@@ -21,6 +21,10 @@ import { createTui, b, defaultTheme } from "../../dist/index.js";
 
 const LINES = Number(process.argv[2] ?? 5_000);
 const REPS = Number(process.argv[3] ?? 20);
+// `patch` (the default) or `logs`. The distinction is the whole of stage 3's
+// result: `logs` declares a window and `patch` does not, because a patch's
+// gutter width is derived from every line it holds (C09 §2a).
+const KIND = process.argv[4] ?? "patch";
 const COLUMNS = 200;
 const ROWS = 50;
 
@@ -164,6 +168,22 @@ function bigPatch(lines) {
   });
 }
 
+/**
+ * One `logs` block of `LINES` lines — the one divisible kind whose rows are
+ * independent of each other, and therefore the one that can be windowed.
+ */
+function bigLogs(lines) {
+  return {
+    kind: "logs",
+    id: "bench-logs",
+    lines: Array.from({ length: lines }, (_, i) => ({
+      ts: `12:00:${String(i % 60).padStart(2, "0")}`,
+      level: i % 7 === 0 ? "error" : "info",
+      message: `value${String(i)} computed in ${String(i)}ms`,
+    })),
+  };
+}
+
 // --- the harness ------------------------------------------------------------
 
 const ms = (t0, t1) => Number(t1 - t0) / 1e6;
@@ -208,7 +228,7 @@ const tui = createTui({
     schema: "tui.view/1",
     command: "/bench",
     status: "ok",
-    blocks: [bigPatch(LINES)],
+    blocks: [KIND === "logs" ? bigLogs(LINES) : bigPatch(LINES)],
     // **All ten fields, and the first draft had six.** A document missing
     // `origin`, `transport`, `argv` or `stderr` is refused by C04's validator,
     // `appendAndCommit` swallows the throw, and `session.ts` swallows a greeting
@@ -230,7 +250,7 @@ const tui = createTui({
   }) }),
 });
 
-console.log(`# F90 baseline — ${String(LINES)} patch lines, ${String(COLUMNS)}x${String(ROWS)}, ${String(REPS)} reps`);
+console.log(`# F90 baseline — ${String(LINES)} ${KIND} lines, ${String(COLUMNS)}x${String(ROWS)}, ${String(REPS)} reps`);
 console.log(`# node ${process.version}`);
 
 const tStart = process.hrtime.bigint();
@@ -257,7 +277,13 @@ if (LINES > 0) {
   // rows above it. Asserting on `module.ts` failed against a perfectly live
   // fixture — the assertion was wrong, not the document, and reading the frame
   // is what said which.
-  const body = seen.filter((r) => r.includes("compute(")).length;
+  // `value` appears in both fixtures' line text, so one marker serves both.
+  // **Two earlier edits to this line matched nothing and reported success**,
+  // because they were written against a version without the trailing `.length`
+  // and `str.replace` is silent about a miss. That is the edit-script rule in
+  // CLAUDE.md arriving in the tool that checks the fixture — ask whether the
+  // change fired, not whether the run is still green.
+  const body = seen.filter((r) => r.includes("value")).length;
   if (body < 5 || content < 5) {
     console.error(
       `\nFIXTURE DEAD: ${String(content)} non-blank rows, ${String(body)} patch lines on screen.\n` +

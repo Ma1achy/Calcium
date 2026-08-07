@@ -204,6 +204,53 @@ stage 3, not before.
 
 ---
 
+## 4c. Stage 3 landed, and it works on one kind of five
+
+**Where the seam applies, it does what the row was for.** A `logs` block, which
+is the one divisible kind that declares a window:
+
+| block | keystroke | drag step | same-size SIGWINCH | first frame |
+|---|---|---|---|---|
+| 1,000 lines | 13.7 ms | **18.2** | 3.6 | 124 |
+| 5,000 | 6.2 | **15.4** | 3.7 | — |
+| 50,000 | **5.5** | **17.1** | 4.7 | — |
+
+Against the same sizes as a `patch`, which declares none: 21.9 ms a keystroke and
+**597.6 ms a drag step** at 1,000 lines, 3,038 ms a drag step at 5,000. **Flat in
+the block's size, and the resize spike stage 2 created is gone** — 17 ms against
+3,038.
+
+### The structural finding, and it is why four kinds are not windowed
+
+Indexing the walk by rule interaction, the cell where *a window is a slice of the
+rows* meets *a row's layout is derived from the block*:
+
+| kind | what is derived from the whole block | windowable |
+|---|---|---|
+| `logs` | nothing — the level column is a constant and the message takes the residual | **yes** |
+| `patch` | `numberWidth(block)` walks every line of every hunk for the gutter | no |
+| `keyValue` | `widest(block.rows)` sets the key column | no |
+| `table` | `planColumns` over every row | no |
+| `code` | `tokenise` runs over the whole text, so a construct spanning the boundary highlights differently | no |
+
+**A window that changed the layout would be exact in height and wrong on screen**
+— the gutter would narrow and the text shift as the reader scrolled, which is
+precisely the drift C14 exists to prevent and the failure that *looks* like the
+terminal misbehaving rather than like a defect. Height conformance cannot see it:
+`measure − skipRows === to − from` holds perfectly while every row moves sideways.
+
+**So the four are omitted rather than shipped wrong**, and the remedy is not a
+harder window. It is that a window has to carry its **derived layout** — a pinned
+gutter width, a pinned column plan — which is a new field on four public block
+types and therefore tier 2's business, before the freeze, rather than this row's.
+
+**This is the row's headline goal not met, and it should be read that way.** F90's
+stage 3 is *the one that actually fixes it*, and the case it was written against —
+a 5,000-line diff — is a `patch`. The mechanism is built, proven and measured; the
+kind it was aimed at cannot use it yet.
+
+---
+
 ## 5. What the numbers say about the order
 
 | stage | what the table says |
