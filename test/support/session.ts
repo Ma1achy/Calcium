@@ -14,6 +14,7 @@ import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { createTui } from "../../src/shell/session.js";
 import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
 import { fakeStdin, fakeStdout, type FakeStdin, type FakeStdout } from "./fake-terminal.js";
+import { screenFrom, type Screen } from "./screen.js";
 
 /**
  * **What an author writes, and nothing more** (C22 I23a).
@@ -176,6 +177,16 @@ export async function buildSession(
   resize: (next: { columns: number; rows: number }) => void;
   /** The injected clock — advance it to close one of C16's windows. */
   clock: ReturnType<typeof fakeClock>;
+  /**
+   * **What is on the screen**, folded from every write at this session's size.
+   *
+   * Bound here rather than offered as a free function so it cannot be called
+   * with a size the session was not built at. Three test files each took the
+   * last chunk containing `HOME` and split it on CRLF, which stopped being a
+   * frame when C22 I55 made the write a difference — the question they ask is
+   * unchanged and only the answer's source moved.
+   */
+  screen: () => Screen;
 }> {
   const clock = fakeClock();
   const stdout = fakeStdout(size);
@@ -197,6 +208,7 @@ export async function buildSession(
   await tui.start();
 
   return {
+    screen: () => screenFrom(stdout.chunks, size),
     tui,
     stdout,
     clock,
@@ -228,6 +240,16 @@ export async function buildGraph(
   resize: (next: { columns: number; rows: number }) => void;
   /** The injected clock — advance it to close one of C16's windows. */
   clock: ReturnType<typeof fakeClock>;
+  /**
+   * **What is on the screen**, folded from every write at this session's size.
+   *
+   * Bound here rather than offered as a free function so it cannot be called
+   * with a size the session was not built at. Three test files each took the
+   * last chunk containing `HOME` and split it on CRLF, which stopped being a
+   * frame when C22 I55 made the write a difference — the question they ask is
+   * unchanged and only the answer's source moved.
+   */
+  screen: () => Screen;
 }> {
   const clock = fakeClock();
   const stdout = fakeStdout(size);
@@ -269,6 +291,7 @@ export async function buildGraph(
     stdout,
     stdin,
     clock,
+    screen: () => screenFrom(stdout.chunks, size),
     renders: () => renders,
     resize: (next) => {
       size.columns = next.columns;

@@ -100,6 +100,17 @@ class Session implements TuiInstance {
   #identity: ReturnType<typeof createIdentityLoop> | null = null;
   /** §8's idempotency. `stop` twice is a no-op, not a second release (T1.10). */
   #stopping: Promise<number> | null = null;
+  /**
+   * The last frame put on **this** screen, or `null` when nothing describes it
+   * (I55, §6b).
+   *
+   * Held here rather than inside `composeFrame` because the write is here: the
+   * composition returns bytes and cannot know whether they landed. `null` is not
+   * *no frame yet* — it is *the screen's contents are unknown*, which is the
+   * statement `contaminated` makes; `repaint` below is where the two meet, and
+   * it is the only place C03's flag needs an expression here.
+   */
+  #lastFrame: readonly string[] | null = null;
 
   constructor(private readonly config: ResolvedConfig) {}
 
@@ -134,8 +145,18 @@ class Session implements TuiInstance {
 
     this.#graph = await constructGraph(this.config, {
       stop: (reason) => this.stop(reason),
+      // **Two functions now, and they were one** (I55). C03 has distinguished
+      // them since it was written — `writeFrame` calls `repaint` when the
+      // screen's contents are unknown and `render` otherwise — and L4 handed it
+      // the same callback twice, so the entire invalidation mechanism reached
+      // nothing. `frame-scheduler.ts` reasons about *"diffing against a screen
+      // whose contents nobody knows"*, which only means something once one of
+      // these two diffs and the other does not.
       render: () => this.#render(),
-      repaint: () => this.#render(),
+      repaint: () => {
+        this.#lastFrame = null;
+        this.#render();
+      },
       frame: this.#frameQueries(),
       onFatal: (err) => {
         // C01's only fatal case, and it has already unwound what it held
@@ -336,6 +357,10 @@ class Session implements TuiInstance {
       paintDeps: (frame) => this.#paintDeps(graph, frame),
       resizeViewport: (size) => void graph.viewport.resize(size),
       cursorSequence: (cursor) => graph.lifecycle.cursorSequence(cursor),
+      // **The record is the caller's, because the write is** (I55, §4a).
+      // `composeFrame` returns bytes and never puts them on a terminal, so it
+      // cannot know whether they landed; this does.
+      previous: () => this.#lastFrame,
     });
 
     // The two side effects the unit deliberately does not perform: the write is
@@ -343,10 +368,23 @@ class Session implements TuiInstance {
     // Where the seam falls between *compose* and *put on a terminal* is a
     // question C22 §4a leaves open, and this is the boundary it had.
     if (result.kind === "fallback") {
+      // The fallback put something else on the screen, so no record describes
+      // it (I55).
+      this.#lastFrame = null;
       drawFallback(result.size, (s) => void graph.lifecycle.writer.write(s));
       return;
     }
+
+    // **Cleared before the bytes go out, restored when they have all gone**
+    // (I56). Setting it afterwards alone is the obvious rule and leaves the
+    // fault case wrong: a write that throws puts a *prefix* of a frame on the
+    // screen while the record still names the frame *before* it, so the next
+    // diff would compare against a screen that never existed and skip exactly
+    // the rows the partial write got wrong. This way a throw is a full repaint
+    // by construction rather than by a handler someone must remember to add.
+    this.#lastFrame = null;
     graph.lifecycle.writer.write(result.write);
+    this.#lastFrame = result.lines;
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {

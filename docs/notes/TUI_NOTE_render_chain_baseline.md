@@ -131,6 +131,40 @@ Reading the frame is what said which of the two was broken.
 
 ---
 
+## 4a. Stage 1 landed, and the number that undercuts its billing
+
+`8d624ba` → stage 1, same machine, same instrument.
+
+| transcript | bytes/frame before | after | keystroke before | after |
+|---|---|---|---|---|
+| empty | 10,190 | **236** | 1.8 ms | 1.8 ms |
+| 50 lines | 25,680 | **264** | 49.4 | 48.1 |
+| 250 | 25,833 | **291** | 159.7 | 150.0 |
+| 1,000 | 25,679 | **373** | 539.5 | 523.2 |
+| 5,000 | 25,679 | **509** | 2,793 | 2,896 |
+
+**Between 50× and 97× fewer bytes, and no measurable change in wall clock.** The
+brief ranked stage 1 first as *"cuts every frame, largest effect, smallest
+change"*. The first and third are confirmed; **the second is not, on this
+measurement**. The cost of a frame here is the render, and the write against a
+fake stream in-process is free — so the time column is unmoved and every
+difference in it is inside the noise.
+
+That does not demote the stage, and it changes what it is for. 25.7 KB per
+keystroke is what goes down a pipe: an ssh session, a slow emulator, tmux
+forwarding to a second terminal, a `script(1)` capture. None of those are on this
+machine and all of them are where a shell is used. **What the measurement can say
+is bytes; what it cannot say is latency on a link it does not have** — and
+reporting the ratio as though it were a speed-up would be the microbenchmark
+error this row's acceptance test exists to avoid.
+
+**So the ordering argument survives on its other leg**, which is the one that was
+always load-bearing: stage 1 is first because it is small, contained to one
+function, and its invalidation story already existed. Not because it was going to
+be the largest win.
+
+---
+
 ## 5. What the numbers say about the order
 
 | stage | what the table says |

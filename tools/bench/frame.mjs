@@ -94,6 +94,53 @@ function fakeStdin() {
   return stream;
 }
 
+// --- the screen ------------------------------------------------------------
+//
+// **The JS twin of `test/support/screen.ts`**, and the duplication is named
+// rather than hidden. That file is TypeScript under `test/`; this runs against
+// the built package as a consumer would, and `dist/` does not carry it.
+// `tools/screen.py` is the third, on the PTY side. Three copies of one model,
+// each on its own side of a boundary — which is the same disposition
+// `VERIFYING.md` records for its instruments.
+const ESCAPE = String.fromCharCode(27);
+const HOME_SEQ = `${ESCAPE}[H`;
+
+function screenRows(chunks, size) {
+  const grid = Array.from({ length: size.rows }, () => " ".repeat(size.columns));
+  let row = 0;
+  let col = 0;
+  const put = (text) => {
+    if (text === "" || row < 0 || row >= size.rows) return;
+    const line = grid[row] ?? "";
+    grid[row] = (line.slice(0, col) + text + line.slice(col + text.length))
+      .slice(0, size.columns)
+      .padEnd(size.columns, " ");
+    col += text.length;
+  };
+  const cup = new RegExp(`^${ESCAPE}\\[(\\d+);(\\d+)H`);
+  const other = new RegExp(`${ESCAPE}\\[[0-9;?]*[a-zA-Z]`, "g");
+  for (const chunk of chunks) {
+    let i = 0;
+    while (i < chunk.length) {
+      if (chunk.startsWith(HOME_SEQ, i)) { row = 0; col = 0; i += HOME_SEQ.length; continue; }
+      const m = cup.exec(chunk.slice(i));
+      if (m !== null) { row = Number(m[1]) - 1; col = Number(m[2]) - 1; i += m[0].length; continue; }
+      if (chunk.startsWith(ESCAPE, i)) {
+        other.lastIndex = i;
+        const e = other.exec(chunk);
+        if (e !== null && e.index === i) { i += e[0].length; continue; }
+        i += 1; continue;
+      }
+      if (chunk.startsWith("\r\n", i)) { row += 1; col = 0; i += 2; continue; }
+      let j = i;
+      while (j < chunk.length && chunk[j] !== ESCAPE && !chunk.startsWith("\r\n", j)) j += 1;
+      put(chunk.slice(i, j));
+      i = j;
+    }
+  }
+  return grid;
+}
+
 // --- the document -----------------------------------------------------------
 
 /**
@@ -198,8 +245,12 @@ console.log(`\nstart + greeting ${ms(tStart, tGreeting).toFixed(1)} ms, ${String
 // the bench happily reported timings for a blank screen — flat across 100,
 // 5,000 and 50,000 lines, which is the only reason it was noticed.
 if (LINES > 0) {
-  const last = stdout.chunks[stdout.chunks.length - 1] ?? "";
-  const seen = last.split("\r\n").map((r) => r.replace(/\[[0-9;?]*[a-zA-Z]/g, ""));
+  // **The screen, not the last write** (C22 I55). This read the last chunk and
+  // split it on CRLF, which is a frame only while every frame is written whole
+  // — and stage 1 made the write a difference, so the check reported a dead
+  // fixture against a perfectly live one. The same defect the three test files
+  // had, arriving in the instrument that found them.
+  const seen = screenRows(stdout.chunks, size);
   const content = seen.filter((r) => r.trim() !== "").length;
   // **A body line, not the path header.** The viewport follows the tail, so what
   // is on screen is the *bottom* of the patch and the path row is thousands of

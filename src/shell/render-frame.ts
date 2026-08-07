@@ -29,7 +29,7 @@
  * the caller and this returns which of the two is owed. The unit is the
  * composition; the boundary is where it was.
  */
-import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
+import { CURSOR_HOME as HOME, SGR_RESET, cursorTo } from "../terminal/escapes.js";
 import { cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
 import type { Composed } from "./frame.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
@@ -46,6 +46,17 @@ export type FrameDeps = Readonly<{
   resizeViewport: (size: Readonly<{ width: number; height: number }>) => void;
   /** C01 I19's — the owner yields the bytes and the frame embeds them. */
   cursorSequence: (cursor: ReturnType<typeof cursorFor>) => string;
+  /**
+   * The last frame this session put on **this** screen, or `null` when nothing
+   * describes it (I55).
+   *
+   * A function rather than a value for the reason `transcriptRows` is one: it is
+   * answered when the frame is assembled, not when the deps were built. The
+   * caller owns the record because the caller owns the write — this unit
+   * composes and does not put anything on a terminal (§4a), so it cannot know
+   * whether the bytes it returned ever landed.
+   */
+  previous: () => readonly string[] | null;
 }>;
 
 export type FrameResult =
@@ -109,6 +120,53 @@ export function composeFrame(deps: FrameDeps): FrameResult {
   return {
     kind: "frame",
     lines,
-    write: `${hide}${HOME}${lines.join("\r\n")}${deps.cursorSequence(cursor)}`,
+    write: `${hide}${body(lines, deps)}${deps.cursorSequence(cursor)}`,
   };
+}
+
+/**
+ * The rows, as a full frame or as a difference (I55, §6b).
+ *
+ * `HOME` plus every row joined is the whole-frame form and it is what every
+ * no-record case falls back to: the first frame, a contaminated one, one whose
+ * predecessor was a different size, and one following a refusal or a throw.
+ *
+ * **One concept, not two.** `contaminated` is not read here and does not need to
+ * be: C03 answers a contaminated write by calling `repaint` rather than `render`,
+ * and `repaint` drops the record — so *the screen's contents are unknown* has a
+ * single expression, which is `previous() === null`. Reading C03's flag as well
+ * would be a second record of the same fact, coupled to when C03 clears it.
+ *
+ * The difference addresses each changed row and writes it. **Every row is
+ * already `exact()`-padded to the frame's width**, so a rewrite covers the row
+ * it replaces cell for cell and no erase sequence is needed — the padding that
+ * exists to stop the previous frame showing through is what makes this
+ * affordable.
+ *
+ * **`SGR_RESET` leads every row and the reason is asymmetry** (I57). Measured
+ * when this was written, no composed row ends with a live attribute, so the
+ * prefix is currently inert — four bytes a row against a colour that would bleed
+ * down every row below it and survive the frame, on the day a renderer stops
+ * closing its own styling. A diff writes rows out of order; nothing else asserts
+ * the property that would make this unnecessary.
+ */
+function body(lines: readonly string[], deps: FrameDeps): string {
+  const held = deps.previous();
+  if (held === null || held.length !== lines.length) {
+    return `${HOME}${lines.join("\r\n")}`;
+  }
+
+  let out = "";
+  for (let i = 0; i < lines.length; i += 1) {
+    const row = lines[i];
+    if (row === undefined || row === held[i]) continue;
+    // **0-based, both axes.** `cursorTo` owns the conversion to CUP's 1-based
+    // wire form and says so — *"one place to be off by one, and it is the place
+    // with the test"*. Converting here as well put every row one down and one
+    // right, and the frame it produced was self-consistent: T4.12 saw a screen
+    // lagging its input by exactly one frame, because the prompt's new rows were
+    // landing below the prompt.
+    out += `${cursorTo(i, 0)}${SGR_RESET}${row}`;
+  }
+  return out;
 }
