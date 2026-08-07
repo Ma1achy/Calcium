@@ -4635,8 +4635,8 @@ one.
 
 C23's `route` chose the `app` path on `result.tool.interactive` and handed the
 whole line to `runHandoff`. The `validation.ok` check lives **inside** `runApp`,
-the other arm. So a malformed invocation of an interactive verb was spawned
-without being validated at all:
+which is the *other* arm of that same split. So a malformed invocation of an
+interactive verb was spawned without being validated at all:
 
 ```
 /exec                 → docker exec, no container, no command
@@ -4654,10 +4654,68 @@ refuses a handoff with stdin still in raw mode. That is a check on *this side's*
 state and it passes here, so the route reads as gated when nothing about the
 invocation has been examined.
 
+**And the `local` route has never had the check at all** — `runLocal` dispatches
+to its handler whatever validation said. Same shape, one case over. It is **not**
+fixed here and it is not F119: the app route's version was measured, and this one
+was noticed while reading for it. Repairing a second route on the strength of the
+first route's measurement is how a change stops being about its subject. Named so
+it is a known gap rather than something rediscovered.
+
 **Found by the ruling rather than by a test**, and it is the reason the ruling
 lands as an ordering as well as a field. Resolving `interactive` in the validator
 raises the question *what is the contract when validation failed*, and the honest
 answer is that the question should not arise: gate, then route. C23 I38. The
 fallback C18 I28 keeps for the failed arm has no reader, and saying so is what
 stops it becoming a policy someone later relies on.
+
+**Six mutations, six kills.** The resolver ignoring the arms, an arm equal to the
+default being accepted, I19 reading the tool only, I20 reading the tool only, the
+gate moved back below the split, and C23 reading the declaration — each dies, and
+the last two only after the type is loosened enough to express them. F120 is what
+the pass cost before it said anything true.
+
+**The repair holds by a type, not by discipline.** `runApp`'s parameter now demands
+`Extract<ValidationResult, { ok: true }>`, so the check cannot drift back inside it
+— a caller that has not gated does not compile. That matters more than usual here,
+because **two runtime guards of one condition are indistinguishable from one in
+every test**: each defeats the other's mutation. It is the argument `route`'s own
+`Exclude<…, { kind: "empty" }>` was written from, twenty lines up in the same
+function, and this is the second time that shape has come up in it.
+
+---
+
+## F120 — the mutation harness reported one pre-existing error six times ★★
+
+The pass for C05 I23 ran six mutations and returned the same verdict for all six:
+*did not compile (the type holds it)*. It read as a strong result — the ruling's
+shape making every defect unbuildable — and it was one stale error in a test file
+written ten minutes earlier, reported once per mutant.
+
+```py
+tsc = subprocess.run(["npx", "tsc", "--noEmit"], …)
+verdict = "did not compile" if tsc.returncode != 0 else run()
+```
+
+The harness judged mutants by a gate it had never run against the baseline. Its
+baseline line — `print("baseline after restore:", run())` — went through `run()`,
+which is **vitest only**, so the one gate that produced every verdict was the one
+gate nothing had checked. And it printed last, after all six verdicts were on the
+screen and had already been believed.
+
+**Both halves of the fix are in that sentence**: a harness runs the baseline
+through *every* gate it will judge by, and it runs it **first**. The second half
+is not decoration. A baseline printed at the end is a check on the restore, which
+is a different property, and it is the property the line's name claimed.
+
+**This is `read a green gate's counters` with the colours swapped.** That rule is
+about an exit status being one bit and the same bit for *clean* and for
+*did-not-run*. Here the bit was red, and red is the same bit for *the mutation was
+caught* and *nothing ran*. The instrument is symmetric and the habit was not:
+a green gate gets its counters read and a red one gets believed, because red
+looks like work being done.
+
+Corrected, the six killed six. **The uniform answer was the signal** — six
+mutations across four files, three of them one-line boolean flips, do not all
+fail the type-checker; a result too good in the same shape for every row is
+about the harness rather than about the code.
 

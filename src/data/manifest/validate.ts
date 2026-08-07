@@ -481,12 +481,24 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
     readPositionals(args);
 
+    // **The contract, resolved here for `transmitted`'s reason** (I23, F80).
+    // `counts` is the set of flags this invocation actually gave, which is the
+    // fact C18 cannot recover without re-deriving the grammar above.
+    //
+    // `find` rather than a fold with a precedence rule: parse refuses an arm
+    // equal to the tool's default, so every arm on this tool carries the same
+    // value and the first one found is every one of them. **The arbitration is
+    // absent because the disagreement is unbuildable**, not because a policy
+    // picked a winner — which is why there is nothing here to get wrong later.
+    const deciding = tool.flags.find((f) => f.interactive !== undefined && counts.has(f.name));
+
     return errors.length > 0
       ? Object.freeze({ ok: false as const, errors: Object.freeze(errors) })
       : Object.freeze({
           ok: true as const,
           args: Object.freeze(args),
           transmitted: Object.freeze([...transmitted]),
+          interactive: deciding?.interactive ?? tool.interactive === true,
         });
   }
 

@@ -34,6 +34,7 @@ import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
 import { isViewInvocation } from "../data/manifest/index.js";
+import type { ValidationResult } from "../data/manifest/index.js";
 import { liveDeclarations } from "./builders/live.js";
 import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
@@ -621,27 +622,34 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    *
    * **Validation is read, never recomputed** (C23 I4, §8b B2). C18 ran it and
    * the answer travels on the `ParseResult`. Reading it is not recomputing it —
-   * §2 routes by *shape*, so an `app` result arrives here whatever its validation
+   * §2 routes by *shape*, so an `app` result arrives whatever its validation
    * says, and the check has to happen or an invalid command is spawned.
+   *
+   * **It happens in `route`, above the interactive split** (I38). This function
+   * is the non-interactive arm of that split, so a check here covered half the
+   * verbs — and the half it missed were the ones that take the terminal (F119).
    */
   const runApp = async (
     line: string,
-    result: Extract<ParseResult, { kind: "app" }>,
+    // **The gate's placement, made a compile obligation** (I38). `route` checks
+    // `validation.ok` above the interactive split, and narrowing the parameter
+    // here is what stops that check drifting back into this function: two
+    // runtime guards of one condition are indistinguishable from one in every
+    // test, because each defeats the other's mutation. This one cannot be
+    // satisfied by a caller that has not gated.
+    result: Extract<ParseResult, { kind: "app" }> & {
+      validation: Extract<ValidationResult, { ok: true }>;
+    },
   ): Promise<void> => {
     const verb = result.tool.name;
 
-    // Step 1 — the carried result. C23 §8b B2 is the cell where §2's route table
-    // and §5's containment row named different destinations for one value.
-    if (!result.validation.ok) {
-      appendAndCommit(
-        errorDoc(line, result.validation.errors[0] ?? { message: `${verb}: invalid arguments` }, {
-          origin: "user",
-          verb,
-        }),
-        line,
-      );
-      return;
-    }
+    // Step 1 — the carried result, now read in `route` above the interactive
+    // split (I38). C23 §8b B2 is the cell where §2's route table and §5's
+    // containment row named different destinations for one value; the
+    // destination is unchanged and only the moment moved, because this function
+    // is one arm of two and the gate has to cover both.
+    //
+    // Not left here as well: the parameter type is what holds it now.
 
     // Step 2 — the guard, before the pending entry, so a refusal leaves no
     // orphan (C23 §3, T3.17).
@@ -1152,18 +1160,46 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         );
         return;
 
-      case "app":
-        // C05 I19's field, read off the `ToolDef` C18 already carries — one
-        // fact with one home, rather than a copy on the result. The transport
-        // is bypassed entirely: an interactive verb's child owns the terminal,
-        // and there is no stdout to read (C05 I19 refuses `streams` with it).
+      case "app": {
+        // **The pre-spawn gate, above the interactive split** (I38, F119). It
+        // lived inside `runApp` — which is the *non-interactive* arm of that
+        // split — so an interactive verb was spawned without its invocation
+        // being looked at. A handoff suspends the alternate screen before the
+        // child starts, so the reader watched their session go away and come
+        // back to learn they had missed an argument. D17's argument is that a
+        // malformed invocation costs nothing rather than an interpreter's
+        // startup, and the route stepping over it was the expensive one.
+        //
+        // One check, not two: `runApp`'s parameter demands the narrowed
+        // validation, so the gate cannot drift back into it.
+        if (!result.validation.ok) {
+          appendAndCommit(
+            errorDoc(
+              line,
+              result.validation.errors[0] ?? { message: `${result.tool.name}: invalid arguments` },
+              { origin: "user", verb: result.tool.name },
+            ),
+            line,
+          );
+          return;
+        }
+
+        // **The invocation's contract, not the verb's** (I38, C05 I23). `docker
+        // run` attaches by default and detaches with `-d`, so a `ToolDef` field
+        // cannot answer this; C05 resolves it from the flags actually given and
+        // C18 carries the answer. Both routes read one field name now.
+        //
+        // The transport is bypassed on the handoff arm: the child owns the
+        // terminal and there is no stdout to read (C05 I19 refuses `streams`
+        // with it).
         start(
           line,
-          result.tool.interactive === true
+          result.interactive
             ? runHandoff(line, [deps.binary, ...result.argv], result.tool.name, "app")
-            : runApp(line, result),
+            : runApp(line, { ...result, validation: result.validation }),
         );
         return;
+      }
     }
   };
 

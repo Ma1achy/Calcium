@@ -195,7 +195,15 @@
           "summary": "what to open"
         }
       ],
-      "flags": []
+      "flags": [
+        {
+          "name": "background",
+          "short": "b",
+          "type": "bool",
+          "interactive": false,
+          "summary": "Edit without taking the terminal \u2014 C05 I23's arm, the docker run -d shape"
+        }
+      ]
     },
     {
       "name": "guide",

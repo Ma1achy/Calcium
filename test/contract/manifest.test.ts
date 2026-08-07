@@ -12,6 +12,7 @@ import {
   validateInvocation,
   type ArgType,
   type Manifest,
+  type ToolDef,
 } from "../../src/data/manifest/index.js";
 import { fixture, raw, toolNamed } from "../support/manifest.js";
 
@@ -157,6 +158,41 @@ describe("C05 contract", () => {
     }
 
     expect(cases, "a thousand malformed inputs (C05 T2.3)").toBeGreaterThanOrEqual(1000);
+  });
+
+  it("T2.10 (I23): the terminal contract is resolved from the flags actually given", () => {
+    const edit = toolNamed("edit");
+
+    // The default, with no arm present.
+    const plain = validateInvocation(edit, ["config.yaml"]);
+    expect(plain.ok && plain.interactive, "the verb's own declaration").toBe(true);
+
+    // The arm, long and short, and clustered — the three ways a switch arrives.
+    for (const argv of [["--background"], ["-b"], ["-b", "config.yaml"]]) {
+      const armed = validateInvocation(edit, argv);
+      expect(armed.ok && armed.interactive, `--background via ${argv.join(" ")}`).toBe(false);
+    }
+
+    // **The row that would need arbitration under any other shape.** `docker run
+    // -dit` is the real case: a detach flag and two attach-ish flags in one
+    // invocation. There is no precedence rule because `-i` and `-t` could only
+    // carry the tool's default, and C05 refuses that at parse — so the
+    // disagreement is unbuildable rather than resolved (F80).
+    const clustered = validateInvocation(edit, ["-b", "--", "-it"]);
+    expect(clustered.ok && clustered.interactive).toBe(false);
+
+    // The control, in the other direction: a tool declaring nothing whose flag
+    // carries `true`. Without it, a resolver that simply returned `false`
+    // whenever any arm was present would satisfy every row above.
+    const upward = toolNamed("ps");
+    const armedUp: ToolDef = {
+      ...upward,
+      flags: upward.flags.map((f) => (f.name === "watch" ? { ...f, interactive: true } : f)),
+    };
+    const bare = validateInvocation(armedUp, []);
+    expect(bare.ok && bare.interactive).toBe(false);
+    const watched = validateInvocation(armedUp, ["--watch"]);
+    expect(watched.ok && watched.interactive, "an arm raises it as well as lowers it").toBe(true);
   });
 
   it("T2.4: every ArgType has a validator, and adding one without a validator fails the build", () => {

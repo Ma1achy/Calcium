@@ -236,11 +236,21 @@ function app(
     ...(validation.ok ? validation.transmitted : residual),
   ]);
 
-  return Object.freeze({
-    kind: match.tool.local ? ("local" as const) : ("app" as const),
-    tool: match.tool,
-    argv,
-    residual,
-    validation,
-  });
+  const common = { tool: match.tool, argv, residual, validation };
+
+  // **Two returns rather than one with a ternary `kind`** (I28). The `app` arm
+  // carries the resolved terminal contract and the `local` arm does not: C05 I19
+  // refuses `interactive` with `local: true`, so a member there could only ever
+  // be `false` — A03 §2's vacuity class arriving as a field.
+  //
+  // The fallback on the failure arm is the declaration, and it has no reader:
+  // C23 I38 gates on `validation.ok` above the route. Named rather than left to
+  // a `?? false` that would read as a policy someone could come to rely on.
+  return match.tool.local
+    ? Object.freeze({ kind: "local" as const, ...common })
+    : Object.freeze({
+        kind: "app" as const,
+        ...common,
+        interactive: validation.ok ? validation.interactive : match.tool.interactive === true,
+      });
 }

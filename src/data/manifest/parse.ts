@@ -233,6 +233,7 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
   const conflicts = takeStringArray(raw, "conflicts", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
   const shellOnly = takeOptionalBoolean(raw, "shellOnly", e, at);
+  const interactive = takeOptionalBoolean(raw, "interactive", e, at);
 
   return {
     name,
@@ -244,6 +245,7 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
     ...(conflicts === undefined ? {} : { conflicts }),
     ...(view === undefined ? {} : { view }),
     ...(shellOnly === undefined ? {} : { shellOnly }),
+    ...(interactive === undefined ? {} : { interactive }),
     summary,
   };
 }
@@ -455,16 +457,41 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
 
+  // **I23 — a flag's arm must differ from the tool's default.** An arm that
+  // restates it decides nothing, which is A03 §2's vacuity class arriving in a
+  // manifest; and refusing it is what makes the arms on a verb agree, so two
+  // flags cannot disagree and C05 needs no precedence rule. Both directions,
+  // because either alone leaves half the vacuous declarations expressible.
+  const toolInteractive = interactive === true;
+  flags.forEach((flag, i) => {
+    if (flag.interactive === undefined) return;
+    if (flag.interactive === toolInteractive) {
+      fail(
+        e,
+        `${at}.flags[${i}].interactive`,
+        `--${flag.name} declares interactive ${String(flag.interactive)} and "${name}" is ` +
+          `already ${toolInteractive ? "interactive" : "not interactive"} — the flag decides ` +
+          `nothing. An arm is the opposite of the verb's default, or it is absent`,
+      );
+    }
+  });
+
   // I19 — the two combinations that describe a verb which cannot exist. Both
   // are cross-field rules of I4's kind and sit where I4 sits, so the report
   // reaches the author who wrote the manifest rather than the user watching a
   // terminal misbehave. `interactive` alone is fine and is not checked here.
-  if (interactive === true) {
+  //
+  // **Read from every declaration, not from the tool's** (I24). A flag arm of
+  // `true` re-creates exactly the verb the tool-level refusal forbids, and a
+  // refusal that reads one of the two ways to write its own combination is the
+  // state I20 shipped in — see F118, found by measuring a claim about this.
+  const interactiveAnywhere = toolInteractive || flags.some((f) => f.interactive === true);
+  if (interactiveAnywhere) {
     if (streams === true) {
       fail(
         e,
         `${at}.interactive`,
-        `"${name}" declares both interactive and streams — a handoff gives the ` +
+        `"${name}" is interactive and declares streams — a handoff gives the ` +
           `terminal to the child and a stream reads its stdout into the transcript; ` +
           `drop whichever one the verb does not do`,
       );
@@ -483,14 +510,24 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   // deliberately absent from them: S12's logs view is a streaming source rendered
   // into a pushed view, so refusing that pair would refuse the surface C22 §13a
   // was ruled for.
-  if (view === true) {
-    if (interactive === true) {
+  //
+  // I24 again, and this is where the rule was found missing: I20's own sentence
+  // says `view` is declarable on a flag, and this refusal read the tool's field
+  // only. Both sides now read every declaration.
+  //
+  // **Conservative on purpose, and the limit is recorded rather than
+  // discovered.** A verb declared interactive whose arm resolves to `false`
+  // beside a `view` flag would be legal, and this refuses it. No app declares
+  // one; the first that wants to is the argument for narrowing this.
+  const viewAnywhere = view === true || flags.some((f) => f.view === true);
+  if (viewAnywhere) {
+    if (interactiveAnywhere) {
       fail(
         e,
         `${at}.view`,
-        `"${name}" declares both view and interactive — both hand input ownership ` +
-          `away, the view to the shell's own keymap and the handoff to a child; ` +
-          `drop whichever one the verb does not do`,
+        `"${name}" declares both view and interactive — on the tool or on a flag, ` +
+          `and either way both hand input ownership away, the view to the shell's ` +
+          `own keymap and the handoff to a child; drop whichever one the verb does not do`,
       );
     }
     if (oneShot === true) {

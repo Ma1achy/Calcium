@@ -216,6 +216,33 @@ describe("C21 with C06", () => {
     expect(app.handed).toEqual([["widget", "edit", "config.yaml"]]);
     expect(app.calls, "an interactive verb never goes through the transport").not.toContain("invoke");
 
+    // **T4.23 (C23 I38, C05 I23) — the contract is the invocation's.** `edit` is
+    // declared interactive and `--background` carries the arm, so one verb takes
+    // both routes. Both halves in one row: a route that always hands off
+    // satisfies the handoff assertion, and one that never does satisfies the
+    // transport assertion.
+    const armed = pipelineHarness();
+    armed.pipeline.submit("/edit -b config.yaml");
+    await settled();
+    expect(armed.calls, "the arm sends it through the transport").toContain("invoke");
+    expect(armed.calls, "and nowhere near the terminal").not.toContain("handoff");
+    expect(armed.lifecycle).toEqual([]);
+    // The flag is the app's own and still travels: the axis here is the terminal
+    // contract, not transmission (C05 I21 is the other one).
+    expect(armed.handed).toEqual([]);
+
+    // **T4.24 (C23 I38) — the gate is above the split.** An invalid invocation of
+    // an interactive verb produced an error and no spawn. `handed` is the
+    // assertion; a row checking only the document passes on the ordering that
+    // spawns first and reports afterwards, which is the ordering this replaces
+    // (F119).
+    const invalid = pipelineHarness();
+    invalid.pipeline.submit("/edit --nonsense");
+    await settled();
+    expect(invalid.handed, "nothing was spawned").toEqual([]);
+    expect(invalid.calls, "and the terminal was never taken").not.toContain("suspend");
+    expect(invalid.calls).not.toContain("invoke");
+
     // The control: an ordinary app verb still does, so the branch is reading
     // `interactive` rather than having replaced the app route.
     const ordinary = pipelineHarness();
