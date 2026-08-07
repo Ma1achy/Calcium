@@ -724,6 +724,63 @@ not in the component that took the decision.
 
 ---
 
+## 6c. The rendered lines are cached, walked by hand
+
+`visibleRows` calls `renderSequenceToLines` for every visible entry on every
+frame, and nothing keeps the result — only `measure` is cached, by C14. The
+measurement says what that costs: a keystroke against a 250-line patch is 160 ms
+and against 5,000 lines 2.8 s, **linear in the lines the block holds and flat in
+the rows the screen shows** (`docs/notes/TUI_NOTE_render_chain_baseline.md`).
+
+**Alone this is not a fix, and saying so is the point of stating it here.** It
+makes the *second* frame free while the first still renders every line, so it
+converts continuous lag into one long stall. Landing it and reporting the problem
+solved is the failure mode the ordering exists to prevent; §6d is the stage that
+fixes it.
+
+### The key, and `(entryId, rev, width)` is not it
+
+The obvious key is C14's, and C14's `HeightCache` says in its own header why
+**theme and capabilities are deliberately absent**: C09 §4 makes capability
+substitutions 1:1 by cell count and C10 T4.1 asserts geometry is identical across
+themes, so a theme switch invalidates the *frame* and not one cached height.
+
+None of that transfers, because **this caches appearance and that caches
+geometry**. Two axes are added and each is measured rather than assumed:
+
+- **Focus.** `visibleRows` passes `focus: focusFor(graph, entry.id)` into the
+  render, and C11 draws the focused row in a different tone (C11 I14). Two frames
+  of one entry at one `rev` and one width differ. `focusFor` returns non-null only
+  for the live entry, so at most one slot is ever affected — which is what makes
+  a per-slot discriminator cheap rather than a reason to clear.
+- **The theme's identity, carried in the key rather than hooked.** `ResolvedTheme.name`
+  already changes on a variant switch **and** on an override, and C10 I11 already
+  depends on exactly that for its own memo. So this needs no invalidation call and
+  cannot be left out of one — the fact travels with the value. An `invalidate`
+  hook someone must remember to add at a fourth call site is the shape this
+  project keeps finding unwired.
+
+### The sequence trace — event-mediated, because a document changes under it
+
+| # | Sequence | Which rules meet | Ruling |
+|---|---|---|---|
+| 1 | append, render, patch the same entry, render | validity by `rev` | Re-rendered. One slot per entry, so the old value is overwritten rather than kept beside |
+| 2 | two patches inside one `stream` window | C03 coalesces at 33 ms | One render, at the later `rev`. The cache never sees the intermediate, because the frame does not |
+| 3 | `settle(id, doc)` | C13 moves `rev` (C13 I13) | Re-rendered — the same arm C14 gives it, and for the reason C14 records: a bare settle costs a lookup that returns the same value |
+| 4 | focus moves between two rows of one table | focus, not `rev` | Re-rendered. `rev` and width are unchanged, so this is the axis that would otherwise serve a stale frame |
+| 5 | focus moves to an entry that is not live | `focusFor` returns null for it | Nothing re-renders. The discriminator must normalise *no focus* to one value, or a session alternates between two keys for one appearance |
+| 6 | `/theme dark` | `ResolvedTheme.name` moves | Every slot's key changes. No hook, no clear |
+| 7 | a width change | width | Every slot's key changes, exactly as C14's does |
+| 8 | evict, then the same id appended again | C13 ids are not reused | Deleted on evict; a fresh id could not collide in any case |
+| 9 | `/clear` | | Cleared |
+| 10 | **a `steps` block animating through `ctx.tick`** | the key has no `tick` axis | **Not reachable, and recorded because it is one line from being reachable.** `visibleRows` passes no `tick`, so every transcript render is at 0. The day it is threaded, an animating entry serves its first frame forever and no assertion here would fail — so either the key gains the axis or live entries stop being cached, and this row is where that decision is owed |
+
+**Row 10 is A03 §2's shape pointed at a cache.** A key that omits an axis nothing
+currently varies is indistinguishable from a key that is complete, and the
+difference appears the day someone threads one value through one call.
+
+---
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -921,6 +978,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I55** — **The frame is written as a difference against the last frame this session put on this screen, and whole whenever no record describes it.** Four things leave no record: the first frame, a `contaminated` write, a refused frame that drew the fallback, and a record whose size differs from the frame's. `contaminated` is a claim about the *screen* rather than about the frame, so a repaint happens even when the composed rows are identical to the last (§6b table row 3) — and until this invariant existed `render` and `repaint` were the same function, so C03's whole invalidation mechanism reached nothing.
 - **I56** — **The record is dropped before the bytes go out and restored only when they have all gone.** Setting it after the write returns is the obvious rule and leaves the fault case wrong: a write that throws puts a *prefix* of a frame on the screen, and a record surviving the throw describes the frame *before* it — so the next diff compares against a screen that never existed and skips exactly the rows the partial write got wrong. Clearing first makes a throw a full repaint by construction rather than by a handler someone must remember to add (§6b trace row 10).
 - **I57** — **Every row the diff writes carries a leading reset, and the rule rests on asymmetry rather than on a live defect.** Measured at the time of writing, **0 of 50 composed rows end with a live SGR attribute** — every renderer closes its own styling and `fitStyled` pads with plain spaces — so a rule justified as *otherwise colour bleeds* would forbid nothing and read exactly like a rule that holds (A03 §2, in a remedy rather than in a check). What keeps it: four bytes per changed row, against a colour bleeding down every row below it and surviving the frame, on the day a renderer stops closing its own. A diff writes rows out of order, so a row can inherit a state that was never above it; nothing else asserts the property that would make the prefix unnecessary (§6b table row 7).
+- **I58** — **An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry.** The first three are C14's and the last two are the difference between caching *appearance* and caching *geometry*: `HeightCache` records that theme and capabilities are deliberately absent from it because C09 §4 and C10 T4.1 make height theme-invariant, and neither argument reaches colour. Focus enters because C11 draws the focused row in another tone (C11 I14) and `visibleRows` passes it in; the theme enters as `ResolvedTheme.name`, which already moves on a variant switch and on an override and which C10 I11 already relies on for the same purpose — carried in the key rather than through an invalidation call, because a hook at a fourth call site is the shape this tree keeps finding unwired. One slot per entry makes the cache bounded by the entry count by construction rather than by an eviction rule, which is the argument C14 §4 makes for the same shape.
+- **I59** — **The cache makes the second frame free and the first no cheaper, and that is why it is not the fix.** A 5,000-line block still renders every line the first time it is drawn at a width, so this stage on its own converts continuous lag into one long stall. It is recorded as an invariant rather than as a note because the failure mode is *reporting the problem solved* — §6d is what bounds the first frame, and the ordering is the finding (F90).
+- **I60** — **`ctx.tick` is not in the key and no transcript render receives one.** `visibleRows` passes no tick, so every entry renders at 0; a `steps` block animating in the transcript would serve its first frame for the life of the session and nothing here would fail. The invariant is the *pair*: the axis is absent **and** the value is constant, so the day one is threaded the other is owed — either the key gains it or live entries stop being cached (§6c trace row 10, A03 §2).
 ---
 
 ## 11. Commitments
@@ -973,6 +1033,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 28. The record is cleared before the write and restored after it completes, so a write that throws repaints rather than diffing against a screen that never existed (I56, §6b).
 29. Each written row opens with a reset, kept on the asymmetry between four bytes and a colour that survives the frame, with the measurement that shows it is currently inert recorded beside it (I57, §6b).
 
+30. An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry — the two axes C14's height cache deliberately omits are the two this one cannot (I58, C10 I11).
+31. **This stage makes the second frame free and the first no cheaper**, so it is not the fix and the spec says so where someone would otherwise stop (I59, F90).
+32. No transcript render receives a `tick`, and the key has no axis for one; threading either obliges the other (I60).
 ---
 
 ## 12. Tests
@@ -1082,6 +1145,10 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.11** (I13a): header and footer receive the same `now` within one frame, asserted with a clock that advances on every read — a fake returning a fresh value per call, so two reads cannot agree by accident. A monotonic fake would pass whether the value were sampled once or twice, which is the setup where both readings agree (A03 §2).
 - **T4.10** (with C13, C20): `/clear` empties the transcript and leaves history intact.
 - **T4.12** (I34, with C14): a document taller than the region, scrolled to the bottom → **the document's last row is on the frame**, at three prompt heights: one row, three rows, and a prompt long enough to hit S01 §3's half-terminal cap. Asserted from the painted frame rather than from a spy on `resize`, because `TuiInstance` exposes no graph and a value read at the seam is not the claim — the claim is that the last row can be reached. Three heights and not one: at a one-row prompt the terminal's height and the region's differ by a constant, so a `rows − 3` written anywhere agrees with the right answer exactly there.
+- **T4.16** (I58): one entry, drawn twice with nothing changed → the registry's `renderSequence` is called **once**. Asserted with a counting registry rather than by timing, because a timing assertion under contention is a flake and the claim is *it did not render again*, not *it was faster*.
+- **T4.17** (I58): the same entry across each axis in turn — a patch moving `rev`, a width change, focus moving between two rows of one table, and `/theme dark` — → a render for each. **Four sub-cases and not one**, because a key missing any single axis passes every assertion about the other three, and the two this cache adds to C14's are exactly the two that would be left out.
+- **T4.18** (I58): `evict` drops the evicted entry's slot and keeps its neighbours'; `/clear` drops all. C13's `Change` arms map onto the operations with nothing left over, which is C14 §4's argument for the same shape.
+- **T4.19** (I59): a 2,000-line block drawn for the first time renders every line, and the second frame renders none — **the stall stated as a test**, so a later reader who finds this stage and stops has an executable statement of what it did not do.
 - **T4.13** (I55): a keystroke into a settled session writes **fewer bytes than the frame it produced**, and the screen folded from every write equals the frame `paint` composed. Two assertions and neither is sufficient alone: the byte count alone is satisfied by a diff that drops rows, and the screen equality alone is satisfied by writing everything. The screen comes from `test/support/screen.ts`, which is verified against its own control before anything is read through it.
 - **T4.14** (I55): a `SIGWINCH` writes the frame **whole** even when the composed rows are identical to the last — the terminal is resized to the size it already holds, so C14 refuses the resize (C14 I21) and the rows cannot differ, and `contaminated` is the only thing that can produce the repaint. The row that makes contamination a claim about the *screen* rather than about the frame.
 - **T4.15** (I56): a write that throws, then a successful frame → the successful frame is **whole**. Asserted with `FakeStdout.throwOn`, which is what makes the fault path constructible at all; without I56 the record survives the throw and the next frame diffs against a screen holding a prefix of a frame nobody has.
@@ -1138,6 +1205,10 @@ PTY harness.
 - **T6.36** (I40): treating an unreadable `theme` file as fatal, or as silently absent → T1.19b fails on the notice or on the session opening at all. The two halves of C20's repair, arriving one component up.
 - **T6.34** (I39): removing the `cancel()` from the printable path → C19 T5.2 fails on its last assertion, and a menu opens for a prefix the user has typed past. The effect table's own `mine !== seq` guard does not cover it: a printable keystroke does not advance that sequence, which is why the guard looked like the mechanism and was not.
 - **T6.33** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.
+- **T6.41** (I58): dropping `focus` from the key → T4.17's focus case fails, and moving the selection down a table leaves the highlight where it was until something else moves the entry's `rev`. The mutation nothing else catches: `rev`, width and theme are all unchanged, so every other row agrees.
+- **T6.42** (I58): dropping the theme identity from the key → T4.17's theme case fails, and `/theme light` repaints the chrome while the transcript keeps its dark colours. C03's `invalidate` still fires, which is what makes this survivable-looking: the *frame* is repainted from a cache that was not.
+- **T6.43** (I58): keying on `(entryId, rev)` alone — C14's key minus width, which is the key F90 proposed → T4.17's width case fails, and a resize redraws the transcript at the old wrapping.
+- **T6.44** (I59): deleting T4.19 → nothing fails, and that is the point of the row: it is the only executable statement that this stage leaves the first frame alone.
 - **T6.38** (I55): handing C03 the same callback for `render` and `repaint` — which is what the tree did before this — → T4.14 fails, and a `SIGWINCH`, a `SIGCONT`, a handoff and a theme change all diff against a screen nobody knows. The mutation is a deletion of two lines and it restores a state in which C03's entire invalidation mechanism, and the comment in `frame-scheduler.ts` reasoning about it, reach nothing.
 - **T6.39** (I56): setting the record after the write instead of clearing it before → T4.15 fails. Nothing else does: every frame on a healthy path is identical under both orders, so this is a row about the fault path or it is not a row at all.
 - **T6.40** (I55): converting to CUP's 1-based form at the call site as well as inside `cursorTo` → T4.12 fails with the screen lagging its input by exactly one frame. **Found by a test rather than by reading**, and `escapes.ts` had already written the warning: *one place to be off by one, and it is the place with the test*. Every row landed one down and one right, and the frame produced was internally consistent.
