@@ -5532,3 +5532,78 @@ under `tools/capture.py`, and establish whether the shell fails to start or fail
 its six targets throughout, and four commit messages quoted `enforce` and `npm test` as
 evidence. Both were true. Neither covers `golden` or `e2e`. See `VERIFYING.md` §0's fifth
 entry.
+
+---
+
+## F134 — a window is exact in height and wrong on screen for four kinds of five ★★★
+
+**F90's stage 3, built and then measured against the kinds it was for.** The seam
+lands: `window(block, width, from, to) → { block, skipRows }`, dispatched per kind,
+with `measure(block) − skipRows === to − from` checked generically. A 50,000-line
+`logs` block is 5.5 ms a keystroke and 17 ms a drag step, flat in the block's size.
+
+**Four of the five divisible kinds cannot use it**, and the reason is one cell of
+the classification table — *a window is a slice of the rows* meeting *a row's
+layout is derived from the block*:
+
+| kind | derived from the whole block |
+|---|---|
+| `patch` | `numberWidth(block)` walks every line of every hunk to size the gutter |
+| `keyValue` | `widest(block.rows)` sets the key column |
+| `table` | `planColumns` reads every row |
+| `code` | `tokenise` runs over the whole text — a construct spanning the boundary highlights differently |
+
+**Height conformance cannot see it.** `measure − skipRows === to − from` holds
+perfectly while every row moves sideways: the gutter narrows and the text shifts
+as the reader scrolls, which is the drift C14 exists to prevent and which reads as
+the terminal misbehaving rather than as a defect.
+
+**The remedy is a field, not a harder window.** A window has to carry its derived
+layout — a pinned gutter width, a pinned column plan, a tokenisation anchor —
+which is a new field on four public block types and therefore **tier 2, before the
+freeze**. It is the single change that finishes F90's stage 3.
+
+**What its absence costs is narrower than it reads**, because stages 1, 2 and 4
+apply to every kind: typing into a 5,000-line diff is 10 ms against 2,793 at the
+baseline. What remains is *opening* one (11.1 s → 3.2 s) and *resizing* while one
+is on screen (3,252 → ~3,000 ms).
+
+---
+
+## F135 — a malformed greeting is swallowed twice and the session shows nothing ★★
+
+C04's validator refuses the document, `appendAndCommit` (`execution.ts:216`)
+catches the throw, and `session.ts`'s greeting arm catches a rejection on top of
+it. The session starts, draws its header and its prompt, and **nothing appears,
+with nothing anywhere saying why**.
+
+Found by handing the bench a six-field `meta`. The symptom is not a crash and not
+an error entry — it is a working shell with an empty transcript, which is
+indistinguishable from an app that has no greeting.
+
+**F15's class through a second route, and with one more catch.** F15 is filed on a
+verb's document and its open question is whether a malformed document may be
+indistinguishable from a verb that did nothing. The greeting has two catches
+between the producer and the screen rather than one, so the tier-3 ruling F15 owes
+should be read as covering both.
+
+---
+
+## F136 — MG24 matches a record's members by name and not by owner, third instance ★
+
+A parameter written `cache: RenderCache` in `src/shell/` satisfied MG24's
+consumption test for `EngineOptions.cache` in `src/interaction/completion/`, two
+components away, and the equality arm then reported the exemption as one that had
+outlived its reason.
+
+**The rule already records the class as F105** — a frozen marker table gaining the
+keys `changed` and `removed` made two unrelated `CorpusDiff` members read as
+consumed — and records that the obvious fix, scoping the shorthand half to files
+that name the owner, trades one false consumer for nineteen false violations.
+
+**Filed as a third instance rather than as a repair**, because the measured
+remedy is worse and the equality arm caught it both times, which is that arm
+working. What a third instance buys is the record: the collision is with any
+identifier of the same name anywhere in `src/`, not only with a similar table.
+
+---

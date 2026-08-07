@@ -189,14 +189,38 @@ is, and no field fixes it.
 
 | item | fix | consumers | ⚠ | depends on |
 |---|---|---|---|---|
-| **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | — | internal: diffing → caching → window the block → cap |
+| **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | C09 | **partial** · `48d3be3` `af87fb3` `a2d4fd3` `6cf2ee2` `266c076` `4efa247` `1d5a4b3` `5bc3f91` — stage 3 reaches one kind of five (**F134**) |
 | **F91** shared pollers | change | 3 parts, plus the off-screen half | — | — |
 | **F15** the empty-block mechanism | **ruling** — C23 §5's bare catch is deliberate | 1, *and it is the mechanism* | — | — |
 | **F67** a region too small refused rather than drawn dark | ruling | 1 | — | — |
 
-**F90's order is the finding.** Stage 2 alone converts continuous lag into one long stall;
-stage 3 is the one that fixes it and `windowPatch` proves the pattern only inside a pushed
-view. Acceptance is a frame-read — type into a 5,000-line diff and watch.
+**F90's order was the finding and three of its four claims moved under measurement.**
+`docs/notes/TUI_NOTE_render_chain_baseline.md` is the record; the row is **partial**, and
+what closes it is F134.
+
+- **Stage 1 was ranked first as the largest effect.** It is 50–97× fewer bytes and **no
+  measurable change in wall clock** — the cost is the render, and a write to an in-process
+  stream is free. It keeps its place because it is small and its invalidation story already
+  existed, not because it was the biggest win.
+- **Stage 2 did convert continuous lag into a stall, and into a spike nobody had named**: a
+  keystroke went flat in the block's size while a resize drag still pays the full render, so
+  24 ms against 3,099. Same transformation, second axis.
+- **Stage 3 is built, proven and reaches one divisible kind of five** (F134). `windowPatch`
+  proves the *shape* — a valid smaller block — and not the *contract*: its window is a slice
+  plus sticky headers, which a transcript window may not add. The seam therefore returns
+  `{ block, skipRows }`, and the four kinds it cannot serve are the ones deriving a row's
+  layout from the whole block.
+- **Stage 4 was ranked last and is the second-largest win** — 2× to 3.4×, because `exact()`
+  pads every row of every frame and the cache does not touch it.
+
+**Acceptance was a frame-read and it passes**: six keystrokes into a 5,000-line document,
+every intermediate frame exactly `columns` cells, 47 content rows throughout, the prompt in
+order. **2,793 ms a keystroke → 10 ms.** What stage 3's absence still costs is *opening* a
+large diff and *resizing* while one is on screen.
+
+**The bound is still owed and is a ruling**, deliberately not taken inside a performance
+row: which component owns a per-block row cap — C13 on append, C07 at adaptation, C09 at
+measure — and what *overridable* means. The marker is what keeps it honest.
 
 **F91 is filed on the correctness half.** Two views of one source holding different numbers is
 the defect; three subprocesses is the symptom. `source → derivation → part`, two levels and
