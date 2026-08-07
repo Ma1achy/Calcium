@@ -108,11 +108,30 @@ preparation for it.
 - **F36 is served.** `expectDocument(doc).isValid()` is public in `@fmx/calcium/testing` and
   this app already imports that entry in `degradation.test.ts`. What survives is a **stale
   deep import** in `test/documents.test.ts`, which is a workaround to delete rather than a
-  gap to close — unless it needs the error list rather than a throw, which is one read.
+  gap to close. **The one open read is settled**: both uses survive the throw — the fifteen
+  documents want the errors in a message, which `isValid()` throws with, and the invalid
+  control asserts that it throws at all.
 - **F37 is two items on opposite sides of the line.** The height request is one. The other is
   `codeRows` at `src/inspect.ts:92`, called inside `structuredBlocks` to decide splitting —
   **production logic, not a test affordance**, and it takes a width. It was filed here as an
   export and it is not one.
+
+**The mechanism, measured rather than described.** `TuiConfig.localHandlers` requires the
+handler's `ctx` to be mutually assignable with `LocalContext` (`ExactLocalHandlers`, C23 I39),
+so a narrower or optional declaration is refused at registration. It inspects the **declared
+parameter type** through `infer` rather than testing assignability, which is why variance does
+not reach it: probed across four declaration positions — a named const, an inline arrow, an
+**object method** (where parameters are bivariant) and a pre-typed record — and all four are
+refused. `NoInfer` is not needed and would not add anything.
+
+**Two of the four arms were wrong on the first draft and the probe is what said so**: a handler
+taking only `argv` was refused, because `infer C` on a one-parameter function yields `unknown`;
+and an optional `ctx?:` slipped through, because it does not match a required two-tuple. Neither
+is visible in the type.
+
+**And one direction is not new.** A *wider* declaration was already refused by assignability
+alone. Removing the check kills three tier-6 rows and leaves the wider one passing — so the
+mutual form is how the check is written, not the work it does.
 
 **And three measurements are filed rather than carried**: F124 (the app's sniff and C02
 disagree on three of four locale shapes), F125 (four of eight handler families declare their
