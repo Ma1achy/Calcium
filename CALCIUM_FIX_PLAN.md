@@ -44,18 +44,28 @@ not firing is indistinguishable from a rule that works.** 11 instruments, 1 cove
 **Sequenced so the unblocked work goes first.** The producer-context ruling is twelve findings
 and a design question; three of them close ahead of it and are blocked on nothing.
 
-| | item | fix | consumers | ⚠ | depends on |
-|---|---|---|---|---|---|
-| **1** | **F13 · F58b · F85 — narrow the type at the construction boundary** | change | **3** | C04 · C07 | **nothing** |
-| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **12 with the above** | C07 · C24 | — |
-| 3 | F30 F49 F51 F81 — a change axis distinct from `Tone` | ruling, then change | 4 | C04 · C09 · C10 | the 1-bit rendering, decided inside it |
-| 4 | F33 F34 F18 F50 — a block cannot express what the surface needs | **ruling** | 4 | C04 | rule with F30 — three questions about `Comparison` |
-| 5 | F39 · **F92** — a flag that selects a rendering | change | **2** | C05 | — · F92 waits on it |
-| 6 | F21 — the action dispatch route | change | 1 filed, **3 dependents** | C23 | — |
-| 7 | F22 F41 F78 F23 — the builder surface | **audit**, then changes | 4 | C04 | — |
-| 8 | F80 — `interactive` as a predicate over the invocation | ruling | 1 | C05 | — |
-| 9 | F55 — the prompt and `loading…` | change | 1 | C22 §6 | — |
-| 10 | F93 — grammar registration | change | 1 | additive export | — |
+| | item | fix | consumers | ⚠ | depends on | status |
+|---|---|---|---|---|---|---|
+| **1** | **F13 · F58b · F85 — narrow the type at the construction boundary** | change | **3** | C04 · C07 | **nothing** | **done** · `bea5fcd` `7ea1c28` `74da764` |
+| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **12 with the above** | C07 · C24 | — | open |
+| 3 | F30 F49 F51 F81 — a change axis distinct from `Tone` | ruling, then change | 4 | C04 · C09 · C10 | the 1-bit rendering, decided inside it | **done** · `794547d` `1a7feab` |
+| 4 | F33 F34 F18 F50 — a block cannot express what the surface needs | **ruling** | 4 | C04 | rule with F30 — three questions about `Comparison` | **done** · `37d6d74` |
+| 5 | F39 · **F92** — a flag that selects a rendering | change | **2** | C05 | — · F92 waits on it | **done** · `4721e28` |
+| 6 | F21 — the action dispatch route | change | 1 filed, **3 dependents** | C23 | — | **done** · `84a6db2` |
+| 7 | F22 F41 F78 F23 — the builder surface | **audit**, then changes | 4 | C04 | — | **partial** · `ad9058b` — F23 open |
+| 8 | F80 — `interactive` as a predicate over the invocation | ruling | 1 | C05 | — | **done** · `36fbc99` `fe7ecee` |
+| 9 | F55 — the prompt and `loading…` | change | 1 | C22 §6 | — | open |
+| 10 | F93 — grammar registration | change | 1 | additive export | — | open |
+
+**The status column is a record, not a claim about the remainder.** Six rows landed
+before it existed, so the plan read as untouched and the next reader would have
+re-derived progress from the log. `done` means the row's findings are closed and the
+commit is named; `partial` names what is not — row 7's F23 was measured as F78's class
+and deliberately left, because refusing `view` on a local tool would foreclose S6/S7 and
+the remedy is to extend the local route.
+
+**Rows 1 and 3–8 are done and the tier is not**, which is the distinction a column of
+ticks would hide: rows 2, 9 and 10 remain, and row 2 is twelve findings behind one ruling.
 
 ### 1 · The narrower half, and it is the plan's most useful line
 

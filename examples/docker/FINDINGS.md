@@ -4719,3 +4719,57 @@ mutations across four files, three of them one-line boolean flips, do not all
 fail the type-checker; a result too good in the same shape for every row is
 about the harness rather than about the code.
 
+---
+
+## F121 — six tier-5 rows were red at HEAD, and nothing said so ★★★
+
+Measured while checking whether C05 I23 had broken anything: stash, build, run the
+whole tier; pop, build, run it again. **The same six fail both ways.**
+
+| | |
+|---|---|
+| C06 T5.1 | a real binary emitting a large document |
+| C03 T5.4 | dragging the terminal edge continuously |
+| C04 T5.1 | a tall transcript pages top to bottom |
+| C04 T5.1b | `⌃Home` / `⌃End` reach the extremes |
+| C04 T5.2 | the same at four widths, resizing between |
+| C04 T5.3a | a live stream above a detached viewport |
+
+All six are frame waits timing out at ~30 s — the harness's `the frame never
+satisfied it`. The sessions start and render: the failing row's own dump shows
+`/ps --limit` drawn correctly, so this is a wait for a *particular* frame, not a
+broken build.
+
+**The finding is not the six. It is that measuring the baseline was not part of
+anything.** `npm test` excludes tier 5, `make enforce` does not run it, and every
+step in this programme has read a green framework suite and moved on. A tier
+nobody runs is a tier nobody notices going red, and the interval could be one
+commit or twenty — **the record cannot say, which is the second half of the
+defect.** A red gate with no baseline date is a red gate that will be inherited.
+
+**And a known-red tier is worse than a broken one, because it is stepped around.**
+The next person to run it reads six failures, matches them against six they were
+told about, and stops looking — so the seventh is invisible. That is not
+hypothetical here: a seventh row (`cols and rows: the child's window is the size
+asked for`) appeared once under full-tier load and passed three times in
+isolation. It was distinguishable from the six **only** because the six had just
+been enumerated against a stash. Without that list it would have read as *the
+usual tier-5 noise*.
+
+### What is not claimed
+
+**Not diagnosed.** These are timing-shaped and the environment has a load
+generator (`make fixtures` / `make load-down`), so *flaky under load* is the
+cheap reading and it is unverified — six rows failing together and repeatably is
+not what one-off contention usually looks like. Recorded as a measurement with
+its method, and the diagnosis is owed.
+
+**Not caused by C05 I23** — that is what the stash measured, and it is the only
+claim here that is settled.
+
+**The instrument is the same one as F120's, one level up.** That finding is about
+a harness judging mutants by a gate it never ran against the baseline. This is a
+programme judging changes by a suite that excludes a tier. Both are *the check you
+did not run on the state you started from*, and both were invisible while every
+gate that did run stayed green.
+
