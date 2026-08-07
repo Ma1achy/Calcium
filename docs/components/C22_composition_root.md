@@ -648,6 +648,82 @@ adjust.
 
 ---
 
+## 6b. The write, walked by hand
+
+The frame is composed whole and **written as a difference** against the last frame
+this session put on this screen. `docs/notes/TUI_NOTE_render_chain_baseline.md` has
+the measurement that makes it worth doing: 25.7 KB reach the terminal per frame
+regardless of what changed, and 10.2 KB of that with an empty transcript.
+
+**The invalidation story already existed and had no consumer.** `contaminated` is
+C03's, set eagerly at commit time for a resize (C03 I7) and by `invalidate()` on
+resume, on handoff and on a theme change. `frame-scheduler.ts` even reasons about
+*"diffing against a screen whose contents nobody knows"* — a sentence that only means
+something if diffing is the normal case. Until this, `render` and `repaint` were the
+same function, so the whole mechanism reached nothing.
+
+The write has structure — which rows differ — **and** state — what the screen already
+holds — so it takes both artefact shapes.
+
+### The classification table — which rows go on the wire
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | Row equal, nothing else true | skip it | — | Skipped. The screen holds it |
+| 2 | **Every** row equal | skip them all | the cursor may still have moved | **Hide and cursor, no rows.** An empty diff is a legitimate write rather than a skipped one — the cursor is the frame's too |
+| 3 | `contaminated`, frame identical to the last | skip them all | the screen's contents are unknown | **Contamination wins.** It is a claim about the screen, not about the frame, and the two are only usually the same |
+| 4 | Previous record is a different size | rows compare | the screen is a different shape | **Full write.** A resize contaminates already (C03 I7), so this is defence and not a path — and it is what makes keeping a record across a resize safe rather than lucky |
+| 5 | Row differs only in SGR bytes | strings compare | the glyphs are identical | **Rewritten.** String equality is the rule, and it errs towards writing |
+| 6 | An overlay opened or closed | rows differ where the box is | overlays take no rows (I29) | Ordinary diff. Nothing special |
+| 7 | Row *i* unchanged, row *i−1* changed and ends with a live attribute | skip *i* | SGR is terminal state, not per-row | **Skipped — and every written row carries a leading reset.** See below |
+
+**Row 7 is the one the walk was written for, and the ruling did not survive
+measurement.** The reasoning is sound: with a full frame the rows go out in order, so
+each inherits the last one's SGR state; a diff writes them out of order, so a row can
+inherit a state that was never above it. The remedy — reset each written row — follows.
+
+Then the frame was read. **Zero of fifty composed rows end with a live attribute**:
+every block renderer closes its own styling and `fitStyled` pads with plain spaces. So
+the rule as first written forbids nothing, and would read exactly like a rule that
+holds — A03 §2's vacuity class arriving in a *remedy* rather than in a check.
+
+**What keeps the prefix is the asymmetry, and both figures are recorded.** Four bytes
+per changed row against a colour that bleeds down every row below it and survives the
+frame, on the day a renderer stops closing its own. The property the diff would
+otherwise depend on is asserted nowhere; the prefix is what makes the writer
+independent of it. A justification the next reader checks and cannot reproduce is one
+they delete, so this one says which argument it rests on.
+
+### The sequence trace — what the screen holds
+
+| # | Sequence | Written |
+|---|---|---|
+| 1 | acquire → first frame | Everything. There is no record |
+| 2 | keystroke | The prompt's rows, and whatever the transcript moved |
+| 3 | `SIGWINCH` | Everything — C03 set `contaminated` at commit (I7) |
+| 4 | `SIGWINCH` *during* a write | The **next** frame, whole. The flag is set eagerly and read at the top of the next `writeFrame` |
+| 5 | `SIGCONT` after a suspend | Everything — `onResume` → `invalidate` (§3, construct step 8a) |
+| 6 | A handoff returns | Everything — C23 invalidates (C23 §4) |
+| 7 | A theme change | Everything — the sequence is L4's (A02 Seam 4) |
+| 8 | A stream commit coalesced with an input one | One frame, one diff. Coalescing is C03's and sits above this |
+| 9 | `paint` refuses and the fallback is drawn | The record is dropped: the fallback put something else on the screen |
+| 10 | **The write itself throws** | The screen holds a *prefix* of a frame, and no record describes it |
+
+**Row 10 is the second finding, and it is why the record is cleared before the write
+rather than merely set after it.** *Set the record after the write returns* is the
+obvious rule and it is not enough: on a throw the record still holds the frame
+**before** the failed one, which is a frame the screen no longer shows. The next diff
+would then compare against a screen that never existed and skip precisely the rows the
+partial write got wrong. So the record is dropped before the bytes go out and restored
+only when they have all gone — which makes a throw a full repaint by construction
+rather than by a handler someone must remember to write.
+
+This is the rejection-path question CLAUDE.md asks of any ruling that throws: a
+decision leaves state, and the invariant that forbids the resulting state is usually
+not in the component that took the decision.
+
+---
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -842,6 +918,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
 - **I53** — **The greeting is a producer and is handed the producer context** (C23 I40, C07 §3). It returns a document and was told nothing, which is the same omission the local route had at four other sites; a producer told nothing decides anyway, from a worse copy of the fact. It falls out of the producer ruling rather than extending it.
 - **I54** — **The frame composition is a named unit and `session.ts` calls it. There is no second composition, and a scan says so.** The class no rule here could see: every prior instance of a mechanism unreachable across a seam was *a member nobody could call*, and this was *a sequence nobody named* — MG24, MG25 and MG27 are all satisfied by a tree where every member is consumed and only the order is missing. It matters now rather than in the abstract because the render chain gains diffing, caching, windowing and a cap as one change, and a copy would diverge on the first of them in silence (F126, C24 I25).
+- **I55** — **The frame is written as a difference against the last frame this session put on this screen, and whole whenever no record describes it.** Four things leave no record: the first frame, a `contaminated` write, a refused frame that drew the fallback, and a record whose size differs from the frame's. `contaminated` is a claim about the *screen* rather than about the frame, so a repaint happens even when the composed rows are identical to the last (§6b table row 3) — and until this invariant existed `render` and `repaint` were the same function, so C03's whole invalidation mechanism reached nothing.
+- **I56** — **The record is dropped before the bytes go out and restored only when they have all gone.** Setting it after the write returns is the obvious rule and leaves the fault case wrong: a write that throws puts a *prefix* of a frame on the screen, and a record surviving the throw describes the frame *before* it — so the next diff compares against a screen that never existed and skips exactly the rows the partial write got wrong. Clearing first makes a throw a full repaint by construction rather than by a handler someone must remember to add (§6b trace row 10).
+- **I57** — **Every row the diff writes carries a leading reset, and the rule rests on asymmetry rather than on a live defect.** Measured at the time of writing, **0 of 50 composed rows end with a live SGR attribute** — every renderer closes its own styling and `fitStyled` pads with plain spaces — so a rule justified as *otherwise colour bleeds* would forbid nothing and read exactly like a rule that holds (A03 §2, in a remedy rather than in a check). What keeps it: four bytes per changed row, against a colour bleeding down every row below it and surviving the frame, on the day a renderer stops closing its own. A diff writes rows out of order, so a row can inherit a state that was never above it; nothing else asserts the property that would make the prefix unnecessary (§6b table row 7).
 ---
 
 ## 11. Commitments
@@ -890,6 +969,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 24. **Ghost text reaches the frame**, composited into the prompt as appearance and never as geometry: the spinner wins the row, a suggestion that does not fit is dropped rather than truncated, and `measure` never sees it (I50, C19 I7).
 25. A layer that is chrome for the prompt does not stop typing. What the overlay handler does not bind is forwarded to the prompt's, because the alternative is measured and is not "the menu takes the key" but "nobody does" (I51, C19 I20).
 26. The prompt is a capability pair of equal cell width, resolved where it is drawn and not at module scope, because the function that draws it is the function that measures it (I52, C09 I22).
+27. **The frame goes to the terminal as a difference**, whole whenever no record describes the screen — which `contaminated` is the existing and until now unconsumed statement of (I55, §6b).
+28. The record is cleared before the write and restored after it completes, so a write that throws repaints rather than diffing against a screen that never existed (I56, §6b).
+29. Each written row opens with a reset, kept on the asymmetry between four bytes and a colour that survives the frame, with the measurement that shows it is currently inert recorded beside it (I57, §6b).
 
 ---
 
