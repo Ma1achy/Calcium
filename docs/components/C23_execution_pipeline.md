@@ -57,10 +57,11 @@ made by accident.
 
 ```typescript
 type LocalHandler = (args: readonly string[], ctx: LocalContext) =>
-  ViewDocument | Promise<ViewDocument>;
+  LocalDocument | Promise<LocalDocument>;
   // `args` is what follows the verb, not `ParseResult.argv`
+  // `LocalDocument`, not `ViewDocument` — `runLocal` fills `meta` (I15, F13)
 
-interface LocalContext {
+interface LocalContext extends ProducerContext {   // C07 §3 — the four facts
   readonly command: string;          // as typed, for `doc.command`
   ask(opts: AskOptions): Promise<string>;
 }
@@ -76,6 +77,18 @@ interface LocalRegistry {
   seal(): void;
 }
 ```
+
+#### The context is obligatory, and a wider parameter is refused (I39)
+
+**A grant a consumer may decline to name is a grant that reaches nobody.** `LocalContext` gained `ask` and was published for exactly this reason, and the sentence that justified it — *"a handler that asks cannot name the type of the thing it is asking through"* — is **true about the handlers that ask and silent about the rest**. Measured across the reference app's eight local-handler families: four name `LocalContext`, four declare `ctx: { command: string }` by hand, and **the split is exact — the four that name it are the four that call `ask`** (F125).
+
+A parameter type may always be **wider** than what is passed. That is not a gap in the declaration; it is how function assignability works and it always will be. So a field added here arrives at the four families that had no complaint and does not arrive at the four that filed the findings, and nothing about granting fixes it.
+
+So `TuiConfig.localHandlers` requires the handler's context to be **mutually** assignable with `LocalContext` — wider is refused, not only narrower. A handler declaring one field stops compiling at the registration boundary rather than compiling and receiving a context it cannot see.
+
+**This is C07 I13's mechanism in reverse.** There the seven registry-owned `meta` keys are typed `never`, so supplying a discarded value fails to compile rather than failing to matter. Here the refusal is on the parameter rather than the return, and it is the direction that has something to bite on: F13's narrowing landed correctly and changed nothing at four call sites, because a hand-written shape was structurally assignable.
+
+**Its first catch was a direct call.** The reference app invokes a handler outside the shell for its greeting, with an object literal that is not a `LocalContext`, has no `ask`, and compiled. Once the handler names the type the literal is a compile error — the obligation reaches the call site through the declaration, without a rule that walks call sites.
 
 #### `ctx.ask` — a question the handler awaits
 
@@ -566,6 +579,9 @@ Per submission.
 - **I36** — **A question raised by `ctx.ask` is pushed with `dismissable: false`, and it resolves with a choice on every path.** The two halves are one invariant because either alone is a defect. `dismissable: false` is what C16 I8's first clause reads, so no key reaches the surface beneath an open question — and it also stops C16's rung 4 from popping the layer on `⌃c`, which would close the question while the handler's promise stayed pending and the entry never settled. **The flag says the router may not discard this layer without telling its owner; it does not say the user cannot escape it.** Those are two meanings of one word and the layer needs opposite answers to them: `Esc` and `⌃c` resolve with the default choice, which the answer handler does (C16 I25), so the escape the user sees is the owner resolving rather than the router discarding. Resolving with a choice on every path is the second half: `ask` returns `Promise<string>` and never null, because declining **is** the choice marked `default` and a second representation of *nothing happened* is one every caller must handle and none can act on differently.
 - **I37** — **`enter` on a focused row fires that row's first action, through the same dispatcher every other route uses.** C16 owns the binding and C23 owns the dispatch; the shell supplies the join, because the component that knows a live entry's blocks is the one that already answers C16 I22's *which rows are focusable*, and a second walk would be a second answer to *what is here*. **The first action, and C04 I19 is why that is safe** — a row lists its actions in order and `fill` is the default kind, so the first action of a well-formed row is the one a reader expects; a row declaring `exec` first has declared a reversible operation, which is what I19 reserves that kind for. A row with no actions does nothing and says nothing: `focusableRowIds` returns every row because navigating to read is worth doing alone, so a refusal per keystroke would be noise on most of a table. The refusals that matter — a frozen entry (I18), a disallowed scheme (I17) — are the dispatcher's and are unchanged. **Until this existed `actions.ts` implemented all five arms and nothing in `src/` reached it** (F21): an app could build a `view` action, have C04 validate it and C09 render its label, and no keystroke would arrive. C24 I16's subject arriving on `Action`.
 - **I38** — **The `app` route reads `result.interactive`, and it reads it after `validation.ok`.** The first half is C05 I23 arriving: the contract belongs to the invocation, so C23 has no business consulting a `ToolDef` field that cannot describe one, and the `shell` arm has carried the resolved form since C18 §5. The second half is the ordering, and it is the one that was wrong: the gate sat inside the non-interactive arm of the split it was supposed to precede, so an unvalidated invocation was spawned on exactly the verbs where the failure is a terminal handed to a child that should never have started (F119). **A gate inside one arm is a gate for the arm that was easy to gate.** It stays single: `runApp` takes the narrowed result, so a caller that has not gated does not compile. **The `local` route has never had this check and still does not** — the same shape one case over, observed rather than measured, and named here so it is a known gap rather than a discovery.
+- **I39** — **A local handler's context is obligatory: `TuiConfig.localHandlers` refuses a handler whose `ctx` is not mutually assignable with `LocalContext`.** A parameter type may always be *wider*, so a handler declaring `ctx: { command: string }` is legal TypeScript that compiles, registers, runs, and cannot see a field the framework adds — measured at four of the reference app's eight families, and the split is exact: the four that name the type are the four that call `ask` (F125). **The sentence that published `LocalContext` was true about the handlers it described and silent about the other half**, which is MG24's shape (F84) and the second instance of it. This is C07 I13's `never` keys in reverse — there the refused thing is a supplied return value, here it is a declared parameter — and it is the direction with something to bite on, because F13's narrowing landed correctly and changed nothing at four call sites that were structurally assignable. The obligation reaches direct calls through the declaration: once a handler names the type, an object literal missing `ask` is a compile error at the call site, with no rule walking call sites.
+- **I40** — **Every route that produces a document is handed the same `ProducerContext`** (C07 §3, I17): the adapter route, the local route, a live part's `render` and the greeting. One shape, because four shapes is four places for the four facts to diverge — which is the defect the grant exists to close, reproduced inside the framework.
+- **I41** — **`height` is non-null on the view route and `null` everywhere else**, decided from `isViewInvocation` before step 3 (C07 I18, C22 I45). The decision is already read there because after step 3 it is too late; this adds a consumer, not a second read.
 
 ---
 
@@ -605,6 +621,9 @@ Per submission.
 32. A local handler may ask a question and await the answer. It is a choice list, it is modal by C15's flag rather than by a second mechanism, and it resolves with a choice on every path including `Esc` and `⌃c` — so no caller distinguishes declining from cancelling, because nothing downstream could act on the difference (I36, C16 I25).
 33. `enter` on a focused row fires its first action through C23's dispatcher. The binding is C16's, the dispatch is C23's, and the join is answered where C16 I22's focusable rows are — one walk, one answer (I37, C16 I26, F21).
 34. The terminal contract is read from the invocation rather than the declaration, and it is read after validation — so both routes name one field and no verb is spawned ungated (I38, C05 I23).
+35. A local handler that declines to name its context does not compile. The grant is only a grant if every consumer can see it, and four of eight could not (I39, F125).
+36. Four producing routes are told one thing, in one shape, from one source (I40, C07 I17).
+37. A bound is stated where a region defines the document and `null` where nothing does (I41, C07 I18).
 
 ---
 

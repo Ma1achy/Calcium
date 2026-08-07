@@ -485,6 +485,28 @@ The ordering is asserted rather than the outcome (C01 T4.4b). "The child receive
 
 ---
 
+### 4a. The frame is a named unit, and `session.ts` calls it (I54)
+
+**Nothing in the tree composed a frame as a value.** The composition existed only inside a private method returning `void`:
+
+```
+guard on acquired → #composed() → viewport.resize(width, region.height)
+  → paint(frame, deps)               ← FrameError falls back to drawFallback
+  → cursorFor(frame, deps) → cursorSequence(null) → assemble → write
+```
+
+`lines` was a local. It was never returned, never yielded, never handed to anything.
+
+**The class is one level up from the one every rule here can see.** Every prior instance of *a complete mechanism unreachable across a seam* is **a member nobody could call**; this is **a sequence nobody named**, and no rule that walks members reaches it — MG24 counts consumers of exported members, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree in which every member is consumed and the only thing missing is the order they go in. **A private method is the perfect hiding place**, because the composition *is* consumed — sixty times a second — by the one caller inside the class.
+
+So it is `composeFrame`, and `session.ts` calls it. **Not a second implementation**: the value of a consumer reading a frame is that it is the frame the shell draws, and the render chain is about to gain output diffing, render caching, block windowing and a cap. A copy would diverge on the first of those and say nothing. A03 carries the scan (SS-frame): **one composition, one caller**.
+
+**What the extraction does not decide.** Where the seam falls between *compose a frame* and *put it on a terminal* is a separate question and is not answered here. The write is C01's writer and the fallback is a side effect; the unit is the composition, and the boundary is where it was.
+
+**Every comment survives the move**, and they are the most careful in the file: the size read once by `compose` so a resize between compose and paint is the next frame's problem, the fallback rather than a short frame, the viewport resized from the composed frame before its rows are read (I34), and the cursor sequence embedded in the single write so it cannot straddle C03's synchronised-update window.
+
+---
+
 ## 5. Session state
 
 The state that belongs to no component.
@@ -818,6 +840,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 
   **The spinner wins the row when both would draw.** They occupy the same cells — immediately after the text — and both are true at once whenever a `Tab` is in flight over a prefix that also has a static suggestion. Showing a stale suggestion beside *still thinking* states two things, one of which is about to stop being true; the spinner is the one the reader needs.
 
+- **I53** — **The greeting is a producer and is handed the producer context** (C23 I40, C07 §3). It returns a document and was told nothing, which is the same omission the local route had at four other sites; a producer told nothing decides anyway, from a worse copy of the fact. It falls out of the producer ruling rather than extending it.
+- **I54** — **The frame composition is a named unit and `session.ts` calls it. There is no second composition, and a scan says so.** The class no rule here could see: every prior instance of a mechanism unreachable across a seam was *a member nobody could call*, and this was *a sequence nobody named* — MG24, MG25 and MG27 are all satisfied by a tree where every member is consumed and only the order is missing. It matters now rather than in the abstract because the render chain gains diffing, caching, windowing and a cap as one change, and a copy would diverge on the first of them in silence (F126, C24 I25).
 ---
 
 ## 11. Commitments

@@ -58,7 +58,7 @@ export type {
 };
 
 // adapters — the extension point they use most
-export type { Adapter, AdapterContext, StreamContext, RawResult, RawPatch };
+export type { Adapter, AdapterContext, ProducerContext, StreamContext, RawResult, RawPatch };
 
 // manifest — written by hand
 export type { Manifest, ManifestDocument, ToolDef, FlagDef, ArgDef, ArgType, ValidationResult };
@@ -68,6 +68,7 @@ export type { ThemeTokens, ThemeSet, PaletteSpec, ColourRef, Style };
 export { defaultTheme };
 
 // hooks
+export type { LocalHandler, LocalContext, AskOptions, Choice };   // C23 §2 — and `localHandlers` refuses a wider ctx (C23 I39)
 export type { CompletionSource, CompletionContext, Candidate, Slot };
 export type { LiveSpec, ViewRefresh };
 export type { Identity };
@@ -88,8 +89,13 @@ step with a name and no mechanism. `TuiConfig` had no field, nothing fired
 anything, and C22's own T3.10 and T3.11 tested it and had never been written.
 
 ```ts
-greeting?: () => ViewDocument | Promise<ViewDocument>;
+greeting?: (ctx: ProducerContext) => ViewDocument | Promise<ViewDocument>;
 ```
+
+**It takes the context because it is a producer** (C23 I40). The hook returns a
+document and was handed nothing, which is the same omission the local route had
+at four other sites — a producer told nothing decides anyway, from a worse copy
+of the fact. It falls out of the producer ruling rather than extending it.
 
 Fired at step 7 and **not awaited**, so a greeting that hangs or rejects leaves
 the prompt usable and simply produces no entry. It appends through C23's ordinary
@@ -138,10 +144,20 @@ notice.** It took a consumer that respected the boundary — docker-tui, whose
 first act was a test asserting a deep import is a resolution error — and it
 failed on that app's first start. See `examples/docker/FINDINGS.md` F7.
 
-`parseManifest` is deliberately **still not exported**. Exporting it would make
-the working path *"call this first"*, which leaves `TuiConfig.manifest: Manifest`
-exactly as misleading as it was. The framework's own verbs are the framework's to
-add, and construction now parses both arms itself (C22 §3a, C22 I23).
+`parseManifest` was deliberately **not exported**, and that ruling was reversed
+by I19 without this paragraph hearing about it. Exporting it would have made the
+working path *"call this first"*, which leaves `TuiConfig.manifest: Manifest`
+exactly as misleading as it was; construction parses both arms itself (C22 §3a,
+C22 I23) and that is still true and still the reason `createTui` needs no such
+call. What changed is a *second* consumer: `contextAt` takes a `Manifest` and an
+app hands `createTui` an unparsed document, so a consumer implementing
+`CompletionSource` had no producer for the type its own hook receives. It is
+exported, for I19's reason and not as the entry path.
+
+**Recorded rather than corrected quietly**, because a spec paragraph and an
+export that disagree is the state `CLAUDE.md` calls worse than either being
+wrong on its own — and this one read as a live ruling for as long as it was
+false.
 
 **`planColumns` is public** because a custom table-like kind needs it and it is pure. `cells` and `truncate` likewise — a kind that measured width itself would be wrong in a different way from every other kind.
 
@@ -168,6 +184,21 @@ A consumer never constructs, inspects or drives any of them. If one is ever need
 | `ExecutionWrites.setRetained` | C22 session state | **Drop.** `SessionSnapshot` already carries the readable half of the session; the writable half is the shell driving itself, and a consumer that could write it could contradict the shell. |
 
 None of the three moves the export list, and all three stay in `UNCONSUMED_MEMBERS` naming their owner — this ruling says they are not public, not that they are finished.
+
+### What a producer is told, and what stays interior
+
+`ProducerContext` is on the surface and three of the things it replaces are not. The pairing is the point: **a refusal with no mechanism named is a deferral wearing a ruling's clothes**, and each of these was filed as a missing export by a consumer that had a real need.
+
+| filed as | ruling | what the consumer uses instead |
+|---|---|---|
+| export `detectCapabilities` (F43, F54, F124) | **refused** | `ProducerContext.capabilities` — C02's **resolved** record. An app re-deriving from the environment reads seven variables it does not know about and misses the overrides it supplied itself; measured wrong at three of four locale shapes, in both directions, inside the fix written for the finding that asked for it. |
+| export `createBlockRegistry` (F37) | **refused** — it is one of the eleven | `ProducerContext.measure` for production, `expectDocument().lines()` for evidence (§7, I23) |
+| export `validateDocument` (F36) | **refused**, and it was already served | `expectDocument().isValid()`, which has shipped since this section was written. What survived was a deep import nobody re-checked against the surface — a workaround to delete, not a gap to close. |
+| export `liveDeclarations` (F28) | **refused on this entry** | `liveParts` on `@fmx/calcium/testing` (§7, I24). The cost is to testing by the finding's own text; a production consumer reading back its own declaration holds a second record of the document. |
+| an adapter that can `ask` (F77) | **refused** | the local route (C23 §2). C07 specifies a pure mapping from result to document. The 185 lines that finding measured are `meta`, the failure arm, the invocation record and the spawn — the confirm was never the expensive part, and the producer grant closes the rest. |
+| tell a live part the width so it can size its own history (F24, F25) | **refused, and nothing replaces it** | C12 already buckets N samples into the available dot columns, with I5 keeping each column's vertical span. The finding reports a view opened at 120 and read at 80 drawing *"two samples per column"*; that is C12 working. The ring's length is retention, which the producer owns and no terminal bounds. **Measured against `plot/curve.ts`, and the direction inverts** — over-wide is handled, under-wide is a resolution loss rather than a wrong frame. `render` still receives the context, for `capabilities`: a live panel drawing `░█` is F54's list inside F24's route. |
+
+**Six findings, one question, and the answer is not uniform** — which is what makes it a ruling. Four grants, five refusals, and every refusal names the thing that does the work instead.
 
 **`ViewRefresh` was off the hooks list until C23 drove it, and it is on now.** It is the declaration type for C23 §3b's part refresh, and for the whole of C22 and C23 that section implemented two of its three mechanisms: stall detection and the identity notice had drivers, part refresh had none. `ViewRefresh`, `assignOffsets` and `backoffOf` were a complete producer whose only consumer was a unit test, and exporting the declaration type of a mechanism nothing runs is A03 §2's vacuity class arriving as an export — a consumer declares a refreshing part, everything type-checks, and nothing ever fires. **The condition was the driver, not a release date**, which is why the sentence named one; C23 I32, C23 I33, C23 I34 and C23 I35 satisfied it and the type crossed with
 `b.live` (§5).
@@ -548,7 +579,11 @@ interface DocumentAssertions {
   degradesTo1Bit(): this;                          // B04 B4.3 — glyph or word carries it
   hasNoColourOnlyDistinction(): this;              // D29
   matchesGolden(name: string): this;
+
+  lines(width: number, opts?: RenderOpts): readonly string[];   // I23 — the frame, not a property of it
 }
+
+export function liveParts(doc: ViewDocument): readonly LivePart[];   // I24 — what `b.live` declared
 
 export function adaptFixture(id: string, adapter: Adapter): ViewDocument;
 export function fakeClock(): FakeClock;
@@ -578,8 +613,23 @@ decidable from the text. Closing it means giving those two kinds a glyph field,
 which is a C04 change.
 
 **`matchesGolden` is specified and unbuilt.** It needs somewhere to keep frames
-and a policy for updating them, and §8a records the prerequisite the probe found
-independently: nothing in the surface lets a consumer obtain a frame at all.
+and a policy for updating them. §8a recorded the prerequisite the probe found
+independently — *nothing in the surface lets a consumer obtain a frame at all* —
+and `lines()` is that prerequisite met.
+
+### `lines()` — a picture of a document, not a property of one (I23)
+
+**Every other method on this interface measures or asserts and none of them returns a frame.** That is the whole surface's blind spot, and it is not an ergonomic one: the reference app documents its workaround as *"a row is a complete description of what will be drawn"*, which is true of a table and false of the change axis, whose rows say `added` while only the frame says `+`. So the app asserts a value whose rendering it cannot see, and the framework's own testing surface could not have caught the class the change axis produced.
+
+**It is the production renderer, not a second one.** `expectDocument` already holds a registry internally — which is why `renderToLines` was never usable and this is — and already calls `renderSequenceToLines` to do its own work. `lines()` returns what that call produces instead of asserting about it. A parallel renderer here would be the fifth instance of a suite building its own version of the thing under test, and it would diverge silently the first time the render chain changes.
+
+**Which it will.** The render chain gains diffing, caching, block windowing and capping, in that order and as one change. A consumer reading frames through this stays on the production path across all four **only** if `session.ts` composes through the same unit — which is why the extraction is a rule and not a convention (C22 §4).
+
+### `liveParts` — the declaration, readable from the side that made it (I24)
+
+`b.live` records its `LiveSpec` beside the document rather than inside it, and nothing read it back. So a consumer could declare a refreshing part and had no way to exercise the `fetch` or the `render` it supplied without a shell, a transport and a clock — the reference app worked around it by exporting its own tick, which is an app building a testing affordance the framework withheld.
+
+**On this entry rather than the runtime one, and the distinction is the finding's own.** F28's cost is to testing by its own text. A production consumer reading back what it just declared holds a second record of the document, and two records of one fact is the class this repository removes; a test reading it is exercising the thing it declared.
 
 **`degradesTo1Bit` is the one that earns the module.** It is B04's compliance sweep — every distinction carried by a glyph or a word — and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 
@@ -727,6 +777,9 @@ carries the state — and §7 records what that changed.
 - **I20** — Every field a block type carries is reachable from its builder, or `BUILDER_OMISSIONS` names it with the reason. I18 stated this and nothing read it; MG27 is the mechanism, and it found `patch.collapsedAfter`, `patch.actions` and `table.sort` on the run that created it (F41, F114). The reasons are data rather than prose for the reason C09 §4a gives: a rule with nothing reading it passes exactly like a rule that is satisfied.
 - **I21** — A public option is implemented or it is not declarable. `LiveSpec.stream` was accepted, validated by two throws policing a choice against `fetch`, and read by nothing — so a part declared with it rendered `render(null)` once, and a part that streams nothing looked exactly like a part that produced nothing. **Accepted, validated and inert is the third state, and it is A03 §2's vacuity class arriving in an API rather than in a rule.** The remedy is removal and a required `fetch`, because a compile error is where a runtime throw was and the option is additive to restore the day something drives it (F78).
 - **I22** — **`registerGrammar` is exported, because a block kind whose vocabulary is closed is a kind an app cannot use for its own domain.** C09 §4a promised registration and shipped none; the default set is sixteen grammars and a mainstream set never covers a consumer's nouns. Exported block kinds with unexported grammars is the asymmetry a factory you can import and cannot install has, and it is the one this API exists to refuse (F93, C09 I23).
+- **I23** — **A consumer can obtain a frame, and it is the frame the shell draws.** `expectDocument().lines()` returns what `renderSequenceToLines` produced rather than asserting about it; the registry it needs is the one `expectDocument` already holds, which is why this is publishable where `renderToLines` was not. Every other method on that interface measures or asserts a *property*, and a property of a document is not a picture of one — which is why the surface could not have caught the class the change axis produced, where the rows say `added` and only the frame says `+` (F37, F81, F126).
+- **I24** — **What `b.live` declared is readable from the testing entry and not from the runtime one.** A `fetch` exercisable only by running the whole refresh driver pushes every consumer toward whole-stack tests or none — the shape that let four defects survive a green suite — and a *production* consumer reading its own declaration back holds a second record of the document (F28).
+- **I25** — **No component composes a frame twice.** The composition `session.ts` performs is a named unit that `session.ts` calls, and a source scan says so, because the render chain's four coming stages — diffing, caching, windowing, capping — would diverge silently from any copy. **The class is one level up from an unreachable member**: every prior instance was *a member nobody could call*, this was *a sequence nobody named*, and no rule that walks members can see it — MG24 counts consumers, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree where every member is consumed and only the order is missing. A private method is the perfect hiding place, because the composition **is** consumed, sixty times a second, by the one caller inside the class (F126).
 
 ---
 
@@ -752,6 +805,10 @@ carries the state — and §7 records what that changed.
 18. Every block field is reachable from its builder or named with a reason a rule can resolve — checked, not promised (I20, MG27).
 19. A public option is implemented or it is not declarable. Two throws policing a choice between an implemented arm and an inert one is the shape to look for, and the remedy is removal rather than a third throw (I21).
 20. `registerGrammar` is public: a `code` block accepts any language name, and until this existed only two of them meant anything (I22). The mechanism is C09's (→ C09 I23).
+21. A consumer can obtain the frame the shell would draw, from the code that draws it. Every other assertion on this surface is a property of a document, and a property is not a picture (I23).
+22. What `b.live` declared is exercisable from the testing entry without a shell, a transport or a clock (I24).
+23. The composition exists once. A named unit `session.ts` calls, checked by a scan, because the coming render chain would diverge from a copy in silence (I25).
+24. Each refused export names the mechanism that replaces it, and the one that replaces nothing says which component already does the work (§3, C07 I17).
 
 ---
 

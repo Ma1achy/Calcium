@@ -210,7 +210,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 |---|---|---|
 | MG1 | No module imports upward across layers | A02 §1 |
 | MG2 | No cycle within a layer | A02 §1 |
-| MG3 | `terminal/` ↮ `data/` — L0's halves never import each other | A02 §1, C01 T2.4, C03 T2.6 |
+| MG3 | `terminal/` ↮ `data/` — L0's halves never import each other, **type-only edges included**. `CROSS_HALF_TYPES` excuses them by file and name, with MG27's bidirectional arm | A02 §1, C01 T2.4, C03 T2.6, C07 I10 |
 | MG4 | C04 imports nothing from `terminal/`, `presentation/` or above | C04 T2.9 |
 | MG5 | C05 imports nothing from `terminal/` or above | C05 T2.6 |
 | MG6 | C06 imports no C04 type | C06 T2.2 |
@@ -260,6 +260,20 @@ It counts imports of the **store itself**, not any symbol from a module that hap
 What MG13 guards is a fix the C15 spec pass rejected, and the fabrication is copied from it rather than invented (commitment 14a). C15's I10 asked the overlay manager to dismiss a layer whose anchor row had been evicted, and the only way to notice an eviction is to subscribe to the store. One import buys the detection and pays with C15's statelessness, `layout()`'s purity, and a second component in the tree reading a change stream as a description of current state — the class §2 records and C14 paid for in a blank screen. The reason is recorded by whoever raised the layer instead, and this rule is what stops the one-line version being rediscovered by someone reading I10 without §5 beside it.
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; Calcium reaching into `prism-tui` ends the reuse claim outright.
+
+**And MG3 has never walked `import type`.** `importsOf` takes `includeTypeOnly = false` and every caller uses the default, so for the whole life of this table the rule hardest to undo has been clean about an edge it could not see. Measured when the producer ruling needed one: a fabricated type-only edge from `src/data/adapters/types.ts` into `terminal/capabilities.ts` leaves `make enforce` green at 175 files and 6927 references; the same edge written as a value import fires MG3 immediately. **The rule works and the subject was half absent** — MG24's shape one rule over (F83, F84), and the third instance of a correct rule scoped past most of what it is about.
+
+**The table already holds both answers, in two rows, and neither is wrong.** MG21 says *type-only imports are not edges* for `presentation/` → `terminal/`, which is a **downward** direction the layer walk permits anyway — the row is about which runtime module may be reached, and a type erases. MG22 says *type-only counts*, because it is a **cycle** rule and a reference is a dependency whether or not it survives the build. MG3 is the second kind: what it protects is that `data/` type-checks without `terminal/` present, and a type-only edge is exactly what removes that.
+
+So the arm is on, and the one edge that survives it is named rather than tolerated:
+
+| file | name | why |
+|---|---|---|
+| `src/data/adapters/types.ts` | `TerminalCapabilities` | `ProducerContext` grants a producer the **resolved** capability record (C07 §3, I19). The alternative is a second declaration of it inside `data/`, pinned by a test that agrees with itself — which is two records of one fact, and is the defect the grant exists to close, reproduced one layer in. |
+
+**The runtime edge stays forbidden in both directions**, which is what keeps A02 §1's parallel-build claim true: the halves still build independently as *modules*, and one name crosses as a *declaration*.
+
+**One entry is the number to distrust, not to celebrate.** The walk found zero cross-half edges of either kind before this one, so the arm ships with a subject of one and a rule that has never fired in anger is indistinguishable from a rule that works. It is believable because the fabricated pair was run, not because the tree came back clean.
 
 ---
 
@@ -346,6 +360,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
 | SS45 | A tone or glyph literal as an object-literal value | `src/shell/builders/` | C24 I5, T2.7 |
 | SS47 | A non-ASCII mark in a `src/` string literal that is not prose punctuation. The reasons live in `MARK_EXEMPTIONS`, keyed by file, with MG27's bidirectional arm: an entry whose file no longer carries a mark is itself a violation | `src/`, ten sites excused with reasons | C09 I22, C22 I52, FINDINGS F55 · F122 |
+| SS48 | A second frame composition. `shell/session.ts` may not call `paint` — the composition is `shell/frame.ts`'s and `session.ts` calls that | `src/shell/`, no exemptions | C22 I54, C24 I25, FINDINGS F126 |
 | SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |

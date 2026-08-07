@@ -5150,3 +5150,107 @@ be the fifth instance of a suite building its own version of the thing under tes
 **And not measured: whether every step belongs to the unit.** The write is C01's writer and
 the fallback is a side effect; where the seam falls between *compose a frame* and *put it on
 a terminal* is the ruling's question and is not answered here.
+
+---
+
+## F127 — MG3 has never walked `import type`, and it is the rule the table calls hardest to undo ★★★
+
+A03 §3 names **MG3 and MG8** as the two whose violation is hardest to undo: L0's halves
+touching collapses the parallel-build property. MG3 has been green for the life of the
+table. It has also never been able to see half its subject.
+
+`importsOf(file, readFile, includeTypeOnly = false)` — and **every caller uses the
+default**. So a cross-half `import type` has never been an edge to MG3, and its clean record
+covers value imports only.
+
+Measured with a fabricated pair, because a clean run cannot tell a satisfied rule from an
+absent one:
+
+| fabricated edge in `src/data/adapters/types.ts` | `make enforce` |
+|---|---|
+| `import type { TerminalCapabilities } from "../../terminal/capabilities.js"` | **green** · 175 files · 6927 references · no violations |
+| `import { isUsable } from "../../terminal/capabilities.js"` | **MG3 fires** — *crosses L0's halves: data → terminal* |
+
+And the walk over `src/` as it stands finds **zero** cross-half edges of either kind. So the
+rule ships with a subject of one, which is the number to distrust rather than to report as
+coverage.
+
+**The table already holds both answers and neither row is wrong**, which is what made this
+survivable. MG21 records *"type-only imports are not edges"* for `presentation/` →
+`terminal/`; MG22 records *"type-only counts … a reference is a dependency whether or not it
+survives the build"*. The difference is what each row protects: MG21 is a **downward**
+direction the layer walk permits anyway, so erasure settles it, and MG22 is a **cycle** rule,
+where a reference is the dependency. MG3 is MG22's kind — what it protects is that `data/`
+type-checks with `terminal/` absent — so type-only is exactly the edge that breaks it.
+
+**Third instance of a correct rule scoped past most of its subject**, after MG24's
+`export interface` (F84) and F125's `ask` sentence. All three read as deliberate, all three
+were written by someone holding the right distinction, and none is findable by asking whether
+the sentence is true. The question that reaches them is *does this sentence constrain the
+decision it is attached to*.
+
+The arm is on, with one named exemption and the runtime edge still forbidden — see A03 §3
+and C07 I10.
+
+---
+
+## F128 — three specs disagreed with the code they specify, all in one direction
+
+Found by editing four component specs in one pass rather than by reading any of them. Each is
+a **later ruling that landed in code and never reached the document**, which is the state
+`CLAUDE.md` calls worse than either being wrong on its own.
+
+| spec | says | code | landed as |
+|---|---|---|---|
+| C07 §3 | `AdapterContext` has seven fields | it has eight — **`flags` is absent from the spec entirely** | row 5, `4721e28` (F39) |
+| C23 §2 | `LocalHandler` returns `ViewDocument` | `LocalDocument` | row 1, F13 |
+| C24 §3 | *"`parseManifest` is deliberately **still not exported**"* | it is exported | C24 I19, for `contextAt` |
+
+**The third is the one worth the finding.** The other two are a field and a type name — a
+reader hits the compiler. C24's is a **paragraph of live-sounding reasoning for a decision
+that had been reversed**, sitting above the export list that reverses it, and its argument
+(*"exporting it would make the working path 'call this first'"*) is still correct and still
+not the question. I19 exported it for a second consumer the paragraph does not mention: a
+`CompletionSource` needs a producer for the `Manifest` its own hook receives.
+
+**A correct sentence attached to a decision it no longer governs** — MG24's shape (F84) a
+fourth time, and the first instance where the sentence was right when written and was
+overtaken. That is the version review cannot catch at all: there is no moment at which it
+reads as wrong.
+
+All three corrected in the specs rather than footnoted, with the reversal recorded where the
+stale paragraph stood.
+
+---
+
+## F24 corrected — C12 already downsamples, and the direction inverts
+
+Not a new finding; a measurement against an existing one, taken while ruling on it.
+
+F24 reports that a plot's cap *"is taken from `AdapterContext.width` when the view opens and
+is wrong from the first resize afterwards: a view opened at 120 and read at 80 draws two
+samples per column."*
+
+**That is C12 working.** `curveRows` (`presentation/plot/curve.ts`) calls
+`columnsOf(samples, series.values.length, grid.dotWidth)` — N samples bucketed into the
+available dot columns — and C12 I5 keeps each column's whole vertical span, so the spike
+survives. The module's own header says why there is no branch to get wrong:
+
+> With at most one sample per column all four values coincide and the span is a single dot,
+> so this is plain Bresenham between points. **Fifty samples and fifty thousand take one
+> path**, and there is no density branch to get wrong at the boundary.
+
+So the finding's direction inverts. **Over-wide is handled**; **under-wide** — a ring of 120
+stretched across 200 columns — is a resolution loss rather than a wrong frame, and the ring's
+length is *retention*, which the producer already owns and which no terminal bounds.
+
+**What survives is the capability half, not the width half.** The reference app's live panel
+body draws `░` and `█` inside a `render`, which is F54's list arriving through F24's route —
+a live part cannot ask what the terminal supports any more than an adapter could. So
+`LiveSpec.render` takes the producer context, and it takes it for `capabilities`.
+
+Found by checking whether the mechanism a refusal was about to name actually existed. The
+mechanism proposed — a width fraction, *"which is `b.row`'s"* — does not: `b.row` is
+`row(id, cells)` at `builders/index.ts:279`, a table-row builder, and no width-fraction
+mechanism exists anywhere in the tree. **Both halves of that check paid**: the replacement
+was absent and the finding was wrong about why it needed one.

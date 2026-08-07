@@ -43,13 +43,13 @@ not firing is indistinguishable from a rule that works.** 11 instruments, 1 cove
 
 ## Tier 2 — public-type changes, before the freeze
 
-**Sequenced so the unblocked work goes first.** The producer-context ruling is twelve findings
-and a design question; three of them close ahead of it and are blocked on nothing.
+**Sequenced so the unblocked work goes first.** The producer-context ruling is **nine** findings
+and a design question; three more closed ahead of it as row 1 and were blocked on nothing.
 
 | | item | fix | consumers | ⚠ | depends on | status |
 |---|---|---|---|---|---|---|
 | **1** | **F13 · F58b · F85 — narrow the type at the construction boundary** | change | **3** | C04 · C07 | **nothing** | **done** · `bea5fcd` `7ea1c28` `74da764` |
-| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **9** · **F124 F125 F126** | C07 · C24 | — | open |
+| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **9** · **F124 F125 F126** | C07 · C23 · C24 · C22 | — | **ruling landed**, changes open |
 | 3 | F30 F49 F51 F81 — a change axis distinct from `Tone` | ruling, then change | 4 | C04 · C09 · C10 | the 1-bit rendering, decided inside it | **done** · `794547d` `1a7feab` |
 | 4 | F33 F34 F18 F50 — a block cannot express what the surface needs | **ruling** | 4 | C04 | rule with F30 — three questions about `Comparison` | **done** · `37d6d74` |
 | 5 | F39 · **F92** — a flag that selects a rendering | change | **2** | C05 | — · F92 waits on it | **done** · `4721e28` |
@@ -66,8 +66,11 @@ commit is named; `partial` names what is not — row 7's F23 was measured as F78
 and deliberately left, because refusing `view` on a local tool would foreclose S6/S7 and
 the remedy is to extend the local route.
 
-**Rows 1 and 3–8 are done and the tier is not**, which is the distinction a column of
-ticks would hide: rows 2, 9 and 10 remain, and row 2 is twelve findings behind one ruling.
+**Rows 1 and 3–10 are done and the tier is not**, which is the distinction a column of
+ticks would hide: row 2's ruling has landed and its changes have not, and row 7's F23 is
+still open. **Row 2 is nine findings, not twelve** — F13, F58b and F85 closed as row 1 and
+this line kept the old number for four commits after the field above it was corrected. A
+count restated in a second place is a second unmeasured claim.
 
 **Row 9's four fields were all wrong, and the direction is the one worth recording.**
 It read *change · 1 consumer · ⚠ C22 §6*, written from F55's two characters — which were
@@ -122,10 +125,23 @@ export).
 and has been answered as though it were about **knowledge**. Withholding the fact did not
 prevent the decision; it produced five duplicated modules, which is the measured outcome.
 
-One `ProducerContext` carrying width, capabilities, a document validator, and height **where a
-bound exists** — a pushed view's producer is defined by the region and has no other bound.
-`LiveSpec.render` gets it too, which is F24 and F25 and is why this is twelve and not ten.
-Say in the spec that layout authority stays with C11; do not enforce it by omission.
+One `ProducerContext` carrying **width, capabilities, `measure`, and height where a bound
+exists** — a pushed view's producer is defined by the region and has no other bound. The
+document validator is not on it: `expectDocument().isValid()` already ships, which is F36's
+correction above. `LiveSpec.render` gets the context too, and the greeting is a tenth site
+the row never counted. Say in the spec that layout authority stays with C11; do not enforce
+it by omission.
+
+**F24 loses its width and the measurement is why.** `plot/curve.ts` buckets N samples into
+the available dot columns and C12 I5 keeps each column's vertical span — *"fifty samples and
+fifty thousand take one path"*. F24 reports a view opened at 120 and read at 80 drawing
+*"two samples per column"*; that is C12 working. The direction inverts: over-wide is handled,
+under-wide is a resolution loss rather than a wrong frame, and the ring's length is retention
+the producer already owns. `render` keeps the context for `capabilities` — a live panel
+drawing `░█` is F54's list inside F24's route.
+
+**The ruling landed as a spec commit alone.** C07 §3 and I17–I21, C23 §2 and I39–I41, C24 §3
+and §7 with I23–I25, C22 §4a and I53–I54, A03 §3's MG3 arm and SS48.
 
 ### 7 · The audit is the item, and F78 is not a field
 
