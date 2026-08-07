@@ -33,6 +33,7 @@ import {
   uncoveredKinds,
 } from "../../src/testing/measurement-conformance.js";
 
+import { producerContext } from "../support/producer-context.js";
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error.message}`);
   return r.doc;
@@ -159,6 +160,7 @@ describe("C04 integration — the document lifecycle", () => {
           overflowed: false,
         },
         {
+          ...producerContext(),
           command: "/ps",
           verb: "ps",
           width: 100,

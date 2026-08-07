@@ -13,7 +13,9 @@ import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import type { AdapterContext, RawResult } from "../../src/data/adapters/types.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 
+import { producerContext } from "../support/producer-context.js";
 const CTX: AdapterContext = Object.freeze({
+  ...producerContext(),
   command: "/ps",
   verb: "ps",
   width: 100,
@@ -146,18 +148,46 @@ describe("T2.2 (I1) — the source scan, from C07's side", () => {
   });
 });
 
-describe("T2.6 (I10, MG7) — C07 imports nothing from terminal/ or above", () => {
-  it("the whole component's import graph stays inside L0 data", () => {
-    // MG1 catches this as an upward edge and runs as a build gate. Asserted
-    // here too because the *reason* is C07-specific: an adapter that reaches
-    // into `presentation/` is one that cannot be tested without a terminal,
-    // which is the property commitment 2 exists to keep.
+describe("T2.6 (I10, MG7) — C07's runtime import graph stays inside L0 data", () => {
+  it("no value import reaches terminal/ or above, which is the property", () => {
+    // MG1 catches the upward half as a build gate. Asserted here too because
+    // the *reason* is C07-specific: an adapter that reaches into
+    // `presentation/` is one that cannot be tested without a terminal, which is
+    // the property commitment 2 exists to keep.
+    //
+    // **Value imports, because I10 changed and this row is what it changed
+    // against.** `ProducerContext` names `TerminalCapabilities`, type-only —
+    // the runtime edge stays forbidden, so `data/` still builds as JavaScript
+    // with `terminal/` absent, which is what A02 §1 protects. The next row
+    // pins that it is the only one and that it really is type-only.
     for (const file of readdirSync("src/data/adapters")) {
       const code = readFileSync(`src/data/adapters/${file}`, "utf8");
-      expect(code, `${file} imports upward`).not.toMatch(
+      const valueImports = code
+        .split("\n")
+        .filter((l) => /^\s*(?:import|export)\s/.test(l) && !/^\s*(?:import|export)\s+type\b/.test(l));
+      expect(valueImports.join("\n"), `${file} imports upward`).not.toMatch(
         /from\s+["'][^"']*(?:terminal|presentation|viewport|interaction|shell)\//,
       );
     }
+  });
+
+  it("I10: exactly one type-only name crosses the halves, and MG3 excuses it by name", () => {
+    // The control for the row above. Without it, "no value import" is satisfied
+    // by a component that type-imports the whole of `terminal/` — which is the
+    // shape the old row was written to forbid and the new one no longer does.
+    const crossings: string[] = [];
+    for (const file of readdirSync("src/data/adapters")) {
+      for (const line of readFileSync(`src/data/adapters/${file}`, "utf8").split("\n")) {
+        if (!/^\s*(?:import|export)\s+type\b/.test(line)) continue;
+        if (!/from\s+["'][^"']*terminal\//.test(line)) continue;
+        crossings.push(`${file}: ${line.trim()}`);
+      }
+    }
+
+    expect(crossings).toHaveLength(1);
+    expect(crossings[0]).toContain("TerminalCapabilities");
+    // Named in the enforcement's own allow-list, not merely tolerated here.
+    expect(readFileSync("tools/enforce/module-graph.mjs", "utf8")).toContain("TerminalCapabilities");
   });
 });
 

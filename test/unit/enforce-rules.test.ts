@@ -974,7 +974,10 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     // `make enforce` green at 175 files and 6927 references, and the same edge
     // written as a value import fired MG3 at once. The rule worked; half its
     // subject was invisible (FINDINGS F127).
-    const file = "src/data/adapters/types.ts";
+    // **Not `adapters/types.ts`.** That file holds the one entry
+    // `CROSS_HALF_TYPES` excuses, so fabricating there tests the exemption
+    // rather than the arm — the row would pass with the walk switched off.
+    const file = "src/data/manifest/parse.ts";
     const read = (f: string): string =>
       f === file ? 'import type { TerminalCapabilities } from "../../terminal/capabilities.js";' : "";
 

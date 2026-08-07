@@ -23,6 +23,7 @@ import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 
+import { producerContext } from "../support/producer-context.js";
 /** R01 §4, verbatim — the fields and the awkwardness, not a tidied version. */
 const DOCKER_PS: readonly Record<string, string>[] = [
   {
@@ -55,6 +56,7 @@ const DOCKER_PS: readonly Record<string, string>[] = [
 ];
 
 const CTX: AdapterContext = Object.freeze({
+  ...producerContext(),
   command: "/ps",
   verb: "ps",
   width: 120,

@@ -33,6 +33,7 @@ import { blockId, completeLocal, compose, errorDoc, noticeDoc, usageDoc } from "
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
+import type { ProducerContext } from "../data/adapters/types.js";
 import { isViewInvocation } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
 import { liveDeclarations } from "./builders/live.js";
@@ -101,6 +102,28 @@ class Guard {
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
+  /**
+   * The producer context, **built at the call and never captured** (C07 §3a).
+   *
+   * Every route that produces a document or a block is told the same four facts
+   * (C23 I40). Reading them here, per call, is what makes them true when the
+   * producer runs rather than when its document was made — a live part renders
+   * repeatedly and a stream adapts per patch, and a captured width is stale by
+   * the first resize. That is the half of F24 that survives.
+   *
+   * `height` is the caller's, because only the caller knows whether this
+   * document is bound: `null` on every route but a view invocation, which C23
+   * reads before step 3 for its own reasons (C22 I45).
+   */
+  const producerContext = (height: number | null): ProducerContext => ({
+    width: deps.lifecycle.size().columns,
+    height,
+    capabilities: deps.capabilities,
+    // The frame's own measurer, not a second one (C09 I1, C07 I20). The
+    // registry is sealed at composition, so this closure cannot go stale.
+    measure: (block, width) => deps.blocks.measure(block, width),
+  });
+
   const guard = new Guard();
   const local = createLocalRegistry();
 
@@ -427,6 +450,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
       }
       const produced = await handler(argv, {
+        // **`null`, and C07 §3a cell B records that it is right by accident.**
+        // The local route cannot open a view — C18 classifies on `tool.local`
+        // first and `isViewInvocation` is read only on the `app` route — so a
+        // local verb has no bound to state. F129 is that gap; when it closes,
+        // this argument changes with it.
+        ...producerContext(null),
         command: line,
         // **The host's own `ask`, not a per-call wrapper** (C23 I36). One layer
         // id and one answer handler exist at a time, so a question asked while
@@ -577,7 +606,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       const doc = deps.adapters.adapt(raw, {
         command: displayed,
         verb,
-        width: deps.lifecycle.size().columns,
+// **The region's height, because a view's producer is defined by it**
+// (C07 I18, C15 §4). The same source `documentView` reads — a second
+// computation is a producer splitting against an axis the frame does
+// not use, and nothing in the arithmetic would look wrong.
+...producerContext(deps.region().height),
         userRequestedJson: result.argv.includes("--json"),
         // C05 I21 — the validated values, so a `shellOnly` flag is readable by
         // the thing that has to act on it. Empty on the failure arm, which
@@ -766,7 +799,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       const doc = deps.adapters.adapt(raw, {
         command: displayed,
         verb,
-        width: deps.lifecycle.size().columns,
+// `null` — a transcript entry is windowed by rows and has no bound
+// (C07 I18). The terminal's height standing in here would be a region
+// nobody promised.
+...producerContext(null),
         userRequestedJson: result.argv.includes("--json"),
         // C05 I21 — the validated values, so a `shellOnly` flag is readable by
         // the thing that has to act on it. Empty on the failure arm, which
@@ -900,7 +936,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         const view = deps.adapters.adaptPatch(patch, {
           command: displayed,
           verb,
-          width: deps.lifecycle.size().columns,
+  // **The region's height, because a view's producer is defined by it**
+  // (C07 I18, C15 §4). The same source `documentView` reads — a second
+  // computation is a producer splitting against an axis the frame does
+  // not use, and nothing in the arithmetic would look wrong.
+  ...producerContext(deps.region().height),
           userRequestedJson: false,
           flags,
           transport: "subprocess",
@@ -974,7 +1014,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         const view = deps.adapters.adaptPatch(patch, {
           command: displayed,
           verb,
-          width: deps.lifecycle.size().columns,
+  // `null` — a transcript entry is windowed by rows and has no bound
+  // (C07 I18). The terminal's height standing in here would be a region
+  // nobody promised.
+  ...producerContext(null),
           userRequestedJson: false,
           flags,
           transport: "subprocess",
@@ -1374,6 +1417,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     clock: deps.clock,
     schedule: deps.schedule,
     commit: (reason) => void deps.scheduler.commit(reason),
+    // One builder for every route (C23 I40) — this file's.
+    producerContext: () => producerContext(null),
     // **The only path in §3b that appends, and so the only producer of
     // `origin: "refresh"`.** The other two patch, and a patch carries no `meta`.
     append: (text) =>
@@ -1416,6 +1461,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     onAction,
     identityNotice: (text) => void refresh.identityNotice(text),
     releaseView: () => void refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID }),
+    // C22 I53 — the greeting is a producer, and this is the one builder.
+    producerContext: () => producerContext(null),
 
     // C22 §4 step 7 (C22 I44). Through `appendAndCommit` like everything else,
     // which is what drives a live part in it and what lets `/clear` remove it.

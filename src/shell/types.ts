@@ -11,7 +11,7 @@
  */
 
 import type { ConfirmHost } from "./confirm.js";
-import type { Adapter, AdapterRegistry } from "../data/adapters/index.js";
+import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { Manifest, ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
@@ -171,6 +171,15 @@ export interface Pipeline {
    */
   releaseView(): void;
   /**
+   * The producer context, for C22's greeting (C22 I53, C23 I40).
+   *
+   * **Exposed so there is one builder rather than two.** The greeting fires
+   * from `session.ts`, which holds the lifecycle, the capabilities and the
+   * registry and could assemble a second one — which is the two-records defect
+   * the grant exists to close, reproduced one file over.
+   */
+  producerContext(): ProducerContext;
+  /**
    * C22's identity loop signalling a transition worth saying out loud (C23 §3b).
    *
    * **C22 signals, C23 appends** — the loop produces a *fact* and not an entry,
@@ -239,6 +248,22 @@ export type PipelineDeps = Readonly<{
   adapters: AdapterRegistry;
   manifest: ManifestStore;
   blocks: BlockRegistry;
+  /**
+   * C02's **resolved** record, for `ProducerContext.capabilities` (C07 I19).
+   *
+   * The resolved one, not `detect()`'s: overrides are applied at construction
+   * (C22 I49), and a second derivation is F124 reproduced inside the framework.
+   */
+  capabilities: TerminalCapabilities;
+  /**
+   * The region a view fills (C15 §4) — for `ProducerContext.height` on the one
+   * route where a bound exists (C07 I18).
+   *
+   * The same source `documentView` reads, rather than a second computation of
+   * it: two answers to *how big is the region* is how a producer splits against
+   * an axis the frame does not use.
+   */
+  region: () => Readonly<{ width: number; height: number }>;
   editor: LineEditor;
   overlays: OverlayManager;
   /**
@@ -421,7 +446,7 @@ export type TuiConfig = Readonly<{
    * is cleared — **not** until the first command (C23 I9, C23 I33). An app that
    * wants launch cheap omits `every` and gets a one-shot.
    */
-  greeting?: () => ViewDocument | Promise<ViewDocument>;
+  greeting?: (ctx: ProducerContext) => ViewDocument | Promise<ViewDocument>;
 }>;
 
 /**

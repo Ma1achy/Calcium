@@ -5272,3 +5272,80 @@ mechanism proposed — a width fraction, *"which is `b.row`'s"* — does not: `b
 `row(id, cells)` at `builders/index.ts:279`, a table-row builder, and no width-fraction
 mechanism exists anywhere in the tree. **Both halves of that check paid**: the replacement
 was absent and the finding was wrong about why it needed one.
+
+---
+
+## F129 — a `view` verb that is also `local` appends an entry and opens nothing ★★★
+
+Found by C07 §3a's classification table, before a line of the producer grant was written,
+and it is the table doing the thing a trace cannot: two rules that are both true at rest.
+
+`isViewInvocation` has exactly one caller — `runApp`, at `execution.ts:668`, read before step 3
+because after step 3 it is too late (C22 I45). **`runLocal` has no such read.** And C18
+classifies on `tool.local` first (`parser/parse.ts:249`), so the two never meet:
+
+```
+local: true, view: true   →  kind: "local"  →  runLocal  →  appendAndCommit
+                                                          ↑ no asView branch exists
+```
+
+The verb runs, a document is produced, an ordinary transcript entry appears, and **no view
+opens, no refusal is raised, and nothing anywhere says so.** C05's parser permits the pair —
+it refuses `view` with `interactive` and with `oneShot`, and says nothing about `local`.
+
+**The sharp part is what the code already knew.** `manifest/types.ts` records, beside
+`shellOnly`:
+
+> `ps <uuid> --watch` *"cannot be built that way"* because argv goes over verbatim — so the
+> `view` arm **has been usable only on `local` tools** since it was written, and nothing said
+> so.
+
+That sentence is about the *flag-level* arm and it is correct. Its consequence is that the
+one route on which the arm is usable is the one route that ignores it. Two correct statements
+in two components, and the defect lives where they overlap — which is why no reader checking
+either one finds it.
+
+**Not fixed here.** It is C23 §2's route rather than the producer ruling's, and the fix is a
+decision: either `runLocal` gains the `asView` branch, or C05 refuses `view` with `local` and
+the arm's own comment stops being true. Recorded in C07 §3a cell B because the producer
+context's `height` is `null` on the local route **for this reason** — correct today, and
+correct by accident, so the cell moves when this does.
+
+**What it is evidence for.** The classification table earning its place a second time: C18's
+was the founding case for structural interactions, and this is one that no sequence trace
+reaches, because there is no event between *C18 classifies on `local` first* and *`runApp` is
+where the view decision lives*. They simply both hold.
+
+---
+
+## F130 — the grant's own tests could not see the grant, because the double was narrower
+
+The producer context landed with `make check` green, `make enforce` green and 2575 tests
+passing. Then the mutation pass:
+
+| mutation in `execution.ts` | before the rows below | after |
+|---|---|---|
+| `height` handed the region on **every** route — the defect C07 I18 forbids by name | **nothing failed** | T1.46 dies |
+| `capabilities` a hardcoded ASCII record rather than C22's resolved one — F124 reproduced inside the framework | **nothing failed** | T1.47 dies |
+| `measure` replaced by `() => 0` | **nothing failed** | T1.47 dies |
+
+**One cause for all three.** `test/unit/execution.test.ts`'s adapter double declared
+
+```ts
+adapt: (_raw: unknown, ctx: { command: string }) => …
+```
+
+so every field the grant added was erased at the one place a test could have observed it. The
+file's own comment, two lines below, records the same class from its last occurrence — *"this
+fake took no arguments at all, which is why nothing here could see that C23 passed a literal
+`seq: 0` — the parameter that was wrong was the one the double erased."*
+
+**It is F125 in a test double.** A parameter type may always be wider than what is passed, so
+the narrow declaration compiled, ran, and could never see a field. The obligation landed one
+commit earlier and covers `TuiConfig.localHandlers`; nothing covers a double inside the
+framework's own suite, and nothing sensibly could.
+
+**What it is evidence for.** Not that the tests were thin — they are 55 rows on this file
+alone. That **a grant nothing observes is a grant nothing can be wrong about**, and that the
+place to look is the double rather than the assertion. Three mutations, one narrowed
+parameter, and a green suite either way.

@@ -17,6 +17,7 @@ import { createFocusStore } from "../../src/interaction/router/focus.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
+import { producerContext } from "../support/producer-context.js";
 const key = (k: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }): Key => ({
   name: k.name,
   ctrl: k.ctrl ?? false,
@@ -563,6 +564,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         onAction: () => undefined,
         identityNotice: () => undefined,
         releaseView: () => undefined,
+        producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
       }),

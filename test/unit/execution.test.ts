@@ -37,6 +37,8 @@ import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import { createDocumentView } from "../../src/shell/document-view.js";
 import type { Block, ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 
+import { FULL_CAPABILITIES } from "../support/producer-context.js";
+import type { AdapterContext, StreamContext } from "../../src/data/adapters/types.js";
 type Scripted = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
@@ -72,6 +74,8 @@ function harness(script: Scripted = {}) {
   const calls: string[] = [];
   const typed: string[] = [];
   const recorded: { command: string; exitCode: number }[] = [];
+  /** Every `ProducerContext` C23 built, by route (C07 §3a). */
+  const contexts: { where: string; ctx: AdapterContext }[] = [];
   /** Every `seq` C23 handed C07, in order. */
   const seqs: number[] = [];
   /**
@@ -120,6 +124,12 @@ function harness(script: Scripted = {}) {
     session: () => session.snapshot,
     writes: session.execution,
     transcript,
+    // C07 I18/I19 — what the producer context is built from (C23 I40). `blocks`
+    // is already the real registry below, so `measure` is the frame's rather
+    // than a stub's; this adds the two the context also needs, with the same
+    // region `documentView` is given.
+    capabilities: FULL_CAPABILITIES,
+    region: () => ({ width: 80, height: 24 }),
     scheduler: {
       commit: (r: string) => void commits.push(r),
       flush: () => undefined,
@@ -129,8 +139,15 @@ function harness(script: Scripted = {}) {
     },
     transport,
     adapters: {
-      adapt: (_raw: unknown, ctx: { command: string }) => {
+      // **`AdapterContext`, not `{ command: string }`.** The narrowed parameter
+      // was here for the same reason it was in four of the reference app's
+      // handler families: it compiled. It also erased every field the producer
+      // grant added, so `height`, `capabilities` and `measure` were invisible
+      // to every row in this file — which is how making `height` unconditional
+      // passed the whole suite (C07 I18, F125's shape in a double).
+      adapt: (_raw: unknown, ctx: AdapterContext) => {
         commands.push({ where: "settle", command: ctx.command });
+        contexts.push({ where: "adapt", ctx });
         return script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt(ctx);
       },
       // **The context is read, not discarded.** This fake took no arguments at
@@ -138,9 +155,10 @@ function harness(script: Scripted = {}) {
       // `seq: 0` — the parameter that was wrong was the one the double erased.
       // A fake narrower than the interface it stands for cannot fail on the
       // difference.
-      adaptPatch: (_patch: RawPatch, ctx: { seq: number; command: string }) => {
+      adaptPatch: (_patch: RawPatch, ctx: StreamContext) => {
         seqs.push(ctx.seq);
         commands.push({ where: "patch", command: ctx.command });
+        contexts.push({ where: "adaptPatch", ctx });
         return script.adaptPatch === undefined
           ? { op: "append" as const, block: { kind: "notice" as const, id: `s${String(ctx.seq)}`, tone: "info" as const, text: "tick" } }
           : script.adaptPatch();
@@ -244,6 +262,7 @@ function harness(script: Scripted = {}) {
   pipeline.seal();
 
   return {
+    contexts,
     pipeline,
     transcript,
     session,
@@ -1318,6 +1337,54 @@ describe("C23 §4 — the submit row's two other steps", () => {
     h.tick(1500);
     await settled();
     expect(ticks.adapter, "an adapter's b.live must be driven too (I33a)").toBeGreaterThan(0);
+  });
+
+  it("T1.46 (C07 I18, I40): a transcript entry's producer is told `null`, a view's is told the region", async () => {
+    // **The row the mutation pass asked for.** Making `height` unconditional —
+    // handing every producer the region — passed all 2575 tests, because the
+    // adapter double declared `ctx: { command: string }` and erased the field.
+    // A grant nothing observes is a grant nothing can be wrong about.
+    const entry = harness();
+    entry.pipeline.submit("/ps");
+    await settled();
+
+    const onEntry = entry.contexts.find((c) => c.where === "adapt")?.ctx;
+    expect(onEntry, "the adapter route ran").toBeDefined();
+    expect(onEntry?.height, "a transcript entry is windowed by rows and has no bound").toBe(null);
+    expect(onEntry?.width).toBe(80);
+
+    // The view route, where a bound exists and C23 knows it before step 3.
+    const view = harness({
+      stream: async function* () {
+        yield { kind: "data", value: { line: "one" } } as const;
+        await new Promise(() => undefined);
+      },
+      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
+    });
+    view.pipeline.submit("/tail --screen");
+    await settled();
+
+    const onView = view.contexts.find((c) => c.where === "adaptPatch")?.ctx;
+    expect(onView, "the view route ran").toBeDefined();
+    expect(onView?.height, "a view is defined by the region — C15 §4").toBe(24);
+  });
+
+  it("T1.47 (C07 I19, I20): the capabilities are the resolved record and `measure` is the frame's", async () => {
+    // The other two facts, and the same argument: without this, swapping
+    // `deps.capabilities` for any literal, or `measure` for `() => 0`, changes
+    // nothing anywhere in the suite.
+    const h = harness();
+    h.pipeline.submit("/ps");
+    await settled();
+
+    const ctx = h.contexts.find((c) => c.where === "adapt")?.ctx;
+    expect(ctx?.capabilities, "the record C22 resolved, not a re-detection").toBe(FULL_CAPABILITIES);
+
+    // Measured through the context and through the registry directly: one
+    // arithmetic, or a producer's split and the frame's rows disagree (C09 I1).
+    const sample = block({ kind: "raw", id: "m", text: "one\ntwo\nthree" });
+    expect(ctx?.measure(sample, 40)).toBe(blocks.measure(sample, 40));
+    expect(ctx?.measure(sample, 40)).toBeGreaterThan(0);
   });
 
   it("T1.41 (C22 I48): a view+streams verb patches the view and releases the guard", async () => {

@@ -18,7 +18,9 @@ import { createNdjsonReader } from "../../src/data/transport/index.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import type { ToolDef } from "../../src/data/manifest/index.js";
 
+import { producerContext } from "../support/producer-context.js";
 const CTX: AdapterContext = Object.freeze({
+  ...producerContext(),
   command: "/ps",
   verb: "ps",
   width: 100,

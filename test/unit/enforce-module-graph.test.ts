@@ -56,9 +56,12 @@ describe("A03 module graph", () => {
         "src/terminal/lifecycle.ts": `import type { TerminalCapabilities } from "./capabilities.js";`,
       }),
     ).toEqual([]);
+    // Not `adapters/types.ts`: that file carries MG3's one exemption, so a run
+    // scoped to it answers a different question — the exemption's, not the
+    // arm's.
     expect(
       check({
-        "src/data/adapters/types.ts": `import type { RawResult } from "../transport/types.js";`,
+        "src/data/manifest/parse.ts": `import type { RawResult } from "../transport/types.js";`,
       }),
     ).toEqual([]);
   });

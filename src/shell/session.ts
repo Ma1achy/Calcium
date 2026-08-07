@@ -193,7 +193,10 @@ class Session implements TuiInstance {
     if (greeting !== undefined) {
       void (async () => {
         try {
-          graph.pipeline.greeting(await greeting());
+          // **The context comes from the pipeline, not from here** (C22 I53).
+          // This file holds the lifecycle, the capabilities and the registry
+          // and could assemble a second one; one builder is the point.
+          graph.pipeline.greeting(await greeting(graph.pipeline.producerContext()));
         } catch {
           // Contained. The prompt is already usable and the session is running;
           // a welcome that could not reach its far side is not a startup fault.

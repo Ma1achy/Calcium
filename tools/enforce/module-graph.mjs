@@ -690,13 +690,15 @@ export function checkBuilderCoverage(
 // not a module: `data/` still builds without `terminal/` present as JavaScript,
 // and the coupling is `tsc`'s alone.
 const CROSS_HALF_TYPES = [
-  // The producer ruling's one entry arrives with `ProducerContext` (C07 §3, I10,
-  // I19): `src/data/adapters/types.ts` → `TerminalCapabilities`, because the
-  // alternative is a second declaration of the resolved record inside `data/`,
-  // pinned by a test that agrees with itself — two records of one fact, which is
-  // F124's defect one layer in. **Empty until the import exists**, because the
-  // bidirectional arm below refuses an exemption that excuses nothing, and an
-  // entry landing ahead of its edge is exactly the unread list it guards against.
+  {
+    file: "src/data/adapters/types.ts",
+    name: "TerminalCapabilities",
+    reason:
+      "C07 §3's ProducerContext grants a producer the *resolved* capability record (C07 I19). " +
+      "The alternative is a second declaration of it inside data/, pinned by a test that " +
+      "agrees with itself — two records of one fact, which is F124's defect one layer in. " +
+      "The runtime edge stays forbidden, so data/ still builds with terminal/ absent",
+  },
 ];
 
 /** Every `import type` / `export type` in a file, as `{ names, spec }`. */
@@ -752,7 +754,14 @@ function checkCrossHalfTypes(files, readFile) {
     }
   }
 
+  // **Only over files this run actually walked.** MG27's arm can compare against
+  // a constant; this one cannot, because the fabricated-violation harness passes
+  // a single file and a stale-entry report would then fire on every check that
+  // is not about this rule. The staleness question is only answerable when the
+  // exempted file is in scope.
+  const inScope = new Set(files);
   for (const entry of CROSS_HALF_TYPES) {
+    if (!inScope.has(entry.file)) continue;
     if (seen.has(`${entry.file}::${entry.name}`)) continue;
     violations.push({
       rule: "MG3",

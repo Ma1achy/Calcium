@@ -20,6 +20,7 @@ import { SESSION_BLOCK_CAP } from "../../src/viewport/transcript/cap.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 
+import { producerContext } from "../support/producer-context.js";
 const SWEEP = STALL_MS / 4;
 
 const raw = (id: string, text: string): Block => block({ kind: "raw", id, text });
@@ -55,6 +56,7 @@ function harness() {
   const driver = createRefreshDriver({
     transcript,
     clock: () => now,
+    producerContext: () => producerContext(),
     schedule: (fn, ms) => {
       const t = { fn, at: now + ms, live: true };
       timers.push(t);

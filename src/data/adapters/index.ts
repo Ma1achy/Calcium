@@ -11,6 +11,7 @@
 export type {
   Adapter,
   AdapterContext,
+  ProducerContext,
   AdapterRegistry,
   RawPatch,
   RawResult,

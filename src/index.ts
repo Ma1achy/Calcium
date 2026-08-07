@@ -164,6 +164,7 @@ export type { ColumnDef } from "./data/viewmodel/index.js";
 export type {
   Adapter,
   AdapterContext,
+  ProducerContext,
   RawPatch,
   RawResult,
   StreamContext,

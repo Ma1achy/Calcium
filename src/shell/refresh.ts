@@ -26,6 +26,7 @@
 
 import { block } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, Panel } from "../data/viewmodel/index.js";
+import type { ProducerContext } from "../data/adapters/types.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
 
 /** C23 §3b — a stream silent for this long gets a notice, never an error (C23 I25). */
@@ -56,7 +57,12 @@ export type ViewRefresh = Readonly<{
    * thunk the driver cannot tell which happened, and the rule stays written
    * down with nothing implementing it.
    */
-  render: (data: unknown) => Block;
+  /**
+   * The producer context arrives per tick (C07 §3a C, C24 §5). Built at the
+   * call by C23, never captured: a live part renders repeatedly, and a context
+   * held from when the document was made is stale by the first resize.
+   */
+  render: (data: unknown, ctx: ProducerContext) => Block;
   renderError: (err: ErrorLike, retryInMs: number | null) => Block;
 }>;
 
@@ -118,6 +124,12 @@ export type RefreshDeps = Readonly<{
   clock: () => number;
   schedule: (fn: () => void, ms: number) => Disposable;
   commit: (reason: "stream" | "input") => void;
+  /**
+   * The producer context, per tick (C07 §3a C). C23 owns the one builder; a
+   * second construction here is the two-records defect the grant exists to
+   * close, reproduced inside the framework.
+   */
+  producerContext: () => ProducerContext;
   /** Appends a document. The identity notice is the only §3b path that does. */
   append: (text: string) => void;
   stopping: () => boolean;
@@ -316,7 +328,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           // rejection reaches the backoff below.
           let child: Block;
           try {
-            child = part.spec.render(data);
+            child = part.spec.render(data, deps.producerContext());
           } catch (err) {
             const shown = { message: err instanceof Error ? err.message : String(err) };
             put(host, part, part.spec.renderError(shown, null));

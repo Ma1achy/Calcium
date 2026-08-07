@@ -28,6 +28,7 @@ import { noticeDoc } from "../../src/shell/documents.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
 
+import { producerContext } from "../support/producer-context.js";
 function fakeFs(): FileSystem {
   const files = new Map<string, string>();
   return {
@@ -197,6 +198,7 @@ describe("C22 §3 — construction order", () => {
         onAction: () => undefined,
         identityNotice: () => undefined,
       releaseView: () => undefined,
+    producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
       };
@@ -356,6 +358,7 @@ describe("C22 §3 — construction order", () => {
             onAction: () => undefined,
             identityNotice: () => undefined,
       releaseView: () => undefined,
+    producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
           };
@@ -586,6 +589,7 @@ describe("C22 §3 — construction order", () => {
         onAction: () => undefined,
         identityNotice: () => undefined,
       releaseView: () => undefined,
+    producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
       }),

@@ -23,6 +23,7 @@ import {
   type DocumentView,
 } from "../../src/shell/document-view.js";
 
+import { producerContext } from "../support/producer-context.js";
 const registry = createBlockRegistry();
 
 /**
@@ -362,6 +363,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
       commit: () => undefined,
       append: () => undefined,
       stopping: () => false,
+      producerContext: () => producerContext(),
       // **The seams as `execution.ts` wires them** — through the owner, not the
       // layer. Copied deliberately rather than simplified: a test that pointed
       // them at `overlays` would be asserting about a wiring the shell does not

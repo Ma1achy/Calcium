@@ -33,6 +33,7 @@ import type { ViewDocument } from "../../src/data/viewmodel/index.js";
 import type { HistoryEntry } from "../../src/interaction/history/types.js";
 import type { Exit } from "../../src/data/process/types.js";
 
+import { FULL_CAPABILITIES } from "./producer-context.js";
 export type PipelineScript = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
@@ -148,6 +149,13 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
     blocks: {} as never,
+    // C07 I19 / I18 — what `ProducerContext` is built from (C23 I40). Real
+    // values rather than stubs: a producer told `ascii` behaves differently, and
+    // a region of zero would make every view-route split agree with nothing.
+    // `blocks` stays the stub above — `measure` is a closure, so a row that
+    // reaches it throws loudly rather than measuring wrongly.
+    capabilities: FULL_CAPABILITIES,
+    region: () => ({ width: 80, height: 24 }),
     // **The real editor, not a stub.** `editor: {} as never` cost a diagnosis
     // once and `{ setText, text }` cost another the day C23 gained
     // `editor.clear()` on the submit path (I28) — a two-method stub is the same

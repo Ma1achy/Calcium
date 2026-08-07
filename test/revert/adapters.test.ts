@@ -8,7 +8,9 @@ import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import type { ViewPatch } from "../../src/data/viewmodel/index.js";
 
+import { producerContext } from "../support/producer-context.js";
 const CTX: AdapterContext = Object.freeze({
+  ...producerContext(),
   command: "/ps",
   verb: "ps",
   width: 100,

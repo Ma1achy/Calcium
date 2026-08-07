@@ -25,6 +25,7 @@ import { fixture } from "../support/manifest.js";
 import { asScriptFile, scripts, waitForFileToContain } from "../support/process.js";
 import { clockOf, drain, invocation, recorded, result } from "../support/transport.js";
 
+import { producerContext } from "../support/producer-context.js";
 /**
  * The routing decision C23 will make, in the two lines it actually is.
  *
@@ -188,6 +189,7 @@ describe("C06 with C05", () => {
 
     const registry = createAdapterRegistry();
     const ctx = {
+      ...producerContext(),
       command: "/ps",
       verb: "ps",
       width: 100,
@@ -237,6 +239,7 @@ describe("C06 with C05", () => {
     let remainder = "";
     for await (const patch of transport.stream(invocation({ verb: "logs", streams: true }))) {
       const view = registry.adaptPatch(patch, {
+        ...producerContext(),
         command: "/logs",
         verb: "logs",
         width: 100,

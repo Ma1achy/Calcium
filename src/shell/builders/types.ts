@@ -15,6 +15,7 @@
  */
 
 import type { Action, Block, Cell, ErrorLike, Glyph, Tone } from "../../data/viewmodel/index.js";
+import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
  * What every block-returning builder accepts, and the only declaration of it
@@ -124,6 +125,7 @@ export type ComparisonRow = Readonly<{
 
 /** Re-exported for the builders' own signatures; C04 owns them. */
 export type { Action, Block, Cell, Glyph, Tone };
+export type { ProducerContext };
 
 /**
  * C24 §5 — what `b.live` declares.
@@ -162,7 +164,27 @@ export type LiveSpec = BlockOpts &
      * streaming part is additive to re-add the day something drives one.
      */
     fetch: () => Promise<unknown>;
-    render: (data: unknown) => Block;
+    /**
+     * **The producer context arrives as a second parameter** (C07 §3, C24 §5).
+     *
+     * A live part is a producer: it renders repeatedly, and a part drawing
+     * non-ASCII text cannot ask what the terminal supports any more than an
+     * adapter could — the reference app's live panel draws `░` and `█`, which
+     * is F54's list arriving through F24's route.
+     *
+     * **It is not here so a part can size itself to the width.** F24 asked for
+     * that and C12 already does it: `curveRows` buckets N samples into the
+     * available dot columns and I5 keeps each column's vertical span, so a view
+     * opened at 120 and read at 80 is downsampled rather than doubled. The ring's
+     * length is retention, which the declarer owns and no terminal bounds.
+     *
+     * **Built per tick, never captured** (C07 §3a C), and `height` is `null` on
+     * this route even inside a view: the region belongs to the document and a
+     * refresh replaces one panel sharing it (C23 I34).
+     *
+     * Additive — an implementation ignoring it is unchanged.
+     */
+    render: (data: unknown, ctx: ProducerContext) => Block;
     renderError?: (err: ErrorLike, retryInMs: number | null) => Block;
     renderLoading?: () => Block;
     /** Default: twice `every`. Below it, construction throws (C24 T3.6). */

@@ -699,6 +699,11 @@ export async function constructGraph(
       adapters: built.adapters,
       manifest: built.manifest,
       blocks: built.blocks,
+      // C07 I19 — the **resolved** record, which is what `detection` holds after
+      // C22 I49's overrides. Deriving it again anywhere else is F124.
+      capabilities: detection.capabilities,
+      // C07 I18 — the same region `documentView` reads, not a second one.
+      region: deps.frame.overlayRegion,
       editor: stores.editor,
       overlays: stores.overlays,
       patchView,

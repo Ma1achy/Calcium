@@ -120,6 +120,33 @@ A refusal with no mechanism named is a deferral wearing a ruling's clothes. Four
 | `createBlockRegistry` | `measure` above, and `expectDocument().lines()` for evidence (C24 §7) |
 | a live part told the width, to size its own history | **C12 already does it.** `curveRows` buckets N samples into the available dot columns and I5 keeps each column's vertical span — *"fifty samples and fifty thousand take one path, and there is no density branch to get wrong at the boundary."* F24 reports a view opened at 120 and read at 80 drawing *"two samples per column"*; that is C12 working. The ring's length is **retention**, which the producer already owns and which no terminal bounds. Measured against `plot/curve.ts`, and the finding's direction inverts: over-wide is handled, under-wide is a resolution loss and not a wrong frame. |
 
+### 3a. The classification table — which route is told what
+
+**A structural artefact rather than a trace**, because the interactions here have no event between them: they are *which route* × *which field*, both true at rest. A sequence trace indexed by events cannot reach a cell where two rules simply both hold.
+
+Six routes produce a document or a block. Four facts. The cells that matter are the ones two rules can both claim.
+
+| route | `width` | `height` | `capabilities` | `measure` |
+|---|---|---|---|---|
+| adapter, transcript entry | frame | `null` | resolved | registry |
+| adapter, **view invocation** | frame | **region** | resolved | registry |
+| `adaptPatch`, per patch | frame **at that patch** | as its invocation | resolved | registry |
+| local handler | frame | `null` — **see B** | resolved | registry |
+| `LiveSpec.render`, per tick | frame **at that tick** | `null` — **see D** | resolved | registry |
+| greeting | frame | `null` | resolved | registry |
+
+**A — `width` for a view is the frame's, and that is a fact rather than a coincidence.** Two rules could claim the cell: *a producer is told the frame's width* and *a view's producer is bounded by the region*. They agree today because `compose` builds `overlayRegion` as `{ width: size.columns, height }` — a view fills the width and insets only vertically. **Stated because it is load-bearing and could stop being true**: the day a view insets horizontally, a producer splitting content would measure against an axis the frame does not use, and nothing in the arithmetic would look wrong.
+
+**B — the local route's `null` is correct today for a reason that is a defect.** `isViewInvocation` is read on the `app` route and nowhere else, and C18 classifies on `tool.local` first, so a local verb can never open a view — which makes `height: null` right by accident. C05's parser permits `local: true` with `view: true`; `types.ts` records that the flag-level `view` arm *"has been usable only on `local` tools since it was written"*. **So the one combination the arm was said to be usable on is the one that silently appends an entry** (F129). This cell changes when that is fixed, and it is written down here so it changes rather than being rediscovered.
+
+**C and G are one rule — the context is built at the call, never captured.** A live part renders repeatedly and a stream adapts per patch, so a context captured when the document was built is stale by the first resize. That is F24's complaint stated generally, and it is the half of F24 that survives: not that a producer needs the width to size its history, but that *whatever* a producer is told must be true when it is told, not when its document was made.
+
+**D — a live part has no bound, even inside a view.** Two rules meet: *a view's producer is bounded by the region*, and *a refresh replaces one panel inside a document* (C23 I34). The region belongs to the document; the part is one block sharing it with others, so a part told the region's height would size itself to space it does not have. `null` on every route but the view invocation itself.
+
+**E — `measure` needs no capability argument** because the registry is built with one and sealed at composition. A second capability path into measurement is the measure/render divergence C09 I1 exists to prevent.
+
+**F — the greeting's context is available where it fires.** Capabilities are resolved during construction and the greeting is startup step 7, so nothing is read before it exists.
+
 ### The registry owns `meta`
 
 An adapter returns a `ViewDocument`, and the registry **overwrites its `meta`** from the `RawResult` and the context, keeping only `resultId`, `adapter` and `truncated` from what the adapter supplied.

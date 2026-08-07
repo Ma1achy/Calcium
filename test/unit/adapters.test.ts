@@ -18,7 +18,9 @@ import type { AdapterContext, RawResult } from "../../src/data/adapters/types.js
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import type { Block, ColumnDef } from "../../src/data/viewmodel/index.js";
 
+import { producerContext } from "../support/producer-context.js";
 const CTX: AdapterContext = Object.freeze({
+  ...producerContext(),
   command: "/ps",
   verb: "ps",
   width: 100,
