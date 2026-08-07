@@ -3702,6 +3702,16 @@ asymmetry as a factory you can import and cannot install.
 of the weight and none of the value. What changed is that *"actually needed"* was measured
 against two consumers and now has more.
 
+### Amended when it was built — its own figures held and it named one change of three
+
+**Rare, and worth saying: every measurement in this entry re-measured true.** 384 grammars,
+9.2 MB for the package, and sixteen mainstream ones at 121 KB. The size objection survives
+and the scope of it was the thing that was wrong.
+
+**But two changes were missing, and both are the kind only the build finds.** F123 has them:
+`registerGrammar` without clearing the memo leaves §4a's sentence false, and shipping the
+set without extending `SLOTS` ships two grammars that highlight nothing.
+
 ---
 
 ## F94 — `export interface` does not mark a seam, and MG24's premise rests on it ★★★
@@ -4869,3 +4879,78 @@ all of them.** An em dash on a terminal reporting `unicode: ascii` is drawn as v
 as `❯` is. That is a real and larger question — every error message in the tree — and it
 is not this rule's, which is about *marks*. Recorded rather than discovered, and the
 count is what makes it re-checkable.
+
+---
+
+## F123 — a promise needs three mechanisms and the finding that named it found one ★★★
+
+F93 read C09 §4a's promises — *readable today and highlighted whenever someone registers
+it* — against a constructor with a fixed pair and no registration path, and prescribed two
+changes: ship a mainstream set, expose registration. Both are right. Building them found
+that **neither makes the sentence true on its own**.
+
+### 1 · Registration without invalidation leaves the promise false
+
+`tokenise` memoises on `(language, text)` — and caches the **fallback**:
+
+```ts
+const tokens = lowlight.registered(language)
+  ? flatten(lowlight.highlight(language, text) as HastNode, null)
+  : [{ text, slot: null }];
+memo.set(key, tokens);
+```
+
+So a language registered after anything has been rendered keeps returning plain text until
+the 256-entry cap happens to clear the map. **Every assertion F93's change would suggest
+still passes**: the export exists, `lowlight.registered()` answers true, a *fresh* block
+highlights. The one that fails is the sentence's own case — the block that was on screen
+before the grammar arrived, which is the only reason the promise was worth making.
+
+**Two correct rules overlapping in a cell neither is about.** Memoise, because a transcript
+re-tokenising every frame makes scrolling cost more than producing the document. Fall back
+to text, because an unregistered language must be readable. Nothing in either says what
+happens when the second becomes false for a key the first is holding.
+
+### 2 · Shipping a grammar whose classes are unmapped ships nothing
+
+`SLOTS` maps thirteen `hljs-` classes and was written when the set was `json` and `yaml`.
+Tokenising a sample of each of the sixteen, counting **runs** rather than class names:
+
+| | runs | uncoloured |
+|---|---|---|
+| `json` | 13 | 0 |
+| `sql` | 16 | 6 |
+| `xml` | 11 | 8 |
+| `markdown` | 4 | **4 — nothing highlights** |
+| the sixteen | 152 | 59 |
+
+`markdown` emits `hljs-section`, `hljs-bullet`, `hljs-code`, and `SLOTS` carries none of
+them: registering it is **indistinguishable from not registering it**. `diff` colours its
+`@@` header and drops `hljs-addition` and `hljs-deletion`, which is worse than plain text —
+it highlights the one line nobody reads and leaves the ones they do.
+
+**Counting runs rather than class names is the whole of that measurement.** The class-name
+version says *fifteen classes unmapped across the set*, which sounds like a rounding error
+and hides that one grammar scores zero. `hljs-params` is unmapped and appears in five
+grammars and means nothing, because parameters are ordinary identifiers and are supposed to
+be plain. **The unit that carries the defect is the rendered run**, and the tidier count
+would have been reported and believed.
+
+### The three deliberate omissions, and one is a ruling already taken
+
+`hljs-params` is plain by design. `hljs-strong` and `hljs-emphasis` are **appearance**, and
+§4a maps rôles to slots. And `hljs-addition` / `hljs-deletion` get no slot because **C04's
+change-axis ruling says a change is a marker and never a tone** (F30, F49, F81) — colouring
+a `+` line green is exactly what that ruling refused, and a real diff is C25's, where the
+marker column is. So the gap `diff` has is not closed here and the reason is a decision made
+three items ago rather than a judgement made in this file.
+
+### Why nothing caught the original, which F93 got right
+
+C09 was built when the consumers were `docker inspect` and an nginx config. **Two grammars
+satisfied every test, and no test could distinguish *we ship two* from *we ship two for
+now*.** The promises were prose and no rule reads prose. What is added is not a rule for
+that — there isn't one — but T3.32, which asserts every grammar **in the set** colours
+something, with the three omissions in a list it reads. A grammar added later whose classes
+nobody checked fails on the commit that adds it.
+

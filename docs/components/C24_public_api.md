@@ -726,6 +726,7 @@ carries the state — and §7 records what that changed.
 - **I19** — The producers of a hook's argument types are exported wherever the hook is: a consumer implementing `CompletionSource` can build the `CompletionContext` it receives, through `contextAt` and `parseManifest`. A type without its producer is testable only by a hand-built literal that agrees with the test rather than with the derivation.
 - **I20** — Every field a block type carries is reachable from its builder, or `BUILDER_OMISSIONS` names it with the reason. I18 stated this and nothing read it; MG27 is the mechanism, and it found `patch.collapsedAfter`, `patch.actions` and `table.sort` on the run that created it (F41, F114). The reasons are data rather than prose for the reason C09 §4a gives: a rule with nothing reading it passes exactly like a rule that is satisfied.
 - **I21** — A public option is implemented or it is not declarable. `LiveSpec.stream` was accepted, validated by two throws policing a choice against `fetch`, and read by nothing — so a part declared with it rendered `render(null)` once, and a part that streams nothing looked exactly like a part that produced nothing. **Accepted, validated and inert is the third state, and it is A03 §2's vacuity class arriving in an API rather than in a rule.** The remedy is removal and a required `fetch`, because a compile error is where a runtime throw was and the option is additive to restore the day something drives it (F78).
+- **I22** — **`registerGrammar` is exported, because a block kind whose vocabulary is closed is a kind an app cannot use for its own domain.** C09 §4a promised registration and shipped none; the default set is sixteen grammars and a mainstream set never covers a consumer's nouns. Exported block kinds with unexported grammars is the asymmetry a factory you can import and cannot install has, and it is the one this API exists to refuse (F93, C09 I23).
 
 ---
 
@@ -750,6 +751,7 @@ carries the state — and §7 records what that changed.
 17. **A hook's argument types come with their producers** (I19, §8b). An app can write a completion source and could not construct a context to test it with, which the second consumer found the way the first found the builders — by using the thing.
 18. Every block field is reachable from its builder or named with a reason a rule can resolve — checked, not promised (I20, MG27).
 19. A public option is implemented or it is not declarable. Two throws policing a choice between an implemented arm and an inert one is the shape to look for, and the remedy is removal rather than a third throw (I21).
+20. `registerGrammar` is public: a `code` block accepts any language name, and until this existed only two of them meant anything (I22). The mechanism is C09's (→ C09 I23).
 
 ---
 
