@@ -14,7 +14,14 @@
  */
 
 import { appendFileSync } from "node:fs";
-import { access, appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  access,
+  appendFile,
+  mkdir,
+  readdir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
 import { drawFallback, tooSmall } from "./fallback.js";
@@ -22,6 +29,7 @@ import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
 import { composeFrame } from "./render-frame.js";
+import { focusKey } from "./render-cache.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
@@ -86,7 +94,9 @@ function ambient(): Ambient {
   };
 }
 
-export function createTui<C extends TuiConfig>(config: TuiConfigInput<C>): TuiInstance {
+export function createTui<C extends TuiConfig>(
+  config: TuiConfigInput<C>,
+): TuiInstance {
   // **Step 1, and nothing else** (I7a). Validation needs nothing constructed
   // and a bad config should fail at the call site; steps 2 to 11 run inside
   // `start()`, because step 3 may read a manifest from a path and a constructor
@@ -121,7 +131,8 @@ class Session implements TuiInstance {
   async start(): Promise<void> {
     // §9's two illegal cells. `stopped` is terminal, matching C01's released
     // state — a second session constructs a new instance (I16).
-    if (this.#state === "stopped") throw new SessionStateError("start", this.#state);
+    if (this.#state === "stopped")
+      throw new SessionStateError("start", this.#state);
     if (this.#state === "running") return; // T3.2 — nothing constructed twice.
 
     // **Gate 1** (§4 step 1, I36, I37) — above `constructGraph`, and that is the
@@ -189,6 +200,7 @@ class Session implements TuiInstance {
     if (graph === null || graph.lifecycle.acquired) return;
 
     graph.lifecycle.acquire();
+
     graph.scheduler.commit("input");
 
     /**
@@ -217,7 +229,9 @@ class Session implements TuiInstance {
           // **The context comes from the pipeline, not from here** (C22 I53).
           // This file holds the lifecycle, the capabilities and the registry
           // and could assemble a second one; one builder is the point.
-          graph.pipeline.greeting(await greeting(graph.pipeline.producerContext()));
+          graph.pipeline.greeting(
+            await greeting(graph.pipeline.producerContext()),
+          );
         } catch {
           // Contained. The prompt is already usable and the session is running;
           // a welcome that could not reach its far side is not a startup fault.
@@ -320,7 +334,8 @@ class Session implements TuiInstance {
     // printed onto the alternate screen is discarded when the screen is
     // released, so the dev sees a flash and an empty shell (I6). C02's warnings
     // wait here for the same reason (C02 §2).
-    for (const line of graph.capabilityWarnings) this.config.stdout.write(`${line}\n`);
+    for (const line of graph.capabilityWarnings)
+      this.config.stdout.write(`${line}\n`);
 
     // 4 — the caller's code, returned rather than exited: the caller owns the
     // process, and a library that calls `process.exit` cannot be embedded.
@@ -424,7 +439,11 @@ class Session implements TuiInstance {
       // recorded the other half as deferred "when C22 lands".
       ghost: () =>
         graph.completion.ghost(
-          contextAt(graph.editor.text, graph.editor.cursor, graph.manifest.manifest),
+          contextAt(
+            graph.editor.text,
+            graph.editor.cursor,
+            graph.manifest.manifest,
+          ),
         ),
       // **The region comes from the frame, not from a fresh one** (C22 I28).
       // `#frameQueries` serves the same value to the router, and a second
@@ -509,7 +528,8 @@ class Session implements TuiInstance {
       // composed frame against itself, and 1 + 1 + region + 1 is consistent at
       // every width. Two records of one number, and T1.5c is the only thing
       // comparing them.
-      promptRows: (width, gutter) => graph?.editor.layout(width, gutter).length ?? 1,
+      promptRows: (width, gutter) =>
+        graph?.editor.layout(width, gutter).length ?? 1,
     });
   }
 }
@@ -531,17 +551,32 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     // rows are part of the entry's height (C14 I20), which is why the slice
     // below is taken over `chrome ++ blocks` rather than over the blocks alone.
     const chrome = commandRows(entry.doc.command, width, graph.capabilities);
-    const lines = renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
-      theme: graph.theme.current,
-      capabilities: graph.capabilities,
-      // **The third field, and the context was shipped with two** (C16 §3).
-      // Focus was stored, derived and routed, and a focused row rendered
-      // exactly like an unfocused one because nothing ever put it in the
-      // context C09 reads it from. Every reference existed and the seam was
-      // still broken — a partially-populated context, which counting
-      // references cannot see.
-      focus: focusFor(graph, entry.id),
-    });
+
+    // **Cached on all five axes, and the last two are the ones a height cache
+    // does not need** (I58, §6c). `focusFor` changes the rendering without
+    // moving `rev`, and `ResolvedTheme.name` moves on a variant switch and on an
+    // override — the same value C10 I11 keys its own memo on, carried here
+    // rather than reached for through an `invalidate` someone must remember.
+    const focus = focusFor(graph, entry.id);
+    const key = focusKey(focus);
+    const theme = graph.theme.current.name;
+    const held = graph.rendered.get(entry.id, entry.rev, width, key, theme);
+    const lines =
+      held ??
+      renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
+        theme: graph.theme.current,
+        capabilities: graph.capabilities,
+        // **The third field, and the context was shipped with two** (C16 §3).
+        // Focus was stored, derived and routed, and a focused row rendered
+        // exactly like an unfocused one because nothing ever put it in the
+        // context C09 reads it from. Every reference existed and the seam was
+        // still broken — a partially-populated context, which counting
+        // references cannot see.
+        focus,
+      });
+    if (held === undefined)
+      graph.rendered.set(entry.id, entry.rev, width, key, theme, lines);
+
     const rows = [...chrome, ...lines];
     out.push(...rows.slice(ve.skipRows, ve.skipRows + ve.takeRows));
   }
@@ -568,7 +603,10 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
 
   for (const block of entry.doc.blocks) {
     if (block.kind !== "table") continue;
-    if (stored.rowId === null || focusableRowIds(block).includes(stored.rowId)) {
+    if (
+      stored.rowId === null ||
+      focusableRowIds(block).includes(stored.rowId)
+    ) {
       return Object.freeze({ blockId: block.id, rowId: stored.rowId });
     }
   }

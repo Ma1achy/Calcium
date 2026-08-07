@@ -638,6 +638,8 @@ export const TOPICS = {
   fixture: "C01",
   fixtures: "C08",
   "frame-scheduler": "C03",
+  "render-cache": "C22",
+  screen: "C22",
   lifecycle: "C01",
   manifest: "C05",
   "measurement-conformance": "C09",

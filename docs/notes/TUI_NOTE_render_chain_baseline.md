@@ -165,6 +165,45 @@ be the largest win.
 
 ---
 
+## 4b. Stage 2 landed, and it did exactly what the spec said it would not
+
+| transcript | keystroke, stage 1 | **stage 2** | drag step, stage 1 | **stage 2** |
+|---|---|---|---|---|
+| 250 lines | 150.0 ms | **22.7** | 173.5 | **166.2** |
+| 1,000 | 523.2 | **31.5** | 621.2 | **605.0** |
+| 5,000 | 2,896 | **23.9** | 3,252 | **3,099** |
+
+First frame at 5,000 lines: **3,206 ms**, against 11,127 at the baseline — the
+gain there is stage 1's build plus warm-up noise, not the cache, which by
+construction cannot help a frame that has never been drawn.
+
+**A keystroke is now flat in the block size.** 22.7, 31.5, 23.9 — the transcript
+is served from the cache and only the chrome and the prompt are composed.
+
+**And the drag is untouched, which is C22 I59 arriving as a shape rather than as a
+sentence.** A width change invalidates every slot, so every step of a drag pays
+the full render: 3,099 ms at 5,000 lines against a 24 ms keystroke. Before this
+stage the two were equal.
+
+**So §3's conclusion needs its third correction, and it is not a retraction.**
+The claim there — *the drag's cost is the render, and stage 3 fixes it on the
+same terms as a keystroke* — is still true. What has changed is the profile.
+Stage 2 did not make the drag slower; it made everything else faster, and in
+doing so turned a uniformly slow shell into a fast one with a **130× spike** on
+resize. That is the same transformation C22 I59 warns about — continuous lag into one
+long stall — arriving on a second axis nobody had named.
+
+**A number worth chasing at stage 4.** The residual keystroke is ~23 ms flat,
+against 1.8 ms with an empty transcript, and the transcript's lines are now
+*cached*. Something costs 20 ms per frame that is neither the block render nor
+the chrome. The candidate is `exact()` — `fitStyled` over 47 rows × 200 cells,
+which segments graphemes on every cell of every row of every frame. If that is
+what it is, stage 4 is worth considerably more than the brief expected, and it is
+measurable only now that the render no longer dominates. To be settled after
+stage 3, not before.
+
+---
+
 ## 5. What the numbers say about the order
 
 | stage | what the table says |

@@ -45,6 +45,7 @@ import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
+import { RenderCache } from "./render-cache.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
@@ -209,6 +210,18 @@ export type Graph = Readonly<{
   completion: ReturnType<typeof createEngine>;
   transcript: ReturnType<typeof createTranscriptStore>;
   viewport: ReturnType<typeof createViewport>;
+  /**
+   * An entry's rendered lines (C22 I58, §6c).
+   *
+   * **Here rather than on `Session`, because the wiring is here.** Its two
+   * C13 arms sit beside C14's, which take the same two changes for the same
+   * reason — and a cache whose subscription lives in one file while its owner
+   * lives in another is the seam that goes unwired. `size` is exposed on C14's
+   * `stats` precedent: the claim *one slot per entry* is about memory, and a
+   * render count cannot see an eviction arm because an evicted entry is never
+   * asked for again.
+   */
+  rendered: RenderCache;
   overlays: ReturnType<typeof createOverlayManager>;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
@@ -419,6 +432,19 @@ export async function constructGraph(
       // viewport describes a document it is not showing.
       chromeRows: (entry, width) => commandRows(entry.doc.command, width, detection.capabilities).length,
     });
+
+    // **The render cache's two C13 arms, beside C14's** (I58, §6c trace rows 8
+    // and 9). `rev`, width, focus and theme are all *in the key*, so `append`,
+    // `patch` and `settle` need no handler — a moved `rev` simply misses. What
+    // the key cannot express is an entry that no longer exists: its slot would
+    // hold a rendered document nothing can reach, for the life of the session.
+    // C14's `HeightCache` takes the same two changes for the same reason.
+    const rendered = new RenderCache();
+    transcript.subscribe((change) => {
+      if (change.kind === "evict") for (const id of change.ids) rendered.delete(id);
+      else if (change.kind === "clear") rendered.clear();
+    });
+
     const overlays = createOverlayManager({ registry: built.blocks });
     // **The state directory has to exist before anything writes into it**, and
     // nothing created it. `FileSystem.mkdir` was declared, implemented at
@@ -533,7 +559,7 @@ export async function constructGraph(
       );
     }
 
-    return { transcript, viewport, overlays, history, editor, theme: themed.value };
+    return { transcript, viewport, rendered, overlays, history, editor, theme: themed.value };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("stores", cause);
   });
