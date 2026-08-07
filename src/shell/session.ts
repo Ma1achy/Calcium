@@ -35,6 +35,7 @@ import {
   type SessionState,
   type StopReason,
   type TuiConfig,
+  type TuiConfigInput,
   type TuiInstance,
 } from "./types.js";
 
@@ -85,7 +86,7 @@ function ambient(): Ambient {
   };
 }
 
-export function createTui(config: TuiConfig): TuiInstance {
+export function createTui<C extends TuiConfig>(config: TuiConfigInput<C>): TuiInstance {
   // **Step 1, and nothing else** (I7a). Validation needs nothing constructed
   // and a bad config should fail at the call site; steps 2 to 11 run inside
   // `start()`, because step 3 may read a manifest from a path and a constructor

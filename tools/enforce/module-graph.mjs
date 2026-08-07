@@ -327,6 +327,16 @@ const BARE   = /^\s*import\s*['"]([^'"]+)['"]/gm;
  *
  * An inline `import { type X, y }` is NOT skipped: the statement still emits,
  * and `y` is a real edge.
+ *
+ * **That ruling was made for a pair inside one half and MG3 inherited it without
+ * a decision** (FINDINGS F127). C01 → C02 is `terminal/` → `terminal/`: no layer
+ * question arises and erasure settles it. L0's *halves* are a different claim —
+ * A02 §1 protects each half type-checking with the other absent — so a type-only
+ * edge is exactly what removes the property, and `checkCrossHalfTypes` walks
+ * them. Measured: a fabricated type-only edge from `data/` into `terminal/` left
+ * `make enforce` green at 6927 references; the same edge as a value import fired
+ * MG3 at once. MG21 and MG22 already record the two answers, and both are right
+ * for what they protect.
  */
 function isTypeOnly(clause) {
   return /^type\b/.test(clause.trim());
@@ -668,9 +678,100 @@ export function checkBuilderCoverage(
   return violations;
 }
 
+// --- MG3's type-only arm — the edge the rule could not see ------------------
+//
+// **One entry, and that is the number to distrust.** The walk over `src/` finds
+// zero cross-half edges of either kind besides this one, so the arm ships having
+// never fired in anger — indistinguishable from a rule that works, which is
+// exactly F83's lesson one rule over. It is believable because the fabricated
+// pair was run, not because the tree came back clean.
+//
+// The runtime edge stays forbidden in both directions. What crosses is a *name*,
+// not a module: `data/` still builds without `terminal/` present as JavaScript,
+// and the coupling is `tsc`'s alone.
+const CROSS_HALF_TYPES = [
+  // The producer ruling's one entry arrives with `ProducerContext` (C07 §3, I10,
+  // I19): `src/data/adapters/types.ts` → `TerminalCapabilities`, because the
+  // alternative is a second declaration of the resolved record inside `data/`,
+  // pinned by a test that agrees with itself — two records of one fact, which is
+  // F124's defect one layer in. **Empty until the import exists**, because the
+  // bidirectional arm below refuses an exemption that excuses nothing, and an
+  // entry landing ahead of its edge is exactly the unread list it guards against.
+];
+
+/** Every `import type` / `export type` in a file, as `{ names, spec }`. */
+function typeOnlyImportsOf(file, readFile) {
+  const src = readFile(file);
+  const out = [];
+  IMPORT.lastIndex = 0;
+  let m;
+  while ((m = IMPORT.exec(src))) {
+    if (!isTypeOnly(m[1])) continue;
+    const names = [...m[1].matchAll(/[A-Za-z_$][\w$]*/g)]
+      .map((n) => n[0])
+      .filter((n) => n !== "type" && n !== "as");
+    out.push({ names, spec: m[2] });
+  }
+  return out;
+}
+
+/**
+ * MG3, type-only. Bidirectional, on MG27's precedent: an allow-list entry whose
+ * edge no longer exists is itself a violation, because an exemption that
+ * outlives its reason is how the list stops being read.
+ */
+function checkCrossHalfTypes(files, readFile) {
+  const violations = [];
+  const seen = new Set();
+
+  for (const file of files) {
+    const from = layerOf(file);
+    if (!from || from.rank !== 0) continue;
+    for (const { names, spec } of typeOnlyImportsOf(file, readFile)) {
+      const target = resolve(file, spec);
+      if (!target) continue;
+      const to = layerOf(target);
+      if (!to || to.rank !== 0 || to.half === from.half) continue;
+
+      for (const name of names) {
+        const excused = CROSS_HALF_TYPES.find((e) => e.file === file && e.name === name);
+        if (excused) {
+          seen.add(`${excused.file}::${excused.name}`);
+          continue;
+        }
+        violations.push({
+          rule: "MG3", file,
+          message:
+            `crosses L0's halves type-only: ${from.half} → ${to.half} (${name} from ${spec}). ` +
+            `A type-only edge erases at build and still makes this half un-type-checkable ` +
+            `without the other, which is the property A02 §1 protects. Add a CROSS_HALF_TYPES ` +
+            `entry with its reason, or declare the shape on this side`,
+          spec: "A02 §1 · C07 I10 · A03 §3, MG3",
+        });
+      }
+    }
+  }
+
+  for (const entry of CROSS_HALF_TYPES) {
+    if (seen.has(`${entry.file}::${entry.name}`)) continue;
+    violations.push({
+      rule: "MG3",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `CROSS_HALF_TYPES names ${entry.name} in ${entry.file}, which no longer imports it ` +
+        `type-only. Remove the entry: an exemption that excuses nothing is how the next one ` +
+        `gets in unread`,
+      spec: "A03 §3, MG3",
+    });
+  }
+
+  return violations;
+}
+
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [
     ...checkModeOwnership(files, readFile),
+    ...checkCrossHalfTypes(files, readFile),
     ...checkPresentationEdges(files, readFile),
     ...checkForbiddenEdges(files, readFile),
      ...checkDevEntryIsolation(files, readFile),

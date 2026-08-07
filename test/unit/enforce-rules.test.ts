@@ -966,6 +966,30 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
   });
 
+  it("MG3 fires on a fabricated *type-only* cross-half edge, which it could not see at all", () => {
+    // **The arm's only proof, because the tree has no subject for it.** The walk
+    // over `src/` finds zero cross-half edges of either kind, so a green run says
+    // nothing — F83's lesson one rule over. Measured by hand before this row
+    // existed: a real type-only edge in `data/adapters/types.ts` left
+    // `make enforce` green at 175 files and 6927 references, and the same edge
+    // written as a value import fired MG3 at once. The rule worked; half its
+    // subject was invisible (FINDINGS F127).
+    const file = "src/data/adapters/types.ts";
+    const read = (f: string): string =>
+      f === file ? 'import type { TerminalCapabilities } from "../../terminal/capabilities.js";' : "";
+
+    const fired = checkModuleGraph([file], read).filter((v) => v.rule === "MG3");
+    expect(fired, "MG3 does not walk `import type` — the arm is off").toHaveLength(1);
+    expect(fired[0]!.message).toContain("type-only");
+
+    // The control, and it is what tells the arm from the walk it sits beside:
+    // the same file with no cross-half import at all must be silent, or the row
+    // above passes against a rule that fires on everything.
+    const clean = (f: string): string =>
+      f === file ? 'import type { RawResult } from "../transport/types.js";' : "";
+    expect(checkModuleGraph([file], clean).filter((v) => v.rule === "MG3")).toHaveLength(0);
+  });
+
   it("SS40's annotation is honoured on all three branches, and is a claim", () => {
     // The lookahead sat on the `.length` alternative alone, so `.charAt(` and
     // `.slice(` had no escape hatch — and C17 needs one, because slicing a

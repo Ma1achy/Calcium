@@ -16,18 +16,49 @@ const check = (files: Record<string, string>) =>
   checkModuleGraph(Object.keys(files), (f) => files[f] ?? "");
 
 describe("A03 module graph", () => {
-  it("MG3: a type-only import across L0's halves is not an edge", () => {
-    // C01 needs C02's TerminalCapabilities while genuinely not importing C02.
-    // The same shape across the halves is what this asserts is permitted.
+  it("MG3: a type-only import across L0's halves IS an edge, and the reason it was not is the finding", () => {
+    // **This row asserted the opposite for the life of the table, and its
+    // justification was true.** It read:
+    //
+    //   > C01 needs C02's TerminalCapabilities while genuinely not importing
+    //   > C02. The same shape across the halves is what this asserts is
+    //   > permitted.
+    //
+    // The first sentence is correct. The second generalises it to a case where
+    // the argument does not hold: C01 → C02 is `terminal/` → `terminal/`, where
+    // no independence claim exists to break, and erasure settles it. **L0's
+    // halves are a different claim** — A02 §1 protects each half type-checking
+    // with the other absent, and a type-only edge is exactly what removes that.
+    //
+    // A true observation promoted to a general claim, and the third instance of
+    // a correct sentence justifying a scope it does not reach (F84, F125, F127).
+    // It is also why `make enforce` was green over the edge A03 §262 calls
+    // hardest to undo: the rule worked, half its subject was invisible, and the
+    // suite said so on purpose.
+    const both = [
+      `import type { Row } from "../data/viewmodel/index.js";`,
+      `export type { Row } from "../data/viewmodel/index.js";`,
+    ];
+    for (const source of both) {
+      const violations = check({ "src/terminal/lifecycle.ts": source });
+      expect(violations, source).toHaveLength(1);
+      expect(violations[0]!.rule).toBe("MG3");
+      expect(violations[0]!.message).toContain("type-only");
+    }
+  });
+
+  it("MG3: type-only *within* a half is still not an edge, which is the distinction", () => {
+    // The control, and the half of the old row that was right. C01 naming C02's
+    // capability record is `terminal/` → `terminal/`: MG3 has no business in it,
+    // and a rule that fired here would be the arm firing on correct code.
     expect(
       check({
-        "src/terminal/lifecycle.ts": `import type { Row } from "../data/viewmodel/index.js";`,
+        "src/terminal/lifecycle.ts": `import type { TerminalCapabilities } from "./capabilities.js";`,
       }),
     ).toEqual([]);
-
     expect(
       check({
-        "src/terminal/lifecycle.ts": `export type { Row } from "../data/viewmodel/index.js";`,
+        "src/data/adapters/types.ts": `import type { RawResult } from "../transport/types.js";`,
       }),
     ).toEqual([]);
   });

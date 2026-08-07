@@ -30,7 +30,7 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { TerminalLifecycle } from "../terminal/lifecycle.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { TranscriptStore } from "../viewport/transcript/index.js";
-import type { LocalHandler } from "./local/registry.js";
+import type { LocalContext, LocalHandler } from "./local/registry.js";
 import type { ExecutionWrites } from "./state.js";
 
 /** The five triggers of §8. Three reach `stop`; two are C01's (I4). */
@@ -324,6 +324,12 @@ export type TuiConfig = Readonly<{
    * existed there was no way to satisfy it.
    */
   localHandlers?: Readonly<Record<string, LocalHandler>>;
+  /**
+   * **Not the type `createTui` accepts.** This field is what the shell reads;
+   * `ExactLocalHandlers` is what the call site must satisfy (C23 I39). The two
+   * differ because a handler assignable to `LocalHandler` may still have
+   * declared a context it cannot be told anything through.
+   */
   commandPolicy?: CommandPolicy;
   completionSources?: readonly CompletionSource[];
   chrome?: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
@@ -417,6 +423,76 @@ export type TuiConfig = Readonly<{
    */
   greeting?: () => ViewDocument | Promise<ViewDocument>;
 }>;
+
+/**
+ * C23 I39 — a local handler's context is obligatory, and a wider parameter is
+ * refused.
+ *
+ * **A parameter type may always be wider than what is passed.** That is not a
+ * gap in `LocalContext`'s declaration; it is how function assignability works,
+ * and it always will be. So a handler written `(argv, ctx: { command: string })`
+ * is legal TypeScript that compiles, registers, runs, and **can never see a
+ * field the framework adds** — measured at four of the reference app's eight
+ * handler families, where the split is exact: the four that name the type are
+ * the four that call `ask` (F125).
+ *
+ * The sentence that published `LocalContext` — *a handler that asks cannot name
+ * the type of the thing it is asking through* — is true about the handlers it
+ * describes and silent about the other half. MG24's shape (F84), and the second
+ * instance of a correct sentence justifying a scope it does not reach.
+ *
+ * **This is C07 I13's `never` keys in reverse.** There a supplied return value
+ * the registry discards fails to compile rather than failing to matter; here it
+ * is a declared parameter. It is the direction with something to bite on: F13's
+ * narrowing landed correctly and changed nothing at four call sites, because a
+ * hand-written shape was structurally assignable.
+ *
+ * **Only one direction is new, and the mutation pass is what said so.** A
+ * handler declaring `LocalContext & { extra }` is *already* refused by
+ * assignability alone — a parameter wider than what is passed has never been
+ * legal. What this adds is the **narrower** arm and the **optional** one; the
+ * mutual form is how the check is written, not the work it does. Removing it
+ * from `createTui` kills three of the four tier-6 rows and leaves the wider one
+ * passing, which is the row being a restatement of a rule it does not test.
+ *
+ * The four arms, each measured by probe before this was written down:
+ *
+ * | declared | verdict |
+ * |---|---|
+ * | `ctx: LocalContext`, or typed as `LocalHandler` | accepted |
+ * | no second parameter at all | accepted — nothing declared, nothing to miss |
+ * | `ctx: { command: string }` · `ctx: LocalContext & { … }` | refused |
+ * | `ctx?: …`, whatever the type | refused |
+ *
+ * **The optional arm is not pedantry and the first version of this type got it
+ * wrong twice.** `ctx?: LocalContext` declares a handler that may run with no
+ * context, which is exactly the direct-call shape this exists to kill — the
+ * reference app invokes a handler outside the shell with an object literal that
+ * has no `ask` and compiles. And the first draft refused a handler taking only
+ * `argv`, because `infer C` on a one-parameter function yields `unknown`. Both
+ * were found by the probe and neither is visible in the type.
+ */
+export type ExactLocalHandlers<T> = {
+  [K in keyof T]: T[K] extends (...a: infer A) => unknown
+    ? A["length"] extends 0 | 1
+      ? T[K]
+      : A extends readonly [readonly string[], (infer C)?, ...unknown[]]
+        ? [LocalContext] extends [C]
+          ? [C] extends [LocalContext]
+            ? T[K]
+            : never
+          : never
+        : never
+    : never;
+};
+
+/**
+ * What `createTui` accepts: a `TuiConfig` whose handlers have named their
+ * context (C23 I39). The shell reads `TuiConfig`; the boundary checks this.
+ */
+export type TuiConfigInput<C extends TuiConfig> = C & {
+  localHandlers?: ExactLocalHandlers<C["localHandlers"]>;
+};
 
 export interface TuiInstance {
   start(): Promise<void>;

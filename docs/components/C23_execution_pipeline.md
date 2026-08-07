@@ -84,7 +84,9 @@ interface LocalRegistry {
 
 A parameter type may always be **wider** than what is passed. That is not a gap in the declaration; it is how function assignability works and it always will be. So a field added here arrives at the four families that had no complaint and does not arrive at the four that filed the findings, and nothing about granting fixes it.
 
-So `TuiConfig.localHandlers` requires the handler's context to be **mutually** assignable with `LocalContext` — wider is refused, not only narrower. A handler declaring one field stops compiling at the registration boundary rather than compiling and receiving a context it cannot see.
+So `TuiConfig.localHandlers` requires the handler's context to be **mutually** assignable with `LocalContext`. A handler declaring one field stops compiling at the registration boundary rather than compiling and receiving a context it cannot see, and so does one declaring the context *optional* — `ctx?: …` says the handler may run without one, which is the direct-call shape.
+
+**Only one direction is new, and the mutation pass is what said so.** A handler declaring `LocalContext & { extra }` is *already* refused by assignability alone — a parameter wider than what is passed has never been legal. What the boundary adds is the **narrower** arm and the **optional** one; the mutual form is how the check is written, not the work it does. Measured by removing it: the wider row still fails, the other three stop.
 
 **This is C07 I13's mechanism in reverse.** There the seven registry-owned `meta` keys are typed `never`, so supplying a discarded value fails to compile rather than failing to matter. Here the refusal is on the parameter rather than the return, and it is the direction that has something to bite on: F13's narrowing landed correctly and changed nothing at four call sites, because a hand-written shape was structurally assignable.
 

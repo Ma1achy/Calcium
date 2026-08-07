@@ -5189,8 +5189,26 @@ were written by someone holding the right distinction, and none is findable by a
 the sentence is true. The question that reaches them is *does this sentence constrain the
 decision it is attached to*.
 
-The arm is on, with one named exemption and the runtime edge still forbidden — see A03 §3
-and C07 I10.
+**And it was not merely unnoticed — the suite asserted it.** `test/unit/enforce-module-graph.test.ts`
+carried a row titled *"MG3: a type-only import across L0's halves is not an edge"*, with this
+justification:
+
+> C01 needs C02's `TerminalCapabilities` while genuinely not importing C02. **The same shape
+> across the halves is what this asserts is permitted.**
+
+The first sentence is true. The second generalises it to a case where the argument does not
+hold: C01 → C02 is `terminal/` → `terminal/`, where there is no independence claim to break
+and erasure settles it. Across the halves the claim is that each type-checks with the other
+absent, and a type-only edge is precisely what removes it.
+
+**So the blind spot had a green test pinning it**, which is why nobody found it by reading:
+the rule was silent, the suite agreed, and the reason given was correct about a different
+pair. *A true observation promoted to a general claim* — and the measurement that would have
+falsified it is the one nobody ran, because there was nothing that looked wrong.
+
+The arm is on, with the runtime edge still forbidden and `CROSS_HALF_TYPES` shipping **empty**:
+the bidirectional arm refuses an exemption that excuses nothing, so the entry lands with the
+import it excuses rather than ahead of it. See A03 §3 and C07 I10.
 
 ---
 
