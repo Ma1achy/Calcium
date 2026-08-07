@@ -55,7 +55,7 @@ and a design question; three of them close ahead of it and are blocked on nothin
 | 7 | F22 F41 F78 F23 — the builder surface | **audit**, then changes | 4 | C04 | — | **partial** · `ad9058b` — F23 open |
 | 8 | F80 — `interactive` as a predicate over the invocation | ruling | 1 | C05 | — | **done** · `36fbc99` `fe7ecee` |
 | 9 | F55 · **F122** — the framework's own marks | **ruling**, then changes + a rule | **6 sites** | C09 · C22 §6 | — | **done** · `7df96f0` |
-| 10 | F93 — grammar registration | change | 1 | additive export | — | open |
+| 10 | F93 · **F123** — grammar registration | change ×3 | 1 | C09 · **C24** | — | **done** · `a3531a7` |
 
 **The status column is a record, not a claim about the remainder.** Six rows landed
 before it existed, so the plan read as untouched and the next reader would have

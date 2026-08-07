@@ -257,7 +257,7 @@ Measured over `src/`, excluding comments (F122):
 |---|---|
 | string literals carrying a non-ASCII character | 164 |
 | …prose punctuation only — em dash, `§`, `·` | 106 |
-| …reported by SS47 | **58** |
+| …reported by SS47 | **58** as measured; 54 today, the six defects fixed and `ℹ` reclassified |
 | …of those, the glyph table itself | 43 |
 | …carrying their own ASCII form already | 5 |
 | …a developer's report, never a frame | 4 |

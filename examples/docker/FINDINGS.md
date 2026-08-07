@@ -4874,6 +4874,26 @@ a smaller number, and **it excludes exactly the three sites the ruling is about*
 because a mark embedded in a sentence is still a mark. A scan tuned until its output
 looks tidy is tuned away from the class.
 
+### The rule was wrong twice on its first new file, and the count is what said so
+
+**`rôle` in a reason string fired it.** A Latin letter with a diacritic is text, and the
+rule's subject is a *mark* — so the rule was wrong and the file was not. `\p{L}` passes.
+
+**Then `\p{L}` let `ℹ` through**, which is U+2139, in a letter category, and **C09's `info`
+glyph** — a mark sitting in the very table this rule polices. Caught by the count: 43
+glyph-table hits became 42, and *one fewer violation in the file the rule is about* is the
+shape to distrust. Excluded by range, since everything from U+2100 is a symbol classified as
+a letter and that is exactly where a mark would be drawn from.
+
+Neither would have been found by re-reading the rule. Both were found by **re-running the
+count after changing it** — the same instrument as F120's, one turn later: a verdict is not
+believed until its baseline has been through the same gate.
+
+**The reported figure is 54 with the exemptions removed, and it was 58 when this finding was
+written** — six of those were the defects, since fixed, and one was `ℹ` under the version of
+the rule that lasted an hour. Both numbers are kept because the first is what the finding was
+argued from.
+
 **The blind spot, with its number: 106 literals carry prose punctuation and SS47 passes
 all of them.** An em dash on a terminal reporting `unicode: ascii` is drawn as verbatim
 as `❯` is. That is a real and larger question — every error message in the tree — and it

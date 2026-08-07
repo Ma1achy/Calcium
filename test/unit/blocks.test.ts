@@ -2,7 +2,13 @@
 import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
 import { block } from "../../src/data/viewmodel/index.js";
-import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import {
+  createBlockRegistry,
+  DEFAULT_LANGUAGES,
+  registerGrammar,
+  tokenise,
+  UNSLOTTED,
+} from "../../src/presentation/blocks/index.js";
 import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
@@ -10,6 +16,87 @@ import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, measurable, visible } fro
 import { cells } from "../../src/presentation/text.js";
 
 describe("C09 §6 — the registry's transition table", () => {
+
+  it("T3.31 (C09 I23): a grammar registers after the fact, and the memo does not outlive it", async () => {
+    // **The memo is the subject, not the export.** `tokenise` caches the
+    // *fallback* under `language\u0000text`, so a registration that does not
+    // invalidate leaves every block already rendered as plain text — and every
+    // assertion about `registerGrammar` existing still passes (F123).
+    const text = "SELECT 1;";
+    const before = tokenise(text, "madeuplang");
+    expect(before, "unregistered falls back to one unslotted run").toEqual([
+      { text, slot: null },
+    ]);
+
+    // The control the row needs: the fallback is now *in the memo* under this
+    // key. Without it the assertion below could pass on a tokeniser that never
+    // cached anything, which is a different implementation than the one here.
+    expect(tokenise(text, "madeuplang"), "and it is cached").toBe(before);
+
+    const sql = (await import("highlight.js/lib/languages/sql")).default;
+    registerGrammar("madeuplang", sql);
+
+    const after = tokenise(text, "madeuplang");
+    expect(after.some((t) => t.slot !== null), "highlighted whenever someone registers it").toBe(
+      true,
+    );
+
+    // **And nothing reflows** (I8) — the other half of I23, and the reason
+    // registration is safe at any moment rather than only at composition.
+    const rendered = (lang: string): number =>
+      renderToLines(
+        createBlockRegistry({ defaults: true }),
+        block({ kind: "code", id: "code-r", language: lang, text }),
+        40,
+        { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0, onAction: () => undefined },
+      ).length;
+    expect(rendered("madeuplang")).toBe(rendered("json"));
+  });
+
+  it("T3.32 (C09 I24): every grammar in the default set colours something", () => {
+    // **Over the set rather than per grammar**, because what this catches is a
+    // grammar added later whose emitted classes nobody checked — and a per-
+    // grammar row can only be written for the ones already known. `markdown`
+    // is the row that failed before `SLOTS` was extended: four runs, none
+    // slotted, which is indistinguishable from not shipping it (F123).
+    const SAMPLES: Readonly<Record<string, string>> = {
+      bash: 'for f in *.ts; do echo "$f"; done # c',
+      css: ".a { color: #fff; } /* c */",
+      diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
+      dockerfile: "FROM node:22\nRUN npm ci\n",
+      go: 'func main() { fmt.Println("hi") } // c',
+      ini: "[s]\nk = v ; c\n",
+      java: "public class A { public static void main(String[] a) {} }",
+      javascript: "async function f(a) { return await g(a); } // c",
+      json: '{"a": 1, "b": [true, null]}',
+      markdown: "# h\n\n`code` and text\n",
+      python: "def f(x):\n    return [i for i in range(x)]  # c",
+      rust: "fn main() { let v: Vec<u8> = vec![1]; } // c",
+      sql: "SELECT id FROM t WHERE x > 1; -- c",
+      typescript: "export const f = (x: number): string => `n`; // c",
+      xml: '<a href="x">t</a><!-- c -->',
+      yaml: "a: 1\nb:\n  - x\n",
+    };
+
+    // The set drives the samples, not the other way round: a grammar added with
+    // no sample fails here rather than being silently uncovered.
+    expect(Object.keys(SAMPLES).sort()).toEqual([...DEFAULT_LANGUAGES]);
+
+    const dead = DEFAULT_LANGUAGES.filter(
+      (lang) => !tokenise(SAMPLES[lang] ?? "", lang).some((t) => t.slot !== null),
+    );
+    expect(dead, "a grammar that colours nothing is a grammar not shipped").toEqual([]);
+
+    // The deliberate omissions, with the bidirectional arm MG27 and SS47 have:
+    // an entry that starts being mapped is a stale reason rather than a pass.
+    for (const [cls, why] of Object.entries(UNSLOTTED)) {
+      expect(why.length, `${cls} needs a reason`).toBeGreaterThan(20);
+    }
+    expect(
+      Object.keys(UNSLOTTED),
+      "the change axis is refused a slot on C04's ruling, not on judgement here",
+    ).toContain("hljs-addition");
+  });
 
   it("T2.x (C09, F85): a caller cannot supply the two fields the registry owns", () => {
     // **The narrowing, asserted where it has to hold: at compile time.**

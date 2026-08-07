@@ -777,6 +777,25 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "the conformance report, same premise: a tool's output, not a rendered document",
 });
 
+/**
+ * A letter is prose; a **letterlike symbol** is a mark.
+ *
+ * `\p{L}` alone was the first version and it let `ℹ` through — U+2139 is in a
+ * letter category and is C09's `info` glyph, sitting in the table this rule
+ * exists to police. The block is excluded by range: everything from U+2100 is a
+ * symbol that happens to be classified as a letter, which is exactly the set a
+ * mark would be drawn from.
+ *
+ * Found by the count moving: 43 glyph-table hits became 42 when the letter
+ * allowance landed, and one fewer violation in the file the rule is *about* is
+ * the shape to distrust.
+ */
+function isLetter(c) {
+  const cp = c.codePointAt(0) ?? 0;
+  if (cp >= 0x2100 && cp <= 0x214f) return false;
+  return /\p{L}/u.test(c);
+}
+
 const NON_ASCII = /[^\x00-\x7F]/u;
 const LITERALS = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/gsu;
 
@@ -800,7 +819,13 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
       const body = m[0].slice(1, -1);
       const marks = [...body].filter((c) => c.codePointAt(0) > 127);
       if (marks.length === 0) continue;
-      if (marks.every((c) => PROSE_MARKS.has(c))) continue;
+      // **A letter is prose, whatever its diacritics.** `rôle` in a reason string
+      // fired this on the first new file written after the rule landed, and the
+      // rule was wrong rather than the file: the subject is a *mark*, and `ô` is
+      // text. `\p{L}` rather than a longer character list, because the next one
+      // is `naïve` or a far side's name and a list would be extended one panic
+      // at a time.
+      if (marks.every((c) => PROSE_MARKS.has(c) || isLetter(c))) continue;
       if (exemptions[f] !== undefined) {
         fired.add(f);
         continue;
@@ -813,7 +838,7 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
           `\`${body.slice(0, 40)}\` carries a mark the framework draws and cannot substitute. ` +
           `A mark in framework text is a \`Glyph\` slot, or a pair resolved where the ` +
           `capability is in hand, or ASCII (C09 I22)`,
-        rule_spec: "C09 I22 · C22 I52",
+        spec: "C09 I22 · C22 I52",
       });
     }
   }
@@ -830,7 +855,7 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
       message:
         `is excused from SS47 — "${exemptions[f]}" — and carries no mark. ` +
         `Remove the entry, or the reason stops being one anybody checks`,
-      rule_spec: "C09 I22",
+      spec: "C09 I22",
     });
   }
 

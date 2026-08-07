@@ -242,6 +242,16 @@ export type {
 
 export type { BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
 /**
+ * C24 I22 — a `code` block accepts any language name, and until this existed
+ * only two of them meant anything (C09 §4a, F93).
+ *
+ * `DEFAULT_LANGUAGES` beside it because an app cannot otherwise tell whether
+ * it needs to register one: a `code` block with an unregistered language
+ * renders as plain text and reports nothing, by design (C09 I8), so the set
+ * has to be readable or the fallback is indistinguishable from a mistake.
+ */
+export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.js";
+/**
  * The record a `RenderContext` carries, and what `TuiConfig.capabilities`
  * overrides (C22 I49).
  *

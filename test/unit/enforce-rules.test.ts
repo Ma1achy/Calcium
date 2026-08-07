@@ -768,6 +768,21 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     expect(violations.filter((v) => v.file === "src/mark.ts")).toHaveLength(2);
     expect(violations.every((v) => v.rule === "SS47")).toBe(true);
 
+    // **The letterlike control, and it is the one a mutation found missing.**
+    // `\p{L}` alone — the first fix for `rôle` firing — passes `ℹ`, which is
+    // U+2139, in a letter category, and C09's `info` glyph. Deleting the range
+    // exclusion from `isLetter` survived the whole suite until this row existed,
+    // which is a finding about the tests rather than a licence (F122).
+    const letterlike = checkMarks(["src/info.ts"], () => 'const g = "ℹ";', {});
+    expect(
+      letterlike.length,
+      "a letterlike symbol is a mark, whatever its Unicode category says",
+    ).toBe(1);
+    expect(
+      checkMarks(["src/word.ts"], () => 'const w = "a rôle, naïve";', {}),
+      "and an actual letter is prose",
+    ).toEqual([]);
+
     // The prose control. 106 literals in the real tree are this, and the rule
     // passes every one — a limit recorded in the rule's own comment, because an
     // em dash at `unicode: ascii` is as unsubstituted as `❯` was.
