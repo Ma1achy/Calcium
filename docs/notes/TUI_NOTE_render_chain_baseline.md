@@ -244,10 +244,112 @@ harder window. It is that a window has to carry its **derived layout** — a pin
 gutter width, a pinned column plan — which is a new field on four public block
 types and therefore tier 2's business, before the freeze, rather than this row's.
 
-**This is the row's headline goal not met, and it should be read that way.** F90's
-stage 3 is *the one that actually fixes it*, and the case it was written against —
-a 5,000-line diff — is a `patch`. The mechanism is built, proven and measured; the
-kind it was aimed at cannot use it yet.
+**What that costs is narrower than it first reads, and §6's frame-read is what
+said so.** Typing into a 5,000-line diff — F90's own acceptance case — is
+**10 ms a keystroke**, from 2,793 at the baseline, because stages 1, 2 and 4 all
+apply to a `patch` and only stage 3 does not. What stage 3's absence still costs
+on an unwindowed kind is the two things the cache cannot serve:
+
+| | baseline | now | windowed kind |
+|---|---|---|---|
+| keystroke, 5,000 lines | 2,793 ms | **10** | 1.8 |
+| first frame | 11,127 | **3,206** | ~60 |
+| drag step | 3,252 | **~3,000** | 9 |
+
+So the mechanism is built, proven and measured on a kind that is not the one it
+was aimed at — and the residue is *opening* a large diff and *resizing* while one
+is on screen, not reading or typing in it.
+
+---
+
+## 4d. Stage 4 was ranked last and is the second-largest win
+
+`cells()` gains a printable-ASCII path: for a string whose every code unit is in
+`[0x20, 0x7e]`, `stripControl` removes nothing, the segmenter yields one cluster
+per character and each is one cell — so the count **is** the length. An equality,
+not an approximation, and tested as one.
+
+| case | stage 3 | **stage 4** |
+|---|---|---|
+| empty transcript, keystroke | 1.8 ms | **1.4** |
+| 5,000-line `logs`, keystroke | 6.2 | **1.8** |
+| 5,000-line `logs`, drag step | 15.4 | **9.0** |
+| 1,000-line `patch`, keystroke | 21.9 | **9.9** |
+| 1,000-line `patch`, drag step | 597.6 | **415.4** |
+
+**The brief ranked this fourth on the reasoning that most calls vanish with the
+cache.** They do not. `exact()` runs `fitStyled` over every row of every frame,
+and that is *after* the transcript is served from the cache — the cache removes
+the block render and leaves the padding untouched. A 3.4× on the windowed
+keystroke and 2.2× on the unwindowed one, for eleven lines of code.
+
+**The ordering claim it undercuts is its own.** *Only worth measuring after 1–3*
+was right about the method and wrong about the size, and the reason it reads as
+right is that the saving is invisible while the render dominates: at the baseline
+this would have been 0.5% of 2,793 ms. The order was still correct — measured
+first, it would have been dismissed.
+
+---
+
+## 6. The acceptance test, which is a frame-read
+
+**Type into it and read the screen**, frame by frame, reconstructed from the
+bytes. A microbenchmark that improves while the frame still stutters has measured
+something other than what a reader experiences.
+
+Six keystrokes into a 5,000-line document, at 200×50:
+
+| | `logs` (windowed) | `patch` (not) |
+|---|---|---|
+| per keystroke | 1.8–2.6 ms | 9.6–11.1 ms |
+| bytes per frame | 236 | 236 |
+| content rows | 47 on every frame | 47 on every frame |
+| frame width | exactly 200 on every row of every frame | same |
+| prompt | reads `search` after six keys, in order | same |
+
+**The three things a timing cannot say**, and each is a defect one of these
+stages could have introduced: every row of every intermediate frame is exactly
+`columns` cells — a diffed row that came up short would leave the previous frame
+showing through precisely where it was written; the content row count never moves
+while the prompt grows — a window off by one would show 46 or 48; and every
+keystroke reaches the prompt in order — a cache serving a stale row would lose
+one silently.
+
+**Against the baseline this is the row's claim met**: 2,793 ms a keystroke into a
+5,000-line diff, now 10.
+
+---
+
+## 7. What is still owed, with the reason each is owed rather than done
+
+**a. The bound — a ruling, deliberately not taken here.** Even windowed, `measure`
+walks the whole block once to know its height. Nothing bounds a single block's
+size: D40 caps *blocks per document* (C13 I17), `MAX_ROWS = 2_000` at
+`data/adapters/fallback.ts:39` is the fallback adapter's own limit, and an app
+adapter has no bound at all. What is owed is a **placement** decision — C13 on
+append, C07 at adaptation, or C09 at measure — and what *overridable* means. The
+marker is what keeps it honest: `fallback.ts:251` already writes *"Showing the
+first 2,000 rows; N more were not rendered"*, and a silent truncation is the
+empty-block class.
+
+**Measured, the bound is cheaper than it was.** The first frame of a 5,000-line
+patch is 3.2 s, and of a 50,000-line `logs` about 60 ms — so the cost the bound
+would remove is now concentrated in the unwindowed kinds, and shrinks again with
+§7b. That is an argument for taking §7b first.
+
+**b. A window must be able to carry its derived layout**, which is what makes the
+other four kinds windowable — a pinned gutter width for `patch`, a pinned column
+plan for `table` and `keyValue`, a tokenisation anchor for `code`. It is a new
+field on four public block types, so it belongs to **tier 2, before the freeze**,
+and it is the single change that would finish this row's stage 3.
+
+**c. F133 is unchanged and is not this row's.** 44 failed / 50 passed / 7 todo at
+the baseline and after every stage.
+
+**d. `logs` is the only kind whose window is exercised by a corpus.** The height
+property is generic and holds for any kind that declares one, but until §7b lands
+there is one such kind, and a conformance suite covering one arm is covering one
+arm.
 
 ---
 
@@ -258,4 +360,4 @@ kind it was aimed at cannot use it yet.
 | 1 · output diffing | 25.7 KB written per frame regardless of what changed, and 10.2 KB with an empty transcript. Every frame, every size |
 | 2 · render caching | Turns 2,793 ms into 2,793 ms once and ~1.8 ms after — **a stall, not a fix**, and the table is where that is visible rather than argued |
 | 3 · window the block | The only stage whose effect is not bounded by the block's size. 47 rows are drawn; up to 5,000 are rendered |
-| 4 · `cells()` | Not separable at this resolution. Re-measure after 1–3 or drop it |
+| 4 · `cells()` | **Not separable at this resolution — and worth 2× to 3.4× once it is.** `exact()` pads every row of every frame and the cache does not touch it |

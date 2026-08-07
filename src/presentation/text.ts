@@ -85,6 +85,28 @@ export function expandTabs(text: string, tabStop: number = TAB_STOP): string {
  */
 export function cells(text: string): number {
   if (text === "") return 0;
+
+  // **The printable-ASCII path, and it is an equality rather than an
+  // approximation** (C09 §5). For a string whose every code unit lies in
+  // `[0x20, 0x7e]`: `stripControl` removes nothing (it keeps only tab and
+  // newline below `0x20`, and both are excluded here), the segmenter yields one
+  // cluster per character, and `clusterCells` answers 1 for each — so the count
+  // *is* the length. This is not a fast approximation of the walk; it is the
+  // walk's answer, arrived at without allocating a segmenter, an iterator and a
+  // string per cluster.
+  //
+  // `charCodeAt` rather than a regex or `for…of`: both allocate, and this
+  // function is called for every cell of every row of every frame.
+  let ascii = true;
+  for (let i = 0; i < text.length; i += 1) {  // cells-ok — a code-unit cursor, not a width
+    const c = text.charCodeAt(i);
+    if (c < 0x20 || c > 0x7e) {
+      ascii = false;
+      break;
+    }
+  }
+  if (ascii) return text.length; // cells-ok — proven equal to the walk above
+
   let total = 0;
   for (const { segment } of GRAPHEMES.segment(stripControl(text))) {
     total += clusterCells(segment);
