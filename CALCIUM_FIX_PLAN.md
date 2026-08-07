@@ -49,7 +49,7 @@ and a design question; three more closed ahead of it as row 1 and were blocked o
 | | item | fix | consumers | ⚠ | depends on | status |
 |---|---|---|---|---|---|---|
 | **1** | **F13 · F58b · F85 — narrow the type at the construction boundary** | change | **3** | C04 · C07 | **nothing** | **done** · `bea5fcd` `7ea1c28` `74da764` |
-| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **9** · **F124 F125 F126** | C07 · C23 · C24 · C22 | — | **ruling landed**, changes open |
+| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **9** · **F124 F125 F126** | C07 · C23 · C24 · C22 | — | **done** · `783353d` `3d9fee9` `2761b0b` `a25574a` `5af7b65` `b1b671b` `f1f8d77` `5167a49` `c4b2869` |
 | 3 | F30 F49 F51 F81 — a change axis distinct from `Tone` | ruling, then change | 4 | C04 · C09 · C10 | the 1-bit rendering, decided inside it | **done** · `794547d` `1a7feab` |
 | 4 | F33 F34 F18 F50 — a block cannot express what the surface needs | **ruling** | 4 | C04 | rule with F30 — three questions about `Comparison` | **done** · `37d6d74` |
 | 5 | F39 · **F92** — a flag that selects a rendering | change | **2** | C05 | — · F92 waits on it | **done** · `4721e28` |
@@ -66,11 +66,25 @@ commit is named; `partial` names what is not — row 7's F23 was measured as F78
 and deliberately left, because refusing `view` on a local tool would foreclose S6/S7 and
 the remedy is to extend the local route.
 
-**Rows 1 and 3–10 are done and the tier is not**, which is the distinction a column of
-ticks would hide: row 2's ruling has landed and its changes have not, and row 7's F23 is
-still open. **Row 2 is nine findings, not twelve** — F13, F58b and F85 closed as row 1 and
-this line kept the old number for four commits after the field above it was corrected. A
-count restated in a second place is a second unmeasured claim.
+**Every row is done and the tier is not**, which is the distinction a column of ticks would
+hide: row 7's F23 is open by decision — it was measured as F78's class and left, because
+refusing `view` on a local tool would foreclose S6/S7. **Row 2 was nine findings, not twelve**
+— F13, F58b and F85 closed as row 1 and this line kept the old number for four commits after
+the field above it was corrected. A count restated in a second place is a second unmeasured
+claim.
+
+**What row 2 cost, and what it produced.** Nine commits: the ruling alone, the obligation, the
+grant, a plan correction, MG3's header, the exports, the frame unit, the golden repair, the
+app. It closed nine findings and **filed seven** — F127 (MG3 has never walked `import type`,
+and a green test held the blind spot open), F128 (three specs overtaken by their code), F129 (a
+`view` verb that is also `local` opens nothing), F130 (the grant's own tests could not see the
+grant), F131 (the golden gate red for four commits), F132 (the grant untestable from the
+consuming side — the workaround was also the fixture), F133 (tier 5 red at session start, 44
+rows, one cause).
+
+**The workaround column fell by 35 lines of code and 149 lines of file**, and the smaller
+figure is the honest one: four of the five removed workarounds carry more explanation than
+implementation, because an unbuilt mechanism is documented more than a working one.
 
 **Row 9's four fields were all wrong, and the direction is the one worth recording.**
 It read *change · 1 consumer · ⚠ C22 §6*, written from F55's two characters — which were

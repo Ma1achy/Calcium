@@ -5499,3 +5499,36 @@ Found by reading the diff rather than by a failure — the rule that assertions 
 `as unknown as LocalContext` casts came out with it: they satisfied the type by **erasure**,
 which is the double-narrower-than-its-interface class, and the published fixture makes the
 real record available so the cast has nothing left to hide.
+
+---
+
+## F133 — tier 5 was 44 failed at session start, and the prompt never draws
+
+The second half of F131's measurement, and the one that is **not** fixed here.
+
+`make e2e` at `7241627`, before this row's work: **44 failed / 50 passed / 7 todo, across 13
+of 16 files.** Measured again at `c4b2869` with the whole producer ruling landed:
+`harness.test.ts` is **5 failed / 10 passed** at both commits, unchanged, so the failures
+predate this row and none of them is the frame extraction.
+
+The failure is systemic rather than per-test:
+
+```
+Error: never saw /❯/ in:
+   <blank rows>
+```
+
+**The prompt never appears.** `❯` is `PROMPT` in `shell/config.ts` and it is on every frame
+the shell ever draws, so a capture without it is a shell that drew nothing — which is why
+`transport`, `harness`, `editor`, `completion`, `parser` and `manifest` all fail together.
+That is one cause with forty-four symptoms, not forty-four defects.
+
+**Filed rather than fixed**, and the boundary is deliberate: it is a tier-5 harness question
+with no bearing on row 2's ruling, and diagnosing it inside a row about producer context is
+how a row stops being reviewable. What it needs is its own step — reproduce one row by hand
+under `tools/capture.py`, and establish whether the shell fails to start or fails to paint.
+
+**What it changes about every green report on this branch.** `make all` has been red on two of
+its six targets throughout, and four commit messages quoted `enforce` and `npm test` as
+evidence. Both were true. Neither covers `golden` or `e2e`. See `VERIFYING.md` §0's fifth
+entry.

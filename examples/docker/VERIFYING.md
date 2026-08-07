@@ -81,6 +81,38 @@ wrong on purpose and watching the report not change**. That is the mutation pass
 the instrument instead of to the code, and it is the only method that has worked on any of
 them.
 
+### A fifth, and it is the shape none of the four has: a gate nobody reports
+
+The four above are results read through a channel that garbles them. This one has no channel
+at all.
+
+**`make all` runs six targets. `make enforce` and `npm test` are the two run by habit, and the
+pre-commit hook runs the first.** So `golden` and `e2e` are reported by nothing between
+commits, and a target that starts failing is indistinguishable from one nobody has run.
+
+Measured at `7241627`, before a session's work began:
+
+| target | at session start |
+|---|---|
+| `check` · `enforce` · `audit` · `test` | pass |
+| `golden` | **18 failed / 41 passed** — stale since row 4, four commits back |
+| `e2e` | **44 failed / 50 passed / 7 todo**, 13 of 16 files |
+
+**Neither was noticed, and neither was hidden.** No pipe swallowed an exit code and no
+assertion returned a plausible value: nothing asked. The green that was quoted in four commit
+messages was `enforce` and `npm test`, both true, and both silent about two thirds of what
+`make all` covers.
+
+**The remedy is not another rule.** It is to run `make all` and report the counters per
+target — before, so the baseline is known, and after, so a delta is attributable. A verdict
+without a verified baseline is a verdict about the harness.
+
+**And the golden failure is the shape to expect after a narrowing.** Sixteen were stale
+snapshots; two were assertions aimed at a value that *stopped being a document* when
+`AdapterMeta` narrowed to the three keys an adapter owns. **A narrowing's blast radius is
+every test that asserted the old shape, and the ones that fail are in whichever tier nobody
+runs.**
+
 ### A fourth, and it is a different class: two instruments that disagreed
 
 The three above are one instrument giving a wrong answer. This one is **two instruments
