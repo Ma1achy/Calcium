@@ -4974,3 +4974,179 @@ that — there isn't one — but T3.32, which asserts every grammar **in the set
 something, with the three omissions in a list it reads. A grammar added later whose classes
 nobody checked fails on the commit that adds it.
 
+---
+
+## F124 — the app's capability sniff and C02 disagree on three of four locale shapes ★★★
+
+F54 was fixed app-side by threading a boolean called `unicodeText` through eight
+functions, computed in `main.ts` from `TERM`, `LC_ALL` and `LANG`. F43 records the cost as
+*duplicating `terminal/capabilities.ts` in the app*. **Duplication was the charitable
+reading.** Run against C02 at four locale shapes:
+
+| env | C02 `unicode` | the app | |
+|---|---|---|---|
+| `LC_ALL=C LANG=en_US.UTF-8` | `ascii` | **unicode** | disagree |
+| `LC_CTYPE=C LANG=en_US.UTF-8` | `ascii` | **unicode** | disagree |
+| `LC_CTYPE=en_US.UTF-8` | `full` | **ascii** | disagree |
+| `LANG=C` | `ascii` | ascii | — |
+
+**The mechanism is POSIX precedence against string concatenation.** C02 resolves
+`lcAll ?? lcCtype ?? lang` — *the first variable that is set wins and the others are not
+consulted* — and the app builds `` `${LC_ALL ?? ""}${LANG ?? ""}` `` and regex-tests the
+join. So `LC_ALL=C` beside a UTF-8 `LANG` is `ascii` to the framework and unicode to the
+app, and the app draws `▄ ▀ █` into a frame the renderer has already decided cannot show
+them.
+
+**That is F54's own defect, alive inside F54's fix**, and C02 names the case in a comment
+with a test number beside it (`capabilities.ts:113`, T3.8). The framework had the answer,
+covered, on the line the app was reimplementing.
+
+**It fails in both directions, which is what makes it a measurement rather than a
+complaint.** The third row degrades a terminal that could have drawn: `LC_CTYPE` alone is a
+locale the app has never heard of, so a reader with it set loses the banner, the bar and
+three captions for nothing.
+
+### The rejected mechanism, with the reason it fails
+
+*Let the app read the environment properly* is the obvious answer and it does not work.
+C02 reads **seven** variables — `TERM`, `TERM_PROGRAM`, `COLORTERM`, `LC_ALL`, `LC_CTYPE`,
+`LANG`, `TMUX` — and the app reads three. Closing the gap means porting `detectUnicode`,
+`detectColourDepth`, `detectSynchronisedUpdate`, `detectImageProtocol` and the `usable`
+gate into the app, which is the whole of C02 and is what C02 exists to not have twice.
+
+**And the port would still be wrong, because the app cannot see the overrides.**
+`detectCapabilities` takes a second argument, C22 I49 lets an application supply it, and
+this app supplies one — `DOCKER_TUI_DEPTH` (F52). An app deriving capabilities from the
+environment gets the *detected* record and never the *resolved* one, so the second consumer
+of its own override disagrees with the first.
+
+**One correction to a plausible version of this finding: C02 does not read `NO_COLOR`.**
+An app that read it would diverge from the framework rather than converge on it. It belongs
+in this section, as a cost of the rejected mechanism, and not in a list of things the
+workaround covers.
+
+### What it is evidence for
+
+Not that duplication is untidy. **That the duplicate is wrong today, in a shipped
+application, in the fix written for the finding that asked for the fact.** The workaround
+is three lines and it disagrees with the framework on three of the four shapes anyone
+tests.
+
+---
+
+## F125 — four of eight handler families declare their own context, and the surface says they cannot ★★★
+
+`src/index.ts:56` records why `LocalContext` became public:
+
+> **`TuiConfig.localHandlers` has been public since C22 and its context type was not**,
+> which was invisible while `LocalContext` held one field: an app wrote
+> `(argv, ctx: { command: string })` and structural typing agreed. `ctx.ask` makes that
+> impossible — a handler that asks cannot name the type of the thing it is asking through.
+
+Measured across the app's eight local-handler families:
+
+| names `LocalContext` | declares `ctx: { command: string }` |
+|---|---|
+| `mutation.ts:220` | `dashboard.ts:486` |
+| `destructive.ts:72, 123, 225` | `events.ts:276` |
+| `progress.ts:253` | `drift.ts:337, 396` |
+| `transfer.ts:116` | `config.ts:244` |
+
+**Four and four, and the split is exact: the four that name the type are the four that call
+`ask`.** So the sentence is true about the handlers it describes and constrains nothing
+about the other half — a parameter type may always be *wider* than what is passed, so
+declaring a context of one field remains assignable to `LocalHandler` and always will be.
+
+**`main.ts:205` is the sharpest instance.** It calls the dashboard handler directly for the
+greeting with `{ command: "" }` — an object literal that is not a `LocalContext`, has no
+`ask`, and compiles.
+
+### Why it matters to the ruling above it
+
+F14 asks that a local handler be handed the terminal's width. **Its own consumer is
+`dashboard.ts`, which is one of the four that would not see it.** A field added to
+`LocalContext` arrives at `mutation`, `destructive`, `progress` and `transfer` — the four
+that had no complaint — and does not arrive at the four that filed the findings.
+
+So the grant is not the whole of the change: **a context a consumer may decline to name is a
+context that cannot carry anything new.** What is owed is an obligation, and the shape of it
+is a decision this repository has taken before — make the wrong state unbuildable rather
+than corrected.
+
+### The class
+
+**A correct sentence justifying a scope it does not reach**, which is MG24's shape (F84)
+and the second instance. There the reasoning about type aliases was true and irrelevant to
+consuming a member; here the reasoning about `ask` is true and silent about handlers that
+do not ask. Both read as deliberate, both were written by someone who had the right
+distinction in hand, and neither is findable by asking whether the sentence is correct.
+
+The question that reaches it is the mutation pass's, asked of prose: **does this sentence
+constrain the decision it is attached to.**
+
+---
+
+## F126 — there is no seam because there is no unit ★★★
+
+F37's confirmation records four attempts at reading the app's own rendered frame, each
+blocked by a different unexported symbol — `renderToLines`, `block`, `resolveTheme`, then
+the theme store's shape — and reads as *four missing exports*. Measured, it is one thing
+missing, and it is not an export.
+
+**Nothing in the tree composes a frame as a named unit.** `session.ts:319` has `#render()`,
+a private method returning `void`, and the composition exists only inside it:
+
+```
+guard on acquired → #composed() → viewport.resize(width, region.height)
+  → paint(frame, #paintDeps(…))          ← FrameError falls back to drawFallback
+  → cursorFor(frame, #paintDeps(…)) → cursorSequence(null) → assemble → write
+```
+
+`lines` is a local. It is never returned, never yielded, never handed to anything. So the
+four attempts were not hunting a function someone forgot to export — **they were hunting a
+composition that has never existed as a value anywhere in the tree.**
+
+### The class, one level up from the audit's
+
+Every prior instance of *a complete mechanism unreachable from the other side of a seam*
+(TRIAGE group 2, five open and seven closed) is **a member nobody could call**. This is a
+**sequence nobody named**, and no rule that walks members can see it: MG24 counts consumers
+of exported members, MG25 and MG27 compare declared shapes against builders, and all three
+are satisfied by a tree in which every member is consumed and the only thing missing is the
+order they go in.
+
+**A private method is the perfect hiding place for it**, because the composition *is*
+consumed — sixty times a second — by the one caller that is inside the class.
+
+### What it costs, and the sharper half
+
+`test/verbs.test.ts` documents the app's workaround as *"a row is a complete description of
+what will be drawn"*, and for a table that is true. **The change axis falsified it**: rows
+say `added` and only the frame says `+` (F81). So the app asserts a value whose rendering it
+cannot see.
+
+**And the framework's own testing surface has the same blind spot, for the same reason.**
+`@fmx/calcium/testing` ships `expectDocument().isValid() · measuresCorrectly() ·
+rendersAt() · degradesToAscii() · degradesTo1Bit() · hasNoColourOnlyDistinction()`, plus
+two conformance suites. Every one of them **measures or asserts a property and none of them
+returns a frame**. `renderToLines` was there and was removed, correctly — `src/testing/index.ts`
+records why: it takes a `BlockRegistry`, which no consumer can construct, so it was an
+uncallable function on a public surface.
+
+That leaves the position measured: **the framework's own testing surface could not have
+caught the class the change axis produced.** It is the app's workaround's bound, one layer
+in, and it was invisible for the same reason — a property of a document is not a picture of
+one.
+
+### What is not claimed
+
+**Not that the composition is wrong.** `#render()`'s comments are the most careful in the
+file — the size read once by `compose`, the fallback rather than a short frame, the cursor
+sequence embedded in the single write. Extracting it must keep every one of those, and the
+only extraction worth making is one `session.ts` then calls, so that a consumer's frame is
+the production path rather than a second implementation of it. **A parallel renderer would
+be the fifth instance of a suite building its own version of the thing under test.**
+
+**And not measured: whether every step belongs to the unit.** The write is C01's writer and
+the fallback is a side effect; where the seam falls between *compose a frame* and *put it on
+a terminal* is the ruling's question and is not answered here.

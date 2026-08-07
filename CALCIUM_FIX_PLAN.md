@@ -11,9 +11,11 @@ it**, **⚠ if it changes a public type**, and **what it depends on landing firs
 
 ## Settled, and not re-derived
 
-- **1.1 is twelve findings behind one ruling, not ten.** F24 and F25 sit in a separately
-  ranked group and 1.1's own text names `LiveSpec.render`. It is the top item and it is
-  bigger than the triage showed.
+- **1.1 was twelve findings behind one ruling and is now nine.** F24 and F25 sit in a
+  separately ranked group and 1.1's own text names `LiveSpec.render`, which is what made it
+  twelve rather than ten. **Three of the twelve — F13, F58b, F85 — are row 1, which is
+  `done`**, and this line is where the stale count came from: a field written once and read
+  as an estimate afterwards. Corrected in place on row 9's precedent.
 - **1.1, 1.3 and 2.1 close nothing as written** — they reframe. *The ruling taken*, *the four
   mechanisms*, *the mechanism* are the work items; the entries are not.
 - **The instruments tier keeps its place on the narrower claim**: not that verdicts are
@@ -47,15 +49,15 @@ and a design question; three of them close ahead of it and are blocked on nothin
 | | item | fix | consumers | ⚠ | depends on | status |
 |---|---|---|---|---|---|---|
 | **1** | **F13 · F58b · F85 — narrow the type at the construction boundary** | change | **3** | C04 · C07 | **nothing** | **done** · `bea5fcd` `7ea1c28` `74da764` |
-| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **12 with the above** | C07 · C24 | — | open |
+| 2 | **F14 F43 F54 F37 F36 F28 F77 · F24 F25 — what a producer may know** | **ruling**, then change | **9** · **F124 F125 F126** | C07 · C24 | — | open |
 | 3 | F30 F49 F51 F81 — a change axis distinct from `Tone` | ruling, then change | 4 | C04 · C09 · C10 | the 1-bit rendering, decided inside it | **done** · `794547d` `1a7feab` |
 | 4 | F33 F34 F18 F50 — a block cannot express what the surface needs | **ruling** | 4 | C04 | rule with F30 — three questions about `Comparison` | **done** · `37d6d74` |
 | 5 | F39 · **F92** — a flag that selects a rendering | change | **2** | C05 | — · F92 waits on it | **done** · `4721e28` |
 | 6 | F21 — the action dispatch route | change | 1 filed, **3 dependents** | C23 | — | **done** · `84a6db2` |
 | 7 | F22 F41 F78 F23 — the builder surface | **audit**, then changes | 4 | C04 | — | **partial** · `ad9058b` — F23 open |
 | 8 | F80 — `interactive` as a predicate over the invocation | ruling | 1 | C05 | — | **done** · `36fbc99` `fe7ecee` |
-| 9 | F55 · **F122** — the framework's own marks | **ruling**, then changes + a rule | **6 sites** | C09 · C22 §6 | — | **done** · `7df96f0` |
-| 10 | F93 · **F123** — grammar registration | change ×3 | 1 | C09 · **C24** | — | **done** · `a3531a7` |
+| 9 | F55 · **F122** — the framework's own marks | **ruling**, then changes + a rule | **6 sites** | C09 · C22 §6 | — | **done** · `7df96f0` `cfc9398` |
+| 10 | F93 · **F123** — grammar registration | change ×3 | 1 | C09 · **C24** | — | **done** · `a3531a7` `860338f` |
 
 **The status column is a record, not a claim about the remainder.** Six rows landed
 before it existed, so the plan read as untouched and the next reader would have
@@ -96,6 +98,24 @@ know*, and three findings closing before the hard thing starts is real progress 
 preparation for it.
 
 ### 2 · The ruling, and the plan owes a shape
+
+**Three corrections from measuring the nine, before the shape is argued.**
+
+- **The count is nine.** F13, F58b and F85 closed as row 1 and row 2's field never dropped.
+- **F36 is served.** `expectDocument(doc).isValid()` is public in `@fmx/calcium/testing` and
+  this app already imports that entry in `degradation.test.ts`. What survives is a **stale
+  deep import** in `test/documents.test.ts`, which is a workaround to delete rather than a
+  gap to close — unless it needs the error list rather than a throw, which is one read.
+- **F37 is two items on opposite sides of the line.** The height request is one. The other is
+  `codeRows` at `src/inspect.ts:92`, called inside `structuredBlocks` to decide splitting —
+  **production logic, not a test affordance**, and it takes a width. It was filed here as an
+  export and it is not one.
+
+**And three measurements are filed rather than carried**: F124 (the app's sniff and C02
+disagree on three of four locale shapes), F125 (four of eight handler families declare their
+own context, so a field added to `LocalContext` does not reach F14's consumer), F126 (no
+named frame composition exists, so F37's four attempts were hunting a unit rather than an
+export).
 
 **Split what a producer may *know* from what it may *decide*.** The recorded counter-argument
 — `AdapterContext.width` says *"never a layout decision — C11's"* — is about **authority**,
