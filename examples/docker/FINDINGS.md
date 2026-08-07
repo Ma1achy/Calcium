@@ -5373,3 +5373,41 @@ framework's own suite, and nothing sensibly could.
 alone. That **a grant nothing observes is a grant nothing can be wrong about**, and that the
 place to look is the double rather than the assertion. Three mutations, one narrowed
 parameter, and a green suite either way.
+
+---
+
+## F131 — `make all`'s golden gate had been red for four commits, and nobody read it ★★★
+
+Measured at `7241627`, before any of this row's work: `npm run golden` was **18 failed / 41
+passed**. It is one of the six targets `make all` runs, and `make enforce` and `npm test` —
+the two run by habit and by the pre-commit hook — were green throughout.
+
+**Two classes, both residue of earlier rows on this same branch.**
+
+| class | count | left by |
+|---|---|---|
+| stale snapshots: a comparison row gaining its derived mark, `✓` and `+` | **16** | row 4, `37d6d74` — C04 I38's ruling landing without regenerating |
+| `validateDocument` refusing seven `meta` fields on the fallback path | **2** | row 1, F13/F58b — `AdapterMeta` narrowing |
+
+**The second is the one worth the finding, because it looks like a defect and is not.** The
+two rows asserted C07 I5 — *every produced document passes C04's validator* — against
+`createFallbackAdapter().adapt(...)`. That value **stopped being a document** when
+`AdapterMeta` narrowed to the three keys an adapter owns: the seven the registry fills are
+absent by construction, so the validator was right and the assertion was aimed one call too
+early. Routed through an empty registry — which falls to the fallback by C07 I2's route 3 and
+fills `meta` — both pass unchanged.
+
+**A narrowing's blast radius is every test that asserted the old shape**, and the ones that
+fail are in whichever tier nobody runs. Row 1 landed in three commits, all green on `npm
+test`; the two rows it broke live in `test/golden/`, which `npm test` does not include.
+
+**The class is the one already recorded from the other direction.** *An exit code read through
+a pipe is the pipe's*, and *read a green gate's counters* — both about a gate whose result was
+not looked at. This is the third: a gate that was **read as absent**. Nothing reports `make
+all`'s status between commits, so a target that starts failing is indistinguishable from one
+nobody has run, and four commits went past.
+
+**Fixed rather than filed**, because it is this branch's own debt: the two assertions now go
+through the registry, and the sixteen snapshots were regenerated after reading the diff —
+every one is the single line `p99 120ms 98ms` becoming `p99 120ms ✓ 98ms` or `+ 98ms`, which
+is row 4's ruling working. `npm run golden` is 59 passed.

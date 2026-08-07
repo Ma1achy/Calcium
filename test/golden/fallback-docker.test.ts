@@ -18,6 +18,7 @@
 // notices.
 import { describe, expect, it } from "vitest";
 import { createFallbackAdapter } from "../../src/data/adapters/fallback.js";
+import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import type { AdapterContext, RawResult } from "../../src/data/adapters/types.js";
 import { validateDocument } from "../../src/data/viewmodel/index.js";
 import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
@@ -86,10 +87,26 @@ function resultOf(stdout: unknown): RawResult {
 describe("C07 §5 — docker's real JSON through the fallback, unadapted", () => {
   const kit = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS });
 
+  /**
+   * **Through the registry, not the bare adapter** (C07 I13, F13/F58b).
+   *
+   * These two rows asserted C07 I5 — *every produced document passes C04's
+   * validator* — against `createFallbackAdapter().adapt(...)`, and that stopped
+   * being a document when `AdapterMeta` narrowed to the three keys an adapter
+   * owns. The seven the registry fills are absent by construction, so the
+   * validator refused seven `meta` fields and the rows had been red on `make
+   * all` ever since, while `npm test` and `make enforce` stayed green.
+   *
+   * The invariant is intact and the assertion was aimed one call too early. An
+   * empty registry falls to the fallback (C07 I2 route 3) and fills `meta`, so
+   * this is the same adapter exercised where I5 actually applies.
+   */
+  const viaRegistry = (raw: RawResult) => createAdapterRegistry().adapt(raw, CTX);
+
   it("a single container object — the drill-down shape", () => {
     // `/inspect` returns one object, not a list. Same fallback, different §5 row,
     // and the one whose renderer exists today.
-    const doc = createFallbackAdapter().adapt(resultOf(DOCKER_PS[0]), CTX);
+    const doc = viaRegistry(resultOf(DOCKER_PS[0]));
     expect(validateDocument(doc).ok).toBe(true);
 
     const frame = doc.blocks.map((b) => kit.renderToLines(b, 80).join("\n")).join("\n");
@@ -101,7 +118,7 @@ describe("C07 §5 — docker's real JSON through the fallback, unadapted", () =>
   // that `Status` prose and `State` both survive as columns, that nothing was
   // flattened or invented — is here; how wide the columns come out is C11's.
   it("the list shape carries docker's own fields, in docker's own order", () => {
-    const doc = createFallbackAdapter().adapt(resultOf(DOCKER_PS), CTX);
+    const doc = viaRegistry(resultOf(DOCKER_PS));
     expect(validateDocument(doc).ok).toBe(true);
 
     const table = doc.blocks.find((b) => b.kind === "table");
