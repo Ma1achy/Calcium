@@ -244,6 +244,59 @@ Colour degradation is C10's; C09 names a palette slot and renders whatever style
 
 ---
 
+### The rule is about who can substitute, and the framework exempted itself
+
+§4 says a glyph is a **slot** and never a character, because substitution is 1:1 by
+column count and **only the renderer knows the capability**. That argument is about
+*where the knowledge is*, not about who owns the character — and it was written about
+what a **block** carries. The framework's own authored text was never held to it.
+
+Measured over `src/`, excluding comments (F122):
+
+| | |
+|---|---|
+| string literals carrying a non-ASCII character | 164 |
+| …prose punctuation only — em dash, `§`, `·` | 106 |
+| …reported by SS47 | **58** |
+| …of those, the glyph table itself | 43 |
+| …carrying their own ASCII form already | 5 |
+| …a developer's report, never a frame | 4 |
+| **…drawn verbatim into a frame** | **6** |
+
+**Four working sites are what make this a defect rather than a wish.** `text.ts`
+resolves `caps.unicode === "ascii" ? "~" : "…"`, `patch/collapse.ts` carries a pair,
+`patch/definition.ts` picks its rule character, `plot/ramp.ts` has a whole ASCII ramp.
+The mechanism is not missing. **It is applied in four places and skipped in six**, and
+a discipline holding four times in ten is what a scan is for rather than a rule.
+
+**Three of the six bypass a function that already holds their fallback.**
+`spinnerFrames(caps)` returns an ASCII set and `shell/paint.ts` hardcodes `⠋` two files
+away; `GLYPH_TABLE.expand` is `["▸", ">"]` and `shell/confirm.ts` writes `▸`;
+`collapse.ts` carries `["⋯", "..."]` and `paint.ts` declares its own `⋯`. For those
+there was nothing to rule — there was a function nobody called. F55 filed this as
+*wanting a ruling*, and half of it wanted a call.
+
+**The other three are the ruling, and they divide by where the text is authored.**
+
+- **The capability is in hand.** `paint.ts`'s spinner sits inside a function holding
+  `deps`. One line.
+- **The function is shared with the measurer.** The prompt is drawn by `commandRows`,
+  which `construct.ts` also calls for `chromeRows` — so its two forms must be **1:1 by
+  cell count** (I22) or `measure` and the composer describe the same row differently.
+  `❯ ` and `> ` are both two cells, and `PROMPT_GUTTER.first` is that number.
+- **The text is authored above the renderer.** `loading…` is built by a builder,
+  `… n more` by C19, `▸` by C15's caller. These are **unsubstitutable by construction**:
+  the string is fixed at L3 or L4 and the capability is known at L1. C09's answer already
+  exists and is the glyph slot — so a mark in framework text is a slot, or it is ASCII.
+
+**`…` gets no slot, and that is the interesting refusal.** I5 requires 1:1 by cell count
+and the ASCII ellipsis is three cells; the pair that satisfies it is `["…", "~"]`, which
+`text.ts` already uses for truncation and which reads as a marker rather than as an
+elision anywhere else. So `loading…` becomes a notice carrying the `pending` glyph — the
+mark it actually wanted — and `… n more` becomes ASCII. **A vocabulary that admits every
+character its callers reach for stops being a vocabulary**, and the refusal is what keeps
+the 1:1 rule true.
+
 ## 4a. Syntax tokenisation
 
 C10 defines a `syntax` palette; this is where the tokens come from. `Code` is `{kind, id, language, text, wrap}` — text and a language name, no spans — so something has to turn one into the other, and it is not the adapter.
@@ -376,6 +429,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I19** — Wrapping never deletes a cluster. A cluster wider than the line it must fit into is **substituted** by a one-cell `?`, never dropped: a row that silently loses a glyph is a frame that is arithmetically consistent and describing different content than it holds. Substitution rather than overflow, because a row wider than it was measured wraps into a row nobody counted — the one failure I1 exists to prevent. C17 I20 answers the same question the other way and says why: a block renders someone's data, an editor holds what the user typed.
 - **I20** — A cell window over a styled line composes and preserves width: for every `0 ≤ a ≤ b`, `displayCells(sliceCells(t, 0, a)) + displayCells(sliceCells(t, a, b))` equals `displayCells(sliceCells(t, 0, b))`. The window carries the skipped prefix's SGR forward, so a tail draws in the style that was in effect where it starts, and it never splits a cluster or half-draws a double-width glyph — I9's rule over a window rather than a cut. This is what makes compositing a layer into a painted row width-preserving by construction rather than by three separate measurements happening to agree: three pieces that each measure right and together measure `columns + 1` put the frame one cell into a row nobody counted (§5a).
 - **I21** — A `rule` with an empty label draws an unbroken line. The lead, the label and the fill are separated by spaces that exist to set a label apart from the line; with no label they are a two-cell gap at the left of a rule that is a boundary rather than a heading. Found by reading a frame — C19's menu edge (C19 I23) is the first unlabelled rule in the tree, and every assertion about it was about width and about the block being present, both of which held.
+- **I22** — **Every non-ASCII character the framework draws is resolved against the capability, on the same terms as a block's glyph.** §4's argument is about where the knowledge lives, so it does not stop at the block schema: a mark in the framework's own text is a `Glyph` slot, or it is a pair resolved where the capability is in hand, or it is ASCII. A substitution used by a function the *measurer* also calls is 1:1 by cell count, as I5 requires of the vocabulary — the prompt is that function, and its cell count is `PROMPT_GUTTER.first`. Enforced by SS47 with a per-site allow-list, because the rule was already true of four sites and false of six, and a discipline with that record is not one a sentence fixes (F122).
 
 ---
 
@@ -399,6 +453,7 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 16. **Wrapping substitutes a cluster it cannot place rather than dropping it** (I19). It dropped, and both halves called the same function, so `measure` and `render` agreed and nothing failed — a frame arithmetically consistent and describing content it did not hold. The reach is a fact about child count rather than terminal width (§5).
 17. **A line that already carries SGR is measured, fitted and windowed here, not by its caller** (I20, §5a). `displayCells` and `fitStyled` exist because `cells()` counts an escape as printable text; `sliceCells` exists because the frame cannot draw a layer over a painted row without taking a cell window out of one, and a `slice` by code unit cuts inside an escape and bleeds colour down every row below. Three answers to "how wide is this line" is I1's divergence in the one place that moves the whole frame.
 18. **A `rule` with no label draws an unbroken line** (I21). The spaces around the label exist to set it apart from the fill, and with no label they are a gap in a boundary — found by reading a frame, which is the only instrument that reaches it: the block is present, the row is exactly the width, and every existing assertion holds.
+19. **The framework substitutes its own marks, not only its blocks'** (I22). §4's rule is about who knows the capability, and it was written about what a block carries; six framework-authored characters reached the frame unresolved while four sites next to them did it correctly. Three of the six bypassed a function that already held their ASCII form, so half of what read as a missing mechanism was a mechanism not called (F55, F122).
 
 ---
 
@@ -467,6 +522,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.10**: text exactly `w`, `w-1`, `w+1` cells → 1, 1, 2 rows for wrapped kinds.
 - **T3.11**: `panel` at width 2 → children measured at 0, clamped to 1; no negative width reaches a child.
 - **T3.12**: `group` nested five deep → correct total, no stack overflow.
+- **T3.30** (I22): a session at `unicode: "ascii"` draws a frame with no character above U+007F — asserted over the whole frame rather than per site, because a per-site row is a restatement of the fix and the seventh site is what this must catch. The controls are the frame at `full` still carrying `❯`, and the two forms measuring the same number of cells.
 - **T3.13** (I11): a renderer that throws → that block renders as an error block; sibling blocks render normally.
 - **T3.14** (I11): a *measurer* that throws → contained, block treated as height 1, logged. A throwing measurer must not break virtualisation.
 - **T3.15**: `pills` whose chips exceed `w` → wraps, and the wrap count is measured correctly.

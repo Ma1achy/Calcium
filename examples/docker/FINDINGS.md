@@ -1872,6 +1872,21 @@ Filed, not fixed. C22 §6 owns the prompt and gives it no capability-dependent f
 wants a ruling — a pair like C09's, or a `PROMPT` that takes the record — rather than a
 character swapped in place.
 
+### Amended when it was ruled on — two characters was one app's frame, not the class
+
+**The count is right about the dashboard and wrong about the framework.** *"Exactly one
+non-ASCII character"* was measured over the ASCII dashboard's own frame and holds there.
+Swept over `src/`, the framework draws **six** characters it does not substitute: the
+prompt and `loading…`, plus `⋯` and `⠋` in `paint.ts`, `… n more` in C19's menu, and `▸`
+marking the selected choice in `confirm.ts`. A frame is a sample of the class, and this
+finding measured the sample.
+
+**And *"wants a ruling"* is right about half of them.** Three bypass a function that
+already holds their ASCII form — `spinnerFrames(caps)`, `GLYPH_TABLE.expand`,
+`collapse.ts`'s pair. For those there is nothing to rule and there is a call that was
+not made. Ruled as C09 I22 and C22 I52, enforced by SS47, and the whole measurement is
+F122.
+
 ---
 
 ## F56 — a `bin` entry is a claim about an executable, and nothing checks it ★★★ — **fixed**
@@ -4773,3 +4788,84 @@ programme judging changes by a suite that excludes a tier. Both are *the check y
 did not run on the state you started from*, and both were invisible while every
 gate that did run stayed green.
 
+---
+
+## F122 — the framework holds apps to a rule it exempts itself from ★★★
+
+C09 §4: **a glyph is a slot and never a character**, because substitution is 1:1 by
+column count and only the renderer knows the capability. It is a rule about *where the
+knowledge is*, and it was written about what a **block** carries. The framework's own
+authored text was never held to it.
+
+| | |
+|---|---|
+| string literals in `src/` with a non-ASCII character | 164 |
+| prose punctuation only — em dash, `§`, `·` | 106 |
+| **reported by SS47** | **58** |
+| the glyph table itself | 43 |
+| already carrying an ASCII form | 5 |
+| a developer's report, never a frame | 4 |
+| **drawn verbatim into a frame** | **6** |
+
+**Four correct sites are what make this a finding.** `text.ts` picks `"~"` at `ascii`,
+`patch/collapse.ts` carries a pair, `patch/definition.ts` its rule character,
+`plot/ramp.ts` an entire ASCII ramp. So the mechanism exists, is understood, and is
+**applied in four places and skipped in six** — which is a discipline failing rather
+than a gap, and a discipline failing four times in ten is what a scan is for.
+
+### Three of the six had nothing to rule
+
+| site | writes | while | |
+|---|---|---|---|
+| `shell/paint.ts:104` | `⠋` | `spinnerFrames(caps)` returns `["-","\\","|","/"]` at ascii | two files away |
+| `shell/confirm.ts:94` | `▸` | `GLYPH_TABLE.expand` is `["▸", ">"]` | the same character, with its pair |
+| `shell/paint.ts:94` | `⋯` | `collapse.ts` carries `["⋯", "..."]` | a second copy of one constant |
+
+**A mechanism that exists and is not called reads exactly like a mechanism that is
+missing**, from the site. That is why F55 filed the whole thing as wanting a ruling: at
+the point of use there is no difference between *no one has decided this* and *someone
+decided it in another file*. The instrument that tells them apart is the sweep, and it
+is the same instrument as the audit that produced MG27 — ask what the tree already
+does, not what this site does.
+
+### The three that are the ruling divide by where the text is authored
+
+- **Capability in hand** — the spinner sits inside a function holding `deps`.
+- **Shared with the measurer** — the prompt is drawn by `commandRows`, which
+  `construct.ts` also calls for `chromeRows`. Its two forms must be **1:1 by cell
+  count**, which is C09 I5's rule about the glyph vocabulary arriving at L4, in the one
+  place a *measurement* depends on a substitution. `❯ ` and `> ` are both two cells and
+  `PROMPT_GUTTER.first` is that number, so the equality is asserted rather than noted.
+- **Authored above the renderer** — `loading…`, `… n more`, `▸`. **Unsubstitutable by
+  construction**: the string is fixed at L3 or L4 and the capability is known at L1.
+  This is C09 §4's argument reaching the case it was never applied to, and the answer it
+  already gives is the slot.
+
+**`…` is refused a slot, and the refusal is the load-bearing part.** I5 wants 1:1 by
+cell count; the ASCII ellipsis is three cells. The pair that satisfies it is `["…","~"]`
+— which is right for truncation, where `text.ts` already uses it, and wrong as a general
+mark. So `loading…` becomes a notice carrying `pending`, the mark it actually wanted, and
+`… n more` becomes ASCII. **A vocabulary that admits every character its callers reach
+for stops being a vocabulary**, and this is the second time in three items that the
+right answer was to narrow rather than widen a type.
+
+### The scan's scope was measured before it was written
+
+Three candidate scopes, in order:
+
+| scope | reports | verdict |
+|---|---|---|
+| any non-ASCII in code | 183 | the em dashes in error messages swamp it |
+| a literal with no ASCII word — "a mark" | 53 | **misses the ruling**: `loading…` and `▸` sit in literals with words |
+| a literal whose non-ASCII is outside the prose set | 58, **6 unexcused** | the one that reports the defect and nothing else |
+
+The second is the instructive failure. It is the tighter, more elegant rule, it reports
+a smaller number, and **it excludes exactly the three sites the ruling is about** —
+because a mark embedded in a sentence is still a mark. A scan tuned until its output
+looks tidy is tuned away from the class.
+
+**The blind spot, with its number: 106 literals carry prose punctuation and SS47 passes
+all of them.** An em dash on a terminal reporting `unicode: ascii` is drawn as verbatim
+as `❯` is. That is a real and larger question — every error message in the tree — and it
+is not this rule's, which is about *marks*. Recorded rather than discovered, and the
+count is what makes it re-checkable.
