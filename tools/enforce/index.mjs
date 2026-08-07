@@ -10,7 +10,7 @@ import {
   checkSeamConsumers,
   componentSeamSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import {
   checkCommitments,
@@ -44,6 +44,11 @@ const violations = [
   ...checkSeamConsumers(files),
   ...checkFunctionConsumers(files),
   ...checkSourceScans(files),
+  // SS47 — a mark the framework draws and cannot substitute. Its own function
+  // rather than a row of `SCANS`, for MG27's reason: the subject is a string
+  // literal's contents, its exemptions carry reasons, and it has the
+  // bidirectional arm a path allow-list cannot express.
+  ...checkMarks(files),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // The specs are enforced too. A03 governs the source; SP1 governs the

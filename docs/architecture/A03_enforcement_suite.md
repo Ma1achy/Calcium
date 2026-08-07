@@ -345,6 +345,7 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
 | SS45 | A tone or glyph literal as an object-literal value | `src/shell/builders/` | C24 I5, T2.7 |
+| SS47 | A non-ASCII mark in a `src/` string literal that is not prose punctuation. The reasons live in `MARK_EXEMPTIONS`, keyed by file, with MG27's bidirectional arm: an entry whose file no longer carries a mark is itself a violation | `src/`, ten sites excused with reasons | C09 I22, C22 I52, FINDINGS F55 · F122 |
 | SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |

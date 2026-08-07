@@ -17,6 +17,7 @@ import { slashPolicy } from "../interaction/parser/index.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
 /**
  * Below this the layout engine cannot produce a sane answer, so the size gate
@@ -28,8 +29,24 @@ import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 export const MIN_COLUMNS = 60;
 export const MIN_ROWS = 16;
 
-/** §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one. */
-export const PROMPT = "❯ ";
+/**
+ * §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one.
+ *
+ * **A pair, and both forms are `PROMPT_GUTTER.first` cells** (C22 I52, C09 I22).
+ * `commandRows` draws the prompt and `construct.ts` calls the same function for
+ * `chromeRows`, so a form of unequal width would leave the measurer and the
+ * composer describing the same row differently — C09 I1's divergence on the one
+ * row the reader types into. `promptFor` is the only reader; nothing resolves it
+ * at module scope, which would read a capability before C02 has detected one.
+ */
+const PROMPT_FORMS: readonly [unicode: string, ascii: string] = Object.freeze(["❯ ", "> "]);
+
+export function promptFor(caps: Pick<TerminalCapabilities, "unicode">): string {
+  return caps.unicode === "ascii" ? PROMPT_FORMS[1] : PROMPT_FORMS[0];
+}
+
+/** The pair itself, for the row asserting both forms are the gutter's width. */
+export const PROMPT_SUBSTITUTION: readonly [string, string] = PROMPT_FORMS;
 export const PROMPT_GUTTER = Object.freeze({ first: 2, cont: 2 });
 
 /** C13 §5a — a number rather than "all"; doubling memory is how a debug mode

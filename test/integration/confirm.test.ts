@@ -65,7 +65,7 @@ function world(over: Partial<RouterDeps> = {}) {
   const globalSeen: InputEvent[] = [];
   let cancels = 0;
 
-  const confirm = createConfirmHost({ overlays, invalidate });
+  const confirm = createConfirmHost({ capabilities: { unicode: "full" }, overlays, invalidate });
 
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),

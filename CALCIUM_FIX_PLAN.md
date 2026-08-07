@@ -54,7 +54,7 @@ and a design question; three of them close ahead of it and are blocked on nothin
 | 6 | F21 — the action dispatch route | change | 1 filed, **3 dependents** | C23 | — | **done** · `84a6db2` |
 | 7 | F22 F41 F78 F23 — the builder surface | **audit**, then changes | 4 | C04 | — | **partial** · `ad9058b` — F23 open |
 | 8 | F80 — `interactive` as a predicate over the invocation | ruling | 1 | C05 | — | **done** · `36fbc99` `fe7ecee` |
-| 9 | F55 — the prompt and `loading…` | change | 1 | C22 §6 | — | open |
+| 9 | F55 · **F122** — the framework's own marks | **ruling**, then changes + a rule | **6 sites** | C09 · C22 §6 | — | **done** · `7df96f0` |
 | 10 | F93 — grammar registration | change | 1 | additive export | — | open |
 
 **The status column is a record, not a claim about the remainder.** Six rows landed
@@ -66,6 +66,18 @@ the remedy is to extend the local route.
 
 **Rows 1 and 3–8 are done and the tier is not**, which is the distinction a column of
 ticks would hide: rows 2, 9 and 10 remain, and row 2 is twelve findings behind one ruling.
+
+**Row 9's four fields were all wrong, and the direction is the one worth recording.**
+It read *change · 1 consumer · ⚠ C22 §6*, written from F55's two characters — which were
+measured over one app's frame. Swept over `src/` the framework draws **six** marks it does
+not substitute, three of them bypassing a function that already holds their ASCII form, and
+the ruling reaches C09's vocabulary as well as C22's prompt (F122).
+
+**This is F112's shape from the other direction.** That lesson is *compounding facts are not
+a difficulty estimate* — a row that reads larger than it is. This one read **smaller**,
+because it was written from a symptom rather than from a sweep, and a symptom is a sample.
+The fields are corrected in place rather than footnoted: tier 3 is scheduled from this table,
+and an estimate nobody revises is one that gets used.
 
 ### 1 · The narrower half, and it is the plan's most useful line
 

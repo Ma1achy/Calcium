@@ -2,6 +2,7 @@
 // the reader injected, so no fixture touches src/.
 import { describe, expect, it } from "vitest";
 import { readdirSync, statSync } from "node:fs";
+import { checkMarks, MARK_EXEMPTIONS } from "../../tools/enforce/source-scans.mjs";
 import {
   checkModuleGraph,
   checkBuilderCoverage,
@@ -95,6 +96,23 @@ describe("A03 MG23 — one store per component, above L0", () => {
       });
     return walk("src");
   };
+
+  it("SS47: the real tree is clean, and every exemption still has a subject", () => {
+    // **F116's row.** A rule whose only reader is a Makefile target is a rule a
+    // `npm test` refactor can silence, and every other real-tree guard in this
+    // file exists because that happened once already.
+    //
+    // The counter is read rather than the exit status: zero violations is the
+    // same number for *clean* and for *the scan matched nothing*, so the second
+    // assertion is what tells them apart — ten exemptions, each of which must
+    // still find a mark or the bidirectional arm reports it.
+    const files = srcFiles();
+    expect(checkMarks(files), "run `make enforce` for the detail").toEqual([]);
+    expect(Object.keys(MARK_EXEMPTIONS).length).toBeGreaterThan(0);
+    for (const f of Object.keys(MARK_EXEMPTIONS)) {
+      expect(files, `${f} is excused and must be in scope`).toContain(f);
+    }
+  });
 
   it("MG27: the real tree is clean, and the rule can see it", () => {
     // **The row the mutation pass asked for.** Deleting

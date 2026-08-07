@@ -32,7 +32,7 @@ import {
   checkBuilderCoverage,
   checkSeamConsumers,
 } from "../../tools/enforce/module-graph.mjs";
-import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
+import { checkMarks, checkSourceScans, MARK_EXEMPTIONS, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
@@ -529,7 +529,25 @@ const FABRICATED: readonly Fabrication[] = [
 ];
 
 const scanIds = SCANS.map((s) => s.id);
-const implemented = [...scanIds, ...MODULE_GRAPH_RULES, ...DEPENDENCY_RULES, ...SPEC_RULES];
+
+/**
+ * Scans that are their own function rather than a row of `SCANS`.
+ *
+ * SS47's subject is a string literal's *contents* rather than a line, and its
+ * exemptions carry reasons with a bidirectional arm — neither of which the shared
+ * row shape can hold. Listed here for the same reason `MODULE_GRAPH_RULES` is a
+ * list: a rule invisible to `implemented` is a rule the fabrication check does not
+ * demand a violation for, which is A03 §2 arriving in the mechanism against it.
+ */
+const STANDALONE_SCANS = ["SS47"];
+
+const implemented = [
+  ...scanIds,
+  ...STANDALONE_SCANS,
+  ...MODULE_GRAPH_RULES,
+  ...DEPENDENCY_RULES,
+  ...SPEC_RULES,
+];
 
 function srcFiles(dir = "src", out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -557,6 +575,9 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // allow-list rather than about the tree, and that half needs two runs of
       // the same fixture with different lists.
       "MG25",
+      // SS47 likewise: its subject is a string literal's contents rather than a
+      // line, and its exemptions carry reasons the shared shape has nowhere to put.
+      "SS47",
       // MG27 likewise: its subject is two whole files read together — a block
       // type and the builder that constructs it — so the shared `FABRICATED`
       // shape, which is one file's text, cannot express it.
@@ -722,6 +743,49 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "CompletionEngine.spinning": "why",
     });
     expect(exempted, "a named member is exempt").toEqual([]);
+  });
+
+  it("SS47 fires: a mark in framework text, and the exemption list expires", () => {
+    // **The three controls are the rule's scope, and they are the whole point.**
+    // The scan's scope was chosen across three candidates (F122), and the one
+    // that reports fewest sites — "a literal with no ASCII word in it" — misses
+    // `loading…` and `▸ [y] yes`, which are the sites the ruling is about.
+    const files = ["src/mark.ts", "src/prose.ts", "src/excused.ts"];
+    const read = (f: string): string =>
+      f.endsWith("mark.ts")
+        ? ['const a = "loading…";', 'const b = `${sel ? "▸" : " "} [y] yes`;'].join("\n")
+        : f.endsWith("prose.ts")
+          ? [
+              'const c = "a verb — and its flags — are the app\'s (§3)";',
+              "// a comment naming ❯ is prose about the rule, not a violation of it",
+            ].join("\n")
+          : 'const G = ["✓", "+"];';
+
+    const violations = checkMarks(files, read, { "src/excused.ts": "the vocabulary itself" });
+
+    // Both marks, and **both are inside literals carrying ASCII words** — the
+    // case a tighter "is this literal only marks?" rule cannot see.
+    expect(violations.filter((v) => v.file === "src/mark.ts")).toHaveLength(2);
+    expect(violations.every((v) => v.rule === "SS47")).toBe(true);
+
+    // The prose control. 106 literals in the real tree are this, and the rule
+    // passes every one — a limit recorded in the rule's own comment, because an
+    // em dash at `unicode: ascii` is as unsubstituted as `❯` was.
+    expect(
+      violations.some((v) => v.file === "src/prose.ts"),
+      "prose punctuation and comments are not marks",
+    ).toBe(false);
+
+    // The exemption control, and the arm that keeps the reasons honest.
+    expect(violations.some((v) => v.file === "src/excused.ts")).toBe(false);
+    const stale = checkMarks(files, read, {
+      "src/excused.ts": "the vocabulary itself",
+      "src/prose.ts": "this file has no mark, so the entry has outlived its reason",
+    });
+    expect(
+      stale.some((v) => v.file === "src/prose.ts" && v.message.includes("carries no mark")),
+      "an exemption that outlives its reason is a violation of its own",
+    ).toBe(true);
   });
 
   it("MG27 fires: a block field no builder sets, and the reason list expires", () => {

@@ -227,7 +227,7 @@ function harness(script: Scripted = {}) {
     // `/theme` alike. This is the second harness in the tree with its own
     // `as unknown as PipelineDeps`, and the cast is why the compiler saw
     // neither.
-    confirm: createConfirmHost({ overlays, invalidate: () => undefined }),
+    confirm: createConfirmHost({ capabilities: { unicode: "full" }, overlays, invalidate: () => undefined }),
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);

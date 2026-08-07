@@ -417,7 +417,7 @@ export async function constructGraph(
       // it is part of the height the index virtualises against. **The same
       // function that draws it**, or the two arithmetics part company and the
       // viewport describes a document it is not showing.
-      chromeRows: (entry, width) => commandRows(entry.doc.command, width).length,
+      chromeRows: (entry, width) => commandRows(entry.doc.command, width, detection.capabilities).length,
     });
     const overlays = createOverlayManager({ registry: built.blocks });
     // **The state directory has to exist before anything writes into it**, and
@@ -630,6 +630,7 @@ export async function constructGraph(
    */
   const confirm = createConfirmHost({
     overlays: stores.overlays,
+    capabilities: detection.capabilities,
     invalidate: () => void scheduler.commit("input"),
   });
 

@@ -599,7 +599,11 @@ function live(spec: LiveSpec): Panel {
   // around rather than a way past it.
   const loading =
     spec.renderLoading?.() ??
-    noticeOf("muted", "loading…", undefined, { id: `${spec.id}-loading` });
+    // **The `pending` glyph rather than an ellipsis in the text** (C09 I22,
+    // F122). A builder runs above the renderer, so a character written here
+    // cannot be substituted — and the mark this wanted is one C09 already
+    // carries, with `.` for a terminal that cannot draw `◌`.
+    noticeOf("muted", "loading", "pending", { id: `${spec.id}-loading` });
   const panel = finish<Panel>(
     { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
     spec,

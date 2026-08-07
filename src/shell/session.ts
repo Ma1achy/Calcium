@@ -508,7 +508,7 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     // C22 I33 — the command that produced the entry, above it, as chrome. Its
     // rows are part of the entry's height (C14 I20), which is why the slice
     // below is taken over `chrome ++ blocks` rather than over the blocks alone.
-    const chrome = commandRows(entry.doc.command, width);
+    const chrome = commandRows(entry.doc.command, width, graph.capabilities);
     const lines = renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
       theme: graph.theme.current,
       capabilities: graph.capabilities,

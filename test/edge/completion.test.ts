@@ -252,7 +252,10 @@ describe("C19 §6 — the menu", () => {
     // An edge, the body, the indicator, an edge (C19 I23).
     expect(blocks).toHaveLength(4);
     expect(blocks[0]).toMatchObject({ kind: "rule" });
-    expect(blocks[2]).toMatchObject({ kind: "raw", text: "… 4960 more" });
+    // ASCII, because C19 is L3 and the substitution happens at L1 (C09 I22,
+    // F122). A `raw` block carries text rather than a slot, so `…` here could
+    // never have been resolved against the capability.
+    expect(blocks[2]).toMatchObject({ kind: "raw", text: "+ 4960 more" });
     expect(blocks[3]).toMatchObject({ kind: "rule" });
     expect(menuWidth(many.slice(0, 40))).toBeGreaterThan(0);
   });

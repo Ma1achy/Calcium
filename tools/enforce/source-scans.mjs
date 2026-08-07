@@ -714,6 +714,130 @@ export const SCANS = [
 ];
 
 /**
+ * SS47 — a mark the framework draws and cannot substitute (C09 I22, F122).
+ *
+ * **Not a line regex, because the subject is a literal's contents.** The other
+ * rules here ask whether a line matches; this one asks whether a *string* carries
+ * a character the renderer would have to substitute and nobody will. Prose
+ * punctuation passes by character class; everything else needs an entry.
+ *
+ * ## The scope was measured before it was written, across three candidates
+ *
+ * | scope | reports |
+ * |---|---|
+ * | any non-ASCII in code | 183 — the em dashes in error messages swamp it |
+ * | a literal with no ASCII word — "a mark" | 53, and it **misses the ruling** |
+ * | this one | 58, of which 6 were unexcused |
+ *
+ * The middle one is the instructive failure: tighter, tidier, a smaller number,
+ * and it excludes `loading…`, `… n more` and `▸ [y] yes` — the three sites the
+ * ruling is about — because a mark embedded in a sentence is still a mark. A scan
+ * tuned until its output looks tidy is tuned away from its class.
+ *
+ * ## The blind spot, with its number
+ *
+ * **106 literals carry prose punctuation and this passes every one.** An em dash
+ * on a terminal reporting `unicode: ascii` is drawn as verbatim as `❯` was. That
+ * is a real and much larger question — every error message in the tree — and it
+ * is not this rule's, which is about marks. Recorded so it is re-checkable rather
+ * than rediscovered.
+ *
+ * A second limit: this reads literals lexically, so a mark built by
+ * `String.fromCodePoint` or held in a variable passes. Every current site is a
+ * literal, and a computed one would be a change worth noticing on its own.
+ */
+const PROSE_MARKS = new Set("—§·×≤≥→«»⚠");
+
+/**
+ * Every site allowed to carry a mark, and **why** — the shape `UNCONSUMED_MEMBERS`
+ * and `BUILDER_OMISSIONS` both have, for the reason F102 gives: an exemption
+ * records which premise it rests on, so the premise can be re-checked rather than
+ * inherited. Keyed by file, because a per-line key goes stale on any edit above it.
+ */
+export const MARK_EXEMPTIONS = Object.freeze({
+  "src/presentation/blocks/glyphs.ts":
+    "the vocabulary itself — every entry is a pair and C09 I5's test asserts each is 1:1 by cell count",
+  "src/presentation/text.ts":
+    "the truncation marker resolves against the capability on the line it is written (`ascii ? \"~\" : \"…\"`)",
+  "src/presentation/patch/collapse.ts":
+    "carries its own `[unicode, ascii]` pair; the marker is a whole row, so the ASCII form's three cells cost nothing",
+  "src/presentation/patch/definition.ts":
+    "picks its rule character from the capability in the expression that draws it",
+  "src/presentation/plot/ramp.ts":
+    "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
+  "src/presentation/plot/curve.ts":
+    "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
+  "src/shell/config.ts":
+    "`PROMPT_SUBSTITUTION` is the pair, and `frame.ts` asserts both forms are `PROMPT_GUTTER.first` cells (C22 I52)",
+  "src/shell/paint.ts":
+    "the elision pair, resolved from `deps.capabilities`; the spinner is taken from C09's `spinnerFrames`",
+  "src/data/fixtures/diff.ts":
+    "a corpus-drift report written to a developer's terminal by a developer's command — never composed into a frame",
+  "src/testing/measurement-conformance.ts":
+    "the conformance report, same premise: a tool's output, not a rendered document",
+});
+
+const NON_ASCII = /[^\x00-\x7F]/u;
+const LITERALS = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/gsu;
+
+/** Comments blanked, newlines kept, so reported lines are the source's. */
+function codeOnly(src) {
+  const blank = (m) => m[0].replace(/[^\n]/gu, " ");
+  return src
+    .replace(/\/\*[\s\S]*?\*\//gu, (m) => blank([m]))
+    .replace(/\/\/[^\n]*/gu, (m) => blank([m]));
+}
+
+export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exemptions = MARK_EXEMPTIONS) {
+  const violations = [];
+  const fired = new Set();
+
+  for (const file of files) {
+    const f = file.replaceAll("\\", "/");
+    if (!f.startsWith("src/")) continue;
+    const code = codeOnly(readFile(file));
+    for (const m of code.matchAll(LITERALS)) {
+      const body = m[0].slice(1, -1);
+      const marks = [...body].filter((c) => c.codePointAt(0) > 127);
+      if (marks.length === 0) continue;
+      if (marks.every((c) => PROSE_MARKS.has(c))) continue;
+      if (exemptions[f] !== undefined) {
+        fired.add(f);
+        continue;
+      }
+      violations.push({
+        rule: "SS47",
+        file: f,
+        line: code.slice(0, m.index).split("\n").length,
+        message:
+          `\`${body.slice(0, 40)}\` carries a mark the framework draws and cannot substitute. ` +
+          `A mark in framework text is a \`Glyph\` slot, or a pair resolved where the ` +
+          `capability is in hand, or ASCII (C09 I22)`,
+        rule_spec: "C09 I22 · C22 I52",
+      });
+    }
+  }
+
+  // **The bidirectional arm** (MG27's, and `UNCONSUMED_MEMBERS`'). An entry whose
+  // file no longer carries a mark has outlived its reason, and a list nobody
+  // prunes is one nobody reads — which is how the reasons stop being checked.
+  for (const f of Object.keys(exemptions)) {
+    if (fired.has(f)) continue;
+    violations.push({
+      rule: "SS47",
+      file: f,
+      line: 1,
+      message:
+        `is excused from SS47 — "${exemptions[f]}" — and carries no mark. ` +
+        `Remove the entry, or the reason stops being one anybody checks`,
+      rule_spec: "C09 I22",
+    });
+  }
+
+  return violations;
+}
+
+/**
  * `readFile` is injected for the same reason the module graph injects it: a rule
  * is only known to work when it has been shown to fire, and showing that means
  * a fabricated violation at a path that does not exist on disk. A03 commitment
