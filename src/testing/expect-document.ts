@@ -207,6 +207,13 @@ function plain(line: string): string {
     .join("");
 }
 
+export type RenderOpts = Readonly<{
+  /** Defaults to the truecolour, full-unicode record. */
+  capabilities?: TerminalCapabilities;
+  /** Keep SGR. Defaults to `false`, because a frame read by eye is a frame without escapes. */
+  colour?: boolean;
+}>;
+
 export interface DocumentAssertions {
   isValid(): this;
   measuresCorrectly(widths?: readonly number[]): this;
@@ -214,6 +221,29 @@ export interface DocumentAssertions {
   degradesToAscii(): this;
   degradesTo1Bit(): this;
   hasNoColourOnlyDistinction(): this;
+  /**
+   * The rows this document draws — **the frame, not a property of it** (C24 I23).
+   *
+   * Every other method here measures or asserts, and a property of a document is
+   * not a picture of one. The reference app documents its workaround as *"a row
+   * is a complete description of what will be drawn"*, which is true of a table
+   * and false of the change axis: the rows say `added` and only the frame says
+   * `+`. So the app asserted a value whose rendering it could not see, and this
+   * surface could not have caught the class that produced.
+   *
+   * **The production renderer, not a second one.** It returns what
+   * `renderSequenceToLines` produced instead of asserting about it — the same
+   * call `measuresCorrectly` and `degradesToAscii` already make, through the
+   * registry this object already holds. That is why it is publishable where the
+   * raw `renderToLines` was not: `BlockRegistry` stays unreachable (C24 §3), and
+   * a parallel renderer here would be the fifth instance of a suite building its
+   * own version of the thing under test.
+   *
+   * **Not `this`.** Every other method chains because it asserts; this one is
+   * the value, and returning `this` would make the frame unreachable from the
+   * one method whose whole point is to hand it over.
+   */
+  lines(width: number, opts?: RenderOpts): readonly string[];
 }
 
 export function expectDocument(doc: ViewDocument): DocumentAssertions {
@@ -358,6 +388,15 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
      * it means giving those two kinds a glyph field, which is a C04 spec change
      * and is recorded there as one.
      */
+    lines(width, opts = {}) {
+      const caps = opts.capabilities ?? TRUECOLOUR;
+      const drawn = renderSequenceToLines(registry, doc.blocks, width, {
+        theme: resolved,
+        capabilities: caps,
+      });
+      return opts.colour === true ? drawn : drawn.map(plain);
+    },
+
     hasNoColourOnlyDistinction() {
       const offences: string[] = [];
 

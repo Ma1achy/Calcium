@@ -19,11 +19,28 @@
  * it put an uncallable function on the surface *and* named an absent component
  * in this entry's declarations. It is `presentation/render-lines.ts` now, and
  * the public way to assert about a rendered document is `expectDocument` (§7).
+ *
+ * **What that left, and `lines()` is the repair.** Every assertion on this
+ * surface measured or checked a *property*, and none returned a frame — so the
+ * framework's own testing surface could not have caught the class the change
+ * axis produced, where the rows say `added` and only the frame says `+` (F126).
+ * `expectDocument().lines()` closes it the way the removal implied: the registry
+ * stays interior, and the object that already holds one hands back what the
+ * production renderer drew rather than asserting about it.
  */
 
 // --- the document assertions, C24 §7 ----------------------------------------
 
-export { expectDocument, type DocumentAssertions } from "./expect-document.js";
+export { expectDocument, type DocumentAssertions, type RenderOpts } from "./expect-document.js";
+
+/**
+ * What `b.live` declared (C24 §7, I24, F28).
+ *
+ * Here rather than on the runtime entry: the cost F28 measured is to testing, and
+ * a production consumer reading back its own declaration holds a second record of
+ * the document.
+ */
+export { liveParts, type LivePart } from "./live-parts.js";
 
 // --- the conformance suites, C24 §7 -----------------------------------------
 
