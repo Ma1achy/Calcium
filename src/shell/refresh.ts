@@ -616,8 +616,18 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       if (now >= src.dueAt && anyoneLooking(src)) runSource(src);
     }
 
-    for (const [key, entry] of hosts) {
-      if (entry.parts.every((p) => p.source.done)) hosts.delete(key);
+    // **Through `release`, for the reason `/clear` was** (I32). A host whose parts
+    // are all finished is dropped here, and dropping the map entry directly
+    // leaves every one of its parts still in its source's referring set — so the
+    // source is never retired and the map grows for the session. Nothing fails:
+    // a `done` source does not poll, so the only symptom is a leak.
+    //
+    // Found by reading the diff rather than by a test. It is the second instance
+    // in this file of the same shape — a teardown written beside the only
+    // teardown path instead of through it — and I32's *five sites agreeing by
+    // inspection* is exactly what that sentence is about.
+    for (const entry of [...hosts.values()]) {
+      if (entry.parts.every((p) => p.source.done)) release(entry.host);
     }
   };
 
@@ -679,21 +689,30 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
 
     const now = deps.clock();
     let soonest = Infinity;
-    let retiring = false;
+    /**
+     * **There is cleanup to do, so wake once even though nothing is due** (I45).
+     *
+     * Two states qualify and both are terminal: a source nobody refers to, which
+     * the sweep retires, and a host whose parts have all finished, which the
+     * sweep releases. Neither is true after the sweep that handles it, so this
+     * wakes the timer once rather than spinning it.
+     *
+     * **Without the second clause the first is unreachable for a one-shot.** Its
+     * source is `done` and still referred to, so the loop below arms nothing, no
+     * sweep ever runs again, and the host is never released — which is how a leak
+     * with no symptom survives a green suite: a `done` source does not poll.
+     */
+    const cleanup =
+      [...sources.values()].some((s) => s.parts.size === 0) ||
+      [...hosts.values()].some((e) => e.parts.every((p) => p.source.done));
     for (const src of sources.values()) {
-      // A source with no referrers has nothing to arm for and still has to be
-      // collected, so it wakes the sweep once rather than never (C23 I45). Without
-      // this the retirement never runs and the map grows for the session.
-      if (src.parts.size === 0) {
-        retiring = true;
-        continue;
-      }
+      if (src.parts.size === 0) continue;
       // **A paused source is not soonest** (C23 I46). Arming to an overdue source
       // nobody is looking at spins the timer at zero; the resume comes from
       // `visibilityChanged`, which is heard rather than polled.
       if (!src.done && !src.inFlight && anyoneLooking(src)) soonest = Math.min(soonest, src.dueAt);
     }
-    if (retiring) soonest = Math.min(soonest, now);
+    if (cleanup) soonest = Math.min(soonest, now);
     if (!Number.isFinite(soonest)) return;
 
     partTimer = deps.schedule(() => {

@@ -883,6 +883,34 @@ describe("C23 §3c — one source behind several parts", () => {
     expect(calls, "one poll, one failure").toBe(1);
   });
 
+  it("T2.25 (I32, I45): a host whose parts are all finished releases its sources", async () => {
+    // **A leak with no symptom, found by reading the diff.** A one-shot host was
+    // dropped from the map directly rather than through `release`, so its parts
+    // stayed in the source's referring set, the source was never retired, and the
+    // map grew for the session. Nothing fails: a `done` source does not poll.
+    //
+    // Asserted on the driver being able to re-declare the same key at a *different*
+    // interval, which a surviving source refuses (I43) and a retired one accepts.
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", source: "shots", intervalMs: 0 }),
+    ]);
+    await h.tick();
+    // Two sweeps: the first finishes the one-shot and releases the host, the
+    // second retires the source now that nobody refers to it (I45).
+    await h.tick(60_000);
+    await h.tick(60_000);
+
+    const g = h.transcript.append(docWith([panel("b", "b", raw("b-c", "…"))]));
+    h.driver.declare({ kind: "entry", id: g }, [
+      part({ id: "b", source: "shots", intervalMs: 2_000 }),
+    ]);
+    expect(shown(h, g, "b"), "the key was free, so no refusal was drawn").not.toContain(
+      "two intervals",
+    );
+  });
+
   it("T2.23 (I44): one commit per source tick, whatever the number of parts", async () => {
     // The frame count cannot see this — C03 coalesces `stream` into one frame
     // either way (33 ms window) — so the assertion is on the commits, which is
