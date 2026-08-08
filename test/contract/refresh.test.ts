@@ -699,27 +699,46 @@ describe("C23 §3c — one source behind several parts", () => {
     expect([shown(h, id, "a"), shown(h, id, "b")], "and one sample in both").toEqual(["1", "1"]);
   });
 
-  it("T1.40 (I43, §8d D1): one key with two intervals is refused, naming both", async () => {
+  it("T1.40 (I43, §8d D1): one key with two intervals is refused in the losing panel", async () => {
+    // **Asserted on the rendered block, not on a throw**, and the difference was
+    // measured rather than argued. Thrown from `declare` the refusal lands in
+    // `appendAndCommit`'s bare catch with the entry already appended, so the
+    // author gets two panels at `◌ loading` for the session and nothing anywhere
+    // says why — which a `toThrow()` row would have passed against happily.
     const h = harness();
-    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
-    // **Asserted on the message, not on the throw.** A refusal that does not say
-    // which two declarations disagree is one the author has to bisect for, and a
-    // `toThrow()` alone passes for a driver that refuses every declaration.
-    expect(() =>
-      h.driver.declare({ kind: "entry", id }, [
-        part({ id: "a", source: "stats", intervalMs: 2_000 }),
-        part({ id: "b", source: "stats", intervalMs: 10_000 }),
-      ]),
-    ).toThrow(/"a" says 2000ms and "b" says 10000ms/);
+    let calls = 0;
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+    );
+    const counting = () => {
+      calls += 1;
+      return Promise.resolve("ok");
+    };
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", source: "stats", intervalMs: 2_000, fetch: counting }),
+      part({ id: "b", source: "stats", intervalMs: 10_000, fetch: counting }),
+    ]);
+
+    expect(shown(h, id, "b"), "both parts and both values, where the author is looking").toBe(
+      'err:live source "stats" is declared with two intervals: ' +
+        '"a" says 2000ms and "b" says 10000ms. One source has one cadence.:none',
+    );
+    // **The second half: a refusal that still polls is not one.** Only "a" runs.
+    for (let i = 0; i < 3; i += 1) await h.tick(60_000);
+    expect(calls, "the winner polls and the refused part does not").toBeGreaterThan(0);
+    expect(shown(h, id, "b"), "and the refused panel still says why").toContain("two intervals");
 
     // §8d D3 — a one-shot sharing with a periodic part is this rule and not a
     // second case. `0 !== N`, so it takes the same message. T3.31.
-    expect(() =>
-      h.driver.declare({ kind: "entry", id }, [
-        part({ id: "c", source: "shots", intervalMs: 0 }),
-        part({ id: "d", source: "shots", intervalMs: 2_000 }),
-      ]),
-    ).toThrow(/"c" says 0ms and "d" says 2000ms/);
+    const g = harness();
+    const gid = g.transcript.append(
+      docWith([panel("c", "c", raw("c-c", "…")), panel("d", "d", raw("d-c", "…"))]),
+    );
+    g.driver.declare({ kind: "entry", id: gid }, [
+      part({ id: "c", source: "shots", intervalMs: 0 }),
+      part({ id: "d", source: "shots", intervalMs: 2_000 }),
+    ]);
+    expect(shown(g, gid, "d")).toContain('"c" says 0ms and "d" says 2000ms');
   });
 
   it("T1.41 (I47): a derivation folds once per version, not once per part", async () => {

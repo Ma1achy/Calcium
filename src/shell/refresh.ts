@@ -375,6 +375,31 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    * implicit space whatever it contains. A rule that depends on nobody choosing a
    * particular string is not a rule.
    */
+  /**
+   * The source a refused part is given: `done`, referred to by nobody, and never
+   * in `sources` (I43).
+   *
+   * A part with no source at all would need a nullable field, and every read of
+   * `part.source` would grow a branch for a state one call site produces. This is
+   * the same shape the unshared case takes — every part has a source, and this
+   * one has already finished.
+   */
+  const deadSource = (key: string, spec: ViewRefresh): Omit<Source, "parts"> => ({
+    key,
+    intervalMs: spec.intervalMs,
+    declaredBy: spec.id,
+    fetch: () => Promise.resolve(null),
+    folds: new Map(),
+    offsetMs: 0,
+    dueAt: 0,
+    failures: 0,
+    inFlight: false,
+    version: 0,
+    data: undefined,
+    done: true,
+    retired: true,
+  });
+
   const declaredKey = (source: string): string => `d${SEP}${source}`;
   const implicitKey = (host: RefreshHost, partId: string): string =>
     `p${SEP}${keyOf(host)}${SEP}${partId}`;
@@ -821,6 +846,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       // did not ask where the two declarations were.
       const seen = new Map<string, { declaredBy: string; intervalMs: number }>();
       for (const [key, src] of sources) seen.set(key, src);
+      const refused = new Map<string, string>();
       for (const { spec, key } of wanted) {
         const existing = seen.get(key);
         if (existing === undefined || existing.intervalMs === spec.intervalMs) {
@@ -832,7 +858,14 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         // the two-records-of-one-fact class with a timing symptom. Both parts and
         // both values, because a refusal that does not say which two declarations
         // disagree is one the author has to bisect for.
-        throw new Error(
+        //
+        // **Drawn, not thrown** (I43), and that half was measured. Thrown from
+        // here it lands in `appendAndCommit`'s bare catch — C23 §5's deliberate
+        // one — with the entry already appended, so the author gets two panels at
+        // `◌ loading` for the session and nothing anywhere reports a fault. A
+        // refusal nobody can see refuses nothing.
+        refused.set(
+          spec.id,
           `live source "${spec.source ?? spec.id}" is declared with two intervals: ` +
             `"${existing.declaredBy}" says ${String(existing.intervalMs)}ms and ` +
             `"${spec.id}" says ${String(spec.intervalMs)}ms. One source has one cadence.`,
@@ -840,7 +873,23 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       }
 
       const made: Part[] = [];
+      const drawn: { part: Part; message: string }[] = [];
       for (const { spec, key } of wanted) {
+        const why = refused.get(spec.id);
+        if (why !== undefined) {
+          // Declared, so the host still owns it and `release` still reaches it —
+          // and joined to no source, so it never polls. The panel says why.
+          const part: Part = {
+            spec,
+            host,
+            source: { ...deadSource(key, spec), parts: new Set<Part>() },
+            lastOk: null,
+            stale: false,
+          };
+          made.push(part);
+          drawn.push({ part, message: why });
+          continue;
+        }
         let src = sources.get(key);
         if (src === undefined) {
           src = {
@@ -870,6 +919,17 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
         made.push(part);
       }
       hosts.set(keyOf(host), { host, parts: made });
+
+      // After the host is registered, because `put` reads the block currently in
+      // place to carry `gapBefore` across — and one commit for the set, which is
+      // I44's rule applied to the one path that is not a poll.
+      if (drawn.length > 0) {
+        let any = false;
+        for (const { part, message } of drawn) {
+          if (put(part.host, part, part.spec.renderError({ message }, null))) any = true;
+        }
+        if (any) deps.commit("stream");
+      }
 
       // **Staggered across the session's sources, not this call's parts** (C23
       // I20). Reassigned rather than assigned, because a source added now shifts
