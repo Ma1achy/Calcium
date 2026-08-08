@@ -246,6 +246,15 @@ function harness(script: Scripted = {}) {
     // `as unknown as PipelineDeps`, and the cast is why the compiler saw
     // neither.
     confirm: createConfirmHost({ capabilities: { unicode: "full" }, overlays, invalidate: () => undefined }),
+    // C23 I46 — everything visible. This harness has no viewport, so answering
+    // from one would pause every part in the file: a fake supplying the
+    // behaviour under test rather than standing in for it. The pause has its own
+    // rows, against a real viewport.
+    //
+    // **The third harness in the tree whose cast hid a missing field**, which is
+    // what `as unknown as PipelineDeps` buys and costs — `overlays` and `confirm`
+    // are the two the comment above already records.
+    visible: () => true,
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);

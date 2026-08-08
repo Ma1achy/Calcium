@@ -19,6 +19,7 @@ import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { DocumentView } from "./document-view.js";
 import type { PatchView } from "./patch-view.js";
+import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
@@ -171,6 +172,18 @@ export interface Pipeline {
    */
   releaseView(): void;
   /**
+   * Something moved on screen, so which hosts are visible may have changed
+   * (C23 I46).
+   *
+   * **Heard rather than polled**, which is I33's disposition for eviction one
+   * level down. A paused source is not what the timer arms to — arming to an
+   * overdue source nobody is looking at would spin at zero — so without this
+   * signal a scroll back into view would resume nothing until the next unrelated
+   * wake-up, and a session whose only live parts were off screen would never
+   * resume at all.
+   */
+  visibilityChanged(): void;
+  /**
    * The producer context, for C22's greeting (C22 I53, C23 I40).
    *
    * **Exposed so there is one builder rather than two.** The greeting fires
@@ -276,6 +289,15 @@ export type PipelineDeps = Readonly<{
   patchView: PatchView;
   /** C22 §13a — raised when a verb's declaration says its result is a view. */
   documentView: DocumentView;
+  /**
+   * Whether anyone is looking at a live part's host (C23 I46).
+   *
+   * **Answered by C22 and not by the pipeline**, because the answer is C14's for
+   * an entry and C15's for a layer, and a pipeline reaching into two stores to
+   * decide when to poll is the seam A02 Seam 4 exists to hold. It is also why
+   * `refresh.ts` still imports nothing from `viewport/` but a type.
+   */
+  visible: (host: RefreshHost) => boolean;
   /**
    * `ctx.ask`'s host (C23 I36).
    *

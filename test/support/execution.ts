@@ -27,6 +27,7 @@ import { createEditor } from "../../src/interaction/editor/index.js";
 import { fixture } from "./manifest.js";
 import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
+import type { RefreshHost } from "../../src/shell/refresh.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import type { ViewDocument } from "../../src/data/viewmodel/index.js";
@@ -47,6 +48,8 @@ export type PipelineScript = Readonly<{
   theme?: ThemeStore;
   /** For the handoff rows: reject to reach C23 §8a A6.5's throw path. */
   handoff?: (argv: readonly string[]) => Promise<Exit>;
+  /** C23 I46 — for the rows about the off-screen pause. Everything visible by default. */
+  visible?: (host: RefreshHost) => boolean;
 }>;
 
 export type PipelineHarness = Readonly<{
@@ -168,6 +171,20 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     // runtime `Cannot read properties of undefined (reading 'ask')`, which the
     // compiler could not see past the cast at the bottom of this function.
     overlays: harnessOverlays,
+    /**
+     * C23 I46 — everything visible unless a row says otherwise.
+     *
+     * **A default of `true` and not a real viewport**, because this harness has
+     * no frame: answering from a store nothing scrolls would make every part
+     * here paused, which is a fake supplying the behaviour under test rather
+     * than standing in for it. Rows about the pause hand in their own predicate,
+     * and T4.26's is a real viewport in an integration test.
+     *
+     * The cast at the bottom of this function is why the absence of this field
+     * was a runtime failure rather than a compile one — the same way `overlays`
+     * cost four suites a `Cannot read properties of undefined`.
+     */
+    visible: script.visible ?? (() => true),
     /**
      * The real host (C23 I36), for the same reason as `editor` above.
      *

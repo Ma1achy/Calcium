@@ -363,6 +363,7 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
       commit: () => undefined,
       append: () => undefined,
       stopping: () => false,
+    visible: () => true,
       producerContext: () => producerContext(),
       // **The seams as `execution.ts` wires them** — through the owner, not the
       // layer. Copied deliberately rather than simplified: a test that pointed
@@ -409,6 +410,8 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
         title: id,
         intervalMs: SWEEP,
         staleAfterMs: SWEEP * 2,
+        source: null,
+        derive: null,
         fetch: h.countFetch,
         render: (data) => b.raw(String(data), { id: `${id}-c` }),
         renderError: (err) => b.raw(`err:${err.message}`, { id: `${id}-c` }),
@@ -458,6 +461,14 @@ describe("C22 §13a — a live part hosted by a pushed view", () => {
     // T4.35 through the real driver. The layer holds two of three blocks, so
     // after two `down`s the part is off-window — and it must still be fetching,
     // because the seam asks the owner and the owner holds the document.
+    //
+    // **C23 I46 could have changed this row and does not, for a stated reason.**
+    // A source polls only while some referring host is visible — and a `view`
+    // host is visible while its layer exists, because popping the view is one of
+    // I33's five release triggers. So *off-window inside a view* is not
+    // *off-screen*, and this row is now the consumer of that ruling rather than
+    // of "the driver consults no viewport". The two read the same from here and
+    // are one edit apart, which is why the difference is written down.
     const h = wired();
     h.view.open("/watch api");
     h.view.fill(docOf([chunk("cpu", "loading"), chunk("b", "two"), chunk("c", "three")]));

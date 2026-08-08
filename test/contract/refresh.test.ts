@@ -46,12 +46,16 @@ const docWith = (blocks: readonly Block[]): ViewDocument => ({
   },
 });
 
+/** The driver's own host key, so a test can hide one (C23 I46). */
+const keyOfHost = (host: { kind: string; id: string }): string => `${host.kind}:${host.id}`;
+
 function harness() {
   const transcript = createTranscriptStore();
   const commits: string[] = [];
   const views = new Map<string, Block[]>();
   let now = 0;
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
+  const hidden = new Set<string>();
 
   const driver = createRefreshDriver({
     transcript,
@@ -67,6 +71,9 @@ function harness() {
       };
     },
     commit: (r) => void commits.push(r),
+    // Every host visible by default (C23 I46). Rows about the pause set this
+    // themselves; a fake that answered `false` would pause the whole file.
+    visible: (host) => !hidden.has(keyOfHost(host)),
     append: () => undefined,
     stopping: () => false,
     updateView: (id, blockId, next) => {
@@ -94,6 +101,7 @@ function harness() {
     transcript,
     commits,
     views,
+    hidden,
     /** Advance and fire what is due, once each — one turn. */
     async tick(ms = SWEEP): Promise<void> {
       now += ms;
@@ -111,12 +119,12 @@ function harness() {
 }
 
 /** A part, with the fields the driver needs and nothing a row does not use. */
-const part = (
-  over: Partial<Omit<ViewRefresh, "offsetMs">> & { id: string },
-): Omit<ViewRefresh, "offsetMs"> => ({
+const part = (over: Partial<ViewRefresh> & { id: string }): ViewRefresh => ({
   title: over.id,
   intervalMs: 30_000,
   staleAfterMs: 60_000,
+  source: null,
+  derive: null,
   fetch: () => Promise.resolve("ok"),
   render: (data) => raw(`${over.id}-c`, String(data)),
   renderError: (err, retryInMs) =>
@@ -636,5 +644,349 @@ describe("C23 §3b — part refresh", () => {
     h.driver.dispose();
     for (let i = 0; i < 3; i += 1) await h.tick(60_000);
     expect(calls, "and neither ran again").toBe(2);
+  });
+});
+
+// C23 §3c/§3d — sources, derivations and the off-screen pause.
+//
+// **Two artefacts produced these rows and they are indexed differently.** §8c is
+// a sequence trace and §8d a classification table: the first finds interactions
+// that need an event in between, the second finds rules that both hold at rest.
+// A row governed by one rule restates that rule and finds nothing, so every row
+// here is a cell where two correct statements overlap.
+describe("C23 §3c — one source behind several parts", () => {
+  it("T1.39 (I42, I44): two parts naming one key fetch once and read one sample", async () => {
+    // **The control is the same pair without the key**, and it must show two
+    // calls and two values. Without it this row passes against a driver that
+    // fetches nothing at all — and the two-values half *is* the defect F91 was
+    // filed on, measured at 19 against 20 before any of this existed.
+    const unshared = harness();
+    let un = 0;
+    const uid = unshared.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+    );
+    const bump = () => {
+      un += 1;
+      return Promise.resolve(un);
+    };
+    unshared.driver.declare({ kind: "entry", id: uid }, [
+      part({ id: "a", fetch: bump }),
+      part({ id: "b", fetch: bump }),
+    ]);
+    await unshared.tick();
+    expect(un, "the control: two parts, two polls").toBe(2);
+    expect(
+      [shown(unshared, uid, "a"), shown(unshared, uid, "b")],
+      "the control: and two samples of one instant, which is the defect",
+    ).toEqual(["1", "2"]);
+
+    const h = harness();
+    let calls = 0;
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+    );
+    const one = () => {
+      calls += 1;
+      return Promise.resolve(calls);
+    };
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", source: "stats", fetch: one }),
+      part({ id: "b", source: "stats", fetch: one }),
+    ]);
+
+    await h.tick();
+    expect(calls, "one key, one poll").toBe(1);
+    expect([shown(h, id, "a"), shown(h, id, "b")], "and one sample in both").toEqual(["1", "1"]);
+  });
+
+  it("T1.40 (I43, §8d D1): one key with two intervals is refused, naming both", async () => {
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    // **Asserted on the message, not on the throw.** A refusal that does not say
+    // which two declarations disagree is one the author has to bisect for, and a
+    // `toThrow()` alone passes for a driver that refuses every declaration.
+    expect(() =>
+      h.driver.declare({ kind: "entry", id }, [
+        part({ id: "a", source: "stats", intervalMs: 2_000 }),
+        part({ id: "b", source: "stats", intervalMs: 10_000 }),
+      ]),
+    ).toThrow(/"a" says 2000ms and "b" says 10000ms/);
+
+    // §8d D3 — a one-shot sharing with a periodic part is this rule and not a
+    // second case. `0 !== N`, so it takes the same message. T3.31.
+    expect(() =>
+      h.driver.declare({ kind: "entry", id }, [
+        part({ id: "c", source: "shots", intervalMs: 0 }),
+        part({ id: "d", source: "shots", intervalMs: 2_000 }),
+      ]),
+    ).toThrow(/"c" says 0ms and "d" says 2000ms/);
+  });
+
+  it("T1.41 (I47): a derivation folds once per version, not once per part", async () => {
+    const h = harness();
+    let computes = 0;
+    let calls = 0;
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+    );
+    // A fold: `prev` carries the accumulation. **Three versions, because two pass
+    // against an implementation that recomputes from scratch each time** — the
+    // first is indistinguishable either way and the second only differs by one.
+    const ring = {
+      key: "ring",
+      compute: (data: unknown, prev: unknown): unknown => {
+        computes += 1;
+        return [...((prev as number[] | undefined) ?? []), data as number];
+      },
+    };
+    const one = () => {
+      calls += 1;
+      return Promise.resolve(calls);
+    };
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        source: "stats",
+        derive: ring,
+        fetch: one,
+        render: (d) => raw("a-c", (d as number[]).join(",")),
+      }),
+      part({
+        id: "b",
+        source: "stats",
+        derive: ring,
+        fetch: one,
+        render: (d) => raw("b-c", (d as number[]).join(",")),
+      }),
+    ]);
+
+    for (let i = 0; i < 3; i += 1) await h.tick(60_000);
+    expect(calls, "three polls").toBe(3);
+    expect(computes, "and three folds, not six").toBe(3);
+    expect(shown(h, id, "a"), "the accumulation, not the latest sample").toBe("1,2,3");
+    expect(shown(h, id, "b"), "and both parts read the same one").toBe("1,2,3");
+  });
+
+  it("T1.42 (I45, §8c C3): release-then-declare at settlement keeps the fold", async () => {
+    // **The assertion is the history and not the current value.** A source
+    // destroyed between the release and the declare renders a perfectly correct
+    // latest sample, so a row reading the newest number passes against the defect.
+    const h = harness();
+    let calls = 0;
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]), {
+      streaming: true,
+    });
+    const ring = {
+      key: "ring",
+      compute: (data: unknown, prev: unknown): unknown => [
+        ...((prev as number[] | undefined) ?? []),
+        data as number,
+      ],
+    };
+    const declare = (): void =>
+      h.driver.declare({ kind: "entry", id }, [
+        part({
+          id: "a",
+          source: "stats",
+          derive: ring,
+          fetch: () => {
+            calls += 1;
+            return Promise.resolve(calls);
+          },
+          render: (d) => raw("a-c", (d as number[]).join(",")),
+        }),
+      ]);
+
+    declare();
+    for (let i = 0; i < 2; i += 1) await h.tick(60_000);
+    expect(shown(h, id, "a"), "the control: it accumulated").toBe("1,2");
+
+    // I33a's ordering: C13 emits `settle` synchronously, so the driver's teardown
+    // runs inside this call and the re-declaration follows it.
+    h.transcript.settle(id, docWith([panel("a", "a", raw("a-c", "1,2"))]));
+    declare();
+    await h.tick(60_000);
+    expect(shown(h, id, "a"), "and the fold survived the settle").toBe("1,2,3");
+  });
+
+  it("T1.44 (I42, §8d D5): a declared key cannot spell an implicit one", async () => {
+    // A fabricated violation. The namespaces are disjoint by construction, so
+    // without a row that tries to forge one this invariant has nothing to be
+    // wrong about — and the failure it prevents is two unrelated parts sharing a
+    // fetch while looking *more* self-consistent than the defect being fixed.
+    const h = harness();
+    let calls = 0;
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+    );
+    const one = () => {
+      calls += 1;
+      return Promise.resolve(calls);
+    };
+    h.driver.declare({ kind: "entry", id }, [
+      // "a" declares nothing, so its key is the implicit one for this host.
+      part({ id: "a", fetch: one }),
+      // "b" spells that key as literally as a consumer could.
+      part({ id: "b", source: `entry:${id}:a`, fetch: one }),
+    ]);
+
+    await h.tick();
+    expect(calls, "two sources, because the namespaces do not meet").toBe(2);
+  });
+
+  it("T3.33 (I21, §8d D6): each part renders its own error; the source backs off once", async () => {
+    const h = harness();
+    let calls = 0;
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+    );
+    const failing = () => {
+      calls += 1;
+      return Promise.reject(new Error("far side"));
+    };
+    h.driver.declare({ kind: "entry", id }, [
+      part({ id: "a", source: "stats", intervalMs: 1_000, fetch: failing }),
+      part({
+        id: "b",
+        source: "stats",
+        intervalMs: 1_000,
+        fetch: failing,
+        renderError: (err) => raw("b-c", `mine:${err.message}`),
+      }),
+    ]);
+
+    await h.tick();
+    // **Rendering is the part's**: the override is honoured beside the default.
+    expect(shown(h, id, "a"), "the framework's arm").toBe("err:far side:2000");
+    expect(shown(h, id, "b"), "and the overridden one, side by side").toBe("mine:far side");
+    // **Backoff is the source's**, counted once. Doubling per referrer would put
+    // the retry at 4000 after one failure rather than 2000.
+    expect(calls, "one poll, one failure").toBe(1);
+  });
+
+  it("T2.23 (I44): one commit per source tick, whatever the number of parts", async () => {
+    // The frame count cannot see this — C03 coalesces `stream` into one frame
+    // either way (33 ms window) — so the assertion is on the commits, which is
+    // what `rev` bumps and C14 invalidations follow.
+    const counts: number[] = [];
+    for (const n of [1, 2, 5]) {
+      const h = harness();
+      const ids = Array.from({ length: n }, (_, i) => `p${String(i)}`);
+      const id = h.transcript.append(docWith(ids.map((p) => panel(p, p, raw(`${p}-c`, "…")))));
+      h.driver.declare(
+        { kind: "entry", id },
+        ids.map((p) => part({ id: p, source: "stats" })),
+      );
+      await h.tick();
+      counts.push(h.commits.filter((c) => c === "stream").length);
+    }
+    expect(counts, "one, three times").toEqual([1, 1, 1]);
+  });
+});
+
+describe("C23 §3d — a source does not poll while nothing is looking", () => {
+  it("T1.43 (I46): off screen stops the fetch; back on screen resumes it at once", async () => {
+    // **Both halves in one row**, because a driver that pauses and never resumes
+    // satisfies the first — and the resume is *immediately*, not on the next
+    // interval, which is the half a coarse re-check would fail.
+    const h = harness();
+    let calls = 0;
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 1_000,
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve("ok");
+        },
+      }),
+    ]);
+
+    await h.tick(2_000);
+    expect(calls, "the control: it was polling").toBe(1);
+
+    h.hidden.add(`entry:${id}`);
+    for (let i = 0; i < 4; i += 1) await h.tick(60_000);
+    expect(calls, "and stopped while nobody was looking").toBe(1);
+
+    h.hidden.delete(`entry:${id}`);
+    h.driver.visibilityChanged();
+    await h.tick(0);
+    expect(calls, "and was due the moment it came back").toBe(2);
+  });
+
+  it("T2.24 (I46, I33): pausing releases nothing", async () => {
+    // A paused part is still declared, which is the difference between I46 and
+    // I33's five triggers — and the one the ruling turns on. If the pause were a
+    // release, coming back would find nothing to resume and the panel would sit
+    // at whatever it last held for the life of the session.
+    const h = harness();
+    let calls = 0;
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 1_000,
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve(String(calls));
+        },
+      }),
+    ]);
+
+    h.hidden.add(`entry:${id}`);
+    for (let i = 0; i < 3; i += 1) await h.tick(60_000);
+    expect(calls, "paused before it ever ran").toBe(0);
+    expect(shown(h, id, "a"), "and the loading state is untouched, not torn down").toBe("…");
+
+    h.hidden.delete(`entry:${id}`);
+    h.driver.visibilityChanged();
+    await h.tick(0);
+    expect(shown(h, id, "a"), "the declaration survived the pause").toBe("1");
+  });
+
+  it("T3.32 (I45, §8c C2): a resolution with no referrers is dropped, not a failure", async () => {
+    // Nothing failed, so nothing backs off. Backing off here would make a source
+    // that lost its readers poll *more slowly* when they come back, which is the
+    // opposite of what the pause promises.
+    const h = harness();
+    let calls = 0;
+    let release: (v: string) => void = () => undefined;
+    const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]));
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 1_000,
+        fetch: () => {
+          calls += 1;
+          return new Promise<string>((r) => {
+            release = r;
+          });
+        },
+      }),
+    ]);
+
+    await h.tick(2_000);
+    expect(calls, "the control: one fetch is in flight").toBe(1);
+
+    h.driver.release({ kind: "entry", id });
+    release("ok");
+    await h.tick(0);
+
+    // Re-declared: if the resolution above had been read as a failure the source
+    // would now be waiting out a doubled interval rather than polling.
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 1_000,
+        fetch: () => {
+          calls += 1;
+          return Promise.resolve("ok");
+        },
+      }),
+    ]);
+    await h.tick(1_000);
+    expect(calls, "and the next declaration polls on its own interval").toBe(2);
   });
 });

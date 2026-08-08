@@ -1288,7 +1288,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "SgrStyle.inverse": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
   "SgrStyle.underline": "C01 — as `inverse`",
   "FrameSchedulerOptions.windows": "C03 — per-reason coalescing windows, injected by six test files to drive the scheduler deterministically",
-  "ViewRefresh.offsetMs": "C23 — the stagger `assignOffsets` writes; never chosen by the declarer, which is the field's own comment",
   "Finding.subject": "C09 §7 — boundary-conformance report field, asserted by the suite it exists for",
   "Finding.assertion": "C09 §7 — as `subject`",
   "Finding.means": "C09 §7 — as `subject`",

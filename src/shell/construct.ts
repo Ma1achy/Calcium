@@ -734,6 +734,23 @@ export async function constructGraph(
       overlays: stores.overlays,
       patchView,
       documentView,
+      /**
+       * C23 I46 — whether anyone is looking at a live part's host.
+       *
+       * **The entry arm is C14's answer and nothing else's.** Asking the
+       * transcript whether an entry exists would answer a different question:
+       * an entry scrolled a thousand rows above the viewport is present, live
+       * and invisible, and it is exactly the one that should stop spawning.
+       *
+       * **A `view` host is visible while it is declared**, which is a ruling and
+       * not a shortcut: popping the view is one of C23 I33's five release
+       * triggers, so a declared view host is on screen by construction. The
+       * consequence is recorded rather than left to be found — the pause reaches
+       * transcript-hosted parts and does not reach a drill-in at all.
+       */
+      visible: (host) =>
+        host.kind === "view" ||
+        stores.viewport.visible().entries.some((e) => e.id === host.id),
       confirm,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same
@@ -772,6 +789,16 @@ export async function constructGraph(
       p.register(verb, handler);
     }
     p.seal();
+    // **C23 I46's resume, heard rather than polled.** A source nobody is looking
+    // at is not what the part timer arms to — arming to an overdue paused source
+    // would spin it at zero — so the scroll back into view has to say so. C14
+    // emits on `scroll`, `content` and `resize`, and all three can change which
+    // entries are on screen.
+    //
+    // The same disposition C23 I33 takes for eviction, and the same reason: a
+    // check on the next tick is correct and arrives one interval late, which is
+    // long enough for a reader to see a panel that has not caught up.
+    stores.viewport.subscribe(() => void p.visibilityChanged());
     return p;
   });
 

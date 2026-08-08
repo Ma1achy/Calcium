@@ -1310,6 +1310,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     title: spec.title,
     intervalMs: spec.every ?? 0,
     staleAfterMs: spec.staleAfter ?? (spec.every ?? 0) * 2,
+    // **`null` rather than absent, and that is the same choice as the two above.**
+    // The driver's shape is total where the declaration's is optional: a part
+    // that named no key is its own source (C23 I42), so there is one code path
+    // and the unshared case is the degenerate one rather than a branch.
+    source: spec.source ?? null,
+    derive: spec.derive ?? null,
     // **No `?? Promise.resolve(null)` fallback** (F78). It existed to cover the
     // `stream` arm, which nothing drove, so its whole effect was to turn an
     // undriven declaration into a part that rendered `render(null)` once — a
@@ -1454,6 +1460,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           : deps.overlays.stack.find((l) => l.id === id)?.content.find((b) => b.id === blockId);
       return found !== undefined && found !== null && found.kind === "panel" ? found : null;
     },
+    // C23 I46 — C22 answers, because the answer is C14's for an entry and C15's
+    // for a layer (A02 Seam 4).
+    visible: deps.visible,
   });
 
   return {
@@ -1461,6 +1470,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     onAction,
     identityNotice: (text) => void refresh.identityNotice(text),
     releaseView: () => void refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID }),
+    visibilityChanged: () => void refresh.visibilityChanged(),
     // C22 I53 — the greeting is a producer, and this is the one builder.
     producerContext: () => producerContext(null),
 

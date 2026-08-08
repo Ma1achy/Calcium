@@ -165,6 +165,44 @@ export type LiveSpec = BlockOpts &
      */
     fetch: () => Promise<unknown>;
     /**
+     * **The key that declares two parts read one source** (C24 I27, C23 §3c).
+     *
+     * A string and not a function, because functions cannot be compared and
+     * sharing needs a claim of sameness. Parts naming one key share the `fetch`
+     * *and* the derivation; only `render` is per instance — so two panels of one
+     * document cannot show two samples of one instant, which is what they did:
+     * `19` against `20`, read from a single composed frame, before this existed.
+     *
+     * Two parts naming one key with different `every` is **refused at
+     * construction**, naming both. Two naming one key with different `fetch`
+     * closures is **not checked and cannot be**: the key is the claim that they
+     * are the same and the framework takes it, which is the standing a string key
+     * has at all.
+     *
+     * Omitted, a part is its own source. That is not a second mode — every part
+     * has one, and this only says when two of them are the same.
+     */
+    source?: string;
+    /**
+     * **A fold over the source's versions**, run once per version and shared by
+     * key; its result reaches `render` in the fetched data's place (C23 I47).
+     *
+     * Not a convenience beside `source` but what makes it usable. A ring buffer
+     * maintained inside `fetch` is what the reference app did, and it is the
+     * shape this rule forbids:
+     *
+     * > Per-part state is view state only. Anything that accumulates belongs in
+     * > a derivation.
+     *
+     * That rule is also what makes the off-screen pause safe (C24 I28): a paused
+     * part holds nothing that could fall behind.
+     *
+     * `compute` throws like a `render` and not like a `fetch` — deterministic, so
+     * it does not retry, and the version is not consumed because a fold that
+     * threw has not advanced.
+     */
+    derive?: Readonly<{ key: string; compute: (data: unknown, prev: unknown) => unknown }>;
+    /**
      * **The producer context arrives as a second parameter** (C07 §3, C24 §5).
      *
      * A live part is a producer: it renders repeatedly, and a part drawing
