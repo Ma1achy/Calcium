@@ -513,9 +513,12 @@ reference app did — so `derive` is not a convenience beside `source`, it is wh
 `source` usable at all.
 
 **Two rulings a consumer will meet.** Two parts naming one key with different `every` is
-**refused at construction**, naming both parts and both values — a conflicting cadence is a
-programming error and refusing is available, so arbitrating it would store the loser's
-declaration where it reads as honoured. And two parts naming one key with different `fetch`
+**refused**, naming both parts and both values — a conflicting cadence is a programming error
+and refusing is available, so arbitrating it would store the loser's declaration where it
+reads as honoured. **The refusal is drawn in the losing part's panel**, because a thrown one
+never reaches you: the declaration happens inside the append, whose bare catch is deliberate,
+and the measured result was two panels at `◌ loading` for the whole session with nothing
+anywhere saying why. And two parts naming one key with different `fetch`
 closures is **not checked**: the key is the claim that these fetches are the same and the
 framework takes it, which is exactly the standing of `source` being a string.
 
@@ -830,7 +833,7 @@ carries the state — and §7 records what that changed.
 - **I25** — **No component composes a frame twice.** The composition `session.ts` performs is a named unit that `session.ts` calls, and a source scan says so, because the render chain's four coming stages — diffing, caching, windowing, capping — would diverge silently from any copy. **The class is one level up from an unreachable member**: every prior instance was *a member nobody could call*, this was *a sequence nobody named*, and no rule that walks members can see it — MG24 counts consumers, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree where every member is consumed and only the order is missing. A private method is the perfect hiding place, because the composition **is** consumed, sixty times a second, by the one caller inside the class (F126).
 - **I26** — **A consumer can build a `ProducerContext`**, with the real measurer in it. `ProducerContext.measure` is the frame's own — one arithmetic, or a split decided in a producer and the rows drawn on screen disagree — and `BlockRegistry` stays interior (§3), so a consumer whose adapter or handler *takes* a context could not call it outside a session. That is I19's argument a second time: a producer the framework can test and a consumer cannot is a producer whose app-side tests assert against something the user never sees. **Found by deleting the reference app's reimplementation of the measurer** (F37), which was also the fixture its own suite measured with. `localContext` comes with it for the same reason and adds `ask`, defaulting to the **decline** path — C23 I36's own semantics, so a handler tested without a scripted answer takes the route `Esc` takes rather than a stub's.
 
-- **I27** — **`LiveSpec.source` declares sameness and `LiveSpec.derive` is what makes it usable.** Two parts naming one key share one `fetch` and one fold, so two panels of one document cannot show two samples of one instant (C23 I44). The pairing is not a convenience: a part accumulating inside its `fetch` cannot share one, which is what the reference app did, so `source` without `derive` has no consumer. A conflicting `every` on one key is **refused at construction naming both parts**, and conflicting `fetch` closures are **not checked** — the key is the claim that they are the same and the framework takes it, which is the standing of a string key at all (C23 I42, C23 I43, C23 I47).
+- **I27** — **`LiveSpec.source` declares sameness and `LiveSpec.derive` is what makes it usable.** Two parts naming one key share one `fetch` and one fold, so two panels of one document cannot show two samples of one instant (C23 I44). The pairing is not a convenience: a part accumulating inside its `fetch` cannot share one, which is what the reference app did, so `source` without `derive` has no consumer. A conflicting `every` on one key is **refused, in the losing part's panel, naming both parts** — thrown, it is swallowed by the append's deliberate bare catch and the author sees two loading panels for ever — and conflicting `fetch` closures are **not checked** — the key is the claim that they are the same and the framework takes it, which is the standing of a string key at all (C23 I42, C23 I43, C23 I47).
 - **I28** — **A live part does not poll while nothing is looking at it, and this is not configurable** (I6, C23 I46). It reaches every part rather than only those declaring a `source`, because a part accumulating inside `fetch` is already broken by I27's rule and pausing surfaces that rather than causing it; the alternative would make off-screen behaviour depend on an unrelated declaration. **Nothing is released** — the part stays declared and C23 I33's five triggers remain the only teardown — and a pushed view is visible while its layer exists, so the pause reaches transcript-hosted parts and not a drill-in. It is a stated behaviour change for declarations that predate it, which is why it is an invariant here and not only in C23.
 
 ---
@@ -862,7 +865,7 @@ carries the state — and §7 records what that changed.
 23. The composition exists once. A named unit `session.ts` calls, checked by a scan, because the coming render chain would diverge from a copy in silence (I25).
 24. Each refused export names the mechanism that replaces it, and the one that replaces nothing says which component already does the work (§3, C07 I17).
 25. A consumer can build the context its own producer receives, measurer included — the grant is testable from the side that consumes it (I26).
-26. Parts sharing a declared key share one poll and one fold, so two views of one source cannot disagree; a conflicting cadence is refused and conflicting fetches are taken on the key's word (I27).
+26. Parts sharing a declared key share one poll and one fold, so two views of one source cannot disagree; a conflicting cadence is refused **where the author can see it** and conflicting fetches are taken on the key's word (I27).
 27. A live part does not poll while nothing is looking at it, for every part and not only the sharing ones — a stated behaviour change, unconditional, and releasing nothing (I28).
 
 ---
@@ -913,7 +916,7 @@ carries the state — and §7 records what that changed.
 - **T3.10**: nesting `b.panel` inside `b.group` inside `b.panel` → valid, measured correctly.
 - **T3.11**: an adapter registered for an absent verb → warning at startup, session opens.
 - **T3.12**: a theme failing contrast → construction throws before the terminal is acquired.
-- **T3.13 (I27)**: two `b.live` parts naming one `source` with different `every` → construction throws, and the message names **both** ids and **both** values. From the public entry, because this is the error an app author meets and the one that has to say which two declarations to look at.
+- **T3.13 (I27)**: two `b.live` parts naming one `source` with different `every` → the losing part's panel names **both** ids and **both** values, and neither part is left at `◌ loading`. **From the public entry, and that is the whole row**: the first implementation threw, which every unit test of the driver could see and no consumer ever could.
 
 ### Tier 4 — integration
 
