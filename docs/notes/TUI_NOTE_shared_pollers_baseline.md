@@ -27,6 +27,23 @@ reasons outside either is exactly what an exit code cannot tell you.
 **Read the counters, not the statuses.** `e2e` is 44 failed / 50 passed / 7 todo at the
 baseline; anything other than that number moving is this row's.
 
+**After, per target:**
+
+```
+check   EXIT=0
+enforce EXIT=0
+audit   EXIT=2      <-- the same advisory, unmoved
+test    EXIT=0      2605 -> 2618 passed, 2 todo
+golden  EXIT=0
+e2e     EXIT=2      44 failed / 50 passed / 7 todo — F133, identical
+```
+
+**Two rows failed on a contended run and pass alone**, both of them source scans taking
+19–21 s against a 15 s timeout while an `e2e` run held the machine (C01 T2.8, C21 T2.4). The
+earlier row 1 flakes were the same shape. Recorded rather than smoothed over: a timing row
+that only fails under contention is a fact about the harness, and the honest form of it is
+the number and the condition rather than a re-run reported as the result.
+
 ---
 
 ## 2. The divergence, and it reproduces
