@@ -57,17 +57,23 @@ export const SCANS = [
   // anything a broader rule misses? Its clock clause could not — SS1 bans clock
   // reads across all of `src/` — so the clause is gone rather than carried, and
   // C20 T2.4's clock half is SS1's coverage declared. What is left is `fs` and
-  // the `~/.prism` literal, and SS1 speaks for neither.
+  // a hardcoded state-directory literal, and SS1 speaks for neither.
   //
   // The literal is the live half. C20 is the first component since C08 to write
-  // anything, and a hardcoded `~/.prism` means a standalone run appends to the
+  // anything, and a hardcoded state path means a standalone run appends to the
   // developer's own history — which makes a clean clone neither clean nor
   // repeatable, and does it silently, in a file nobody looks at until it is
   // wrong (C20 I12, T6.12).
   { id: "SS9", spec: "C20 I11 · C20 I12 · C20 T2.4",
-    pattern: /require\(["']fs["']\)|from\s+["']node:fs["']|~\/\.prism/,
+    // **Any tilde-rooted dotfile, not one app's name.** This matched `~/.prism`
+    // literally, so renaming the default to `~/.calcium` would have left it
+    // hunting a string nobody would write — a rule with nothing to be wrong
+    // about, which is A03 §2's vacuity class arriving through a rename rather
+    // than through a bad rule. A hardcoded state path in `history/` is wrong
+    // whatever it is called, so the shape is the pattern and the spelling is not.
+    pattern: /require\(["']fs["']\)|from\s+["']node:fs["']|~\/\.[a-z]/,
     scope: "src/interaction/history/", allow: [],
-    why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and a hardcoded `~/.prism` makes standalone development append to a real install" },
+    why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and any hardcoded `~/.<name>` makes standalone development append to a real install" },
 
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,

@@ -53,7 +53,20 @@ export const PROMPT_GUTTER = Object.freeze({ first: 2, cont: 2 });
  * becomes one nobody turns on. */
 export const DEFAULT_RETAIN_PAYLOADS = 50;
 
-export const DEFAULT_STATE_DIR = "~/.prism";
+/**
+ * C22 §3 — **the framework's own name, never a consumer's**.
+ *
+ * It was `~/.prism`, named for one app, in a framework that claims to serve
+ * others: every consumer that said nothing wrote its history and its theme
+ * preference into `prism-tui`'s directory, and two apps shared one file. C22
+ * §141 already refuses `PRISM_TUI_STATE_DIR` inside `src/` for exactly that
+ * reason — the argument was written down, applied to the environment variable,
+ * and not applied to the constant three files away.
+ *
+ * **The default is what an app gets when it says nothing**, which is precisely
+ * when it must not name somebody else.
+ */
+export const DEFAULT_STATE_DIR = "~/.calcium";
 
 const REQUIRED = ["name", "binary", "manifest", "theme"] as const;
 

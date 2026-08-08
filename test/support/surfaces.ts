@@ -956,7 +956,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     label: "S14 §2 — config, two table regions",
     width: 78,
     blocks: [
-      block({ kind: "rule", id: "s14-rule", label: "config · ~/.prism/config.toml" }),
+      block({ kind: "rule", id: "s14-rule", label: "config · ~/.calcium/config.toml" }),
       S14_KEYS,
       block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", gapBefore: true }),
       withActions(S14_CONTEXTS, ["⏎ edit", "␣ expand", "↕ switch context", "⊘ reset"]),

@@ -322,12 +322,16 @@ const FABRICATED: readonly Fabrication[] = [
   },
   {
     // SS9's literal half, which is the live one. A default that reads
-    // `~/.prism` looks like a courtesy and makes a standalone run append to the
+    // A hardcoded state path looks like a courtesy and makes a standalone run append to the
     // developer's own history — silently, in a file nobody opens until it is
     // wrong (C20 I12, T6.12).
     rule: "SS9",
     file: "src/interaction/history/store.ts",
-    source: 'const stateDir = deps.stateDir ?? "~/.prism";',
+    // **Deliberately not the current default.** SS9 matched `~/.prism` by name,
+    // so the rename to `~/.calcium` would have retired it in silence — a rule
+    // hunting a string nobody would write. Fabricating the violation with a third
+    // name is what proves the pattern is about the shape.
+    source: 'const stateDir = deps.stateDir ?? "~/.widget";',
   },
   {
     // SS30's three subjects, one fabrication each — a rule with three subjects
@@ -435,7 +439,7 @@ const FABRICATED: readonly Fabrication[] = [
     // than as the framework reading the environment.
     rule: "SS44",
     file: "src/shell/config.ts",
-    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? "~/.prism",',
+    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? "~/.calcium",',
   },
   {
     // **The shape SS29 could not catch and MG23 does.** An overlay manager

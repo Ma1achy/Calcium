@@ -147,7 +147,7 @@ describe("C22 §2 — config", () => {
   });
 
   it("T1.5d (I20): stateDir defaults and no environment is read", () => {
-    expect(resolveConfig(minimal(), AMBIENT).stateDir).toBe("~/.prism");
+    expect(resolveConfig(minimal(), AMBIENT).stateDir).toBe("~/.calcium");
     expect(resolveConfig({ ...minimal(), stateDir: "/tmp/x" }, AMBIENT).stateDir).toBe("/tmp/x");
   });
 
