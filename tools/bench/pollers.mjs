@@ -29,6 +29,10 @@ import { createTui, b, defaultTheme } from "../../dist/index.js";
 
 const WINDOW_MS = Number(process.argv[2] ?? 1_000);
 const EVERY_MS = Number(process.argv[3] ?? 100);
+// `own` (the default) is what the tree did before F91: two parts, two fetches.
+// `shared` is the same two parts naming one key. Both run against the same
+// `dist/`, so the comparison is a flag rather than a checkout.
+const MODE = process.argv[4] ?? "own";
 const COLUMNS = 100;
 const ROWS = 24;
 
@@ -174,6 +178,7 @@ const part = (id, title) =>
     id,
     title,
     every: EVERY_MS,
+    ...(MODE === "shared" ? { source: "bench-stats" } : {}),
     fetch: readSource,
     render: (data) => b.kv({ sample: String(data.sample) }, { id: `${id}-body` }),
     renderLoading: () => b.kv({ sample: "-" }, { id: `${id}-body` }),
@@ -182,7 +187,42 @@ const part = (id, title) =>
 const tui = createTui({
   name: "bench",
   binary: "/bin/true",
-  manifest: { schema: "tui.manifest/1", binary: "bench", version: "1.0.0", tools: [] },
+  manifest: {
+    schema: "tui.manifest/1",
+    binary: "bench",
+    version: "1.0.0",
+    // `local: true` is what lets `seal()` accept the handler below: the registry
+    // and the manifest are two records of one fact and C23 I27 compares them.
+    tools: [{ name: "fill", local: true, summary: "push the live entry off screen", args: [], flags: [] }],
+  },
+  localHandlers: {
+    // **A second entry, because visibility is per *host*.** The live parts and a
+    // filler block inside one document are one entry, and an entry with any row
+    // on screen is visible — so the only way to get the parts off screen is to
+    // put something else below them. That is C23 I46's stated granularity
+    // arriving in the instrument that measures it.
+    // **`schema`, `command` and `status` too.** `LocalDocument` omits only `meta`,
+    // so a handler returning `{blocks}` alone is a document C04 refuses — and the
+    // refusal is swallowed twice on the way out, which is F135 arriving a third
+    // time in an instrument. The guard below is what said so; the numbers above
+    // it were fine and the ones after it would have been a measurement of
+    // nothing.
+    fill: () => ({
+      schema: "tui.view/1",
+      command: "/fill",
+      status: "ok",
+      blocks: [
+        b.logs(
+          Array.from({ length: 200 }, (_, i) => ({
+            ts: "12:00:00",
+            level: "info",
+            message: `filler ${String(i)}`,
+          })),
+          { id: "filler" },
+        ),
+      ],
+    }),
+  },
   theme: defaultTheme,
   env: { TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "en_GB.UTF-8" },
   stdout,
@@ -209,7 +249,7 @@ const tui = createTui({
   }),
 });
 
-console.log(`# F91 baseline — two parts, one source, every ${String(EVERY_MS)} ms`);
+console.log(`# F91 — two parts, ${MODE === "shared" ? "one shared source" : "a source each"}, every ${String(EVERY_MS)} ms`);
 console.log(`# node ${process.version}, window ${String(WINDOW_MS)} ms`);
 
 await tui.start();
@@ -248,19 +288,38 @@ console.log(
     `= ${(onScreen / (WINDOW_MS / 1000)).toFixed(1)}/s across 2 parts`,
 );
 
-// Scroll the entry out of the viewport. `⌃Home` is `scrollTop` (C16's keymap),
-// and with the prompt and chrome taking the bottom rows a `scrollTop` on a
-// transcript this small still shows it — so the count below is the honest
-// statement of what the driver does NOT check rather than a demonstration of
-// scrolling. `refresh.ts` holds no visibility check of any kind: the number is
-// identical by construction, and that is the finding.
+// **Push the live entry off screen with a second entry, then read the rate.**
+// A `⌃Home` on a two-row transcript scrolls nothing, so an earlier draft of this
+// measured a part that had never left the viewport and reported the pause as
+// absent — the fixture agreeing with itself. Two hundred rows below it is what
+// makes the question askable.
+for (const ch of "/fill\r") stdin.emit(ch);
+await sleep(50);
+// **The fixture must be shown to respond before the number is read.** A `/fill`
+// that was refused leaves the parts on screen, and the rate below would report
+// the pause as absent while measuring nothing at all.
+const afterFill = screenRows(stdout.chunks, size);
+if (!afterFill.some((r) => r.includes("filler"))) {
+  console.error("\nFIXTURE DEAD: /fill did not append. The parts never left the screen.");
+  console.error(afterFill.filter((r) => r.trim() !== "").join("\n"));
+  process.exit(1);
+}
 const before = ticks;
-stdin.emit(`${ESCAPE}[1;5H`);
 await sleep(WINDOW_MS);
-const scrolled = ticks - before;
+const off = ticks - before;
 console.log(
-  `  scrolled:    ${String(scrolled)} fetches / ${String(WINDOW_MS)} ms ` +
-    `= ${(scrolled / (WINDOW_MS / 1000)).toFixed(1)}/s`,
+  `  off screen:  ${String(off)} fetches / ${String(WINDOW_MS)} ms ` +
+    `= ${(off / (WINDOW_MS / 1000)).toFixed(1)}/s`,
+);
+
+// And back. `⌃Home` is `scrollTop` (C16's keymap).
+stdin.emit(`${ESCAPE}[1;5H`);
+await sleep(50);
+const resumedFrom = ticks;
+await sleep(WINDOW_MS);
+console.log(
+  `  back on:     ${String(ticks - resumedFrom)} fetches / ${String(WINDOW_MS)} ms ` +
+    `= ${((ticks - resumedFrom) / (WINDOW_MS / 1000)).toFixed(1)}/s`,
 );
 
 // d — commits per source tick. C03 gives `stream` a 33 ms window, so two patches

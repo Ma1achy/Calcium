@@ -5607,3 +5607,38 @@ working. What a third instance buys is the record: the collision is with any
 identifier of the same name anywhere in `src/`, not only with a similar table.
 
 ---
+
+## F137 — a fold runs on a version, so an attempt that failed is not counted ★★
+
+**A stated loss of the derivation layer, filed with the migration that produced
+it.** C23 I47's fold runs once per *source version*, and a version exists only
+when the fetch resolved. So a poll that failed at the transport reaches
+`renderError` and never reaches `compute` — and an app that counts attempts
+cannot count that one.
+
+`createCpuTick` counted them. It was the `fetch`, so `ring.began()` ran on the
+way past and its `catch` recorded the miss before rethrowing; `axisCaption` then
+says *N attempts, M readings*, and the divergence between the two is the app's
+report of a stall.
+
+**The two misses are not the same and only one is lost.** A container that has
+stopped still *resolves* — docker returns `--` for every measurement — so the
+fold runs and `took(null)` records it. That is the common case and it is
+unchanged. What is gone is `docker` itself failing, and there the driver renders
+the error arm and the panel title says `unavailable` outright, so the caption's
+divergence was the weaker of two signals for one event.
+
+**Why it is not fixed here.** The remedy is widening `derive` to run on the
+failure path too — `compute(data | error, prev)` — which makes every app's fold
+handle a second shape for a case most of them do not accumulate across. That is a
+C23 §3c ruling and taking it from inside a sharing change would be deciding I47
+to suit one consumer.
+
+**Filed rather than absorbed, because the app's own walk ruled the opposite.**
+S3_WALK A2 says *a rejection is still a tick, and a count taken only on success
+cannot see the stall it exists to report*. That sentence is still right and its
+mechanism has moved out from under it — the shape C23 §8a A4 records, where a
+ruling is correct about the interaction and assumes a mechanism the layer below
+does not have.
+
+---
