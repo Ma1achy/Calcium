@@ -480,14 +480,60 @@ type LiveSpec = Readonly<{
   id:     string;
   title:  string;                                  // the panel's, and where state is said
   every?: number;                                  // omit → one-shot, no retry
-  fetch?: () => Promise<unknown>;
-  stream?: () => AsyncIterable<unknown>;           // → stall detection
-  render: (data: unknown) => Block;
+  fetch:  () => Promise<unknown>;                  // required — I21, F78
+  source?: string;                                 // shared with every part naming it
+  derive?: { key: string; compute: (data: unknown, prev: unknown) => unknown };
+  render: (data: unknown, ctx: ProducerContext) => Block;
   renderError?:   (err: ErrorLike, retryInMs: number | null) => Block;
   renderLoading?: () => Block;
   staleAfter?: number;                             // default 2 × every
 }>;
 ```
+
+> **`stream` is gone and `fetch` is required** (I21, F78) — the block above carried both for
+> as long as this section was specified-and-not-shipped, which is the state that lets a type
+> in a spec disagree with an invariant two hundred lines below it.
+
+### `source` and `derive` — one poll behind several parts (C23 §3c)
+
+**`source` is a key and not a fetch**, because functions cannot be compared and sharing needs
+a declared claim of sameness. Every part naming one key shares **one** `fetch` and one
+derivation; only `render` is per instance, so two panels of one document cannot show two
+samples of one instant — which is what they did, measured at `19` against `20` in a single
+composed frame before this existed.
+
+**`derive` is a fold over that source's versions**, run once per version and shared by key,
+and its result reaches `render` in the fetched data's place. It exists because the rule below
+has to be satisfiable:
+
+> **Per-part state is view state only. Anything that accumulates belongs in a derivation.**
+
+A ring buffer maintained inside `fetch` is the shape that rule forbids, and it is what the
+reference app did — so `derive` is not a convenience beside `source`, it is what makes
+`source` usable at all.
+
+**Two rulings a consumer will meet.** Two parts naming one key with different `every` is
+**refused at construction**, naming both parts and both values — a conflicting cadence is a
+programming error and refusing is available, so arbitrating it would store the loser's
+declaration where it reads as honoured. And two parts naming one key with different `fetch`
+closures is **not checked**: the key is the claim that these fetches are the same and the
+framework takes it, which is exactly the standing of `source` being a string.
+
+### A behaviour change for parts that declared nothing
+
+**A source polls only while something is looking at it** (C23 I46). Scroll a hosting entry
+out of the viewport and the fetch stops; scroll back and it is due immediately. This applies
+to **every** live part and not only those declaring a `source`.
+
+**It is not configurable, which is I6**, and the asymmetry is why it is safe to make it
+unconditional: a part accumulating inside its `fetch` is already broken by the rule above, so
+pausing surfaces that defect rather than causing it. The alternative — pausing only parts
+that opted into sharing — would make off-screen behaviour depend on an unrelated declaration,
+so an app adding a key to share a fetch would find its polling semantics changed with it.
+
+**What does not change**: nothing is released, the part stays declared, and C23 I33's five
+triggers remain the only teardown. A pushed view is visible while its layer exists, so the
+pause reaches transcript-hosted parts and does not reach a drill-in at all.
 
 **`b.live` returns a `panel`, and the three renderings supply its child.** Both
 halves were forced rather than chosen, and by different things.
@@ -784,6 +830,9 @@ carries the state — and §7 records what that changed.
 - **I25** — **No component composes a frame twice.** The composition `session.ts` performs is a named unit that `session.ts` calls, and a source scan says so, because the render chain's four coming stages — diffing, caching, windowing, capping — would diverge silently from any copy. **The class is one level up from an unreachable member**: every prior instance was *a member nobody could call*, this was *a sequence nobody named*, and no rule that walks members can see it — MG24 counts consumers, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree where every member is consumed and only the order is missing. A private method is the perfect hiding place, because the composition **is** consumed, sixty times a second, by the one caller inside the class (F126).
 - **I26** — **A consumer can build a `ProducerContext`**, with the real measurer in it. `ProducerContext.measure` is the frame's own — one arithmetic, or a split decided in a producer and the rows drawn on screen disagree — and `BlockRegistry` stays interior (§3), so a consumer whose adapter or handler *takes* a context could not call it outside a session. That is I19's argument a second time: a producer the framework can test and a consumer cannot is a producer whose app-side tests assert against something the user never sees. **Found by deleting the reference app's reimplementation of the measurer** (F37), which was also the fixture its own suite measured with. `localContext` comes with it for the same reason and adds `ask`, defaulting to the **decline** path — C23 I36's own semantics, so a handler tested without a scripted answer takes the route `Esc` takes rather than a stub's.
 
+- **I27** — **`LiveSpec.source` declares sameness and `LiveSpec.derive` is what makes it usable.** Two parts naming one key share one `fetch` and one fold, so two panels of one document cannot show two samples of one instant (C23 I44). The pairing is not a convenience: a part accumulating inside its `fetch` cannot share one, which is what the reference app did, so `source` without `derive` has no consumer. A conflicting `every` on one key is **refused at construction naming both parts**, and conflicting `fetch` closures are **not checked** — the key is the claim that they are the same and the framework takes it, which is the standing of a string key at all (C23 I42, C23 I43, C23 I47).
+- **I28** — **A live part does not poll while nothing is looking at it, and this is not configurable** (I6, C23 I46). It reaches every part rather than only those declaring a `source`, because a part accumulating inside `fetch` is already broken by I27's rule and pausing surfaces that rather than causing it; the alternative would make off-screen behaviour depend on an unrelated declaration. **Nothing is released** — the part stays declared and C23 I33's five triggers remain the only teardown — and a pushed view is visible while its layer exists, so the pause reaches transcript-hosted parts and not a drill-in. It is a stated behaviour change for declarations that predate it, which is why it is an invariant here and not only in C23.
+
 ---
 
 ## 10. Commitments
@@ -813,6 +862,8 @@ carries the state — and §7 records what that changed.
 23. The composition exists once. A named unit `session.ts` calls, checked by a scan, because the coming render chain would diverge from a copy in silence (I25).
 24. Each refused export names the mechanism that replaces it, and the one that replaces nothing says which component already does the work (§3, C07 I17).
 25. A consumer can build the context its own producer receives, measurer included — the grant is testable from the side that consumes it (I26).
+26. Parts sharing a declared key share one poll and one fold, so two views of one source cannot disagree; a conflicting cadence is refused and conflicting fetches are taken on the key's word (I27).
+27. A live part does not poll while nothing is looking at it, for every part and not only the sharing ones — a stated behaviour change, unconditional, and releasing nothing (I28).
 
 ---
 
@@ -862,6 +913,7 @@ carries the state — and §7 records what that changed.
 - **T3.10**: nesting `b.panel` inside `b.group` inside `b.panel` → valid, measured correctly.
 - **T3.11**: an adapter registered for an absent verb → warning at startup, session opens.
 - **T3.12**: a theme failing contrast → construction throws before the terminal is acquired.
+- **T3.13 (I27)**: two `b.live` parts naming one `source` with different `every` → construction throws, and the message names **both** ids and **both** values. From the public entry, because this is the error an app author meets and the one that has to say which two declarations to look at.
 
 ### Tier 4 — integration
 
@@ -869,6 +921,8 @@ carries the state — and §7 records what that changed.
 - **T4.2** (with C09): every builder's output measures correctly at seven widths.
 - **T4.3** (with C23): a `b.live` part in a transcript entry and one in a pushed view are driven by the same code path.
 - **T4.4** (with C23): a failing `b.live` part leaves its siblings rendering.
+- **T4.4a** (I27, with C23): two parts naming one `source`, from the public entry only — one `fetch` per tick and one value in both panels. **The control is the same pair without the key**, and it must show two calls and two values: the row's subject is the divergence, so a fixture that cannot produce one asserts nothing.
+- **T4.4b** (I28, with C23, C14): a hosting entry scrolled out of the viewport → the `fetch` spy stops advancing; scrolled back → it advances again. Both halves, because a pause that never resumes satisfies the first.
 - **T4.5** (with C10): `defaultTheme` passes every contrast floor at every colour depth.
 - **T4.6** (with C07): an adapter written using only the public surface produces a document indistinguishable from one written against internals.
 - **T4.7** (with the reference app): the docker app compiles against the public entry only — no deep imports.
@@ -888,6 +942,8 @@ carries the state — and §7 records what that changed.
 - **T6.2** (I3): a builder returning a description → T2.4 fails, and consumers learn two type families.
 - **T6.3** (I5): inferring a tone from a field name → T2.7 fails, and the fifth verb breaks silently.
 - **T6.4** (I6): making backoff configurable → the isolation guarantee becomes optional.
+- **T6.14** (I27): arbitrating a conflicting `every` instead of refusing → T3.13 fails. The revert that reads as tolerance: nothing throws, both parts tick, and the losing declaration is stored where an author will read it and believe it.
+- **T6.15** (I28): making the off-screen pause opt-in — reaching only parts that declared a `source` → T4.4b fails for a part with no key, and off-screen behaviour starts depending on an unrelated declaration.
 - **T6.5** (I7): passing `tick` to `measure` → T2.5 fails, and a spinner shifts the viewport.
 - **T6.6** (I8): `testing` reachable from the runtime entry → T2.3 fails.
 - **T6.7** (I1): an export nothing consumes → T2.2 fails, and the surface starts accreting.
