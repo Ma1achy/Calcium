@@ -45,7 +45,7 @@ type TuiConfig = Readonly<{
   capabilities?: Partial<TerminalCapabilities> | undefined;   // C02's overrides, wired (I49)
   clock?:    () => number;
   fs?:       FileSystem;
-  stateDir?: string;                       // default ~/.prism; the app resolves PRISM_TUI_STATE_DIR (I20)
+  stateDir?: string;                       // default ~/.calcium; the app resolves its own variable (I20)
   openUrl?: (url: URL) => Promise<void>;   // default: the OS handler, http/https only
   stdout?: NodeJS.WriteStream;
   stdin?:  NodeJS.ReadStream;
@@ -100,7 +100,11 @@ Found by running the fixture manifest through a real session for the first time.
 
 They arrive as config because that is where everything an app supplies arrives, and they are registered at step 10 **before** `seal()`, which is what makes the reconciliation see them. Registering after the seal would be a second window in which the two records can differ, and the seal exists to close the first.
 
-`stateDir` defaults to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
+`stateDir` defaults to **`~/.calcium`**, and the framework's own name is the only defensible one. It read `~/.prism` — named for one consumer, in a framework that claims to serve others, so every app that did not override it wrote its history and its theme preference into `prism-tui`'s directory and two apps shared one file.
+
+**The argument against it was already in this section**, twenty lines down: §141 refuses `PRISM_TUI_STATE_DIR` inside `src/` because *a variable named for one consumer has no business inside a framework that claims to serve others*. That reasoning is right, it was applied to the environment variable, and it was not applied to the constant three files away — **a correct sentence justifying the scope it was attached to and silent about the identical case beside it**, which is F84's shape (MG24 scoped to `export interface` for a true reason about a different question).
+
+It is still injected, for the reason it always was: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable. **The default is what an app gets when it says nothing, and that is exactly when it must not name somebody else.**
 
 **`env` is the environment record, and the app supplies it** (I20). C02 takes one (`detectCapabilities(env, overrides)`) and C21 takes one (`ProcessRunnerDeps.env`, for `$SHELL`), and **no file under `src/` reads `process.env`** — not even C02, which is allow-listed for it and does not use the allowance. So the record enters through config, from the app's entry point, along with `stateDir` and `transport`.
 
@@ -986,7 +990,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 ## 11. Commitments
 
 1. Four required config fields; every other has a working default, `pipeline` included (I17, I22).
-2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.prism` and the **app's entry point** resolves `PRISM_TUI_STATE_DIR` (I10, I20).
+2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.calcium` — the framework's name, never a consumer's — and the **app's entry point** resolves its own variable (I10, I20).
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
 3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
 3b. `createTui` validates and returns; steps 2 to 12 run inside `start()` (I7a).

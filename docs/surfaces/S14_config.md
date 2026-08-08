@@ -25,7 +25,7 @@ The flat verbs remain for scripting. This surface is the interactive path, not a
 ## 2. The screen
 
 ```
-▌ ── config · ~/.prism/config.toml ─────────────────────────────────────────────
+▌ ── config · ~/.calcium/config.toml ───────────────────────────────────────────
 ▌
 ▌     key                    value                        source
 ▌ ▸   current_context        fmx-prod                     config
@@ -251,7 +251,7 @@ Every action is a fill. Nothing on this surface changes anything directly — a 
 - **T4.3** (with C17, C19): a value containing a space survives fill → edit → submit → parse.
 - **T4.4** (with C10): `/config set ui.theme light` submitted from here switches the theme through the normal path, with no local shortcut.
 - **T4.5** (with C05): accepted values come from the manifest, not from a table here.
-- **T4.6** (with C22): the file path in the rule header is the resolved `stateDir`, not a hardcoded `~/.prism`.
+- **T4.6** (with C22): the file path in the rule header is the resolved `stateDir`, not a hardcoded default of any name.
 
 ### Tier 5 — e2e
 
