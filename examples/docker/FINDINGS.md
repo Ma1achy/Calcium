@@ -3570,6 +3570,23 @@ something other than what a reader experiences.
 
 ## F91 — every `b.live` part owns its own fetch, and two views of one source disagree ★★★
 
+> **CLOSED** — tier 3 row 2, `36e850d` `1c78ab6` `af90056` `b2f63c3` `372cff3`. Measured
+> before and after in `docs/notes/TUI_NOTE_shared_pollers_baseline.md`: two panels of one
+> document, read from **one composed frame**, went from `19` and `20` to `10` and `10`; the
+> poll rate halved; the reference app's drill-in went from 7 `docker container stats` in
+> fourteen seconds to 4; and a source polls nothing at all while nobody is looking.
+>
+> **Two of this finding's own claims were wrong and are corrected here.** `/stats` **does not
+> exist** — `manifest/read.ts:59` reserves the name deliberately, *"so that `/stats` stays
+> free"* — so the three sharers are two, and they are `container.ts`'s `cpu` and `io`, in one
+> document, running identical argv every 2 s. And the dashboard's `docker stats` (all
+> containers) is a *different* command from the drill-in's, so those two were never sharers.
+>
+> **What stayed owed**: staleness is still measured per part from its own `lastOk`, so two
+> parts on one `sourceVersion` can agree on the data and disagree in their titles (C23 §8d
+> D10). And **F137** — a fold runs on a version, so an attempt that failed at the transport is
+> no longer counted.
+
 **The optimisation is the weaker half.** The landing dashboard, `/stats` and a
 single-container panel each spawn `docker stats --no-stream` on their own interval —
 three subprocesses, one endpoint, no coordination.

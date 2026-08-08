@@ -124,3 +124,77 @@ a side effect and `io`'s does not, and **sharing one fetch between them silently
 ring**. Stage 1 therefore has no consumer in the reference app until stage 2 exists. Row 1's
 danger was a stage that landed alone and flattered itself; this row's is a stage that cannot
 land alone at all.
+
+---
+
+## 6. After — the same instrument, the same build
+
+`tools/bench/pollers.mjs` takes the mode as a flag rather than a checkout, so both
+columns are one `dist/`:
+
+| | polls / s (2 parts) | the two panels, from one frame | off screen | back on |
+|---|---|---|---|---|
+| a source each | **20.0** | `19` vs `20` | **0.0** | 20.0 |
+| one shared key | **10.0** | `10` and `10` | **0.0** | 10.0 |
+
+**The correctness half is closed on the frame and not on a counter.** Two panels of one
+document, read from a single composed frame, carrying one number where they carried two.
+
+**The pause reaches both rows, which is the Q2 ruling working.** `own` polls nothing off
+screen either, because C23 I46 applies to every part and not only to those declaring a `source`.
+A part accumulating inside its `fetch` was already broken by §3c's rule; pausing surfaces
+that rather than causing it.
+
+**And the off-screen leg needed a second entry to be askable at all.** Visibility is per
+*host*, so the live parts and a filler block inside one document are one entry and an entry
+with any row on screen is visible. A first draft sent `⌃Home` on a two-row transcript,
+scrolled nothing, and reported the pause as absent — the fixture agreeing with itself. The
+guard that caught it checks the filler is on screen before the number below it is read, and
+it fired twice: once for the scroll, once because a local handler returning `{blocks}` alone
+is a document C04 refuses and `appendAndCommit` swallows. **F135's shape, third instance, in
+the instrument built to measure something else.**
+
+## 7. The reference app, read through a PTY
+
+`docker container stats dtui-web`, fourteen seconds, counted with a `docker` shim earlier on
+`PATH` that logs its argv and execs the real one — counting invocations rather than
+processes, because processes race.
+
+```
+before   7 × container stats --no-stream --format json 2e6210b77167
+after    4 ×
+```
+
+**And the plot has no gap.** `4 ticks · 2s each` on both sides, the curve accumulating —
+which is the migration read the ring's move from `fetch` to `derive` had to survive. What it
+does *not* survive is F137, and that is filed rather than absorbed: a fold runs on a version
+and a version exists only when the fetch resolved, so a poll that failed at the transport is
+no longer counted as an attempt.
+
+## 8. What the row found that nothing failed on
+
+Six, and the split is the argument for the instruments rather than for the assertions:
+
+| how | what |
+|---|---|
+| ask where a claim was written down | `/stats` does not exist; F91's three sharers are two, in one document |
+| reading the source before building on it | `createCpuTick` accumulates *inside* the fetch, so stage 1 has no consumer without stage 2 |
+| writing the test the spec named | the cadence refusal threw into a bare catch: **two panels at `◌ loading`, silently, for ever** |
+| a row, not the walk | a conflict *inside one* `declare` call compared itself against an empty map |
+| a row, not the walk | `/clear` deleted hosts from the map directly, bypassing the only teardown path |
+| an enforcement rule firing | MG24 matched `Source.derived` against C08's unrelated `VerbRatio.derived`, by name and not by owner — F136's class, fourth instance |
+
+**Two of those are about the *reader* and neither artefact indexes the reader.** §8a A4's
+lesson says a ruling can be correct about an interaction and wrong about a mechanism the
+layer below does not have; the walk asked what a throw *leaves behind* and never asked **who
+sees it**. That question has no row in a sequence trace or a classification table, because
+the person reading the screen is not a rule.
+
+## 9. Still owed
+
+- **Staleness is per part and the data is per source** (§8d D10). Two parts on one
+  `sourceVersion` can disagree in their titles, because `lastOk` is the part's. Moving it is
+  a decision about C23 I35 and taking it from inside a sharing change would be deciding one
+  invariant to suit another.
+- **F137** — a fold cannot count an attempt that failed. The remedy widens `derive` to the
+  failure path, which is a §3c ruling.

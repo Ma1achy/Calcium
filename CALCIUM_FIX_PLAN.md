@@ -190,7 +190,7 @@ is, and no field fixes it.
 | item | fix | consumers | ⚠ | depends on |
 |---|---|---|---|---|
 | **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | C09 | **partial** · `48d3be3` `af87fb3` `a2d4fd3` `6cf2ee2` `266c076` `4efa247` `1d5a4b3` `5bc3f91` — stage 3 reaches one kind of five (**F134**) |
-| **F91** shared pollers | change | 3 parts, plus the off-screen half | — | — |
+| **F91** shared pollers | change | **2 parts of one document**, plus the off-screen half | — | **done** · `36e850d` `1c78ab6` `af90056` `b2f63c3` `372cff3` — one owed (**F137**) |
 | **F15** the empty-block mechanism | **ruling** — C23 §5's bare catch is deliberate | 1, *and it is the mechanism* | — | — |
 | **F67** a region too small refused rather than drawn dark | ruling | 1 | — | — |
 
@@ -222,9 +222,30 @@ large diff and *resizing* while one is on screen.
 row: which component owns a per-block row cap — C13 on append, C07 at adaptation, C09 at
 measure — and what *overridable* means. The marker is what keeps it honest.
 
-**F91 is filed on the correctness half.** Two views of one source holding different numbers is
-the defect; three subprocesses is the symptom. `source → derivation → part`, two levels and
-not a reactive graph.
+**F91 was filed on the correctness half and that half is what closed it.** Two panels of one
+document, read from **one composed frame**, went from `19` and `20` to `10` and `10`; the poll
+rate halved; the reference app's drill-in went from 7 `docker container stats` in fourteen
+seconds to 4; and a source now polls nothing while nobody is looking.
+`docs/notes/TUI_NOTE_shared_pollers_baseline.md` is the record.
+
+**Two of the finding's own claims moved under measurement, and one changed what got built.**
+`/stats` does not exist — reserved deliberately, never declared — so the three sharers are
+two, in one document, running identical argv every 2 s. And `createCpuTick` accumulated
+*inside the fetch*, so **stage 1 had no consumer until stage 2 existed**: row 1's danger was a
+stage that landed alone and flattered itself, and this row's was a stage that could not land
+alone at all.
+
+**The ruling that changed shape mid-row was where a refusal lands.** A conflicting cadence is
+refused rather than arbitrated — and thrown, it went into `appendAndCommit`'s deliberate bare
+catch and the author got **two panels at `◌ loading` for the life of the session, silently**.
+Strictly worse than the arbitration it was chosen over. It is drawn in the losing part's panel
+now, and the row that found it is at the public entry, because every driver-level assertion
+could see the throw and no app author ever could.
+
+**Still owed**: staleness is per part while the data is per source, so two parts on one
+`sourceVersion` can agree on the numbers and disagree in their titles (C23 §8d D10); and
+**F137**, a fold runs on a version, so an attempt that failed at the transport is no longer
+counted.
 
 **F15 is a ruling and not a change** because the bare catch is documented and deliberate. What
 is owed is whether a malformed document may be indistinguishable from a verb that did nothing.
