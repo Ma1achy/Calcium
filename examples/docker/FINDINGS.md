@@ -5788,48 +5788,55 @@ leaves a transcript indistinguishable from one where the verb was quiet.
 
 ---
 
-## F139 — the tier-5 baseline is 44 *or* 45, and the row that decides is a coin flip ★★
+## F139 — T5.6 measures the host, so tier 5's count is a fingerprint only on an idle machine ★★
 
 | | |
 |---|---|
 | **Surface** | `make e2e`, and every row-closing comparison that cites F133's 44 |
 | **Reached for** | a clean before/after on tier 5 for tier 3 row 3 |
-| **Verdict** | **a real finding about the instrument**, not about the code under test |
+| **Verdict** | **a real finding about the instrument** — and this entry is a rewrite of a wrong one |
 
-The after-run came back **45 failed / 49 passed / 7 todo** against a baseline of
-**44 / 50 / 7**. One row moved: C03's `T5.6 — sixty seconds idle is zero writes and no
-measurable CPU`.
+C03's `T5.6 — sixty seconds idle is zero writes and no measurable CPU` asserts
+`cpuFraction < 0.01`, a fraction of **wall-clock** CPU over a minute. That is a statement
+about the machine the suite is running on, not about C03: `writes` is `0` on every run,
+including the failures, so the frame path is silent and what is over budget is the process's
+share of a host somebody else is also using.
 
-**The first diagnosis was wrong and re-measuring is what said so.** I had run the eleven-run
-mutation pass concurrently with that e2e, which is F69's contention pattern, so the obvious
-reading was a timing failure under load. Re-run alone, T5.6 failed **worse** — 0.0275 against
-0.0121 — and T5.1, which had also failed, passed. So contention explains T5.1 and explains
-nothing about T5.6.
+**Measured.**
 
-**Measured on both sides, in a worktree at the pre-row commit:**
+| condition | tree | runs | failed | `cpuFraction` on failures |
+|---|---|---|---|---|
+| a VAE training in another process | `a5b6486`, before the row | 4 | 2 | 0.0245, 0.0153 |
+| the same | `ee0caf7`, after the row | 3 | 1 | 0.0414 |
+| **idle machine** | `ee0caf7` | **5** | **0** | — |
 
-| tree | runs | failed | `cpuFraction` observed |
-|---|---|---|---|
-| `a5b6486` — before the row | 4 | **2** | 0.0245, 0.0153 |
-| `ee0caf7` — after the row | 3 | **1** | 0.0414 |
+And the full suite on an idle machine: **44 failed / 50 passed / 7 todo**, with the failing
+row set *identical* to F133's baseline — the same rows, not merely the same count.
 
-The bound is `0.01`. `writes` is `0` on every run, so the frame path is silent and it is the
-process's own idle cost that is over — and it is over by between 1.5× and 4×, about half the
-time, **on both sides of the change**. The row did not regress; it was sampled.
+### The rewrite, because the first version of this finding was wrong
 
-### Why this is worth a finding rather than a shrug
+It claimed the baseline was *"44 or 45, and the row that decides is a coin flip"*, on the
+strength of seven runs across two trees. **Every one of those seven was taken while a VAE was
+training on the same host**, which I did not know and did not look for.
 
-**F133's 44 is used as a fingerprint.** The comparison protocol for every row in the fix plan
-is *the six targets before and after, counters compared, and F133's 44 rows are a known red on
-both sides* — which is only a check if the number is stable. It is not. A row closed against a
-45 would be read as having broken something, and a row that genuinely breaks one e2e test
-would be read as having hit the flake. **The instrument cannot currently distinguish the two**,
-which is the same failure mode as an exit status standing in for a counter, one level up.
+**Removing your own contention is not measuring on a quiet machine, and I treated it as
+though it were.** The sequence is the instructive part: the count moved, I attributed it to a
+mutation pass I had genuinely run concurrently, removed that, re-measured, found the number
+*worse* — and concluded contention was ruled out. It was ruled out as *my* contention. The
+correct inference from "quieter yet worse" is that the load is somewhere I have not looked,
+not that there is no load. Five for five green once the host was actually idle.
+
+**The tell was in the data and I read past it.** A row asserting a *CPU fraction* cannot fail
+for a reason internal to the code when its companion assertion — `writes === 0` — passes. That
+is the row telling you it is measuring the host, in the same output.
 
 ### What is owed
 
-Not fixed here, and deliberately not: the remedy is either a bound derived from the machine
-rather than a constant, or the row moved off wall-clock CPU entirely, and both are C03
-decisions taken from inside an unrelated row. What this entry buys is that the next person
-comparing tier-5 counters knows **44 and 45 are the same measurement**, and knows which row to
-check first when they differ.
+The row is not wrong to exist and is not fixed here: an idle session that burns 4% of a core
+would be a real defect, and the assertion is the only thing that would catch it. What is owed
+is that it cannot currently distinguish *that* from a busy laptop, so either the bound is
+derived from a calibration run or the row is skipped when the host is loaded.
+
+**And the comparison protocol needs one clause.** *The six targets before and after, counters
+compared* is only a check on an otherwise idle machine, and nothing said so — which is how a
+45 got as far as a committed finding.

@@ -247,11 +247,16 @@ could see the throw and no app author ever could.
 **F137**, a fold runs on a version, so an attempt that failed at the transport is no longer
 counted.
 
-**Tier 5 came back 45 and the baseline is 44, and it is neither a regression nor contention.**
-C03's `T5.6` fails about half the time on **both** sides of the change — measured four runs at
-`a5b6486` (two failures) against three at `ee0caf7` (one) — so **44 and 45 are the same
-measurement**. F139 records it, because F133's 44 is used as a fingerprint by every row in this
-plan and a fingerprint that moves on its own cannot tell a flake from a break.
+**Tier 5 is clean: 44 / 50 / 7, and the failing row set is *identical* to F133's** — the same
+rows, not merely the same count. It first came back 45, and C03's `T5.6` was the row that
+moved; it asserts a wall-clock **CPU fraction**, so it measures the host. Every failure was
+measured while an unrelated training job held the machine, and it is five for five green once
+the host is idle (F139).
+
+**So the protocol gains a clause it never had**: *the six targets before and after, counters
+compared* is only a check on an otherwise idle machine. And the lesson underneath it —
+**removing your own contention is not measuring on a quiet machine** — is what turned a clean
+row into a committed finding that had to be rewritten.
 
 **F15 was filed as a ruling and is a change**, because the ruling had already been made and
 never built: C23 §5, I1 and §8a A5 all said *"logged as a defect"* and no component had a sink.
