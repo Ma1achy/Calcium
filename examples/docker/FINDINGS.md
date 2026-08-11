@@ -2461,7 +2461,7 @@ and the reason it is uninteresting is better than the reason given.
 
 ---
 
-## F67 — below a certain terminal size the shell draws nothing, says nothing, and stays alive ★★★
+## F67 — below a certain terminal size the shell draws nothing, says nothing, and stays alive ★★★ — **CLOSED**
 
 Found while shrinking a capture to make a compact README image. At **14 rows** the
 application produced an empty picture and the pipeline reported success.
@@ -2501,6 +2501,68 @@ Filed with what was measured.
 60 / 80 / 120 / 160 columns and a fixed height; the height axis has no equivalent sweep,
 and a document that renders to zero visible rows produces a frame that is *correct* — it
 is what was asked for. It took someone wanting a smaller picture.
+
+---
+
+### CLOSED — tier 3. The mechanism existed, was specified, and neither half ran
+
+**The gate was built and the record did not know.** `tooSmall()`, `drawFallback()`,
+`MIN_COLUMNS = 60`, `MIN_ROWS = 16`, wired as C22 gate 4, specified in C22 I8, I9 and I36,
+with unit rows — landed in `16ad934` on 2026-07-31, after this was filed. `CALCIUM_FIX_PLAN.md`
+still called it an open *ruling* and `TRIAGE.md` still called it open.
+
+**And measuring it reproduced the finding exactly.** Through a real PTY at F67's own table:
+
+| size | before | after |
+|---|---|---|
+| 100 x 12 | **0 bytes**, alive | `Terminal too small` / `100x12` / `Needs 60x16` |
+| 100 x 15 | **0 bytes**, alive | the same, with its own size |
+| 30 x 16 | **0 bytes**, alive | the same — the *columns* bound, which is why 30x16 was as blank as 100x12 |
+| 100 x 16 | opens | opens |
+| 100x12 → resize 100x30 | **0 further bytes**, no alternate screen | opens |
+
+### Two halves, one class, and it is the class that survives review
+
+**The fallback was drawn through `config.stdout`, which is not a route to the screen.** C01
+redirects `stdout.write` into its `debug` sink at **construction** (C01 I3, I9) — not at
+acquire — and `lifecycle.writer` is the only handle that still reaches the real stream.
+`constructGraph` has already run when gate 4 is read, so every byte went to a sink nobody
+reads. `fallback.ts`'s own doc explains the two-sink design and gets this one backwards:
+*"the terminal was never acquired and there is no alternate screen — this writes to the
+primary one, directly."* **Every clause is true.** It conflates *not acquired* with *not
+redirected*, and C01 separates them deliberately. The mid-session call site forty lines away
+has always used `writer`.
+
+**And the deferral deferred for ever.** C22 I8 registers an `onResize` to continue from step 5,
+and C01's `onWinch` began `if (state !== "acquired") return;` — while gate 4 deliberately does
+not acquire. T3.18's stated reason, *while suspended the dimensions belong to the child*, is
+true of `suspended` and of nothing else; `released` is terminal; `constructed` has neither
+property. **A guard covering three states with a reason that holds for one**, and C22 I8
+depended on a delivery C01 declined to make while C01 I12a recorded the asymmetry as though it
+were a decision. Ruled and fixed as C01 I12b.
+
+Both halves are **a correct sentence justifying a wider condition than it warrants** — MG24's
+class, twice in one defect, in two components.
+
+### Why no test could see either
+
+**A unit row hands `drawFallback` its own spy sink**, so a fallback written into C01's debug
+sink renders perfectly to it. **A fake lifecycle delivers a resize the real one dropped.** Each
+component was correct on its own side of the seam and the pair did nothing — which is why the
+rows that close this are tier 5, at F67's exact sizes, against a real PTY: **C22 T4.21** and
+**T4.21b**, plus **C01 T3.18c**, which is the pair T3.18 never had. Four mutations, all caught,
+with a control the harness verified.
+
+**The height axis still has no sweep**, and that half of the finding stands: golden frames run
+60/80/120/160 columns at one height. What exists now is three rows at three small sizes, not a
+sweep, and the difference is worth stating rather than letting the closure imply more.
+
+### One thing measured on the way
+
+`test/e2e/lifecycle.test.ts`'s pre-existing failure — C22 T5.6, *piping the shell to `cat`* —
+is **never saw `/❯/`**, and the cause is that this PTY carries no `LANG`, so C02 resolves the
+ASCII pair and the prompt is `>`. One of the 44 explained, and the reason the row here waits on
+the alternate-screen sequence rather than on a glyph.
 
 ---
 

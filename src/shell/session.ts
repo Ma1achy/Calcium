@@ -184,7 +184,24 @@ class Session implements TuiInstance {
     // startup step 5 with session state intact.
     const size = this.#graph.lifecycle.size();
     if (tooSmall(size)) {
-      drawFallback(size, (s) => void this.config.stdout.write(s));
+      // **C01's writer, not `config.stdout`** — F67, and the one-line difference
+      // between this working and the shell drawing nothing for ever.
+      //
+      // `config.stdout.write` is *not* a route to the primary screen once the
+      // lifecycle exists. C01 redirects `stdout.write` into its `debug` sink at
+      // **construction** (C01 I3, I9) rather than at acquire, and `writer` is
+      // the only handle that still reaches the real stream. `constructGraph`
+      // has already run by the time this gate is read, so the fallback went to
+      // a sink nobody reads: 0 bytes on both channels, the process alive, for
+      // ever — which is F67's measurement exactly.
+      //
+      // **The reasoning was right and the handle was wrong**, which is why it
+      // survived review: *the terminal was never acquired, so there is no
+      // alternate screen, so write to the primary one directly* is true in
+      // every clause. It conflates *not acquired* with *not redirected*, and
+      // C01 separates them deliberately. The mid-session call site below has
+      // always used `writer`.
+      drawFallback(size, (s) => void this.#graph?.lifecycle.writer.write(s));
       this.#graph.lifecycle.onResize((next) => {
         if (!tooSmall(next)) this.#open();
       });

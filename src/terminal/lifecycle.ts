@@ -410,8 +410,18 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   const snapshotSize = (): TerminalSize => terminalSize(stdout);
 
   function onWinch(): void {
-    // T3.18 — while suspended the dimensions belong to the child.
-    if (state !== "acquired") return;
+    // **I12b — the states that drop are named, not inferred from the one that
+    // delivers.** This was `state !== "acquired"`, and T3.18's reason — while
+    // suspended the dimensions belong to the child — is true of `suspended` and
+    // of nothing else. `released` is terminal (I11). `constructed` has neither
+    // property, and C01 already answers `size()` there.
+    //
+    // The cost of the wider form was a contradiction neither spec could see:
+    // C22 I8 defers a failed size gate and registers an `onResize` to continue
+    // from startup step 5, and gate 4 deliberately does not acquire — so the
+    // deferral deferred for ever. Measured at 100x12, resized to 100x30: zero
+    // further bytes, no alternate screen, process alive. FINDINGS F67.
+    if (state === "suspended" || state === "released") return;
 
     // I12 — read each once, freeze, hand the same object to every subscriber.
     // Two reads per subscriber is where a mismatched pair would come from.

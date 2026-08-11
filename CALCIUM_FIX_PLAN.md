@@ -192,7 +192,7 @@ is, and no field fixes it.
 | **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | C09 | **partial** · `48d3be3` `af87fb3` `a2d4fd3` `6cf2ee2` `266c076` `4efa247` `1d5a4b3` `5bc3f91` — stage 3 reaches one kind of five (**F134**) |
 | **F91** shared pollers | change | **2 parts of one document**, plus the off-screen half | — | **done** · `36e850d` `1c78ab6` `af90056` `b2f63c3` `372cff3` — one owed (**F137**) |
 | **F15** the empty-block mechanism | **change** — a channel, not a rethrow | 1, *and it is the mechanism*, plus **C20's** and **F138's** | C04 | **done** · `4a7b9ec` `caf4f6a` `ee0caf7` — three subjects, one drain |
-| **F67** a region too small refused rather than drawn dark | ruling | 1 | — | — |
+| **F67** a region too small refused rather than drawn dark | **change** — two halves, one class | 1 | C01 | **done** · `a08f6db` — the gate existed and neither half ran |
 
 **F90's order was the finding and three of its four claims moved under measurement.**
 `docs/notes/TUI_NOTE_render_chain_baseline.md` is the record; the row is **partial**, and
@@ -257,6 +257,15 @@ the host is idle (F139).
 compared before and after* is a check only on an otherwise idle machine, and **compare the row
 set rather than the count**. None of it was unknown: the file opens with *"this file measures
 wall-clock and must not share the machine"*. The gap was a reader, not a record.
+
+**F67 was filed as a ruling and is a change, and the mechanism was already there.** `tooSmall`,
+`drawFallback` and gate 4 landed in `16ad934`; this plan and TRIAGE both still called it open.
+Measuring reproduced the finding exactly, because **neither half of the gate ran**: the fallback
+was written to `config.stdout`, which C01 redirects into its `debug` sink at construction rather
+than at acquire, and the `onResize` C22 I8 registers could never fire because C01 dropped every
+`SIGWINCH` outside `acquired`. Both are one class — a correct sentence justifying a condition
+wider than it warrants — in two components. C01 I12b is the ruling; C22 T4.21/T4.21b and C01
+T3.18c are the rows, all tier 5 or paired, because no unit test could see either half.
 
 **F15 was filed as a ruling and is a change**, because the ruling had already been made and
 never built: C23 §5, I1 and §8a A5 all said *"logged as a defect"* and no component had a sink.

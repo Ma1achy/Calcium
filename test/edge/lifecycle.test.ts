@@ -433,6 +433,26 @@ describe("C01 signals", () => {
     expect(resized).not.toHaveBeenCalled();
   });
 
+  it("T3.18c (I12b): SIGWINCH while constructed notifies everyone", () => {
+    // **The pair with T3.18, and it has to be a pair.** The guard was
+    // `state !== "acquired"`, which drops three states with a reason that holds
+    // for one — and any row checking only the dropping half passes against it.
+    // `constructed` is not `suspended`: nothing else owns the terminal, and C01
+    // already answers `size()` here for the same caller.
+    //
+    // The cost was C22 I8, whose whole mechanism is an `onResize` registered by
+    // a gate that deliberately does not acquire. It could never fire, so a
+    // shell too small to draw stayed that way through every resize. F67.
+    const { lifecycle } = harness();
+    const resized = vi.fn();
+    lifecycle.onResize(resized);
+
+    process.emit("SIGWINCH");
+
+    expect(resized).toHaveBeenCalledTimes(1);
+    expect(resized).toHaveBeenCalledWith({ columns: 80, rows: 24 });
+  });
+
   it("T3.19: three SIGWINCH in one tick give three notifications", () => {
     const { lifecycle } = harness();
     lifecycle.acquire();

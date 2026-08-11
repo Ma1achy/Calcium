@@ -289,7 +289,7 @@ Every instance is invisible by construction: a green suite, a plausible frame, n
 | **F61** | **`/logs` had never worked** — mawk block-buffers, so a `--follow` produced an empty screen for as long as the verb existed | **fixed** |
 | **F15** | an invalid document — no entry, no error, no clue | open, and it is the mechanism |
 | **F64** | `b.logs` has no consumer in this app at all; the surfaces document says it demonstrates tone on log lines and it does not | open — a claim, not a feature |
-| **F67** | **below 16 rows the shell draws nothing, says nothing, and stays alive** | open |
+| **F67** | **below 16 rows the shell draws nothing, says nothing, and stays alive** | **closed** — the gate existed and neither half ran (C01 I12b, C22 T4.21) |
 
 **F67 is the new instance and the first where the *framework* is the one saying nothing.**
 Measured with the size set on the PTY master before the child draws: 100×12, 100×15 and 30×16
