@@ -173,6 +173,22 @@ before filing a finding, ask where this would already be written. FINDINGS F139.
 
 ### The failing set moves under load, and that is the discriminator
 
+> **Most of this section was already written, in `test/support/budget.ts`**, and it was filed
+> here as new. That file's header says it in one sentence — *"Three consecutive full runs each
+> timed out a different subset of them, and every one passed on its own — which is worse than a
+> slow suite"* — and goes on to give the per-file measured worst times, the 5× ratio the budget
+> was sized at, and a standing instruction not to raise the numbers without re-measuring.
+>
+> **This is F139's own shape, a second time in one session.** F139 exists because the rule was
+> in `frame-scheduler.test.ts`'s header and a finding was filed re-deriving it wrongly. The
+> same thing happened again, on the same subject, four hours later — which says the instrument
+> *ask where this would already be written* wants pointing at the **test support directory**
+> specifically, because that is where a measurement's reason gets written and it is not a place
+> a reader looks for a protocol.
+>
+> What survives as new is narrower and is kept below: the **composition** test, the **start and
+> end** load readings, and why a *changed* set is more misleading than an identical one.
+
 Two more instances since, and together they sharpen *compare the row set* into something that
 identifies the cause rather than merely detecting a difference.
 
