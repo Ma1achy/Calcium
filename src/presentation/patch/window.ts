@@ -201,6 +201,169 @@ export function clampOffset(patch: Patch, width: number, height: number, offset:
  * a diff whose first visible row is the middle of a change is worse than one
  * that starts a row early.
  */
+/**
+ * Rows `[from, to)` of the full rendering, as a `Patch` plus leading slack —
+ * `BlockDefinition.window`'s shape (C09 I25, C09 I26).
+ *
+ * **A second function rather than a parameter on `windowPatch`, and the
+ * difference is I18's and not incidental.** The pushed view owns its region, so
+ * its window is *a slice plus sticky headers* and the headers come out of the
+ * budget: ask for 20 rows and get fewer rows of diff. A transcript window cannot
+ * do that — C14 measured the entry at full height and addresses rows inside it,
+ * so a window that returned different content for a row range would make the
+ * rendered entry disagree with the index, three components from the cause. Here
+ * the headers are still forced by the block shape, and they are paid for as
+ * `skipRows` instead of out of the budget. One shared row model (`rowsOf`), two
+ * accountings — a single function serving both would have to lie to one caller
+ * about what its budget bought.
+ *
+ * **The cut is row-wise and therefore exact**, which is the thing this row
+ * checked before building on it. I19 says a cut inside a run is not additive,
+ * and its example is a cut of the *line array*: a run of one removed and two
+ * added lines is two rows whole and three cut between them. A cut by **rows** —
+ * the first `min(k, removes)` removes beside the first `min(k, adds)` adds — is
+ * additive at every point, measured across every run up to 4x4. So C09 I26's
+ * equality holds with no slack beyond the headers, and no snapping is needed on
+ * this route. I19 still governs the view's offsets, whose reason is I20b's
+ * caller/window agreement rather than additivity.
+ */
+export function windowRows(
+  patch: Patch,
+  width: number,
+  from: number,
+  to: number,
+): Readonly<{ block: Patch; skipRows: number }> {
+  const layout = layoutFor(patch, width);
+  const rows = rowsOf(patch, layout);
+  const lo = Math.max(0, Math.min(Math.trunc(from), rows.length));  // cells-ok — a row index, not a width
+  const hi = Math.max(lo + 1, Math.min(Math.trunc(to), rows.length));  // cells-ok — a row index, not a width
+
+  // The path header renders whichever rows were asked for, so it is slack unless
+  // row 0 is one of them.
+  let skipRows = lo > 0 ? 1 : 0;
+
+  // Body rows are contiguous per hunk, so one range each is enough.
+  const touched = new Map<number, { first: number; last: number }>();
+  let markerIn = new Set<number>();
+  let headerIn = new Set<number>();
+  let tail = false;
+
+  rows.forEach((row, i) => {
+    if (i < lo || i >= hi) return;
+    if (row.kind === "tail") tail = true;
+    else if (row.kind === "marker") markerIn.add(row.hunk);
+    else if (row.kind === "header") headerIn.add(row.hunk);
+    else if (row.kind === "body") {
+      const cur = touched.get(row.hunk);
+      if (cur === undefined) touched.set(row.hunk, { first: i, last: i });
+      else cur.last = i;
+    }
+  });
+
+  // A hunk whose header is out of range still renders one, because nothing
+  // suppresses it (I18) — so it is slack, exactly as the path header is.
+  const hunkIds = [...new Set([...touched.keys(), ...headerIn, ...markerIn])].sort((a, c) => a - c);
+  for (const h of hunkIds) if (!headerIn.has(h)) skipRows += 1;
+
+  // Where each hunk's body rows begin in `rows`, so a row index becomes a body
+  // offset within the hunk.
+  const bodyStart = new Map<number, number>();
+  rows.forEach((row, i) => {
+    if (row.kind === "body" && !bodyStart.has(row.hunk)) bodyStart.set(row.hunk, i);
+  });
+
+  const hunks: Hunk[] = [];
+  for (const h of hunkIds) {
+    const source = patch.hunks[h];
+    if (source === undefined) continue;
+    const range = touched.get(h);
+    const lines =
+      range === undefined
+        ? []
+        : linesForRows(
+            source,
+            layout,
+            range.first - (bodyStart.get(h) ?? range.first),
+            range.last + 1 - (bodyStart.get(h) ?? range.first),
+          );
+    hunks.push({
+      header: source.header,
+      lines,
+      // I20 — only on the window whose rows contain it.
+      ...(markerIn.has(h) && source.collapsedBefore !== undefined
+        ? { collapsedBefore: source.collapsedBefore }
+        : {}),
+    });
+  }
+
+  const block_ = block({
+    kind: "patch",
+    id: patch.id,
+    path: patch.path,
+    language: patch.language,
+    hunks,
+    ...(tail && patch.collapsedAfter !== undefined ? { collapsedAfter: patch.collapsedAfter } : {}),
+    ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
+    // C25 I21a — the parent's gutter, read through `numberWidth` so a window of
+    // a window passes the pin down (T3.20b).
+    numberWidth: numberWidth(patch),
+  } as Patch);
+
+  return Object.freeze({ block: block_, skipRows });
+}
+
+/**
+ * The lines occupying body rows `[b0, b1)` of one hunk.
+ *
+ * A unit fully inside the range contributes its lines whole; a unit the range
+ * cuts contributes a **row-wise** slice, which is the additive one. Unified has
+ * one row per unit so the partial case never arises there — the same walk, not
+ * a branch.
+ */
+function linesForRows(hunk: Hunk, layout: Layout, b0: number, b1: number): Hunk["lines"] {
+  const out: Hunk["lines"][number][] = [];
+  let acc = 0;
+  for (const unit of unitsOf(hunk, layout)) {
+    const start = acc;
+    const end = acc + unit.rows;
+    acc = end;
+    if (end <= b0 || start >= b1) continue;
+    const lines = hunk.lines.slice(unit.lineFrom, unit.lineTo);
+    if (start >= b0 && end <= b1) {
+      out.push(...lines);
+      continue;
+    }
+    out.push(...rowSlice(lines, Math.max(0, b0 - start), Math.min(unit.rows, b1 - start)));
+  }
+  return out;
+}
+
+/**
+ * Rows `[p, q)` of one run, by side.
+ *
+ * A run of `r` removes and `a` adds is `max(r, a)` rows, the *n*th pairing the
+ * *n*th of each side. So its rows `[p, q)` are removes `[p, q)` beside adds
+ * `[p, q)`, each clamped to its own length — and that is why the halves sum:
+ * every row is accounted for on exactly one side of the cut.
+ */
+function rowSlice(lines: Hunk["lines"], p: number, q: number): Hunk["lines"][number][] {
+  const out: Hunk["lines"][number][] = [];
+  let removes = 0;
+  let adds = 0;
+  for (const line of lines) {
+    if (line.kind === "remove") {
+      if (removes >= p && removes < q) out.push(line);
+      removes += 1;
+    } else if (line.kind === "add") {
+      if (adds >= p && adds < q) out.push(line);
+      adds += 1;
+    } else {
+      out.push(line);
+    }
+  }
+  return out;
+}
+
 export function windowPatch(patch: Patch, width: number, offset: number, height: number): Patch {
   return build(patch, width, clampOffset(patch, width, height, offset), height).patch;
 }

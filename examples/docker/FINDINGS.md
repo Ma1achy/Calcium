@@ -5817,9 +5817,50 @@ Opening one is 3.7 s. The keystroke and same-size cases, which the cache and sta
 are 13.2 ms and 11.1 ms and are fine.
 
 **And the pin does not touch this.** `Patch.numberWidth` fixes the *fullscreen* window's
-correctness; the 43x and 384x are the *transcript* path, which is unwindowed and stays so until
-`patch` declares `BlockDefinition.window`. That remains owed, and it is now the only half of
-F134 left.
+correctness; the 43x and 384x are the *transcript* path, which is unwindowed until `patch`
+declares `BlockDefinition.window`.
+
+### CLOSED — `patch` declares a window, and the cut is exact
+
+| | before | after | `logs` |
+|---|---|---|---|
+| first frame | 3,679 ms | **176.7 ms** | 85.9 |
+| drag step | 3,229 ms | **31.5 ms** | 8.4 |
+| keystroke | 13.2 ms | 12.4 ms | 1.6 |
+| `SIGWINCH`, same size | 11.1 ms | 10.8 ms | 1.1 |
+
+**21x on opening and 102x on a drag step**, landing within 2–4x of the windowed kind rather
+than 43–384x. A patch does more per row than a log line — a gutter, a marker, syntax slots —
+so parity was never the target; the *shape* was, and it is the same shape now. The bench's own
+liveness guard still reports 47 body rows on screen, so it is not fast by drawing nothing.
+
+**The premise checked before building, and it inverted a stated invariant.** I19 says a window
+cuts only at run boundaries because *cutting inside a run is not additive* — and its example is
+a cut of the **line array**: a run of one removed and two added lines is two rows whole and
+three cut between them. A cut by **rows** is a different operation: the first `min(k, removes)`
+removes beside the first `min(k, adds)` adds is exactly `k` rows and leaves exactly the
+remainder. **Measured across every run up to 4x4 at every cut point: additive everywhere.** So
+C09 I26's equality holds exactly, with no slack beyond the headers, and no snapping is needed
+on this route. I19 still governs the pushed view's offsets — its reason there is I20b, a caller
+and a window disagreeing about where one may begin, not additivity. Recorded as **I19a**.
+
+**Two functions, one row model, and that was the other thing checked rather than assumed.**
+`windowPatch` could not be parameterised into serving both: the pushed view owns its region, so
+its window is *a slice plus sticky headers* and the headers come out of the budget (I18) — ask
+for 20 rows, get fewer rows of diff. A transcript window cannot do that, because C14 measured
+the entry at full height and addresses rows inside it. `windowRows` pays for the same forced
+headers as `skipRows` instead. They share `rowsOf`, so they cannot disagree about what a row
+is; a single function would have had to lie to one caller about what its budget bought.
+
+**Verified by the sweep, not by a row I wrote.** Declaring `window` puts `patch` into C09's
+generic conformance, which walks **every** `(from, to)` pair of every fixture and checks
+`measure(w.block, w) − skipRows === to − from`. Two fabrications confirm it is live rather than
+vacuous: an off-by-one in the row slice and dropping the path header's slack each fail it, and
+each failed exactly one row.
+
+**One correction to this file's own record.** `structured.ts` named four derivations that
+disqualify a kind from windowing, and `planColumns` was in the list in error — it reads column
+definitions and the width, never the rows. `keyValue` and `code` are the two still open.
 
 **Measured, and the measurement is inconclusive by construction rather than by variance.** A
 control pair with and without the pin, back to back: start 3,545 against 6,002 ms, keystroke
