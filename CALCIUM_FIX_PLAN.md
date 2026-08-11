@@ -326,7 +326,8 @@ leaves a constructed graph — measured identical on the pre-gate tree, so inher
 
 | item | fix | depends on |
 |---|---|---|
-| **F79 · F86** `screen.py`'s OSC leak, and F79's mechanism unestablished | change | **the fixture** — and the shape is already built, see below |
+| ~~**F79 · F86** `screen.py`'s OSC leak, and F79's mechanism unestablished~~ | — | **CLOSED** — the leak repaired and measured, 15 rows in `examples/docker/tools/screen_test.py`, five mutations. **Group 9 does not close: 1 of 11** |
+| **Group 9's other ten instruments** | **audit** | one fixture each, and a runner that runs them all |
 | ~~**Group 12** F69, F73 — time-based assertions under contention~~ | — | **NOT WORK** — ruled in this document, and `test/support/budget.ts` holds the measured half |
 | ~~**Group 7** 14 artefact findings~~ | — | **NOT WORK** — *habit, not a patch*, and the 14-vs-15 is measured and explained by F87 |
 | **Group 10** 5, all disproved | → `CLAUDE.md` | — |
@@ -354,13 +355,40 @@ was checked* by F87's remedy, which landed.
 lines, six rows, including *"responds to the thing under test — a wrong row is a wrong screen"*
 and *"strips SGR and modes without consuming the text around them"*, which is F79 and F86's
 exact subject tested on the TypeScript twin. `test/support/screen.ts`'s own header names
-`tools/screen.py` as *"the PTY-side equivalent"*. So the row is: port that file's six rows to
+`examples/docker/tools/screen.py` as *"the PTY-side equivalent"*. So the row is: port that file's six rows to
 the Python instrument, against `examples/docker/tools/screen.py` (133 lines).
 
-**And the citation misdirects, for the second time today.** Every reference says
-`tools/screen.py`; the file is at **`examples/docker/tools/screen.py`**. `tools/` in this
-repository holds `bench`, `enforce`, `mutate` and `proof.sh` and has never held it. F64's
-citation was the first, and both were found by following the pointer rather than trusting it.
+**And the citation misdirects when quoted out of its home directory**, which is a sharper
+thing than a wrong path and is why it survived. Inside `examples/docker/` the reference
+`tools/screen.py` is **relative-correct** — `make` runs there and `python3 tools/screen.py`
+works. Quoted from the repository root, or from `test/support/screen.ts`, or from
+`tools/bench/frame.mjs`, it names this repository's own `tools/`, which holds `bench`,
+`enforce`, `mutate` and `proof.sh` and has never held it. Three such quotations existed and are
+corrected; the in-directory ones are left, because they are right where they are. F64's was the
+first today, and both were found by following the pointer rather than trusting it.
+
+### What the distribution does to this plan
+
+**Group 11 goes sixth to first and group 9 seventh to third.** Of the 55 findings that were
+outside the inventory, sixteen are *a gate that passes without checking* and eight are *the
+instrument was wrong* — so everything filed since the count was last derived is dominated by
+the apparatus rather than by the framework.
+
+**That is not a reason to reopen tiers 1 to 5.** They were sorted by consumer count over the 89
+findings then visible, the work landed, and it is green. Re-sorting closed work against a
+ranking it could not have used buys nothing.
+
+**It is the reason group 9 does not close on `screen.py`**, and the reason the next section is
+about the apparatus rather than about another feature: a framework approaching publication
+needs its gates trustworthy more than it needs another capability, and the largest live group
+says the gates are where the defects are.
+
+**One caveat on the distribution itself, because it rests on judgement.** SP6 proves coverage
+and not placement — a bolded id anywhere in a section counts, and nothing distinguishes a key
+from a mention. So the 55 placements are one reader's, made from each entry's heading, and the
+document says so where they sit. The *shape* of the finding is robust to a few misplacements;
+a precise ranking from it is not. Tightening the key form to table rows only is what would make
+it checkable, and it is filed rather than done.
 
 **Group 12 is a decision already taken**, and it is here so nobody retakes it: `make load-down`
 keeps its place on the asymmetry rather than the odds, and both measurements are recorded —

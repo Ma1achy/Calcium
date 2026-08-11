@@ -103,7 +103,9 @@ function fakeStdin() {
 // **The JS twin of `test/support/screen.ts`**, and the duplication is named
 // rather than hidden. That file is TypeScript under `test/`; this runs against
 // the built package as a consumer would, and `dist/` does not carry it.
-// `tools/screen.py` is the third, on the PTY side. Three copies of one model,
+// `examples/docker/tools/screen.py` is the third, on the PTY side — the path is
+// relative-correct inside that directory and misdirects everywhere else, which
+// is how F79's citation went unfollowed. Three copies of one model,
 // each on its own side of a boundary — which is the same disposition
 // `VERIFYING.md` records for its instruments.
 const ESCAPE = String.fromCharCode(27);

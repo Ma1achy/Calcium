@@ -3644,6 +3644,44 @@ reproduce* is not a tidying exercise: the two commands above are the entire cost
 they turn one unreproducible anecdote into one falsified mechanism and one reproducible
 defect. Neither was available while the tool had no fixture.
 
+**Closed, both halves** — `examples/docker/tools/screen_test.py`, 15 rows, and the leak
+repaired.
+
+**The repair, measured before and after.** The pattern required a terminator, so
+`\x1b]0;docker-tui` with no BEL matched nothing, the render loop skipped its two escape bytes
+as *an escape we do not model*, and the remainder was written into the grid as text:
+
+```
+before   0;docker-tui[3/3] RUN sleep 2
+after    [3/3] RUN sleep 2
+```
+
+A terminal abandons an OSC at the next ESC and discards it at end of input, so both are
+terminators now. The lookahead consumes the body **without** swallowing the escape that follows
+— a fix that ate the CSI too would repair the leak and lose the colour, and one row cannot see
+the difference, which is why four forms are asserted.
+
+**F79's row is kept even though it does not reproduce.** *Strips SGR without consuming the text
+around it* is what stops the symptom returning silently, and a finding whose cause was
+falsified still names a property worth holding.
+
+**The port is not a pure port, and the mutation pass is what said so.** The six rows came from
+`test/support/screen.ts`, which models what `composeFrame` writes — HOME, CUP at column 0,
+`\r\n`. Making CUP **ignore its column entirely** left all ten rows green, because not one of
+them addresses a column. This instrument replays a *real capture*, so its input domain is
+strictly larger: five rows were added for CUP's column, CUF, EL, ED and CUU, and each kills a
+mutation the ported six could not. **A port inherits the domain of the thing it was ported
+from**, and here the two domains differ by the whole of the far side's output.
+
+**And the fixture failed on its own arithmetic first**, which is the argument for running it:
+the F86 row used F79's full seventeen-cell line against a ten-column screen, so it wrapped and
+the row read `[3/3] RUN` against an expectation of the whole line. The tool was right and the
+expectation was not.
+
+**Group 9 does not close on this: 1 of 11.** Said in `CALCIUM_FIX_PLAN.md` rather than only
+here, because a disposition recorded in the finding it disposes of is how F53 sat in a plan as
+work for a tier.
+
 ---
 
 ## F87 — the triage's partition is claimed, and the count that checks it cannot see the claim ★★

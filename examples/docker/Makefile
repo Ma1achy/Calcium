@@ -135,6 +135,9 @@ fixtures-status:    ## what is up
 	@docker ps -a --filter 'name=dtui-' \
 	  --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 
+tools-test:         ## the instruments' own fixtures — known bytes in, stated frame out
+	@python3 tools/screen_test.py
+
 help:
 	@grep -E '^[a-z-]+:.*?##' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN{FS=":.*?## "};{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}'

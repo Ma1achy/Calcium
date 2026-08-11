@@ -16,8 +16,10 @@
  * **Deliberately small.** It handles `ESC[H`, `ESC[r;cH`, `\r\n`, and strips
  * everything else — no scroll region, no insert mode, no wrapping. That is the
  * whole of what `composeFrame` writes, and a screen model that handled more
- * would be a second terminal to be wrong in. `tools/screen.py` is the PTY-side
- * equivalent and answers the same question about a real capture.
+ * would be a second terminal to be wrong in. `examples/docker/tools/screen.py`
+ * is the PTY-side equivalent and answers the same question about a real
+ * capture — and it now carries this file's rows, ported, plus five more for the
+ * arms a real capture has and `composeFrame` does not (F79, F86).
  */
 
 const ESC = "\u001b";
