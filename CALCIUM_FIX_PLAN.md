@@ -189,7 +189,7 @@ is, and no field fixes it.
 
 | item | fix | consumers | ⚠ | depends on |
 |---|---|---|---|---|
-| **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | C09 | **partial** · `48d3be3` `af87fb3` `a2d4fd3` `6cf2ee2` `266c076` `4efa247` `1d5a4b3` `5bc3f91` — stage 3 reaches one kind of five (**F134**, corrected — no drift exists; the residue is cost, measured 43x on opening and 384x on a drag step) |
+| **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | C09 | **partial** · `48d3be3` `af87fb3` `a2d4fd3` `6cf2ee2` `266c076` `4efa247` `1d5a4b3` `5bc3f91` — **F134 closed** — the drift was shipped in the fullscreen view and is pinned (C25 I21a), and `patch` now declares a window: 13-21x on opening, 90-102x per drag step |
 | **F91** shared pollers | change | **2 parts of one document**, plus the off-screen half | — | **done** · `36e850d` `1c78ab6` `af90056` `b2f63c3` `372cff3` — one owed (**F137**) |
 | **F15** the empty-block mechanism | **change** — a channel, not a rethrow | 1, *and it is the mechanism*, plus **C20's** and **F138's** | C04 | **done** · `4a7b9ec` `caf4f6a` `ee0caf7` — three subjects, one drain |
 | **F67** a region too small refused rather than drawn dark | **change** — two halves, one class | 1 | C01 | **done** · `a08f6db` — the gate existed and neither half ran |
