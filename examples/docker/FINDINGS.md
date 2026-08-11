@@ -710,7 +710,7 @@ failure with no bound. The return value was `null` in four rows where the entry 
 is corrected without a row, because nothing can observe it without adding the consumer the row
 would be testing for.
 
-**Ten mutations, all caught, with a control the harness verified live** — and two of the ten
+**Eleven mutations, all caught, with a control the harness verified live** — and two of the ten
 survived first time, both findings about the tests rather than the code: *"the reset was
 attempted"* was satisfied by the try's reset alone, and *"the reason appears after `stop()`"*
 was satisfied by both orderings of release and drain.

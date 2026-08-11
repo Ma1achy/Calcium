@@ -109,6 +109,14 @@ const results = runPass({
       to: "\"error\", { origin: \"refresh\" }, \"error\"",
       expect: "T1.48",
     },
+    // --- the arm's reader ----------------------------------------------------
+    {
+      name: "`/debug` stops showing the origin",
+      file: "src/shell/local/handlers.ts",
+      from: '            { label: "origin", value: m.origin },\n',
+      to: "",
+      expect: "T1.49",
+    },
     // --- the class the fabricated ladder found -------------------------------
     {
       name: "a notice with status `error` carries no `error` again",

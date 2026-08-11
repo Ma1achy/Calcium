@@ -1386,6 +1386,7 @@ Fake transport, fake stores.
 - **T1.45** (I48): a `transcript.append` that throws → the reason appears in `pipeline.faults`, carrying the store's own sentence rather than a summary of it. F15's document — two blocks with one id — is the input, so the row fails if the message is replaced by a generic one.
 - **T1.46** (I48): the same cause swallowed five times → one entry in `faults` and one notice in the transcript. A per-tick failure would otherwise fill both.
 - **T1.47** (I49): a throw from a statement **after** the append → `resetFocus` is still called and the entry id is still returned. Asserted on the spy and the return value together: the reset alone passes against a catch that resets and still returns `null`, which is §8e E2 unfixed.
+- **T1.49** (→ C04 I13): `/debug` renders `origin` for a fault notice. **The arm's justification, made durable** — `defect` earns a fifth arm on a public union only because it separates a contained failure from a verb that did nothing *in the one field that could say so*, and that holds only while something displays it. Checked by reading the handler before the arm landed; this is the same answer for whoever edits that handler next.
 - **T1.48** (I1, §8b B1): a swallowed append → the transcript holds **one** entry, and it is the fault notice rather than the submission's. The count and the identity, because a row asserting only the count passes on the day the notice is the wrong document.
 
 ### Tier 2 — contract / interface

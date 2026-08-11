@@ -785,6 +785,34 @@ describe("C23 §2 — the seven routes", () => {
     expect(only?.command, "and it is nobody's submission").toBe("");
   });
 
+  it("T1.49 (C04 I13): `/debug` renders the arm the fifth origin was added for", async () => {
+    // **The justification checked rather than asserted.** `defect` is worth a
+    // fifth arm on a public union only because it separates a contained failure
+    // from a verb that did nothing *in the one field that could say so* — and
+    // that is true only if something displays it. A grep answered it for today;
+    // this answers it for the next person to touch the `/debug` handler.
+    const h = harness();
+    let armed = true;
+    const real = h.transcript.append.bind(h.transcript);
+    h.transcript.append = ((...args: Parameters<typeof real>) => {
+      if (armed) {
+        armed = false;
+        throw new Error("refused");
+      }
+      return real(...args);
+    }) as typeof real;
+
+    h.pipeline.submit("/help");
+    await settled();
+    h.pipeline.submit("/debug 1");
+    await settled();
+
+    const shown = h.transcript.entries.at(-1)?.doc.blocks.flatMap((b) =>
+      b.kind === "keyValue" ? b.rows.map((r) => `${r.label}=${r.value}`) : [],
+    );
+    expect(shown, "the reader the arm's justification rests on").toContain("origin=defect");
+  });
+
   it("T3.37 (I48, §8b B1): a swallow while stopping is recorded and not appended", async () => {
     // B1's ruling reaching a fourth non-submission append rather than becoming a
     // fourth exception to it. The transcript is being torn down; the collection
