@@ -291,7 +291,10 @@ if (LINES > 0) {
     );
     process.exit(1);
   }
-  console.log(`fixture live: ${String(content)} non-blank rows, ${String(body)} of them patch lines`);
+  // `KIND`, not the word "patch": the marker is deliberately kind-agnostic
+  // (see above), and the label said `patch lines` in a `logs` run — the one
+  // line whose whole job is to tell the reader the fixture responded.
+  console.log(`fixture live: ${String(content)} non-blank rows, ${String(body)} of them ${KIND} lines`);
 }
 
 // 1 — a keystroke. C03 gives `input` a zero window, so the whole frame happens

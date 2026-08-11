@@ -5688,40 +5688,106 @@ entry.
 
 ---
 
-## F134 — a window is exact in height and wrong on screen for four kinds of five ★★★
+## F134 — CORRECTED. Four kinds take no window, so nothing drifts; the residue is cost ★★
 
-**F90's stage 3, built and then measured against the kinds it was for.** The seam
-lands: `window(block, width, from, to) → { block, skipRows }`, dispatched per kind,
-with `measure(block) − skipRows === to − from` checked generically. A 50,000-line
-`logs` block is 5.5 ms a keystroke and 17 ms a drag step, flat in the block's size.
+**The heading this replaces was *"a window is exact in height and wrong on screen for four
+kinds of five"*, and it describes a state that cannot currently occur.** Filed with a remedy —
+a new field on four public block types, therefore tier 2 before the freeze — and the premise
+was never checked against the registry.
 
-**Four of the five divisible kinds cannot use it**, and the reason is one cell of
-the classification table — *a window is a slice of the rows* meeting *a row's
-layout is derived from the block*:
+### The fact the whole thing turns on
 
-| kind | derived from the whole block |
-|---|---|
-| `patch` | `numberWidth(block)` walks every line of every hunk to size the gutter |
-| `keyValue` | `widest(block.rows)` sets the key column |
-| `table` | `planColumns` reads every row |
-| `code` | `tokenise` runs over the whole text — a construct spanning the boundary highlights differently |
+**`logs` is the only kind that implements `window`.** One `window:` in all of
+`src/presentation/`. For a kind without one, `registry.ts` keeps the block whole:
 
-**Height conformance cannot see it.** `measure − skipRows === to − from` holds
-perfectly while every row moves sideways: the gutter narrows and the text shifts
-as the reader scrolls, which is the drift C14 exists to prevent and which reads as
-the terminal misbehaving rather than as a defect.
+```ts
+if (windowable !== undefined && (localFrom > 0 || localTo < height)) { … }
+// otherwise: piece = block; dropped = localFrom;
+```
 
-**The remedy is a field, not a harder window.** A window has to carry its derived
-layout — a pinned gutter width, a pinned column plan, a tokenisation anchor —
-which is a new field on four public block types and therefore **tier 2, before the
-freeze**. It is the single change that finishes F90's stage 3.
+So `patch`, `keyValue`, `table` and `code` render entire at every scroll position, and
+`numberWidth`, `widest` and `tokenise` are computed over the whole block every time —
+**identically, at every offset. Nothing moves sideways.** The gutter cannot narrow as the
+reader scrolls, because the gutter is never computed from a slice.
 
-**What its absence costs is narrower than it reads**, because stages 1, 2 and 4
-apply to every kind: typing into a 5,000-line diff is 10 ms against 2,793 at the
-baseline. What remains is *opening* one (11.1 s → 3.2 s) and *resizing* while one
-is on screen (3,252 → ~3,000 ms).
+**Recorded as the load-bearing fact rather than left implicit**, because it is what changes the
+day someone adds a second implementer — which is exactly what stage 3's remaining work is.
 
----
+### The invariant does not check the wrong axis; it has no subject
+
+The question asked of this row was *which axis does the invariant not check* — and
+`measure(w.block, width) − w.skipRows === to − from` checks **nothing** for these four.
+`measurement-conformance.ts` says so in its own words: the window hook is *"optional on the
+shape as it is on the definition… a kind that **declares** a window and gets it wrong is what
+this exists for."* Four of five declare none. **Not an invariant looking at the wrong axis — an
+invariant with no subject**, which is A03 §2's vacuity class arriving in a conformance suite.
+
+### And the `table` row was a correct conclusion on a wrong reason
+
+| kind | filed reason | measured |
+|---|---|---|
+| `patch` | `numberWidth` walks every line of every hunk | **true** — and it would need a pinned gutter *if* windowed |
+| `keyValue` | `widest(block.rows)` sets the key column | **true** — `render` maps every row's label |
+| `table` | `planColumns` reads every row | **false.** `planColumns(cols: readonly ColumnDef[], width)` reads the column *definitions* and the width; `minOf` reads `column.minWidth`. It never touches `block.rows` |
+| `code` | `tokenise` runs over the whole text | **true**, and the pin is lexer state at the boundary rather than a scalar |
+
+A table **is** hard to window, for a different mechanism: its height is
+`header + rows.length + Σ detailHeight(row) + actionBar`, so a boundary cuts *through* a
+variable-height row rather than between rows. Same verdict, different cause — and **the cause
+is the part a remedy would have been built on.**
+
+### What that does to the remedy
+
+*"A new field on four public block types and therefore tier 2, before the freeze"* is **not
+established**. At most three types; `code`'s is not a field; and none is needed until those
+kinds are windowed, which nothing currently is. **F134 is not freeze-relevant on this
+evidence.**
+
+### The hazard survives the claim, and is stated separately
+
+**A kind that implements `window` without pinning its layout derivation will drift** — the
+gutter narrows, the key column shifts, a construct spanning the cut highlights differently —
+and height conformance cannot see any of it. That is true, useful, and owed to whoever
+implements stage 3 for the remaining kinds. It is **not a defect today**.
+
+Separated from the claim rather than folded into it, which is F102's disposal: *an exemption
+records which premise it rests on, so it can be re-checked.* **The premise here is that `logs`
+is the only implementer.** The day a second appears, this hazard becomes a live requirement
+and this entry is where to look.
+
+### What remains, and it is cost rather than correctness
+
+F134's own last paragraph was the accurate part: stages 1, 2 and 4 apply to every kind, and
+what stage 3 leaves is *opening* a large diff and *resizing* while one is on screen.
+
+**Re-measured rather than cited**, because row 1's figures predate nothing that has landed
+since but were four rows old, and the honest possibility was that *the number justifying the
+work had already been spent by the work*. It has not. `tools/bench/frame.mjs`, 5,000 lines,
+200x50, 20 reps, both kinds in one session:
+
+| | `patch` — unwindowed | `logs` — windowed | ratio |
+|---|---|---|---|
+| first frame (start + greeting) | **3,679 ms** | 85.9 ms | **43x** |
+| drag step (`SIGWINCH` → frame) | **3,229 ms** | 8.4 ms | **384x** |
+| keystroke → frame | 13.2 ms | 1.6 ms | 8x |
+| `SIGWINCH`, same size | 11.1 ms | 1.1 ms | 10x |
+
+**Against row 1's recorded figures for the same unwindowed kind** — first frame 3,206 ms, drag
+step ~3,000 ms — this is +15% and +8%. **Nothing regressed**: the host carried a browser and
+two agents at roughly 1.5 of 11 cores, which is what that gap is, and the condition is recorded
+here rather than reported as clean (F69's disposition, and this session's own).
+
+**So the residue is real, large, and worst where a user is least able to tolerate it.** A drag
+is not one `SIGWINCH` but a stream of them, and each costs three and a quarter seconds with a
+max of 10.6 s — resizing a window with a big diff on screen is not slow, it is unusable.
+Opening one is 3.7 s. The keystroke and same-size cases, which the cache and stage 4 do serve,
+are 13.2 ms and 11.1 ms and are fine.
+
+**Which makes `patch` the one case worth a field, and it is one field on one type** — a pinned
+gutter width, a single number, on the kind that carries the measured cost and whose height is
+one row per line so the slice is simple. That is a much smaller freeze question than the one
+this finding was filed with, and it is now a decision with a measurement under it rather than
+a hypothesis.
 
 ## F135 — a malformed greeting is swallowed twice and the session shows nothing ★★
 
