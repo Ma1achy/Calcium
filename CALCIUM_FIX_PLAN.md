@@ -191,7 +191,7 @@ is, and no field fixes it.
 |---|---|---|---|---|
 | **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | C09 | **partial** · `48d3be3` `af87fb3` `a2d4fd3` `6cf2ee2` `266c076` `4efa247` `1d5a4b3` `5bc3f91` — stage 3 reaches one kind of five (**F134**) |
 | **F91** shared pollers | change | **2 parts of one document**, plus the off-screen half | — | **done** · `36e850d` `1c78ab6` `af90056` `b2f63c3` `372cff3` — one owed (**F137**) |
-| **F15** the empty-block mechanism | **change** — a channel, not a rethrow | 1, *and it is the mechanism*, plus **C20's** and **F138's** | C04 | **done** · `4a7b9ec` — three subjects, one drain |
+| **F15** the empty-block mechanism | **change** — a channel, not a rethrow | 1, *and it is the mechanism*, plus **C20's** and **F138's** | C04 | **done** · `4a7b9ec` `caf4f6a` `ee0caf7` — three subjects, one drain |
 | **F67** a region too small refused rather than drawn dark | ruling | 1 | — | — |
 
 **F90's order was the finding and three of its four claims moved under measurement.**
@@ -246,6 +246,12 @@ could see the throw and no app author ever could.
 `sourceVersion` can agree on the numbers and disagree in their titles (C23 §8d D10); and
 **F137**, a fold runs on a version, so an attempt that failed at the transport is no longer
 counted.
+
+**Tier 5 came back 45 and the baseline is 44, and it is neither a regression nor contention.**
+C03's `T5.6` fails about half the time on **both** sides of the change — measured four runs at
+`a5b6486` (two failures) against three at `ee0caf7` (one) — so **44 and 45 are the same
+measurement**. F139 records it, because F133's 44 is used as a fingerprint by every row in this
+plan and a fingerprint that moves on its own cannot tell a flake from a break.
 
 **F15 was filed as a ruling and is a change**, because the ruling had already been made and
 never built: C23 §5, I1 and §8a A5 all said *"logged as a defect"* and no component had a sink.
