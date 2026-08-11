@@ -400,8 +400,22 @@ export type TuiConfig = Readonly<{
    *
    * C02 and C21 each take one and **no file under `src/` reads `process.env`** —
    * not even C02, which is allow-listed for it and does not use the allowance.
-   * Omitted, it defaults to `{}`, and the shell degrades to ASCII with no
-   * colour: the safe direction, and the alternative is a fifth required field.
+   * **Omitted, it defaults to `{}`, and the shell refuses to open** (C22 I61).
+   * The sentence here used to say it *"degrades to ASCII with no colour: the
+   * safe direction"*, which was true about two of the three consequences and
+   * silent about the one that ends the process (F8). C02 derives
+   * `bracketedPaste`, `mouse` and `altScreen` from one `usable` flag that is
+   * false without `TERM`:
+   *
+   *     env {} → altScreen: false  colourDepth: 1  unicode: ascii
+   *
+   * Colour and unicode do degrade. `altScreen` is not a fallback — it is the
+   * one hard requirement (C02 I7) — so the safe direction was the opposite of
+   * what the default does, and it read as reassurance while being the failure.
+   *
+   * The default stands, because a fifth required field is what I17 forbids and
+   * R01 §1 tests. What changed is that gate 3b now names `env` at the point of
+   * exit instead of leaving C01 to name a capability the author never mentioned.
    */
   env?: Readonly<NodeJS.ProcessEnv>;
   /**
@@ -575,6 +589,27 @@ export class SessionStateError extends Error {
   ) {
     super(`cannot ${operation}() while ${state}: stopped is terminal — construct a new session`);
     this.name = "SessionStateError";
+  }
+}
+
+/**
+ * Thrown by gate 3b when the resolved record cannot open a terminal (I61, T3.20).
+ *
+ * **It names the cause; C01's refusal could only name the consequence** (F8). C01
+ * raises *"alternate screen unsupported — the shell cannot open"* and is entitled
+ * to nothing but the capability record, so an author who omitted `env` was told
+ * about a capability they never mentioned. C22 holds the record and the config
+ * and is the only layer that holds both.
+ *
+ * `remedy` is the config field or variable to change, not a description of the
+ * failure — it is what the reader has to go and edit. **Not `cause`**: `Error`
+ * has carried that member since ES2022, and shadowing it would put the string
+ * where every logger looks for a nested error.
+ */
+export class UnusableTerminalError extends Error {
+  constructor(readonly remedy: string) {
+    super(`the terminal cannot open: no alternate screen — ${remedy}`);
+    this.name = "UnusableTerminalError";
   }
 }
 

@@ -285,7 +285,7 @@ no entry. F15's own mechanism was hiding a second instance of F15's own class.
 
 | item | fix | ⚠ | why no consumer yet |
 |---|---|---|---|
-| **F8** omitting `env` stops the shell opening | **change** — a doc sentence, and a silent failure | — | **first.** Total failure, no warning, public doc |
+| ~~**F8** omitting `env` stops the shell opening~~ | — | — | **CLOSED** — gate 3b (C22 I61), the sentence corrected in three places, T3.20–T3.20e, four mutations. Residue F140 |
 | **F31** `yFormat: "percent"` expects a fraction | change | C04 | a wrong number on screen for any CLI-wrapping consumer |
 | **F64** `b.logs` has no consumer and a document claims otherwise | **audit** | — | a claim, not a feature; its own citation misdirects |
 | ~~**F28** the live parts just declared~~ | — | — | **CLOSED** — `liveParts` on `@fmx/calcium/testing` cites it by name |
@@ -298,6 +298,15 @@ three documents**; F53's disposition was written inside F53 and read as outstand
 three that survive were each confirmed by going to the code, and **F8 gained a fact in the
 process**: `env {}` produces `warnings: []`, so the failure is not only ungraceful but
 unreported.
+
+**F8 closed, and it re-ruled itself once.** The where-is-this-written check found the sentence
+in three places, and the third — `C22 §117` — answered its own silence with a mechanism that
+has never existed and routed it to a channel this path never reaches. That decided *refuse*
+over *warn*. Then reading the diff falsified the ordering the ruling had just fixed: gate 3b
+runs **before** the size gate, because deferring an unusable terminal waits for a resize that
+cannot cure it and then throws C01's unnamed fatal out of an unguarded `onResize`, after
+`start()` has resolved. One residue filed rather than folded in: **F140**, a refusal that
+leaves a constructed graph — measured identical on the pre-gate tree, so inherited, not caused.
 
 ---
 

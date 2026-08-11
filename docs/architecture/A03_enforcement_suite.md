@@ -906,7 +906,7 @@ Nothing sequenced those two. The scans are scoped to `src/` and could not see th
 | `assignOffsets`, `backoffOf` | producer, no driver | allow-listed; ships with `b.live` |
 | `gutterMatchesPrompt` | an assertion evaluated nowhere | wired into `paint` |
 | `promptPrefix` | dead, and no test read it either | deleted |
-| `isUsable`, `plotAreaWidth` | **a rule expressed twice, the second unreachable** | allow-listed against C02 and C12 |
+| `isUsable`, `plotAreaWidth` | **a rule expressed twice, the second unreachable** | `plotAreaWidth` allow-listed against C12; **`isUsable` is disposed of** — C22's gate 3b calls it (C22 I61, F8), and MG25 compares the list by equality, so the entry could not outlive the wiring |
 | `renderToLines` | public surface (C24 §7); its seam is an entry point | allow-listed |
 
 `gutterMatchesPrompt` is the one worth naming on its own. Its declaration says *"asserted here rather than only in a test, because the two are declared in one file and read in two"* — and nothing called it, so the sentence was false and the check ran nowhere. **A03 §2's vacuity class in a function**: an assertion that is never evaluated passes exactly like one that holds, and it sits three lines from `heightsSum`, which *is* called from `paint`. Review reads the pair as symmetric because on the page they are.

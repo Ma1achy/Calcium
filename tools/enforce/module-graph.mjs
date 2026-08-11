@@ -1654,7 +1654,17 @@ export function componentSeamSignal(files, readFile = (f) => readFileSync(f, "ut
 //                               each has a helper stating the same rule that
 //                               nothing calls.
 //
-// Note the last pair is a *different* class from MG24's: not a seam with no
+// **`isUsable` came off the list by being consumed, and the rule is what took it
+// off.** C22's gate 3b calls it (C22 I61, F8), and the entry did not have to be
+// remembered: the list is compared by equality, so `make enforce` refused the
+// commit until the row went. That is the disposal MG25's own note asked for —
+// *wire it or remove it* — rather than a second exemption. C01's inline test
+// stays, because C01 is a component with its own consumers and must refuse
+// whoever hands it an unusable record. The duplication is gone in the sense that
+// mattered: the rule now has one *reachable* statement on the shell's path, and
+// C01's is the floor under it rather than a second opinion nobody reads.
+//
+// Note that pair — one of it left — is a *different* class from MG24's: not a seam with no
 // consumer but a rule with two expressions, one of which is unreachable. The
 // rule finds it because an unreachable expression and an unconsumed producer
 // look identical from the import graph, and both want disposal.
@@ -1696,11 +1706,6 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // commit until the rows went. Neither had to be remembered.
 
   // --- a rule expressed twice, the second expression unreachable ------------
-  isUsable:
-    "C02, D28 — alternate screen is the sole hard requirement. `lifecycle.ts` asks " +
-    "`!capabilities.altScreen` inline instead, so the rule holds and its statement is " +
-    "unreachable. Wiring C01 to it is C01's call, not C24's: the two would then agree " +
-    "by construction rather than by a reader noticing",
   plotAreaWidth:
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +

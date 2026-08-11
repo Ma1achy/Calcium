@@ -25,6 +25,7 @@ import {
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
 import { drawFallback, tooSmall } from "./fallback.js";
+import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
 import { commandRows, type PaintDeps } from "./paint.js";
@@ -38,6 +39,7 @@ import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
+  UnusableTerminalError,
   type FileSystem,
   type SessionSnapshot,
   type SessionState,
@@ -79,6 +81,35 @@ const nodeFileSystem: FileSystem = {
       directory: e.isDirectory(),
     })),
 };
+
+/**
+ * What the reader has to go and edit, for gate 3b's refusal (I61, F8).
+ *
+ * **Ordered from the omission outwards**, because the case that produced the
+ * finding is the one an author reaches first: `env` is optional, `{}` is what
+ * they get for saying nothing, and every consequence below follows from a
+ * `TERM` that record does not have. Naming the variable before the field would
+ * be true and useless — nobody who omitted `env` is thinking about `TERM`.
+ *
+ * **The remedy names the field and not the expression**, and SS10 is why rather
+ * than style: the scan bans the environment accessor across `src/` with a
+ * one-file allow-list, and it does not read strings from code — correctly, since
+ * a reader auditing I20 by grep must not have to clear a hit every time. So the
+ * message says *the process environment* where it wants to say the expression.
+ *
+ * The last arm is not a fallback. C02 I4 lets a valid override win for
+ * `altScreen`, so an app can switch this off deliberately, and a refusal that
+ * blamed the environment for a decision the config made would send the reader
+ * to the wrong file.
+ */
+function unusableCause(env: Readonly<NodeJS.ProcessEnv>): string {
+  if (Object.keys(env).length === 0)
+    return "`TuiConfig.env` is empty, which is what an omitted `env` defaults to — pass the process environment as `env`";
+  const term = env["TERM"];
+  if (term === undefined) return "`TERM` is not set in the `env` the app supplied";
+  if (term === "dumb") return "`TERM` is `dumb`, which declares no alternate screen";
+  return "`TuiConfig.capabilities` overrides `altScreen` to false";
+}
 
 /** The ambient reads, in the one file allowed to perform them. */
 function ambient(): Ambient {
@@ -182,6 +213,42 @@ class Session implements TuiInstance {
     // fallback is drawn on the *primary* screen — nothing was acquired, so
     // there is no alternate screen to draw into — and a resize continues from
     // startup step 5 with session state intact.
+    // **Gate 3b — refuse, naming the cause** (I61, F8).
+    //
+    // One line above gate 4, reading the same terminal, taking the opposite
+    // decision — so the difference is asserted rather than left to the reader.
+    // Gate 4's subject can change while the session waits; this one cannot,
+    // because `altScreen` follows from `TERM` and `TERM` is fixed for the life
+    // of the process. That is **gate 1's argument, not gate 4's**: a pipe
+    // cannot become a terminal, and a terminal that declares nothing cannot
+    // start declaring something.
+    //
+    // **It goes first, and the ruling that put it second was wrong** — the code
+    // is what falsified it. Deferring an unusable terminal on size waits for a
+    // resize that cannot cure it, and when the resize arrives `#open()` reaches
+    // C01's fatal from inside `onResize`, which nothing guards: the throw leaves
+    // the SIGWINCH handler with `start()` long since resolved, so the author's
+    // `catch` cannot see it and neither can gate 3b. The incurable condition is
+    // answered before the curable one, or the curable one hides it.
+    //
+    // **The resolved record, which is what puts the gate here** rather than
+    // beside gate 1. C02 I4 makes a valid `capabilities` override win
+    // unconditionally including for `altScreen`, and the override resolves
+    // inside `detectCapabilities` during construction — so a gate reading
+    // `config.env` ahead of step 3 would refuse exactly the app that had said
+    // what to do about it. It accepts I36's cost knowingly: a history file is
+    // opened for a process about to exit, which is smaller than refusing a
+    // legal configuration.
+    //
+    // **A throw, not a warning, and the moment is the reason.** C02's channel
+    // is *returned, never emitted*, drained by §8 step 3 — which `stop()`
+    // reaches and this path never calls, because `start()` rejects and the
+    // session never runs. A warning routed there is unread by construction:
+    // the same silence with more machinery. Measured under a PTY.
+    if (!isUsable(this.#graph.capabilities)) {
+      throw new UnusableTerminalError(unusableCause(this.config.env));
+    }
+
     const size = this.#graph.lifecycle.size();
     if (tooSmall(size)) {
       // **C01's writer, not `config.stdout`** — F67, and the one-line difference

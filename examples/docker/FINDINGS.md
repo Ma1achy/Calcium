@@ -331,6 +331,58 @@ matters** — colour and unicode *do* degrade, and `altScreen: false` ends the p
 new: the entry describes a false sentence, and the measurement shows the failure is also
 unreported, which is F15's class in a fourth place.
 
+**Closed** — C22 gate 3b (C22 I61, commitment 32), the sentence corrected in three places,
+`T3.20`–`T3.20e`, four mutations.
+
+**The where-is-this-written check found the sentence three times and the third made a claim of
+its own.** `C22 §117` answered its own silence with *"C02's warnings surface on the restored
+primary screen and an empty record is one of them"* — a mechanism that has **never existed**.
+C02 produces a warning for a rejected override (C02 I4, T3.5) and for nothing else, which is
+why `warnings` is empty and always was. That is the sixth blind spot pointed at the document
+that carried the remedy rather than at the one that carried the defect.
+
+**And the remedy was wrong twice, which is what decided the fix.** It routed the notice to §8
+step 3 — reached from `stop()`, which this path never calls, because `start()` rejects and the
+session never runs. Measured under a PTY. A warning there would have been **the same silence
+with more machinery**, so the ruling is a refusal at the point of exit rather than a warning.
+
+**What the refusal has that C01's did not: the cause.** C01 is entitled to the capability
+record alone, so *"alternate screen unsupported"* names the consequence and cannot name the
+reason — an author who omitted `env` was told about a capability they never mentioned. C22
+holds the record and the config and is the only layer that holds both. Measured, all four
+arms:
+
+```
+env: {}                          → `TuiConfig.env` is empty … pass the process environment as `env`
+env: { HOME }                    → `TERM` is not set in the `env` the app supplied
+env: { TERM: "dumb" }            → `TERM` is `dumb`, which declares no alternate screen
+env: {}, capabilities.altScreen  → the shell opens
+```
+
+**The fourth line is the gate's position, not a courtesy.** C02 I4 makes a valid override win
+unconditionally including for `altScreen`, and it resolves during construction — so a gate
+reading `config.env` ahead of step 3, which is where I36 would want it, refuses exactly the app
+that had said what to do. `T3.20b` is that row and it fails against every simpler tree.
+
+**Then the implementation falsified the ruling.** The gate was specified *after* the size gate,
+on the reasoning that both read the same terminal. Reading the diff showed a terminal both too
+small and unusable would defer — wait for a resize that cannot cure an absent `TERM`, then
+reach C01's fatal from inside `onResize`, which `resizeSubscribers` dispatches **unguarded**,
+so the throw leaves the SIGWINCH handler with `start()` long since resolved. The author's
+`catch` cannot see it and the gate never runs: **F8's silence, restored by the fix for F8.**
+It is gate 3b, ahead of gate 4 — the incurable condition answered before the curable one.
+
+**`isUsable` came off MG25's allow-list by being consumed.** A03 §9 had it as *a rule expressed
+twice, the second expression unreachable*; gate 3b is the caller. The list is compared by
+equality, so `make enforce` refused the commit until the entry went — the disposal MG25's own
+note asked for rather than a second exemption.
+
+**Not closed, and separated from the claim** (F140): the refusal leaves a constructed graph, so
+an author who **catches** the rejection and continues has a process that never exits. Measured
+on both trees — it is identical before this change, where C01's fatal throws from the same
+position — so the gate inherits it rather than introducing it. The realistic path is clean:
+uncaught, node prints the named message and exits 1.
+
 ---
 
 ## F9 — startup step 7 named the effect and had no mechanism ★★ · **closed**
@@ -6177,3 +6229,61 @@ to escape the first problem. Neither direction is guessable; both want the quiet
   C18's trailing `&`, C20's corrupt file, C22's piped shell, and history's. `VERIFYING.md`
   cites `T5.6` bare in two places meaning two different rows. A bare id is ambiguous across
   components in the one document whose job is to stop a result being misread.
+
+---
+
+## F140 — a refusal that leaves a constructed graph, so a caught rejection never exits ★
+
+| | |
+|---|---|
+| **Surface** | none — found by asking what F8's throw leaves behind |
+| **Reached for** | nothing; it fell out of ruling that gate 3b should throw |
+| **Verdict** | **framework-side**, pre-existing, and separated from F8's claim rather than folded into it |
+
+C22's gate 3b throws after `constructGraph` has run, so the graph — its history file, its
+stores, its transport — outlives the refusal. `stop()` is never called, because `start()`
+rejected. An author who **catches** the rejection and continues therefore has a process that
+does not exit.
+
+**Measured on both trees, which is the reason it is a separate entry.** Before gate 3b existed,
+C01's fatal threw from the same position with the same graph constructed, and the process hung
+identically. So the gate **inherits** this and does not introduce it, and folding it into F8
+would have made a pre-existing defect read as a regression the fix caused.
+
+**The realistic path is clean and the figure matters more than the finding.** Uncaught, node
+prints the named message and exits 1 — measured, twice. It bites only the author who catches
+`start()` and carries on, which is a narrow case and a real one.
+
+**A claim I made here was wrong, and it is left standing as the correction rather than
+deleted.** Four of F8's rows refuse, so each left a constructed graph alive in the vitest
+worker, and when C17 T3.15 — a wall-clock paste budget in another file — went from green to
+**2362 ms against a 2000 ms budget**, this entry said the leak was why and that stopping every
+session restored it. **The next run said 3684 ms with the sessions stopped.** The host's load
+average was **20.81**, against a baseline run taken when it was quiet.
+
+**The measurement that settles it**: with the whole change stashed, T3.15 run **alone** on the
+pre-change tree fails at **2099 ms**. It is contention, and it is independent of this row in
+both directions — the tree and the suite size.
+
+So the leak is real, the rows now stop their sessions because that is correct on its own
+terms, and **it is not what moved T3.15**. The sequence 2362 → 2612 → 3684 is monotonic in the
+wrong direction for a fixed cause and the remedy landed between the second and third. What
+made it look causal is that the leak was predicted by this very finding one paragraph above —
+a mechanism in hand is the most expensive kind of coincidence, because it supplies the
+explanation before the measurement does.
+
+**And the claim was written before the run that would have tested it**, which is the whole
+defect: *stopping every session restored it* was a prediction typed in the past tense. It is
+the sixth blind spot turned on my own paragraph, and the cheapest instrument for it was the
+one already scheduled — wait for the confirming run before writing the sentence that depends
+on it.
+
+**Why it is filed rather than fixed here.** The remedy is a teardown on the refusing path, and
+teardown is `stop()`'s — which drains diagnostics to stdout, sets `stopped`, and returns a
+code. Whether a gate may call it before throwing is a C22 §8 ruling about the five callers
+(I4), not a line inside a gate, and this row had already re-ruled its own ordering once.
+
+**Found by the throw question, and it is four for four now.** *When a ruling chooses to throw,
+ask what the throw leaves behind* — neither artefact shape indexes the rejection path, because
+both index the accepted one. C13's `settle(id, doc)` was the measured case; this is the same
+question asked of a decision taken in this row rather than of one already shipped.

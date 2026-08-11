@@ -41,7 +41,7 @@ type TuiConfig = Readonly<{
 
   debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
 
-  env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` refuses at gate 4b (I20, I61)
+  env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` refuses at gate 3b (I20, I61)
   capabilities?: Partial<TerminalCapabilities> | undefined;   // C02's overrides, wired (I49)
   clock?:    () => number;
   fs?:       FileSystem;
@@ -139,7 +139,7 @@ never calls**.
 
 The default itself stands, for the reason it always had: a fifth required field is what I17
 forbids and R01 §1 tests. What changes is that the failure is now **named at the point of
-exit** by gate 4b (I61), where the config and the capability record are both in hand.
+exit** by gate 3b (I61), where the config and the capability record are both in hand.
 
 **`capabilities` is C02's `overrides` argument, and it had no producer** (I49). C02 §2
 takes `detectCapabilities(env, overrides)`; I4 makes a valid override win unconditionally,
@@ -470,8 +470,8 @@ cell that value was reserved for.
                                             unless the verb declares one-shot output
  2  load app config                       → missing or no context: dispatch config init
  3  construct the graph (§3)
+3b  check the terminal is usable          → no alternate screen: refuse, naming the cause
  4  check terminal size                   → below 60 × 16: fallback render, await resize
-4b  check the terminal is usable          → no alternate screen: refuse, naming the cause
  5  acquire the terminal                     C01
  6  first paint: empty frame
  7  fire banner fetches, non-blocking
@@ -491,12 +491,23 @@ It must be **non-empty**, and that is the half worth stating. A gate that exits 
 > **How it resolves**: `oneShot` reaches C22 through `config`, with the app parsing argv. That is what every other environment-derived value in this project does — C06 I18 settled exactly that pattern for `PRISM_TUI_TRANSPORT`, and §12a's theme persistence is the same shape. C22 growing an argv parser is the alternative and it is the wrong one: the framework would then own a CLI surface it has no other reason to have.
 
 
-**Gate 4b refuses, and it refuses where gate 4 defers** (I61). The two gates read the same
+**Gate 3b refuses, and it refuses where gate 4 defers** (I61). The two gates read the same
 terminal one line apart and take opposite decisions, so the difference is stated rather than
-left to the reader: gate 4's subject can change while the session waits and gate 4b's cannot.
+left to the reader: gate 4's subject can change while the session waits and gate 3b's cannot.
 `altScreen` follows from `TERM`, which is fixed for the life of the process — so this is
 **gate 1's argument, not gate 4's**: a pipe cannot become a terminal, and a terminal that
 declares nothing cannot start declaring something.
+
+**It runs before gate 4, and the first ruling put it after** — the implementation is what
+falsified that, which is the class this project already has a name for. Both gates read the
+same terminal, gate 4 was already there, and *after* looked like the smaller change. It is
+not: a terminal that is **both** too small and unusable would then defer, drawing the fallback
+and waiting for a resize that cannot cure an absent `TERM`. When the resize arrives, `#open()`
+reaches C01's fatal from inside `onResize` — and `resizeSubscribers` dispatches unguarded, so
+the throw leaves the SIGWINCH handler with `start()` long since resolved. **The author's
+`catch` cannot see it, gate 3b never runs, and the message is C01's unnamed one**: F8's exact
+silence, restored by the fix for F8. So the incurable condition is answered before the curable
+one, or the curable one hides it.
 
 **It sits after construction, and that is forced rather than chosen.** C02 I4 makes a valid
 `capabilities` override win unconditionally *including for `altScreen`*, so an app that
@@ -1063,7 +1074,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I58** — **An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry.** The first three are C14's and the last two are the difference between caching *appearance* and caching *geometry*: `HeightCache` records that theme and capabilities are deliberately absent from it because C09 §4 and C10 T4.1 make height theme-invariant, and neither argument reaches colour. Focus enters because C11 draws the focused row in another tone (C11 I14) and `visibleRows` passes it in; the theme enters as `ResolvedTheme.name`, which already moves on a variant switch and on an override and which C10 I11 already relies on for the same purpose — carried in the key rather than through an invalidation call, because a hook at a fourth call site is the shape this tree keeps finding unwired. One slot per entry makes the cache bounded by the entry count by construction rather than by an eviction rule, which is the argument C14 §4 makes for the same shape.
 - **I59** — **The cache makes the second frame free and the first no cheaper, and that is why it is not the fix.** A 5,000-line block still renders every line the first time it is drawn at a width, so this stage on its own converts continuous lag into one long stall. It is recorded as an invariant rather than as a note because the failure mode is *reporting the problem solved* — §6d is what bounds the first frame, and the ordering is the finding (F90).
 - **I60** — **`ctx.tick` is not in the key and no transcript render receives one.** `visibleRows` passes no tick, so every entry renders at 0; a `steps` block animating in the transcript would serve its first frame for the life of the session and nothing here would fail. The invariant is the *pair*: the axis is absent **and** the value is constant, so the day one is threaded the other is owed — either the key gains it or live entries stop being cached (§6c trace row 10, A03 §2).
-- **I61** — **A resolved capability record that cannot open the terminal refuses at gate 4b, and the refusal names the cause rather than the consequence.** `isUsable` is the test (C02 I7), read from the **resolved** record so that a valid `capabilities` override still opens (C02 I4) — which is what forces the gate after construction and makes it accept I36's cost knowingly. It throws rather than returning, because `start()` rejecting is the only channel this path has: §8 step 3 is reached from `stop()`, and a session that never ran never calls it, so a warning into C02's collection would be **unread by construction**. The message names `env` when the record is empty or carries no `TERM`, because the cause is a config field and C01 — which raised the only prior refusal — is entitled to the capability record alone and can only name the consequence (F8).
+- **I61** — **A resolved capability record that cannot open the terminal refuses at gate 3b, and the refusal names the cause rather than the consequence.** `isUsable` is the test (C02 I7), read from the **resolved** record so that a valid `capabilities` override still opens (C02 I4) — which is what forces the gate after construction and makes it accept I36's cost knowingly. It throws rather than returning, because `start()` rejecting is the only channel this path has: §8 step 3 is reached from `stop()`, and a session that never ran never calls it, so a warning into C02's collection would be **unread by construction**. The message names `env` when the record is empty or carries no `TERM`, because the cause is a config field and C01 — which raised the only prior refusal — is entitled to the capability record alone and can only name the consequence (F8).
 ---
 
 ## 11. Commitments
@@ -1115,7 +1126,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 27. **The frame goes to the terminal as a difference**, whole whenever no record describes the screen — which `contaminated` is the existing and until now unconsumed statement of (I55, §6b).
 28. The record is cleared before the write and restored after it completes, so a write that throws repaints rather than diffing against a screen that never existed (I56, §6b).
 31. A terminal too small draws a legible message through C01's writer and opens when it grows, and both halves are asserted against a real terminal (I8, I9) (→ C01 I12b).
-32. A terminal that cannot open is refused at gate 4b with the cause named, not the consequence — and refused rather than warned, because the channel a warning would use is reached only from `stop()` (I61, → C02 I7).
+32. A terminal that cannot open is refused at gate 3b with the cause named, not the consequence — and refused rather than warned, because the channel a warning would use is reached only from `stop()` (I61, → C02 I7).
 30. Step 3 drains every component that accumulates a diagnostic, read after the release rather than snapshotted before it — and two of the three had no reader at all (I6a) (→ C20 I17) (→ C23 I48).
 29. Each written row opens with a reset, kept on the asymmetry between four bytes and a colour that survives the frame, with the measurement that shows it is currently inert recorded beside it (I57, §6b).
 
@@ -1190,6 +1201,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.32** (I42): the entry is evicted while its view is open → the layer is dismissed with `anchorEvicted`, and `Esc` afterwards reaches the prompt rather than a dangling view.
 - **T3.1**: every illegal transition in §9 throws with a named error — two cases.
 - **T3.19**: `stop` sets `session.stopping` before releasing, so a submission racing shutdown is refused.
+- **T3.20** (I61): an omitted `env` in a TTY → `UnusableTerminalError`, the message names the **field**, and no alternate-screen sequence is emitted. The class is asserted, not the wording: C01's plain `Error` would satisfy a message assertion and is the thing this gate exists to replace.
+- **T3.20b** (I61, → C02 I4): the same empty `env` **with** `capabilities: { altScreen: true }` → the shell opens, asserted by the alternate screen being entered rather than by the absence of a throw. This is the row a gate reading `config.env` ahead of construction fails while passing T3.20.
+- **T3.20c** (I61): `TERM=dumb` names the **variable** and not the field. A constant message satisfies T3.20 completely.
+- **T3.20d** (I8, I61): a terminal that is both too small and unusable **refuses** — gate 3b is reached first. The row the first ruling had backwards: deferring here waits for a resize that cannot cure it and then throws C01's unnamed fatal out of an unguarded `onResize`, after `start()` has resolved. Asserted with both conditions true, because either alone restates the gate that owns it.
+- **T3.20e** (I8): the control — a small terminal that *can* open still defers. Without it T3.20d is satisfied by a tree that refuses every small terminal, which is what gate 4 exists not to do.
 - **T3.2**: `start` twice → no-op, nothing constructed twice.
 - **T3.3**: `stop` during construction → nothing acquired, no cleanup attempted.
 - **T3.4**: `stop` while a handed-off child is running → `beforeRelease` signals every handle in `runner.live` and **the handed-off child is not among them**, then the terminal is released.
