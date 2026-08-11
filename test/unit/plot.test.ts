@@ -263,11 +263,44 @@ describe("C12 tier 1 — degenerate series", () => {
 });
 
 describe("C12 tier 1 — labels", () => {
-  it("T1.12: y-labels format per yFormat", () => {
+  it("T1.12: y-labels format per yFormat — one case per arm", () => {
     expect(formatValue(0.0372, "number")).toBe("0.037");
-    expect(formatValue(0.968, "percent")).toBe("97%");
+    expect(formatValue(0.968, "fraction")).toBe("97%");
+    expect(formatValue(96.8, "percent")).toBe("97%");
     expect(formatValue(1536, "bytes")).toBe("1.5 KB");
     expect(formatValue(130, "duration")).toBe("2m 10s");
+  });
+
+  it("T1.12b (C04 I41): the two per-cent arms differ on one value", () => {
+    // **The row a per-arm table cannot express.** Every line above asserts one
+    // arm against its own rule and agrees with itself; the defect was that two
+    // arms meant one thing, which is only visible when the same value goes
+    // through both.
+    //
+    // `0.84` is what a fraction-holding producer has and `84%` is what it means.
+    // The same number reaching the arm named for what a CLI emits is 0.84 of one
+    // per cent, and rounds to `1%`. Neither is wrong; naming them by the
+    // rendered form is, because both render a per-cent sign.
+    expect(formatValue(0.84, "fraction")).toBe("84%");
+    expect(formatValue(0.84, "percent")).toBe("1%");
+
+    // F31's measured case, which is what the old naming got wrong by 100×.
+    expect(formatValue(100.2, "percent"), "docker's CPUPerc").toBe("100%");
+    expect(formatValue(100.2, "fraction"), "the old `percent`").toBe("10020%");
+  });
+
+  it("T1.12c (C04 I41): the arms produce different label widths, so `yFormat` is geometry", () => {
+    // **A test that only reads label text passes against a renderer measuring
+    // the wrong set.** C12 §3 sizes the gutter with `labelWidth` over the
+    // rendered labels, so an arm that changes a label's width changes the plot
+    // area — which is why this is an invariant about geometry and not a note
+    // about formatting.
+    const asFraction = yLabels({ min: 0, max: 1 }, 5, "fraction");
+    const asPercent = yLabels({ min: 0, max: 100 }, 5, "percent");
+
+    expect(labelWidth(asFraction), "`100%` is four cells").toBe(4);
+    expect(labelWidth(yLabels({ min: 0, max: 0.5 }, 5, "fraction")), "`50%` is three").toBe(3);
+    expect(labelWidth(asPercent)).toBe(4);
   });
 
   it("T1.12: the three labels share one precision, taken from the span", () => {

@@ -286,7 +286,7 @@ no entry. F15's own mechanism was hiding a second instance of F15's own class.
 | item | fix | ⚠ | why no consumer yet |
 |---|---|---|---|
 | ~~**F8** omitting `env` stops the shell opening~~ | — | — | **CLOSED** — gate 3b (C22 I61), the sentence corrected in three places, T3.20–T3.20e, four mutations. Residue F140 |
-| **F31** `yFormat: "percent"` expects a fraction | change | C04 | a wrong number on screen for any CLI-wrapping consumer |
+| ~~**F31** `yFormat: "percent"` expects a fraction~~ | — | — | **CLOSED** — arms named for the unit in: `fraction`/`percent` (C04 I41), `b.plot` carries it, validated in both paths, five mutations |
 | **F64** `b.logs` has no consumer and a document claims otherwise | **audit** | — | a claim, not a feature; its own citation misdirects |
 | ~~**F28** the live parts just declared~~ | — | — | **CLOSED** — `liveParts` on `@fmx/calcium/testing` cites it by name |
 | ~~**F53** `exactOptionalPropertyTypes`~~ | — | — | **DISPOSED** — the ruling is in the finding; no task without a second consumer |

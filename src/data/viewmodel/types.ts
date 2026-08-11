@@ -357,7 +357,23 @@ export type Plot = Readonly<{
   height?: number;
   axes?: boolean;
   xLabels?: readonly [string, string, string];
-  yFormat?: "number" | "percent" | "bytes" | "duration";
+  /**
+   * **The unit the value arrives in, not the unit it renders as** (I41, F31).
+   *
+   * `fraction` takes `0.84` and `percent` takes `100.2`; both draw a per-cent
+   * sign, which is why the rendered form could never tell them apart and why
+   * naming them by it gave one member two plausible meanings — the obvious call
+   * rendered `10020%` against a far side emitting `CPUPerc: "100.2%"`.
+   *
+   * `fraction` is the arm that multiplies by 100. It was called `percent` and
+   * kept the behaviour when it lost the name, because the surprising arm is the
+   * one that should carry the surprising name.
+   *
+   * **This is geometry.** C12 §3 measures the gutter with `labelWidth` over the
+   * rendered labels, so an arm that changes a label's width changes the plot
+   * area — a format that reads like styling and is not.
+   */
+  yFormat?: "number" | "fraction" | "percent" | "bytes" | "duration";
   /**
    * Pin the vertical range, independently and optionally (I29).
    *

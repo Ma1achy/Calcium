@@ -1247,6 +1247,13 @@ drops; a ceiling would render a busy container identically to a saturated one.
 left as an omission: `yFormat` is a trap in the shape a caller wants it (F31), `xLabels` is a
 fixed three-tuple that cannot hold S3's caption sentence, and `emptyMessage` has no consumer.
 
+> **Two of three now.** `yFormat` was exposed when F31 was fixed, and the reason recorded here
+> is why it took a separate row to see it: *a trap in the shape a caller wants it* is a reason
+> to fix the trap and it was written as a reason to withhold the field. The trap was the
+> **naming** — `percent` multiplied by 100 — and renaming that arm to `fraction` left nothing
+> to withhold (C04 I41). An omission with a recorded reason is a decision until something
+> presses on it, and nothing had.
+
 **And the shape of this finding is worth keeping.** C12 implemented all five fields, its
 tests were right, and every one of them passed — the mechanism was complete and *unreachable
 from the public surface*. A green suite over a mechanism nobody can invoke, which is MG25's
@@ -1352,6 +1359,47 @@ neither is a builder change.
 **Re-checked and it stands.** `plot/axes.ts` still returns `` `${Math.round(v * 100)}%` ``,
 `yFormat` is still on the public block type (`viewmodel/types.ts:360`), and `b.plot` still
 withholds it. Nothing has moved.
+
+**Closed** — C04 I41, `b.plot` carries the field, T1.12/T1.12b/T1.12c, T1.16b, T2.12c, a new
+golden, five mutations.
+
+**The arms are named for the unit that arrives, not the unit that renders.** Both draw a
+per-cent sign, so the rendered form could never separate them and naming them by it is what
+gave one member two plausible meanings:
+
+| arm | in | out |
+|---|---|---|
+| `fraction` | `0.84` | `84%` |
+| `percent` | `100.2` | `100%` |
+
+`fraction` **is the old `percent`, renamed** — the arithmetic never moved. Proof it did not:
+regenerating the goldens after migrating the existing fixture from `percent` to `fraction`
+produced **144 insertions and 0 deletions**. Every frame of that fixture is byte-identical;
+the insertions are the new arm's own case.
+
+**`percent`/`percentage` was the alternative and it is worse.** Two members one letter apart
+meaning opposite things is the two-meanings-one-word class this project has found the hard way
+three times already — `dismissable`, `origin`, `viewState`. Renaming a public enum member is
+breaking and the freeze is ahead, which is the argument for doing it now rather than against:
+two callers in the tree, both fixtures.
+
+**It is geometry, not appearance**, and that is the half a formatting change hides. C12 §3
+sizes the gutter with `labelWidth` over the *rendered* labels, so an arm that changes a
+label's width changes the plot area — which is why T1.12c asserts widths and why the new arm
+got a golden rather than a unit row.
+
+**And the arm is validated now, in both places.** It never was: an unknown string fell through
+to the numeric arm, so a typo rendered plain values in silence. The rename is exactly the
+event that produces one, because `percentage` is what a reader guesses. The check is in the
+constructor **and** the validator, on §3's standing reason — a document can arrive from a
+fixture without passing through a constructor, and a constructed block never reaches the
+validator, so a check in one covers half the ways a plot is built.
+
+**Two exemptions disposed of by their subjects being wired**, neither remembered by anyone:
+MG27's `BUILDER_OMISSIONS` entry for `plot.yFormat` and — in the row before this — MG25's for
+`isUsable`. Both lists are compared by equality, so `make enforce` refused each commit the
+moment the subject was consumed. That is the difference between an exemption that expires and
+one that outlives its reason unread.
 
 ---
 
@@ -6219,6 +6267,30 @@ So the rule has two halves and only one was written down. Load makes an **absolu
 untrustworthy — that is this entry's original subject — and it can make a **ratio** look
 better than it is, which is worse, because a ratio is the form everyone reaches for precisely
 to escape the first problem. Neither direction is guessable; both want the quiet re-run.
+
+### The failing set under load is not stable, which the protocol assumes it is
+
+Added after F8 and F31, where it cost two false diagnoses. *Compare the failing set, not the
+count* is the right rule and it has a premise nobody stated: that a contended run fails the
+**same** rows. Measured across three loaded runs on one afternoon, it does not.
+
+| run | load | failing set |
+|---|---|---|
+| F8, first | ~20 | `C17 T3.15` — a paste budget |
+| F8, second | ~20 | `C17 T3.15` again, worse |
+| F31 | 14.6 | `C10 T2.8`, `C10 T2.9`, `C01 T2.9`, `C21 T2.7` — four source scans |
+
+Every row is green when run alone and the whole suite is green when the host is quiet. The
+rows have nothing in common except a **deadline**: one is an explicit millisecond budget, four
+are vitest's 15 s timeout over a scan that takes 10–22 s under load. So the set is a sample of
+whichever deadline the machine missed this time, and a reader comparing two sets sees a
+different failure and concludes the change caused it.
+
+**What makes it dangerous rather than merely noisy** is that a *changed* set reads as evidence
+where an *identical* set would read as noise. F8's diagnosis went wrong exactly there: a
+plausible mechanism was in hand — F140, filed one paragraph earlier — and a set that had moved
+looked like confirmation. So the protocol needs the load beside the set, and a set that differs
+between two runs of the same tree is a measurement of the host, not of the change.
 
 ### Two things that are genuinely new
 

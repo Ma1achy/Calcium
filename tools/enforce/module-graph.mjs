@@ -553,10 +553,21 @@ function checkForbiddenEdges(files, readFile) {
  * is reachable, never that it is wired correctly. It also cannot see a field
  * exposed with the wrong shape. Both are the frame-read's job, and neither is
  * why a field goes missing: the measured cases are all a field nobody typed.
+ *
+ * **`plot.yFormat` came off by being built, and the rule took it off** (C04 I41,
+ * F31). Its entry read *"`percent` multiplies by 100 and every far side that
+ * emits a percentage emits 84, not 0.84"* — accurate about the trap, and it
+ * recorded the trap as grounds for withholding rather than as the thing to fix.
+ * Renaming the multiplying arm to `fraction` left nothing to withhold. The list
+ * is compared by equality, so this could not be forgotten: `make enforce`
+ * refused the commit the moment the builder set the field.
+ *
+ * That is the second entry in one session to be disposed of by its subject being
+ * wired rather than by anyone remembering — MG25's `isUsable` was the first. An
+ * exemption whose reason has expired is indistinguishable from a live one to a
+ * reader, and equality comparison is what makes the difference mechanical.
  */
 export const BUILDER_OMISSIONS = Object.freeze({
-  "plot.yFormat":
-    "C24 §4 — `percent` multiplies by 100 and every far side that emits a percentage emits 84, not 0.84 (F31)",
   "plot.xLabels":
     "C24 §4 — a fixed three-tuple, and no surface has wanted one; a caption sentence does not fit it",
   "plot.emptyMessage":

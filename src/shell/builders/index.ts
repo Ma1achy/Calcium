@@ -318,9 +318,18 @@ function events(input: readonly EventLine[], opts?: BlockOpts): Events {
 }
 
 /**
- * **`yMin` and `yMax` are here and `yFormat`, `xLabels` and `emptyMessage` are
+ * **`yMin`, `yMax` and `yFormat` are here; `xLabels` and `emptyMessage` are
  * not** — C24 §4 carries the reasoning for each, and this comment carries the
  * one that made the pin urgent.
+ *
+ * **`yFormat` was withheld and the reason was about the naming** (C04 I41, F31).
+ * C24 §4 said exposing it *"wants either a second format or a sentence at the
+ * call site, and neither is a builder change"* — accurate about the trap, and it
+ * treated the trap as grounds for withholding rather than as the thing to fix.
+ * `percent` multiplied by 100, so the obvious call against a far side emitting
+ * `100.2` rendered `10020%`. With the arms named for the unit that arrives —
+ * `fraction` takes `0.84`, `percent` takes `100.2` — there is no sentence left
+ * to put at a call site, and the field comes here.
  *
  * Absent a pin the range is the data's, so a series that is genuinely flat is
  * drawn against its own noise. A CPU plot watching a container pinned at 100%
@@ -339,9 +348,10 @@ function plot(
     axes?: boolean;
     yMin?: number;
     yMax?: number;
+    yFormat?: Plot["yFormat"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax } = spec;
+  const { series, height, axes, yMin, yMax, yFormat } = spec;
   return finish<Plot>(
     {
       kind: "plot",
@@ -352,6 +362,7 @@ function plot(
       ...(axes === undefined ? {} : { axes }),
       ...(yMin === undefined ? {} : { yMin }),
       ...(yMax === undefined ? {} : { yMax }),
+      ...(yFormat === undefined ? {} : { yFormat }),
     } as Plot,
     spec,
     true,

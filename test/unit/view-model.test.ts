@@ -209,6 +209,48 @@ describe("C04 validation", () => {
     ).not.toThrow();
   });
 
+  it("T1.16b (I41): an unknown `yFormat` is a construction error, not a silent number", () => {
+    // **It was unvalidated, so a typo rendered plain values and said nothing** —
+    // `formatValue`'s `default` arm took anything it did not recognise. The
+    // `fraction`/`percent` rename is exactly the event that produces a typo,
+    // because `percentage` is what a reader guesses, so the arm that catches it
+    // lands with the rename rather than after someone hits it.
+    expect(() =>
+      block({
+        kind: "plot",
+        id: "p",
+        form: "line",
+        height: 4,
+        series: [{ values: [1, 2] }],
+        yFormat: "percentage",
+      } as never),
+    ).toThrow(BlockShapeError);
+
+    // Both real arms, because a check that rejects everything passes the line
+    // above and is the failure this project keeps finding in guards.
+    for (const yFormat of ["fraction", "percent"] as const) {
+      expect(
+        () =>
+          block({ kind: "plot", id: "p", form: "line", height: 4, series: [{ values: [1, 2] }], yFormat }),
+        yFormat,
+      ).not.toThrow();
+    }
+
+    // **And the validator, which is the half the constructor cannot cover.**
+    // §3's standing reason: a document can arrive from a fixture without passing
+    // through a constructor, so a check in one of them covers half the ways a
+    // plot is built. Asserted through a raw document rather than a built block,
+    // because a built block cannot carry the bad value that far.
+    const raw = validateDocument({
+      ...doc({ status: "ok" }),
+      blocks: [
+        { kind: "plot", id: "p", form: "line", height: 4, series: [{ values: [1, 2] }], yFormat: "percentage" },
+      ],
+    } as never);
+    expect(raw.ok, "the fixture path rejects it too").toBe(false);
+    expect(raw.ok === false && raw.error.join(" ")).toContain("yFormat");
+  });
+
   it("T2.8 (I6): an error or warn tone without a glyph is a construction error", () => {
     expect(() => block({ kind: "notice", id: "n", tone: "error", text: "failed" })).toThrow(
       BlockShapeError,

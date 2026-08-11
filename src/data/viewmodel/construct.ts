@@ -92,6 +92,36 @@ function checkPlotHeight(plot: Plot): void {
   }
 }
 
+/**
+ * I41 — an unknown `yFormat` is an error, not a silent fall-through to `number`.
+ *
+ * **Both here and in the validator**, which is §3's standing reason rather than
+ * duplication: a document can arrive from a fixture without passing through a
+ * constructor, and a constructed block never reaches the validator. A check in
+ * one of them covers half the ways a plot is built.
+ *
+ * The arm the rename produces is `percentage` — what a reader guesses when
+ * `fraction` and `percent` are the two on offer — and it used to render plain
+ * numbers in silence.
+ */
+const Y_FORMATS: ReadonlySet<string> = new Set([
+  "number",
+  "fraction",
+  "percent",
+  "bytes",
+  "duration",
+]);
+
+function checkPlotFormat(plot: Plot): void {
+  const format: unknown = plot.yFormat;
+  if (format !== undefined && !(typeof format === "string" && Y_FORMATS.has(format))) {
+    throw new BlockShapeError(
+      `plot "${plot.id}": "yFormat" must be one of ${[...Y_FORMATS].join(", ")} (C04 I41) — ` +
+        `an unknown arm used to render plain numbers and say nothing`,
+    );
+  }
+}
+
 /** Every shape check that applies to a block, by kind. */
 function checkShape(block: Block): void {
   switch (block.kind) {
@@ -100,6 +130,7 @@ function checkShape(block: Block): void {
       break;
     case "plot":
       checkPlotHeight(block);
+      checkPlotFormat(block);
       break;
     case "table":
       for (const row of block.rows) {

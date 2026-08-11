@@ -58,6 +58,14 @@ const ACTION_FIELD: Readonly<Record<Action["kind"], string>> = Object.freeze({
 
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
 const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh", "defect"]);
+/** C04 I41 — the arms, named for the unit that arrives, not the unit rendered. */
+const Y_FORMATS: ReadonlySet<string> = new Set([
+  "number",
+  "fraction",
+  "percent",
+  "bytes",
+  "duration",
+]);
 
 // --- small total helpers --------------------------------------------------
 
@@ -189,6 +197,14 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     // because a document can arrive from a fixture without passing through one.
     if (b["form"] === "line" && !isFiniteNumber(b["height"])) {
       e.push(`${at}: form "line" requires a numeric "height" (C04 §3) — there is no default`);
+    }
+    // **C04 I41 — an unknown arm is an error, not a silent numeric fall-through.**
+    // It was unvalidated, so a typo rendered plain numbers and said nothing; the
+    // `fraction`/`percent` rename is exactly the event that produces one, because
+    // `percentage` is what a reader guesses.
+    const format = b["yFormat"];
+    if (format !== undefined && !(isString(format) && Y_FORMATS.has(format))) {
+      e.push(`${at}: "yFormat" must be one of ${[...Y_FORMATS].join(", ")} (C04 I41)`);
     }
   },
   progress: (b, e, at) => {

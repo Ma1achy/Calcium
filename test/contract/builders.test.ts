@@ -282,6 +282,46 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
     expect(frame(expectedKv)).not.toBe(frame(expectedCmp));
   });
 
+  it("T2.12c (F31, C04 I41): b.plot passes `yFormat`, read off the axis", () => {
+    // **The omission's reason met its consumer.** C24 §4 withheld this field
+    // because `percent` multiplied by 100 and a far side emitting a percentage
+    // emits `100.2` — accurate about the trap, and it treated the trap as
+    // grounds for withholding rather than as the thing to fix. Renaming the
+    // multiplying arm to `fraction` left nothing to withhold.
+    //
+    // Read off the **rendered axis** on T2.12b's precedent: asserting the field
+    // round-trips is the builder restated, and what the field is for is the
+    // label. A builder that dropped it renders `100` where `100%` belongs, and
+    // the gutter shifts with it.
+    const r = kit();
+    const axis = (blk: Block): string =>
+      renderSequenceToLines(r.registry, seq([blk]), 40, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      })[0] ?? "";
+
+    const cpu = axis(
+      b.plot({
+        id: "p",
+        series: [{ values: [12, 44, 100] }],
+        height: 5,
+        axes: true,
+        yMin: 0,
+        yMax: 100,
+        yFormat: "percent",
+      }),
+    );
+
+    expect(cpu, "the arm reached the renderer").toContain("100%");
+
+    // The control: without it the same block labels a bare number, so the row
+    // is about the field travelling rather than about `100` appearing at all.
+    const plain = axis(
+      b.plot({ id: "p", series: [{ values: [12, 44, 100] }], height: 5, axes: true, yMin: 0, yMax: 100 }),
+    );
+    expect(plain, "and it is the field that put it there").not.toContain("100%");
+  });
+
   it("T2.12b (F27, C04 I29): b.plot passes the pin, read off the axis and not the field", () => {
     // **The defect this rules out was found in a frame, not in a field.**
     //

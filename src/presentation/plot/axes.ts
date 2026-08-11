@@ -19,13 +19,25 @@ export type YLabel = Readonly<{ row: number; text: string }>;
  *
  * `number` trims trailing zeroes rather than fixing a precision, because a loss
  * curve and an epoch count share the format and want different amounts of it.
+ *
+ * **`default` is the numeric arm and is now unreachable from a validated
+ * document** (C04 I41). It stays because this function is called with
+ * `Plot["yFormat"]` including `undefined`, which is the real default — not
+ * because an unknown string should quietly become a number, which is what it
+ * used to mean and what let a typo render plain values in silence.
  */
 export function formatValue(v: number, format: Plot["yFormat"], places?: number): string {
   if (!Number.isFinite(v)) return "—";
 
   switch (format) {
-    case "percent":
+    // **Named for the unit in, not the unit out** (C04 I41, F31). Both arms end
+    // in a per-cent sign, so the rendered form cannot distinguish them; the
+    // producer's value can. `fraction` is the old `percent` — the arithmetic
+    // never moved, the name did.
+    case "fraction":
       return `${Math.round(v * 100)}%`;
+    case "percent":
+      return `${Math.round(v)}%`;
     case "bytes":
       return formatBytes(v);
     case "duration":
