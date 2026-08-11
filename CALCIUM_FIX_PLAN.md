@@ -265,7 +265,7 @@ was written to `config.stdout`, which C01 redirects into its `debug` sink at con
 than at acquire, and the `onResize` C22 I8 registers could never fire because C01 dropped every
 `SIGWINCH` outside `acquired`. Both are one class — a correct sentence justifying a condition
 wider than it warrants — in two components. C01 I12b is the ruling; C22 T4.21/T4.21b and C01
-T3.18c are the rows, all tier 5 or paired, because no unit test could see either half.
+T3.18c are the rows, all tier 5 or paired, because no unit test could see either half. Tier 5 after: **44 failed / 54 passed / 7 todo** against a baseline of 44 / 50 / 7 — four rows added, all green, failing row set identical, on an idle machine.
 
 **F15 was filed as a ruling and is a change**, because the ruling had already been made and
 never built: C23 §5, I1 and §8a A5 all said *"logged as a defect"* and no component had a sink.
