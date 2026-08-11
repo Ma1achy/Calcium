@@ -5788,55 +5788,65 @@ leaves a transcript indistinguishable from one where the verb was quiet.
 
 ---
 
-## F139 — T5.6 measures the host, so tier 5's count is a fingerprint only on an idle machine ★★
+## F139 — the rule was in the file header, and I filed a finding re-deriving it wrongly ★★★
 
 | | |
 |---|---|
-| **Surface** | `make e2e`, and every row-closing comparison that cites F133's 44 |
+| **Surface** | tier 5's counters, and the record that says how to read them |
 | **Reached for** | a clean before/after on tier 5 for tier 3 row 3 |
-| **Verdict** | **a real finding about the instrument** — and this entry is a rewrite of a wrong one |
+| **Verdict** | **a finding about the reader, not the suite** — and this entry is its second rewrite |
 
-C03's `T5.6 — sixty seconds idle is zero writes and no measurable CPU` asserts
-`cpuFraction < 0.01`, a fraction of **wall-clock** CPU over a minute. That is a statement
-about the machine the suite is running on, not about C03: `writes` is `0` on every run,
-including the failures, so the frame path is silent and what is over budget is the process's
-share of a host somebody else is also using.
+Tier 5 came back **45** against a baseline of **44**. C03's `T5.6 — sixty seconds idle is
+zero writes and no measurable CPU` was the row that moved.
 
-**Measured.**
+**It is already documented, at the top of the file it lives in:**
 
-| condition | tree | runs | failed | `cpuFraction` on failures |
-|---|---|---|---|---|
-| a VAE training in another process | `a5b6486`, before the row | 4 | 2 | 0.0245, 0.0153 |
-| the same | `ee0caf7`, after the row | 3 | 1 | 0.0414 |
-| **idle machine** | `ee0caf7` | **5** | **0** | — |
+> **This file measures wall-clock and must not share the machine.** T5.2 is a p95
+> input-to-frame latency and T5.6 is sixty seconds of idle CPU; run alongside fifteen other
+> PTY files they measure the contention rather than the scheduler.
 
-And the full suite on an idle machine: **44 failed / 50 passed / 7 todo**, with the failing
-row set *identical* to F133's baseline — the same rows, not merely the same count.
+And `VERIFYING.md`'s own preamble already carries the general form — *a rotating failure set
+is a diagnosis, not a mystery* — and §7 carries three measurements of a load generator
+perturbing exactly these rows. **Nothing here was unknown. What was missing was a reader.**
 
-### The rewrite, because the first version of this finding was wrong
+### The diagnostic error, which is the transferable part
 
-It claimed the baseline was *"44 or 45, and the row that decides is a coin flip"*, on the
-strength of seven runs across two trees. **Every one of those seven was taken while a VAE was
-training on the same host**, which I did not know and did not look for.
+The count moved. I attributed it to a mutation pass I had genuinely been running
+concurrently, removed that, re-measured, found the number **worse** — 0.0275 against 0.0121 —
+and concluded contention was ruled out.
 
-**Removing your own contention is not measuring on a quiet machine, and I treated it as
-though it were.** The sequence is the instructive part: the count moved, I attributed it to a
-mutation pass I had genuinely run concurrently, removed that, re-measured, found the number
-*worse* — and concluded contention was ruled out. It was ruled out as *my* contention. The
-correct inference from "quieter yet worse" is that the load is somewhere I have not looked,
-not that there is no load. Five for five green once the host was actually idle.
+**It was ruled out as *my* contention.** An unrelated training job held the host across every
+run, on both sides of the change. The step that was wrong is the one that felt like rigour:
+eliminating a cause you control is not eliminating the cause, and **quieter yet worse is
+evidence of load you have not found, not evidence of no load.**
 
-**The tell was in the data and I read past it.** A row asserting a *CPU fraction* cannot fail
-for a reason internal to the code when its companion assertion — `writes === 0` — passes. That
-is the row telling you it is measuring the host, in the same output.
+Idle: **five for five green**, and the full suite **44 / 50 / 7 with a failing row set
+identical to the baseline's** — the same rows, not merely the same count.
 
-### What is owed
+**And the tell was in the first run's own output.** `writes === 0` passed while
+`cpuFraction < 0.01` failed. **One of a pair failing while the other passes is a
+discriminator**: the behavioural half says the frame path is silent, so the resource half can
+only be measuring the host. It was there before any of the re-measuring.
 
-The row is not wrong to exist and is not fixed here: an idle session that burns 4% of a core
-would be a real defect, and the assertion is the only thing that would catch it. What is owed
-is that it cannot currently distinguish *that* from a busy laptop, so either the bound is
-derived from a calibration run or the row is skipped when the host is loaded.
+### A fourth instance of the rotating set, and it is uncaptured
 
-**And the comparison protocol needs one clause.** *The six targets before and after, counters
-compared* is only a check on an otherwise idle machine, and nothing said so — which is how a
-45 got as far as a committed finding.
+`make test` reported **7 failures** on one run and has been green on four since, two of them
+on an idle host. `npm test` is `vitest run --dir test` with **file parallelism** — `npm run
+e2e` passes `--no-file-parallelism` and this does not — so a rotating set under load is the
+documented phenomenon, of which VERIFYING already records 5, then 7, then 8.
+
+**I cannot confirm it, because I read that run through a `grep` and never captured the
+failing set** — §0's rule, arriving one indirection along: not an exit code through a pipe
+but a *failure list* through a filter, and the same loss. Filed unconfirmed rather than
+dismissed, because four green runs since is consistent with contention and also consistent
+with something intermittent that has not recurred.
+
+### Two things that are genuinely new
+
+- **The counter-comparison protocol never stated its precondition.** *The six targets before
+  and after, counters compared* is a check only on an otherwise idle machine, and that clause
+  existed nowhere. It is `VERIFYING.md` §0's fifth entry now.
+- **`T5.6` names six different rows in tier 5** — C03's idle CPU, C06's standalone build,
+  C18's trailing `&`, C20's corrupt file, C22's piped shell, and history's. `VERIFYING.md`
+  cites `T5.6` bare in two places meaning two different rows. A bare id is ambiguous across
+  components in the one document whose job is to stop a result being misread.

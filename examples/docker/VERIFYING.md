@@ -21,8 +21,9 @@ what is installed**, and the framework's has no docker socket by design.
 Measured in step 12: `npx vitest run --dir test` reported 5, then 7, then 8 failures on
 three consecutive runs of identical code, **with a completely different set each time** and
 never including anything the change had touched. Every one of those files passed when run
-alone. The same tree with `--no-file-parallelism` reported **one** failure — `T5.6`, which
-is independently known to be pre-existing.
+alone. The same tree with `--no-file-parallelism` reported **one** failure — **C03** `T5.6`
+(*sixty seconds idle*), which measures wall-clock CPU and is a statement about the host; see
+§0's sixth entry and the id-ambiguity note beside it.
 
 So a rotating failure set is a diagnosis, not a mystery: when the failures differ run to
 run and the union is the timing-sensitive files, the answer is contention. Re-run serially
@@ -139,6 +140,42 @@ mentions.
 **The rule this adds: after a merge, read CI's result, not the local one.** They are two
 instruments, they disagree, and the one that gates nothing is the one that had been
 believed.
+
+### A sixth: the comparison's precondition was never stated
+
+The remedy above — **run `make all` and report the counters per target, before and after** —
+is the protocol every row in `CALCIUM_FIX_PLAN.md` closes against. **It is a check only on an
+otherwise idle machine, and nothing said so.**
+
+Tier 5 came back **45** against a baseline of **44**, with C03's `T5.6` (frame-scheduler's —
+*sixty seconds idle*) the row that moved. It asserts a fraction of **wall-clock CPU**, so it
+measures the host. An unrelated training job held the machine; idle, it is five for five
+green and the suite is 44 with a failing row set *identical* to the baseline's.
+
+**Compare the row set, not the count.** Two runs at 44 with different rows failing is not the
+same result, and only the set says so. `comm` over the sorted `×` lines costs nothing.
+
+**And the diagnostic error is worth more than the rule.** I attributed the move to a mutation
+pass I *had* been running concurrently, removed it, re-measured, found the number **worse**,
+and concluded contention was excluded. It was excluded as *my* contention. **Eliminating a
+cause you control is not eliminating the cause, and quieter-yet-worse means the load is
+somewhere you have not looked.**
+
+The tell was in the first run's output: `writes === 0` passed while `cpuFraction < 0.01`
+failed. **One of a pair failing while the other passes is a discriminator** — the behavioural
+half said the frame path was silent, so the resource half could only be measuring the host.
+
+**None of this was unknown.** `test/e2e/frame-scheduler.test.ts` opens with *"This file
+measures wall-clock and must not share the machine"*, and the preamble above already says a
+rotating failure set is contention. **The gap was a reader, not a record** — which is the
+inverse of *ask where a claim was written down*, and wants the same question asked earlier:
+before filing a finding, ask where this would already be written. FINDINGS F139.
+
+### Test ids are not unique across components
+
+`T5.6` names **six** different tier-5 rows — C03's idle CPU, C06's standalone build, C18's
+trailing `&`, C20's corrupt file, C22's piped shell, and history's corrupt file. This document
+cites `T5.6` bare in two places meaning two different rows. **Always qualify: `C03 T5.6`.**
 
 ---
 
@@ -268,7 +305,7 @@ on an idle one now.
 
 | | with `dtui-load` up | after `make load-down` |
 |---|---|---|
-| `T5.6` — a session with no far side installed | **timed out at 75s** | **898 ms** |
+| **C06** `T5.6` — a session with no far side installed | **timed out at 75s** | **898 ms** |
 
 Eighty-three times, and the failure mode is a *hang* rather than a threshold — which is
 worse than the original `T5.3a` finding, because a timeout reads as a deadlock in the code

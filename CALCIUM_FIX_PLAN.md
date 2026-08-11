@@ -253,10 +253,10 @@ moved; it asserts a wall-clock **CPU fraction**, so it measures the host. Every 
 measured while an unrelated training job held the machine, and it is five for five green once
 the host is idle (F139).
 
-**So the protocol gains a clause it never had**: *the six targets before and after, counters
-compared* is only a check on an otherwise idle machine. And the lesson underneath it —
-**removing your own contention is not measuring on a quiet machine** — is what turned a clean
-row into a committed finding that had to be rewritten.
+**So the protocol gains the clause it never had** — `VERIFYING.md` §0's sixth: *counters
+compared before and after* is a check only on an otherwise idle machine, and **compare the row
+set rather than the count**. None of it was unknown: the file opens with *"this file measures
+wall-clock and must not share the machine"*. The gap was a reader, not a record.
 
 **F15 was filed as a ruling and is a change**, because the ruling had already been made and
 never built: C23 §5, I1 and §8a A5 all said *"logged as a defect"* and no component had a sink.
