@@ -171,6 +171,38 @@ rotating failure set is contention. **The gap was a reader, not a record** — w
 inverse of *ask where a claim was written down*, and wants the same question asked earlier:
 before filing a finding, ask where this would already be written. FINDINGS F139.
 
+### The failing set moves under load, and that is the discriminator
+
+Two more instances since, and together they sharpen *compare the row set* into something that
+identifies the cause rather than merely detecting a difference.
+
+| run | load avg | failing set |
+|---|---|---|
+| baseline | quiet | — |
+| after F8 | 20.81 | C17 T3.15 (a paste budget) |
+| after F31 | 14.57 | C01 T2.9, C21 T2.7, C10 T2.8, C10 T2.9 (four source scans) |
+| quiet re-run | 4.91 | — |
+
+**A defect picks the same row every time. Contention picks a different one.** The F8 run and
+the F31 run share no failing row, and neither set overlaps the other's subject — a paste
+budget in C17 and four structural scans across C01, C10 and C21 have nothing in common except
+a clock. That is a stronger signal than the count and stronger than the set alone, and it is
+available at zero cost the moment two loaded runs exist.
+
+**The second instance also names the mechanism, which the first did not.** All four rows
+failed with *"Test timed out in 15000ms"* rather than an assertion — and the passing rows
+beside them read **10.9 s, 12.9 s, 18.4 s and 22.5 s** for work that takes about a second
+quiet. They are source scans over the whole tree, so they are I/O and CPU against a fixed
+per-row timeout: a class that converts host load directly into failure with no assertion
+involved. Worth knowing which rows those are, because *timed out* and *wrong answer* are the
+same red tick in a summary.
+
+**And each was diagnosed wrongly first.** F8's run was attributed to a graph leak these rows
+had themselves introduced — a mechanism in hand is the most expensive kind of coincidence,
+because it supplies the explanation before the measurement does. The check that settled both
+costs one command: **run the failing rows alone.** C17 T3.15 passed 3/3; these four passed
+40/40.
+
 ### Test ids are not unique across components
 
 `T5.6` names **six** different tier-5 rows — C03's idle CPU, C06's standalone build, C18's
