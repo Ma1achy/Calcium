@@ -5822,15 +5822,20 @@ declares `BlockDefinition.window`.
 
 ### CLOSED — `patch` declares a window, and the cut is exact
 
-| | before | after | `logs` |
+| | before | after (two runs) | `logs` |
 |---|---|---|---|
-| first frame | 3,679 ms | **176.7 ms** | 85.9 |
-| drag step | 3,229 ms | **31.5 ms** | 8.4 |
-| keystroke | 13.2 ms | 12.4 ms | 1.6 |
-| `SIGWINCH`, same size | 11.1 ms | 10.8 ms | 1.1 |
+| first frame | 3,679 ms | **177–286 ms** | 85.9 |
+| drag step | 3,229 ms | **31.5–35.8 ms** | 8.4 |
+| keystroke | 13.2 ms | 12.4–19.2 ms | 1.6 |
+| `SIGWINCH`, same size | 11.1 ms | 10.8–16.9 ms | 1.1 |
 
-**21x on opening and 102x on a drag step**, landing within 2–4x of the windowed kind rather
-than 43–384x. A patch does more per row than a log line — a gutter, a marker, syntax slots —
+**13–21x on opening and 90–102x on a drag step**, landing within 2–4x of the windowed kind
+rather than 43–384x.
+
+**Ranges rather than figures, because the two runs disagree by 60% on the first frame and the
+*quieter* host produced the worse number** — the same shape F139 records, in the instrument
+this row is standing on. What survives that spread is the effect: two orders of magnitude is
+not something a busy laptop explains. A patch does more per row than a log line — a gutter, a marker, syntax slots —
 so parity was never the target; the *shape* was, and it is the same shape now. The bench's own
 liveness guard still reports 47 body rows on screen, so it is not fast by drawing nothing.
 
@@ -5861,6 +5866,34 @@ each failed exactly one row.
 **One correction to this file's own record.** `structured.ts` named four derivations that
 disqualify a kind from windowing, and `planColumns` was in the list in error — it reads column
 definitions and the width, never the rows. `keyValue` and `code` are the two still open.
+
+### The gap this row created, closed in it
+
+**Nothing benched the fullscreen view**, and C25 I21a had just added a second O(n) walk to a
+function called once per frame. The whole tier is about claims with no measurement behind them,
+so leaving that one unmeasured was the state being complained about.
+
+`tools/bench/patch-window.mjs` times the window *build* — not the frame around it, which the
+file says rather than leaving a number that looks like a frame time to imply it. A control
+pair, **three runs each on a host settled below 33%**, 5,000 lines:
+
+| | runs | median |
+|---|---|---|
+| with the pin | 4.014, 3.420, 3.548 | **~3.5 ms** |
+| without | 2.084, 2.053, 1.958 | **~2.0 ms** |
+
+**+1.5 ms, or +75%** on the window build. **The loaded pair understated it** — it read +40–70%
+— which is worth recording as the direction that mistake goes: contention compressed a ratio
+rather than inflating it.
+
+**Worth it and not free.** A fullscreen view rebuilds its window per frame, so ~1.5 ms against
+a 16 ms budget, buying a gutter that no longer moves. **Avoidable and not avoided here**:
+`build()` already walks every line in `rowsOf`, so the width could fold into that pass. Named
+rather than taken, because it changes `rowsOf`'s contract for a saving nothing has asked for.
+
+**And the instrument guards the thing under test rather than a proxy.** Without the pin it
+prints `gutter: window 2, block 4  ← DRIFT`, so a run that measured a broken window could not
+be read as a clean one.
 
 **Measured, and the measurement is inconclusive by construction rather than by variance.** A
 control pair with and without the pin, back to back: start 3,545 against 6,002 ms, keystroke
