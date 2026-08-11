@@ -6434,7 +6434,16 @@ this row is not.
 `grep '^## F' FINDINGS.md` yields **89** ids and every one is keyed in a group above — 10 + 12
 + 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 + 6 + 2 + 1 + 6 = 89."*
 
-Measured now: **147**.
+Measured now, and **carefully, because the first pass at this entry did the thing the entry is
+about**: `grep -c '^## F'` gives **148** section headings, of which **145** are distinct
+findings — `## F24 corrected`, `## F37 confirmed at a cost` and `## F37 closed` are follow-up
+sections reusing an id, and a raw `grep -c` counts them as findings. Of those 145, **55 are
+keyed in no group**.
+
+I first reported this as *"147, fifty-eight outside"*, from a `grep -c` I had not looked at.
+Both numbers were wrong in the direction that makes the finding sound bigger, and the method
+was the one being criticised — a count quoted rather than derived. It is left here rather than
+silently replaced, because the entry's whole subject is a number nobody recomputes.
 
 **The check is correct and its subject moved.** *Derived, not hand-copied* is true about the
 moment it was written and says nothing about any moment since — and the sum still adds to 89,
@@ -6462,5 +6471,36 @@ entry cannot outlive its reason unread, and this is the same requirement stated 
 nothing can compare it.
 
 **And the pre-check is what found it**, which is the argument for the pre-check: the tier-5
-plan cites `TRIAGE.md`'s groups as its inventory, so every item below rests on a partition that
-has been stale for fifty-eight findings.
+plan cites `TRIAGE.md`'s groups as its inventory, so every item below rested on a partition
+that had been stale for fifty-five findings.
+
+**Closed** — `SP6` in `tools/enforce/findings.mjs`, wired into `make enforce`, A03 §7a's table,
+and the 55 keyed.
+
+**The mechanism, not a recount.** SP6 takes the distinct ids from the ledger, takes the ids
+keyed in the group sections, and **compares the two sets by equality** — `BUILDER_OMISSIONS`'
+precedent, because a list checked as a subset lets an entry outlive its reason unread, which is
+exactly how this went stale. It returns `ids` and `keyed` as counters for the same reason SP5
+returns `scanned` and `citations`: an exit status cannot say whether the comparison happened.
+
+**Fabricated both ways**, because the two failures are different rules wearing one id — a
+finding filed and not keyed (the drift), and a key removed (the reverse, which also moves the
+total and so proves the sum check is live rather than inert behind the completeness check).
+Clean reads `145 ids, 145 keyed, 0 violations`.
+
+**The 55 are keyed by mechanism, and the distribution is the finding.** Two groups took more
+than half of them: **16 into group 11** (a gate that passes without checking) and **8 into
+group 9** (the instrument was wrong), with a further 9 into group 2. Everything filed since the
+inventory was last derived is dominated by the apparatus rather than by the framework — which
+inverts the ranking table's own story, where group 11 was sixth by size and is now first.
+
+**The duplicate prose counts were deleted rather than checked twice.** Group 9 read *7
+surfaces* in its heading and *"Six findings"* in the sentence beneath, because F86 was added to
+the table and not the sentence. A number stated twice can disagree with itself; the size is now
+in the ranking table only, where SP6 checks it.
+
+**Residue, named because a citation reads as coverage.** SP6 counts a bolded id anywhere in a
+group section, so it proves coverage and **not placement** — the triage keys in two forms and
+nothing distinguishes a key from a mention. Tightening the key form to table rows only would
+make placement checkable and is not done here. Until it is, the 55 placements above are
+one reader's judgement from each entry's heading, and they are marked as such in the document.

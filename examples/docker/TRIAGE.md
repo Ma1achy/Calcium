@@ -27,22 +27,22 @@ type change.
 
 ## The ranking
 
-| rank | mechanism | findings | consumers | ⚠ | disposition |
+| rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 10 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 12 | **5 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 12 fixed** |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 21 | **5 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 12 fixed** |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
-| **5** | [The far side's shape is not the framework's contract](#5) | 6 | **2 open** | ⚠ C05 | mostly app-side · one shim |
+| **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
-| **7** | [An artefact describes the world rather than being checked against it](#7) | 14 | **14** | — | artefact discipline — **no code** |
-| **8** | [Absence indistinguishable from failure](#8) | 8 | **3 open** (5 closed) | partly | real Calcium work · **5 of 8 fixed** |
-| **9** | [**The instrument was wrong**](#9) | 7 | **7** | — | **new at F80** · tooling, and it has no test |
-| **10** | [**A claim carried without a record**](#10) | 5 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 6 | **6** | — | 4 closed · **2 open, both about a rule's reach** |
+| **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
+| **8** | [Absence indistinguishable from failure](#8) | 10 | **3 open** (5 closed) | partly | real Calcium work · **5 of 8 fixed** |
+| **9** | [**The instrument was wrong**](#9) | 15 | **7** | — | **new at F80** · tooling, and it has no test |
+| **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
+| **11** | [A gate that passes without checking](#11) | 22 | **6** | — | 4 closed · **2 open, both about a rule's reach** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits and does not substitute](#13) | 1 | 1, *and every consumer has it* | — | real Calcium work · needs a ruling |
-| — | [Singles](#singles) | 6 | 1 each | — | see each |
+| — | [Singles](#singles) | 14 | 1 each | — | see each |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
 that changes the picture, and it is the only group whose subject is the apparatus rather
@@ -139,6 +139,22 @@ mechanism.
 ---
 
 <a id="3"></a>
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F92** | `usageBlocks` renders per-verb help and only an exit code can ask for it |
+| **F96** | the member that would create the history directory is uncalled |
+| **F97** | reverse search opens and `type()` has no caller |
+| **F108** | `FlagDef.view` reaches local verbs only, and its own comment says why |
+| **F125** | four of eight handler families declare a context the surface says they cannot |
+| **F126** | no seam, because the composition was never a unit |
+| **F129** | a `view` verb that is also `local` appends an entry and opens nothing |
+| **F132** | the grant is untestable from the side that consumes it |
+| **F141** | `b.logs` is reached by one test fixture, and S12 composes `raw` |
+
+
 ## 3 · A block cannot express what the surface needs — **4 open** ⚠
 
 | | | verdict |
@@ -234,6 +250,15 @@ the adapter and never spawn anything.
 ---
 
 <a id="6"></a>
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F101** | `stderr` and `exitCode` on a route that has no far side |
+| **F124** | the app's capability sniff and C02 disagree on three of four locale shapes |
+
+
 ## 6 · Rendered from data that has since moved — **2 open** ⚠
 
 **F24** — `LiveSpec.render` receives no width, so anything sized at build time cannot follow a
@@ -246,7 +271,7 @@ badly and *"the banner overflows when you resize"* argues for itself immediately
 ---
 
 <a id="7"></a>
-## 7 · An artefact describes the world rather than being checked against it — **14 surfaces**
+## 7 · An artefact describes the world rather than being checked against it
 
 **The largest group by count, no code, and the cheapest to act on.** It spans three kinds of
 wrongness and the split is the finding: `DOCKER_TUI_SURFACES.md`'s corrections index scores
@@ -276,6 +301,16 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 ---
 
 <a id="8"></a>
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F88** | `CALCIUM_ROADMAP.md`'s cross-references point at the wrong entries |
+| **F106** | the block-expressiveness group is three findings and one visitor |
+| **F128** | three specs disagreed with the code they specify, all in one direction |
+
+
 ## 8 · Absence indistinguishable from failure — **3 open, 5 closed**
 
 Every instance is invisible by construction: a green suite, a plausible frame, no diagnostic.
@@ -322,9 +357,18 @@ and the claim has to be one the producer can support.*
 ---
 
 <a id="9"></a>
-## 9 · The instrument was wrong — **7 surfaces** · new at F80
 
-**Six findings about the measuring apparatus, and this group did not exist at F55.** It is
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F135** | a malformed greeting is swallowed twice and the session shows nothing |
+| **F138** | every notice composed as an error was an invalid document |
+
+
+## 9 · The instrument was wrong · new at F80
+
+**This group did not exist at F55, and its size is stated once — in the ranking table.** It is
 listed high despite one open entry because of what the count means: every frame-read in steps
 9 through 13 went through `screen.py`, and F79 is the **first time its output was checked
 against the bytes it was replaying.**
@@ -362,6 +406,21 @@ says a demo of a plot should have a shape.
 ---
 
 <a id="10"></a>
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F107** | the wiring survived the mutation pass, and the fixture is why |
+| **F110** | `as never` in a fixture, fourth instance |
+| **F111** | a test named for a workaround outlives it, and passes |
+| **F113** | a one-action fixture cannot falsify a first-action rule |
+| **F116** | a mutation surviving located the guard, not a hole |
+| **F117** | a blanket rename took a rule id that was already taken, twice |
+| **F120** | the mutation harness reported one pre-existing error six times |
+| **F130** | the grant's own tests could not see it, because the double was narrower |
+
+
 ## 10 · A claim carried without a record — **5, and all five disproved** · new at F80
 
 **This group is the disposition.** Every entry is a finding that was filed, believed, and then
@@ -402,6 +461,19 @@ through a menu in as many words — as the reason the implementation writes ever
 ---
 
 <a id="11"></a>
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F89** | an Order entry carries a claim its own document records as corrected |
+| **F93** | C09 §4a promises a registration path that was never built |
+| **F112** | F21's four claims all held, and the fix was a tenth the size |
+| **F123** | a promise needs three mechanisms and the finding that named it found one |
+| **F134** | corrected twice; the drift is real and shipped by a route neither reading found |
+| **F139** | the rule was in the file header, and a finding re-derived it wrongly |
+
+
 ## 11 · A gate that passes without checking — **6: 4 closed, 2 open**
 
 | | the gate | what it was not checking |
@@ -477,6 +549,29 @@ reads goes through the entry point a user has.
 ---
 
 <a id="12"></a>
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F87** | the partition is claimed and the count that checks it cannot see the claim |
+| **F94** | `export interface` does not mark a seam, and MG24's premise rests on it |
+| **F95** | MG24 counted method parameters as interface members |
+| **F99** | eleven published members no rule could see |
+| **F102** | D29's sweep exempts a *kind* and the guard catches only a new kind |
+| **F104** | `block()` is transparent to excess properties, so C04's narrowings land unenforced |
+| **F105** | MG24 matches member names globally |
+| **F109** | a proxy that stopped measuring its property, and the property stayed true |
+| **F114** | the builder-coverage rule existed, correctly stated, with nothing reading it |
+| **F115** | the coverage rule was blind to its own findings regressing |
+| **F121** | six tier-5 rows were red at HEAD and nothing said so |
+| **F127** | MG3 has never walked `import type` |
+| **F131** | `make all`'s golden gate had been red for four commits |
+| **F133** | tier 5 was 44 failed at session start, and the prompt never draws |
+| **F136** | MG24 matches a record's members by name and not by owner |
+| **F142** | a derived count is derived once, and nothing re-derives it |
+
+
 ## 12 · A time-based assertion under contention — **2** · new at F80
 
 **Calcium's own suite, not the app's**, and it is here because a failure of this kind names an
@@ -517,6 +612,14 @@ already made — folding it in is cheaper than making a second one.
 ---
 
 <a id="singles"></a>
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F55** | the framework draws two characters it does not substitute — this group's subject |
+
+
 ## Singles — one consumer each
 
 | | verdict |
@@ -529,6 +632,21 @@ already made — folding it in is cheaper than making a second one.
 | **F72** | `ls -p` does not mark a symlinked directory, so the one thing a user wants to do with a directory is the thing it prevents — **fixed** with `ls -1pL`, measured out of a real container's listing |
 
 ---
+
+
+**Keyed here by the F142 inventory sweep** — the second cohort, filed after this document's own count was last derived. Placed by mechanism from the entry; SP6 proves coverage and not placement, which is its stated limit.
+
+| | why this group |
+|---|---|
+| **F90** | the frame is recomputed and rewritten whole, and the four fixes are one chain |
+| **F91** | every `b.live` part owns its own fetch, so two views of one source disagree |
+| **F98** | the suite leaves eleven sessions' process handlers attached |
+| **F100** | narrowing the adapter's return exposed three things the wide type hid |
+| **F103** | three renderers implement one pattern and none of them names it |
+| **F122** | the framework holds apps to a rule it exempts itself from |
+| **F137** | a fold runs on a version, so an attempt that failed is not counted |
+| **F140** | a refusal that leaves a constructed graph |
+
 
 ## What this triage cannot see
 
@@ -572,9 +690,26 @@ a triage is a thing asserted. Specifically:
 
 ## How this file was checked
 
-**The inventory is derived, not hand-copied.** `grep '^## F' FINDINGS.md` yields 89 ids and
-every one is keyed in a group above — 10 + 12 + 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 + 6 + 2 + 1 + 6
-= 89.
+**The inventory is derived, and now it is derived by something that runs.** `SP6` in
+`tools/enforce/findings.mjs` takes the distinct ids from `FINDINGS.md`, takes the ids keyed in
+the group sections here, and **compares the two sets by equality** — so a finding filed and not
+keyed fails `make enforce`, and the sum in the ranking table is checked against what the groups
+actually hold rather than against itself.
+
+**It was a snapshot until then, and it had gone 55 findings stale.** This paragraph used to
+read *"yields 89 ids and every one is keyed in a group above — 10 + 12 + … = 89"*. Measured
+when SP6 was written: **145 distinct findings, 55 keyed nowhere**, and the sum still reached
+89, so the arithmetic offered as evidence passed exactly as it did on the day it was true. That
+is F87's proxy one level out — F87 found a total cannot see a duplicate placed twice and
+counted once, and this is the same total unable to see an id never placed at all. F142.
+
+**What the column counts, stated because it is not what the header used to say.** `ids keyed`
+is *ids appearing in bold inside a group's section*. This document keys in two forms — a table
+row's first cell, and bold in prose — and nothing distinguishes a key from a mention: table
+cells alone find 78 and leave groups 6 and 13 keying nothing at all. So the number, and SP6,
+prove **coverage and not placement**, exactly as SP5 checks a citation's existence and not its
+aim. Tightening the key form to table rows only is real work and is not done here; until it is,
+a finding bolded in passing inside a group it does not belong to is counted there.
 
 **The groups are not disjoint, and an earlier version of this paragraph claimed they were.**
 F30 is keyed in group 4 and again in group 7 — it genuinely is both a verdict the union lacks
@@ -633,8 +768,8 @@ or fifth consumer turned up, not because anything got more severe — the F55 tr
 mechanism arriving again, exactly as it should.
 
 **The actionable divergence is that group 9 outranks ROADMAP's entry 4 on consumer count and is
-not on the list at all.** Six findings about the apparatus every other finding was measured
-with, and its disposition — *every instrument gets a fixture it must reproduce* — is cheaper
+not on the list at all.** A whole group about the apparatus every other finding was measured
+with — the size is in the ranking table and is derived, not restated here — and its disposition — *every instrument gets a fixture it must reproduce* — is cheaper
 than any of the four entries ROADMAP already carries.
 
 ROADMAP is **not** edited here. Step 3 rewrites it from this file.

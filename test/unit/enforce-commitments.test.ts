@@ -13,7 +13,7 @@
 // Commitments section produces no findings and looks compliant.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { checkFindings } from "../../tools/enforce/findings.mjs";
+import { checkFindings, checkTriageInventory } from "../../tools/enforce/findings.mjs";
 import {
   checkCommitments,
   checkOrdering,
@@ -634,6 +634,36 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
   // when the regex matches nothing and when the scope holds the wrong files. The
   // pair that failed both earlier times is regex-and-scope *together*, and only
   // `citations` can show it. F82.
+  it("SP6: the inventory is complete, and both directions can fail", () => {
+    // **The rule this test exists for was green while 55 of 145 findings were
+    // keyed nowhere** — because the evidence it offered was a sum over the
+    // groups, and a total computed over the groups can only describe the
+    // groups. F142, and F87's proxy one level out.
+    const clean = checkTriageInventory();
+    expect(clean.ids, "findings read").toBeGreaterThan(100);
+    expect(clean.keyed, "and every one is keyed").toBe(clean.ids);
+    expect(clean.map((x) => x.message), "SP6").toEqual([]);
+
+    // **Fabricated both ways, because the two failures are different rules
+    // wearing one id.** A finding filed and not keyed is the drift this exists
+    // to catch; a key removed is the reverse, and it also moves the total, so
+    // the second fabrication proves the sum check is live rather than inert
+    // behind the completeness check.
+    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const triage = readFileSync("examples/docker/TRIAGE.md", "utf8");
+    const io = (l: string, t: string) => ({
+      read: (f: string) => (f.endsWith("TRIAGE.md") ? t : l),
+    });
+
+    const filed = checkTriageInventory(
+      io(`${ledger}\n\n## F999 — a fabricated finding\n\nbody.\n`, triage),
+    );
+    expect(filed.map((x) => x.message).join(" "), "an unkeyed finding fails").toContain("F999");
+
+    const unkeyed = checkTriageInventory(io(ledger, triage.replace("**F142**", "F142")));
+    expect(unkeyed.length, "a removed key fails completeness and the sum").toBe(2);
+  });
+
   it("SP5: the real tree is clean, and the rule actually read it", () => {
     const v = checkFindings();
     expect(v.scanned, "files scanned").toBeGreaterThan(50);

@@ -245,3 +245,105 @@ export function checkFindings(io) {
   violations.citations = citations;
   return violations;
 }
+
+const TRIAGE = "examples/docker/TRIAGE.md";
+
+/**
+ * SP6 — every finding in the ledger is keyed in the triage, and the triage's
+ * declared total equals what it keys.
+ *
+ * **`TRIAGE.md` certifies itself complete and the certificate is a snapshot.**
+ * Its §*How this file was checked* opens *"The inventory is derived, not
+ * hand-copied — `grep '^## F' FINDINGS.md` yields 89 ids and every one is keyed
+ * in a group above"*, followed by a sum that reaches 89. Measured when this rule
+ * was written: **145 distinct findings, 55 of them keyed in no group.** The sum
+ * still reached 89, so the arithmetic offered as evidence passed exactly as it
+ * did on the day it was true.
+ *
+ * That is F87's mechanism one level out. F87 found that a total over group sizes
+ * cannot see a duplicate placed twice and counted once — a proxy agreeing with
+ * itself. This is the same total failing to see **absence**: a sum computed over
+ * the groups can only ever describe the groups, so nothing in it can notice ids
+ * that were never keyed anywhere. F87 fixed the disjointness half and left the
+ * completeness half resting on a number nobody recomputes. FINDINGS F142.
+ *
+ * **Compared by equality, on `BUILDER_OMISSIONS`' precedent** (A03 §3). The
+ * triage's inventory is an exemption list in prose: it says *these are all the
+ * findings and here is where each sits*, and a list that is checked as a subset
+ * lets an entry outlive its reason unread. Twice today an allow-list disposed of
+ * its own stale entry because equality made it mechanical.
+ *
+ * **Known limits, stated because an unrecorded limit reads as strength:**
+ *
+ *   - **A bolded id anywhere in a group section counts as keyed.** The triage
+ *     keys in two forms — a table row's first cell, and bold in prose — and
+ *     nothing distinguishes a key from a mention. Measured: table-cells alone
+ *     find 78 and groups 6 and 13 key nothing that way at all. So this proves
+ *     *coverage*, not correct placement, exactly as SP5 checks existence and not
+ *     aim. A finding bolded in passing inside a group it does not belong to
+ *     passes here.
+ *   - **Per-group counts are not checked**, for the same reason: with keys and
+ *     mentions indistinguishable, a per-group rule would fire on prose. The
+ *     remedy taken instead was to delete the duplicate counts, so each group's
+ *     size is stated once — group 9 carried *"7 surfaces"* in its heading and
+ *     *"Six findings"* in the sentence below it, because F86 was added to the
+ *     table and not to the sentence.
+ *   - **Follow-up sections share an id.** `## F24 corrected`, `## F37 confirmed
+ *     at a cost` and `## F37 closed` are continuations, so a raw `grep -c '^## F'`
+ *     answers 148 where the finding count is 145. The first draft of F142 quoted
+ *     that grep and was wrong by three, which is the entry's own subject.
+ */
+export function checkTriageInventory(io) {
+  const readText = io?.read ?? ((f) => readFileSync(f, "utf8"));
+  const violations = [];
+
+  const ledger = readText(LEDGER);
+  const triage = readText(TRIAGE);
+
+  // Distinct, so a follow-up section is the finding it continues.
+  const ids = [...new Set([...ledger.matchAll(/^## (F\d+[a-z]?)\b/gmu)].map((m) => m[1]))];
+
+  // A group section runs from its `## N · ` heading to the next `## `, and
+  // `Singles` is a group in everything but numbering — leaving it out would make
+  // its six findings read as unkeyed.
+  const sections = triage.split(/^## /mu).filter((c) => /^(?:\d+ · |Singles)/u.test(c));
+  const keyed = new Set(sections.flatMap((c) => [...c.matchAll(/\*\*(F\d+[a-z]?)\*\*/gu)].map((m) => m[1])));
+
+  const unkeyed = ids.filter((id) => !keyed.has(id));
+  if (unkeyed.length > 0) {
+    violations.push({
+      rule: "SP6",
+      file: TRIAGE,
+      message:
+        `${String(unkeyed.length)} of ${String(ids.length)} findings are keyed in no group: ` +
+        `${unkeyed.join(" ")}. The inventory claims every id is keyed, and its sum reaches the ` +
+        `total either way — a count over the groups can only describe the groups, so it cannot ` +
+        `see an id that was never keyed at all (F142, F87 one level out). Key each one, or ` +
+        `add a group for the mechanism they share.`,
+      spec: "A03 §7a · FINDINGS",
+    });
+  }
+
+  // The declared total, which is the sentence that went stale. Per-group numbers
+  // are not checked — see the limits above — but the total is derivable from the
+  // same table and is what the self-check actually asserts.
+  const declared = [...triage.matchAll(/^\|\s*(?:\*\*)?(?:\d+|—)(?:\*\*)?\s*\|[^|]*\|\s*(\d+)\s*\|/gmu)].map(
+    (m) => Number(m[1]),
+  );
+  const sum = declared.reduce((a, b) => a + b, 0);
+  if (declared.length > 0 && sum !== keyed.size) {
+    violations.push({
+      rule: "SP6",
+      file: TRIAGE,
+      message:
+        `the ranking table's findings column sums to ${String(sum)} and the groups key ` +
+        `${String(keyed.size)} distinct ids. The sum is the document's own evidence that the ` +
+        `inventory is derived; it is derived once and nothing recomputes it (F142).`,
+      spec: "A03 §7a · FINDINGS",
+    });
+  }
+
+  violations.ids = ids.length;
+  violations.keyed = keyed.size;
+  return violations;
+}

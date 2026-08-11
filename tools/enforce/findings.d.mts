@@ -44,3 +44,23 @@ export type FindingsIo = {
 
 /** SP5 — every `Fnn` citation resolves against a finding that exists. */
 export declare function checkFindings(io?: FindingsIo): FindingsResult;
+
+/**
+ * SP6's counters, on `FindingsResult`'s precedent and for the same reason.
+ *
+ * **`ids` and `keyed` are the whole point of the rule.** The paragraph SP6
+ * replaces certified the inventory complete with a sum over the groups, which
+ * cannot see an id that was never keyed at all — so it read as clean while 55 of
+ * 145 findings sat outside it. A rule that answers only "no violations" repeats
+ * that failure in code: a caller asserting `keyed === ids` is asserting the
+ * comparison happened, which an exit status cannot say. FINDINGS F142.
+ */
+export type TriageResult = Violation[] & {
+  /** Distinct findings in the ledger — follow-up sections fold into their id. */
+  ids: number;
+  /** Distinct ids bolded inside a group section. Coverage, not placement. */
+  keyed: number;
+};
+
+/** SP6 — every finding is keyed in the triage, and the declared total is derived. */
+export declare function checkTriageInventory(io?: FindingsIo): TriageResult;

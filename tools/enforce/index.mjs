@@ -2,7 +2,7 @@
 // A03 — the enforcement suite. `make enforce`.
 // Every failure names: the rule, the file, what it prevents, and the spec.
 import { readdirSync, statSync } from "node:fs";
-import { checkFindings } from "./findings.mjs";
+import { checkFindings, checkTriageInventory } from "./findings.mjs";
 import {
   checkFunctionConsumers,
   checkModuleGraph,
@@ -66,6 +66,7 @@ const violations = [
   // only one with no citation check. Written after a wrong number resolved
   // against a real, unrelated finding with enforce green.
   ...checkFindings(),
+  ...checkTriageInventory(),
   ...refViolations,
 ];
 
