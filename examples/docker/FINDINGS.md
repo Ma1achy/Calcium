@@ -2458,9 +2458,10 @@ the reading instrument rather than at the capture.
 
 ## F64 — the app never built the block the surface was written for ★★
 
-S9's drawing shows a pushed logs view with a titled panel, a `following · 342 lines`
-header, key hints along the bottom, and `▐` tone on a `WARN` line. Its **Exercises**
-line claims *tone on individual lines (WARN/ERROR coloured)*.
+`DOCKER_TUI_SURFACES.md` **§9** — line 591, and the citation matters, see below — draws a
+pushed logs view with a titled panel, a `following · 342 lines` header, key hints along the
+bottom, and `▐` tone on a `WARN` line. Its **Exercises** line claimed *tone on individual lines
+(WARN/ERROR coloured)*.
 
 `src/logs.ts` builds `b.raw(text)`. One block per line, no timestamp, no level, no tone.
 
@@ -2486,12 +2487,30 @@ be wrong within a release*, and nginx, postgres and a shell script agree on noth
 **What it costs is a claim, not a feature.** The surfaces document says this app exercises
 tone on log lines. It does not, and until this entry nothing said so.
 
-**Re-checked and it stands — but this entry's own citation misdirects.** "S9" is section 9 of
-`DOCKER_TUI_SURFACES.md`, where the claim sits at line 591. It is **not**
-`docs/surfaces/S09_test.md`, and not `S12_logs_view.md`, which is the per-surface document for
-the logs view and makes no such claim. A reader following the citation finds a file without the
-sentence and concludes the finding is stale — which is what nearly happened here.
-`src/logs.ts:58` still builds `b.raw(text, …)`, so the substance is unchanged.
+**Re-checked, and this entry's own citation misdirected.** "S9" is section 9 of
+`DOCKER_TUI_SURFACES.md`, where the claim sat at line 591. It is **not**
+`docs/surfaces/S09_test.md`, which is a different surface entirely, and not `S12_logs_view.md`,
+which is the per-surface document for the logs view. A reader following the old citation finds
+a file without the sentence and concludes the finding is stale — which is what nearly happened
+here. Corrected in the heading of this section rather than only noted, because a note about a
+misleading citation and the misleading citation can sit in one document indefinitely.
+
+**Closed as an audit** — `DOCKER_TUI_SURFACES.md` §9's *Exercises* line no longer claims the
+tone, and the drawing is kept with the claim recorded beside it, because redrawing it would
+lose what was intended. `src/logs.ts:58` still builds `b.raw(text, …)`; the substance never
+changed and the fix was always going to be the sentence.
+
+**And the where-is-this-written check widened it.** This entry says `b.logs` has no consumer
+*in this application*. Measured across the whole tree, it has exactly **one caller anywhere**
+and it is a contract-test fixture (`test/contract/builders.test.ts:130`) — and Calcium's own
+logs surface composes the view from `raw` as well: `docs/surfaces/S12_logs_view.md` §Blocks
+lists *`panel` … wrapping `raw` (5 log lines)*. So the block is unreached by the reference app
+**and by the design that specified the view it was built for**.
+
+That is a different finding from this one and it is not closed by this row: F64 is about a
+claim, and *a published block kind whose own surface spec composes something else* is about
+the block. Filed as the residue rather than folded in — the test is whether landing this closes
+it, and it does not.
 
 ---
 
@@ -6360,3 +6379,43 @@ code. Whether a gate may call it before throwing is a C22 §8 ruling about the f
 ask what the throw leaves behind* — neither artefact shape indexes the rejection path, because
 both index the accepted one. C13's `settle(id, doc)` was the measured case; this is the same
 question asked of a decision taken in this row rather than of one already shipped.
+
+---
+
+## F141 — a block kind whose own surface spec composes something else ★★
+
+| | |
+|---|---|
+| **Surface** | S12, the logs view — the surface `Logs` was built for |
+| **Reached for** | nothing. Found by widening F64's citation check past the app |
+| **Verdict** | **framework-side** — a published shape with no consumer in the app *or* the design |
+
+F64 records that docker-tui builds `b.raw` where the drawing wanted toned log lines, and files
+it as a claim rather than a feature. Checking where that claim was written turned up a wider
+fact the entry did not have.
+
+**`b.logs` has exactly one caller in the whole tree, and it is a test fixture** —
+`test/contract/builders.test.ts:130`, the per-kind builder table. Nothing in `src/`, nothing in
+`examples/`.
+
+**And Calcium's own logs surface composes `raw`.** `docs/surfaces/S12_logs_view.md` §Blocks
+reads *`panel` with `title` … wrapping `raw` (5 log lines), `rule` … and `keyValue`*. So the
+surface that `Logs` exists to serve specifies a composition that does not use it. That is not
+the reference app failing to exercise a block; it is the **design** not reaching for it.
+
+**Why this is not F64 and not closed by it.** F64's subject is a sentence in a surfaces
+document that claimed something the app does not do, and correcting the sentence closes it. This
+one's subject is a published block kind. The test is *would landing that close this* — it does
+not, so it is the residue and it is named rather than folded in.
+
+**Nor is it MG24's.** `Logs` is consumed — by a test — so an import-graph rule sees a consumer
+and is satisfied. What has no consumer is the *shape's reason*: a kind whose surface spec
+composes a different kind is a producer no design reaches for, and no rule in the suite asks
+that question. It is F94's seam signal at the level of a block kind rather than a member.
+
+**Disposition owed before the freeze, not now.** Three readings and they want different work:
+S12 is wrong and should compose `logs`; `Logs` is speculative and should go the way
+`FileSystem.exists` went (F96 — narrowing a public type is cheap now and breaking after); or
+both are right and `raw` is the degraded path with `logs` the structured one, in which case
+**that sentence exists nowhere** and is the actual gap. Deciding it needs the S12 walk, which
+this row is not.

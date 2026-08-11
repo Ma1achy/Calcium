@@ -287,7 +287,7 @@ no entry. F15's own mechanism was hiding a second instance of F15's own class.
 |---|---|---|---|
 | ~~**F8** omitting `env` stops the shell opening~~ | — | — | **CLOSED** — gate 3b (C22 I61), the sentence corrected in three places, T3.20–T3.20e, four mutations. Residue F140 |
 | ~~**F31** `yFormat: "percent"` expects a fraction~~ | — | — | **CLOSED** — arms named for the unit in: `fraction`/`percent` (C04 I41), `b.plot` carries it, validated in both paths, five mutations |
-| **F64** `b.logs` has no consumer and a document claims otherwise | **audit** | — | a claim, not a feature; its own citation misdirects |
+| ~~**F64** `b.logs` has no consumer and a document claims otherwise~~ | — | — | **CLOSED** — §9's *Exercises* line corrected in place, citation fixed in the entry. Residue **F141** |
 | ~~**F28** the live parts just declared~~ | — | — | **CLOSED** — `liveParts` on `@fmx/calcium/testing` cites it by name |
 | ~~**F53** `exactOptionalPropertyTypes`~~ | — | — | **DISPOSED** — the ruling is in the finding; no task without a second consumer |
 
@@ -298,6 +298,18 @@ three documents**; F53's disposition was written inside F53 and read as outstand
 three that survive were each confirmed by going to the code, and **F8 gained a fact in the
 process**: `env {}` produces `warnings: []`, so the failure is not only ungraceful but
 unreported.
+
+**Tier 4 is closed. Five findings in, two removed by the pre-check, three fixed, three
+residues filed** — F140, F141, and F139's new section on the failing set. That ratio is the
+tier's own argument: *findings with no consumer* means nothing has pressed on them, so nothing
+has corrected them either, and each one that was pressed on moved.
+
+**F64 closed as an audit and widened on the way out.** The claim was at
+`DOCKER_TUI_SURFACES.md:591` §9 — not `docs/surfaces/S09_test.md`, not `S12_logs_view.md` — and
+following the old citation finds a file without the sentence, which reads as a stale finding.
+Correcting it turned up the wider fact: `b.logs` has **one caller in the whole tree and it is a
+test fixture**, and Calcium's own S12 composes the view from `raw`. That is F141, and it is
+residue rather than part of F64 because landing F64 does not close it.
 
 **F8 closed, and it re-ruled itself once.** The where-is-this-written check found the sentence
 in three places, and the third — `C22 §117` — answered its own silence with a mechanism that
