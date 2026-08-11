@@ -321,16 +321,24 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import type { LineEditor } from "../editor/index.js";',
   },
   {
-    // SS9's literal half, which is the live one. A default that reads
-    // A hardcoded state path looks like a courtesy and makes a standalone run append to the
-    // developer's own history — silently, in a file nobody opens until it is
-    // wrong (C20 I12, T6.12).
+    // SS9's literal half, which is the live one. A hardcoded state path looks
+    // like a courtesy and makes a standalone run write beside a real install —
+    // silently, in a file nobody opens until it is wrong (C20 I12, T6.12).
+    //
+    // **Both forms, and neither is the current default.** SS9 matched `~/.prism`
+    // by name and has since survived two renames that would each have retired it
+    // in silence: to `~/.calcium`, which no longer contained `prism`, and to
+    // `.calcium`, which no longer contains a tilde. The bare arm below passes
+    // against the pattern that preceded the second rename and the tilde arm
+    // passes against the one that followed the first, so a row carrying only one
+    // of them agrees with whichever mistake is current.
     rule: "SS9",
     file: "src/interaction/history/store.ts",
-    // **Deliberately not the current default.** SS9 matched `~/.prism` by name,
-    // so the rename to `~/.calcium` would have retired it in silence — a rule
-    // hunting a string nobody would write. Fabricating the violation with a third
-    // name is what proves the pattern is about the shape.
+    source: 'const stateDir = deps.stateDir ?? ".widget";',
+  },
+  {
+    rule: "SS9",
+    file: "src/interaction/history/store.ts",
     source: 'const stateDir = deps.stateDir ?? "~/.widget";',
   },
   {
@@ -439,7 +447,7 @@ const FABRICATED: readonly Fabrication[] = [
     // than as the framework reading the environment.
     rule: "SS44",
     file: "src/shell/config.ts",
-    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? "~/.calcium",',
+    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? ".calcium",',
   },
   {
     // **The shape SS29 could not catch and MG23 does.** An overlay manager

@@ -65,15 +65,20 @@ export const SCANS = [
   // repeatable, and does it silently, in a file nobody looks at until it is
   // wrong (C20 I12, T6.12).
   { id: "SS9", spec: "C20 I11 · C20 I12 · C20 T2.4",
-    // **Any tilde-rooted dotfile, not one app's name.** This matched `~/.prism`
-    // literally, so renaming the default to `~/.calcium` would have left it
-    // hunting a string nobody would write — a rule with nothing to be wrong
-    // about, which is A03 §2's vacuity class arriving through a rename rather
-    // than through a bad rule. A hardcoded state path in `history/` is wrong
-    // whatever it is called, so the shape is the pattern and the spelling is not.
-    pattern: /require\(["']fs["']\)|from\s+["']node:fs["']|~\/\.[a-z]/,
+    // **Any dot-directory path literal, in either form.** This matched
+    // `~/.prism` by name and has since survived two renames that would each have
+    // retired it in silence: to `~/.calcium`, which no longer contained `prism`,
+    // and to `.calcium`, which no longer contains a tilde. **A pattern naming
+    // today's default is a rule with an expiry date nobody wrote down** — A03
+    // §2's vacuity class arriving through a rename rather than through a bad rule.
+    //
+    // The shape is a quoted string beginning with an optional `~/` and then a
+    // dot-name. Relative imports are the near miss and they do not match: `./x`
+    // and `../x` put `/` or `.` where this wants `[a-z]`.
+    pattern:
+      /require\(["']fs["']\)|from\s+["']node:fs["']|["'`](?:~\/)?\.[a-z][a-z0-9._-]*(?:\/|["'`])/,
     scope: "src/interaction/history/", allow: [],
-    why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and any hardcoded `~/.<name>` makes standalone development append to a real install" },
+    why: "the filesystem and the state directory are injected (I11, I12): C20 writes through `HistoryFs`, and any hardcoded dot-directory path makes standalone development write beside a real install" },
 
   { id: "SS4", spec: "C13 I9 · C13 T2.2 · C14 T2.4",
     pattern: /\b(?:Date\.now|new Date|performance\.now|process\.hrtime|Date)\b/,

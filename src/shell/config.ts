@@ -65,8 +65,19 @@ export const DEFAULT_RETAIN_PAYLOADS = 50;
  *
  * **The default is what an app gets when it says nothing**, which is precisely
  * when it must not name somebody else.
+ *
+ * **Relative, and the tilde it used to carry was never expanded.** `fs.mkdir` has
+ * no shell in it, so `~/.prism` created a directory *literally named* `~` in the
+ * launch directory — measured, with real history files in it. The path was
+ * already relative and the tilde was decoration; dropping it makes the behaviour
+ * and the documentation one statement rather than adding expansion machinery to
+ * reach a home directory nothing had ever written to.
+ *
+ * So state belongs to the directory the shell was opened in, which is also what
+ * makes C22 §3's injection argument structural: standalone development cannot
+ * append to a developer's real history, because there is no single one.
  */
-export const DEFAULT_STATE_DIR = "~/.calcium";
+export const DEFAULT_STATE_DIR = ".calcium";
 
 const REQUIRED = ["name", "binary", "manifest", "theme"] as const;
 

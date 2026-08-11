@@ -425,7 +425,7 @@ export type TuiConfig = Readonly<{
   cwd?: string;
   clock?: () => number;
   fs?: FileSystem;
-  /** Default `~/.calcium` — the framework's name. The **app** resolves its own variable (I20). */
+  /** Default `.calcium`, beside the project. The **app** resolves its own variable (I20). */
   stateDir?: string;
   /** Default: the OS handler, http/https only. */
   openUrl?: (url: URL) => Promise<void>;
