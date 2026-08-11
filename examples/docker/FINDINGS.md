@@ -316,6 +316,21 @@ makes the framework unusable, invisible because every harness passes a real envi
 Two in a row is not a coincidence: **the defaults have never been exercised together**, and
 the thing that exercises them is a consumer that supplies only what it was told to.
 
+**Re-checked in the tier-4 pre-check and it stands, with one fact the entry did not have.**
+`env?` is still optional, the sentence is still in `src/shell/types.ts`, and `acquire()` still
+treats `!capabilities.altScreen` as fatal. Measured rather than read:
+
+```
+env {} → altScreen: false   colourDepth: 1   unicode: ascii
+warnings: []
+```
+
+**The sentence is true about two of the three consequences and silent about the one that
+matters** — colour and unicode *do* degrade, and `altScreen: false` ends the process. And
+`warnings` is **empty**, so C02's one channel to the author says nothing either. That half is
+new: the entry describes a false sentence, and the measurement shows the failure is also
+unreported, which is F15's class in a fourth place.
+
 ---
 
 ## F9 — startup step 7 named the effect and had no mechanism ★★ · **closed**
@@ -1187,7 +1202,7 @@ class arriving from the consumer's side rather than the producer's.
 
 ---
 
-## F28 — an app cannot reach the live parts it just declared
+## F28 — an app cannot reach the live parts it just declared — **CLOSED, and the record did not know**
 
 `b.live` records its `LiveSpec` in a `WeakMap` beside the document (`builders/live.ts:30`),
 and neither the map nor `liveDeclarations` is exported. So an app that builds a document
@@ -1203,6 +1218,18 @@ building a testing affordance the framework withheld.
 stretch survived a green suite because every row called a mechanism directly and nothing
 called the wiring. A framework that makes the mechanism unreachable pushes every consumer
 toward whole-stack tests or none.
+
+**CLOSED — the seam exists and cites this finding by name.** `src/testing/live-parts.ts`
+exports `liveParts(doc): readonly LivePart[]`, giving back the `block` and *exactly* the
+`LiveSpec` the declarer supplied, and `@fmx/calcium/testing` re-exports it. Its own header
+carries the argument this entry makes, including why it lands on the testing surface rather
+than the runtime one: *a production consumer reading back what it just declared holds a second
+record of the document, which is the class this repository removes; a test reading it is
+exercising the thing it declared.*
+
+Found by the tier-4 pre-check rather than by anything failing. **This is the population where
+that matters most**: a finding with no consumer has nothing pressing on it, so nothing corrects
+it either — and this one had been built against, closed, and left standing in three documents.
 
 ---
 
@@ -1269,6 +1296,10 @@ This is why `b.plot` exposes `yMin`/`yMax` and **not** `yFormat` (F27). The form
 for the loss curves C12 was written against and a trap in the shape a CLI-wrapping consumer
 reaches for. Fixing it means a second format or a documented sentence at the call site, and
 neither is a builder change.
+
+**Re-checked and it stands.** `plot/axes.ts` still returns `` `${Math.round(v * 100)}%` ``,
+`yFormat` is still on the public block type (`viewmodel/types.ts:360`), and `b.plot` still
+withholds it. Nothing has moved.
 
 ---
 
@@ -1870,7 +1901,7 @@ Error: alternate screen unsupported — the shell cannot open
 
 ---
 
-## F53 — `exactOptionalPropertyTypes` makes an optional field unsupplyable
+## F53 — `exactOptionalPropertyTypes` makes an optional field unsupplyable — **DISPOSED**
 
 A consumer computing an optional config value cannot pass it. Neither form compiles:
 
@@ -1889,6 +1920,12 @@ nothing in `src/` or the test tree could ever have met it. Fifteen optional fiel
 `TuiConfig` have the shape; **one of them has been wanted conditionally**, and that one now
 carries `| undefined`. The rest are filed rather than changed, because a variance widened
 for no consumer is a guess about the next one.
+
+**DISPOSED, and the disposition is the sentence above.** `TuiConfig.capabilities` reads
+`Partial<TerminalCapabilities> | undefined` today (`src/shell/types.ts:432`), with *"fixed here
+because this is the field with a consumer"* beside it. The fourteen others are deliberately
+unwidened. **So there is no task here unless a second consumer appears** — this is a ruling
+already taken, and it was sitting in a plan as work.
 
 ---
 
@@ -2348,6 +2385,13 @@ be wrong within a release*, and nginx, postgres and a shell script agree on noth
 
 **What it costs is a claim, not a feature.** The surfaces document says this app exercises
 tone on log lines. It does not, and until this entry nothing said so.
+
+**Re-checked and it stands — but this entry's own citation misdirects.** "S9" is section 9 of
+`DOCKER_TUI_SURFACES.md`, where the claim sits at line 591. It is **not**
+`docs/surfaces/S09_test.md`, and not `S12_logs_view.md`, which is the per-surface document for
+the logs view and makes no such claim. A reader following the citation finds a file without the
+sentence and concludes the finding is stale — which is what nearly happened here.
+`src/logs.ts:58` still builds `b.raw(text, …)`, so the substance is unchanged.
 
 ---
 
@@ -6111,6 +6155,18 @@ is not C03's and nothing else currently makes it.
 a training job read 0.0121–0.0414, while two saturated cores produced 0.0014. Which is the
 argument for the delta restated as a measurement: an absolute bound was tracking something
 neither the test nor the reader controls.
+
+### A comparison taken under load is not automatically conservative
+
+Added after F134 measured it. The intuition is that contention inflates everything, so a
+*ratio* between two things measured under the same load is safe and if anything pessimistic.
+**Measured, it went the other way.** The pin's cost read **+40–70%** on a host carrying a
+training job and **+75%** on a settled one, three runs each side: load *compressed* the ratio.
+
+So the rule has two halves and only one was written down. Load makes an **absolute**
+untrustworthy — that is this entry's original subject — and it can make a **ratio** look
+better than it is, which is worse, because a ratio is the form everyone reaches for precisely
+to escape the first problem. Neither direction is guessable; both want the quiet re-run.
 
 ### Two things that are genuinely new
 

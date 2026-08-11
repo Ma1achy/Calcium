@@ -285,11 +285,19 @@ no entry. F15's own mechanism was hiding a second instance of F15's own class.
 
 | item | fix | ⚠ | why no consumer yet |
 |---|---|---|---|
-| **F28** the live parts just declared | change | C07 | no surface has needed it; it rides the tier-2 ruling |
-| **F64** `b.logs` has no consumer and a document claims otherwise | **audit** | — | a claim, not a feature — it belongs with group 7's habit |
-| **F8** omitting `env` stops the shell opening | change | — | the spec says it degrades and it does not |
-| **F31** `yFormat: "percent"` expects a fraction | change | C04 | one consumer, and it is why `b.plot` exposes the pin |
-| **F53** `exactOptionalPropertyTypes` makes an optional field unsupplyable | change | — | rhymes with F58b: the type surface fighting the consumer |
+| **F8** omitting `env` stops the shell opening | **change** — a doc sentence, and a silent failure | — | **first.** Total failure, no warning, public doc |
+| **F31** `yFormat: "percent"` expects a fraction | change | C04 | a wrong number on screen for any CLI-wrapping consumer |
+| **F64** `b.logs` has no consumer and a document claims otherwise | **audit** | — | a claim, not a feature; its own citation misdirects |
+| ~~**F28** the live parts just declared~~ | — | — | **CLOSED** — `liveParts` on `@fmx/calcium/testing` cites it by name |
+| ~~**F53** `exactOptionalPropertyTypes`~~ | — | — | **DISPOSED** — the ruling is in the finding; no task without a second consumer |
+
+**The pre-check was the tier's first step and it removed two of five before any work started.**
+Tier 4 is *findings with no consumer*, which means nothing has pressed on them since they were
+filed — so nothing has corrected them either. **F28 had been built, closed and left standing in
+three documents**; F53's disposition was written inside F53 and read as outstanding work. The
+three that survive were each confirmed by going to the code, and **F8 gained a fact in the
+process**: `env {}` produces `warnings: []`, so the failure is not only ungraceful but
+unreported.
 
 ---
 
