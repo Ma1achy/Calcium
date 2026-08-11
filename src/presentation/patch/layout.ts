@@ -51,8 +51,18 @@ export type PatchLayout = Readonly<{
   width: number;
 }>;
 
-/** The widest line number in the patch, as cells. */
+/**
+ * The widest line number in the patch, as cells.
+ *
+ * **A pin wins** (C25 I21a). A window of a patch carries the gutter its parent
+ * measured, because the width describes the *block* and not the slice: derived
+ * again inside a window whose numbers are narrower, the gutter shrinks and
+ * every row of text shifts sideways as the reader scrolls. Honoured here rather
+ * than at the call sites so that every consumer of the width gets it — there
+ * are two, and a second one added later would not know to ask.
+ */
 export function numberWidth(block: Patch): number {
+  if (block.numberWidth !== undefined) return Math.max(1, Math.trunc(block.numberWidth));
   let widest = 1;
   for (const hunk of block.hunks) {
     for (const line of hunk.lines) {

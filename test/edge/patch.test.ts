@@ -1,6 +1,9 @@
 // C25 tier 3 — edge cases. The degenerate patches, and none of them throws.
 import { describe, expect, it } from "vitest";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
+import { numberWidth } from "../../src/presentation/patch/layout.js";
+import type { Patch } from "../../src/data/viewmodel/index.js";
+import { clampOffset, totalRows, windowPatch } from "../../src/presentation/patch/window.js";
 import { hunkOf, patchOf } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
@@ -112,5 +115,62 @@ describe("C25 edge", () => {
         expect(row.length, `ascii width ${width}`).toBeLessThanOrEqual(width); // cells-ok
       }
     }
+  });
+});
+
+describe("C25 I21a — a window's gutter is the block's (F134)", () => {
+  /**
+   * Numbered 1–9 at the top and 4000–4050 below, so the widest line number a
+   * window sees depends on where the window is. Without a pin the gutter is 1
+   * cell at the top and 4 further down, and **every row of text moves three
+   * columns sideways as the reader scrolls** — which reads as the terminal
+   * misbehaving rather than as a defect.
+   */
+  const drifty = () =>
+    patchOf({
+      hunks: [
+        hunkOf(
+          Array.from({ length: 9 }, (_, i) => ` top ${String(i + 1)}`),
+          { oldStart: 1, newStart: 1 },
+        ),
+        hunkOf(
+          Array.from({ length: 51 }, (_, i) => ` deep ${String(i + 4000)}`),
+          { oldStart: 4000, newStart: 4000 },
+        ),
+      ],
+    }) as Patch;
+
+  it("T3.20 (I21a): every valid offset renders the same gutter as the whole block", () => {
+    const whole = drifty();
+    const width = 80;
+    const height = 8;
+
+    // The subject before the claim: the block really does have a wide gutter and
+    // a narrow head, or every assertion below holds on a patch that could not
+    // drift in the first place.
+    expect(numberWidth(whole), "the fixture can drift").toBe(4);
+
+    const total = totalRows(whole, width);
+    const seen = new Set<number>();
+    for (let offset = 0; offset < total; offset += 1) {
+      const snapped = clampOffset(whole, width, height, offset);
+      seen.add(numberWidth(windowPatch(whole, width, snapped, height)));
+    }
+
+    // **The sweep, not one offset.** The drift is a *difference between* windows:
+    // a row asserting the top window alone passes against the shipped behaviour,
+    // and one asserting a single window against a constant passes against a pin
+    // that is simply wrong. One value across every offset, and it is the block's.
+    expect([...seen], "one gutter at every offset").toEqual([numberWidth(whole)]);
+  });
+
+  it("T3.20b (I21a): the pin survives a window of a window", () => {
+    // `windowPatch` reads the parent through `numberWidth`, so a parent that is
+    // itself a window passes its pin down rather than re-deriving from a slice
+    // of a slice. Without that, nesting reintroduces the drift one level in.
+    const whole = drifty();
+    const once = windowPatch(whole, 80, 0, 8);
+    const twice = windowPatch(once, 80, 0, 4);
+    expect(numberWidth(twice)).toBe(numberWidth(whole));
   });
 });

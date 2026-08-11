@@ -212,6 +212,17 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (after !== undefined && (typeof after !== "number" || !Number.isInteger(after) || after < 0)) {
       e.push(`${at}: "collapsedAfter" must be a non-negative integer`);
     }
+    // C25 I21a — a pinned gutter. **At least 1**, not merely non-negative: a
+    // zero pin renders line numbers into no columns at all, which is a window
+    // that draws its parent's rows without their numbers rather than an
+    // arithmetic error anything downstream would notice.
+    const gutter = b["numberWidth"];
+    if (
+      gutter !== undefined &&
+      (typeof gutter !== "number" || !Number.isInteger(gutter) || gutter < 1)
+    ) {
+      e.push(`${at}: "numberWidth" must be a positive integer (C25 I21a)`);
+    }
   },
   pills: (b, e, at) => requireArray(b, "chips", e, at),
   tip: (b, e, at) => {

@@ -29,6 +29,7 @@
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
 import { block } from "../../data/viewmodel/index.js";
 import { isCollapsed, layoutFor, pairedRows, patchHeight, type Layout } from "./height.js";
+import { numberWidth } from "./layout.js";
 
 /**
  * The smallest thing a window may cut at.
@@ -299,6 +300,17 @@ function build(
     hunks,
     ...(tail && patch.collapsedAfter !== undefined ? { collapsedAfter: patch.collapsedAfter } : {}),
     ...(patch.layout !== undefined ? { layout: patch.layout } : {}),
+    // **C25 I21a — the gutter is the parent's, pinned.** Exactly `Hunk.header`'s
+    // rule one field along (I21): a window describes the block it came from, not
+    // the slice it shows. Derived again inside the window it shrinks whenever the
+    // slice's widest line number is narrower, and every row of text steps
+    // sideways as the reader scrolls — 4 cells whole against 1 at offset 0 on the
+    // patch that measured it.
+    //
+    // Taken from `patch` and never from `hunks`, which is the whole point, and
+    // read through `numberWidth` so a parent that is *itself* a window passes its
+    // pin down rather than re-deriving from a slice of a slice.
+    numberWidth: numberWidth(patch),
   } as Patch);
 
   return { patch: windowed, reachedEnd: consumed >= rows.length - 1 };  // cells-ok — a row count, not a width

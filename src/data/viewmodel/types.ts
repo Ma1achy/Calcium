@@ -468,6 +468,21 @@ export type Patch = Readonly<{
    */
   actions?: readonly Action[];
   layout?: "unified" | "split";
+  /**
+   * The gutter width, in cells, **pinned when this block is a window of a
+   * larger one** (C25 I21a).
+   *
+   * `numberWidth` walks every line of every hunk, so a window whose widest line
+   * number is narrower than the block's draws a narrower gutter and every row of
+   * text shifts sideways as the reader scrolls. Measured on the shipped
+   * fullscreen view: 4 cells whole, 1 in the window at offset 0.
+   *
+   * **The same argument `Hunk.header` already carried** (C25 I21) — a window
+   * describes the block it came from, not the slice it shows — one field along.
+   * A producer building a patch by hand leaves it absent and nothing changes;
+   * it exists so a *window* can say what its parent measured.
+   */
+  numberWidth?: number;
 }> & Gap;
 
 export type Pills = Readonly<{

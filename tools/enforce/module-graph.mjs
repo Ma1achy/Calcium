@@ -561,6 +561,11 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "C24 §4 — a fixed three-tuple, and no surface has wanted one; a caption sentence does not fit it",
   "plot.emptyMessage":
     "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
+  "patch.numberWidth":
+    "C25 I21a — not the producer's to set. It is what a *window* carries so its gutter " +
+    "describes the block it came from rather than the slice it shows, and a hand-built patch " +
+    "that set it would be asserting a gutter its own lines do not justify. `windowPatch` is " +
+    "the one writer, and a builder exposing it would offer a consumer the drift (F134)",
 });
 
 /** `Kind.field` for every block field, and whether a builder mentions it. */

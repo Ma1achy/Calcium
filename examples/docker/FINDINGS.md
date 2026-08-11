@@ -5688,14 +5688,47 @@ entry.
 
 ---
 
-## F134 — CORRECTED. Four kinds take no window, so nothing drifts; the residue is cost ★★
+## F134 — CORRECTED TWICE. The drift is real and shipped, by a route neither reading found ★★★
 
 **The heading this replaces was *"a window is exact in height and wrong on screen for four
 kinds of five"*, and it describes a state that cannot currently occur.** Filed with a remedy —
 a new field on four public block types, therefore tier 2 before the freeze — and the premise
 was never checked against the registry.
 
-### The fact the whole thing turns on
+### The second correction, and it reverses the first
+
+**A patch *is* windowed today, and the drift is on screen.** `src/shell/patch-view.ts:97` calls
+`windowPatch(patch, region.width, offset, region.height)` and puts the result straight into
+`Layer.content` — the fullscreen patch viewer, reached by the `view` action on any patch. That
+window rebuilds a smaller `Patch`, and `numberWidth` was derived again from it.
+
+Measured on the shipped path: a patch numbered 1–9 at the top and 4000–4050 below renders a
+**4**-cell gutter whole and a **1**-cell gutter in the window at offset 0. Scrolling down grows
+the gutter and **moves every line of text three columns sideways** — F134's original symptom,
+exactly, and reachable by any reader who opens a large diff fullscreen.
+
+**So the first correction was wrong in the way it warned about.** It checked
+`BlockDefinition.window`, found four kinds declare none, and generalised to *no windowing
+happens*. C25 windows a patch by its own route (§3c), which is not that hook — **a correct
+observation about one mechanism promoted to a claim about all of them**, which is the class
+this session had already recorded twice before it produced a third instance in the finding
+written to correct the first.
+
+**C25 I21 had the argument and applied it to the neighbouring field.** *"`Hunk.header` is
+carried into a window verbatim, so its counts describe the whole hunk while the window shows
+part of it. Rewriting it to match the slice would make C25 compute from the one field it is
+defined not to read."* The gutter is that fact one field along. Pinned now as **I21a**, with
+`Patch.numberWidth` — the public field this row was going to spend on an optimisation and
+instead spends on a defect.
+
+**Neither conformance could see it.** C09 I26 checks rows; the generic window check never
+reaches a patch, because a patch declares no `BlockDefinition.window`. And `T3.20` sweeps
+**every valid offset** rather than asserting one, because the drift is a difference *between*
+windows: a single-offset row passes against the shipped behaviour, and a row comparing one
+window to a constant passes against a pin that is simply wrong. Dropping the pin gives
+`expected [ 1, 4 ] to deeply equal [ 4 ]`.
+
+### What the first correction got right, and it still stands
 
 **`logs` is the only kind that implements `window`.** One `window:` in all of
 `src/presentation/`. For a kind without one, `registry.ts` keeps the block whole:
@@ -5783,11 +5816,23 @@ max of 10.6 s — resizing a window with a big diff on screen is not slow, it is
 Opening one is 3.7 s. The keystroke and same-size cases, which the cache and stage 4 do serve,
 are 13.2 ms and 11.1 ms and are fine.
 
-**Which makes `patch` the one case worth a field, and it is one field on one type** — a pinned
-gutter width, a single number, on the kind that carries the measured cost and whose height is
-one row per line so the slice is simple. That is a much smaller freeze question than the one
-this finding was filed with, and it is now a decision with a measurement under it rather than
-a hypothesis.
+**And the pin does not touch this.** `Patch.numberWidth` fixes the *fullscreen* window's
+correctness; the 43x and 384x are the *transcript* path, which is unwindowed and stays so until
+`patch` declares `BlockDefinition.window`. That remains owed, and it is now the only half of
+F134 left.
+
+**Measured, and the measurement is inconclusive by construction rather than by variance.** A
+control pair with and without the pin, back to back: start 3,545 against 6,002 ms, keystroke
+13.2 against 29.2, same-size `SIGWINCH` 29.4 against 16.1 — **the directions disagree**, and a
+host process was at 104% throughout. The structural reason is better than another run: the
+bench never pushes a view, so `windowPatch` is never called and the pin cannot execute on the
+path being timed. **A difference that cannot exist is noise however it is distributed**, and
+the pair is recorded rather than re-run to a number that would mean nothing either.
+
+What the pin *does* cost is one `numberWidth(patch)` walk per window build, on the fullscreen
+path — which already walks every line in `rowsOf`, so it is a second O(n) pass on a path that
+had one. **Nothing benches the fullscreen view**, which is stated here rather than left
+implicit: it is the path the correctness fix is for and the one with no timing instrument.
 
 ## F135 — a malformed greeting is swallowed twice and the session shows nothing ★★
 
