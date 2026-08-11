@@ -110,7 +110,9 @@ type Patch    = Readonly<{ kind: "patch"; id: string;
                            path: string;               // the file, for the header
                            language: string;           // syntax palette, per hunk line
                            hunks: readonly Hunk[];
-                           collapsedAfter?: number;    // elided below the last hunk
+                           collapsedAfter?: number;
+  /** The gutter width, pinned when this block is a window of a larger one (C25 I21a). */
+  numberWidth?: number;    // elided below the last hunk
                            actions?: readonly Action[];
                            layout?: "unified" | "split" }> & Gap;   // default: width-derived
 type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@

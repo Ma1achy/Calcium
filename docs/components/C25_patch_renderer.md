@@ -452,6 +452,7 @@ Consequences that matter:
 - **I20a** — The offset ceiling is the **first offset whose window reaches the last row**, not `total − height`. Sticky headers are counted once in the full rendering and again in every window that carries them, so the arithmetic ceiling stops short and the document's last rows — `collapsedAfter` among them — become unreachable. Computed from the same builder that makes the window, never from a second arithmetic (§3c).
 - **I20b** — A valid offset is a row a window may **begin** at, and every motion lands on one. Snapping inside the builder instead leaves the caller's offset and the window it produces disagreeing in one direction and produces a keystroke that redraws the same window in the other; neither is visible to a test that drives one motion, and neither is a defect the window itself can be blamed for (§3c).
 - **I21** — `Hunk.header` is carried into a window verbatim, so its counts describe the whole hunk while the window shows part of it. Rewriting it to match the slice would make C25 compute from the one field it is defined not to read (§4, §3c).
+- **I21a** — **The gutter width is pinned on a window and never recomputed from its slice.** `numberWidth` walks every line of every hunk, so a window whose widest line number is narrower than the block's draws a narrower gutter — and every row of text shifts sideways as the reader scrolls. Measured on the shipped fullscreen view: a patch whose first lines are numbered 1–9 and whose body reaches 4050 renders a **4**-cell gutter whole and a **1**-cell gutter in the window at offset 0, so scrolling down moves every line three columns right. **I21 is this argument about the neighbouring field** — a hunk header is carried verbatim so that its counts describe the whole hunk — and the gutter is the same fact one field along: it describes the *block*, not the slice, so it travels with the window rather than being derived again inside it. Height conformance cannot see any of this (C09 I26 checks rows), and the generic check does not reach a patch at all, because a patch does not declare `BlockDefinition.window` — this window is C25's own route (§3c). FINDINGS F134.
 
 ---
 
@@ -504,7 +505,7 @@ Attributes are already spoken for: bold and dim are how 1-bit carries tone (C10 
 15. Fullscreen is every hunk of this block uncollapsed, never the whole file — the whole file is the editor's, and it is one component rather than two (I17).
 16. A window is a rebuilt `Patch`, its path and hunk headers sticky because the shape forces them, and its collapse markers present only on the windows their rows fall in (I18, I20).
 17. A window cuts at run boundaries in split layout, because pairing is not additive across an arbitrary cut (I19). An offset is always such a boundary, and the ceiling is the first offset that reaches the end rather than `total − height` (I20a, I20b).
-18. A window carries `Hunk.header` verbatim and never reconciles it with the lines it shows (I21).
+18. A window carries `Hunk.header` verbatim and never reconciles it with the lines it shows (I21), **and carries the gutter width the same way** — pinned from the block, never derived from the slice, or every row shifts sideways as the reader scrolls (I21a).
 19. The collapsed cap and the expansion threshold are specified here and are **not this component's to satisfy**: both are functions of the viewport, and a renderer that could see one would be a renderer whose `measure` is no longer pure over `(block, width)` (I14, I15, §3a).
 
 ---
@@ -557,6 +558,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T3.10** (I14): forty single-line hunks against a twenty-four-row viewport → the collapsed form stops at a hunk boundary within one viewport and states how many it dropped. No hunk is half-rendered.
 - **T3.11** (I15, I16): a patch whose expanded form exceeds `maxExpandHeight` → inline expansion is not offered and fullscreen is; one whose expanded form fits → expansion is offered. Both decided without rendering either.
 - **T3.12** (I16): `maxExpandHeight` at 1.5 and at 4 → the threshold moves; there is no value at which expansion stops existing.
+- **T3.20** (I21a): a patch numbered 1–9 at the top and 4000–4050 below, windowed at **every valid offset** → the gutter is the same width in all of them and equal to the whole block's. **The sweep, not one offset**: the drift is a *difference between* two windows, so a row asserting one window's gutter against a constant passes against a pin that is simply wrong, and a row asserting the top window alone passes against the shipped behaviour. Measured before the fix: 4 cells whole, **1** at offset 0.
 - **T3.13** (I12): a `remove` line whose text is a YAML key → the gutter is `error`-toned and the key is `syntax.key`, on the same row. The row that would have been dropped by option (c).
 
 ### Tier 4 — integration
@@ -596,6 +598,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T6.3** (I6): making `patch` a privileged built-in → T2.3 fails.
 - **T6.4** (I4): rendering the add/remove distinction with tone alone → T4.2 fails at `colourDepth: 1`.
 - **T6.5** (I3): tokenising inside `measure` → T2.5 fails.
+- **T6.8** (I21a): dropping the pin, so a window derives its own gutter → T3.20 fails. **This is the shipped behaviour**, and its symptom is not a crash or a wrong height: it is every line of a large diff moving three columns sideways as the reader scrolls the fullscreen view, which reads as the terminal misbehaving.
 - **T6.6** (§3): flipping the layout threshold so split is the narrow form → T1.5 fails, and every line truncates at 60 columns.
 - **T6.7** (C04 commitment 20): merging `patch` into `diff` behind a mode flag → T2.1 fails, because height then depends on the mode rather than the block.
 
