@@ -6262,7 +6262,8 @@ session restored it. **The next run said 3684 ms with the sessions stopped.** Th
 average was **20.81**, against a baseline run taken when it was quiet.
 
 **The measurement that settles it**: with the whole change stashed, T3.15 run **alone** on the
-pre-change tree fails at **2099 ms**. It is contention, and it is independent of this row in
+pre-change tree fails at **2099 ms**. On a settled host the whole suite is green — **2638
+passed / 2 todo**, the baseline's 2633 plus exactly the five rows this row added. It is contention, and it is independent of this row in
 both directions — the tree and the suite size.
 
 So the leak is real, the rows now stop their sessions because that is correct on its own

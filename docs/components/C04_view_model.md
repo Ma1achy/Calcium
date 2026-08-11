@@ -140,12 +140,41 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
                            series: readonly Series[];
                            height?: number; axes?: boolean;
                            xLabels?: readonly [string, string, string];
-                           yFormat?: "number" | "percent" | "bytes" | "duration";
+                           yFormat?: "number" | "fraction" | "percent"
+                                   | "bytes" | "duration";   // the unit IN, not OUT (I41)
                            yMin?: number; yMax?: number;      // pin the range (I29)
                            emptyMessage?: string }> & Gap;
 ```
 
 `Table`, `TableRow`, `Cell` and `ColumnDef` are declared below. **Every block variant is declared here** — C11 and C12 own the table *engine* and the plot *renderer*, not the shapes. `id` is present on every variant because `ViewPatch` addresses blocks by it.
+
+**`yFormat` names the unit the value arrives in, and it used to name the unit it renders as**
+(I41, F31). Both `fraction` and `percent` draw a per-cent sign, so *what it renders as* cannot
+tell them apart and was never the axis to name them on. What differs is what the producer is
+holding:
+
+| arm | in | out |
+|---|---|---|
+| `fraction` | `0.84` | `84%` |
+| `percent` | `100.2` | `100%` |
+
+`fraction` **is the old `percent`, renamed** — the arm that multiplies by 100. It kept the
+behaviour and lost the name, because the name was the defect: a far side that emits a field
+called a percentage emits `100.2`, not `1.002`, so the obvious call rendered **`10020%`**
+(F31, measured against docker's `CPUPerc`). This framework exists to wrap JSON-emitting CLIs,
+so the arm a consumer reaches for first must be the one that matches what a CLI emits, and the
+surprising arm must carry the surprising name.
+
+**Renaming a member of a public enum is breaking, and that is the argument for doing it now.**
+The freeze is ahead; two callers exist in this tree and both are fixtures. `percent` and
+`percentage` — one letter apart, opposite meanings — was the alternative, and it is the
+two-meanings-one-word class this project has already found the hard way three times
+(`dismissable`, `origin`, `viewState`). Shipping a fourth deliberately is worse than a rename
+taken before anyone depends on it.
+
+**And the arm is validated now**, which it never was. An unknown string fell through to the
+numeric arm, so a typo rendered plain numbers and said nothing — and the rename is precisely
+the event that produces typos, because `percentage` is what a reader guesses.
 
 **`yMin` and `yMax` pin the vertical range.** C12 §3 says the range is computed over all series "unless the block pins them" and C12 T1.14 tests exactly that, while the shape had no field to pin it with — intent stated in prose that the schema could not carry, the same class as the missing `align` and the missing truncation side. Absent, the range is the data's; present, values outside it clamp to the edge rather than escaping the grid, which is what makes a pinned axis usable for comparing two plots rather than a way to lose points off the top.
 
@@ -673,6 +702,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I38** — A mark is derived from a fact the block names, never invented by the renderer and never demanded of a producer that has already named the fact. `ComparisonRow.verdict` and `Panel.live` are named facts and carry no glyph slot; `Cell` and `Notice` supply one because the fact *is* the glyph. A shape carrying a tone and nothing else has nothing to derive from, and a glyph slot is its only remedy — added when a surface needs one, never speculatively, because MG24 refuses a published member nothing consumes (I35, F18, F34).
 - **I39** — `Panel.live` names whether a region is refreshing; C09 draws the `live` glyph from it. The block names the fact and the renderer owns the mark, so a live panel differs from a static one under ASCII and at one bit, where a character written into the title would not (F18, → C09 I5).
 - **I40** — `Comparison.labels` names what the two columns are, and their absence means positional. `a`/`b` is right about the *type* — S07 compares two runs and neither is "before" — and was never an answer to whether a consumer may say which side is which; both shipped consumers said it in a `keyValue` block above the block it explained (F33).
+- **I41** — **`yFormat` names the unit the value arrives in.** `fraction` takes `0.84`, `percent` takes `100.2`, and both render a per-cent sign — so the rendered form cannot distinguish them and naming them by it produced a member whose obvious use was wrong by a factor of 100 (F31). The arm that multiplies is `fraction`; it is the old `percent` renamed, and it carries the surprising name because it is the surprising arm. **The value is not appearance**: `labelWidth` measures the rendered labels to size the gutter (C12 §3), so an arm that changes a label's width changes the block's geometry, and this rename moves both. An unknown arm is a validation error rather than a silent fall-through to `number`.
 
 ---
 

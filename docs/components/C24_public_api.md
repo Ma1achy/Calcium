@@ -328,11 +328,24 @@ The other three stay off the builder, each for its own reason, **written here
 rather than left as an omission** so the next consumer knows the cost of taking
 one:
 
-- **`yFormat` is a trap in the shape a caller wants it.** `percent` multiplies by
-  100, so it expects a fraction — and the far sides that emit a field called a
-  percentage mostly emit `100.2`, not `1.002`. The obvious call renders
-  `10020%`. Exposing it wants either a second format or a sentence at the call
-  site, and neither is a builder change.
+- **`yFormat` was a trap in the shape a caller wants it, and it is on the builder
+  now** (C04 I41, F31). The reasoning above was right about the trap and wrong
+  about the disposal: *exposing it wants either a second format or a sentence at
+  the call site, and neither is a builder change* treated the trap as a reason to
+  withhold the field, when the trap was in the **naming** and the withholding is
+  what left it unfixed. `percent` multiplied by 100, so it expected a fraction,
+  and the far sides that emit a field called a percentage emit `100.2` — the
+  obvious call rendered `10020%`.
+
+  So the arms are named for the unit that **arrives**: `fraction` takes `0.84`,
+  `percent` takes `100.2`. `fraction` is the old `percent` renamed. With that
+  settled there is no sentence left to put at the call site, and the field goes
+  on `b.plot` with the pin.
+
+  **An omission with a recorded reason is a decision until something needs it.**
+  This entry is the measured case for that: the reason was written down, it was
+  accurate, and it survived because nothing pressed on it — which is what tier 4
+  is, and F31 is the consumer that pressed.
 - **`xLabels` is a fixed three-tuple**, which cannot hold the one thing S3's plot
   actually needed to say about its horizontal axis — that it counts ticks and how
   many returned nothing. A surface whose axis is a sentence has to put it in a
