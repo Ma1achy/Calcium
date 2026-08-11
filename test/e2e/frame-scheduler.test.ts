@@ -95,8 +95,39 @@ describe("C03 e2e", () => {
       // as frames, as writes, or as CPU — this asserts all three.
       expect(r["frames"]).toBe(0);
       expect(r["writes"]).toBe(0);
-      expect(r["elapsedMs"]).toBeGreaterThan(59_000);
-      expect(r["cpuFraction"]).toBeLessThan(0.01);
+
+      // **The CPU half is a difference, not a level** (F139). Half the window
+      // runs with no scheduler at all and half with one, in the same process,
+      // so whatever the host is doing lands in both. The absolute fraction is
+      // the *process's* CPU over wall clock and inflates four-fold under
+      // unrelated load — 0.0414 against a 0.01 bound, with `frames` and
+      // `writes` both still zero, which is the pair diverging and saying the
+      // level was measuring the host.
+      const base = Number(r["baselineFraction"]);
+      const withScheduler = Number(r["cpuFraction"]);
+      expect(Number(r["baselineWrites"]), "the control phase wrote nothing either").toBe(0);
+      expect(Number(r["baselineElapsedMs"]), "the control phase ran").toBeGreaterThan(29_000);
+      expect(r["elapsedMs"]).toBeGreaterThan(29_000);
+      // **Two blind spots, stated because an unrecorded limit reads as
+      // strength.**
+      //
+      // *The phase order biases toward passing.* Process warm-up and early GC
+      // land in phase one, which is the control — measured under two busy cores
+      // as `0.0014` with the scheduler against `0.0042` without, a delta of
+      // **−0.0028**. A negative delta is the bias, not a discovery. It is
+      // tolerable because the signal dwarfs it: a fabricated polling loop
+      // produced **+0.0488**, and did so on a host whose baseline was `0.0154`
+      // — i.e. one where the old absolute bound of 0.01 would have failed with
+      // no defect present at all.
+      //
+      // *It no longer catches a host-wide idle burn.* If the whole process
+      // spins, both phases spin and the delta is zero. That claim is not C03's
+      // — `frames` and `writes` are what this row owns — and nothing else
+      // currently makes it. Named here rather than left implied.
+      expect(
+        withScheduler - base,
+        `a scheduler that polls costs CPU at any load: ${withScheduler} with, ${base} without`,
+      ).toBeLessThan(0.005);
     },
     120_000,
   );

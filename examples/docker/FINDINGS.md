@@ -5841,6 +5841,30 @@ but a *failure list* through a filter, and the same loss. Filed unconfirmed rath
 dismissed, because four green runs since is consistent with contention and also consistent
 with something intermittent that has not recurred.
 
+### Fixed: the CPU half is a difference, not a level
+
+The row now runs **two phases in one process** — thirty seconds with no scheduler, thirty
+with one — and asserts the *delta*. Whatever the host is doing lands in both, and the
+difference is C03's marginal cost, which is what *"there is no polling render loop"* actually
+claims. `frames === 0` and `writes === 0` are unchanged; they were always exact.
+
+**Shown to respond to the thing under test before being trusted.** A fabricated polling loop
+in the scheduler phase produced a delta of **+0.0488** against a 0.005 bound — *on a host
+whose control phase read `0.0154`*, which is to say a host where the old absolute bound of
+0.01 would have failed with no defect present. Load-tolerant in both directions: the clean row
+passes under two saturated cores, and the defective one is caught under the same load.
+
+**Two blind spots, recorded in the row.** The phase order biases toward passing — warm-up and
+early GC land in phase one, the control, measured at `0.0014` with the scheduler against
+`0.0042` without, a delta of **−0.0028**; a negative delta is that bias, not a discovery. And
+a host-wide idle burn is no longer caught at all, because both phases would burn: that claim
+is not C03's and nothing else currently makes it.
+
+**And the absolute number is not a function of load in any simple way** — the failures under
+a training job read 0.0121–0.0414, while two saturated cores produced 0.0014. Which is the
+argument for the delta restated as a measurement: an absolute bound was tracking something
+neither the test nor the reader controls.
+
 ### Two things that are genuinely new
 
 - **The counter-comparison protocol never stated its precondition.** *The six targets before
