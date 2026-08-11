@@ -590,7 +590,7 @@ context than an adapted one.
 
 ---
 
-## F15 — a rejected document produces no entry, no error, and no clue ★★
+## F15 — a rejected document produces no entry, no error, and no clue ★★ — **CLOSED**
 
 | | |
 |---|---|
@@ -640,6 +640,80 @@ next invalid document, which for a framework means waiting for its first app aut
 The fix is small and does not touch I1's exception: append a notice naming the validation
 error, or at minimum let it reach the fault handler. A silent no-op is the one outcome that
 teaches the author nothing.
+
+---
+
+### CLOSED — tier 3 row 3. Two channels, and the fix was already specified
+
+**The remedy was written down three times and built nowhere.** C23 §5's table, I1's second
+exception and §8a A5 all said the failure was *"logged as a defect"*; `grep` finds no sink in
+any component, and C13 and C14 each delegate diagnostics to C23 §5 by name. One unmeasured
+claim, restated until it read as a mechanism. **This is the *ask where a settled claim is
+written down* instrument pointed at a spec rather than at a plan**, and it is the fourth time
+it has changed what a row was going to build.
+
+**The moment was already chosen, twice.** C02 rules that a component decides what is wrong and
+never when the user is told, because C22 §8 restores the screen before printing; C20 §Warnings
+says that transfers whole. C23 is the third instance and takes the same shape — a readable
+collection, drained at C22 §8 step 3.
+
+So there are two channels and they fail independently, which §8e is what forced:
+
+| | |
+|---|---|
+| **an entry, at the moment** | the fault notice, `origin: "defect"`, carrying C13's own sentence |
+| **an accumulation, at exit** | `Pipeline.faults`, on the restored primary screen |
+
+**The reporting path is the path that failed**, so a single channel could not work: in the row
+where `transcript.append` throws, appending is precisely what cannot be relied on.
+
+### Measured, at the public entry
+
+`/dashboard`'s document — two blocks with the id `running` — submitted through `createTui`,
+the frame read rather than the collection:
+
+```
+prism  prism  22:13:20
+✗ appendAndCommit: TranscriptError: transcript.append: invalid document (C13 I10) — blocks: id
+  "running" appears 2 times (C04 I14) — ViewPatch addresses blocks by id, so a duplicate has no
+  correct target
+❯
+```
+
+Before, at the same size, the whole transcript was empty. The same sentence appears again
+after `⌃d`, on the restored primary screen, asserted to fall *after* the alternate-screen
+release rather than merely after `stop()` began — which the first version of the row did not
+distinguish, and the mutation pass said so.
+
+### What the finding got wrong, and what the count turned up
+
+- **"The fix is small"** — the *remedy* is, and the subject was not. Checking how many callers
+  reach the swallow turned up a **third** subject: `HistoryStore.warnings` is read by nothing
+  in `src/`, so a corrupt history file, a read-only home and a full disk have each been
+  detected, described and discarded for the life of the component. **T2.9 passed throughout**,
+  because what it asserts is that neither stream is written to — the silence it was written to
+  make safe is indistinguishable from the silence of a warning nobody collects. C22 §8 step 3
+  drained one of three collections and now drains three.
+- **"Waiting for the next invalid document, which for a framework means waiting for its first
+  app author"** — it was not waiting. **F138** was already in the tree: every notice composed
+  with `status: "error"` was invalid under C04 I3, so a handoff exiting non-zero produced no
+  entry. F15's own mechanism was hiding a second instance of F15's own class, and the thing
+  that found it was the fabricated row for this fix's ladder.
+
+### Also settled here
+
+**§8e, the walk** — a classification table over the five statements under one catch, indexed
+by which threw. §5's row is written as though only the first can. Four of five abandoned
+`resetFocus` between the append and the commit, which T4.7b asserts the position of because
+one frame with focus in a frozen block is the failure it prevents; abandoning it is that
+failure with no bound. The return value was `null` in four rows where the entry exists, and it
+is corrected without a row, because nothing can observe it without adding the consumer the row
+would be testing for.
+
+**Ten mutations, all caught, with a control the harness verified live** — and two of the ten
+survived first time, both findings about the tests rather than the code: *"the reset was
+attempted"* was satisfied by the try's reset alone, and *"the reason appears after `stop()`"*
+was satisfied by both orderings of release and drain.
 
 ---
 
@@ -5659,3 +5733,55 @@ ruling is correct about the interaction and assumes a mechanism the layer below
 does not have.
 
 ---
+
+---
+
+## F138 — every notice composed as an error was an invalid document, and `vim` said nothing ★★★
+
+| | |
+|---|---|
+| **Surface** | the handoff's outcome notice — an interactive child that exited non-zero or died on a signal |
+| **Reached for** | nothing. It was found by the fabricated row for F15's own reporting ladder |
+| **Verdict** | **a real Calcium finding**, fixed — `documents.ts`, C23 T3.38, mutation `c23-faults` |
+
+`noticeDoc(command, text, tone, meta, status)` composed the document with the caller's
+`status` and **never with an `error` field**. C04 I3 requires the two together in both
+directions — *present iff the status is `"error"`* — so every call passing `"error"` produced
+a document `transcript.append` refuses:
+
+```
+transcript.append: invalid document (C13 I10) — error: required when status is "error" (C04 I3)
+```
+
+Two shipped call sites, both in the handoff's outcome:
+
+```ts
+noticeDoc(line, `${label} ended on ${exit.signal}`, "warn", { origin: "user" }, "error")
+noticeDoc(line, `${label} exited ${String(code)}`,  "warn", { origin: "user" }, "error")
+```
+
+**So `vim` exiting 1 produced no entry at all.** The throw landed in `appendAndCommit`'s bare
+catch, which is F15, and the transcript said the same thing it says when nothing happened.
+The successful arm — `${label} finished`, status `ok` — worked, which is why the route looked
+healthy: the failure path is the one that fails, and it is the one nobody runs twice.
+
+### How it was found, because that is the transferable part
+
+**Not by a test written to look for it.** It came out of the fabricated row for C23 §5a's
+reporting ladder — *if the fault notice itself throws, only the accumulation survives* — and
+the fault notice was written as `status: "error"`. The row was written to prove a claim about
+a construction path could be violated, and the first thing it proved was that the path was
+already broken. **A claim that a shape is safe is a claim, and this is the second time in this
+file that composing a document has been the thing that threw** (the glyph defect is the
+first).
+
+### The fix is the class
+
+Filled in `noticeDoc` rather than at the two call sites: the message is the notice's own text,
+and an `ErrorLike` carrying anything else would be paraphrasing it. Every future caller
+passing `"error"` is covered, which the two-site fix would not have been — and the two-site
+fix is what a reader of the stack trace would have written.
+
+**A03 §2's vacuity class, in a fifth place.** Nothing asserted the handoff's failure notice
+because the handoff's rows assert the *successful* exit, and a document that is never appended
+leaves a transcript indistinguishable from one where the verb was quiet.

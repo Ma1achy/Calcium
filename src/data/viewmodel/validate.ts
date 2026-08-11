@@ -57,7 +57,7 @@ const ACTION_FIELD: Readonly<Record<Action["kind"], string>> = Object.freeze({
 });
 
 const TRANSPORTS: ReadonlySet<string> = new Set(["emulated", "fixture", "subprocess", "local"]);
-const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh"]);
+const ORIGINS: ReadonlySet<string> = new Set(["user", "action", "agent", "refresh", "defect"]);
 
 // --- small total helpers --------------------------------------------------
 

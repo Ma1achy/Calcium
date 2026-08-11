@@ -129,6 +129,15 @@ export interface FileSystem {
  */
 export interface Pipeline {
   submit(line: string): void;
+  /**
+   * What the pipeline's bare catches swallowed (C23 I48, F15).
+   *
+   * **Returned, never emitted** — C02's ruling taken a third time, after C20.
+   * C23 decides what is wrong; C22 §8 step 3 decides when the user is told, on
+   * the restored primary screen, because a diagnostic written to the alternate
+   * screen is discarded with it.
+   */
+  readonly faults: readonly string[];
   seal(): void;
   readonly sealed: boolean;
   /**

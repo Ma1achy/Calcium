@@ -191,7 +191,7 @@ is, and no field fixes it.
 |---|---|---|---|---|
 | **F90** the render chain | change, **4 stages, order fixed** | **every consumer** | C09 | **partial** · `48d3be3` `af87fb3` `a2d4fd3` `6cf2ee2` `266c076` `4efa247` `1d5a4b3` `5bc3f91` — stage 3 reaches one kind of five (**F134**) |
 | **F91** shared pollers | change | **2 parts of one document**, plus the off-screen half | — | **done** · `36e850d` `1c78ab6` `af90056` `b2f63c3` `372cff3` — one owed (**F137**) |
-| **F15** the empty-block mechanism | **ruling** — C23 §5's bare catch is deliberate | 1, *and it is the mechanism* | — | — |
+| **F15** the empty-block mechanism | **change** — a channel, not a rethrow | 1, *and it is the mechanism*, plus **C20's** and **F138's** | C04 | **done** · `4a7b9ec` — three subjects, one drain |
 | **F67** a region too small refused rather than drawn dark | ruling | 1 | — | — |
 
 **F90's order was the finding and three of its four claims moved under measurement.**
@@ -247,9 +247,17 @@ could see the throw and no app author ever could.
 **F137**, a fold runs on a version, so an attempt that failed at the transport is no longer
 counted.
 
-**F15 is a ruling and not a change** because the bare catch is documented and deliberate. What
-is owed is whether a malformed document may be indistinguishable from a verb that did nothing.
-Fixing five instances did not fix the thing that hid them.
+**F15 was filed as a ruling and is a change**, because the ruling had already been made and
+never built: C23 §5, I1 and §8a A5 all said *"logged as a defect"* and no component had a sink.
+The bare catch stays — a malformed document must not take the session down — and what it lost
+was the report, on two channels that fail independently (C23 §5a, I48, I49).
+
+**The count decided the shape, and it came back with a third subject.** C22 §8 step 3 drained
+one of three collections: C20's `warnings` were read by nothing in `src/`, so a corrupt history
+file has been silent for the life of the component with T2.9 passing throughout. And the
+fabricated row for the reporting ladder found **F138** — every notice composed with
+`status: "error"` was an invalid document under C04 I3, so a handoff exiting non-zero produced
+no entry. F15's own mechanism was hiding a second instance of F15's own class.
 
 ---
 

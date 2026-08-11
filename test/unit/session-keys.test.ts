@@ -557,6 +557,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         seal: () => undefined,
         sealed: true,
         liveStreams: 0,
+        faults: [],
         cancelNewestStream: () => false,
         inFlight: null,
         cancel: () => undefined,

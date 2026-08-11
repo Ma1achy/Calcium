@@ -200,6 +200,63 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   };
 
   /**
+   * C23 I48 — what the bare catches record, drained by C22 §8 step 3.
+   *
+   * **A collection and not a callback**, which is C02's ruling taken a third
+   * time: C23 decides what is wrong, never when the user is told. A callback
+   * would choose the moment, and the moment is after the terminal is released —
+   * a diagnostic painted onto the alternate screen is discarded with it.
+   *
+   * Deduplicated by message, which is what C20 already means by *logged once*:
+   * a refresh notice failing on every tick would otherwise fill both channels
+   * with one sentence.
+   */
+  const faults: string[] = [];
+
+  /** Whether this is the first time — the notice's gate as well as the list's. */
+  const recordFault = (stage: string, cause: unknown): boolean => {
+    const text = `${stage}: ${String(cause)}`;
+    if (faults.includes(text)) return false;
+    faults.push(text);
+    return true;
+  };
+
+  /**
+   * The other channel — an entry, at the moment (C23 §5a, F15).
+   *
+   * **Not the submission's entry** (§8b B1), so I1's count is untouched: it is a
+   * fourth thing that appends without being a submission, beside the identity
+   * notice, a stall patch and a refresh tick. `origin: "defect"` is the only
+   * field that can distinguish this from a verb that did nothing, and `/debug`
+   * renders it.
+   *
+   * **Deduplicated by the same collection**, which is why `recordFault` answers
+   * whether it was new: a refresh notice failing every tick would otherwise fill
+   * the transcript with one sentence at 1 Hz.
+   *
+   * **`stopping` halts it, as B1 ruled for B1's own three.** After shutdown
+   * begins the transcript is being torn down, and the accumulation is what the
+   * reader gets — which is right, because step 3 has not run yet.
+   *
+   * The append is direct rather than through `appendAndCommit`: no history, no
+   * live parts, and nothing that could recurse into the catch that called this.
+   * If it throws, the accumulation is all that survives, and that is the end of
+   * the ladder (T3.38).
+   */
+  const contain = (stage: string, cause: unknown): void => {
+    if (!recordFault(stage, cause)) return;
+    if (deps.session().stopping) return;
+    try {
+      deps.transcript.append(
+        noticeDoc("", `${stage}: ${String(cause)}`, "error", { origin: "defect" }, "error"),
+      );
+    } catch {
+      // Nothing left to say it with. `faults` already has it, and that is the
+      // end of the ladder.
+    }
+  };
+
+  /**
    * The one place a document reaches the transcript, and the one place the
    * frame is committed for a submission (Seam 4's submit row).
    *
@@ -207,25 +264,46 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * whole of C23 T4.7b: a reset issued before the append is undone by nothing,
    * and one issued after the commit paints a frame with focus in a block that
    * has just been frozen.
+   *
+   * **The catch covers five statements and §5 was written about the first**
+   * (§8e). `id` is a `let` because four of the five rows leave the entry
+   * appended, and the catch that returned a flat `null` was telling every caller
+   * the entry did not exist. Nothing reads it today, which is what made the lie
+   * survivable rather than what made it true.
    */
   const appendAndCommit = (
     doc: Parameters<typeof deps.transcript.append>[0],
     /** The line as typed, when this append settles a submission (I29). */
     line?: string,
   ): string | null => {
+    let id: string | null = null;
     try {
-      const id = deps.transcript.append(doc);
+      id = deps.transcript.append(doc);
       declareLive(id, doc.blocks);
       if (line !== undefined) recordHistory(line, doc);
       deps.resetFocus();
       deps.scheduler.commit("input");
       return id;
-    } catch {
-      // §5's one stage whose failure loses the outcome, and C23 I1's second
-      // exception. The frame still commits; the guard is still released by the
-      // caller's `finally`.
+    } catch (cause) {
+      // §5's stage whose failure loses the *entry*, and C23 I1's second
+      // exception. The guard is still released by the caller's `finally`.
+      contain("appendAndCommit", cause);
+      // **I49 — the catch finishes what the try did not.** `resetFocus` is
+      // abandoned by every row of §8e but the first, and its absence is the one
+      // that is permanent: the append froze the previous entry and focus is
+      // still inside it, on every frame from here on. Guarded, because a reset
+      // that throws is §8e's fourth row and must not take the commit with it.
+      try {
+        deps.resetFocus();
+      } catch (second) {
+        // **Recorded, not noticed.** One swallow is one notice: a second arm of
+        // the same containment would put two sentences on screen for one event,
+        // and the reader already has the first. The collection keeps both,
+        // because at exit the detail is what tells them apart.
+        recordFault("resetFocus", second);
+      }
       deps.scheduler.commit("input");
-      return null;
+      return id;
     }
   };
 
@@ -1107,9 +1185,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user" }),
           line,
         );
-      } catch {
-        // The document itself is unbuildable. C23 §5's one stage whose failure
-        // loses the outcome, reached from the one direction §5 did not name.
+      } catch (second) {
+        // The document itself is unbuildable. C23 §5's stage whose failure loses
+        // the entry, reached from the one direction §5 did not name — so it
+        // records like the other one (I48). Two causes and both are kept: the
+        // route's, and the failure to say so.
+        contain("pipeline", cause);
+        recordFault("pipeline-report", second);
         deps.scheduler.commit("input");
       }
     });
@@ -1468,6 +1550,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   return {
     submit,
     onAction,
+    /**
+     * C23 I48 — read by C22 §8 step 3, on the restored primary screen.
+     *
+     * A copy, because the collection keeps accumulating and a caller holding the
+     * live array would see it change under them.
+     */
+    get faults() {
+      return Object.freeze([...faults]);
+    },
     identityNotice: (text) => void refresh.identityNotice(text),
     releaseView: () => void refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID }),
     visibilityChanged: () => void refresh.visibilityChanged(),

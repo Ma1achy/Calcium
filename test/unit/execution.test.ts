@@ -55,6 +55,14 @@ type Scripted = Readonly<{
   localLive?: () => Block;
 
   spawnShell?: () => { stdout: AsyncIterable<string>; exited: Promise<{ code: number | null }>; overflowed: boolean };
+
+  /**
+   * Make `resetFocus` throw — §8e's fourth row, and the only statement after the
+   * append this harness can reach. `declareLive` and `recordHistory` are driven
+   * by the document and by C20, so a throw from either would be a fake supplying
+   * a behaviour rather than standing in for one.
+   */
+  focusThrows?: boolean;
 }>;
 
 const blocks = createBlockRegistry();
@@ -224,7 +232,10 @@ function harness(script: Scripted = {}) {
       killAll: () => Promise.resolve(),
     },
     lifecycle: { size: () => ({ columns: 80, rows: 24 }) },
-    resetFocus: () => void resets.push(1),
+    resetFocus: () => {
+      resets.push(1);
+      if (script.focusThrows === true) throw new Error("focus exploded");
+    },
     stop: () => Promise.resolve(0),
     clock: () => now,
     schedule: (fn: () => void, ms: number) => {
@@ -676,6 +687,141 @@ describe("C23 §2 — the seven routes", () => {
       h.transcript.entries.length + h.commits.length,
       "something reached the user, or the frame committed",
     ).toBeGreaterThan(0);
+  });
+
+  it("T1.45 (I48): a rejected document's reason survives, in the store's own words", async () => {
+    // **F15's document is the input**, not a synthetic error: two blocks with one
+    // id, which C04 I14 forbids because `ViewPatch` addresses blocks by id. The
+    // shell said nothing at all about it, and the sentence naming the violation
+    // was in hand and discarded.
+    //
+    // Asserted on the *sentence* rather than on the collection being non-empty,
+    // because a generic "a document was rejected" satisfies every count-based
+    // row while destroying exactly what F15 says was destroyed.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error('blocks: id "running" appears 2 times (C04 I14)');
+    }) as typeof h.transcript.append;
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.pipeline.faults.join("\n")).toContain('id "running" appears 2 times');
+  });
+
+  it("T1.46 (I48): one cause swallowed five times is recorded once", async () => {
+    // C20's *logged once*, which is what makes this safe to put on a path that
+    // can fail per tick. A refresh notice failing every second would otherwise
+    // grow the collection without bound and print a wall of one sentence.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error("the same thing, again");
+    }) as typeof h.transcript.append;
+
+    for (let i = 0; i < 5; i += 1) h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.pipeline.faults.filter((f) => f.includes("the same thing"))).toHaveLength(1);
+  });
+
+  it("T1.47 (I49): a throw after the append still resets focus and still returns the id", async () => {
+    // **§8e's second row, and the one that happened** — row 2's cadence refusal
+    // threw from `declareLive` with the entry already appended. Four of the five
+    // statements under the catch leave the entry there and the sequence after it
+    // abandoned, and `resetFocus` is the one whose absence is permanent: T4.7b
+    // asserts its position because one frame with focus in a frozen block is the
+    // failure it prevents.
+    //
+    // **The entry count is what says the append itself succeeded**, so the row
+    // is about a later statement rather than the first. §8e E2's other half —
+    // returning the id instead of a flat `null` — is corrected in the code and
+    // has **no row**, because all nineteen call sites discard the return: there
+    // is nothing that can observe it, and a row asserting it would have to add
+    // the consumer it is testing for.
+    const h = harness({ focusThrows: true });
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    // Two entries: the submission's, which the append *did* produce, and the
+    // fault notice beside it. The count is what says this is a later row of §8e
+    // rather than the first — in row one there is no submission entry at all.
+    expect(h.transcript.entries).toHaveLength(2);
+    expect(
+      h.transcript.entries[0]?.doc.command,
+      "the append succeeded — this is not row one",
+    ).toBe("/help");
+    // **Twice, and the number is the assertion.** The try's reset ran and threw;
+    // the catch's is the one under test, and `> 0` is satisfied by the first
+    // alone — which is what the mutation pass showed: removing the catch's reset
+    // survived a row written to cover it.
+    expect(h.resets.length, "the sequence reset, and so did the catch").toBe(2);
+    expect(h.commits.length, "and the frame still committed").toBeGreaterThan(0);
+    expect(h.pipeline.faults.join("\n")).toContain("focus exploded");
+  });
+
+  it("T1.48 (I1, §8b B1): the swallow leaves one entry, and it is the fault notice", async () => {
+    // **The count and the identity.** A row asserting only the count passes on
+    // the day the notice is the wrong document, and a row asserting only the
+    // notice passes on the day I1's count went to two — the fault notice is a
+    // fourth non-submission append, not a second entry for one submission.
+    const h = harness();
+    let armed = true;
+    const real = h.transcript.append.bind(h.transcript);
+    h.transcript.append = ((...args: Parameters<typeof real>) => {
+      if (armed) {
+        armed = false;
+        throw new Error("refused");
+      }
+      return real(...args);
+    }) as typeof real;
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.transcript.entries).toHaveLength(1);
+    const only = h.transcript.entries[0]?.doc;
+    expect(only?.meta.origin, "the one field that says a defect from a quiet verb").toBe("defect");
+    expect(only?.command, "and it is nobody's submission").toBe("");
+  });
+
+  it("T3.37 (I48, §8b B1): a swallow while stopping is recorded and not appended", async () => {
+    // B1's ruling reaching a fourth non-submission append rather than becoming a
+    // fourth exception to it. The transcript is being torn down; the collection
+    // is what the reader gets, and C22 §8 step 3 has not run yet.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error("refused while stopping");
+    }) as typeof h.transcript.append;
+    h.session.beginStopping();
+
+    // Not `submit`, which I12 refuses before it reaches the append at all — the
+    // greeting is one of the paths that appends without being a submission.
+    h.pipeline.greeting({ schema: "tui.view/1", command: "", status: "ok", blocks: [], meta: {
+      verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
+      argv: [], stderr: "", transport: "local", origin: "user",
+    } });
+    await settled();
+
+    expect(h.pipeline.faults.join("\n")).toContain("refused while stopping");
+    expect(h.transcript.entries, "and nothing was appended after shutdown began").toHaveLength(0);
+  });
+
+  it("T3.38 (§5a): when the notice cannot land either, the collection still has it", async () => {
+    // **The end of the ladder, fabricated rather than stated.** A frozen shape
+    // is a claim about a construction path, and the glyph defect is how F15 was
+    // found in the first place — this row is what caught the fault notice being
+    // composed with `status: "error"` and no `error` field, which C04 I3 refuses.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error("everything is refused");
+    }) as typeof h.transcript.append;
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.transcript.entries, "nothing could be appended at all").toHaveLength(0);
+    expect(h.pipeline.faults.join("\n")).toContain("everything is refused");
   });
 });
 

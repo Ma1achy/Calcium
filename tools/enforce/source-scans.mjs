@@ -742,6 +742,26 @@ export const SCANS = [
     ],
     why: "`origin: \"refresh\"` is provenance — a system notice with no user behind it (C23 §3a). A fifth site is either a new one of those or the word drifting" },
 
+  // --- SS49 — who may append with `origin: "defect"` ------------------------
+  //
+  // SS46's argument with a narrower set: **one site, not four.** `defect` is the
+  // arm the framework sets about itself (C23 §5a, C04 I13), and the whole reason
+  // it is worth a fifth arm on a public union is that it distinguishes a
+  // contained failure from a verb that did nothing. A second producer widens it
+  // back into a general "something went wrong", which is what `refresh` already
+  // drifted into once.
+  //
+  // **Known limit, stated because an unrecorded one reads as strength.** Like
+  // SS46 it finds the literal and not a computed origin, and — unlike SS46 —
+  // its allow-list has one entry, so it is also the weakest possible version of
+  // itself: it cannot tell a second `contain()` in `execution.ts` from the
+  // first. What it catches is the shape someone would write, which is the
+  // notice copied into another file.
+  { id: "SS49", spec: "C23 §5a · C23 I48 · C04 I13",
+    pattern: /origin:\s*"defect"/,
+    scope: "src/", allow: ["src/shell/execution.ts"],
+    why: "`origin: \"defect\"` is the framework reporting a failure it contained (C23 §5a). A second producer is the word widening into `something went wrong`, which is what `refresh` did before SS46" },
+
   { id: "SS35", spec: "C04 §4 · C05 §2",
     pattern: /^\s*(?:export\s+)?type Result\s*[<=]/m,
     scope: "src/", allow: ["src/data/viewmodel/types.ts"],

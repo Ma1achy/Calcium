@@ -42,8 +42,15 @@ export type DocumentMeta = Readonly<{
   argv: readonly string[];
   stderr: string;
   transport: "emulated" | "fixture" | "subprocess" | "local";
-  /** Required, never optional (I13). Provenance that can be absent is untrusted. */
-  origin: "user" | "action" | "agent" | "refresh";
+  /**
+   * Required, never optional (I13). Provenance that can be absent is untrusted.
+   *
+   * `defect` is the one arm the framework sets about **itself** — a document
+   * that exists because a stage failed and C23 contained it (C23 §5a, F15). Not
+   * `refresh`, which is a system notice about the session, and not `action`,
+   * which names a mechanism that did not produce it.
+   */
+  origin: "user" | "action" | "agent" | "refresh" | "defect";
 }>;
 
 /**

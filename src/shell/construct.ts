@@ -203,7 +203,16 @@ export type Graph = Readonly<{
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   capabilities: TerminalCapabilities;
-  capabilityWarnings: readonly string[];
+  /**
+   * C22 I6a — every component that accumulates a diagnostic, drained at §8
+   * step 3 in construction order.
+   *
+   * **A function and not an array**, because step 2b's `history.drain()` is a
+   * synchronous append that can fail, and its warning exists only after the
+   * release. A collection snapshotted at construction holds every warning
+   * except the one the exit path itself caused.
+   */
+  diagnostics: () => readonly string[];
   blocks: ReturnType<typeof createBlockRegistry>;
   adapters: ReturnType<typeof createAdapterRegistry>;
   manifest: ReturnType<typeof createManifestStore>;
@@ -1111,7 +1120,22 @@ export async function constructGraph(
      */
     promptUnderMenu,
     capabilities: detection.capabilities,
-    capabilityWarnings: detection.warnings,
+    /**
+     * C22 I6a — construction, then the session, then what the session contained.
+     *
+     * **Two of these three were collected and read by nothing**: C20's
+     * `warnings` reached no caller in `src/`, so a corrupt history file or a
+     * read-only home was detected, described and discarded for the life of every
+     * session, and C23 collected nothing at all (F15). C02's ruling —
+     * *the component decides what is wrong, never when the user is told* — is
+     * only half a ruling until something drains them.
+     */
+    diagnostics: () =>
+      Object.freeze([
+        ...detection.warnings,
+        ...stores.history.warnings,
+        ...pipeline.faults,
+      ]),
     blocks: built.blocks,
     adapters: built.adapters,
     manifest: built.manifest,

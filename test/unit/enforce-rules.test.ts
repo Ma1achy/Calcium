@@ -442,6 +442,16 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'meta: { origin: "refresh", verb: null },',
   },
   {
+    // SS46's argument with a narrower set — one site rather than four. `defect`
+    // is worth a fifth arm on a public union only because it separates a
+    // contained failure from a verb that did nothing, and a second producer
+    // widens it back into "something went wrong", which is the drift SS46 was
+    // written after.
+    rule: "SS49",
+    file: "src/shell/documents.ts",
+    source: 'return compose({ command, status, meta: { origin: "defect" } });',
+  },
+  {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
     // resolving its own variable, which reads as C22 owning the default rather
     // than as the framework reading the environment.

@@ -334,8 +334,13 @@ class Session implements TuiInstance {
     // printed onto the alternate screen is discarded when the screen is
     // released, so the dev sees a flash and an empty shell (I6). C02's warnings
     // wait here for the same reason (C02 §2).
-    for (const line of graph.capabilityWarnings)
-      this.config.stdout.write(`${line}\n`);
+    //
+    // **Three sources, and it had one** (I6a). C20's warnings and C23's faults
+    // were both accumulating where nothing read them — *returned, never
+    // emitted* honoured on the half that is easy. **Read here rather than
+    // captured earlier**: `history.drain()` is step 2b, inside the release
+    // above, so the warning from a failed final append exists only now.
+    for (const line of graph.diagnostics()) this.config.stdout.write(`${line}\n`);
 
     // 4 — the caller's code, returned rather than exited: the caller owns the
     // process, and a library that calls `process.exit` cannot be embedded.

@@ -155,7 +155,23 @@ const GLYPH_OF = Object.freeze({
   error: "error",
 } as const);
 
-/** A single-block notice. The shape most containment paths end in. */
+/**
+ * A single-block notice. The shape most containment paths end in.
+ *
+ * **`status: "error"` carries its own `error`, and it did not.** C04 I3 requires
+ * the field in both directions — present iff the status is `"error"` — so every
+ * notice composed with that status was an invalid document, and `transcript.append`
+ * threw on all of them. Two shipped call sites: a handoff killed by a signal and
+ * a handoff exiting non-zero. **Neither produced an entry.** `vim`, exiting 1,
+ * left a transcript that said nothing had happened.
+ *
+ * That is the same shape as the glyph defect above and as F15 itself, and it was
+ * found by the fabricated row for §5a's ladder — the fault notice was written
+ * with this status and could not be appended either. Filling the field here
+ * rather than at the two call sites is the class rather than the instances: the
+ * message is the notice's own text, which is what an `ErrorLike` carrying
+ * anything else would be paraphrasing.
+ */
 export function noticeDoc(
   command: string,
   text: string,
@@ -167,6 +183,7 @@ export function noticeDoc(
   return compose({
     command,
     status,
+    ...(status === "error" ? { error: { message: text } } : {}),
     blocks: [
       block({
         kind: "notice",

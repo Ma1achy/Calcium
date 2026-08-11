@@ -6,7 +6,8 @@
 // A row about it written against `buildGraph` would measure the harness.
 import { describe, expect, it } from "vitest";
 
-import { buildSession } from "../support/session.js";
+import { MANIFEST, buildSession, fakeFs } from "../support/session.js";
+import type { TuiConfig } from "../../src/shell/types.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { displayCells } from "../../src/presentation/text.js";
@@ -599,4 +600,119 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     expect(promptOf(), "the *first* action, not whichever the array ends with").not.toContain("/logs");
   });
 
+});
+
+describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", () => {
+  /**
+   * A manifest with one local verb, so a handler can be registered without
+   * tripping C23 I27's reconciliation.
+   */
+  const withLocal = (name: string): TuiConfig["manifest"] => ({
+    schema: "tui.manifest/1",
+    binary: "prism",
+    version: "1.0.0",
+    tools: [
+      { name, local: true, summary: "a verb whose document C04 refuses", args: [], flags: [] },
+    ],
+  });
+
+  /**
+   * **F15's document**, and it is the input rather than a synthetic error: two
+   * blocks with the id `running`, which C04 I14 forbids because `ViewPatch`
+   * addresses blocks by id. This is what `/dashboard` returned, and what the
+   * shell said nothing at all about.
+   */
+  const duplicateIds = () => ({
+    schema: "tui.view/1" as const,
+    command: "/fault",
+    status: "ok" as const,
+    blocks: [
+      { kind: "notice" as const, id: "running", tone: "info" as const, glyph: "info" as const, text: "one" },
+      { kind: "notice" as const, id: "running", tone: "info" as const, glyph: "info" as const, text: "two" },
+    ],
+  });
+
+  it("T4.27 (C23 I48, I1): a rejected document is said in the transcript and again at exit", async () => {
+    // **The row belongs at the public entry.** Every driver-level assertion
+    // could already see this throw and no app author ever could — F15 cost four
+    // wrong turns against a framework that had the answer in one sentence.
+    const stdin = fakeStdin();
+    const { stdout, screen, tui } = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: withLocal("fault"),
+        localHandlers: { fault: () => duplicateIds() },
+      },
+      { columns: 100, rows: 30 },
+    );
+    await settle();
+
+    // The control: the session is up and the prompt takes keys, so a blank
+    // assertion below would be about this row rather than about the frame.
+    expect(screen().rows.join("\n"), "the shell painted").not.toBe("");
+
+    stdin.emit("/fault\r");
+    await settle();
+    await settle();
+
+    // Channel one — at the moment, where the missing entry should be.
+    expect(
+      screen().rows.join("\n"),
+      "the reason is on screen, not only in a collection",
+    ).toContain("running");
+
+    // Channel two — after the release, on the restored primary screen. Taken
+    // from what is written *after* stop begins, because the frames before it
+    // are on the alternate screen and are discarded with it.
+    const before = stdout.chunks.length;
+    await tui.stop("exit");
+    const after = stdout.chunks.slice(before).join("");
+
+    // **After the release, and the ordering is the assertion** (C22 I6). A
+    // diagnostic written before `lifecycle.release()` goes to the alternate
+    // screen and is discarded with it — the dev sees a flash and an empty
+    // shell. "It appears somewhere after `stop()` began" is satisfied by both
+    // orders, which is what the mutation pass showed.
+    const LEAVE_ALT = "\u001b[?1049l";
+    expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
+    expect(
+      after.indexOf("running"),
+      "and again at exit, on the restored primary screen",
+    ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+  });
+
+  it("T4.20 (I6a, C20 I17): a history warning reaches the same drain", async () => {
+    // **C20's half, and it was the older one.** `HistoryStore.warnings` was read
+    // by nothing in `src/`: a corrupt file, a read-only home and a full disk
+    // were each detected, described and discarded for the life of every session,
+    // with T2.9 passing throughout because what it asserts is the silence.
+    //
+    // Fabricated at the filesystem, which is where the real cause lives.
+    const base = fakeFs();
+    const fs = {
+      ...base,
+      appendFile: () => Promise.reject(new Error("EROFS: read-only file system")),
+      appendFileSync: () => {
+        throw new Error("EROFS: read-only file system");
+      },
+    };
+
+    const stdin = fakeStdin();
+    const { stdout, tui } = await buildSession({ stdin: stdin as never, fs });
+    await settle();
+
+    stdin.emit("/help\r");
+    await settle();
+
+    const before = stdout.chunks.length;
+    await tui.stop("exit");
+    const after = stdout.chunks.slice(before).join("");
+
+    const LEAVE_ALT = "\u001b[?1049l";
+    expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
+    expect(
+      after.indexOf("EROFS"),
+      "the write failure is reported, and after the release",
+    ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+  });
 });

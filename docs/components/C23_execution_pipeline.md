@@ -711,7 +711,10 @@ So the two channels are:
   F15 says was in hand and destroyed. It is **not the submission's entry** (§8b B1), so I1's
   count is untouched, and `stopping` halts it exactly as B1 ruled for B1's own three.
   Deduplicated by message: a source failing every tick would otherwise fill the transcript
-  with one sentence, and *logged once* is what C20 already means by it.
+  with one sentence, and *logged once* is what C20 already means by it. **One swallow is one
+  notice**: a containment that fails a second way — the catch's own `resetFocus` throwing —
+  records the second cause and does not draw it, because the reader already has the first and
+  two sentences for one event describes the machinery rather than the fault.
 - **An accumulation, at shutdown** — `faults`, drained by C22 §8 step 3 onto the restored
   primary screen with the capability warnings and the history warnings. **This is the channel
   that survives §8e's first row**, where nothing can be appended at all.
@@ -1310,6 +1313,12 @@ a return code.
 **Ruled: the id is returned when the entry exists**, which costs one variable and removes a
 statement that is currently false. It is latent only because nothing reads it, and that is
 the class that bites on the day something does.
+
+**And it has no test row, which is the same fact stated from the other side.** Nothing can
+observe the return value without adding the consumer the row would be testing for, so the
+correction lands in the code and is named here as unobservable rather than given a row that
+asserts against a caller written to make it pass. T1.47 covers the reset, which is the half
+this table found and the half that reaches a frame.
 
 ### E3 — a `commit` that throws is committed again by the catch
 
