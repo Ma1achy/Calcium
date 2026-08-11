@@ -455,7 +455,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T2.1** (I5, I29, the important one): a corpus of realistic commands — UUIDs, 7- and 40-character SHAs, semvers, absolute and relative paths, flag names — survives redaction intact.
 - **T2.2** (I5): `--token=ghp_16C7e42F292c6912E7710c838347Ae178B4a`, `GITLAB_PASSWORD=hunter2`, `--api-key foo` → redacted in all three positions.
 - **T2.3** (I6): a redacted-on-disk entry is still complete in `entries` for the current session.
-- **T2.4** (I11, I12): a source scan finds no clock, no direct `fs`, and **no tilde-rooted dotfile literal at all** in `history/`. The rule matched `~/.prism` by name, so renaming the default to `~/.calcium` would have left it looking for a string nobody would write — A03 §2's vacuity class arriving through a rename rather than through a bad rule. The scope is the shape, not the spelling.
+- **T2.4** (I11, I12): a source scan finds no clock, no direct `fs`, and **no dot-directory path literal of any form** in `history/` — `.calcium`, `.widget`, `~/.anything`. The rule matched `~/.prism` by name, and it has now survived two renames that would each have retired it silently: to `~/.calcium`, which no longer contained `prism`, and to `.calcium`, which no longer contains a tilde. **A pattern that names today's default is a rule with an expiry date nobody wrote down.** The scope is the shape, not the spelling.
 - **T2.4b** (I12): two stores with different `stateDir`s do not observe each other's entries.
 - **T2.5** (I1): a source scan finds no C17 import.
 - **T2.6** (I15): the module graph shows no import from `terminal/` and no scheduler call.
@@ -527,7 +527,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.7** (I9): refusing to start on corruption → T5.6 fails.
 - **T6.8** (I1): calling C17 directly → T2.5 fails.
 - **T6.9** (I11): reading the ambient clock → T2.4 fails and timestamps become untestable.
-- **T6.12** (I12): hardcoding any `~/.<name>` state path → T2.4 fails, and standalone development appends to the developer's real history. The fabricated violation uses a name that is **not** the current default, because a rule that only catches today's spelling is one a rename retires silently.
+- **T6.12** (I12): hardcoding a state path in either form — `.widget` or `~/.widget` → T2.4 fails, and standalone development writes beside a real install. **Both forms, and neither is the current default**: the tilde arm would pass against a pattern that had followed the rename, and the bare arm would pass against the one that preceded it, so a row carrying only one of them agrees with whichever mistake is current.
 - **T6.10** (I14): making the clear confirm dismissable → T3.15 fails, and a stray `Esc` wipes history.
 - **T6.11** (I4): storing consecutive duplicates → T1.2 fails and `↑` walks the same command repeatedly.
 - **T6.13** (I16): issuing appends in parallel rather than through the chain → T3.19 fails and the sidecar de-aligns, so every timestamp names the wrong command.

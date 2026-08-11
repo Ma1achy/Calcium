@@ -32,7 +32,7 @@ That sets the priority. Each answers a diagnostic question directly and states w
 ▌   cluster    fmx-prod · https://prism.fmx.io/v1
 ▌   token      valid · expires in 30d          (2026-08-27 14:02 UTC)
 ▌   auth       gitlab oauth
-▌   config     ~/.calcium/config.toml
+▌   config     .calcium/config.toml
 ▌
 ▌   ↻ /login   ≡ /config
 ```

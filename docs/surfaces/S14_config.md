@@ -25,7 +25,7 @@ The flat verbs remain for scripting. This surface is the interactive path, not a
 ## 2. The screen
 
 ```
-▌ ── config · ~/.calcium/config.toml ───────────────────────────────────────────
+▌ ── config · .calcium/config.toml ─────────────────────────────────────────────
 ▌
 ▌     key                    value                        source
 ▌ ▸   current_context        fmx-prod                     config

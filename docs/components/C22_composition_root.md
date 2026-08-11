@@ -45,7 +45,7 @@ type TuiConfig = Readonly<{
   capabilities?: Partial<TerminalCapabilities> | undefined;   // C02's overrides, wired (I49)
   clock?:    () => number;
   fs?:       FileSystem;
-  stateDir?: string;                       // default ~/.calcium; the app resolves its own variable (I20)
+  stateDir?: string;                       // default .calcium, beside the project; the app resolves its own (I20)
   openUrl?: (url: URL) => Promise<void>;   // default: the OS handler, http/https only
   stdout?: NodeJS.WriteStream;
   stdin?:  NodeJS.ReadStream;
@@ -100,7 +100,13 @@ Found by running the fixture manifest through a real session for the first time.
 
 They arrive as config because that is where everything an app supplies arrives, and they are registered at step 10 **before** `seal()`, which is what makes the reconciliation see them. Registering after the seal would be a second window in which the two records can differ, and the seal exists to close the first.
 
-`stateDir` defaults to **`~/.calcium`**, and the framework's own name is the only defensible one. It read `~/.prism` — named for one consumer, in a framework that claims to serve others, so every app that did not override it wrote its history and its theme preference into `prism-tui`'s directory and two apps shared one file.
+`stateDir` defaults to **`.calcium`** — the framework's own name, and a path relative to where the shell was launched.
+
+**The name was one consumer's.** It read `~/.prism`, in a framework that claims to serve others, so every app that did not override it wrote its history and its theme preference into `prism-tui`'s directory and two apps shared one file. The argument against that was already in this section, twenty lines down: §141 refuses `PRISM_TUI_STATE_DIR` inside `src/` because *a variable named for one consumer has no business inside a framework that claims to serve others*. Correct, applied to the environment variable, and not applied to the constant three files away — F84's shape.
+
+**And the tilde was never expanded, so the old default never meant what six documents said it meant.** `fs.mkdir` has no shell in it: `~` is an ordinary path segment, so `~/.prism` created a directory *literally named* `~` in whatever directory the shell was launched from. Measured, not inferred. The path was therefore already relative and the tilde was decoration on top of it; dropping it makes the documented behaviour and the actual behaviour the same statement rather than adding expansion machinery to reach a home directory nothing had ever written to.
+
+**So state is per project, and that is the behaviour rather than a side effect.** History and the theme preference belong to the directory the shell was opened in, the way a repository's own dotfiles do. It also makes the injection argument structural instead of advisory: standalone development cannot append to the developer's real history, because there is no single real history to append to.
 
 **The argument against it was already in this section**, twenty lines down: §141 refuses `PRISM_TUI_STATE_DIR` inside `src/` because *a variable named for one consumer has no business inside a framework that claims to serve others*. That reasoning is right, it was applied to the environment variable, and it was not applied to the constant three files away — **a correct sentence justifying the scope it was attached to and silent about the identical case beside it**, which is F84's shape (MG24 scoped to `export interface` for a true reason about a different question).
 
@@ -990,7 +996,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 ## 11. Commitments
 
 1. Four required config fields; every other has a working default, `pipeline` included (I17, I22).
-2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.calcium` — the framework's name, never a consumer's — and the **app's entry point** resolves its own variable (I10, I20).
+2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `.calcium` — the framework's name, never a consumer's, and relative to the launch directory because the tilde it used to carry was never expanded — and the **app's entry point** resolves its own variable (I10, I20).
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
 3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
 3b. `createTui` validates and returns; steps 2 to 12 run inside `start()` (I7a).
