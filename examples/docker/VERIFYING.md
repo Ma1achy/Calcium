@@ -197,6 +197,19 @@ per-row timeout: a class that converts host load directly into failure with no a
 involved. Worth knowing which rows those are, because *timed out* and *wrong answer* are the
 same red tick in a summary.
 
+**Gate the start and read the end, because the load moves during the run.** A third loaded
+run began at **6.43** — under the threshold a waiter had been set to — and finished at
+**33.98**, with **16** failures. Gating on the load at launch is not enough for a run that
+takes minutes; the reading that invalidates the result is the one taken *after* it, and it
+costs one command.
+
+**That third set also settles the class without a re-run.** Fifteen of the sixteen were *Test
+timed out* — thirteen at 15 s, one at 5 s, one at 20 s — and the sixteenth was the paste
+budget. **Zero assertion failures.** A change that broke something produces at least one
+assertion; a machine that ran out of time produces only deadlines. So the composition of the
+set answers the question the set's identity only hints at, and it is readable from the summary
+without running anything again.
+
 **And each was diagnosed wrongly first.** F8's run was attributed to a graph leak these rows
 had themselves introduced — a mechanism in hand is the most expensive kind of coincidence,
 because it supplies the explanation before the measurement does. The check that settled both
