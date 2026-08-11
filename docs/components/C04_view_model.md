@@ -43,7 +43,7 @@ type ViewDocument = Readonly<{
     argv:       readonly string[];    // what was actually spawned
     stderr:     string;               // usually empty
     transport:  "emulated" | "fixture" | "subprocess" | "local";
-    origin:     "user" | "action" | "agent" | "refresh";
+    origin:     "user" | "action" | "agent" | "refresh" | "defect";
   }>;
 }>;
 ```
@@ -54,7 +54,7 @@ type ViewDocument = Readonly<{
 
 `argv`, `stderr` and `transport` answer the question a rendered block cannot: *did the far side return something unexpected, or did the adapter mishandle it?* They live in `meta` rather than in a block because a block is content and the invocation is *about* the document — in `meta` it is uniformly available to any inspector, including one an app writes. C23 renders them through `/debug`.
 
-**`origin` is not a debugging field, and it is required.** It is what makes a transcript legible once more than one thing is putting entries into it. Shipped optional it would be unset, then unreliable, and the first agent feature is the one that needs to trust it — so it is always present, always set by C23 (`user` for a typed submission, `action` for an exec action, `refresh` for a time-driven tick, `agent` reserved). A string now costs less than a schema migration later.
+**`origin` is not a debugging field, and it is required.** It is what makes a transcript legible once more than one thing is putting entries into it. Shipped optional it would be unset, then unreliable, and the first agent feature is the one that needs to trust it — so it is always present, always set by C23 (`user` for a typed submission, `action` for an exec action, `refresh` for a time-driven tick, `defect` for a failure the framework contained and is reporting, `agent` reserved). A string now costs less than a schema migration later.
 
 `partial` exists for streaming documents that have not finished. **A partial document is renderable at every point in its life** — there is no assembly state in which it cannot be drawn.
 
@@ -642,7 +642,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I10** — A partial document is renderable. No block kind has an "incomplete" representation that renders differently from a complete one.
 - **I11** — C04 imports nothing from `terminal/`, `presentation/` or above. Verified on the module graph.
 - **I12** — `status: "proposed"` is never produced by an adapter. C07 constructs documents from what a command returned, and a proposed change has not run. Reserved for the agent path; unused in v1.
-- **I13** — `meta.origin` is always present. It is not optional, and no code path constructs a document without it — a provenance field that can be absent becomes a provenance field nobody trusts.
+- **I13** — `meta.origin` is always present. It is not optional, and no code path constructs a document without it — a provenance field that can be absent becomes a provenance field nobody trusts. **`defect` is the fifth arm and the only one the framework sets about itself** (C23 §5a, F15): a document that exists because a stage failed and the failure was contained. It is not `refresh`, which is a system notice about the session, and not `action`, which names a mechanism that did not produce it — and the arm is only worth its width because `/debug` renders `origin` as a row, which was checked before it was added.
 - **I14** — Block ids are unique within a document, nested children included. Checked by `validateDocument`; `applyPatch` fails rather than guessing (§4a).
 - **I15** — `applyPatch` is fallible in its type and never throws. Every one of the four failure cases in §4 returns `{ok: false}` with an `ErrorLike`, and the input document is returned untouched and still frozen.
 - **I16** — A `merge` payload cannot carry view state. Structural, via `MergeRow`, not remembered: I9 holds because the field does not exist to be set.

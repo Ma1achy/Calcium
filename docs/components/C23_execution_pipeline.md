@@ -227,6 +227,7 @@ C23 is the only component that appends documents, so it is the only one that can
 | `user` | A typed submission from the prompt |
 | `action` | An `exec` action dispatched from a block (§3a) |
 | `refresh` | **A system notice with no user behind it**: an identity transition signalled by C22 (§3b), C13's cap marker, and the two startup warnings C22 composes. Not the mechanism, the *provenance* — nothing the user typed produced it, so `↑` recalls nothing and `/debug` has no argv to show. It was written as *the identity notice is the only path that sets it*, and three others already did; the stall notice and a part refresh set it neither, because both *patch* and a patch carries no `meta` |
+| `defect` | **The framework contained a failure and is saying so** — §5a's fault notice, and nothing else. Not `refresh`, which is a system notice about the *session*, and not `action`, which names a mechanism that did not produce this. The distinction has a reader: `/debug` renders `origin` as a row, which was checked before the arm was added rather than assumed — a fifth arm nothing displays would be a field with no consumer, which is the class this whole row is about |
 | `agent` | Reserved. Nothing produces it in v1 |
 
 `origin` is not a debugging field. It is what makes a transcript legible once more than one thing is putting entries into it, and a provenance field that can be absent is one nobody trusts.
@@ -672,10 +673,56 @@ Every stage can fail, and none may kill the session (A02 §7).
 | A refresh part's `fetch` rejects | Contained to that part (I21): its panel renders the error at its own size, backoff doubles to the five-minute cap, siblings and the rest of the host are untouched. **A `render` that throws does not retry** — A02 §7 rule 2, and a one-shot part does not retry either, rule 3 |
 | A refresh patch returns `{ok:false}` | Not a failure and never a backoff. `"unknown"` means the host was evicted and `"settled"` that it finalised between arming and firing; both mean the part is over, so it is released. Treating either as a transport failure would back off against a host that is gone |
 | A local handler throws | Error document naming the verb |
-| `transcript.append` throws | The only stage whose failure loses the outcome. Logged as a defect, the frame still commits, and I1's second exception names it rather than leaving the invariant false. **The machine still returns to `idle`** (§8a A5) — I1's exception is about the entry, not a licence to keep the guard, and a stranded guard refuses every submission for the life of the session |
+| `transcript.append` throws | The only stage whose failure loses the *entry*. **Recorded as a fault and reported** (I48), the frame still commits, and I1's second exception names it rather than leaving the invariant false. **The machine still returns to `idle`** (§8a A5) — I1's exception is about the entry, not a licence to keep the guard, and a stranded guard refuses every submission for the life of the session |
+| The append succeeded and a later statement threw | **Not this row, and §5 read as though it were** — the catch covers five statements and only the first is `append` (§8e). The entry exists; what is lost is the rest of the sequence. **The catch finishes what the try did not** (I49) |
 | Commit throws | C03 contains it; contamination is flagged for the next frame |
 
 **Cancellation is not a failure.** Ctrl-C routes through C16 to C06's ladder; whatever the child produced is retained and the document settles as `partial` (C07 §4). The transcript keeps forty log lines rather than discarding them because the user stopped watching.
+
+---
+
+## 5a. A swallowed failure is reported, on two channels
+
+**The reporting path is the path that failed**, so there is no single channel that works.
+§8e's table is what forces two: in the row where `transcript.append` throws, appending is
+precisely what cannot be relied on.
+
+### The correction this section is
+
+Until now §5's row, I1's second exception and §8a A5 all said the failure was *"logged as a
+defect"*. **Nothing anywhere logged anything**, in any component — there was no sink to log
+to. One unmeasured claim, restated in three places, reading as a mechanism because three
+documents agreed; the instrument is *ask where a settled claim is written down*, pointed at
+this spec. F15 is the cost: an invalid document produced no entry, no error and nothing on
+stderr, with the precise violation in hand and discarded, and the route to it was four wrong
+turns against a framework that had the answer in one sentence.
+
+### The moment was already chosen, twice
+
+C02 rules that a component *decides what is wrong, never when the user is told* — detection
+runs before the terminal is acquired, and C22 §8 restores the screen before printing because
+a diagnostic painted onto the alternate screen is discarded with it. C20 §Warnings says that
+ruling "transfers whole". **C23 is the third instance and it takes the same shape**: C23 has
+no logger, `console.*` is banned outright (SS33), and the moment belongs to C22 §8 step 3.
+
+So the two channels are:
+
+- **An entry, at the moment** — a fault notice carrying the caught reason, which is the thing
+  F15 says was in hand and destroyed. It is **not the submission's entry** (§8b B1), so I1's
+  count is untouched, and `stopping` halts it exactly as B1 ruled for B1's own three.
+  Deduplicated by message: a source failing every tick would otherwise fill the transcript
+  with one sentence, and *logged once* is what C20 already means by it.
+- **An accumulation, at shutdown** — `faults`, drained by C22 §8 step 3 onto the restored
+  primary screen with the capability warnings and the history warnings. **This is the channel
+  that survives §8e's first row**, where nothing can be appended at all.
+
+### The ladder ends, and where it ends is stated
+
+If the fault notice itself throws, only the accumulation survives. That is the end of the
+ladder and there is no third channel — a framework whose transcript store is refusing every
+document has nothing left to say through it. **It is fabricated rather than asserted in
+prose** (T3.38): a construction path claimed to be safe is a claim, and the glyph defect is
+how F15 was found in the first place.
 
 ---
 
@@ -696,7 +743,7 @@ Per submission.
 
 ## 7. Invariants
 
-- **I1** — Every submission produces exactly one transcript entry, with two named exceptions: `empty` produces none, and a failure of `transcript.append` itself produces none and is logged as a defect. No other path may produce zero or two.
+- **I1** — Every submission produces exactly one transcript entry, with two named exceptions: `empty` produces none, and a failure of `transcript.append` itself produces none — **and a fault notice in its place**, which is not the submission's entry (§5a, §8b B1) and so does not make the count two. The exception is about the entry the submission asked for, not about the session going silent. No other path may produce zero or two.
 - **I2** — No stage failure escapes; every one produces a document. For patch application the mechanism is C04's `PatchResult` (C04 I15) rather than a caught throw: the failure is a value on the return path, so "settled with what it had" is something C23 *does* with a result, not something it recovers from.
 - **I3** — The pending entry is appended before the transport is invoked.
 - **I4** — Validation is carried from C18, never recomputed.
@@ -744,6 +791,8 @@ Per submission.
 - **I45** — **A source with no referring parts is retired on the next sweep, not at release.** I33a declares at settlement by **release-then-declare**, so retiring at `release` drops the refcount to zero between two synchronous calls, destroys the source and its derivation, and rebuilds them empty — the accumulated history reset on every settle, with the panel still drawing and every assertion about it passing. The same *heard rather than checked* disposition I33 takes for eviction, one level down (§8c C3).
 - **I46** — **A source polls only while some part referring to it belongs to a visible host**: paused means no fetch, no derivation, no render and no patch, and on return the source is due immediately. **It is not I9's freeze and not a violation of it** — I9 protects a frozen entry that is still receiving patches, and scrolled-off is a different state where nobody is looking and the data must be fresh the moment they look. It applies to **every** part rather than only those declaring a `source`, because a part accumulating inside its `fetch` is already broken by §3c's rule and pausing surfaces that rather than causing it. Granularity is the **host**: C14 answers per entry and nothing gives per-block offsets, so a part inside a partly-visible entry counts as visible, and a `view` host is visible while its layer exists. A fetch already in flight is applied rather than discarded.
 - **I47** — **A derivation is a fold over a source's versions, run once per version and shared by key**, and its result reaches `render` in the fetched data's place. `compute` throws like a `render` and not like a `fetch` (A02 §7 rule 2): deterministic, so it does not retry, and the version is not consumed because a fold that threw has not advanced. **Anything that accumulates belongs here and per-part state is view state only** — which is what makes I46's pause safe, since a paused part holds nothing that could fall behind.
+- **I48** — **A swallowed failure is recorded and reported on two channels, and C23 chooses neither moment for the second** (§5a). Every bare `catch` in the pipeline records the reason in `faults`, deduplicated by message; C22 §8 step 3 drains it onto the restored primary screen beside C02's capability warnings and C20's history warnings. This is C02's ruling taken a third time — *the component decides what is wrong, never when the user is told* — and it is why `faults` is a readable collection rather than a callback: a callback chooses the moment, and the moment is after the terminal is released. The other channel is the fault notice, which speaks at the time and cannot be relied on, because in §8e's first row appending is what failed. **The prose it replaces claimed a defect log that no component had.**
+- **I49** — **The catch finishes what the try did not.** `resetFocus` and the commit run on every path out of `appendAndCommit`, and the entry id is returned whenever the entry exists. §8e's table is the argument: four of five rows leave the append done and the sequence after it abandoned, and the reset is the one whose absence is permanent — T4.7b asserts its position because a frame painted with focus in a frozen block is the failure it prevents. The same reasoning §8a A5 applied to the guard, applied to the four statements that ruling did not look at.
 
 ---
 
@@ -790,6 +839,8 @@ Per submission.
 39. A conflicting cadence on one key is refused at declaration rather than arbitrated, and the fetches themselves are taken on the key's word because nothing can compare them (I43).
 40. Anything that accumulates is a fold over the source's versions, run once per version and shared; per-part state is view state only (I47).
 41. A source polls only while something is looking at it, and stops nothing when it is not — no teardown, no release, and due again the moment a referring host is visible (I46, I45, I9).
+42. A failure the pipeline swallows is said twice — once in the transcript at the time, once on the restored primary screen at exit — and C23 chooses only the first moment (I48).
+43. A stage failure after the append finishes the sequence rather than abandoning it, and the entry id is returned whenever the entry exists (I49).
 
 ---
 
@@ -1212,6 +1263,72 @@ invariant to suit another.
 
 ---
 
+## 8e. The classification table — five statements under one catch
+
+The subject is `appendAndCommit`'s bare `catch`, and the index is **which statement threw**.
+A sequence trace cannot reach these: nothing happens *between* the statements, so the rules
+that meet here meet at rest. §5's own row is written as though the first statement were the
+only one that can throw, and that is the finding rather than a consequence of it.
+
+The try body is `append` → `declareLive` → `recordHistory` → `resetFocus` → `commit`.
+
+| threw | entry | parts | history | focus reset | commit | `return` |
+|---|---|---|---|---|---|---|
+| `append` | — | — | — | not needed | catch | `null`, **true** |
+| `declareLive` | **yes** | none | **no** | **no** — E1 | catch | `null`, **false** — E2 |
+| `recordHistory` | yes | yes | no | **no** — E1 | catch | `null`, **false** — E2 |
+| `resetFocus` | yes | yes | yes | no — E1 | catch | `null`, **false** — E2 |
+| `commit` | yes | yes | yes | yes | **twice** — E3 | `null`, **false** — E2 |
+
+### E1 — the catch abandons `resetFocus`, and T4.7b says what that costs
+
+**The reset sits between the append and the commit and the order is load-bearing**: T4.7b
+asserts the call order because *"a reset issued after the commit paints one frame with focus
+in a frozen block"*. Skipping it entirely is that failure without a bound — the append froze
+the previous entry and focus is still inside it, on every frame from then on, until something
+unrelated resets it.
+
+**Ruled: the catch finishes what the try did not** (I49). It is the same argument §8a A5 made
+for the guard — a stage failure is not a licence to abandon the rest of the sequence — and
+that ruling was taken about `running` while three of the four statements after the append
+went unexamined.
+
+**Reachability is stated rather than assumed.** Row 2 of this table is the one that happened:
+the cadence refusal thrown from `declare` (I43, F15). Since that refusal is drawn rather than
+thrown, `declareLive` has no *known* throw today, and rows 3–5 have none either. The remedy
+is structural because the table is — a catch that covers five statements and repairs one is
+wrong independently of which of the other four currently throws.
+
+### E2 — the return value is a lie in four rows of five, and nothing reads it
+
+`appendAndCommit` returns `string | null` and **all nineteen call sites discard it**, several
+with an explicit `void`. So the function's only channel back to its caller is unused — which
+is why the swallow is total by construction, and why the fix has to be a channel rather than
+a return code.
+
+`null` means *no entry* to any reader of the signature, and in rows 2–5 the entry exists.
+**Ruled: the id is returned when the entry exists**, which costs one variable and removes a
+statement that is currently false. It is latent only because nothing reads it, and that is
+the class that bites on the day something does.
+
+### E3 — a `commit` that throws is committed again by the catch
+
+§5's own last row says C03 contains a commit failure and flags contamination for the next
+frame, so this row is very likely unreachable — and **a row governed by one rule restates the
+rule and finds nothing**, which is what makes it worth writing down rather than deleting.
+It is not made unreachable by anything in C23, so the catch's commit is the last statement in
+it and nothing follows that could depend on it.
+
+### What the table settled about the fix itself
+
+**The reporting path is the path that failed**, and that is the constraint the whole row
+turns on. Every other containment path in C23 ends in an appended document; this one cannot
+assume it can append, because the append is what threw in row 1. So the report has two
+channels and they fail independently: an entry at the moment (§5a), and an accumulation read
+after the terminal is restored (I48). The second one is the one that survives row 1.
+
+---
+
 ## 9. Tests
 
 Six tiers. Every cell of the §6 table is covered.
@@ -1257,6 +1374,10 @@ Fake transport, fake stores.
 - **T1.42** (I45): settlement's release-then-declare on a key both documents name → the derivation's accumulation **survives**. The assertion is the accumulated history and not the current value: a source destroyed and rebuilt renders a perfectly correct latest sample.
 - **T1.43** (I46): a host off screen → no `fetch` across several intervals; visible again → a `fetch` immediately, not on the next interval. Both halves in one row, because a driver that pauses and never resumes satisfies the first.
 - **T1.44** (I42): a part whose `source` string is spelled to look like another part's implicit key → the two do **not** share. A fabricated violation, because the namespaces are disjoint by construction and the row is otherwise vacuous.
+- **T1.45** (I48): a `transcript.append` that throws → the reason appears in `pipeline.faults`, carrying the store's own sentence rather than a summary of it. F15's document — two blocks with one id — is the input, so the row fails if the message is replaced by a generic one.
+- **T1.46** (I48): the same cause swallowed five times → one entry in `faults` and one notice in the transcript. A per-tick failure would otherwise fill both.
+- **T1.47** (I49): a throw from a statement **after** the append → `resetFocus` is still called and the entry id is still returned. Asserted on the spy and the return value together: the reset alone passes against a catch that resets and still returns `null`, which is §8e E2 unfixed.
+- **T1.48** (I1, §8b B1): a swallowed append → the transcript holds **one** entry, and it is the fault notice rather than the submission's. The count and the identity, because a row asserting only the count passes on the day the notice is the wrong document.
 
 ### Tier 2 — contract / interface
 
@@ -1306,6 +1427,8 @@ Fake transport, fake stores.
 - **T3.34** (I20): more parts than the smallest interval has milliseconds → offsets remain distinct. `floor(smallest / n)` is zero here, which is I20 violated by the function written to satisfy it.
 - **T3.35** (I34): a `render` returning a block whose id differs from the part's → the mismatch is reported, not silently applied to nothing.
 - **T3.36** (I35): `staleAfter` below the interval → warned at declaration; staleness would otherwise fire on every tick.
+- **T3.37** (I48, §8b B1): a swallow while `stopping` → recorded in `faults`, **no notice appended**. B1's ruling reaching a fourth non-submission append rather than a fourth exception to it.
+- **T3.38** (§5a): a transcript whose `append` throws **unconditionally** → the fault notice cannot land either, and `faults` still carries the reason. The end of the ladder, fabricated rather than stated: the frozen shape is a claim about a construction path, and the glyph defect is how F15 was found.
 
 ### Tier 4 — integration
 
@@ -1324,6 +1447,7 @@ Fake transport, fake stores.
 - **T4.22** (with C22): the driver is released at C22 §8 step 1, **before** `beforeRelease` — asserted on call order, since a release afterwards is invisible to any test that does not have a fetch in flight.
 - **T4.25** (I44, with C22, C13, C14): the reference app's shape through a real session — two parts of **one document** sharing a key, read from **one composed frame**, showing one value. The frame and not the fetch count: an arithmetically consistent driver can still be patching two panels from two samples, and only the frame says which was on screen. This is the row `tools/bench/pollers.mjs` measured `19 vs 20` against before the change.
 - **T4.26** (I46, with C14): the same document scrolled out of the viewport → the fetch count stops advancing; scrolled back → it advances again and the first frame after the return is current. The count is taken from a spy on `fetch` rather than from the panel, because a paused part still draws whatever it last held.
+- **T4.27** (I48, with C22, C24): **the row belongs at the public entry**, because every driver-level assertion could already see these throws and no app author ever could. Through `createTui`: a local handler returning F15's exact document, the frame read for a fault notice carrying the store's sentence, then `stop()` and the **restored primary screen** read for the same reason among the diagnostics. One row spanning both channels, since either alone is satisfied by the half that is easy.
 
 ### Tier 5 — e2e
 
@@ -1374,6 +1498,11 @@ Fake transport, fake stores.
 - **T6.43** (I46): pausing an invisible source without resuming it → T1.43 fails. Pairs with the opposite revert, treating any visible host as making every source due, which fails T4.26 instead — two directions, because a one-directional pause passes half of each row.
 - **T6.44** (I44): committing per part rather than per source → T2.23 fails. A frame-level assertion cannot see it: C03's 33 ms `stream` window already coalesces them into one frame, which is why the row counts commits.
 - **T6.45** (I47): running `compute` once per part rather than once per version → T1.41 fails, and a fold advances N times per tick — a ring buffer that fills N× too fast, with every sample in it genuine.
+- **T6.46** (I48): restoring the bare `catch` — recording nothing — → T1.45 fails. **The revert is the shipped behaviour of every version before this one**, and its symptom is that there is none: no entry, no message, no exit code, and a green suite. F15 took four wrong turns to find because of exactly this.
+- **T6.47** (I48): keeping the collection and dropping the fault notice → T1.48 fails while T1.45 still passes. The half that is easy: `faults` is a field a test can read, and a reader who never reaches `stop()` learns nothing at the moment it matters.
+- **T6.48** (I48): keeping the notice and dropping the collection → T3.38 fails. The opposite half, and the one that looks sufficient until §8e's first row, where appending is what threw.
+- **T6.49** (I48, with C22): draining the diagnostics **before** `lifecycle.release()` rather than after → T4.27 fails on its second half. The revert that reads as an ordering preference: the lines are written, to the alternate screen, and discarded with it — a flash and an empty shell, which is C22 I6's own argument arriving at a third source.
+- **T6.50** (I49): restoring the catch that skips `resetFocus` → T1.47 fails. Nothing crashes and no frame is wrong at the moment; focus sits in a frozen block from then on, which is T4.7b's failure without T4.7b's bound.
 - **T6.13** (I30, C07 I15): pinning `seq` to a constant in `streamInto` → T1.7b fails on both halves. This was the tree's state: the second `data` patch of every stream collided with the first under C04 I14, so a streaming verb could render exactly one block, and the per-stream reset fired on every patch. Found by the first tier-5 row to drive a `streams: true` verb through a real session; the unit suite passed throughout, because its `adaptPatch` double took no arguments and so could not see the one that was wrong.
 
 ---

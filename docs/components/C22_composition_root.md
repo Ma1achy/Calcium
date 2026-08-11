@@ -832,6 +832,21 @@ An unreachable cluster sets `health: "offline"` and nothing else. Verbs fail wit
 4  exit with the caller's code
 ```
 
+**Step 3 has three sources, and it had one** (I6a). C02's capability warnings, C20's history
+warnings and C23's `faults`, in that order — construction, then the session, then what the
+session contained. Two of the three were collected and never read: C20's `warnings` were
+reached by nothing in `src/`, so a corrupt history file or a failed write was silent for
+ever, and C23 collected nothing at all (C23 §5a, F15).
+
+**That is one mechanism with three subjects and only one of them had a reader**, which is why
+this is a step-3 change rather than three component changes. C02 and C20 both state the
+ruling — *the component decides what is wrong, never when the user is told* — and it is only
+true of a component whose warnings something drains.
+
+**Read at step 3, not captured before it.** `history.drain()` is step 2b, inside
+`beforeRelease`, and a synchronous append that fails produces its warning there. A collection
+snapshotted at step 1 holds every warning except the one the exit path itself caused.
+
 with `beforeRelease` — supplied by C22 at construction — doing:
 
 ```
@@ -925,6 +940,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I4a** — `session.stopping` is not set on the signal and fault paths, and nothing may make either of them asynchronous. `process.exit` inside the handler is what stops a submission interleaving; the flag is unnecessary only for as long as that is true.
 - **I5** — Cleanup runs inside `beforeRelease` and nowhere else; it can therefore never run twice.
 - **I6** — Release precedes diagnostics on every path.
+- **I6a** — **Step 3 drains every component that accumulates a diagnostic**, in construction order: C02's capability warnings, C20's `warnings`, C23's `faults`. A component that returns warnings rather than emitting them is only honouring C02's ruling if something reads them — and two of these three were collected and read by nothing, with a passing invariant each (C20 T2.9 asserts that neither stream is written to, which is satisfied by the silence it was meant to make safe). **The collections are read here rather than snapshotted earlier**, because `history.drain()` runs at step 2b and its own failure is a warning.
 - **I7** — History flushes on every path, faults included. A fault before the lifecycle exists flushes nothing and does not violate this: nothing can be appended before input is accepted, which is four steps later. The day anything appends earlier, I7 and I5 conflict for real (§8a).
 - **I7a** — `createTui` runs step 1 — validation — and returns; steps 2 to 12 run inside `start()`. §9's `created` state, T1.9's "nothing acquired" and a manifest given as a path all require it, and validation is the one step that can be eager because it needs nothing constructed.
 - **I8** — A failed size gate does not abort construction; session state survives until a resize.
@@ -1041,6 +1057,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 26. The prompt is a capability pair of equal cell width, resolved where it is drawn and not at module scope, because the function that draws it is the function that measures it (I52, C09 I22).
 27. **The frame goes to the terminal as a difference**, whole whenever no record describes the screen — which `contaminated` is the existing and until now unconsumed statement of (I55, §6b).
 28. The record is cleared before the write and restored after it completes, so a write that throws repaints rather than diffing against a screen that never existed (I56, §6b).
+30. Step 3 drains every component that accumulates a diagnostic, read after the release rather than snapshotted before it — and two of the three had no reader at all (I6a) (→ C20 I17) (→ C23 I48).
 29. Each written row opens with a reset, kept on the asymmetry between four bytes and a colour that survives the frame, with the measurement that shows it is currently inert recorded beside it (I57, §6b).
 
 30. An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry — the two axes C14's height cache deliberately omits are the two this one cannot (I58, C10 I11).
@@ -1161,6 +1178,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.18a** (I58): `delete` drops one slot and leaves its neighbours. **The class, not the wiring**, and the row says so.
 - **T4.18b** (I58): `/clear` through the real graph drops every slot, asserted on **`size`** rather than on a render count. The first version of this row was inert and removing the arm left it green: an evicted or cleared entry is gone from the transcript and `visibleRows` never asks for it again, so a render count cannot see an eviction at all. The claim is about memory, and `Viewport.stats` is the precedent for making a cache's size observable (C14 T2.3b).
 - **The `evict` arm's wiring is not drivable and the gap is named rather than papered over.** C13's cap is 100,000 blocks (C13 I17) and `construct.ts` passes no cap — `createTranscriptStore` accepts one and only `retainPayloads` is threaded through — so reaching an eviction through the real graph would take 100,001 appends. `clear` exercises the same subscription in the same wiring; the `evict` branch inside it is covered by reading. A citation reads as coverage, and this is where that would have happened.
+- **T4.20** (I6a, with C20, C23): a session whose history file is unwritable and whose pipeline swallowed an append → `stop()` writes **both** reasons to stdout, after the release. Two sources in one row because a drain over one collection satisfies a row that reads only the other, and the release ordering is asserted on the call order for the same reason C23 T4.7b asserts `resetFocus`'s.
 - **T4.19** (I59): a 2,000-line block drawn for the first time renders every line, and the second frame renders none — **the stall stated as a test**, so a later reader who finds this stage and stops has an executable statement of what it did not do.
 - **T4.13** (I55): a keystroke into a settled session writes **fewer bytes than the frame it produced**, and the screen folded from every write equals the frame `paint` composed. Two assertions and neither is sufficient alone: the byte count alone is satisfied by a diff that drops rows, and the screen equality alone is satisfied by writing everything. The screen comes from `test/support/screen.ts`, which is verified against its own control before anything is read through it.
 - **T4.14** (I55): a `SIGWINCH` writes the frame **whole** even when the composed rows are identical to the last — the terminal is resized to the size it already holds, so C14 refuses the resize (C14 I21) and the rows cannot differ, and `contaminated` is the only thing that can produce the repaint. The row that makes contamination a claim about the *screen* rather than about the frame.
