@@ -326,10 +326,41 @@ leaves a constructed graph — measured identical on the pre-gate tree, so inher
 
 | item | fix | depends on |
 |---|---|---|
-| **F79 · F86** `screen.py`'s OSC leak, and F79's mechanism unestablished | change | **tier 1's fixture** — the repair is not checkable without it |
-| **Group 12** F69, F73 — time-based assertions under contention | **nothing; the guard stays** | — |
-| **Group 7** 14 artefact findings | habit, not a patch | — |
+| **F79 · F86** `screen.py`'s OSC leak, and F79's mechanism unestablished | change | **the fixture** — and the shape is already built, see below |
+| ~~**Group 12** F69, F73 — time-based assertions under contention~~ | — | **NOT WORK** — ruled in this document, and `test/support/budget.ts` holds the measured half |
+| ~~**Group 7** 14 artefact findings~~ | — | **NOT WORK** — *habit, not a patch*, and the 14-vs-15 is measured and explained by F87 |
 | **Group 10** 5, all disproved | → `CLAUDE.md` | — |
+| **F142** the triage's inventory certifies 89 ids against 147 | **change** — a derived count or none | new, from this pre-check |
+
+### The tier-5 pre-check, run before any of the three was planned
+
+**Three places, not one** — `docs/`, `test/support/`, and the file's own header. Today's two
+false findings were both already written, and both in `test/support/`, which is where a
+measurement's reason gets recorded and is not where anyone looks for a protocol.
+
+**Group 12 is a re-derivation and this document says so eight lines below the table it sits
+in**: *a decision already taken, and it is here so nobody retakes it*. Its own `fix` column has
+read *nothing; the guard stays* the whole time. The timeout half is measured in
+`test/support/budget.ts` — per-file worst times, the 5× ratio the budgets were sized at, and a
+standing instruction not to raise them without re-measuring. Same shape as F53 in tier 4: the
+disposition written inside the entry and the entry left sitting as work.
+
+**Group 7 is the same.** *Habit, not a patch*, and the one number that looked wrong — fifteen
+ids named under a heading of fourteen — is measured, explained and corrected in §*How this file
+was checked* by F87's remedy, which landed.
+
+**`screen.py` is real, and it is cheaper than filed, because the shape exists.**
+`test/unit/support-screen.test.ts` is group 9's ruling already built for one instrument — 80
+lines, six rows, including *"responds to the thing under test — a wrong row is a wrong screen"*
+and *"strips SGR and modes without consuming the text around them"*, which is F79 and F86's
+exact subject tested on the TypeScript twin. `test/support/screen.ts`'s own header names
+`tools/screen.py` as *"the PTY-side equivalent"*. So the row is: port that file's six rows to
+the Python instrument, against `examples/docker/tools/screen.py` (133 lines).
+
+**And the citation misdirects, for the second time today.** Every reference says
+`tools/screen.py`; the file is at **`examples/docker/tools/screen.py`**. `tools/` in this
+repository holds `bench`, `enforce`, `mutate` and `proof.sh` and has never held it. F64's
+citation was the first, and both were found by following the pointer rather than trusting it.
 
 **Group 12 is a decision already taken**, and it is here so nobody retakes it: `make load-down`
 keeps its place on the asymmetry rather than the odds, and both measurements are recorded —

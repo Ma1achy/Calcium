@@ -6419,3 +6419,48 @@ S12 is wrong and should compose `logs`; `Logs` is speculative and should go the 
 both are right and `raw` is the degraded path with `logs` the structured one, in which case
 **that sentence exists nowhere** and is the actual gap. Deciding it needs the S12 walk, which
 this row is not.
+
+---
+
+## F142 — a derived count is derived once, and nothing re-derives it ★★
+
+| | |
+|---|---|
+| **Surface** | `TRIAGE.md` — the document whose own §*How this file was checked* is about a proxy agreeing with itself |
+| **Reached for** | nothing. Found by the tier-5 pre-check, before any of the three items was planned |
+| **Verdict** | **artefact-side**, and it is F87 one level up |
+
+`TRIAGE.md` §*How this file was checked* opens: *"The inventory is derived, not hand-copied.
+`grep '^## F' FINDINGS.md` yields **89** ids and every one is keyed in a group above — 10 + 12
++ 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 + 6 + 2 + 1 + 6 = 89."*
+
+Measured now: **147**.
+
+**The check is correct and its subject moved.** *Derived, not hand-copied* is true about the
+moment it was written and says nothing about any moment since — and the sum still adds to 89,
+so the arithmetic it offers as evidence passes exactly as it did on the day. Fifty-eight
+findings are outside a partition that certifies itself complete.
+
+**This is F87's mechanism one level out.** F87 found that a sum over group sizes cannot see a
+duplicate placed twice and counted once — a proxy that agrees with itself. This is the same
+proxy failing to see **absence**: a total computed over the groups can only ever describe the
+groups, so nothing in the paragraph can notice ids that were never keyed anywhere. Both are
+*assert the artefact, not a proxy*, and F87 fixed the disjointness half while leaving the
+completeness half resting on a number nobody recomputes.
+
+**Second instance, inside group 9 itself.** Its heading reads **7 surfaces**, its table lists
+**seven** rows, and its prose opens *"**Six** findings about the measuring apparatus"*. F86 was
+added to the table and the sentence above it was not. That is exactly the F55-version failure
+the count check was *built to catch* — a heading reading *5 surfaces* over six rows — recurring
+in the group about instruments being wrong.
+
+**The remedy is not another number.** A count in prose is a snapshot with no mechanism, and the
+fix that lasts is either a derived count in the enforcement suite (`grep '^## F'` against the
+keyed ids, `sort | uniq -u` for the unkeyed) or no count at all. A03 already owns the shape:
+`BUILDER_OMISSIONS` and `UNCONSUMED_FUNCTIONS` are compared **by equality** precisely so an
+entry cannot outlive its reason unread, and this is the same requirement stated in prose where
+nothing can compare it.
+
+**And the pre-check is what found it**, which is the argument for the pre-check: the tier-5
+plan cites `TRIAGE.md`'s groups as its inventory, so every item below rests on a partition that
+has been stale for fifty-eight findings.
