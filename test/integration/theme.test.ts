@@ -147,6 +147,10 @@ describe("C10 integration", () => {
     // to start because a preference file has a stray byte in it has made a
     // preference into a dependency.
     const fs = fakeFs();
+    // The directory first, because a pre-existing preference file implies a
+    // pre-existing directory — `fakeFs` models that since F96, and seeding a
+    // file into a directory nothing created was a world `node:fs` cannot have.
+    await fs.mkdir("/state");
     await fs.writeFile("/state/theme", "chartreuse\n");
 
     const { stdout } = await buildSession({ fs, stdin: fakeStdin() as never, stateDir: "/state" });
@@ -158,6 +162,7 @@ describe("C10 integration", () => {
     // The control: a *valid* file produces no notice, so the assertion above is
     // about the corruption rather than about a notice that always appears.
     const good = fakeFs();
+    await good.mkdir("/state");
     await good.writeFile("/state/theme", "light\n");
     const ok = await buildSession({ fs: good, stdin: fakeStdin() as never, stateDir: "/state" });
     expect(ok.stdout.chunks.join(""), "a valid preference is silent").not.toContain(

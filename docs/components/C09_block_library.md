@@ -59,7 +59,15 @@ interface BlockDefinition<B extends Block = Block> {
   kind:    string;
   measure: Measure<B>;                // contract from C04; receives measureChild
   render:  (block: B, ctx: RenderContext) => ReactElement;
+  // §2a — a valid smaller block covering rows [from, to). Optional: a kind that
+  // does not divide omits it and is atomic by having no member.
+  window?: (block: B, width: number, from: number, to: number) => Windowed<B>;
 }
+
+type Windowed<B extends Block = Block> = Readonly<{
+  block:    B;       // a real block of the same kind, measured the ordinary way
+  skipRows: number;  // leading rows of it the caller drops
+}>;
 
 interface BlockRegistry {
   register(def: BlockDefinition): void;
@@ -92,6 +100,59 @@ side, so a gap before one of them is ignored rather than being an error.
 **`renderChild` and `measureChild` are Seam 1 on the render side, and the registry passes itself for both.** A container renders children whose kind it does not know, for the same reason it measures them, and neither may import the registry (I7). `measureChild` is on the context because a container's *frame* has to be as tall as its contents: `panel` draws a border column of `measureChild(child, w - 2)` rows beside children rendered at that width, and the title lives in the top border (S13), which is why the border is drawn rather than delegated to a box-drawing option. That makes I1 visible instead of silent in the one place a violation would otherwise hide — a `panel` whose measurer and renderer disagree draws a border that does not close. **`footer` sits in the bottom border for the same reason `title` sits in the top**, and changes nothing about measurement: the row is drawn either way, so this is a use for a row that already exists rather than a new one. S12 §2 and S13 §2 both draw it, and neither can put those keys in the frame's footer — a pushed view leaves header and footer untouched (C15 T4.4).
 
 **Animation state arrives through `ctx.tick`.** `steps` shows a spinner, and a renderer must stay pure, so the frame index cannot come from a clock inside the block. `tick` is a monotonic counter incremented by C03's `spinner` commit; a renderer computes `frames[tick % frames.length]`. Nothing else in C09 reads it, and `measure` never does — animation must never change height.
+
+### 2a. `window` — a block reduced to a valid smaller block
+
+**The transcript virtualises at *entry* granularity and then renders each entry
+whole.** A 5,000-line patch renders 5,000 lines, keeps thirty, and with
+highlighting tokenises all 5,000 first — per keystroke, at 2.8 seconds a frame
+(`docs/notes/TUI_NOTE_render_chain_baseline.md`). `window` is what bounds it.
+
+**A window is a block, never a list of rows** (C25 I18's rule, generalised).
+`Layer.content` and `TranscriptEntry.doc.blocks` are both `Block[]`, so nobody
+can hand back a slice of rendered output — they hand back a smaller block, which
+the registry measures and draws through the same path as everything else. That
+is what keeps I1 whole and stops a second height codepath appearing.
+
+**`windowPatch` proves the shape and not the contract.** `presentation/patch/window.ts`
+returns a valid smaller `Patch`, which is the part that generalises. But its
+window is *a slice plus sticky headers* (C25 I18): the path header and each
+touched hunk's header are forced, and they cost rows the full rendering already
+counted. A transcript window may not do that — C14 measured the entry at its full
+height and addresses rows inside it, so an inserted row makes the rendered entry
+disagree with the index, which is drift three components from its cause.
+
+**So the seam returns a block *and* a residual offset.** The caller renders the
+returned block and drops `skipRows` leading rows. Three things fall out and each
+would otherwise be a defect:
+
+- **An indivisible unit is expressible.** A run of changed lines in a split patch
+  is one unit (C25 I19); a window opening inside it returns the whole unit and a
+  `skipRows` that steps over what the caller did not ask for.
+- **A sticky header is expressible.** A `table`'s header row and a `patch`'s path
+  row are part of what makes the smaller block *valid*; they are paid for in
+  `skipRows` rather than smuggled into the caller's row count.
+- **Exactness survives both.** The rows the caller keeps are the rows the full
+  rendering would have produced, which is what makes the window invisible.
+
+**The height property carries `skipRows`, or it is not the property:**
+
+```
+measure(w.block, width) − w.skipRows  ===  to − from
+```
+
+Not `measure(...) === to − from`, which is the form the seam invites and which is
+false for every window that costs slack. It is checked **generically over every
+kind that declares `window`** by `src/testing/measurement-conformance.ts` — the
+same suite a consumer runs for `measure`/`render` — so an app's own arm is held
+to it too. Without that, a consumer's window can be silently short and the frame
+describes a document nobody holds.
+
+**A plot has no `window` and never will.** C12 I1 makes a plot's height a
+function of the block alone: reducing its series changes nothing and reducing its
+`height` rescales the curve rather than windowing it. **Atomicity is expressed by
+the absence of a member**, not by a branch — a branch is something a later edit
+removes, and an absent member is not.
 
 **No block renderer reads the environment.** Capabilities arrive through `ctx`, never from `process.env` — C02's I5 extends here, and a renderer probing for itself is the bug that produces a table in ASCII beside a sparkline in Unicode.
 
@@ -244,6 +305,59 @@ Colour degradation is C10's; C09 names a palette slot and renders whatever style
 
 ---
 
+### The rule is about who can substitute, and the framework exempted itself
+
+§4 says a glyph is a **slot** and never a character, because substitution is 1:1 by
+column count and **only the renderer knows the capability**. That argument is about
+*where the knowledge is*, not about who owns the character — and it was written about
+what a **block** carries. The framework's own authored text was never held to it.
+
+Measured over `src/`, excluding comments (F122):
+
+| | |
+|---|---|
+| string literals carrying a non-ASCII character | 164 |
+| …prose punctuation only — em dash, `§`, `·` | 106 |
+| …reported by SS47 | **58** as measured; 54 today, the six defects fixed and `ℹ` reclassified |
+| …of those, the glyph table itself | 43 |
+| …carrying their own ASCII form already | 5 |
+| …a developer's report, never a frame | 4 |
+| **…drawn verbatim into a frame** | **6** |
+
+**Four working sites are what make this a defect rather than a wish.** `text.ts`
+resolves `caps.unicode === "ascii" ? "~" : "…"`, `patch/collapse.ts` carries a pair,
+`patch/definition.ts` picks its rule character, `plot/ramp.ts` has a whole ASCII ramp.
+The mechanism is not missing. **It is applied in four places and skipped in six**, and
+a discipline holding four times in ten is what a scan is for rather than a rule.
+
+**Three of the six bypass a function that already holds their fallback.**
+`spinnerFrames(caps)` returns an ASCII set and `shell/paint.ts` hardcodes `⠋` two files
+away; `GLYPH_TABLE.expand` is `["▸", ">"]` and `shell/confirm.ts` writes `▸`;
+`collapse.ts` carries `["⋯", "..."]` and `paint.ts` declares its own `⋯`. For those
+there was nothing to rule — there was a function nobody called. F55 filed this as
+*wanting a ruling*, and half of it wanted a call.
+
+**The other three are the ruling, and they divide by where the text is authored.**
+
+- **The capability is in hand.** `paint.ts`'s spinner sits inside a function holding
+  `deps`. One line.
+- **The function is shared with the measurer.** The prompt is drawn by `commandRows`,
+  which `construct.ts` also calls for `chromeRows` — so its two forms must be **1:1 by
+  cell count** (I22) or `measure` and the composer describe the same row differently.
+  `❯ ` and `> ` are both two cells, and `PROMPT_GUTTER.first` is that number.
+- **The text is authored above the renderer.** `loading…` is built by a builder,
+  `… n more` by C19, `▸` by C15's caller. These are **unsubstitutable by construction**:
+  the string is fixed at L3 or L4 and the capability is known at L1. C09's answer already
+  exists and is the glyph slot — so a mark in framework text is a slot, or it is ASCII.
+
+**`…` gets no slot, and that is the interesting refusal.** I5 requires 1:1 by cell count
+and the ASCII ellipsis is three cells; the pair that satisfies it is `["…", "~"]`, which
+`text.ts` already uses for truncation and which reads as a marker rather than as an
+elision anywhere else. So `loading…` becomes a notice carrying the `pending` glyph — the
+mark it actually wanted — and `… n more` becomes ASCII. **A vocabulary that admits every
+character its callers reach for stops being a vocabulary**, and the refusal is what keeps
+the 1:1 rule true.
+
 ## 4a. Syntax tokenisation
 
 C10 defines a `syntax` palette; this is where the tokens come from. `Code` is `{kind, id, language, text, wrap}` — text and a language name, no spans — so something has to turn one into the other, and it is not the adapter.
@@ -276,6 +390,69 @@ The fallback is a fallback, not a filter. An unmapped class renders its text in 
 Only the languages actually needed are registered — `createLowlight({ yaml, json })` — rather than highlight.js's full set, which is most of the package's weight and none of its value here.
 
 ---
+
+### Grammars arrive, and three things had to be true for that sentence
+
+§4a has always said a `code` block *"measures identically whether or not its language is
+registered — a grammar shipping tomorrow does not reflow yesterday's transcript"*, and that
+an unregistered language is *"readable today and highlighted whenever someone registers
+it"*. The constructor shipped with `createLowlight({ json, yaml })` and **no registration
+path**, so *whenever someone registers it* had no someone (F93).
+
+Nothing caught it because C09 was built when the only consumers were `docker inspect` and an
+nginx config. **Two grammars satisfied every test, and no test could distinguish *we ship
+two* from *we ship two for now*** — the promises are prose, and no rule checks prose against
+behaviour.
+
+**Three changes, and F93 named one of them.**
+
+**1 · A default set, chosen by a rule so the next one is an argument rather than a taste.**
+A grammar ships if a *terminal user plausibly reads it in this window*: the formats a CLI
+emits (`json`, `yaml`, `xml`, `ini`, `diff`, `markdown`), the ones it is configured by
+(`dockerfile`, `sql`, `css`), the shell they are typed into (`bash`), and the languages CLIs
+are written in (`typescript`, `javascript`, `python`, `go`, `rust`, `java`). Sixteen,
+**measured at 121 KB against the package's 9.2 MB** — the recorded objection is to the 384,
+and it survives: the full set is most of the weight and none of the value. What changed is
+that *"actually needed"* had been measured against two consumers.
+
+**2 · `registerGrammar`, and it clears the memo — which is the half that makes the promise
+true.** `tokenise` memoises on `(language, text)` and caches the *fallback* for an
+unregistered language, so a grammar registered afterwards would leave every block already
+rendered as plain text until the 256-entry cap happened to clear. **Exposing registration
+without invalidating the memo satisfies F93 and leaves §4a's sentence false**, which is the
+walk's finding: two correct rules — memoise for speed, fall back to text — overlapping in
+one cell that neither is about.
+
+**3 · The slot map, which is the same asymmetry one level down.** `SLOTS` maps thirteen
+`hljs-` classes and was written for two grammars. Measured over the sixteen, on a sample of
+each:
+
+| | runs | uncoloured |
+|---|---|---|
+| `json` | 13 | 0 |
+| `markdown` | 4 | **4 — nothing highlights at all** |
+| `xml` | 11 | 8 |
+| the sixteen together | 152 | 59 |
+
+Shipping the set without extending the map ships two grammars that do not work: `markdown`
+is indistinguishable from not registering it, and `diff`'s `hljs-addition` and
+`hljs-deletion` — the whole point of a diff — fall through. **You could register a grammar
+and could not register a slot**, which is *exported block kinds with unexported grammars*
+one layer further in.
+
+The map gains eight entries onto the nine slots that exist, each by rôle rather than by
+name: a section heading is the structural anchor a `keyword` is, a list bullet is
+`punctuation`, inline code and a template substitution are `string`, a shell variable is a
+name and so is `key`, an element name and a CSS selector name a kind and so are `type`, and
+a decorator or shebang is `keyword`.
+
+**Three classes are left unmapped on purpose, and one of them is a ruling already taken.**
+`hljs-params` is ordinary identifiers, which are meant to be plain. `hljs-strong` and
+`hljs-emphasis` are *appearance*, and §4a maps rôles to slots — a bold run has no colour
+rôle. And **`hljs-addition` / `hljs-deletion` get no slot because C04's change-axis ruling
+says a change is a marker and never a tone** (F30, F49, F81): colouring a `+` line green
+here is the exact thing that ruling refused, and a real diff is C25's, where the marker
+column is.
 
 ## 5. Unicode measurement
 
@@ -376,6 +553,13 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 - **I19** — Wrapping never deletes a cluster. A cluster wider than the line it must fit into is **substituted** by a one-cell `?`, never dropped: a row that silently loses a glyph is a frame that is arithmetically consistent and describing different content than it holds. Substitution rather than overflow, because a row wider than it was measured wraps into a row nobody counted — the one failure I1 exists to prevent. C17 I20 answers the same question the other way and says why: a block renders someone's data, an editor holds what the user typed.
 - **I20** — A cell window over a styled line composes and preserves width: for every `0 ≤ a ≤ b`, `displayCells(sliceCells(t, 0, a)) + displayCells(sliceCells(t, a, b))` equals `displayCells(sliceCells(t, 0, b))`. The window carries the skipped prefix's SGR forward, so a tail draws in the style that was in effect where it starts, and it never splits a cluster or half-draws a double-width glyph — I9's rule over a window rather than a cut. This is what makes compositing a layer into a painted row width-preserving by construction rather than by three separate measurements happening to agree: three pieces that each measure right and together measure `columns + 1` put the frame one cell into a row nobody counted (§5a).
 - **I21** — A `rule` with an empty label draws an unbroken line. The lead, the label and the fill are separated by spaces that exist to set a label apart from the line; with no label they are a two-cell gap at the left of a rule that is a boundary rather than a heading. Found by reading a frame — C19's menu edge (C19 I23) is the first unlabelled rule in the tree, and every assertion about it was about width and about the block being present, both of which held.
+- **I22** — **Every non-ASCII character the framework draws is resolved against the capability, on the same terms as a block's glyph.** §4's argument is about where the knowledge lives, so it does not stop at the block schema: a mark in the framework's own text is a `Glyph` slot, or it is a pair resolved where the capability is in hand, or it is ASCII. A substitution used by a function the *measurer* also calls is 1:1 by cell count, as I5 requires of the vocabulary — the prompt is that function, and its cell count is `PROMPT_GUTTER.first`. Enforced by SS47 with a per-site allow-list, because the rule was already true of four sites and false of six, and a discipline with that record is not one a sentence fixes (F122).
+
+- **I23** — **A grammar can be registered after construction, and registering one invalidates the memo.** §4a promised that an unregistered language is readable now and highlighted *whenever someone registers it*; the constructor shipped with a fixed pair and no registration path, so the promise had no mechanism (F93). The invalidation is half the invariant rather than an implementation note: `tokenise` caches the plain-text fallback under the same key, so registration without it leaves every block already rendered flat until an unrelated cap eviction. **Measurement is unaffected by both**, which is what makes registration safe at any time — tokens change appearance and never line count (I8, T2.13).
+- **I24** — **A grammar in the default set has its emitted classes mapped, or the omission has a reason.** Shipping a grammar whose classes `SLOTS` does not carry is indistinguishable from not shipping it — measured: `markdown` emitted four runs and coloured none. Three classes are unmapped deliberately: `hljs-params` is ordinary identifiers, `hljs-strong` and `hljs-emphasis` are appearance rather than a rôle, and **`hljs-addition` / `hljs-deletion` are a change axis, which C04's ruling says is a marker and never a tone** (F30, F81).
+- **I25** — **A kind that divides declares `window`, and a window is a valid block of the same kind plus a residual offset.** `window(b, w, from, to)` returns `{ block, skipRows }`; the caller renders `block` and drops `skipRows` leading rows, and what remains is exactly what the full rendering would have put at rows `[from, to)`. The offset is not a convenience — it is what makes an indivisible unit (C25 I19) and a sticky header (C25 I18) expressible without inventing a row C14 never measured, which is drift three components from its cause. **A window is a block and never a list of rows**, because `Block[]` is what both consumers hold and a slice of rendered output would be a second height codepath.
+- **I26** — **`measure(window(b, w, from, to).block, w) − skipRows === to − from`, checked generically over every kind that declares `window`.** The form without `skipRows` is the one the seam invites and it is false for any window that costs slack. Enforced by `measurement-conformance.ts` rather than per kind, so an application's own arm is held to it — without that a consumer's window is silently short and the frame describes a document nobody holds. It is I1's rule over a window rather than over a block.
+- **I27** — **A kind that does not divide has no `window` member, and that is how atomicity is expressed.** `plot` is the case and it is permanent: C12 I1 makes height a function of the block alone, so reducing the series changes nothing and reducing `height` rescales the curve. An absent member cannot be deleted by a later edit; a branch returning the block unchanged can, and reads as an oversight either way.
 
 ---
 
@@ -399,7 +583,13 @@ Sealing matches C05's manifest store and C07's adapter registry. A kind register
 16. **Wrapping substitutes a cluster it cannot place rather than dropping it** (I19). It dropped, and both halves called the same function, so `measure` and `render` agreed and nothing failed — a frame arithmetically consistent and describing content it did not hold. The reach is a fact about child count rather than terminal width (§5).
 17. **A line that already carries SGR is measured, fitted and windowed here, not by its caller** (I20, §5a). `displayCells` and `fitStyled` exist because `cells()` counts an escape as printable text; `sliceCells` exists because the frame cannot draw a layer over a painted row without taking a cell window out of one, and a `slice` by code unit cuts inside an escape and bleeds colour down every row below. Three answers to "how wide is this line" is I1's divergence in the one place that moves the whole frame.
 18. **A `rule` with no label draws an unbroken line** (I21). The spaces around the label exist to set it apart from the fill, and with no label they are a gap in a boundary — found by reading a frame, which is the only instrument that reaches it: the block is present, the row is exactly the width, and every existing assertion holds.
+19. **The framework substitutes its own marks, not only its blocks'** (I22). §4's rule is about who knows the capability, and it was written about what a block carries; six framework-authored characters reached the frame unresolved while four sites next to them did it correctly. Three of the six bypassed a function that already held their ASCII form, so half of what read as a missing mechanism was a mechanism not called (F55, F122).
+20. **A grammar registers at any time and the transcript reflows for nobody** (I23). The promise was in §4a from the beginning and the constructor took a fixed pair; the memo is why exposing registration alone would not have made it true (F93).
+21. **A shipped grammar's classes are mapped or the gap has a reason** (I24). Two of sixteen were measured as shipping nothing, and the change axis is refused a slot on C04's ruling rather than on this file's judgement.
 
+11. A kind that divides declares `window`; a window is a valid block of the same kind plus a residual offset, and never a list of rows (I25, C25 I18).
+12. The window's height property carries the offset and is checked generically, so an application's own arm is held to it (I26).
+13. A kind that does not divide omits the member rather than branching, which is how `plot` stays atomic permanently (I27, C12 I1).
 ---
 
 ## 9. Tests
@@ -467,6 +657,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T3.10**: text exactly `w`, `w-1`, `w+1` cells → 1, 1, 2 rows for wrapped kinds.
 - **T3.11**: `panel` at width 2 → children measured at 0, clamped to 1; no negative width reaches a child.
 - **T3.12**: `group` nested five deep → correct total, no stack overflow.
+- **T3.31** (I23): tokenise a `dockerfile` block before registering the grammar — one run, no slot — then register it and tokenise the same text again. The second call is highlighted. **The memo is the subject**: without the invalidation the second call returns the first's answer, and every assertion about `registerGrammar` existing still passes. The control is that `measure` returns the same row count across both, or the invariant's other half is untested.
+- **T3.32** (I24): for every grammar in the default set, a sample tokenises to at least one slotted run — asserted over the set rather than per grammar, because the failure this catches is *a grammar added later whose classes nobody checked*. `markdown` is the row that fails today. The three deliberate omissions are named in a list the test reads, so an omission that starts being mapped is a stale entry rather than a silent pass.
+- **T3.30** (I22): a session at `unicode: "ascii"` draws a frame with no character above U+007F — asserted over the whole frame rather than per site, because a per-site row is a restatement of the fix and the seventh site is what this must catch. The controls are the frame at `full` still carrying `❯`, and the two forms measuring the same number of cells.
 - **T3.13** (I11): a renderer that throws → that block renders as an error block; sibling blocks render normally.
 - **T3.14** (I11): a *measurer* that throws → contained, block treated as height 1, logged. A throwing measurer must not break virtualisation.
 - **T3.15**: `pills` whose chips exceed `w` → wraps, and the wrap count is measured correctly.

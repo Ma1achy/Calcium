@@ -34,6 +34,7 @@ type ParseResult =
   | Readonly<{ kind: "builtinThenShell"; name: Builtin;
                args: readonly string[]; rest: string }>
   | Readonly<{ kind: "shell";   command: string; interactive: boolean }>
+  // the `app` arm carries `interactive: boolean` too — C05 I23, resolved not declared
   | Readonly<{ kind: "empty" }>
   | Readonly<{ kind: "error";   error: ErrorLike }>;
 
@@ -90,11 +91,14 @@ neither can be served by token text:
 
 One shape serves both, which is what I11 is for.
 
-**`interactive` is on the `shell` arm and on no other.** It is the shell half of C23
-§4's handoff opt-in. The `app` arm needs nothing: it already carries `tool: ToolDef`,
-and C05 I19's `interactive` field lives there — so C23 reads `result.tool.interactive`
-for an app verb and `result.interactive` for a shell line, and the fact has one home
-on each route rather than a copy with no reconciliation between the copies.
+**`interactive` is on the `shell` arm and on the `app` arm, and it means the same
+thing on both — the contract this invocation has, not the one its verb declares.**
+It used to be the shell's alone, with C23 reading `result.tool.interactive` for an
+app verb, and the sentence here called that *one home for the fact*. It was one home
+for a **declaration**: `docker run` attaches by default and detaches with `-d`, so the
+declaration cannot answer for the invocation and C05 I23 resolves it. C18 carries the
+answer because `validateInvocation` computed it and this result is what travels
+(I28) — the same reason `transmitted` is carried rather than re-derived.
 
 ---
 
@@ -726,6 +730,7 @@ with are different claims.
 - **I25** — The TTY marker is recognised at head position only, through the policy, and **quoting does not disable it** — classification is quoting-blind here as it is for built-ins, job control and app verbs; only the rewrite honours quoting. Elsewhere it is an ordinary rewrite candidate, because a line with a pipeline has no single owner to give the terminal to.
 - **I26** — The marker is stripped before delegation. A delegated command never contains it, on any route — `sh` would receive it as an argument.
 - **I27** — The marker with a `Builtin` after it is an error, and the built-in is not applied. The route destroys the effect, so giving the user one of the two things they asked for is worse than giving them neither and saying so.
+- **I28** — The `app` result carries `interactive: boolean`, resolved by `validateInvocation` rather than copied from the `ToolDef`. C18 recomputes no part of validation (I4's rule one layer down), and this is the same commitment: the walk that knows which flags a token names is the one that answers, and C23 reads the answer. When validation failed the value is the tool's declaration — a fallback with no reader, since C23 I38 gates on `validation.ok` before the route is taken.
 
 ---
 
@@ -756,6 +761,7 @@ with are different claims.
 23. An empty remainder is not a split (I24).
 24. The TTY marker is head-position, policy-read, quoting-blind like every other classification rule, and always stripped before delegation (I25, I26).
 25. A marker with a built-in after it is refused rather than half-applied, and a marker with nothing after it is refused rather than delegated empty (I27).
+26. The `app` arm carries the resolved terminal contract, not the tool's declaration — computed once by the validator and carried, as validation itself is (I28, C05 I23).
 
 ---
 
@@ -832,6 +838,7 @@ Six tiers. No state machine — C18 is pure.
 - **T3.22** (I17): `/zzzzz | cat` → delegated as `widget zzzzz | cat`; no manifest lookup occurs, proved by a spy on `findTool`.
 - **T3.23** (SS40's exemption): astral characters survive tokenising and splicing. Listed here because it was in the tree and not in this section — the same drift §8a's own history records, found while numbering the two rows below.
 - **T3.24** (I25, I12): under `prefixPolicy(":")`, `:tty vim` is interactive and `/tty vim` is a plain shell line. Asserted as a pair, because a hardcoded `"/tty"` satisfies the first row and fails only the second.
+- **T3.26** (I28, C05 I23): `/run -d nginx` against a manifest whose `run` is interactive and whose `detach` carries the arm → an `app` result with `interactive: false`; `/run -it alpine sh` → `true`. Asserted on the parse result rather than on the `ToolDef`, because reading the declaration back gives `true` in both rows and that is the state this replaces.
 - **T3.25** (§5a): a manifest declaring a tool named `tty`, then `/tty vim` → `error` naming both records. The fixture manifest has no such tool, so this row builds its own — and it asserts the ordinary manifest still parses `/tty vim` as interactive, or the conflict rule is indistinguishable from the marker being broken.
 
 ### Tier 4 — integration

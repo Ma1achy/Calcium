@@ -42,6 +42,8 @@ type FlagDef = Readonly<{
   requires?:   readonly string[];     // other flags that must accompany it
   conflicts?:  readonly string[];
   view?:       boolean;               // this flag makes the result a view — C22 §13a (I20)
+  shellOnly?:  boolean;               // consumed by the shell, never transmitted (I21)
+  interactive?: boolean;              // this flag decides the terminal contract (I23)
   summary:     string;
 }>;
 
@@ -62,7 +64,12 @@ type ToolMatch = Readonly<{
 }>;
 
 type ValidationResult =
-  | Readonly<{ ok: true;  args: Readonly<Record<string, unknown>> }>
+  | Readonly<{
+      ok: true;
+      args: Readonly<Record<string, unknown>>;
+      transmitted: readonly string[];   // the invocation minus the shell's own switches (I21)
+      interactive: boolean;             // the resolved terminal contract (I23)
+    }>
   | Readonly<{ ok: false; errors: readonly ErrorLike[] }>;
 
 type ManifestError = Readonly<{ path: string; message: string }>;
@@ -194,6 +201,84 @@ verb is a user watching a terminal do the wrong thing.
 **C05 knows nothing about the `shell` route's marker.** That half of the opt-in is
 C18's (C18 §5), because a shell line has no flags C05 could describe: `sh` is what
 parses it. The asymmetry is in C23 §4 and is the reason there are two mechanisms.
+
+**I19 does not refuse `interactive` with `oneShot`, and the argument for refusing it
+is the same one.** A one-shot writes one frame to stdout and exits; a handoff gives the
+terminal away and reads no stdout at all. No consumer has reached the pair and none is
+foreseen, so it is named here rather than ruled — a refusal written for a combination
+nobody has built is a rule with nothing to be wrong about.
+
+### `interactive` resolves per invocation, and the arms cannot disagree
+
+The section above is right that only the author knows, and wrong that the author knows
+it **about the verb**. `docker run` attaches by default and detaches with `-d`; `docker
+exec` needs the terminal for `-it … sh` and not for `… ls`. One verb, two terminal
+contracts, chosen per invocation — and both are in one file of one app (F80).
+
+So `FlagDef` carries `interactive` too, and **an invocation's contract is the tool's
+declaration unless a flag present in it says otherwise.**
+
+**A predicate is what F80 asked for and a manifest cannot hold one.** §1: the manifest
+is JSON the app ships, and T2.7 asserts `parseManifest` accepts its own serialised
+output. A function does not survive that round trip. What does is a declaration per
+flag, resolved by the one walk that already knows which flags are present.
+
+**Every arm on a tool carries the same value, because an arm equal to the default
+declares nothing.** `interactive: true` on a flag of a verb already interactive changes
+no invocation; so does `false` on a verb that was never interactive. Both are A03 §2's
+vacuity class arriving in a manifest, both are refused at parse — and the refusal is
+what makes the arms agree. On a verb declared interactive every arm reads `false`; on
+one that is not, every arm reads `true`. **Two flags cannot disagree because no manifest
+can express the disagreement**, so there is no precedence rule, no dominant value and
+nothing to arbitrate. Making the wrong state unbuildable rather than resolving it is the
+trade this repository has now won six times.
+
+`docker run -dit` falls out of it rather than being encoded: `-d` carries the only arm
+`run` can have, so the invocation is not interactive — which is what docker does — and
+`-i` and `-t` carry no arm because they could only carry the default.
+
+**`false` and absent differ here, and nowhere else in this type.** Every other optional
+boolean in `FlagDef` and `ToolDef` means the same thing absent as it does `false`. On
+this one, absent means *this flag does not decide* and `false` means *this flag decides,
+and the answer is no*. The parse-time refusal above is what catches a reader who assumes
+the usual reading: writing `interactive: false` where it would be inert fails with a
+path rather than doing nothing.
+
+#### The safe direction was measured and it is the other one
+
+F80 chose `interactive: true` for `run` on an asymmetry — *wrong that way is a flicker;
+wrong the other way is a hung session*. Both halves are false, and the finding is amended
+rather than restated.
+
+| | claimed | measured |
+|---|---|---|
+| `/run -it alpine sh` declared **not** interactive | the session waits on a child nothing can answer | `docker run -it` with a non-terminal stdin exits **1** at once: *cannot attach stdin to a TTY-enabled container*. Reported through the ordinary error path |
+| any REPL spawned without a handoff | the same hang | C21 spawns `stdio: ["ignore", "pipe", "pipe"]` — stdin is `/dev/null`, so a child reading it gets EOF. **The named mechanism does not exist** |
+| `/run -d nginx` declared interactive | a flicker | C23 §4 suspends, the child writes the container id to the **real** terminal, `resume()` and `invalidate()` repaint over it, and the transcript gets `run finished`. The invocation's only output is lost silently |
+
+So the direction called cosmetic is the one that discards the result, and the direction
+called catastrophic is a reported error. **Wrong in both directions**, which is the shape
+F66 had: the conclusion survived because nobody measured either half, and the reason
+given would have been falsified by reading one line of C21.
+
+That is also why this is a ruling and not a preference. A field that cannot describe its
+subject is a defect; a field that describes it in the direction that loses data is one
+with a deadline.
+
+#### Where the resolution happens, and where it is read
+
+`validateInvocation` returns it, for I21's reason and not a new one: it is the walk that
+knows which flags a token names, and C18 would have to re-derive the grammar to find
+out. C18's `app` result carries `interactive: boolean` — **the same member its `shell`
+arm has carried since C18 §5** — so C23 §4 reads one field name on both routes rather
+than a resolved value on one and a declaration on the other.
+
+**And the route is taken after the gate, not before it (I24).** C23 read
+`tool.interactive` in `route`, above the `validation.ok` check that lives inside the
+non-interactive arm — so a malformed invocation of an interactive verb was spawned
+without being validated at all. D17's whole argument is that a malformed invocation
+costs nothing rather than an interpreter's startup, and the verbs that bypassed it are
+the ones whose failure takes the screen. F119.
 
 ---
 
@@ -332,8 +417,12 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 - **I16** — The gate is permissive: `--flag=value` and `--flag value` are both accepted, and no invocation the far side would have run is rejected here.
 - **I17** — A `conflicts` declaration is checked in the direction it is declared; reporting is deduplicated on the unordered pair, so one mistake is one error.
 - **I18** — There is exactly one distance-2 suggester in the tree, and it is C05's. A01 A.2's cutoff is a policy about *when a suggestion is worth making*, and two implementations agree about the distance and diverge about the tie-break — which is where a suggestion is wrong rather than absent, and a wrong suggestion is the thing the cutoff exists to prevent.
-- **I19** — `interactive` is refused with `streams` and refused with `local: true`. Enforced at parse, as I4 is. Both combinations describe a verb that cannot exist, and both would otherwise be discovered by a user watching a terminal misbehave rather than by the author who declared them.
-- **I20** — `view` is declarable on a `ToolDef` and on a `FlagDef`, and an invocation is a view if either declares it. It is refused with `interactive` and with `oneShot`, at parse, as I19 is; it is permitted with `streams`, because S12's logs view is exactly that pair. The declaration lives here rather than on the document an adapter returns because C22 §13a shows an adapter-side decision cannot be implemented: C23 I3 appends the pending entry first and C13 has nothing that removes it.
+- **I19** — `interactive` is refused with `streams` and refused with `local: true`, **wherever either is declared** — a flag's arm re-creates the same impossible verb, and a refusal reading only the tool covers one of the two ways to write it (I24). Enforced at parse, as I4 is. Both combinations describe a verb that cannot exist, and both would otherwise be discovered by a user watching a terminal misbehave rather than by the author who declared them.
+- **I20** — `view` is declarable on a `ToolDef` and on a `FlagDef`, and an invocation is a view if either declares it. It is refused with `interactive` and with `oneShot`, at parse, as I19 is, **and the refusal reads both declarations of each** (I24); it is permitted with `streams`, because S12's logs view is exactly that pair. The declaration lives here rather than on the document an adapter returns because C22 §13a shows an adapter-side decision cannot be implemented: C23 I3 appends the pending entry first and C13 has nothing that removes it.
+- **I21** — A flag declared `shellOnly` is validated exactly as any other and is **absent from `argv`**. `validateInvocation` returns `transmitted` — the invocation minus those switches — because it is the one walk that knows where a flag ends, and a second copy of that grammar in C18 is the drift a shared implementation prevents. The value survives in `args`, so the shell can read what the far side never sees. **The axis is transmission, not presentation**: `--json` selects a rendering *and* is understood by the far side, so it stays transmitted; `--raw` means nothing to the binary, and `/inspect <c> --raw` ran `docker inspect <c> --raw` for docker to exit 125 (F39). `shellOnly` is refused on anything but a `bool` and refused with a `short`, at parse: a switch spans one token and a strip is a comparison, while a valued or clustered flag spans tokens the parser would have to re-derive.
+- **I22** — `--help` is reserved on **every** tool, appended where the framework's six verbs are appended, and an app declaring it fails at parse as an app declaring `clear` does. Reserved rather than asked for, because a per-app `--help` is a per-app discipline and one app forgetting it is a verb with no help — the silent failure `usageBlocks` already argues against for hardcoded usage strings. Appended to `tools` and never to `appTools`, so the round-trip re-derives it rather than re-parsing it (F92).
+- **I23** — `interactive` is declarable on a `FlagDef` as well as on a `ToolDef`, and an invocation's contract is the tool's declaration unless a flag present in it carries an arm. **An arm equal to the tool's default is refused at parse**, which is what makes the arms on a tool agree: every one reads `!default`, so two flags cannot disagree and there is nothing to arbitrate. Resolved by `validateInvocation` — the walk that knows which flags a token names — and returned on the success arm, for I21's reason. `false` and absent differ on this member and on no other in either type: absent means *this flag does not decide* (F80).
+- **I24** — A cross-field refusal reads every declaration of each field it names, not the tool's. `view` on a flag with `interactive` on the tool is the pair I20 forbids, written the other way, and it parsed (F118). The conservative form is deliberate: an arm resolving `interactive` to `false` beside a `view` flag would be legal, and refusing it costs an app nothing today because no app declares one — **the limit is recorded rather than discovered**, and the first consumer to want the pair is the argument for narrowing it.
 
 ---
 
@@ -354,8 +443,12 @@ This is deliberately weaker than a compatibility check. **Reading the actual too
 13. The gate is permissive — both flag-value forms are accepted, completion teaches `=`, and a value beginning with `-` is refused with a message that names the fix (I16).
 14. Conflicts are directional in the check and deduplicated in the report (I17).
 15. The distance-2 suggester is exported, so C18's unknown verbs and C05's unknown flags are one implementation (I18).
-16. `interactive` declares a verb that takes the terminal, and the two combinations that cannot exist are refused at parse (I19).
+16. `interactive` declares a terminal contract, on a tool or on a flag, and the two combinations that cannot exist are refused at parse wherever they are declared (I19, I24).
 17. `view` declares that a result is a pushed view rather than a transcript entry, on a tool or on a flag, and it is read before the verb runs because nothing can withdraw a pending entry afterwards (I20, C22 §13a).
+18. A flag may be declared `shellOnly`: validated, readable, and never transmitted. The split is computed by the validator, not re-derived by the parser, and it is refused on anything but a switch (I21).
+19. `--help` is a flag Calcium reserves on every verb, on the same terms as the six verbs it reserves — appended, collision-checked, and absent from what round-trips (I22).
+20. A verb's terminal contract is resolved per invocation, by the validator, from the tool's declaration and the flags actually present — and an arm that could only restate the default is refused, so no two arms can disagree (I23).
+21. A cross-field refusal covers every way its combination can be written, not the one the first consumer used (I24).
 
 ---
 
@@ -386,6 +479,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T1.16** (I16): `--status running` and `--status=running` produce the same `args`. Both forms, one result — the permissive rule as an equality rather than as two separate passes.
 - **T1.17** (I16, §3): `--since -1h` → a `missing_value` error whose remediation names the token and the `=` form; `--since=-1h` validates. Both halves in one test: the message is only right if the thing it recommends actually works.
 - **T1.18** (I17): a one-directional `conflicts` declaration, given both flags → one error, reported from the flag that declares it. A mutual declaration → still one error.
+- **T1.19b** (I23, I24): a flag arm equal to the tool's default → parse error at `tools[i].flags[j].interactive`, in both directions (`true` on a plain verb, `false` on an interactive one); a flag arm of `true` on a `streams` tool and on a `local` tool → parse error, which is I19 read through the flag; a flag declaring `view` on a tool declaring `interactive` → parse error, **which is the row that fails today** (F118). And the arm that must survive all four: `run` declared `interactive: true` with `detach` declaring `false` parses, and the value reaches the `FlagDef`.
 - **T1.19** (I19): `interactive` with `streams` → parse error at the tool's path; `interactive` with `local: true` → parse error; `interactive` alone on a spawned tool → parses, and the field survives onto the `ToolDef`. The third half is what stops the rule from being a blanket refusal that passes the first two.
 
 ### Tier 2 — contract / interface
@@ -397,6 +491,7 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T2.5** (I12): every tool resolves to exactly one execution route; no tool is both local and spawnable.
 - **T2.6** (I15): the module graph shows no import from `terminal/` or above.
 - **T2.7**: `parseManifest` accepts its own serialised output — round-trip identity.
+- **T2.10** (I23): `validateInvocation` resolves the contract. `run -d nginx` → `false`; `run -it alpine sh` → `true`; `run -dit nginx` → `false` **with no precedence rule consulted**, because `-i` and `-t` carry no arm and cannot; `exec c ls` → `false` and `exec -it c sh` → `true` on a tool that declares nothing. The `-dit` row is the one that would need arbitration under any other shape, and it is the discriminator.
 - **T2.9** (I18): the exported `suggestName` is the one the flag path uses — an unknown flag's suggestion and the same call made directly agree, including the tie-break where two candidates sit at the same distance. Identity of behaviour asserted on the case where two implementations would differ, not on the case where they would agree.
 - **T2.8** (I8): `findTool` over the same manifest twice returns deeply equal results, **and** a second manifest object with identical content does not observe the first's results. `findTool` caches its match index (§3a) and this is the first cache in the tree, so purity is asserted rather than argued. The second half is the load-bearing one: a cache keyed on content rather than object identity passes every other test in this suite and breaks the moment two manifests differ only in a field the key ignores. Asserted by comparing results — the test does not know the cache exists.
 
@@ -452,9 +547,50 @@ Six tiers. Every cell of the §4 transition table is covered.
 - **T6.10** (I16): rejecting `--flag value` pre-spawn → T1.16 fails, and the gate starts refusing invocations the far side would have run.
 - **T6.11** (§3): reverting the `-`-value remediation to a bare "missing value" → T1.17 fails on the message, leaving the user to discover `=` for themselves.
 - **T6.12** (I17): deduplicating conflicts by name order rather than by the unordered pair → T1.18 fails on the one-directional case, which is the ordinary way an app declares it.
+- **T6.14** (I23): resolving the contract from `tool.interactive` alone → T2.10's `-d` row fails. The verb is spawned into a handoff, the container id is written to a terminal that is repainted a frame later, and the transcript says it finished — which is the failure measured in §2 and the reason the field changed shape.
+- **T6.15** (I24): reading only the tool's `view` in I20's refusal → T1.19b's fourth row fails. That is the state the rule shipped in, and it passed every test written against the pair declared the way its first consumer declared it.
 - **T6.13** (I19): accepting `interactive` alongside `streams` → T1.19 fails. A verb declaring both reaches C23, where whichever path loses does nothing and reports nothing — the failure the parse-time refusal exists to move to the author.
 
 ---
+
+## 8a. The walk — the rows where two declarations meet
+
+**A classification table, not a trace.** A manifest is at rest: there are no events between
+its rules, so every interaction here is two statements that both hold about one declaration.
+C18 §8a is the same shape and for the same reason; C16's and C19's traces are not, and
+choosing the trace because `interactive` sounds like a state machine is how the structural
+half goes unexamined.
+
+Indexed by **which two declarations could both claim the answer**, not by which inputs exist.
+A row governed by one rule restates that rule.
+
+| # | tool | flag arm | else | the two rules | ruling |
+|---|---|---|---|---|---|
+| 1 | — | `true` | — | *only the author knows* × *an arm decides* | permitted — `exec` is the consumer |
+| 2 | `true` | `false` | — | same | permitted — `run --detach` is the consumer |
+| 3 | `true` | `true` | — | *an arm decides* × *the tool is the default* | **refused**: it decides what was already decided (A03 §2) |
+| 4 | — | `false` | — | same | **refused**: same |
+| 5 | — | `true` | `streams` | I19 × the arm | **refused** — I19 read through the flag |
+| 6 | — | `true` | `local` | I19 × the arm | **refused** — same |
+| 7 | `true` | `false` | `streams` | I19 already refuses the tool pair | unreachable; no rule needed |
+| 8 | — | `true` | tool `view` | I20 × the arm | **refused** |
+| 9 | `true` | — | **flag** `view` | I20 reads the tool's `view` only | **refused — and it parses at HEAD.** F118 |
+| 10 | — | `true` | flag `view` | both arms | **refused** |
+| 11 | `true` | `false` | flag `view` | resolves to *not interactive, is a view* — legal | **refused anyway**; I24 records the limit |
+| 12 | `true` | `false` on two flags | — | *two arms* × *arbitration* | resolved `false`; rows 3–4 make disagreement unbuildable, so there is nothing to arbitrate |
+| 13 | `true` | `false`, flag **absent** from this invocation | — | *declared* × *present* | the default: resolution reads the flags actually given |
+| 14 | `true` | `false` on a `shellOnly` flag | — | I21 strips it from `argv` × it still decides | resolved `false` — it is an occurrence, and presence is what resolution reads, not transmission |
+| 15 | any | any | **validation failed** | *the contract is resolved by the validator* × *C23 routes on it* | **route after the gate.** F119 — C23 read the declaration above the `validation.ok` check, so an interactive verb was spawned unvalidated |
+
+**Three of fifteen are defects at HEAD**, and none is a row about `interactive` alone.
+Row 9 is a rule covering one of the two ways to write its own combination; row 15 is a
+gate the route steps over; rows 3 and 4 are the ruling that removes the arbitration the
+naive shape would have needed. Rows 1, 2, 13 and 14 are the ones that had to keep working.
+
+**Row 12 is the one worth reading twice.** It is the row every other shape of this field
+answers with a precedence policy — *`false` wins*, *the last flag wins*, *the tool wins* —
+and the ruling answers it by making the question unaskable. A policy would have been
+correct, testable, and a thing to remember; rows 3 and 4 mean there is nothing to remember.
 
 ## 9. Out of scope
 

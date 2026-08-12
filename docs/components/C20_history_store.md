@@ -165,6 +165,15 @@ type SearchState  = Readonly<{ query: string; hit: SearchHit | null; failed: boo
 
 **Warnings are returned, never emitted (I17).** C20 has no logger, cannot write to the terminal, and `console.*` is banned outright (SS33). This is C02's ruling and it transfers whole: *C20 decides what is wrong, never when the user is told.* A callback would decide the moment, and the moment for a write failure is during shutdown — C22 §8 restores the screen before printing diagnostics, and that ordering is load-bearing. `warnings` accumulates instead, deduplicated by cause, which is what "logged once" means for a read-only home producing one failure per command (T3.7).
 
+**And for a long time nothing read it, which made the ruling half a ruling.** *Returned,
+never emitted* is only the safe half of *the component decides what is wrong, never when the
+user is told*; the other half is that somebody tells them. `HistoryStore.warnings` was reached
+by nothing in `src/` — a corrupt file, a read-only home and a full disk were each detected,
+described and discarded, silently, for the life of every session. **T2.9 passed throughout**,
+because what it asserts is that neither stream is written to, and the silence it was written
+to make safe is indistinguishable from the silence of a warning nobody collects. C22 §8 step 3
+is the reader (C22 I6a), and it is where commitment 16's *"to the caller"* finally names one.
+
 **The draft is stashed on the first `previous()`.** A user who types half a command, presses `↑` to check something, then presses `↓` back past the newest entry gets their half-command returned, cursor and all. Losing it is a small thing that feels large, and it is the reason `previous` takes the current buffer rather than being nullary.
 
 `resetNavigation()` is called on submit and on any edit, so the next `↑` starts from the newest entry rather than wherever the last walk ended.
@@ -407,7 +416,7 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 13. C20 returns strings; L4 applies them to the editor (I1).
 14. Clock and filesystem are injected (I11).
 15. Writes are serialised, and `flush()` reports them settled (I16).
-16. Warnings are returned to the caller, never printed (I17).
+16. Warnings are returned to the caller, never printed — **and the caller prints them**, at C22 §8 step 3, after the release (I17) (→ C22 I6a). The first half alone was satisfied for the whole life of the component by nobody reading them.
 17. The exit path drains synchronously, so the command just submitted survives a signal (I18).
 18. Redaction is tokenised, runs line by line, and precedes escaping (I19).
 19. A whitespace-only command is not stored and null bytes are stripped (I20).
@@ -455,13 +464,13 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T2.1** (I5, I29, the important one): a corpus of realistic commands — UUIDs, 7- and 40-character SHAs, semvers, absolute and relative paths, flag names — survives redaction intact.
 - **T2.2** (I5): `--token=ghp_16C7e42F292c6912E7710c838347Ae178B4a`, `GITLAB_PASSWORD=hunter2`, `--api-key foo` → redacted in all three positions.
 - **T2.3** (I6): a redacted-on-disk entry is still complete in `entries` for the current session.
-- **T2.4** (I11, I12): a source scan finds no clock, no direct `fs`, and no `~/.prism` literal in `history/`.
+- **T2.4** (I11, I12): a source scan finds no clock, no direct `fs`, and **no dot-directory path literal of any form** in `history/` — `.calcium`, `.widget`, `~/.anything`. The rule matched `~/.prism` by name, and it has now survived two renames that would each have retired it silently: to `~/.calcium`, which no longer contained `prism`, and to `.calcium`, which no longer contains a tilde. **A pattern that names today's default is a rule with an expiry date nobody wrote down.** The scope is the shape, not the spelling.
 - **T2.4b** (I12): two stores with different `stateDir`s do not observe each other's entries.
 - **T2.5** (I1): a source scan finds no C17 import.
 - **T2.6** (I15): the module graph shows no import from `terminal/` and no scheduler call.
 - **T2.7** (I13): reverse-search content is `Block[]`; a compile-level test rejects React.
 - **T2.8**: `entries` is immutable.
-- **T2.9** (I17): no warning is emitted. Across the corrupt-file, read-only and disk-full fixtures, neither `stdout` nor `stderr` is written to; each cause appears once in `warnings`. The C02 T2.7 analogue, and the same argument.
+- **T2.9** (I17): no warning is emitted **by C20**. Across the corrupt-file, read-only and disk-full fixtures, neither `stdout` nor `stderr` is written to; each cause appears once in `warnings`. The C02 T2.7 analogue, and the same argument. **Its blind spot is stated because it went unstated for the whole life of the component**: it is satisfied identically by a warning nobody drains, so it says the moment is not C20's and cannot say the moment exists. C22 T4.20 is the half it cannot see.
 - **T2.10** (I18): a source scan finds `appendFileSync` called from one place, and that place is `drain`.
 - **T2.11** (I11): `HistoryFs` is structurally satisfied by C22 §2's `FileSystem` — a compile-level test, deferred until C22 exists.
 - **T2.12** (I24, I25, I26): every row of §7b, asserting the rule that fired as well as the output. A row that produces the right string through the wrong rule is a redactor that will produce the wrong string for the next input, and asserting output alone cannot tell them apart.
@@ -527,7 +536,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.7** (I9): refusing to start on corruption → T5.6 fails.
 - **T6.8** (I1): calling C17 directly → T2.5 fails.
 - **T6.9** (I11): reading the ambient clock → T2.4 fails and timestamps become untestable.
-- **T6.12** (I12): hardcoding `~/.prism` → T2.4 fails, and standalone development appends to the developer's real history.
+- **T6.12** (I12): hardcoding a state path in either form — `.widget` or `~/.widget` → T2.4 fails, and standalone development writes beside a real install. **Both forms, and neither is the current default**: the tilde arm would pass against a pattern that had followed the rename, and the bare arm would pass against the one that preceded it, so a row carrying only one of them agrees with whichever mistake is current.
 - **T6.10** (I14): making the clear confirm dismissable → T3.15 fails, and a stray `Esc` wipes history.
 - **T6.11** (I4): storing consecutive duplicates → T1.2 fails and `↑` walks the same command repeatedly.
 - **T6.13** (I16): issuing appends in parallel rather than through the chain → T3.19 fails and the sidecar de-aligns, so every timestamp names the wrong command.

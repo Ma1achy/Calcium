@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import { block, validateBlock } from "../../src/data/viewmodel/index.js";
 import type { Block, BlockKind } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
+import type { LiveSpec } from "../../src/shell/builders/types.js";
 import { defaulted, seq, wasDefaulted } from "../../src/shell/builders/seq.js";
 import { checkMeasurement, formatMeasurementReport } from "../../src/testing/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
@@ -281,6 +282,46 @@ describe("C24 T4.2 — the two near-pairs, where only the frame separates them",
     expect(frame(expectedKv)).not.toBe(frame(expectedCmp));
   });
 
+  it("T2.12c (F31, C04 I41): b.plot passes `yFormat`, read off the axis", () => {
+    // **The omission's reason met its consumer.** C24 §4 withheld this field
+    // because `percent` multiplied by 100 and a far side emitting a percentage
+    // emits `100.2` — accurate about the trap, and it treated the trap as
+    // grounds for withholding rather than as the thing to fix. Renaming the
+    // multiplying arm to `fraction` left nothing to withhold.
+    //
+    // Read off the **rendered axis** on T2.12b's precedent: asserting the field
+    // round-trips is the builder restated, and what the field is for is the
+    // label. A builder that dropped it renders `100` where `100%` belongs, and
+    // the gutter shifts with it.
+    const r = kit();
+    const axis = (blk: Block): string =>
+      renderSequenceToLines(r.registry, seq([blk]), 40, {
+        theme: DARK_THEME,
+        capabilities: FULL_CAPS,
+      })[0] ?? "";
+
+    const cpu = axis(
+      b.plot({
+        id: "p",
+        series: [{ values: [12, 44, 100] }],
+        height: 5,
+        axes: true,
+        yMin: 0,
+        yMax: 100,
+        yFormat: "percent",
+      }),
+    );
+
+    expect(cpu, "the arm reached the renderer").toContain("100%");
+
+    // The control: without it the same block labels a bare number, so the row
+    // is about the field travelling rather than about `100` appearing at all.
+    const plain = axis(
+      b.plot({ id: "p", series: [{ values: [12, 44, 100] }], height: 5, axes: true, yMin: 0, yMax: 100 }),
+    );
+    expect(plain, "and it is the field that put it there").not.toContain("100%");
+  });
+
   it("T2.12b (F27, C04 I29): b.plot passes the pin, read off the axis and not the field", () => {
     // **The defect this rules out was found in a frame, not in a field.**
     //
@@ -472,16 +513,32 @@ describe("C24 §5 — b.live", () => {
     expect(part.children[0]).toMatchObject({ kind: "raw", text: "warming up" });
   });
 
-  it("T3.4, T3.5: fetch and stream are exclusive, and one is required", () => {
-    expect(() => b.live({ ...base, every: 1_000 })).toThrow(/needs a `fetch` or a `stream`/u);
-    expect(() =>
-      b.live({
-        ...base,
-        every: 1_000,
-        fetch: () => Promise.resolve(1),
-        stream: () => (async function* () {})(),
-      }),
-    ).toThrow(/not both/u);
+  it("T3.4, T3.5 (C24 I21, F78): `fetch` is required by the type, and `stream` is gone", () => {
+    // **The two throws are deleted and the guarantee is stronger, not weaker.**
+    // They policed a choice between `fetch` and `stream` where `stream` did
+    // nothing: `partOf` read `spec.fetch ?? (() => Promise.resolve(null))` and
+    // nothing anywhere read `spec.stream`, so a part declared with it rendered
+    // `render(null)` once — a part that streams nothing looking exactly like a
+    // part that produced nothing.
+    //
+    // A required field is a compile error where the pair was a runtime throw,
+    // which is the make-it-unbuildable trade this repository has won on five
+    // times. Asserted with `@ts-expect-error` rather than a `toThrow`, because
+    // there is no longer a runtime moment to catch: an unused directive is
+    // TS2578 and the file stops building, so the assertion checks itself.
+
+    // @ts-expect-error — `fetch` is required (C24 I21). Restoring the optional
+    // marker makes this line compile and this file stop building.
+    const noFetch: LiveSpec = { ...base, every: 1_000 };
+    void noFetch;
+
+    // @ts-expect-error — `stream` no longer exists on the type at all.
+    const streaming: LiveSpec = { ...base, fetch: () => Promise.resolve(1), stream: 1 };
+    void streaming;
+
+    // And the ordinary declaration still builds, so the two rows above are
+    // about the narrowing rather than about the type being broken.
+    expect(b.live({ ...base, every: 1_000, fetch: () => Promise.resolve(1) }).kind).toBe("panel");
   });
 
   it("T3.6: staleAfter below every throws, because a builder cannot warn", () => {

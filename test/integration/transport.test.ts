@@ -25,6 +25,7 @@ import { fixture } from "../support/manifest.js";
 import { asScriptFile, scripts, waitForFileToContain } from "../support/process.js";
 import { clockOf, drain, invocation, recorded, result } from "../support/transport.js";
 
+import { producerContext } from "../support/producer-context.js";
 /**
  * The routing decision C23 will make, in the two lines it actually is.
  *
@@ -33,7 +34,7 @@ import { clockOf, drain, invocation, recorded, result } from "../support/transpo
  * so somebody above must, and this is the whole of what they do.
  */
 function submit(
-  router: TransportRouter,
+  _router: TransportRouter,
   manifest: ReturnType<typeof fixture>,
   inv: Invocation,
 ): "local" | "invoke" | "stream" {
@@ -188,10 +189,12 @@ describe("C06 with C05", () => {
 
     const registry = createAdapterRegistry();
     const ctx = {
+      ...producerContext(),
       command: "/ps",
       verb: "ps",
       width: 100,
       userRequestedJson: false,
+      flags: {},
       transport: "fixture" as const,
       origin: "user" as const,
       tool: null,
@@ -236,10 +239,12 @@ describe("C06 with C05", () => {
     let remainder = "";
     for await (const patch of transport.stream(invocation({ verb: "logs", streams: true }))) {
       const view = registry.adaptPatch(patch, {
+        ...producerContext(),
         command: "/logs",
         verb: "logs",
         width: 100,
         userRequestedJson: false,
+        flags: {},
         transport: "emulated",
         origin: "user",
         tool: null,

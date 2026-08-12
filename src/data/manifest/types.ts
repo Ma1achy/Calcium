@@ -66,6 +66,53 @@ export type FlagDef = Readonly<{
    * the verb arm's claim on purpose.
    */
   view?: boolean;
+  /**
+   * The shell consumes this flag; it never reaches the far side (I21, F39).
+   *
+   * **The axis is transmission, not presentation, and the two do not coincide.**
+   * `--json` selects a rendering *and* is understood by the far side — C06
+   * appends it — so it stays transmitted. `--raw` selects a rendering and means
+   * nothing to the binary: `/inspect <c> --raw` ran `docker inspect <c> --raw`
+   * and docker exited 125. Naming the field for presentation would have put
+   * `--json` on the wrong side of it.
+   *
+   * **This is what `view` already needed and never had.** The comment above
+   * records that `ps <uuid> --watch` "cannot be built that way" because argv
+   * goes over verbatim — so the `view` arm has been usable only on `local`
+   * tools since it was written, and nothing said so. A `view` flag on a spawned
+   * tool wants `shellOnly` too; F108 is the arm being narrower than its type.
+   *
+   * Validated exactly as any other flag: it is in `residual`, so `requires`,
+   * `conflicts` and type-checking are unchanged. Only `argv` drops it.
+   */
+  shellOnly?: boolean;
+  /**
+   * This flag decides the invocation's terminal contract (I23, F80).
+   *
+   * **`interactive` on a `ToolDef` describes a verb, and some verbs do not have
+   * one contract.** `docker run` attaches by default and detaches with `-d`;
+   * `docker exec` needs the terminal for `-it … sh` and not for `… ls`. Same
+   * verb, two contracts, chosen per invocation — and both live in one file of
+   * one app, which is what makes it a defect in the type rather than a wish.
+   *
+   * **F80 asked for a predicate and a manifest cannot hold one.** It is JSON the
+   * app ships and T2.7 round-trips it; a function does not survive that. What
+   * does is this: a declaration per flag, resolved by the walk that already
+   * knows which flags a token names.
+   *
+   * **An arm equal to the tool's default is refused at parse, and that refusal
+   * is the whole design.** It means every arm on a verb reads `!default` — so
+   * two flags cannot disagree, there is no dominant value, no last-wins rule and
+   * nothing to remember. `docker run -dit` resolves to *not interactive* because
+   * `-d` carries the only arm `run` can have, which is what docker does, and no
+   * precedence policy was consulted to get there.
+   *
+   * **`false` and absent differ here, and on no other member of either type.**
+   * Absent means *this flag does not decide*. A reader assuming the usual
+   * reading writes `interactive: false` where it would be inert and gets a parse
+   * error with a path, which is the only place that assumption is cheap to have.
+   */
+  interactive?: boolean;
   summary: string;
 }>;
 
@@ -193,7 +240,30 @@ export type ToolMatch = Readonly<{
 }>;
 
 export type ValidationResult =
-  | Readonly<{ ok: true; args: Readonly<Record<string, unknown>> }>
+  | Readonly<{
+      ok: true;
+      args: Readonly<Record<string, unknown>>;
+      /**
+       * The invocation minus the shell's own switches (I21, F39).
+       *
+       * Returned from here rather than derived by C18, because the walk that
+       * knows where a flag ends is this one — a second copy in the parser is the
+       * drift a shared implementation prevents. `args` still carries the value,
+       * so a `shellOnly` flag is validated and readable and simply does not
+       * travel.
+       */
+      transmitted: readonly string[];
+      /**
+       * The resolved terminal contract (I23, F80) — the tool's declaration
+       * unless a flag present in this invocation carries an arm.
+       *
+       * Here for `transmitted`'s reason and not a new one: this is the walk that
+       * knows which flags a token names, and C18 would re-derive the grammar to
+       * find out. It is on the success arm only because C23 I38 gates before it
+       * routes, so a failed validation has nothing to answer for.
+       */
+      interactive: boolean;
+    }>
   | Readonly<{ ok: false; errors: readonly ErrorLike[] }>;
 
 /** A parse failure, addressed by JSON path: `tools[3].flags[1].values`. */

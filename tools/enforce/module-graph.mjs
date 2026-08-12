@@ -1,6 +1,33 @@
 // A03 §3 — MG1..MG19. Imports go down only; L0's halves never touch.
 import { readFileSync } from "node:fs";
+import { OWNERS } from "./commitments.mjs";
 import { layerOf } from "./layers.mjs";
+
+/**
+ * Which component owns a file, by longest matching prefix.
+ *
+ * **`OWNERS` is reused rather than restated.** It is already the allow-list over
+ * directories that SP-class rules resolve an invariant's owner with, including
+ * the two exceptions a second map would have had to rediscover — `src/shell` is
+ * C22 except `src/shell/execution`, and `src/shell/builders` is C24's because
+ * `b` is L4's surface.
+ *
+ * **An unowned file is its own component**, returned as its own path rather than
+ * as `null`. Two files with no owner are then *different* components, which
+ * makes MG24 fire on them; collapsing them to one `null` component would make
+ * every unowned file a consumer of every other, which is this rule's defect one
+ * level up. `src/index.ts` and `src/data/*.ts` are the live cases.
+ */
+export function componentOf(file) {
+  let best = null;
+  for (const { path, spec } of OWNERS) {
+    if ((file === path || file.startsWith(`${path}/`) || file.startsWith(path)) &&
+        (best === null || path.length > best.path.length)) {
+      best = { path, spec };
+    }
+  }
+  return best === null ? file : best.spec;
+}
 
 /**
  * The rules this module actually implements — A03 §3 inventories twenty, and
@@ -8,7 +35,7 @@ import { layerOf } from "./layers.mjs";
  * the vacuity suite can assert every one of them has been shown to fire; a rule
  * added here without a fabricated violation fails A03 commitment 14.
  */
-export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26"];
+export const MODULE_GRAPH_RULES = ["MG1", "MG3", "MG6", "MG10", "MG11", "MG12", "MG13", "MG14", "MG15", "MG16", "MG17", "MG18", "MG19", "MG20", "MG21", "MG22", "MG23", "MG24", "MG25", "MG26", "MG27"];
 
 /**
  * MG6 is a **third kind of rule**, and saying so is the point of this comment.
@@ -300,6 +327,16 @@ const BARE   = /^\s*import\s*['"]([^'"]+)['"]/gm;
  *
  * An inline `import { type X, y }` is NOT skipped: the statement still emits,
  * and `y` is a real edge.
+ *
+ * **That ruling was made for a pair inside one half and MG3 inherited it without
+ * a decision** (FINDINGS F127). C01 → C02 is `terminal/` → `terminal/`: no layer
+ * question arises and erasure settles it. L0's *halves* are a different claim —
+ * A02 §1 protects each half type-checking with the other absent — so a type-only
+ * edge is exactly what removes the property, and `checkCrossHalfTypes` walks
+ * them. Measured: a fabricated type-only edge from `data/` into `terminal/` left
+ * `make enforce` green at 6927 references; the same edge as a value import fired
+ * MG3 at once. MG21 and MG22 already record the two answers, and both are right
+ * for what they protect.
  */
 function isTypeOnly(clause) {
   return /^type\b/.test(clause.trim());
@@ -483,12 +520,306 @@ function checkForbiddenEdges(files, readFile) {
   return violations;
 }
 
+// --- MG27: a block field no builder can set -------------------------------
+
+/**
+ * **Every builder exposes what its block can express, or the reason is written
+ * down where this rule can find it** (C24 I18, FINDINGS F114).
+ *
+ * **The rule is not new here. Only the mechanism is.** C24 I18 already ends
+ * *"a builder narrower than its block is either a ruling with a reason written
+ * down or a defect; there is no third state"*, and commitment 16 restates it.
+ * Both were correct and nothing read them: `patch.collapsedAfter`,
+ * `patch.actions` and `table.sort` were unreachable underneath. That is C09
+ * §4a's lesson about prose, arriving in the document that states the lesson.
+ *
+ * The model was already in the tree twice before it was a rule. `b.plot` gained
+ * `yMin`/`yMax` and left `yFormat`, `xLabels` and `emptyMessage` out **with the
+ * reason recorded for each** — `percent` multiplies by 100 and a CLI's numbers
+ * are already percentages, `xLabels` is a fixed three-tuple that cannot hold a
+ * caption, no surface has an empty plot. That is a decision. The same omission
+ * with no reason is a gap the next consumer rediscovers, which is how
+ * `collapsedAfter` (F41) and `Hunk.collapsedBefore` were both found *after* the
+ * same builder had been audited by hand.
+ *
+ * **Prose is what no rule reads** — C09 §4a's lesson — so the reasons live in
+ * `BUILDER_OMISSIONS` below, keyed by `Kind.field`, and the bidirectional arm
+ * applies here exactly as it does to `UNCONSUMED_MEMBERS`: an entry naming a
+ * field the builder now sets is itself a violation.
+ *
+ * **The blind spot, stated because an unrecorded limit reads as strength.** This
+ * matches a field *name* in the builder's text, so a builder that mentions a
+ * field without setting it counts as covering it — the check is that the name
+ * is reachable, never that it is wired correctly. It also cannot see a field
+ * exposed with the wrong shape. Both are the frame-read's job, and neither is
+ * why a field goes missing: the measured cases are all a field nobody typed.
+ *
+ * **`plot.yFormat` came off by being built, and the rule took it off** (C04 I41,
+ * F31). Its entry read *"`percent` multiplies by 100 and every far side that
+ * emits a percentage emits 84, not 0.84"* — accurate about the trap, and it
+ * recorded the trap as grounds for withholding rather than as the thing to fix.
+ * Renaming the multiplying arm to `fraction` left nothing to withhold. The list
+ * is compared by equality, so this could not be forgotten: `make enforce`
+ * refused the commit the moment the builder set the field.
+ *
+ * That is the second entry in one session to be disposed of by its subject being
+ * wired rather than by anyone remembering — MG25's `isUsable` was the first. An
+ * exemption whose reason has expired is indistinguishable from a live one to a
+ * reader, and equality comparison is what makes the difference mechanical.
+ */
+export const BUILDER_OMISSIONS = Object.freeze({
+  "plot.xLabels":
+    "C24 §4 — a fixed three-tuple, and no surface has wanted one; a caption sentence does not fit it",
+  "plot.emptyMessage":
+    "C24 §4 — no surface has an empty plot, and `atLeastOne` already floors the height",
+  "patch.numberWidth":
+    "C25 I21a — not the producer's to set. It is what a *window* carries so its gutter " +
+    "describes the block it came from rather than the slice it shows, and a hand-built patch " +
+    "that set it would be asserting a gutter its own lines do not justify. `windowPatch` is " +
+    "the one writer, and a builder exposing it would offer a consumer the drift (F134)",
+});
+
+/** `Kind.field` for every block field, and whether a builder mentions it. */
+export function checkBuilderCoverage(
+  files,
+  readFile = (f) => readFileSync(f, "utf8"),
+  omissions = BUILDER_OMISSIONS,
+) {
+  const typesFile = files.find((f) => f.endsWith("src/data/viewmodel/types.ts"));
+  const buildersFile = files.find((f) => f.endsWith("src/shell/builders/index.ts"));
+  if (typesFile === undefined || buildersFile === undefined) return [];
+
+  const types = readFile(typesFile);
+  const builders = readFile(buildersFile);
+
+  // **The `Block` union is the authority, never a `kind: "x"` literal.** The
+  // first run of this scanned for the literal and invented three kinds:
+  // `Hunk.lines[].kind` is `"add" | "remove" | "context"`, which is a line's
+  // kind and not a block's (C04 I35's neighbour).
+  const union = /export type Block =\n([\s\S]*?);\n/u.exec(types);
+  if (union === null) return [];
+  const typeNames = [...union[1].matchAll(/\|\s*(\w+)/gu)].map((m) => m[1]);
+
+  const fieldsOf = (name) => {
+    // `export type Rule = Readonly<{ … }> & Gap;` is one line, and a body regex
+    // written for the multi-line form silently attributed a neighbour's fields
+    // to it. Non-greedy to the first closing brace at column 0, or the line's.
+    const m = new RegExp(`export type ${name} = Readonly<\\{([\\s\\S]*?)\\n?\\}>`, "u").exec(types);
+    if (m === null) return [];
+    let depth = 0;
+    const out = [];
+    for (const line of m[1].split("\n")) {
+      const atTop = depth === 0;
+      for (const ch of line) {
+        if (ch === "(" || ch === "[" || ch === "{") depth += 1;
+        else if (ch === ")" || ch === "]" || ch === "}") depth -= 1;
+      }
+      const f = /^\s*(\w+)\??\s*:/u.exec(line);
+      if (f !== null && atTop && f[1] !== "kind" && f[1] !== "id") out.push(f[1]);
+    }
+    return out;
+  };
+
+  // Every builder returns through `finish`, which is where `gapBefore` is set,
+  // so its body is part of each builder's reachable surface.
+  const bodies = new Map();
+  const starts = [...builders.matchAll(/^function (\w+)/gmu)].map((m) => [m.index, m[1]]);
+  for (const [i, [pos, name]] of starts.entries()) {
+    const end = i + 1 < starts.length ? starts[i + 1][0] : builders.length;
+    bodies.set(name, builders.slice(pos, end));
+  }
+  const shared = (bodies.get("finish") ?? "") + (bodies.get("idOf") ?? "");
+
+  // **From `finish<` onward, never the whole body** — the correction the
+  // mutation pass forced, and without it this rule reports a gap once and then
+  // goes blind to its own findings regressing.
+  //
+  // A builder's text mentions a field three times: in the spec parameter's type
+  // annotation, in the destructure, and in the constructed literal. Only the
+  // third sets anything. Deleting `...(sort === undefined ? {} : { sort })`
+  // leaves the first two in place, so a whole-body search still saw the name and
+  // MG27 stayed green on exactly the defect it was written for.
+  //
+  // The construction begins at `finish<`, and the annotation and destructure are
+  // both above it, so the split needs no parser.
+  const byKind = new Map();
+  for (const [name, body] of bodies) {
+    if (name === "finish" || name === "idOf") continue;
+    const at = body.indexOf("finish<");
+    const constructed = at === -1 ? body : body.slice(at);
+    for (const m of constructed.matchAll(/kind: "(\w+)"/gu)) {
+      byKind.set(m[1], (byKind.get(m[1]) ?? "") + constructed);
+    }
+  }
+
+  const violations = [];
+  const unreached = new Set();
+  for (const typeName of typeNames) {
+    const kindMatch = new RegExp(
+      `export type ${typeName} = Readonly<\\{[\\s\\S]*?kind: "(\\w+)"`, "u",
+    ).exec(types);
+    if (kindMatch === null) continue;
+    const kind = kindMatch[1];
+    const body = shared + (byKind.get(kind) ?? "");
+    for (const field of [...fieldsOf(typeName), "gapBefore"]) {
+      if (new RegExp(`\\b${field}\\b`, "u").test(body)) continue;
+      const key = `${kind}.${field}`;
+      unreached.add(key);
+      if (omissions[key] !== undefined) continue;
+      violations.push({
+        rule: "MG27",
+        file: "src/shell/builders/index.ts",
+        message:
+          `\`${kind}\` carries \`${field}\` and no builder sets it — a block field a consumer ` +
+          `cannot reach is a surface the spec describes and the API does not. Expose it, or ` +
+          `name it in BUILDER_OMISSIONS with the reason`,
+        spec: "A03 §3, MG27",
+      });
+    }
+  }
+
+  // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry that is no
+  // longer an omission is itself a violation, or the list stops being read.
+  for (const key of Object.keys(omissions)) {
+    if (unreached.has(key)) continue;
+    violations.push({
+      rule: "MG27",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `BUILDER_OMISSIONS names ${key}, which the builder now sets. Remove the entry: an ` +
+        `exemption that outlives its reason is how the list stops being read`,
+      spec: "A03 §3, MG27",
+    });
+  }
+  return violations;
+}
+
+// --- MG3's type-only arm — the edge the rule could not see ------------------
+//
+// **The arm sees twenty-two type-only edges into `terminal/` and forbids none of
+// them, which is the answer rather than a gap.** Measured when the arm was
+// written, so the next person to widen it does not re-derive it — or worse, read
+// legal edges as tolerated ones:
+//
+//     type-only imports into terminal/ from above L0     22
+//       src/presentation  11 · src/shell  9 · src/index.ts  1 · src/testing  1
+//     files above L0 type-importing BOTH halves          13
+//       src/presentation   8 · src/shell  4 · src/index.ts  1
+//     MG3's actual subject: an L0 half → the other half
+//       runtime  0 · type-only  1   ← the entry below
+//
+// **None of the twenty-two is MG3's business and the rule's own name is why they
+// look like they are.** MG3 forbids `data/` ↔ `terminal/`. L1 and L4 importing
+// L0 is *downward* — MG1 permits it and `presentation/` could not do its job
+// otherwise, since rendering C04's blocks onto a terminal means seeing both
+// halves at once. A rule named for the class it forbids, read as forbidding a
+// broader one. Third instance this pass of a rule whose **name** did work its
+// **body** did not: MG24's "unconsumed member", this, and MG27's "coverage".
+//
+// **Zero violations from an arm that can see is a different result from zero
+// from an arm that cannot** (F83, F127), and the count is what tells them apart.
+// The one entry below is the only sideways edge in the tree; the fabricated pair
+// in `enforce-rules.test.ts` is what makes its silence mean anything.
+//
+// The runtime edge stays forbidden in both directions. What crosses is a *name*,
+// not a module: `data/` still builds without `terminal/` present as JavaScript,
+// and the coupling is `tsc`'s alone.
+const CROSS_HALF_TYPES = [
+  {
+    file: "src/data/adapters/types.ts",
+    name: "TerminalCapabilities",
+    reason:
+      "C07 §3's ProducerContext grants a producer the *resolved* capability record (C07 I19). " +
+      "The alternative is a second declaration of it inside data/, pinned by a test that " +
+      "agrees with itself — two records of one fact, which is F124's defect one layer in. " +
+      "The runtime edge stays forbidden, so data/ still builds with terminal/ absent",
+  },
+];
+
+/** Every `import type` / `export type` in a file, as `{ names, spec }`. */
+function typeOnlyImportsOf(file, readFile) {
+  const src = readFile(file);
+  const out = [];
+  IMPORT.lastIndex = 0;
+  let m;
+  while ((m = IMPORT.exec(src))) {
+    if (!isTypeOnly(m[1])) continue;
+    const names = [...m[1].matchAll(/[A-Za-z_$][\w$]*/g)]
+      .map((n) => n[0])
+      .filter((n) => n !== "type" && n !== "as");
+    out.push({ names, spec: m[2] });
+  }
+  return out;
+}
+
+/**
+ * MG3, type-only. Bidirectional, on MG27's precedent: an allow-list entry whose
+ * edge no longer exists is itself a violation, because an exemption that
+ * outlives its reason is how the list stops being read.
+ */
+function checkCrossHalfTypes(files, readFile) {
+  const violations = [];
+  const seen = new Set();
+
+  for (const file of files) {
+    const from = layerOf(file);
+    if (!from || from.rank !== 0) continue;
+    for (const { names, spec } of typeOnlyImportsOf(file, readFile)) {
+      const target = resolve(file, spec);
+      if (!target) continue;
+      const to = layerOf(target);
+      if (!to || to.rank !== 0 || to.half === from.half) continue;
+
+      for (const name of names) {
+        const excused = CROSS_HALF_TYPES.find((e) => e.file === file && e.name === name);
+        if (excused) {
+          seen.add(`${excused.file}::${excused.name}`);
+          continue;
+        }
+        violations.push({
+          rule: "MG3", file,
+          message:
+            `crosses L0's halves type-only: ${from.half} → ${to.half} (${name} from ${spec}). ` +
+            `A type-only edge erases at build and still makes this half un-type-checkable ` +
+            `without the other, which is the property A02 §1 protects. Add a CROSS_HALF_TYPES ` +
+            `entry with its reason, or declare the shape on this side`,
+          spec: "A02 §1 · C07 I10 · A03 §3, MG3",
+        });
+      }
+    }
+  }
+
+  // **Only over files this run actually walked.** MG27's arm can compare against
+  // a constant; this one cannot, because the fabricated-violation harness passes
+  // a single file and a stale-entry report would then fire on every check that
+  // is not about this rule. The staleness question is only answerable when the
+  // exempted file is in scope.
+  const inScope = new Set(files);
+  for (const entry of CROSS_HALF_TYPES) {
+    if (!inScope.has(entry.file)) continue;
+    if (seen.has(`${entry.file}::${entry.name}`)) continue;
+    violations.push({
+      rule: "MG3",
+      file: "tools/enforce/module-graph.mjs",
+      message:
+        `CROSS_HALF_TYPES names ${entry.name} in ${entry.file}, which no longer imports it ` +
+        `type-only. Remove the entry: an exemption that excuses nothing is how the next one ` +
+        `gets in unread`,
+      spec: "A03 §3, MG3",
+    });
+  }
+
+  return violations;
+}
+
 export function checkModuleGraph(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [
     ...checkModeOwnership(files, readFile),
+    ...checkCrossHalfTypes(files, readFile),
     ...checkPresentationEdges(files, readFile),
     ...checkForbiddenEdges(files, readFile),
      ...checkDevEntryIsolation(files, readFile),
+    ...checkBuilderCoverage(files, readFile),
   ];
   for (const file of files) {
     const from = layerOf(file);
@@ -719,6 +1050,49 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 //
 // Scoped to `export interface`, which is where a component states what it
 // offers. A type alias is structural and can be satisfied without being named.
+//
+// --- THE GAP THIS RULE KNOWINGLY LEAVES, and it is deliberate ---------------
+//
+// **A consumer is a call in another FILE, not in another COMPONENT** — and the
+// seam A02 Seam 4 describes is the component one. That is a real gap, chosen
+// rather than overlooked, and it is here rather than only in FINDINGS because a
+// deliberate gap recorded only in a finding goes quiet.
+//
+// Measured over 280 members, three definitions of *consumed*:
+//
+//   a bare name in another file      15 unconsumed   ← before F83; counted the
+//                                                      implementing file as a
+//                                                      consumer, so most of the
+//                                                      tree passed vacuously
+//   a CALL in another file           39 unconsumed   ← what this rule now does
+//   a CALL in another component      76 unconsumed   ← A02 Seam 4 read literally
+//
+// **76 of 280 is 27% of the published surface** — 73 of 276 once F95 removed the
+// phantom members, which changes nothing. A rule whose violation
+// describes a quarter of the tree describes the architecture, not a defect, and
+// the reason is F94: `export interface` marks three different things. Of the 38
+// the component-scoped form produced, 24 were internal contracts called inside
+// their own component, 11 were diagnostics called only by a test, 1 had an
+// out-of-tree consumer, and **2 were the class this rule exists for**. An
+// interface shared between two files of one component *must* be exported for
+// TypeScript to permit it, so exporting is not evidence of anything.
+//
+// A component barrel was tried as the discriminator and fails on L4: 21
+// components have an `index.ts` and `src/shell` has none, because nothing
+// imports from the top — so every C22 and C23 interface would be exempted for
+// the wrong reason.
+//
+// **So: gate on the narrow half, and this comment is the wide half.** The same
+// line C24 I11 draws for the unused-export scan — *a reported signal rather than
+// a build gate*. What it costs: a member consumed only inside its own component
+// satisfies this rule. **Re-read it when a component's public surface becomes
+// expressible**, because at that point the wide reading becomes checkable and
+// this paragraph is the record of why it was not.
+//
+// **What it bought, stated so the trade can be judged:** 22 violations, and two
+// of them were real user-visible defects that no test in either suite could
+// reach — F96 (history never creates its directory, so it never persists on a
+// fresh machine) and F97 (reverse search opens and cannot be typed into).
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
@@ -798,16 +1172,211 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "`retained` has no writer *and* no reader: `SessionSnapshot` carries the field, two " +
     "files initialise it to null, and nothing else in `src/` names it. The whole feature " +
     "is a field",
+
+  // --- diagnostics, second cohort: found when a CALL replaced a bare name ---
+  //
+  // **F83's fix is what surfaced these**, and the shape is worth stating once
+  // for the group: the rule used to accept the file that *implements* the
+  // interface as a consumer, so `types.ts` declaring `pending` and the
+  // implementation writing `pending` closed the loop with nothing calling
+  // anything. A property access is the discriminator.
+  //
+  // Every entry below is observable state or a probe that a test asserts and no
+  // component calls — the same category as the cohort above, arrived at by a
+  // rule that can now see it.
+  "Rng.int":
+    "C08 — the integer draw beneath the fixture generators. `rng.ts` uses it internally " +
+    "and `test/unit/corpus.test.ts` asserts the stream is reproducible, which is the only " +
+    "place a deterministic RNG is observable at all",
+  "TransportRouter.busy":
+    "C06 diagnostics — whether a route is in flight. **F83's own evidence, and it survived " +
+    "its own removal**: `router.ts` records that a guard replaced it and `construct.ts` " +
+    "counts seventeen call sites until it, so the tree documents the deletion twice and " +
+    "the member is still declared. Kept listed rather than deleted until C06 rules, because " +
+    "removing a member two comments describe as removed wants the spec edit first",
+  "CompletionEngine.pending":
+    "C19 diagnostics — whether a dynamic source is in flight, published so the spinner's " +
+    "sequence-as-token-of-validity is assertable. `src/shell` reads the spinner state C19 " +
+    "derives, not this",
+  "FrameScheduler.pending":
+    "C03 diagnostics — whether a commit is scheduled. Sibling of `contaminated` above and " +
+    "listed for the same reason: `frame-scheduler.ts` drives it and a revert test is the " +
+    "only outside reader",
+  "LineEditor.displayRows":
+    "C17 diagnostics — the wrapped row count, asserted by the prompt-window tests. The " +
+    "shell measures the prompt through C09 rather than asking the editor, which is C17 §1's " +
+    "rule that rendering stays outside the editor",
+  "LineEditor.undoDepth":
+    "C17 diagnostics — the undo stack's depth, so T2.x can assert `UNDO_LIMIT` without " +
+    "reaching into the buffer. Sibling of `killBuffer` above",
+  "LineEditor.redoDepth": "C17 diagnostics — the redo half of `undoDepth`, same disposal",
+  "OverlayManager.hasView":
+    "C15 diagnostics — whether a pushed view is on the stack. `src/shell` asks the overlay " +
+    "for its `Placed` and never for this; the tests use it to assert push/pop pairing",
+  "TranscriptStore.payloadOf":
+    "C13 — an entry's payload by id, for tests asserting what a patch actually wrote. The " +
+    "viewport reads entries through the view, not the store",
+  "MeasurableRegistry.renderToLines":
+    "C09 §7's conformance harness — its consumer is a *suite*, not a component. 34 test " +
+    "files call it and no component may, because a second render path is C09 I1's " +
+    "divergence. Same category as `DocumentAssertions.*` above",
+
+  // --- published for a consumer outside this tree ---------------------------
+  "Viewport.stats":
+    "C14 — offset, total height and region, published for a scrollbar that does not exist " +
+    "yet and **already consumed by the reference app**, which draws its own position " +
+    "indicator from it. C24 I11's category: named nowhere else in `src/` is what a " +
+    "published surface looks like from inside the package that publishes it",
+
+  // --- used only inside its own declaring file ------------------------------
+  "LocalRegistry.verbs":
+    "C22 — `registry.ts:128` reads it in the reconciliation walk, in the same file that " +
+    "declares it, and this rule skips the declaring file by design. Not a gap: a member " +
+    "used where it is declared has no seam to be unwired across, and widening the rule to " +
+    "see it would report every private helper on an exported interface",
+
+  // --- specified and unbuilt, second cohort: each names its finding ----------
+  //
+  // **These are gaps, not exemptions**, and the difference is that each cites a
+  // finding rather than a reason. They are listed so the suite is readable
+  // rather than red, and the citation is what stops the entry outliving the
+  // gap: when F96 and F97 close, the equality arm below fires on these the day
+  // a caller appears.
+
+  // --- C20 publishes a wider surface than the shell wires -------------------
+  //
+  // The same shape as F97 and less sharp, because each of these has a working
+  // sibling the shell does call — `searchOlder` for `search`, `entries` for
+  // `list`. Listed separately from the pair above rather than folded in: F97 is
+  // a feature that cannot work, and these are alternatives to a path that does.
+  // **Not investigated one by one**, and saying so is the entry's honest form —
+  // a reason that overstates what was checked is how a list stops being read.
+  "HistoryStore.search":
+    "C20 — the query-setting entry point; the shell drives search through `searchOpen` and " +
+    "`searchOlder` instead. Unverified whether both are intended to remain. F97's group",
+  "HistoryStore.list":
+    "C20 — filtered listing; the shell reads `entries`. Unverified. F97's group",
+  "HistoryStore.listBlocks":
+    "C20 — listing grouped into blocks, for a `/history` rendering nothing builds. F97's group",
+  "HistoryStore.rerun":
+    "C20 — re-execute a numbered entry. **No caller in `src/`; one test calls it.** F83 " +
+    "reported this as *no caller at all*, which dropped the qualifier that makes the claim " +
+    "true — the class F86, F89 and F92 already are, in a finding about the rule that would " +
+    "have caught it. Needs the action dispatch route (F21) before anything can reach it",
+  "HistoryStore.resetNavigation":
+    "C20 — clears navigation state; the shell resets by submitting. Unverified. F97's group",
+  "HistoryStore.clearConfirmLayer":
+    "C20 — dismisses the clear-confirmation overlay; the shell dismisses via the router's " +
+    "`dismiss` action. Unverified. F97's group",
+
+  // === F84: the `export type` cohort ======================================
+  //
+  // The walk covers `export type X = Readonly<{ … }>` from F84, so 276 members
+  // became 1055. Everything below was outside every rule in the suite until
+  // then, and the group divides cleanly in two.
+
+  // --- a reporting record whose consumer is a suite -------------------------
+  //
+  // **The `DocumentAssertions` category, arriving in the shape that produces
+  // most of it.** A conformance report or a fixture diff exists to be asserted
+  // against; a component reading one would be a second implementation of the
+  // check. Each is consumed by `test/` or `tools/` and by no component, which is
+  // what a reporting type looks like from inside the package that publishes it.
+  "Delta.after": "C08 — a fixture diff's new value; `test/unit/fixtures.test.ts` asserts pairs",
+  "FixtureDiff.deltas": "C08 — the diff's payload, read by the corpus tests",
+  "CorpusDiff.matched": "C08 — corpus comparison tally, asserted by the corpus tests",
+  // `CorpusDiff.changed` and `.removed` were here and are gone: `CHANGE_MARKERS`
+  // in C09 has keys of both names, so this rule now reads them as consumed
+  // (F105 — a name collision, not wiring). They remain genuinely unconsumed.
+  // If the collision goes, MG24 fires again and they come back, which is the
+  // entry re-earning its place rather than outliving its reason.
+  "CorpusDiff.deltaCount": "C08 — as `matched`",
+  "FixtureHandlerOptions.world": "C08 — the world a fixture handler runs against; `tools/` supplies it",
+  "ProvenanceProblem.fixtureId": "C08 — which fixture a provenance problem names, asserted in test",
+  "VerbRatio.recorded": "C08 — provenance tally, asserted in test. **Three siblings are dead: F99**",
+  "VerbRatio.flagged": "C08 — as `recorded`",
+  "CompletionResult.superseded": "C19 — the token-of-validity outcome; asserted at three tiers and never branched on by a component, which is C19 I13's whole point",
+  "EngineOptions.onSourceError": "C19 — the injected error sink; supplied by tests and defaulted in the engine",
+  "Graph.log": "C22 — the construction log, read by `tools/` and by seven test files. A component reading it would be a second record of construction order",
+  "Identity.user": "C22 — the identity record's fields, asserted by the identity tests. `SessionSnapshot` carries it and no component destructures it",
+  "Identity.email": "C22 — as `user`",
+  "Identity.groups": "C22 — as `user`",
+  "SgrStyle.inverse": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
+  "SgrStyle.underline": "C01 — as `inverse`",
+  "FrameSchedulerOptions.windows": "C03 — per-reason coalescing windows, injected by six test files to drive the scheduler deterministically",
+  "Finding.subject": "C09 §7 — boundary-conformance report field, asserted by the suite it exists for",
+  "Finding.assertion": "C09 §7 — as `subject`",
+  "Finding.means": "C09 §7 — as `subject`",
+  "ConformanceReport.findings": "C09 §7 — as `subject`",
+  "ConformanceReport.skipped": "C09 §7 — as `subject`, and the reference app reads it in five places",
+  "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
+  "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",
+  "Failure.expected": "C09 §7 — as `check`",
+  "ToolDef.oneShot":
+    "C05 — **already documented at length as having no subject** (C22 §4). Correct " +
+    "disposal, independently confirmed: the coverage audit reached it from the " +
+    "`export type` side and C22 had ruled on it from the spec side",
+
+  // --- dead everywhere, and each names its finding --------------------------
+  //
+  // **Eleven members named nowhere in `src/`, `test/`, `tools/` or the reference
+  // app.** Gaps, not exemptions — listed so the suite is readable rather than
+  // red, and the citation is what makes the entry expire: the equality arm fires
+  // the day any of them gains a consumer. FINDINGS F99.
+  "GlyphSet.teeLeft": "**F99** — a declared glyph slot with no drawer. Box-drawing",
+  "GlyphSet.teeRight": "**F99** — as `teeLeft`",
+  "GlyphSet.hollow": "**F99** — as `teeLeft`",
+  "GlyphSet.blocked":
+    "**F99** — and this one is *semantic* rather than box-drawing, so a theme declaring " +
+    "it gets nothing and the absence reads as a theme error rather than a missing renderer",
+  "GlyphSet.warning": "**F99** — as `blocked`, semantic",
+  "GlyphSet.bar": "**F99** — as `teeLeft`",
+  "VerbRatio.derived":
+    "**F99** — three of a five-field record are dead while `recorded` and `flagged` are " +
+    "read, so the arithmetic producing them runs on every call and is discarded. A " +
+    "partially-consumed record is invisible to every rule that asks about a *type*",
+  "VerbRatio.authored": "**F99** — as `derived`",
+  "VerbRatio.ratio": "**F99** — as `derived`, and it is the computed one",
+  "EngineOptions.cache": "**F99** — an injectable cache nothing injects; C19 constructs its own",
+  "Grid.dots": "**F99** — C12's raster grid payload, written by nothing that reads it",
+  "Failure.actual":
+    "**F99** — the measured value beside `expected`, which *is* read. A failure report " +
+    "naming what was expected and not what happened is the half that makes it actionable",
 });
 
-/** Every `export interface` member under `src/`, with its owner. */
+/**
+ * Every published object-type member under `src/`, with its owner.
+ *
+ * **Both keywords, since F84.** This walked `export interface` only, and the
+ * codebase publishes object types both ways: 280 members behind `interface` and
+ * **798 behind `export type X = Readonly<{ … }>`**, nearly three times as many,
+ * outside the reach of every rule in the suite.
+ *
+ * Its own header used to justify the narrow scope — *a type alias is structural
+ * and can be satisfied without being named* — which is true about **satisfying**
+ * a type and irrelevant to **consuming a member of one**. The distinction the
+ * sentence drew was real and it was not the one the rule needed, so the scope
+ * excluded three-quarters of its subject while reading as deliberate. That is
+ * this rule's scope failing the same way SP5's did three times: naming the form
+ * thought to matter instead of covering the subject and excusing what does not
+ * belong.
+ *
+ * Filed for the scope rather than the contents — the day it landed the widened
+ * walk found no dead members at all, and **a rule whose clean result covers a
+ * quarter of its subject means much less than it reads**, whatever it happens to
+ * contain today.
+ */
 function interfaceMembers(files, readFile) {
   const out = [];
   for (const file of files) {
     const src = readFile(file);
-    const head = /export\s+interface\s+([A-Za-z_$][\w$]*)\s*(?:extends[^{]*)?\{/g;
+    const head =
+      /export\s+(?:interface\s+([A-Za-z_$][\w$]*)\s*(?:extends[^{]*)?|type\s+([A-Za-z_$][\w$]*)\s*=\s*(?:Readonly<)?)\{/g;
     let m;
     while ((m = head.exec(src))) {
+      const owner = m[1] ?? m[2];
+      // Which keyword published it — the two are consumed differently (F94).
+      const record = m[1] === undefined;
       let depth = 1;
       let i = head.lastIndex;
       while (i < src.length && depth > 0) {
@@ -816,9 +1385,25 @@ function interfaceMembers(files, readFile) {
         i += 1;
       }
       const body = src.slice(head.lastIndex, i - 1);
-      const member = /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*(?:\??\s*[:(]|\()/gm;
-      let n;
-      while ((n = member.exec(body))) out.push({ owner: m[1], name: n[1], file });
+      // **Depth 0 only — a member sits directly in the interface body.**
+      //
+      // The line pattern alone also matches a *parameter* inside a multi-line
+      // method signature, so `take(sourceId, key, ttlMs, run)` contributed four
+      // phantom members to `CompletionCache` — and two of them reached the
+      // violation list, where they read exactly like an unwired seam because no
+      // such member exists to be consumed. Four of 280 in this tree, and every
+      // one of them a name that can never be wired. FINDINGS F95.
+      const member = /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*(?:\??\s*[:(]|\()/;
+      let depth2 = 0;
+      for (const line of body.split("\n")) {
+        const atTop = depth2 === 0;
+        for (const ch of line) {
+          if (ch === "(" || ch === "[" || ch === "{") depth2 += 1;
+          else if (ch === ")" || ch === "]" || ch === "}") depth2 -= 1;
+        }
+        const n = member.exec(line);
+        if (n !== null && atTop) out.push({ owner, name: n[1], file, record });
+      }
     }
   }
   return out;
@@ -859,13 +1444,71 @@ export function checkSeamConsumers(
     ]),
   );
 
-  for (const { owner, name, file } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
+  for (const { owner, name, file, record } of interfaceMembers(files, (f) => sources.get(f) ?? "")) {
     const key = `${owner}.${name}`;
 
+    // **A consumer CALLS the member; it does not merely name it.** F83.
+    //
+    // This matched a bare name until F83, so the file that *implements* the
+    // interface counted as consuming it: `types.ts` declares `rerun()`,
+    // `store.ts` writes `rerun() { … }`, and the rule read the implementation as
+    // a consumer. Every member of every interface split across those two files
+    // was consumed by construction — which is most of `src/`, and it is why the
+    // rule sat green over `HistoryStore.rerun`, a method nothing in `src/` calls
+    // at all.
+    //
+    // A property access is the discriminator, and it is the *narrow* half of
+    // F83's fix. The wide half — a consumer outside the **component** rather
+    // than the file — is A02 Seam 4 read literally and is reported by
+    // `componentSeamSignal` below rather than gated on, because measuring it put
+    // **76 of 280 members** outside a component boundary. A rule whose violation
+    // describes 27% of the published surface is describing the architecture, not
+    // a defect. C24 I11 already draws that line for the unused-export scan: a
+    // signal too broad to gate on is reported, not enforced. FINDINGS F94.
+    // **Two shapes of use, because F84 widened the walk to `export type`.**
+    //
+    // A property access is how an *interface* member is consumed — the producer
+    // hands over an object and the consumer calls into it. A published **record**
+    // is consumed the other way round: the consumer *builds* one, and
+    // `{ placed: …, popLayer: … }` names the member without a dot in front of
+    // it. Dot-access alone reported 82 violations over the widened walk, and
+    // the great majority were deps records supplied by object literal — the same
+    // false positive that a skip rule carried from interfaces produced during
+    // the coverage audit, arriving again from the other end.
+    //
+    // So a construction counts. It is the looser of the two and it is the right
+    // looseness: a member nobody accesses *and* nobody supplies is dead by both
+    // routes, which is what the rule is asking.
+    // **The test differs with the keyword, and that is F94's finding applied.**
+    // An `interface` is implemented and *called into*: a property access is the
+    // consumer. A `Readonly<{ … }>` record is *built*: `{ placed: …, popLayer: … }`
+    // names the member with no dot in front of it, and dot-access alone reported
+    // 82 over the widened walk, mostly deps records supplied by object literal.
+    //
+    // **Using both tests everywhere was measured and is worse.** The construction
+    // pattern is loose — a bare `pending:` anywhere counts — and applying it to
+    // interface members made four allow-listed entries read as consumed, which
+    // the equality arm caught immediately. One test each, matched to how the
+    // keyword is actually used.
+    // **The looseness above has a measured instance and no cheap remedy
+    // (F105).** A frozen marker table gained the keys `changed` and `removed`,
+    // and two unrelated `CorpusDiff` members read as consumed — a name
+    // collision, since this test matches names and not owners. The equality arm
+    // caught it, which is the arm working.
+    //
+    // **Scoping the shorthand half to files that name the owner was tried and
+    // is worse**: 19 new violations, and the pattern they share is the one this
+    // arm exists for — a `*Deps` record built inline at a call site whose type
+    // comes from the callee's signature and is never written down.
+    // `ConstructDeps.repaint`, `KeyDeps.anchor`, `RefreshDeps.viewBlock`. The
+    // obvious fix trades one false consumer for nineteen false violations.
+    const consumer = record
+      ? new RegExp(`[.?]\\s*${name}\\b|(?:^|[{,(\\s])${name}\\s*:`, "m")
+      : new RegExp(`[.?]\\s*${name}\\b`);
     let consumed = false;
     for (const [other, src] of stripped) {
       if (other === file) continue;
-      if (new RegExp(`\\b${name}\\b`).test(src)) {
+      if (consumer.test(src)) {
         consumed = true;
         break;
       }
@@ -916,6 +1559,46 @@ export function checkSeamConsumers(
   }
 
   return violations;
+}
+
+/**
+ * **The wide reading of MG24, reported and not gated.** F94.
+ *
+ * A02 Seam 4 describes a *component* complete on its own side, and `checkSeamConsumers`
+ * gates on a *file* — the narrow half, because the wide one puts 76 of 280 members
+ * outside a component boundary and a rule that flags 27% of the published surface is
+ * describing the architecture. This returns that measurement so the number stays visible
+ * instead of living only in a finding, which is the disposal C24 I11 already uses for the
+ * unused-export scan.
+ *
+ * **It is a count, not a verdict.** Most of what it counts is legitimate: an interface
+ * shared between two files of one component must be exported for TypeScript to permit it.
+ * What the number is good for is movement — a jump means a component grew a surface
+ * nothing outside it reaches, and that is worth a look rather than a failure.
+ */
+export function componentSeamSignal(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const sources = new Map(files.map((f) => [f, readFile(f)]));
+  const stripped = new Map(
+    [...sources].map(([f, src]) => [
+      f,
+      src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1"),
+    ]),
+  );
+  const members = interfaceMembers(files, (f) => sources.get(f) ?? "");
+  const withinComponent = [];
+  for (const { owner, name, file } of members) {
+    const home = componentOf(file);
+    let crosses = false;
+    for (const [other, src] of stripped) {
+      if (componentOf(other) === home) continue;
+      if (new RegExp(`[.?]\\s*${name}\\b`).test(src)) {
+        crosses = true;
+        break;
+      }
+    }
+    if (!crosses) withinComponent.push(`${owner}.${name}`);
+  }
+  return { members: members.length, withinComponent };
 }
 
 // --- MG25 — a free function with no consumer --------------------------------
@@ -982,7 +1665,17 @@ export function checkSeamConsumers(
 //                               each has a helper stating the same rule that
 //                               nothing calls.
 //
-// Note the last pair is a *different* class from MG24's: not a seam with no
+// **`isUsable` came off the list by being consumed, and the rule is what took it
+// off.** C22's gate 3b calls it (C22 I61, F8), and the entry did not have to be
+// remembered: the list is compared by equality, so `make enforce` refused the
+// commit until the row went. That is the disposal MG25's own note asked for —
+// *wire it or remove it* — rather than a second exemption. C01's inline test
+// stays, because C01 is a component with its own consumers and must refuse
+// whoever hands it an unusable record. The duplication is gone in the sense that
+// mattered: the rule now has one *reachable* statement on the shell's path, and
+// C01's is the floor under it rather than a second opinion nobody reads.
+//
+// Note that pair — one of it left — is a *different* class from MG24's: not a seam with no
 // consumer but a rule with two expressions, one of which is unreachable. The
 // rule finds it because an unreachable expression and an unconsumed producer
 // look identical from the import graph, and both want disposal.
@@ -1024,11 +1717,6 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // commit until the rows went. Neither had to be remembered.
 
   // --- a rule expressed twice, the second expression unreachable ------------
-  isUsable:
-    "C02, D28 — alternate screen is the sole hard requirement. `lifecycle.ts` asks " +
-    "`!capabilities.altScreen` inline instead, so the rule holds and its statement is " +
-    "unreachable. Wiring C01 to it is C01's call, not C24's: the two would then agree " +
-    "by construction rather than by a reader noticing",
   plotAreaWidth:
     "C12 — `definition.ts` computes `areaWidth` inline across a three-rung ladder with " +
     "`MIN_AREA`, and this helper states the simple case. Two expressions of one width, " +
@@ -1098,7 +1786,7 @@ export function checkDevEntryIsolation(files, readFile = (f) => readFileSync(f, 
         message:
           `imports ${spec} — \`testing/\` and \`fixtures/\` are dev-only entry points, and a ` +
           `module outside them that imports one puts it in the production bundle (C24 I8)`,
-        spec: "A03 §3, MG26 · C24 I8, T2.3",
+        spec: "A03 §3, MG27 · C24 I8, T2.3",
       });
     }
   }

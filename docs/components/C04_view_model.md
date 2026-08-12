@@ -43,7 +43,7 @@ type ViewDocument = Readonly<{
     argv:       readonly string[];    // what was actually spawned
     stderr:     string;               // usually empty
     transport:  "emulated" | "fixture" | "subprocess" | "local";
-    origin:     "user" | "action" | "agent" | "refresh";
+    origin:     "user" | "action" | "agent" | "refresh" | "defect";
   }>;
 }>;
 ```
@@ -54,7 +54,7 @@ type ViewDocument = Readonly<{
 
 `argv`, `stderr` and `transport` answer the question a rendered block cannot: *did the far side return something unexpected, or did the adapter mishandle it?* They live in `meta` rather than in a block because a block is content and the invocation is *about* the document — in `meta` it is uniformly available to any inspector, including one an app writes. C23 renders them through `/debug`.
 
-**`origin` is not a debugging field, and it is required.** It is what makes a transcript legible once more than one thing is putting entries into it. Shipped optional it would be unset, then unreliable, and the first agent feature is the one that needs to trust it — so it is always present, always set by C23 (`user` for a typed submission, `action` for an exec action, `refresh` for a time-driven tick, `agent` reserved). A string now costs less than a schema migration later.
+**`origin` is not a debugging field, and it is required.** It is what makes a transcript legible once more than one thing is putting entries into it. Shipped optional it would be unset, then unreliable, and the first agent feature is the one that needs to trust it — so it is always present, always set by C23 (`user` for a typed submission, `action` for an exec action, `refresh` for a time-driven tick, `defect` for a failure the framework contained and is reporting, `agent` reserved). A string now costs less than a schema migration later.
 
 `partial` exists for streaming documents that have not finished. **A partial document is renderable at every point in its life** — there is no assembly state in which it cannot be drawn.
 
@@ -110,7 +110,9 @@ type Patch    = Readonly<{ kind: "patch"; id: string;
                            path: string;               // the file, for the header
                            language: string;           // syntax palette, per hunk line
                            hunks: readonly Hunk[];
-                           collapsedAfter?: number;    // elided below the last hunk
+                           collapsedAfter?: number;
+  /** The gutter width, pinned when this block is a window of a larger one (C25 I21a). */
+  numberWidth?: number;    // elided below the last hunk
                            actions?: readonly Action[];
                            layout?: "unified" | "split" }> & Gap;   // default: width-derived
 type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@
@@ -138,12 +140,41 @@ type Plot     = Readonly<{ kind: "plot"; id: string;
                            series: readonly Series[];
                            height?: number; axes?: boolean;
                            xLabels?: readonly [string, string, string];
-                           yFormat?: "number" | "percent" | "bytes" | "duration";
+                           yFormat?: "number" | "fraction" | "percent"
+                                   | "bytes" | "duration";   // the unit IN, not OUT (I41)
                            yMin?: number; yMax?: number;      // pin the range (I29)
                            emptyMessage?: string }> & Gap;
 ```
 
 `Table`, `TableRow`, `Cell` and `ColumnDef` are declared below. **Every block variant is declared here** — C11 and C12 own the table *engine* and the plot *renderer*, not the shapes. `id` is present on every variant because `ViewPatch` addresses blocks by it.
+
+**`yFormat` names the unit the value arrives in, and it used to name the unit it renders as**
+(I41, F31). Both `fraction` and `percent` draw a per-cent sign, so *what it renders as* cannot
+tell them apart and was never the axis to name them on. What differs is what the producer is
+holding:
+
+| arm | in | out |
+|---|---|---|
+| `fraction` | `0.84` | `84%` |
+| `percent` | `100.2` | `100%` |
+
+`fraction` **is the old `percent`, renamed** — the arm that multiplies by 100. It kept the
+behaviour and lost the name, because the name was the defect: a far side that emits a field
+called a percentage emits `100.2`, not `1.002`, so the obvious call rendered **`10020%`**
+(F31, measured against docker's `CPUPerc`). This framework exists to wrap JSON-emitting CLIs,
+so the arm a consumer reaches for first must be the one that matches what a CLI emits, and the
+surprising arm must carry the surprising name.
+
+**Renaming a member of a public enum is breaking, and that is the argument for doing it now.**
+The freeze is ahead; two callers exist in this tree and both are fixtures. `percent` and
+`percentage` — one letter apart, opposite meanings — was the alternative, and it is the
+two-meanings-one-word class this project has already found the hard way three times
+(`dismissable`, `origin`, `viewState`). Shipping a fourth deliberately is worse than a rename
+taken before anyone depends on it.
+
+**And the arm is validated now**, which it never was. An unknown string fell through to the
+numeric arm, so a typo rendered plain numbers and said nothing — and the rename is precisely
+the event that produces typos, because `percentage` is what a reader guesses.
 
 **`yMin` and `yMax` pin the vertical range.** C12 §3 says the range is computed over all series "unless the block pins them" and C12 T1.14 tests exactly that, while the shape had no field to pin it with — intent stated in prose that the schema could not carry, the same class as the missing `align` and the missing truncation side. Absent, the range is the data's; present, values outside it clamp to the edge rather than escaping the grid, which is what makes a pinned axis usable for comparing two plots rather than a way to lose points off the top.
 
@@ -374,6 +405,88 @@ C09 §4 owns the vocabulary and both renderings, and the 1:1 rule holds by const
 
 **`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `running` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
 
+### A categorical axis is a marker plus a derived tone, never a second palette
+
+Four surfaces built in four steps for four reasons reached for a distinction `Tone` cannot carry: a comparison wanting `added`, `/diff` wanting `+ - ~` in three colours, a lifecycle stream wanting `die` to read differently from `start`, a build wanting `cached` to read differently from `ran` (FINDINGS F30, F49, F51, F81). Each was filed as *the model has one axis and needs two*. Measured against the tree, that reading is wrong on three counts.
+
+**They are three vocabularies, not one.** `added`/`removed`/`modified` is change; `cached`/`ran` is provenance; `start`/`die`/`oom` is severity, which `Tone` already spells. **No closed union covers all three**, so the shared thing is the *slot* and not the values — and a `ChangeKind` added beside `Tone` would have answered one of the four while reading as though it answered them.
+
+**The rendering already exists, unnamed, in three places.** C09's `patch` module carries change in a **marker** (`+`, `-`, space), tones it from a frozen renderer-owned table, and adds a background surface as a second channel. `levelTone` maps a log level to a tone the same way. `comparisonTone` maps a verdict. Three instances of one pattern, in one layer, with no name for it — which is why four surfaces each rebuilt a piece of it by hand.
+
+So the rule, which settles the 1-bit rendering inside itself rather than leaving it owed:
+
+> **A categorical axis is carried by a marker or a word, and *emphasised* by a tone the renderer derives from the axis. A producer never supplies a colour for it.**
+
+At `colourDepth: 1` the tone goes and the marker remains, so the axis survives **by construction** rather than by a lint. That is why this needs no new palette, no widening of `Tone`, and no new arm in D29's sweep: the case D29 exists to catch cannot be built. It is C10's argument for `Tone` applied one level up — the producer names the fact, the renderer owns the appearance.
+
+**What it rules on each of the four:**
+
+- **F49 and F81 are correct as built**, not workarounds tolerated for now. `+`/`-`/`~` in the marker and a `HOW` column reading `cached`/`ran` are what the rule prescribes, and `b.row`'s throw was right both times.
+- **F30 is a type change**, below.
+- **F51 is not in this group**, and its own text says so — *"a health axis with no way onto a block"*. It needs no vocabulary; it needs the `tone` field `Cell`, `Notice`, `KeyValue` and `Series` already have. Its recorded objection — that adding one makes `logs` and `events` inconsistent — dissolves under the rule above: **a fixed vocabulary the renderer knows needs no field, and one it cannot know does.** `logs` has levels; a container's actions are open-ended, so `events` takes the field. The two kinds differ because their vocabularies differ, which is the consistent answer rather than the inconsistent one.
+
+#### `Comparison`'s verdict splits, because the renderer split it first
+
+`comparison?: "same" | "better" | "worse" | "changed"` presents one closed union, and `comparisonTone` renders it as two: `better`→`ok`, `worse`→`error`, `same`→`muted`, `changed`→`default`. **The judgement half is coloured and the change half deliberately is not** — the renderer took this ruling before it was written down, and the type is the only place still claiming the four are one thing.
+
+```typescript
+change?:  "unchanged" | "changed" | "added" | "removed";
+verdict?: "better" | "worse";
+```
+
+`added` and `removed` land in the half that was always neutral, which closes F30 without touching `Tone` and without a palette slot.
+
+**`Hunk.lines[].kind` is deliberately left alone.** `add`/`remove`/`context` looks like the same vocabulary and is not: `context` is a *positional* fact — a line shown to situate a change — while `unchanged` is a fact about the line. Unifying them would make C25's window logic depend on a field that no longer means what it tests. Two vocabularies that overlap in two members are not one vocabulary, which is this section's own argument turned back on it.
+
+### A mark is derived from a named fact, or there is nothing to derive it from
+
+The sibling of the section above, and the same rule read the other way. I35 says a renderer
+derives appearance from a fact the block names. **The corollary is what happens when a block
+names no fact — only a tone.** Measured over every shape that carries one:
+
+| shape | names | can a mark be derived? |
+|---|---|---|
+| `Cell`, `Notice` | a tone **and** a glyph | — it is supplied |
+| `ComparisonRow` | `verdict` — a fact | **yes** |
+| `Panel` (live) | nothing; the driver knows and the block does not | **not yet** — one field away |
+| `KeyValue` row, `Pills` chip, `Events` line, `Series` | a tone, and nothing else | **no** |
+
+**Two of seven tone-bearing shapes carry a glyph slot and five do not**, which is why
+`hasNoColourOnlyDistinction` declines to enforce D29 for three of them and calls it *a gap in
+the vocabulary rather than a rule*. That disposal is right, and the reason it is right is
+sharper than "no field": for `ComparisonRow` the fact is already named and the renderer simply
+never used it, and for the other three there is genuinely nothing to derive from.
+
+So the ruling splits the five rather than treating them alike:
+
+> **Where a shape names a categorical fact, the renderer derives the mark and no field is
+> added. Where a shape names only a tone, a glyph slot is the only remedy — and it is added
+> when a surface needs one, not before.**
+
+**`ComparisonRow` is the first half and needs no type change.** `verdict` is already a named
+fact; `verdictTone` derived a colour from it and stopped there, so `better` and `worse` render
+identically to each other and to an unmarked row at every colour depth. That is FINDINGS F34's
+measured half — *`200ms` against `150ms` says nothing about which is wanted* — and it closes by
+deriving a glyph beside the tone, exactly as the change axis derives a marker.
+
+**`Panel` is the second half and needs one boolean.** `Glyph` has carried a `live` slot with
+both renderings since C04 was written, two surfaces draw it, and **nothing in `src/` consumes
+it** — a slot reserved and unreachable, which is A03 §2's class in the glyph table (F18). The
+remedy is not a glyph field: it is for the block to *name the fact*, because a panel is live or
+it is not, and the mark follows. `live?: boolean`, and C09 draws the slot.
+
+**The other four do not get a field yet, and the reason is an instrument rather than a
+preference.** MG24 refuses a published member nothing consumes, so four speculative glyph slots
+would arrive as four violations needing four allow-list entries — the rule correctly declining
+to let the schema grow ahead of a surface. When one needs it, the ruling above is already taken
+and the field is additive.
+
+**What this does not close, stated because the boundary is not where it looks.** D29 asks
+whether a distinction is carried by colour alone, and *does this text carry the state* is not
+decidable from a document: two chips reading `web` and `db`, toned `ok` and `error`, pass every
+check and mean nothing without the colour. **Expressibility is C04's to fix; decidability is
+nobody's.** A glyph slot makes D29 satisfiable, never satisfied.
+
 ### Actions
 
 ```typescript
@@ -560,7 +673,7 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I10** — A partial document is renderable. No block kind has an "incomplete" representation that renders differently from a complete one.
 - **I11** — C04 imports nothing from `terminal/`, `presentation/` or above. Verified on the module graph.
 - **I12** — `status: "proposed"` is never produced by an adapter. C07 constructs documents from what a command returned, and a proposed change has not run. Reserved for the agent path; unused in v1.
-- **I13** — `meta.origin` is always present. It is not optional, and no code path constructs a document without it — a provenance field that can be absent becomes a provenance field nobody trusts.
+- **I13** — `meta.origin` is always present. It is not optional, and no code path constructs a document without it — a provenance field that can be absent becomes a provenance field nobody trusts. **`defect` is the fifth arm and the only one the framework sets about itself** (C23 §5a, F15): a document that exists because a stage failed and the failure was contained. It is not `refresh`, which is a system notice about the session, and not `action`, which names a mechanism that did not produce it — and the arm is only worth its width because `/debug` renders `origin` as a row, which was checked before it was added.
 - **I14** — Block ids are unique within a document, nested children included. Checked by `validateDocument`; `applyPatch` fails rather than guessing (§4a).
 - **I15** — `applyPatch` is fallible in its type and never throws. Every one of the four failure cases in §4 returns `{ok: false}` with an `ErrorLike`, and the input document is returned untouched and still frozen.
 - **I16** — A `merge` payload cannot carry view state. Structural, via `MergeRow`, not remembered: I9 holds because the field does not exist to be set.
@@ -583,6 +696,13 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I32** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
 - **I33** — `patch` and `comparison` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
 - **I34** — A `view` action's `target` denotes a block id **within the document the action fired from**, and denotes nothing else. The kind carries no content of its own, so a target resolved against a wider scope would let one entry's action fill the screen with another entry's data. C04 owns what the field means; C23 owns refusing one that does not resolve (C23 I31).
+- **I35** — A categorical axis other than `Tone` is never carried by colour. A block names the fact — a marker, a word, or a closed union a renderer maps — and the renderer derives any tone from it; no producer supplies a colour for such an axis, and none is representable. This is why `Tone` stays a judgement axis: the alternative is not a second palette but a distinction that survives `colourDepth: 1` because nothing else was ever available to carry it. Four surfaces reached the boundary independently (F30, F49, F51, F81) and three of them found it correctly by hand.
+- **I36** — `Comparison`'s row carries `change` and `verdict` as separate optional fields, never one union. `comparisonTone` has always coloured the verdict half and left the change half neutral, so one union names two axes that already render differently — and `added`/`removed` have no member of it to join (I35, F30).
+- **I37** — A block kind exempted from D29's sweep is exempted by the *fields it carries*, not by its name. Adding a meaning-bearing field to an exempted kind removes the exemption; the compile-time guard on `KINDS_WITH_NOTHING_TO_CHECK` catches a new kind and cannot catch a new field, so the reason is recorded per kind and re-read when the kind changes (F102).
+- **I38** — A mark is derived from a fact the block names, never invented by the renderer and never demanded of a producer that has already named the fact. `ComparisonRow.verdict` and `Panel.live` are named facts and carry no glyph slot; `Cell` and `Notice` supply one because the fact *is* the glyph. A shape carrying a tone and nothing else has nothing to derive from, and a glyph slot is its only remedy — added when a surface needs one, never speculatively, because MG24 refuses a published member nothing consumes (I35, F18, F34).
+- **I39** — `Panel.live` names whether a region is refreshing; C09 draws the `live` glyph from it. The block names the fact and the renderer owns the mark, so a live panel differs from a static one under ASCII and at one bit, where a character written into the title would not (F18, → C09 I5).
+- **I40** — `Comparison.labels` names what the two columns are, and their absence means positional. `a`/`b` is right about the *type* — S07 compares two runs and neither is "before" — and was never an answer to whether a consumer may say which side is which; both shipped consumers said it in a `keyValue` block above the block it explained (F33).
+- **I41** — **`yFormat` names the unit the value arrives in.** `fraction` takes `0.84`, `percent` takes `100.2`, and both render a per-cent sign — so the rendered form cannot distinguish them and naming them by it produced a member whose obvious use was wrong by a factor of 100 (F31). The arm that multiplies is `fraction`; it is the old `percent` renamed, and it carries the surprising name because it is the surprising arm. **The value is not appearance**: `labelWidth` measures the rendered labels to size the gutter (C12 §3), so an arm that changes a label's width changes the block's geometry, and this rename moves both. An unknown arm is a validation error rather than a silent fall-through to `number`.
 
 ---
 
@@ -624,6 +744,12 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set (I27).
 31. `Result` is declared once, in C04, and nowhere else in the tree (I26). Enforced by SS35, which existed before this commitment did — a build gate with no contract behind it, found by tracing the citation graph.
 32. A `view` action's `target` names a block within its own document and nothing wider; the refusal when it does not resolve is C23's (I34, → C23 I31).
+33. A categorical axis other than `Tone` is a marker or a word with a renderer-derived tone, never a second palette and never a colour a producer supplies. Four surfaces found the boundary independently; three of them got it right unaided, which is the argument for naming the pattern rather than widening the vocabulary (I35).
+34. `Comparison` carries change and judgement in separate fields, because the renderer has always rendered them as separate axes (I36).
+35. D29's sweep exempts a kind for the fields it has, and the exemption is re-read when the fields change — the compile-time guard sees a new kind and is blind to a new field (I37).
+36. A mark is derived from a named fact. Where a shape names one, no field is added; where it names only a tone, a glyph slot is the remedy and it waits for a surface. Two of seven tone-bearing shapes carry a slot, and that asymmetry is a ruling rather than an oversight (I38).
+37. A panel says whether it is live, and C09 draws the slot that has existed unreachable since C04 was written (I39, → C09 I5).
+38. A comparison may name its two columns; absent, they are positional. The type's `a`/`b` was the right answer to a different question (I40).
 
 ---
 

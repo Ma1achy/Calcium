@@ -262,6 +262,48 @@ Each of these produces code that compiles, passes review, and is wrong.
   belief and not a ruling, and the cheapest moment to find that out is before something is
   built on it.
 
+  **The instrument's running total, because a habit that costs twenty minutes deserves a
+  number**: it has now **disproved three findings and produced three** — F58b, F66's
+  replacement reason, and F92. It is the only one that checks the *record* rather than an
+  artefact; the frame-read checks output, the mutation pass checks tests, the audit checks
+  code.
+
+  **And where to point it: compression is where the falsification enters.** F86, F89 and
+  F92 are one mechanism three times — a summary that kept a body's claim and dropped the
+  condition making it true. F86's finding named a mechanism it never ran; F89's retraction
+  never reached the Order list that cited it; F92's *"no caller in `src/`"* sat above a
+  body correctly saying *"it exists as the far side's usage-error path"*. **A claim is
+  falsified by being summarised, not by being wrong**, which is why the summary is where
+  to look — the body usually still reads as correct, and does not have to be re-derived to
+  see it. **Read the abstract against its own section before reading the section against
+  the code.**
+
+- **A correct sentence justifying the wrong decision survives being read carefully.**
+  MG24 was scoped to `export interface` because *"a type alias is structural and can be
+  satisfied without being named"* — which is **true**, about satisfying a type, and
+  irrelevant to consuming a *member* of one. The distinction was real, correctly stated,
+  and not the one the rule needed, so the scope excluded three-quarters of its subject
+  while reading as deliberate. Twenty-five components went past it.
+
+  **This is harder to catch than a wrong sentence**, because review checks whether a
+  justification is true and this one is. The question that reaches it is *does this
+  sentence constrain the decision it is attached to* — the same question the mutation pass
+  asks of a test, and F84 is the measured case at 276 members against 1055.
+
+- **A citation reads as coverage, and that is how a finding gets planned once and fixed
+  never.** The sibling of the rule above, and it fails in the other direction: not a claim
+  weakened by compression, but a *reference* mistaken for a *disposition*. Roadmap entry 38
+  quotes F50 — *a column with no `flex` gets its minimum and nothing more* — as the precedent
+  its width fractions should follow, and fixes nothing about C11's columns. A partition
+  reading generously drops it; a reader skimming for coverage sees the number and moves on.
+
+  **So the test is never *does this mention the finding*. It is *would landing this close
+  it*** — and the three answers are **closes**, **reframes** (the entry restates it as a
+  question still owed) and **partial** (some instances, not the class). Only the first
+  removes it from the remainder, and the residue is named in the other two.
+  `CALCIUM_GAP_PLAN.md` is that test run over 51 entries: three that read as fixes are
+  questions, and **six findings of fifty-four are closed by a document citing twenty-four.**
+
 - **Where the findings actually came from, measured over one step.** Eleven findings across
   docker-tui's step 8, and **not one came from a test written to look for it**:
 

@@ -3,6 +3,21 @@
 Three instruments and three rules. Every one of them exists because reading a result
 wrongly cost more than getting the code wrong, and each names the occasion.
 
+**And the instruments now have instruments.** `make tools-test` here, `make instruments` at the
+root — the same target — runs every tool's own fixture: known bytes in, stated output out, **16
+of 16, 113 rows**, inside `make all`. It closes group 9, and the reason it is a *runner* rather
+than sixteen fixtures is the fifth class below: eleven fixtures nobody runs is a gate nobody
+reports, arriving in the gate built to answer it.
+
+**The inventory is derived and compared by equality**, not listed. The hand-list said eleven and
+the directories hold sixteen — `tools/bench`'s three were never in it, and the waiter had no
+file at all, which is exactly why it had no fixture. An instrument added without one fails the
+target on the day it lands.
+
+Three of the sixteen were repaired by the exercise: two probes that had not run since an
+interface moved (F144), a cast writer that lost a whole recording on a capture cut mid-character
+(F143), and a guard that printed `← DRIFT` and carried on (F145).
+
 ---
 
 ## Which container
@@ -21,8 +36,9 @@ what is installed**, and the framework's has no docker socket by design.
 Measured in step 12: `npx vitest run --dir test` reported 5, then 7, then 8 failures on
 three consecutive runs of identical code, **with a completely different set each time** and
 never including anything the change had touched. Every one of those files passed when run
-alone. The same tree with `--no-file-parallelism` reported **one** failure — `T5.6`, which
-is independently known to be pre-existing.
+alone. The same tree with `--no-file-parallelism` reported **one** failure — **C03** `T5.6`
+(*sixty seconds idle*), which measures wall-clock CPU and is a statement about the host; see
+§0's sixth entry and the id-ambiguity note beside it.
 
 So a rotating failure set is a diagnosis, not a mystery: when the failures differ run to
 run and the union is the timing-sensitive files, the answer is contention. Re-run serially
@@ -81,6 +97,38 @@ wrong on purpose and watching the report not change**. That is the mutation pass
 the instrument instead of to the code, and it is the only method that has worked on any of
 them.
 
+### A fifth, and it is the shape none of the four has: a gate nobody reports
+
+The four above are results read through a channel that garbles them. This one has no channel
+at all.
+
+**`make all` runs six targets. `make enforce` and `npm test` are the two run by habit, and the
+pre-commit hook runs the first.** So `golden` and `e2e` are reported by nothing between
+commits, and a target that starts failing is indistinguishable from one nobody has run.
+
+Measured at `7241627`, before a session's work began:
+
+| target | at session start |
+|---|---|
+| `check` · `enforce` · `audit` · `test` | pass |
+| `golden` | **18 failed / 41 passed** — stale since row 4, four commits back |
+| `e2e` | **44 failed / 50 passed / 7 todo**, 13 of 16 files |
+
+**Neither was noticed, and neither was hidden.** No pipe swallowed an exit code and no
+assertion returned a plausible value: nothing asked. The green that was quoted in four commit
+messages was `enforce` and `npm test`, both true, and both silent about two thirds of what
+`make all` covers.
+
+**The remedy is not another rule.** It is to run `make all` and report the counters per
+target — before, so the baseline is known, and after, so a delta is attributable. A verdict
+without a verified baseline is a verdict about the harness.
+
+**And the golden failure is the shape to expect after a narrowing.** Sixteen were stale
+snapshots; two were assertions aimed at a value that *stopped being a document* when
+`AdapterMeta` narrowed to the three keys an adapter owns. **A narrowing's blast radius is
+every test that asserted the old shape, and the ones that fail are in whichever tier nobody
+runs.**
+
 ### A fourth, and it is a different class: two instruments that disagreed
 
 The three above are one instrument giving a wrong answer. This one is **two instruments
@@ -107,6 +155,103 @@ mentions.
 **The rule this adds: after a merge, read CI's result, not the local one.** They are two
 instruments, they disagree, and the one that gates nothing is the one that had been
 believed.
+
+### A sixth: the comparison's precondition was never stated
+
+The remedy above — **run `make all` and report the counters per target, before and after** —
+is the protocol every row in `CALCIUM_FIX_PLAN.md` closes against. **It is a check only on an
+otherwise idle machine, and nothing said so.**
+
+Tier 5 came back **45** against a baseline of **44**, with C03's `T5.6` (frame-scheduler's —
+*sixty seconds idle*) the row that moved. It asserts a fraction of **wall-clock CPU**, so it
+measures the host. An unrelated training job held the machine; idle, it is five for five
+green and the suite is 44 with a failing row set *identical* to the baseline's.
+
+**Compare the row set, not the count.** Two runs at 44 with different rows failing is not the
+same result, and only the set says so. `comm` over the sorted `×` lines costs nothing.
+
+**And the diagnostic error is worth more than the rule.** I attributed the move to a mutation
+pass I *had* been running concurrently, removed it, re-measured, found the number **worse**,
+and concluded contention was excluded. It was excluded as *my* contention. **Eliminating a
+cause you control is not eliminating the cause, and quieter-yet-worse means the load is
+somewhere you have not looked.**
+
+The tell was in the first run's output: `writes === 0` passed while `cpuFraction < 0.01`
+failed. **One of a pair failing while the other passes is a discriminator** — the behavioural
+half said the frame path was silent, so the resource half could only be measuring the host.
+
+**None of this was unknown.** `test/e2e/frame-scheduler.test.ts` opens with *"This file
+measures wall-clock and must not share the machine"*, and the preamble above already says a
+rotating failure set is contention. **The gap was a reader, not a record** — which is the
+inverse of *ask where a claim was written down*, and wants the same question asked earlier:
+before filing a finding, ask where this would already be written. FINDINGS F139.
+
+### The failing set moves under load, and that is the discriminator
+
+> **Most of this section was already written, in `test/support/budget.ts`**, and it was filed
+> here as new. That file's header says it in one sentence — *"Three consecutive full runs each
+> timed out a different subset of them, and every one passed on its own — which is worse than a
+> slow suite"* — and goes on to give the per-file measured worst times, the 5× ratio the budget
+> was sized at, and a standing instruction not to raise the numbers without re-measuring.
+>
+> **This is F139's own shape, a second time in one session.** F139 exists because the rule was
+> in `frame-scheduler.test.ts`'s header and a finding was filed re-deriving it wrongly. The
+> same thing happened again, on the same subject, four hours later — which says the instrument
+> *ask where this would already be written* wants pointing at the **test support directory**
+> specifically, because that is where a measurement's reason gets written and it is not a place
+> a reader looks for a protocol.
+>
+> What survives as new is narrower and is kept below: the **composition** test, the **start and
+> end** load readings, and why a *changed* set is more misleading than an identical one.
+
+Two more instances since, and together they sharpen *compare the row set* into something that
+identifies the cause rather than merely detecting a difference.
+
+| run | load avg | failing set |
+|---|---|---|
+| baseline | quiet | — |
+| after F8 | 20.81 | C17 T3.15 (a paste budget) |
+| after F31 | 14.57 | C01 T2.9, C21 T2.7, C10 T2.8, C10 T2.9 (four source scans) |
+| quiet re-run | 4.91 | — |
+
+**A defect picks the same row every time. Contention picks a different one.** The F8 run and
+the F31 run share no failing row, and neither set overlaps the other's subject — a paste
+budget in C17 and four structural scans across C01, C10 and C21 have nothing in common except
+a clock. That is a stronger signal than the count and stronger than the set alone, and it is
+available at zero cost the moment two loaded runs exist.
+
+**The second instance also names the mechanism, which the first did not.** All four rows
+failed with *"Test timed out in 15000ms"* rather than an assertion — and the passing rows
+beside them read **10.9 s, 12.9 s, 18.4 s and 22.5 s** for work that takes about a second
+quiet. They are source scans over the whole tree, so they are I/O and CPU against a fixed
+per-row timeout: a class that converts host load directly into failure with no assertion
+involved. Worth knowing which rows those are, because *timed out* and *wrong answer* are the
+same red tick in a summary.
+
+**Gate the start and read the end, because the load moves during the run.** A third loaded
+run began at **6.43** — under the threshold a waiter had been set to — and finished at
+**33.98**, with **16** failures. Gating on the load at launch is not enough for a run that
+takes minutes; the reading that invalidates the result is the one taken *after* it, and it
+costs one command.
+
+**That third set also settles the class without a re-run.** Fifteen of the sixteen were *Test
+timed out* — thirteen at 15 s, one at 5 s, one at 20 s — and the sixteenth was the paste
+budget. **Zero assertion failures.** A change that broke something produces at least one
+assertion; a machine that ran out of time produces only deadlines. So the composition of the
+set answers the question the set's identity only hints at, and it is readable from the summary
+without running anything again.
+
+**And each was diagnosed wrongly first.** F8's run was attributed to a graph leak these rows
+had themselves introduced — a mechanism in hand is the most expensive kind of coincidence,
+because it supplies the explanation before the measurement does. The check that settled both
+costs one command: **run the failing rows alone.** C17 T3.15 passed 3/3; these four passed
+40/40.
+
+### Test ids are not unique across components
+
+`T5.6` names **six** different tier-5 rows — C03's idle CPU, C06's standalone build, C18's
+trailing `&`, C20's corrupt file, C22's piped shell, and history's corrupt file. This document
+cites `T5.6` bare in two places meaning two different rows. **Always qualify: `C03 T5.6`.**
 
 ---
 
@@ -225,6 +370,29 @@ removing the fixture made `make all` green. **Not flakiness discovered — load 
 Worth writing down because the natural reading of a timing failure during a frame-read
 session is that the change under test caused it.
 
+### The gate is its own load generator, and tier 5 runs last
+
+Measured today, three serial runs of the identical command — `make e2e` *is* `npm run e2e`, so
+the target is not the variable:
+
+| run | conditions | result |
+|---|---|---|
+| alone, idle host | load 1.7 | **16/16 files · 98 passed · exit 0** |
+| inside `make all`, after six targets | warm | 2 failed — `transport` T5.6 timed out at 75 s, `view-model` T5.3a asserted `3 to be greater than 6` |
+| alone again, idle host | load 0.77 → 2.92 | **16/16 · 98 passed · exit 0**, T5.6 at **3.16 s** |
+
+**The failing set changed**, which is the tell: an identical set across loaded runs reads as
+evidence, a different one reads as noise. And T5.6's 75 s is the same row and the same number as
+a real quadratic found earlier the same day — so *contention* was the comfortable answer and had
+already been the wrong one once. It was re-measured rather than assumed, and 3.16 s is the
+answer.
+
+**The general form: a gate that runs seven targets in sequence hands its last one a warm host.**
+`check`, `test` and `golden` are CPU-bound and finish moments before tier 5 spawns 16 PTYs with
+timing assertions in them. That is the same sentence as the busy-loop container above, with the
+gate itself in the fixture's place — so *"`make all` per target on an idle host"* is not
+fastidiousness, it is what makes the tier-5 leg mean anything.
+
 **Re-measured in step 8, and it did not reproduce.** `make fixtures` brings up `dtui-load`
 — the same shape of busy loop — and tier 5 ran green with it up: 94 passed, 7 todo,
 `E2E_WITH_LOAD_EXIT=0` read from a redirect. Both measurements are real, and neither
@@ -236,7 +404,7 @@ on an idle one now.
 
 | | with `dtui-load` up | after `make load-down` |
 |---|---|---|
-| `T5.6` — a session with no far side installed | **timed out at 75s** | **898 ms** |
+| **C06** `T5.6` — a session with no far side installed | **timed out at 75s** | **898 ms** |
 
 Eighty-three times, and the failure mode is a *hang* rather than a threshold — which is
 worse than the original `T5.3a` finding, because a timeout reads as a deadlock in the code
@@ -288,6 +456,83 @@ The third is the sharpest, because the byte stream *contained* the text — `gre
 `cannot read` at offset 26337 — and the replayed frame appeared not to. That combination
 reads as **drawn and then overwritten**, which is a real and serious defect class, and two
 minutes went into it before the cause turned out to be the `[:16]`.
+
+### A second class in the same family: the instrument that *manufactures* evidence
+
+The three rows above are one class. Here is the other, and the difference is worth stating
+because the way you find them is not the same.
+
+**A cut corrupts evidence. A misconfigured instrument manufactures it.**
+
+| | the three above | this one |
+|---|---|---|
+| what happened | real output, truncated | no output, produced |
+| what you are looking at | a frame with its edge cut off | a frame that never existed |
+| the tell | re-read the whole thing and the rows are there | nothing to re-read; the artefact is internally consistent |
+| how you find it | reading further | checking the instrument's own configuration |
+
+Diagnosing 44 red tier-5 rows, the shell was driven under `script -qc` to see what it painted.
+It painted **nothing** and stayed alive — F67's signature exactly, and a blank-screen defect
+was one step from being written down.
+
+`script -qc` allocates a **0×0** PTY. `process.stdout.columns` and `.rows` are both `0`, the
+shell has no region to draw on, and the silence was the instrument's. The same fixture through
+`node-pty` at 100×30 printed 3251 bytes and a prompt.
+
+**A truncated frame has a visible edge; a fabricated blank has nothing wrong with it.** That is
+why the second class is worse: re-reading is the habit that catches the first, and re-reading a
+blank screen produces a blank screen however carefully it is done. Only the instrument's
+configuration says which world the artefact came from — and nothing prompts you to look at it,
+because the artefact is a perfectly plausible result.
+
+The rule underneath is `test/support/README.md`'s, one level out: **a fixture must be shown to
+respond to the thing under test before it is asserted against** — and an *instrument* is a
+fixture when it is what you are reading through. For this class the demonstration is not
+optional: it is the only signal there is.
+
+The same rule caught the in-memory filesystem in `test/support/session.ts`, which answered `""`
+for a file that was never written and accepted a write into a directory that did not exist:
+correct about the interface, silent about the world. Same shape, different world — a double
+that cannot fail is a double that agrees.
+
+**What actually found the real cause** was reading the harness's spawn rather than the app's
+output: `interactivePty` builds `{ TERM, PATH }` and no `LANG`, so C02 resolves ASCII and the
+prompt is `>`. F147.
+
+### A third shape: real bytes, reassembled by a wrong model
+
+F149, and it belongs here because the family is the same and the tell is different again.
+
+The framework's own tier-5 harness reconstructs a frame as **everything after the last
+`CSI H`**, on a shape its comment states and cites: *one write per frame, beginning with a hide
+and `CSI H`*, referred to S01 §3 and C22 §6. Measured on a live session: **one home, ever.**
+C22 **I55 §6b** says the opposite in a numbered invariant — the whole-frame form is the
+*fallback*, and every ordinary frame is a **difference** with each changed row addressed by
+`cursorTo(i, 0)`. Stripping escapes throws those addresses away, so rows written to line 4 and
+line 19 arrive adjacent. A 400-row transcript came back as one line.
+
+| | the cut | the 0×0 PTY | this |
+|---|---|---|---|
+| the bytes | real, truncated | none | **real, complete** |
+| what you are looking at | a frame with its edge cut off | a frame that never existed | a frame assembled wrongly |
+| the tell | re-read and the rows are there | check the instrument's configuration | **check the model against what the subject actually emits** |
+
+**Neither of the first two tells reaches it.** Re-reading gives the same wrong screen, and the
+instrument is configured perfectly — 100 columns, 24 rows, the right terminal, the right `LANG`.
+Nothing about it is missing. It is *applying the wrong rule to correct input*, and the only
+thing that finds that is going to the source and asking what the subject emits.
+
+**And a citation is what stopped anyone going.** The claim carried two spec references, so it
+read as settled — which is the sixth blind spot pointed at a harness rather than at a plan. The
+question that reaches it is the same one: *which file holds this, and does it say so?* Twenty
+minutes. One of the two cited sections contradicts it in a numbered invariant.
+
+**Why it survived so long is the part worth carrying.** A "contains" assertion over the blob
+passes whenever the text was *ever* painted, so most rows stayed green and looked like coverage.
+Only the assertions that are about a screen rather than about a string — a row's position, a
+count, something being *gone* — could fail, and there were few of them. **An instrument can be
+wrong in a way that only the minority of assertions can see, and the majority then reads as
+corroboration.**
 
 **So: print every row, always.** A frame at 40 rows is 40 lines of output; there is no
 budget being saved. If the output genuinely needs narrowing, narrow the *columns* — the

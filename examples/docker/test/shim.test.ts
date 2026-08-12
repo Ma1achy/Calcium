@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
+import { buildManifest } from "../src/manifest.ts";
 
 const SHIM = fileURLToPath(new URL("../bin/docker-json", import.meta.url));
 
@@ -210,18 +211,23 @@ describe("A1: --json is dropped for a verb docker cannot format", () => {
  * written about `TAIL`. It was A03 §2's vacuity class arriving in a comment —
  * a sentence naming a mechanism, satisfied by the naming.
  */
-describe("F39: the shim strips a flag that selects a rendering", () => {
-  it("S4.1: --raw does not reach docker", () => {
-    expect(argvOf("inspect", "abc", "--raw", "--json")).toEqual([
-      "inspect",
-      "abc",
-      "--format",
-      "json",
-    ]);
+describe("F39: the shim no longer strips --raw, because nothing sends it", () => {
+  // **The workaround is deleted and this row records what replaced it.**
+  // `--raw` is declared `shellOnly` (C05 I21), so Calcium removes it from argv
+  // before the transport sees anything and the shim is never handed one. The
+  // rows below assert the shim is *passive* now — a second answer to a settled
+  // question is how two mechanisms drift.
+  it("S4.1: the shim passes --raw through untouched, because it never arrives", () => {
+    // Called directly with the flag, which the shell cannot now produce. If the
+    // strip came back this would fail, and so would the declaration's own test.
+    expect(argvOf("inspect", "abc", "--raw", "--json")).toContain("--raw");
   });
 
-  it("S4.2: only for inspect — no other verb has one to strip", () => {
-    expect(argvOf("ps", "--raw", "--json")).toContain("--raw");
+  it("S4.2: and the declaration is what does the work", () => {
+    const inspect = buildManifest("1").tools.find((t) => t.name === "inspect");
+    expect(inspect, "the verb the flag is on").toBeDefined();
+    const raw = inspect?.flags.find((f) => f.name === "raw");
+    expect(raw?.shellOnly, "declared, so C18 drops it from argv").toBe(true);
   });
 });
 

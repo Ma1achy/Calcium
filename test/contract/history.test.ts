@@ -208,7 +208,7 @@ describe("T2.4, T2.5, T2.6, T2.10 — the source scan, from C20's side", () => {
       })
       .join("\n");
 
-  it("no clock, no fs, no `~/.prism`, no C17, no terminal/", () => {
+  it("no clock, no fs, no hardcoded dot-directory path, no C17, no terminal/", () => {
     for (const file of filesIn("src/interaction/history")) {
       const source = code(file);
       expect(source, `${file}: the clock is injected, or a timestamp is untestable`).not.toMatch(

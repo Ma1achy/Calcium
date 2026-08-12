@@ -186,6 +186,8 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
   const occurrences: Occurrence[] = [];
   const positionals: string[] = [];
+  /** The argv the far side gets: everything except the shell's own switches. */
+  const transmitted: string[] = [];
   let terminated = false;
 
   /** Is this token a flag the tool actually declares, long or short? */
@@ -232,6 +234,31 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i] ?? "";
+
+    // **`transmitted` is built by the walk that already understands the
+    // grammar** (I21, F39). C18 needs the argv with the shell's own switches
+    // removed, and deriving it there would be a second copy of the rules below
+    // — where a value is inline or the next token, where `--` terminates. It is
+    // built here, from one pass, and returned on the success arm.
+    //
+    // A switch spans exactly one token, which is why C05 refuses `shellOnly` on
+    // anything else, and why this is a skip rather than a span.
+    //
+    // **The loop pushes one token per iteration; a valued flag spans two** (F148).
+    // `--limit 400` reached the far side as `--limit`, because the value was
+    // consumed by `i++` below and the top-of-loop push never saw it — silently,
+    // on every type and on both forms, with only `--limit=400` surviving. So
+    // each site that consumes a following token now transmits it there.
+    if (!terminated && token.startsWith("--") && !token.includes("=")) {
+      const f = byName.get(token.slice(2));
+      if (f?.shellOnly === true) {
+        // Recorded as an occurrence still: `--help` sets `args.help`, which is
+        // how the shell learns it was asked for.
+        occurrences.push({ flag: f, raw: null });
+        continue;
+      }
+    }
+    transmitted.push(token);
 
     // T3.7 — everything after `--` is positional, including tokens that look
     // like flags. A path named `--weird` is why this exists.
@@ -286,12 +313,15 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
         continue;
       }
       occurrences.push({ flag, raw: next });
+      transmitted.push(next);
       i++;
       continue;
     }
 
     if (looksLikeFlag(token)) {
-      i += readShort(token, i);
+      const consumed = readShort(token, i);
+      if (consumed === 1) transmitted.push(argv[i + 1] ?? "");
+      i += consumed;
       continue;
     }
 
@@ -460,9 +490,25 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
 
     readPositionals(args);
 
+    // **The contract, resolved here for `transmitted`'s reason** (I23, F80).
+    // `counts` is the set of flags this invocation actually gave, which is the
+    // fact C18 cannot recover without re-deriving the grammar above.
+    //
+    // `find` rather than a fold with a precedence rule: parse refuses an arm
+    // equal to the tool's default, so every arm on this tool carries the same
+    // value and the first one found is every one of them. **The arbitration is
+    // absent because the disagreement is unbuildable**, not because a policy
+    // picked a winner — which is why there is nothing here to get wrong later.
+    const deciding = tool.flags.find((f) => f.interactive !== undefined && counts.has(f.name));
+
     return errors.length > 0
       ? Object.freeze({ ok: false as const, errors: Object.freeze(errors) })
-      : Object.freeze({ ok: true as const, args: Object.freeze(args) });
+      : Object.freeze({
+          ok: true as const,
+          args: Object.freeze(args),
+          transmitted: Object.freeze([...transmitted]),
+          interactive: deciding?.interactive ?? tool.interactive === true,
+        });
   }
 
   function readPositionals(args: Record<string, unknown>): void {

@@ -135,6 +135,13 @@ fixtures-status:    ## what is up
 	@docker ps -a --filter 'name=dtui-' \
 	  --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 
+tools-test:         ## the instruments' own fixtures — known bytes in, stated frame out
+	@# **The repository's runner, not this directory's own list.** Six of the
+	@# instruments are the app's and ten are the framework's, and two lists is
+	@# how one of them stops being run. `make instruments` at the root is the
+	@# same target; this is the door from here.
+	@cd ../.. && node tools/instruments.mjs
+
 help:
 	@grep -E '^[a-z-]+:.*?##' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN{FS=":.*?## "};{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}'

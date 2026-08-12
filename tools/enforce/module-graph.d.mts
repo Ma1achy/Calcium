@@ -37,6 +37,18 @@ export declare function checkOneStorePerComponent(
 /** Members whose absence from the rest of `src/` is deliberate, each with why (MG24). */
 export declare const UNCONSUMED_MEMBERS: Readonly<Record<string, string>>;
 
+/** Which component owns a file, by longest `OWNERS` prefix; unowned files are their own. */
+export declare function componentOf(file: string): string;
+
+/**
+ * MG24's wide reading — members never called outside their own component.
+ * Reported in the summary, never gated on: 27% of the surface qualifies. F94.
+ */
+export declare function componentSeamSignal(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): { members: number; withinComponent: string[] };
+
 /**
  * MG24 — a member of an `export interface` under `src/` is named somewhere else
  * under `src/`. A component complete on its own side of a seam, with nothing on
@@ -62,3 +74,20 @@ export declare function checkFunctionConsumers(
   readFile?: (f: string) => string,
   allowed?: Readonly<Record<string, string>>,
 ): Violation[];
+
+/**
+ * MG27 — a field a block type carries that no builder sets (C24 I20, F114).
+ *
+ * `omissions` is a parameter rather than only a module constant so the
+ * fabricated violation can drive both arms: a field with a recorded reason must
+ * be excused, and an entry naming a field the builder now sets must itself
+ * fire. A rule tested only against its real allow-list tests one of the two.
+ */
+export declare function checkBuilderCoverage(
+  files: readonly string[],
+  readFile?: (f: string) => string,
+  omissions?: Readonly<Record<string, string>>,
+): Violation[];
+
+/** MG27's reasons, keyed `Kind.field`. */
+export declare const BUILDER_OMISSIONS: Readonly<Record<string, string>>;

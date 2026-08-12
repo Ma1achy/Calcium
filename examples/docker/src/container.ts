@@ -23,7 +23,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Adapter, Block, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
 import { bar, percent } from "./dashboard.ts";
 import { axisCaption, capFor, createRing, TICK_MS } from "./history.ts";
 import type { Ring } from "./history.ts";
@@ -205,39 +205,51 @@ export function detailsBlock(row: Row | null): Block {
 }
 
 /**
- * One tick of CPU, as the driver's `fetch`.
+ * One tick of CPU, as the driver's **derivation** (C23 I47).
+ *
+ * **It used to be the `fetch`, and moving it is the whole of this app's share of
+ * F91.** `cpu` and `io` both ran `docker container stats --no-stream <id>` every
+ * two seconds — the identical argv, twice, each holding a different sample of
+ * the same instant. They could not share one poll while this function *was* the
+ * poll: its side effect on the ring is what the sibling's fetch does not have,
+ * so one shared `fetch` would have stopped the ring silently. Calcium's rule is
+ * the general form of that:
+ *
+ * > Per-part state is view state only. Anything that accumulates belongs in a
+ * > derivation.
+ *
+ * **`began` first, `took` after** (walk A2), unchanged in meaning: the attempt is
+ * counted before anything can go wrong with reading it.
+ *
+ * **And the sample lands here, not in `render`** (walk A3), which the fold makes
+ * structural rather than a discipline: a derivation runs once per source version
+ * and a `render` runs once per part, so a sample recorded in `render` would be
+ * pushed twice the moment a second part read the same source.
+ *
+ * **What the fold cannot see, and it is a real loss** (FINDINGS F137). A fold
+ * runs on a *version*, and a version exists only when the fetch resolved — so a
+ * tick that failed at the transport is no longer counted as an attempt. The two
+ * misses are not the same: a container that has stopped still resolves and still
+ * reaches `took(null)`, which is the common one and is unchanged. What is gone is
+ * `docker` itself failing, and there the driver renders the error arm and the
+ * panel says so outright, so the caption's divergence was the weaker of two
+ * signals for one event.
  *
  * **Extracted, and the reason is a finding.** `b.live` holds its declaration in
  * a `WeakMap` beside the document and exports neither the map nor
- * `liveDeclarations`, so an app cannot reach the `fetch` and `render` it just
- * declared. Without this seam walk A2, A3 and A8 would be assertable only
- * through the whole driver — which is the shape that made every one of this
- * branch's four wiring defects invisible. FINDINGS F28.
- *
- * **`began` first, `took` after** (walk A2). A rejection is still a tick, and a
- * count taken only on success cannot see the stall it exists to report — so the
- * attempt is counted before anything can go wrong with it, and the catch records
- * the miss before rethrowing so the driver still renders its error.
- *
- * **And the sample lands here, not in `render`** (walk A3). `render` runs once
- * per successful fetch and can throw; a sample recorded there would be lost by a
- * render failure while the tick count stayed right — a hole in the data with no
- * evidence of one. Here the ring is already true and the next good tick draws it.
+ * `liveDeclarations`, so an app cannot reach what it just declared. Without this
+ * seam walks A2, A3 and A8 would be assertable only through the whole driver —
+ * the shape that made every one of this branch's four wiring defects invisible.
+ * FINDINGS F28.
  */
-export function createCpuTick(ring: Ring, read: () => Promise<Row | null>): () => Promise<unknown> {
-  return async () => {
+export function cpuFold(ring: Ring): (data: unknown) => Ring {
+  return (data) => {
     ring.began();
-    let measured: Row | null;
-    try {
-      measured = await read();
-    } catch (err) {
-      ring.took(null);
-      throw err;
-    }
+    const measured = data as Row | null;
     // `--` for a container that has stopped. Absent is not zero (walk A8,
     // DASHBOARD_WALK A3): zero would draw it idling, and it is not idling.
     ring.took(measured === null ? null : percent(str(measured, "CPUPerc")));
-    return measured;
+    return ring;
   };
 }
 
@@ -277,7 +289,18 @@ export function containerView(row: Row, width: number, unicode = true): readonly
   ring.began();
   ring.took(percent(str(row, "CPUPerc")));
 
-  const tickCpu = createCpuTick(ring, () => readStats(id));
+  /**
+   * **One key, and it carries the container id** (C24 I27, F91).
+   *
+   * The two parts below read one `docker container stats --no-stream <id>` where
+   * they used to run two — the same command, twice, two seconds apart, each
+   * drawing a different sample of the same instant. Parametrised by `id` because
+   * the sameness being claimed is *this container's stats*: two drill-ins share
+   * nothing, which is what `createRing` inside this call already says about the
+   * history.
+   */
+  const source = `container-stats:${id}`;
+  const fetch = (): Promise<Row | null> => readStats(id);
 
   return [
     b.kv({ CONTAINER: name || id, ID: id }, { id: "container-head" }),
@@ -285,7 +308,11 @@ export function containerView(row: Row, width: number, unicode = true): readonly
       id: "cpu",
       title: "CPU",
       every: TICK_MS,
-      fetch: tickCpu,
+      source,
+      fetch,
+      // The accumulation, folded once per poll and shared — not a side effect of
+      // this part's own fetch, which is what stopped these two sharing one.
+      derive: { key: `cpu-ring:${id}`, compute: cpuFold(ring) },
       render: () => cpuBlock(ring, undefined, unicode),
       renderLoading: () => cpuBlock(ring, undefined, unicode),
       // Overridden so the history survives the failure that made it
@@ -298,7 +325,8 @@ export function containerView(row: Row, width: number, unicode = true): readonly
       id: "io",
       title: unicode ? "MEMORY · NETWORK · BLOCK" : "MEMORY - NETWORK - BLOCK",
       every: TICK_MS,
-      fetch: () => readStats(id),
+      source,
+      fetch,
       render: (data) => ioBlock(data as Row | null, unicode),
       renderLoading: () => ioBlock(row, unicode),
     }),
@@ -333,10 +361,16 @@ export function containerView(row: Row, width: number, unicode = true): readonly
  * screen by the time this runs (C22 I45 pushes at step 3), so returning nothing
  * useful would leave a reader looking at a spinner that stopped.
  */
-export function createContainerAdapter(unicodeText: () => boolean = () => true): Adapter {
+/**
+ * **The `unicodeText` parameter is gone** (F54, F124). It was one boolean
+ * threaded through eight functions because `AdapterContext` carried `width` and
+ * no capabilities; `ctx.capabilities` is the resolved record now, so the adapter
+ * asks rather than being told by an app that computed it wrongly.
+ */
+export function createContainerAdapter(): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       const failed = result.exitCode !== 0;
       const row = failed ? null : (parseNdjson(result.stdoutRaw).rows[0] ?? null);
 
@@ -349,7 +383,7 @@ export function createContainerAdapter(unicodeText: () => boolean = () => true):
       const blocks: readonly Block[] =
         row === null
           ? [b.notice.error(failure)]
-          : containerView(row, ctx.width, unicodeText());
+          : containerView(row, ctx.width, ctx.capabilities.unicode !== "ascii");
 
       return {
         schema: "tui.view/1",
@@ -361,17 +395,7 @@ export function createContainerAdapter(unicodeText: () => boolean = () => true):
         // FINDINGS F35.
         ...(row === null ? { error: { message: failure, stage: "adapter" as const } } : {}),
         blocks,
-        meta: {
-          verb: ctx.verb,
-          adapter: "container-stats",
-          exitCode: result.exitCode ?? 0,
-          durationMs: result.durationMs,
-          truncated: false,
-          argv: result.argv,
-          stderr: result.stderr,
-          transport: ctx.transport,
-          origin: ctx.origin,
-        },
+        meta: { adapter: "container-stats", truncated: false },
       };
     },
   };

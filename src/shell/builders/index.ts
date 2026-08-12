@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { block, cell } from "../../data/viewmodel/index.js";
+import { cell, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -109,7 +109,7 @@ function finish<B extends Block>(spec: B, opts: BlockOpts | undefined, gapDefaul
   // unequal. T4.6's pairing assertion found exactly that.
   const withGap = gap ? { ...spec, gapBefore: true } : spec;
 
-  const built = block(withGap as B);
+  const built = rebuild(withGap as B);
   if (explicit === undefined) defaulted(built);
   return built;
 }
@@ -225,9 +225,22 @@ function table(
     rows: readonly TableRow[];
     showHeader?: boolean;
     emptyMessage?: string;
+    /**
+     * Which column the rows are already ordered by, and which way (F114).
+     *
+     * **Found by MG27 and by nothing else.** `ColumnDef.sortable` was reachable
+     * from `b.col` throughout, so a surface could mark a column sortable and
+     * never say which one the data arrived sorted on — the indicator C11 draws
+     * had no way to be told. The pair reads as covered because half of it is,
+     * which is why a hand audit walked past it twice.
+     *
+     * It is a statement about the data, not an instruction: C11 renders the
+     * marker and reorders nothing.
+     */
+    sort?: Readonly<{ key: string; direction: "asc" | "desc" }>;
   },
 ): Table {
-  const { id: _id, gapBefore: _gap, columns, rows, showHeader, emptyMessage } = spec;
+  const { id: _id, gapBefore: _gap, columns, rows, showHeader, emptyMessage, sort } = spec;
   return finish<Table>(
     {
       kind: "table",
@@ -236,6 +249,7 @@ function table(
       rows,
       ...(showHeader === undefined ? {} : { showHeader }),
       ...(emptyMessage === undefined ? {} : { emptyMessage }),
+      ...(sort === undefined ? {} : { sort }),
     } as Table,
     spec,
     true,
@@ -304,9 +318,18 @@ function events(input: readonly EventLine[], opts?: BlockOpts): Events {
 }
 
 /**
- * **`yMin` and `yMax` are here and `yFormat`, `xLabels` and `emptyMessage` are
+ * **`yMin`, `yMax` and `yFormat` are here; `xLabels` and `emptyMessage` are
  * not** — C24 §4 carries the reasoning for each, and this comment carries the
  * one that made the pin urgent.
+ *
+ * **`yFormat` was withheld and the reason was about the naming** (C04 I41, F31).
+ * C24 §4 said exposing it *"wants either a second format or a sentence at the
+ * call site, and neither is a builder change"* — accurate about the trap, and it
+ * treated the trap as grounds for withholding rather than as the thing to fix.
+ * `percent` multiplied by 100, so the obvious call against a far side emitting
+ * `100.2` rendered `10020%`. With the arms named for the unit that arrives —
+ * `fraction` takes `0.84`, `percent` takes `100.2` — there is no sentence left
+ * to put at a call site, and the field comes here.
  *
  * Absent a pin the range is the data's, so a series that is genuinely flat is
  * drawn against its own noise. A CPU plot watching a container pinned at 100%
@@ -325,9 +348,10 @@ function plot(
     axes?: boolean;
     yMin?: number;
     yMax?: number;
+    yFormat?: Plot["yFormat"];
   },
 ): Plot {
-  const { series, height, axes, yMin, yMax } = spec;
+  const { series, height, axes, yMin, yMax, yFormat } = spec;
   return finish<Plot>(
     {
       kind: "plot",
@@ -338,6 +362,7 @@ function plot(
       ...(axes === undefined ? {} : { axes }),
       ...(yMin === undefined ? {} : { yMin }),
       ...(yMax === undefined ? {} : { yMax }),
+      ...(yFormat === undefined ? {} : { yFormat }),
     } as Plot,
     spec,
     true,
@@ -380,9 +405,20 @@ function code(language: string, text: string, opts?: BlockOpts & { wrap?: boolea
   );
 }
 
-function comparison(rows: readonly ComparisonRow[], opts?: BlockOpts): Comparison {
+function comparison(
+  rows: readonly ComparisonRow[],
+  opts?: BlockOpts & Readonly<{ labels?: readonly [string, string] }>,
+): Comparison {
   return finish<Comparison>(
-    { kind: "comparison", id: idOf(opts, "comparison"), rows } as Comparison,
+    {
+      kind: "comparison",
+      id: idOf(opts, "comparison"),
+      rows,
+      // Absent stays absent rather than defaulting to `["a", "b"]` — the header
+      // is C09's and a builder writing the default in would make every block
+      // claim a labelling it was never given (F33).
+      ...(opts?.labels === undefined ? {} : { labels: opts.labels }),
+    } as Comparison,
     opts,
     true,
   );
@@ -394,9 +430,28 @@ function patch(
     language: string;
     hunks: readonly Hunk[];
     layout?: "unified" | "split";
+    /**
+     * What was elided **below the last hunk** (F41).
+     *
+     * `Hunk.collapsedBefore` was already reachable, so a patch could say what it
+     * skipped above each hunk and never what it skipped below the last one — a
+     * 44-line file with one hunk near the top ended in thirty lines that simply
+     * stopped. The block documented the field at length; the builder passed four
+     * of its six.
+     */
+    collapsedAfter?: number;
+    /**
+     * Row actions, found by MG27 rather than by a consumer (F114).
+     *
+     * `Patch` has carried them since C25 and no builder passed them, so no app
+     * could put `↗ open in editor` on a diff. Nothing reached for it, which is
+     * the point of the rule: an omission nobody has tripped over yet is exactly
+     * the one a hand audit walks past.
+     */
+    actions?: readonly Action[];
   },
 ): Patch {
-  const { path, language, hunks, layout } = spec;
+  const { path, language, hunks, layout, collapsedAfter, actions } = spec;
   return finish<Patch>(
     {
       kind: "patch",
@@ -405,6 +460,8 @@ function patch(
       language,
       hunks,
       ...(layout === undefined ? {} : { layout }),
+      ...(collapsedAfter === undefined ? {} : { collapsedAfter }),
+      ...(actions === undefined ? {} : { actions }),
     } as Patch,
     spec,
     true,
@@ -535,12 +592,6 @@ export type {
  * `retryInMs` only the backoff can supply.
  */
 function live(spec: LiveSpec): Panel {
-  if (spec.fetch === undefined && spec.stream === undefined) {
-    throw new Error("b.live needs a `fetch` or a `stream`");
-  }
-  if (spec.fetch !== undefined && spec.stream !== undefined) {
-    throw new Error("b.live takes `fetch` or `stream`, not both — they are exclusive");
-  }
   // **Thrown, not warned** (C24 T3.6). The row said *warns* and a builder has no
   // sink: SS33 bans `console.*`, C02's warnings are C22's channel, and putting a
   // notice where the loading render goes lets a cosmetic mistake change the first
@@ -559,7 +610,11 @@ function live(spec: LiveSpec): Panel {
   // around rather than a way past it.
   const loading =
     spec.renderLoading?.() ??
-    noticeOf("muted", "loading…", undefined, { id: `${spec.id}-loading` });
+    // **The `pending` glyph rather than an ellipsis in the text** (C09 I22,
+    // F122). A builder runs above the renderer, so a character written here
+    // cannot be substituted — and the mark this wanted is one C09 already
+    // carries, with `.` for a terminal that cannot draw `◌`.
+    noticeOf("muted", "loading", "pending", { id: `${spec.id}-loading` });
   const panel = finish<Panel>(
     { kind: "panel", id: spec.id, title: spec.title, children: [loading] } as Panel,
     spec,

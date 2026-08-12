@@ -287,34 +287,68 @@ switch (mode) {
   }
 
   case "scheduler-idle": {
-    // T5.6 — no polling render loop. Acquire, commit nothing, and report what
-    // was written and what it cost.
+    // C03 T5.6 — no polling render loop. Acquire, commit nothing, and report
+    // what was written and what it cost.
+    //
+    // **Two phases in one process, and the first is the control** (F139). The
+    // absolute `cpuFraction` this used to report is the *process's* CPU over
+    // wall-clock, and under host contention it inflates four-fold with nothing
+    // about C03 having changed: measured 0.0121, 0.0153, 0.0245, 0.0275 and
+    // 0.0414 against a bound of 0.01 while an unrelated job held the machine,
+    // and five for five under it once the machine was idle.
+    //
+    // A wider constant would lose the defect the row exists to catch, and
+    // skipping on a loaded host is a row that stops running. So the phases are
+    // the remedy: half the window with **no scheduler**, half with one, in the
+    // same process, back to back. Whatever the host is doing lands in both, and
+    // the *difference* is C03's marginal cost — which is what "there is no
+    // polling render loop" actually claims. A polling loop shows up as a delta
+    // at any level of load.
+    //
+    // The baseline is reported as well as subtracted, because it is also the
+    // load measurement: a reader seeing `baselineFraction` near the old bound
+    // knows the host was busy without having to guess.
     const seconds = Number(process.argv[3] ?? 60);
+    const half = (seconds * 1000) / 2;
     const lifecycle = make();
     lifecycle.acquire();
 
-    let frames = 0;
-    makeScheduler(lifecycle, () => {
-      frames += 1;
-    });
-
-    const before = writes;
-    const cpu0 = process.cpuUsage();
-    const t0 = performance.now();
+    const beforeBase = writes;
+    const baseCpu0 = process.cpuUsage();
+    const baseT0 = performance.now();
 
     setTimeout(() => {
-      const elapsed = performance.now() - t0;
-      const cpu = process.cpuUsage(cpu0);
-      const written = writes - before;
-      lifecycle.release();
-      report({
-        frames,
-        writes: written,
-        elapsedMs: elapsed,
-        cpuFraction: (cpu.user + cpu.system) / 1000 / elapsed,
+      const baseElapsed = performance.now() - baseT0;
+      const baseCpu = process.cpuUsage(baseCpu0);
+      const baseWrites = writes - beforeBase;
+
+      // Phase two — the same idling process, now with a scheduler in it.
+      let frames = 0;
+      makeScheduler(lifecycle, () => {
+        frames += 1;
       });
-      process.exit(0);
-    }, seconds * 1000);
+
+      const before = writes;
+      const cpu0 = process.cpuUsage();
+      const t0 = performance.now();
+
+      setTimeout(() => {
+        const elapsed = performance.now() - t0;
+        const cpu = process.cpuUsage(cpu0);
+        const written = writes - before;
+        lifecycle.release();
+        report({
+          frames,
+          writes: written,
+          elapsedMs: elapsed,
+          cpuFraction: (cpu.user + cpu.system) / 1000 / elapsed,
+          baselineWrites: baseWrites,
+          baselineElapsedMs: baseElapsed,
+          baselineFraction: (baseCpu.user + baseCpu.system) / 1000 / baseElapsed,
+        });
+        process.exit(0);
+      }, half);
+    }, half);
     break;
   }
 

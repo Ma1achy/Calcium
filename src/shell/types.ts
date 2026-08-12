@@ -11,14 +11,15 @@
  */
 
 import type { ConfirmHost } from "./confirm.js";
-import type { Adapter, AdapterRegistry } from "../data/adapters/index.js";
-import type { Manifest, ManifestDocument, ManifestStore } from "../data/manifest/index.js";
+import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
+import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { DocumentView } from "./document-view.js";
 import type { PatchView } from "./patch-view.js";
+import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
@@ -30,7 +31,7 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { TerminalLifecycle } from "../terminal/lifecycle.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { TranscriptStore } from "../viewport/transcript/index.js";
-import type { LocalHandler } from "./local/registry.js";
+import type { LocalContext, LocalHandler } from "./local/registry.js";
 import type { ExecutionWrites } from "./state.js";
 
 /** The five triggers of §8. Three reach `stop`; two are C01's (I4). */
@@ -92,13 +93,22 @@ export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
  * `beforeRelease` cannot await, and the append in flight at exit is the command
  * the user has just typed.
  */
+/**
+ * **`exists` was removed rather than allow-listed.** It was declared here,
+ * implemented in `session.ts` over `fs.access`, supplied by both test fakes,
+ * and called by nothing anywhere — MG24's own disposition is *wire it or remove
+ * it*, and there was nothing to wire it to: `mkdir` is `recursive: true`, so a
+ * prior existence check would be a call whose answer changes nothing.
+ *
+ * Narrowing a public type is cheap now and a breaking change after the freeze,
+ * which is the whole argument for doing it here. FINDINGS F96.
+ */
 export interface FileSystem {
   readFile(path: string): Promise<string>;
   writeFile(path: string, data: string): Promise<void>;
   appendFile(path: string, data: string): Promise<void>;
   appendFileSync(path: string, data: string): void;
   mkdir(path: string): Promise<void>;
-  exists(path: string): Promise<boolean>;
   /**
    * C19's `ReadDir`, for the path and executable completion sources (§2b).
    *
@@ -119,6 +129,15 @@ export interface FileSystem {
  */
 export interface Pipeline {
   submit(line: string): void;
+  /**
+   * What the pipeline's bare catches swallowed (C23 I48, F15).
+   *
+   * **Returned, never emitted** — C02's ruling taken a third time, after C20.
+   * C23 decides what is wrong; C22 §8 step 3 decides when the user is told, on
+   * the restored primary screen, because a diagnostic written to the alternate
+   * screen is discarded with it.
+   */
+  readonly faults: readonly string[];
   seal(): void;
   readonly sealed: boolean;
   /**
@@ -161,6 +180,27 @@ export interface Pipeline {
    * as the backstop it was; this is the trigger C23 I33's set was missing.
    */
   releaseView(): void;
+  /**
+   * Something moved on screen, so which hosts are visible may have changed
+   * (C23 I46).
+   *
+   * **Heard rather than polled**, which is I33's disposition for eviction one
+   * level down. A paused source is not what the timer arms to — arming to an
+   * overdue source nobody is looking at would spin at zero — so without this
+   * signal a scroll back into view would resume nothing until the next unrelated
+   * wake-up, and a session whose only live parts were off screen would never
+   * resume at all.
+   */
+  visibilityChanged(): void;
+  /**
+   * The producer context, for C22's greeting (C22 I53, C23 I40).
+   *
+   * **Exposed so there is one builder rather than two.** The greeting fires
+   * from `session.ts`, which holds the lifecycle, the capabilities and the
+   * registry and could assemble a second one — which is the two-records defect
+   * the grant exists to close, reproduced one file over.
+   */
+  producerContext(): ProducerContext;
   /**
    * C22's identity loop signalling a transition worth saying out loud (C23 §3b).
    *
@@ -230,6 +270,22 @@ export type PipelineDeps = Readonly<{
   adapters: AdapterRegistry;
   manifest: ManifestStore;
   blocks: BlockRegistry;
+  /**
+   * C02's **resolved** record, for `ProducerContext.capabilities` (C07 I19).
+   *
+   * The resolved one, not `detect()`'s: overrides are applied at construction
+   * (C22 I49), and a second derivation is F124 reproduced inside the framework.
+   */
+  capabilities: TerminalCapabilities;
+  /**
+   * The region a view fills (C15 §4) — for `ProducerContext.height` on the one
+   * route where a bound exists (C07 I18).
+   *
+   * The same source `documentView` reads, rather than a second computation of
+   * it: two answers to *how big is the region* is how a producer splits against
+   * an axis the frame does not use.
+   */
+  region: () => Readonly<{ width: number; height: number }>;
   editor: LineEditor;
   overlays: OverlayManager;
   /**
@@ -242,6 +298,15 @@ export type PipelineDeps = Readonly<{
   patchView: PatchView;
   /** C22 §13a — raised when a verb's declaration says its result is a view. */
   documentView: DocumentView;
+  /**
+   * Whether anyone is looking at a live part's host (C23 I46).
+   *
+   * **Answered by C22 and not by the pipeline**, because the answer is C14's for
+   * an entry and C15's for a layer, and a pipeline reaching into two stores to
+   * decide when to poll is the seam A02 Seam 4 exists to hold. It is also why
+   * `refresh.ts` still imports nothing from `viewport/` but a type.
+   */
+  visible: (host: RefreshHost) => boolean;
   /**
    * `ctx.ask`'s host (C23 I36).
    *
@@ -315,6 +380,12 @@ export type TuiConfig = Readonly<{
    * existed there was no way to satisfy it.
    */
   localHandlers?: Readonly<Record<string, LocalHandler>>;
+  /**
+   * **Not the type `createTui` accepts.** This field is what the shell reads;
+   * `ExactLocalHandlers` is what the call site must satisfy (C23 I39). The two
+   * differ because a handler assignable to `LocalHandler` may still have
+   * declared a context it cannot be told anything through.
+   */
   commandPolicy?: CommandPolicy;
   completionSources?: readonly CompletionSource[];
   chrome?: Readonly<{ header: ChromeFn; footer: ChromeFn }>;
@@ -329,8 +400,22 @@ export type TuiConfig = Readonly<{
    *
    * C02 and C21 each take one and **no file under `src/` reads `process.env`** —
    * not even C02, which is allow-listed for it and does not use the allowance.
-   * Omitted, it defaults to `{}`, and the shell degrades to ASCII with no
-   * colour: the safe direction, and the alternative is a fifth required field.
+   * **Omitted, it defaults to `{}`, and the shell refuses to open** (C22 I61).
+   * The sentence here used to say it *"degrades to ASCII with no colour: the
+   * safe direction"*, which was true about two of the three consequences and
+   * silent about the one that ends the process (F8). C02 derives
+   * `bracketedPaste`, `mouse` and `altScreen` from one `usable` flag that is
+   * false without `TERM`:
+   *
+   *     env {} → altScreen: false  colourDepth: 1  unicode: ascii
+   *
+   * Colour and unicode do degrade. `altScreen` is not a fallback — it is the
+   * one hard requirement (C02 I7) — so the safe direction was the opposite of
+   * what the default does, and it read as reassurance while being the failure.
+   *
+   * The default stands, because a fifth required field is what I17 forbids and
+   * R01 §1 tests. What changed is that gate 3b now names `env` at the point of
+   * exit instead of leaving C01 to name a capability the author never mentioned.
    */
   env?: Readonly<NodeJS.ProcessEnv>;
   /**
@@ -363,7 +448,7 @@ export type TuiConfig = Readonly<{
   cwd?: string;
   clock?: () => number;
   fs?: FileSystem;
-  /** Default `~/.prism`. The **app** resolves `PRISM_TUI_STATE_DIR` (I20). */
+  /** Default `.calcium`, beside the project. The **app** resolves its own variable (I20). */
   stateDir?: string;
   /** Default: the OS handler, http/https only. */
   openUrl?: (url: URL) => Promise<void>;
@@ -406,8 +491,86 @@ export type TuiConfig = Readonly<{
    * is cleared — **not** until the first command (C23 I9, C23 I33). An app that
    * wants launch cheap omits `every` and gets a one-shot.
    */
-  greeting?: () => ViewDocument | Promise<ViewDocument>;
+  greeting?: (ctx: ProducerContext) => ViewDocument | Promise<ViewDocument>;
 }>;
+
+/**
+ * C23 I39 — a local handler's context is obligatory, and a wider parameter is
+ * refused.
+ *
+ * **A parameter type may always be wider than what is passed.** That is not a
+ * gap in `LocalContext`'s declaration; it is how function assignability works,
+ * and it always will be. So a handler written `(argv, ctx: { command: string })`
+ * is legal TypeScript that compiles, registers, runs, and **can never see a
+ * field the framework adds** — measured at four of the reference app's eight
+ * handler families, where the split is exact: the four that name the type are
+ * the four that call `ask` (F125).
+ *
+ * The sentence that published `LocalContext` — *a handler that asks cannot name
+ * the type of the thing it is asking through* — is true about the handlers it
+ * describes and silent about the other half. MG24's shape (F84), and the second
+ * instance of a correct sentence justifying a scope it does not reach.
+ *
+ * **This is C07 I13's `never` keys in reverse.** There a supplied return value
+ * the registry discards fails to compile rather than failing to matter; here it
+ * is a declared parameter. It is the direction with something to bite on: F13's
+ * narrowing landed correctly and changed nothing at four call sites, because a
+ * hand-written shape was structurally assignable.
+ *
+ * **A check on the declaration, not on assignability.** *The parameter is
+ * invariant* would be the wrong description: variance governs whether a function
+ * is assignable to `LocalHandler`, and this never asks that — it recovers the
+ * declared type through `infer` and tests it directly. Which is why the shape
+ * variance would have let through is refused too: an **object method**, whose
+ * parameters are bivariant, is rejected exactly as an arrow is. Probed across a
+ * named const, an inline arrow, an object method and a pre-typed record.
+ *
+ * **Only one direction is new, and the mutation pass is what said so.** A
+ * handler declaring `LocalContext & { extra }` is *already* refused by
+ * assignability alone — a parameter wider than what is passed has never been
+ * legal. What this adds is the **narrower** arm and the **optional** one; the
+ * mutual form is how the check is written, not the work it does. Removing it
+ * from `createTui` kills three of the four tier-6 rows and leaves the wider one
+ * passing, which is the row being a restatement of a rule it does not test.
+ *
+ * The four arms, each measured by probe before this was written down:
+ *
+ * | declared | verdict |
+ * |---|---|
+ * | `ctx: LocalContext`, or typed as `LocalHandler` | accepted |
+ * | no second parameter at all | accepted — nothing declared, nothing to miss |
+ * | `ctx: { command: string }` · `ctx: LocalContext & { … }` | refused |
+ * | `ctx?: …`, whatever the type | refused |
+ *
+ * **The optional arm is not pedantry and the first version of this type got it
+ * wrong twice.** `ctx?: LocalContext` declares a handler that may run with no
+ * context, which is exactly the direct-call shape this exists to kill — the
+ * reference app invokes a handler outside the shell with an object literal that
+ * has no `ask` and compiles. And the first draft refused a handler taking only
+ * `argv`, because `infer C` on a one-parameter function yields `unknown`. Both
+ * were found by the probe and neither is visible in the type.
+ */
+export type ExactLocalHandlers<T> = {
+  [K in keyof T]: T[K] extends (...a: infer A) => unknown
+    ? A["length"] extends 0 | 1
+      ? T[K]
+      : A extends readonly [readonly string[], (infer C)?, ...unknown[]]
+        ? [LocalContext] extends [C]
+          ? [C] extends [LocalContext]
+            ? T[K]
+            : never
+          : never
+        : never
+    : never;
+};
+
+/**
+ * What `createTui` accepts: a `TuiConfig` whose handlers have named their
+ * context (C23 I39). The shell reads `TuiConfig`; the boundary checks this.
+ */
+export type TuiConfigInput<C extends TuiConfig> = C & {
+  localHandlers?: ExactLocalHandlers<C["localHandlers"]>;
+};
 
 export interface TuiInstance {
   start(): Promise<void>;
@@ -426,6 +589,27 @@ export class SessionStateError extends Error {
   ) {
     super(`cannot ${operation}() while ${state}: stopped is terminal — construct a new session`);
     this.name = "SessionStateError";
+  }
+}
+
+/**
+ * Thrown by gate 3b when the resolved record cannot open a terminal (I61, T3.20).
+ *
+ * **It names the cause; C01's refusal could only name the consequence** (F8). C01
+ * raises *"alternate screen unsupported — the shell cannot open"* and is entitled
+ * to nothing but the capability record, so an author who omitted `env` was told
+ * about a capability they never mentioned. C22 holds the record and the config
+ * and is the only layer that holds both.
+ *
+ * `remedy` is the config field or variable to change, not a description of the
+ * failure — it is what the reader has to go and edit. **Not `cause`**: `Error`
+ * has carried that member since ES2022, and shadowing it would put the string
+ * where every logger looks for a nested error.
+ */
+export class UnusableTerminalError extends Error {
+  constructor(readonly remedy: string) {
+    super(`the terminal cannot open: no alternate screen — ${remedy}`);
+    this.name = "UnusableTerminalError";
   }
 }
 

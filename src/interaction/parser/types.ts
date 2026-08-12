@@ -70,6 +70,20 @@ export type ParseResult =
       argv: readonly string[];
       residual: readonly string[];
       validation: ValidationResult;
+      /**
+       * The resolved terminal contract (I28, C05 I23).
+       *
+       * **The same member the `shell` arm has carried since C18 §5, meaning the
+       * same thing** — the contract *this invocation* has, not the one its verb
+       * declares. C23 used to read `result.tool.interactive` here and
+       * `result.interactive` there, and the asymmetry read as one fact with one
+       * home. It was one home for a declaration: `docker run` attaches by
+       * default and detaches with `-d`, so the declaration cannot answer for the
+       * invocation (F80).
+       *
+       * Carried rather than re-derived, exactly as `validation` is (I4).
+       */
+      interactive: boolean;
     }>
   | Readonly<{
       kind: "local";

@@ -336,6 +336,10 @@ describe("§6 — the default table (C17 I12)", () => {
       "liveBlock escape": ["\u001b"],
       "liveBlock down": ["\u001b[B", "\u001bOB"],
       "liveBlock up": ["\u001b[A", "\u001bOA"],
+      // F21's binding. `\r` is what a terminal sends for Return, and it is the
+      // same byte `overlay enter` resolves — which is the argument for the key:
+      // a reader who has accepted a menu item has already learnt it.
+      "liveBlock enter": ["\r"],
     };
 
     const keymap = createKeymap(defaultKeymap);

@@ -14,6 +14,7 @@ import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { createTui } from "../../src/shell/session.js";
 import type { FileSystem, TuiConfig, TuiInstance } from "../../src/shell/types.js";
 import { fakeStdin, fakeStdout, type FakeStdin, type FakeStdout } from "./fake-terminal.js";
+import { screenFrom, type Screen } from "./screen.js";
 
 /**
  * **What an author writes, and nothing more** (C22 I23a).
@@ -37,6 +38,28 @@ export const MANIFEST: TuiConfig["manifest"] = {
 
 export function fakeFs(): FileSystem {
   const files = new Map<string, string>();
+  /**
+   * **Directories, because `mkdir: () => Promise.resolve()` is a fake that
+   * supplies the behaviour.** F96 was a missing `mkdir` call that no test could
+   * see: every write here succeeded whether or not anything had created the
+   * directory, so the one precondition the real filesystem imposes was the one
+   * the double removed. The suite was correct about the interface and silent
+   * about the world.
+   *
+   * A write to a path whose parent was never created now rejects ENOENT, as
+   * `node:fs` does. That is `test/support/README.md`'s rule — *a fixture must be
+   * shown to respond to the thing under test* — applied to the filesystem.
+   */
+  const dirs = new Set<string>();
+  const parentOf = (p: string) => p.slice(0, Math.max(0, p.lastIndexOf("/")));
+  const ensure = (p: string) => {
+    const dir = parentOf(p);
+    if (dir !== "" && !dirs.has(dir)) {
+      throw Object.assign(new Error(`ENOENT: no such file or directory, open '${p}'`), {
+        code: "ENOENT",
+      });
+    }
+  };
   return {
     // **Throws when absent, as `node:fs` does.** It used to answer `""`, which
     // collapses *no file* into *an empty file* — and C22 I40 is the one caller
@@ -56,16 +79,31 @@ export function fakeFs(): FileSystem {
       return Promise.resolve(held);
     },
     writeFile: (p, d) => {
+      try {
+        ensure(p);
+      } catch (err) {
+        return Promise.reject(err);
+      }
       files.set(p, d);
       return Promise.resolve();
     },
     appendFile: (p, d) => {
+      try {
+        ensure(p);
+      } catch (err) {
+        return Promise.reject(err);
+      }
       files.set(p, (files.get(p) ?? "") + d);
       return Promise.resolve();
     },
-    appendFileSync: (p, d) => void files.set(p, (files.get(p) ?? "") + d),
-    mkdir: () => Promise.resolve(),
-    exists: (p) => Promise.resolve(files.has(p)),
+    appendFileSync: (p, d) => {
+      ensure(p);
+      files.set(p, (files.get(p) ?? "") + d);
+    },
+    mkdir: (p) => {
+      dirs.add(p);
+      return Promise.resolve();
+    },
     // A real answer, not an empty list: C19's path and executable sources take
     // this, and a fake returning nothing makes a completion assertion pass for
     // the wrong reason (`test/support/README.md`).
@@ -139,6 +177,16 @@ export async function buildSession(
   resize: (next: { columns: number; rows: number }) => void;
   /** The injected clock — advance it to close one of C16's windows. */
   clock: ReturnType<typeof fakeClock>;
+  /**
+   * **What is on the screen**, folded from every write at this session's size.
+   *
+   * Bound here rather than offered as a free function so it cannot be called
+   * with a size the session was not built at. Three test files each took the
+   * last chunk containing `HOME` and split it on CRLF, which stopped being a
+   * frame when C22 I55 made the write a difference — the question they ask is
+   * unchanged and only the answer's source moved.
+   */
+  screen: () => Screen;
 }> {
   const clock = fakeClock();
   const stdout = fakeStdout(size);
@@ -160,6 +208,7 @@ export async function buildSession(
   await tui.start();
 
   return {
+    screen: () => screenFrom(stdout.chunks, size),
     tui,
     stdout,
     clock,
@@ -191,6 +240,16 @@ export async function buildGraph(
   resize: (next: { columns: number; rows: number }) => void;
   /** The injected clock — advance it to close one of C16's windows. */
   clock: ReturnType<typeof fakeClock>;
+  /**
+   * **What is on the screen**, folded from every write at this session's size.
+   *
+   * Bound here rather than offered as a free function so it cannot be called
+   * with a size the session was not built at. Three test files each took the
+   * last chunk containing `HOME` and split it on CRLF, which stopped being a
+   * frame when C22 I55 made the write a difference — the question they ask is
+   * unchanged and only the answer's source moved.
+   */
+  screen: () => Screen;
 }> {
   const clock = fakeClock();
   const stdout = fakeStdout(size);
@@ -232,6 +291,7 @@ export async function buildGraph(
     stdout,
     stdin,
     clock,
+    screen: () => screenFrom(stdout.chunks, size),
     renders: () => renders,
     resize: (next) => {
       size.columns = next.columns;

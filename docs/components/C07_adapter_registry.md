@@ -43,11 +43,18 @@ Route 1 means a far side that converges needs no code change at all: delete the 
 ## 3. Public interface
 
 ```typescript
-type AdapterContext = Readonly<{
+type ProducerContext = Readonly<{
+  width:        number;                    // the frame's, handed down — knowledge, not placement
+  height:       number | null;             // the region, where a bound exists; null where none does
+  capabilities: TerminalCapabilities;      // C02's **resolved** record, never a re-detection
+  measure:      (block: Block, width: number) => number;   // C09's measurer, the frame's own
+}>;
+
+type AdapterContext = ProducerContext & Readonly<{
   command:           string;          // as typed, for doc.command
   verb:              string | null;
-  width:             number;          // some adapters choose column sets by width
   userRequestedJson: boolean;         // the user typed --json explicitly
+  flags:             Readonly<Record<string, unknown>>;    // C05's validated values (I21, F39)
   transport:         "emulated" | "fixture" | "subprocess" | "local";
   origin:            "user" | "action" | "agent" | "refresh";
   tool:              ToolDef | null;  // from C05 — the usage block's only source
@@ -73,6 +80,72 @@ function createFallbackAdapter(): Adapter;
 ```
 
 The registry seals at the end of composition, matching C05's manifest store and C09's block registry. Late registration would let a document rendered early in a session differ from the same document rendered later, which is the kind of inconsistency nobody thinks to look for.
+
+### What a producer may know, and what it may decide
+
+`width` used to carry the comment *"never a layout decision — C11's"*, and that sentence has been answered for two years as though it were about **knowledge**. It is about **authority**. The line it draws is around the *frame*: a producer must not own placement, because the frame is C22's and a producer that positions loses on the next resize.
+
+**Withholding the fact never prevented the decision.** It produced five duplicated modules in the reference app, a capability sniff that disagrees with C02 on three of four locale shapes (F124), and one boolean threaded through eight functions (F54). Every one of those is the producer deciding anyway, from a worse copy of the fact.
+
+So `ProducerContext` states the four facts and the spec states the authority (I17). Layout stays with C11 and C22; this is not enforced by omission, because omission did not enforce it.
+
+**The same context reaches every producer**, which is what makes it one shape rather than four: an adapter (`AdapterContext`), a local handler (C23 §2), a live part's `render` (C24 §5) and the greeting (C22 §4 step 7). Four routes producing documents, one thing they are told.
+
+#### `height` is `null` except where a bound exists
+
+A transcript entry has no height bound — C14 windows it by rows and a document may be any length. A **pushed view** is defined by the region, and that is the whole of it (C15 §4).
+
+The framework knows which it is **before the producer runs**: C23 reads `isViewInvocation` ahead of step 3, because after step 3 it is too late (C22 I45, C05 I20). So the field is not an estimate handed down hopefully — it is non-null exactly on the route where a bound exists, and `null` is the honest answer everywhere else rather than the terminal's height standing in for a region nobody promised.
+
+#### `capabilities` is the resolved record, and `detectCapabilities` stays unexported
+
+C02 reads seven environment variables and then applies the application's own overrides (C22 I49). An app that re-derives capabilities from the environment gets the **detected** record and never the **resolved** one, so it disagrees with the framework about an override it supplied itself.
+
+That is not hypothetical. F124 measured the reference app's three-line sniff against C02 at four locale shapes and it disagreed on **three of the four** — in both directions, and inside the fix written for the finding that asked for the fact.
+
+#### `measure` is C09's, and `createBlockRegistry` stays unexported
+
+Measuring is knowledge: *how many rows will this block occupy at this width* is a question about a document, not a decision about a screen. A producer that must divide content — split a record until each part fits, choose a column set — needs it, and reimplementing it is the drift `CLAUDE.md` forbids by name.
+
+`BlockRegistry` remains one of C24 §3's eleven unreachable components. The **function** is granted; the component is not.
+
+### What is refused, and what replaces it
+
+A refusal with no mechanism named is a deferral wearing a ruling's clothes. Four:
+
+| refused | replaced by |
+|---|---|
+| an adapter that can `ask` | the local route (C23 §2). C07 specifies a pure mapping from result to document; a suspension point in that contract is a much larger thing than it looks and probably the wrong shape. The cost F77 measured — 185 lines for five verbs — is `meta` (closed by C23 I15's extension), the failure arm, the invocation record and the spawn. The confirm was never the expensive part. |
+| `detectCapabilities` | the resolved record above |
+| `createBlockRegistry` | `measure` above, and `expectDocument().lines()` for evidence (C24 §7) |
+| a live part told the width, to size its own history | **C12 already does it.** `curveRows` buckets N samples into the available dot columns and I5 keeps each column's vertical span — *"fifty samples and fifty thousand take one path, and there is no density branch to get wrong at the boundary."* F24 reports a view opened at 120 and read at 80 drawing *"two samples per column"*; that is C12 working. The ring's length is **retention**, which the producer already owns and which no terminal bounds. Measured against `plot/curve.ts`, and the finding's direction inverts: over-wide is handled, under-wide is a resolution loss and not a wrong frame. |
+
+### 3a. The classification table — which route is told what
+
+**A structural artefact rather than a trace**, because the interactions here have no event between them: they are *which route* × *which field*, both true at rest. A sequence trace indexed by events cannot reach a cell where two rules simply both hold.
+
+Six routes produce a document or a block. Four facts. The cells that matter are the ones two rules can both claim.
+
+| route | `width` | `height` | `capabilities` | `measure` |
+|---|---|---|---|---|
+| adapter, transcript entry | frame | `null` | resolved | registry |
+| adapter, **view invocation** | frame | **region** | resolved | registry |
+| `adaptPatch`, per patch | frame **at that patch** | as its invocation | resolved | registry |
+| local handler | frame | `null` — **see B** | resolved | registry |
+| `LiveSpec.render`, per tick | frame **at that tick** | `null` — **see D** | resolved | registry |
+| greeting | frame | `null` | resolved | registry |
+
+**A — `width` for a view is the frame's, and that is a fact rather than a coincidence.** Two rules could claim the cell: *a producer is told the frame's width* and *a view's producer is bounded by the region*. They agree today because `compose` builds `overlayRegion` as `{ width: size.columns, height }` — a view fills the width and insets only vertically. **Stated because it is load-bearing and could stop being true**: the day a view insets horizontally, a producer splitting content would measure against an axis the frame does not use, and nothing in the arithmetic would look wrong.
+
+**B — the local route's `null` is correct today for a reason that is a defect.** `isViewInvocation` is read on the `app` route and nowhere else, and C18 classifies on `tool.local` first, so a local verb can never open a view — which makes `height: null` right by accident. C05's parser permits `local: true` with `view: true`; `types.ts` records that the flag-level `view` arm *"has been usable only on `local` tools since it was written"*. **So the one combination the arm was said to be usable on is the one that silently appends an entry** (F129). This cell changes when that is fixed, and it is written down here so it changes rather than being rediscovered.
+
+**C and G are one rule — the context is built at the call, never captured.** A live part renders repeatedly and a stream adapts per patch, so a context captured when the document was built is stale by the first resize. That is F24's complaint stated generally, and it is the half of F24 that survives: not that a producer needs the width to size its history, but that *whatever* a producer is told must be true when it is told, not when its document was made.
+
+**D — a live part has no bound, even inside a view.** Two rules meet: *a view's producer is bounded by the region*, and *a refresh replaces one panel inside a document* (C23 I34). The region belongs to the document; the part is one block sharing it with others, so a part told the region's height would size itself to space it does not have. `null` on every route but the view invocation itself.
+
+**E — `measure` needs no capability argument** because the registry is built with one and sealed at composition. A second capability path into measurement is the measure/render divergence C09 I1 exists to prevent.
+
+**F — the greeting's context is available where it fires.** Capabilities are resolved during construction and the greeting is startup step 7, so nothing is read before it exists.
 
 ### The registry owns `meta`
 
@@ -267,13 +340,18 @@ The notice is muted rather than an error because the *command* may have succeede
 - **I7** — Adapter `schema` mismatch is a **startup** failure, never a runtime surprise.
 - **I8** — A sealed registry cannot be registered against.
 - **I9** — `userRequestedJson` produces a `code` block for every verb, with no per-verb exception.
-- **I10** — C07 imports nothing from `terminal/`, `presentation/` or above.
+- **I10** — C07 imports nothing from `terminal/`, `presentation/` or above **at runtime**, and one name type-only: `TerminalCapabilities`, for `ProducerContext`. The runtime edge stays forbidden, so L0's halves are still independently buildable — which is the whole of what A02 §1 is protecting. The alternative was a second declaration of the resolved record inside `data/`, which is F124's defect one layer in: two records of one fact, pinned by a test that would agree with itself. MG3 carries the exemption by name (A03 §3), and until this ruling MG3 had **never walked `import type` at all** — the edge was permitted by a blind spot rather than by a decision.
 - **I11** — No adapter is required for a verb to be usable.
 - **I12** — A degraded stream's remainder reaches the document **whole**. `malformed` patches are dropped before `degraded` arrives and compose the `raw` block after it, except the one immediately preceding the notice — the line that tripped degradation, which seeds the block. C06 supplies no other carrier for the remainder (C06 §5).
 - **I13** — The registry owns `meta`. An adapter's `meta` is overwritten from the `RawResult` and the context, `resultId`, `adapter` and `truncated` excepted — the three the registry cannot know. No adapter can produce a document with absent or wrong provenance, which is what makes I5 hold without every app author holding it up.
 - **I14** — `meta.exitCode` is finite on every path. `-1` means the process never started and means nothing else.
 - **I15** — `seq` is the patch's position within its stream, counted by the caller from `0` (§6a). It namespaces the generated block ids and its zero value is the per-stream reset, so a constant `seq` is an id collision *and* a reset that never stops firing.
 - **I16** — The registry owns `doc.command` as well as `meta`, on every route including identity. `AdapterContext.command` is the line the user typed, and it is what the transcript draws (C22 I33, C23 I15); a far side's own `command` field is overwritten rather than trusted, for I13's reason — provenance is the framework's to state. The identity route passed it through until C22 drew the command at all, and the symptom was a transcript showing `ps --json`, the spawned form carrying a flag D16 appends and the user never wrote.
+- **I17** — A producer is told four facts — `width`, `height`, `capabilities`, `measure` — and owns no placement. The line is authority, not knowledge: layout is C11's and the frame is C22's, and a producer that positions loses on the next resize. **Not enforced by omission**, because omission did not enforce it — it produced five duplicated modules, a sniff wrong on three of four locale shapes, and a boolean threaded through eight functions.
+- **I18** — `height` is non-null **iff** the producer's document is bound by a region, which is the view route and nothing else. C23 knows this before the producer runs (C22 I45); a transcript entry is windowed by rows and has no bound, so `null` is the answer rather than the terminal's height standing in for a region nobody promised.
+- **I19** — `capabilities` is C02's **resolved** record, overrides applied (C22 I49) — never a re-detection. An app deriving it from the environment gets the detected record and disagrees with the framework about its own override; measured at three of four locale shapes (F124).
+- **I20** — `measure` is the frame's own measurer, not a second implementation. One answer or the two drift (C09 I1), which is the same argument `cells()` rests on.
+- **I21** — `flags` carries C05's validated flag **values**, not tokens (C05 I21). It is what makes `shellOnly` usable: a flag the shell consumes is absent from `argv` by construction, so an adapter reading `raw.argv` cannot see the thing that selects its own rendering. `userRequestedJson` is this field hardcoded for one flag and stays, because `--json` is transmitted and `--raw` is not — two axes, two fields.
 
 ---
 
@@ -297,6 +375,11 @@ The notice is muted rather than an error because the *command* may have succeede
 16. `meta.exitCode` is finite on every path, and `-1` has one documented cause (I14).
 17. `seq` is supplied by the caller and counts patches within one invocation; it is both the id namespace and the per-stream reset (I15, §6a).
 18. The registry owns `doc.command` as well as `meta`; the typed line is what is displayed, on every route (I16).
+19. A producer is told the four facts it was previously made to duplicate, and the spec — not the omission — is what keeps layout authority with C11 and C22 (I17).
+20. A bound is stated where one exists and `null` where none does; the region is never approximated from the terminal (I18).
+21. Capabilities arrive resolved, so an application and the framework cannot disagree about an override the application supplied (I19).
+22. A producer measures with the frame's own measurer, so a split decided in an adapter and the rows drawn on screen are one arithmetic (I20).
+23. `flags` carries validated values, which is what makes a `shellOnly` flag readable by the adapter whose rendering it selects (I21).
 
 ---
 

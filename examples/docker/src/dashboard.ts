@@ -24,11 +24,12 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
 import { banner } from "./banner.ts";
-import type { Block, ColumnDef, Glyph, TableRow, Tone, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone, ViewDocument } from "@fmx/calcium";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
 
+import type { LocalContext, ProducerContext } from "@fmx/calcium";
 const run = promisify(execFile);
 
 /** How often the panel re-reads. */
@@ -472,33 +473,48 @@ export function dashboard(
  * ran, so they are ceremony rather than provenance on this route — and the
  * framework overwrites only `command`.
  */
+/**
+ * The dashboard's blocks, from a producer context — **the unit both callers
+ * share** (C22 I53, C07 §3).
+ *
+ * It exists because the obligation made the old shape impossible to write. The
+ * greeting used to call the *local handler* with `{ command: "" }` — an object
+ * literal that is not a `LocalContext`, has no `ask`, and compiled (F125). Once
+ * the handler named its type that stopped compiling, and the greeting is handed
+ * a `ProducerContext`, which has no `ask` and should not: it is a producer, not
+ * a route that can ask a question.
+ *
+ * So the shared thing is named instead of one caller pretending to be the other.
+ * Two callers, one producer, and neither wraps the other.
+ */
+export async function dashboardBlocks(
+  ctx: ProducerContext,
+  engine: string,
+): Promise<readonly Block[]> {
+  return dashboard(await fetchSnapshot(), ctx.width, engine, ctx.capabilities.unicode !== "ascii");
+}
+
 export function createDashboardHandler(
   engine: string,
-  width: () => number,
+): (argv: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   /**
-   * Whether the terminal can draw `▄ ▀ █`.
+   * **Two injected parameters gone, and both were findings** (F14, F43).
    *
-   * **Injected, because a local handler is told nothing about the terminal and
-   * `detectCapabilities` is not exported** (F43). The app decides in `main.ts`,
-   * which is also the only file allowed to look at the environment.
+   * `width` was `() => process.stdout.columns`, which is C01's job done a second
+   * time and wrong across a resize because it was read once per command. It is
+   * `ctx.width` now, handed down per call.
+   *
+   * `blocks` was the app deciding whether the terminal can draw `▄ ▀ █`, from
+   * three environment variables where C02 reads seven — and it disagreed with
+   * the framework on three of four locale shapes (F124). It is
+   * `ctx.capabilities.unicode` now, which is the record C22 resolved, overrides
+   * included.
    */
-  blocks: () => boolean = () => true,
-): (argv: readonly string[], ctx: { command: string }) => Promise<ViewDocument> {
   return async (_argv, ctx) => ({
     schema: "tui.view/1",
+    meta: { adapter: "dashboard" },
     command: ctx.command,
     status: "ok",
-    blocks: dashboard(await fetchSnapshot(), width(), engine, blocks()),
-    meta: {
-      verb: "dashboard",
-      adapter: "dashboard",
-      exitCode: 0,
-      durationMs: 0,
-      truncated: false,
-      argv: ["docker", "ps", "-a"],
-      stderr: "",
-      transport: "local",
-      origin: "user",
-    },
+    blocks: await dashboardBlocks(ctx, engine),
   });
 }

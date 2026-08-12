@@ -42,9 +42,80 @@ export type DocumentMeta = Readonly<{
   argv: readonly string[];
   stderr: string;
   transport: "emulated" | "fixture" | "subprocess" | "local";
-  /** Required, never optional (I13). Provenance that can be absent is untrusted. */
-  origin: "user" | "action" | "agent" | "refresh";
+  /**
+   * Required, never optional (I13). Provenance that can be absent is untrusted.
+   *
+   * `defect` is the one arm the framework sets about **itself** — a document
+   * that exists because a stage failed and C23 contained it (C23 §5a, F15). Not
+   * `refresh`, which is a system notice about the session, and not `action`,
+   * which names a mechanism that did not produce it.
+   */
+  origin: "user" | "action" | "agent" | "refresh" | "defect";
 }>;
+
+/**
+ * The three `meta` keys an adapter's answer is honoured for.
+ *
+ * **`authoritativeMeta` keeps three of ten and overwrites seven** — `verb`,
+ * `exitCode`, `durationMs`, `argv`, `stderr`, `transport` and `origin` come from
+ * the raw result and the context, always. The adapter's return type demanded all
+ * ten anyway, so every adapter ever written computes seven values that are
+ * discarded, **with no signal that they are**: an adapter returning
+ * `exitCode: 999` produces a document reading `0`.
+ *
+ * **Narrower, not wider.** Making the seven optional would leave them discarded;
+ * removing them means supplying one fails to compile rather than fails to
+ * matter. The same move as `RenderContextInput` one layer up — two components
+ * with the same defect is what said the shape generalises. FINDINGS F58b, F85.
+ *
+ * **The seven are typed `never` rather than merely absent, and that is the half
+ * that does the work.** TypeScript's excess-property check only fires on a
+ * *fresh object literal*: a helper returning a full `DocumentMeta` is assignable
+ * to a `Pick` of it, so the app's own `metaOf()` — nine fields, duplicated in two
+ * files — compiled unchanged against the narrow type and kept computing the
+ * discarded seven. `never` makes the wrong state unbuildable through a helper
+ * too, which is the `Exclude<ParseResult, { kind: "empty" }>` trade one more
+ * time.
+ */
+type ProducerOwned = "adapter" | "truncated" | "resultId";
+
+/**
+ * The three `meta` keys a *producer* owns, on either route.
+ *
+ * **Named for the producer rather than the adapter because both routes reached
+ * the same three independently** (F58b, F13). The adapter route discards the
+ * other seven — `authoritativeMeta` overwrites them — and the local route
+ * *invents* them, four eleven-line helpers writing `durationMs: 0`, a
+ * `transport` that is a constant and an `origin` the shell already knows. One
+ * defect, two directions, one honoured set.
+ */
+export type ProducedMeta = Readonly<Partial<Pick<DocumentMeta, ProducerOwned>>> &
+  Partial<Record<Exclude<keyof DocumentMeta, ProducerOwned>, never>>;
+
+/** @deprecated the adapter-route name for {@link ProducedMeta}. */
+export type AdapterMeta = ProducedMeta;
+
+/**
+ * What an adapter returns: a document whose `meta` carries only what it owns.
+ *
+ * `command` stays the adapter's here, unlike the local route where C23 takes it
+ * (I15) — C07 I16 rules that an adapter states the command it ran, which may
+ * differ from the line submitted.
+ */
+export type AdapterDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: ProducedMeta }>;
+
+/**
+ * What a local handler returns.
+ *
+ * **The mirror of `AdapterDocument`, and the fix runs the other way.** On the
+ * adapter route the seven are computed and thrown away; here nothing overwrites
+ * them, so a handler has to make them up — `verb` re-derived from `argv[0]`,
+ * `durationMs: 0` on a route the shell could time, `stderr: ""` on a route with
+ * no far side. C23 already takes `command` from the handler for exactly this
+ * reason (I15, C22 I33), *"the same one I13 makes for `meta`"* — an argument
+ * written for this case and never applied to it. FINDINGS F13.
+ */
+export type LocalDocument = Omit<ViewDocument, "meta"> & Readonly<{ meta?: ProducedMeta }>;
 
 export type ErrorLike = Readonly<{
   message: string;
@@ -250,7 +321,21 @@ export type Logs = Readonly<{
 export type Events = Readonly<{
   kind: "events";
   id: string;
-  events: readonly Readonly<{ ts: string; type: string; message: string }>[];
+  /**
+   * `tone` is optional here and absent from `Logs` on purpose (I35, F51).
+   *
+   * A fixed vocabulary the renderer knows needs no field — `logs` has levels,
+   * and `levelTone` maps them. A container's actions are open-ended, so no
+   * renderer can know whether `die` outranks `start`, and the producer that
+   * does is the only one able to say. The two kinds differ because their
+   * vocabularies differ, which is the consistent rule rather than a breach of
+   * one: `/events` painted every type `accent`, so a `die · exit 137` read as
+   * a `start`.
+   *
+   * The `type` column carries the word regardless, so the tone emphasises and
+   * never carries alone (D29).
+   */
+  events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
 }> & Gap;
 
 export type Series = Readonly<{
@@ -272,7 +357,23 @@ export type Plot = Readonly<{
   height?: number;
   axes?: boolean;
   xLabels?: readonly [string, string, string];
-  yFormat?: "number" | "percent" | "bytes" | "duration";
+  /**
+   * **The unit the value arrives in, not the unit it renders as** (I41, F31).
+   *
+   * `fraction` takes `0.84` and `percent` takes `100.2`; both draw a per-cent
+   * sign, which is why the rendered form could never tell them apart and why
+   * naming them by it gave one member two plausible meanings — the obvious call
+   * rendered `10020%` against a far side emitting `CPUPerc: "100.2%"`.
+   *
+   * `fraction` is the arm that multiplies by 100. It was called `percent` and
+   * kept the behaviour when it lost the name, because the surprising arm is the
+   * one that should carry the surprising name.
+   *
+   * **This is geometry.** C12 §3 measures the gutter with `labelWidth` over the
+   * rendered labels, so an arm that changes a label's width changes the plot
+   * area — a format that reads like styling and is not.
+   */
+  yFormat?: "number" | "fraction" | "percent" | "bytes" | "duration";
   /**
    * Pin the vertical range, independently and optionally (I29).
    *
@@ -308,11 +409,37 @@ export type Code = Readonly<{
 export type Comparison = Readonly<{
   kind: "comparison";
   id: string;
+  /**
+   * What the two columns are, headed `a` and `b` when absent (I40, F18's
+   * sibling F33).
+   *
+   * **`a`/`b` is right about the type and was never right about the header.**
+   * The renderer's own comment defends them as *positional rather than
+   * directional*, which is the correct answer to *should the type call them
+   * `before` and `after`* — S07 compares two runs and neither is "before". It
+   * is not an answer to *may a consumer say which side is which*, and both
+   * shipped consumers said it in a `keyValue` block above the comparison,
+   * one block away from the columns it explains.
+   *
+   * Positional stays the default: a consumer that has nothing to say says
+   * nothing, and gets the header it had.
+   */
+  labels?: readonly [string, string];
   rows: readonly Readonly<{
     field: string;
     a: string;
     b: string;
-    comparison?: "same" | "better" | "worse" | "changed";
+    /**
+     * The change axis — neutral, and carried by a marker (I35, I36).
+     *
+     * Split from the old single `comparison` union because the renderer had
+     * already split it: `comparisonTone` coloured `better`/`worse` and left
+     * `same`/`changed` at `muted`/`default`. One union naming two axes that
+     * render differently is why `added` and `removed` had nowhere to go (F30).
+     */
+    change?: "unchanged" | "changed" | "added" | "removed";
+    /** The judgement axis, and the only half that takes a colour. */
+    verdict?: "better" | "worse";
   }>[];
 }> & Gap;
 
@@ -357,6 +484,21 @@ export type Patch = Readonly<{
    */
   actions?: readonly Action[];
   layout?: "unified" | "split";
+  /**
+   * The gutter width, in cells, **pinned when this block is a window of a
+   * larger one** (C25 I21a).
+   *
+   * `numberWidth` walks every line of every hunk, so a window whose widest line
+   * number is narrower than the block's draws a narrower gutter and every row of
+   * text shifts sideways as the reader scrolls. Measured on the shipped
+   * fullscreen view: 4 cells whole, 1 in the window at offset 0.
+   *
+   * **The same argument `Hunk.header` already carried** (C25 I21) — a window
+   * describes the block it came from, not the slice it shows — one field along.
+   * A producer building a patch by hand leaves it absent and nothing changes;
+   * it exists so a *window* can say what its parent measured.
+   */
+  numberWidth?: number;
 }> & Gap;
 
 export type Pills = Readonly<{
@@ -391,6 +533,23 @@ export type Panel = Readonly<{
    * footer is one app-supplied row. The keys belong to the view.
    */
   footer?: string;
+  /**
+   * Whether this region refreshes (I39, F18).
+   *
+   * **A fact, not a character.** `Glyph` has carried a `live` slot with both
+   * renderings — `▌` and `|` — since C04 was written, S1 and S13 both draw it,
+   * and nothing in the tree consumed it: a slot reserved and unreachable, which
+   * is A03 §2's class in the glyph table.
+   *
+   * The remedy is not a glyph field on `Panel`. A panel is live or it is not, so
+   * the block names the fact and C09 derives the mark (I38) — which is what makes
+   * it degrade to `|` under ASCII, where a `▌` written into the `title` would
+   * not, and would be F6's mistake made deliberately.
+   *
+   * It changes no measurement: the mark rides in the top border, which is drawn
+   * either way.
+   */
+  live?: boolean;
   children: readonly Block[];
 }> & Gap;
 

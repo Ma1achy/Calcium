@@ -29,9 +29,10 @@ import {
   modeOwnersAreReal,
   MODULE_GRAPH_RULES,
   checkFunctionConsumers,
+  checkBuilderCoverage,
   checkSeamConsumers,
 } from "../../tools/enforce/module-graph.mjs";
-import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
+import { checkMarks, checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
@@ -227,6 +228,15 @@ const FABRICATED: readonly Fabrication[] = [
     source: "if (process.stdin.isRaw) throw new Error('suspend first');",
   },
   {
+    // SS48 — the second composition. The shape someone would actually write is
+    // the old `#render()` body pasted into a file that has a `Composed` in
+    // hand, which is why the pattern is the `paint(` call rather than anything
+    // structural about frames.
+    rule: "SS48",
+    file: "src/shell/chrome-preview.ts",
+    source: "const lines = paint(frame, deps);",
+  },
+  {
     rule: "MG1",
     file: "src/presentation/table.ts",
     source: 'import { scroll } from "../viewport/viewport.js";',
@@ -311,13 +321,25 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import type { LineEditor } from "../editor/index.js";',
   },
   {
-    // SS9's literal half, which is the live one. A default that reads
-    // `~/.prism` looks like a courtesy and makes a standalone run append to the
-    // developer's own history — silently, in a file nobody opens until it is
-    // wrong (C20 I12, T6.12).
+    // SS9's literal half, which is the live one. A hardcoded state path looks
+    // like a courtesy and makes a standalone run write beside a real install —
+    // silently, in a file nobody opens until it is wrong (C20 I12, T6.12).
+    //
+    // **Both forms, and neither is the current default.** SS9 matched `~/.prism`
+    // by name and has since survived two renames that would each have retired it
+    // in silence: to `~/.calcium`, which no longer contained `prism`, and to
+    // `.calcium`, which no longer contains a tilde. The bare arm below passes
+    // against the pattern that preceded the second rename and the tilde arm
+    // passes against the one that followed the first, so a row carrying only one
+    // of them agrees with whichever mistake is current.
     rule: "SS9",
     file: "src/interaction/history/store.ts",
-    source: 'const stateDir = deps.stateDir ?? "~/.prism";',
+    source: 'const stateDir = deps.stateDir ?? ".widget";',
+  },
+  {
+    rule: "SS9",
+    file: "src/interaction/history/store.ts",
+    source: 'const stateDir = deps.stateDir ?? "~/.widget";',
   },
   {
     // SS30's three subjects, one fabrication each — a rule with three subjects
@@ -420,12 +442,22 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'meta: { origin: "refresh", verb: null },',
   },
   {
+    // SS46's argument with a narrower set — one site rather than four. `defect`
+    // is worth a fifth arm on a public union only because it separates a
+    // contained failure from a verb that did nothing, and a second producer
+    // widens it back into "something went wrong", which is the drift SS46 was
+    // written after.
+    rule: "SS49",
+    file: "src/shell/documents.ts",
+    source: 'return compose({ command, status, meta: { origin: "defect" } });',
+  },
+  {
     // The C22 half, and the one that actually shipped in a draft: `stateDir`
     // resolving its own variable, which reads as C22 owning the default rather
     // than as the framework reading the environment.
     rule: "SS44",
     file: "src/shell/config.ts",
-    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? "~/.prism",',
+    source: 'stateDir: config.stateDir ?? process.env.PRISM_TUI_STATE_DIR ?? ".calcium",',
   },
   {
     // **The shape SS29 could not catch and MG23 does.** An overlay manager
@@ -528,7 +560,25 @@ const FABRICATED: readonly Fabrication[] = [
 ];
 
 const scanIds = SCANS.map((s) => s.id);
-const implemented = [...scanIds, ...MODULE_GRAPH_RULES, ...DEPENDENCY_RULES, ...SPEC_RULES];
+
+/**
+ * Scans that are their own function rather than a row of `SCANS`.
+ *
+ * SS47's subject is a string literal's *contents* rather than a line, and its
+ * exemptions carry reasons with a bidirectional arm — neither of which the shared
+ * row shape can hold. Listed here for the same reason `MODULE_GRAPH_RULES` is a
+ * list: a rule invisible to `implemented` is a rule the fabrication check does not
+ * demand a violation for, which is A03 §2 arriving in the mechanism against it.
+ */
+const STANDALONE_SCANS = ["SS47"];
+
+const implemented = [
+  ...scanIds,
+  ...STANDALONE_SCANS,
+  ...MODULE_GRAPH_RULES,
+  ...DEPENDENCY_RULES,
+  ...SPEC_RULES,
+];
 
 function srcFiles(dir = "src", out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -556,6 +606,13 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // allow-list rather than about the tree, and that half needs two runs of
       // the same fixture with different lists.
       "MG25",
+      // SS47 likewise: its subject is a string literal's contents rather than a
+      // line, and its exemptions carry reasons the shared shape has nowhere to put.
+      "SS47",
+      // MG27 likewise: its subject is two whole files read together — a block
+      // type and the builder that constructs it — so the shared `FABRICATED`
+      // shape, which is one file's text, cannot express it.
+      "MG27",
       ...DEPENDENCY_RULES,
       // The SP family's fabrications are in `enforce-commitments.test.ts`,
       // beside the parser they exercise. Listing them here without checking that
@@ -564,6 +621,95 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       ...SPEC_RULES,
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
+  });
+
+  it("MG24 fires: the file that IMPLEMENTS a member is not a consumer of it", () => {
+    // **F83's fix, and the row that pins it.** The rule matched a bare name
+    // until F83, so `store.ts` writing `rerun() { … }` counted as consuming the
+    // `rerun` that `types.ts` declares — declaration and implementation closing
+    // the loop with nothing calling anything. Every interface split across those
+    // two files passed by construction, which is most of `src/`.
+    //
+    // The fixture is the real shape: a declaration, an implementation that names
+    // the member without calling it, and one member that is genuinely called.
+    const split: Record<string, string> = {
+      "src/interaction/history/types.ts":
+        "export interface HistoryStore {\n" +
+        "  append(line: string): void;\n" +
+        "  rerun(n: number): void;\n" +
+        "}\n",
+      // The implementation. `rerun` appears as a definition, never as a call —
+      // which is exactly what the bare-name rule could not tell apart.
+      "src/interaction/history/store.ts":
+        "export const store = {\n" +
+        "  append(line: string) { rows.push(line); },\n" +
+        "  rerun(n: number) { void n; },\n" +
+        "};\n",
+      // A real consumer, so the fixture is not vacuous in the other direction.
+      "src/shell/keys.ts": "history.append(line);\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(split), (f) => split[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]);
+
+    expect(named, "rerun is implemented and never called; append is called").toEqual([
+      "HistoryStore.rerun",
+    ]);
+  });
+
+  it("MG24 walks `export type X = Readonly<{…}>`, and a record is consumed by being BUILT", () => {
+    // **F84.** The walk was anchored on `export interface`, and this codebase
+    // publishes object types both ways — 276 members behind one keyword and 798
+    // behind the other, outside the reach of every rule in the suite. The old
+    // header justified the scope with *a type alias is structural and can be
+    // satisfied without being named*, which is true about satisfying a type and
+    // irrelevant to consuming a member of one.
+    //
+    // **And the consumer test has to differ with the keyword.** An interface is
+    // called into; a record is built. `{ dots: … }` names a member with no dot
+    // in front of it, and dot-access alone reported 82 over the widened walk.
+    const rec: Record<string, string> = {
+      "src/presentation/plot/raster.ts":
+        "export type Grid = Readonly<{\n" +
+        "  rows: number;\n" +
+        "  dots: readonly number[];\n" +
+        "}>;\n",
+      // A consumer that BUILDS one — `rows` is supplied and must not be
+      // reported; `dots` is named nowhere and must be.
+      "src/presentation/plot/render.ts": "const g = { rows: 4 };\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(rec), (f) => rec[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]);
+
+    expect(named, "a supplied field is consumed; an unsupplied one is not").toEqual([
+      "Grid.dots",
+    ]);
+  });
+
+  it("MG24 does not report a method PARAMETER as an interface member", () => {
+    // **F95.** The member pattern is line-oriented, so a parameter inside a
+    // multi-line signature matched it — `take(sourceId, key, ttlMs, run)` gave
+    // `CompletionCache` four phantom members, two of which reached the violation
+    // list. A phantom is the worst shape a violation can take: it cannot be
+    // wired and it cannot be deleted, so an allow-list entry is the only
+    // resolution and it justifies something that does not exist.
+    const nested: Record<string, string> = {
+      "src/interaction/completion/cache.ts":
+        "export interface CompletionCache {\n" +
+        "  take(\n" +
+        "    sourceId: string,\n" +
+        "    key: string,\n" +
+        "  ): Promise<string>;\n" +
+        "}\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(nested), (f) => nested[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]);
+
+    expect(named, "only `take` is a member — sourceId and key are its parameters").toEqual([
+      "CompletionCache.take",
+    ]);
   });
 
   it("MG24 fires: a published interface member no other file in src/ names", () => {
@@ -628,6 +774,143 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       "CompletionEngine.spinning": "why",
     });
     expect(exempted, "a named member is exempt").toEqual([]);
+  });
+
+  it("SS47 fires: a mark in framework text, and the exemption list expires", () => {
+    // **The three controls are the rule's scope, and they are the whole point.**
+    // The scan's scope was chosen across three candidates (F122), and the one
+    // that reports fewest sites — "a literal with no ASCII word in it" — misses
+    // `loading…` and `▸ [y] yes`, which are the sites the ruling is about.
+    const files = ["src/mark.ts", "src/prose.ts", "src/excused.ts"];
+    const read = (f: string): string =>
+      f.endsWith("mark.ts")
+        ? ['const a = "loading…";', 'const b = `${sel ? "▸" : " "} [y] yes`;'].join("\n")
+        : f.endsWith("prose.ts")
+          ? [
+              'const c = "a verb — and its flags — are the app\'s (§3)";',
+              "// a comment naming ❯ is prose about the rule, not a violation of it",
+            ].join("\n")
+          : 'const G = ["✓", "+"];';
+
+    const violations = checkMarks(files, read, { "src/excused.ts": "the vocabulary itself" });
+
+    // Both marks, and **both are inside literals carrying ASCII words** — the
+    // case a tighter "is this literal only marks?" rule cannot see.
+    expect(violations.filter((v) => v.file === "src/mark.ts")).toHaveLength(2);
+    expect(violations.every((v) => v.rule === "SS47")).toBe(true);
+
+    // **The letterlike control, and it is the one a mutation found missing.**
+    // `\p{L}` alone — the first fix for `rôle` firing — passes `ℹ`, which is
+    // U+2139, in a letter category, and C09's `info` glyph. Deleting the range
+    // exclusion from `isLetter` survived the whole suite until this row existed,
+    // which is a finding about the tests rather than a licence (F122).
+    const letterlike = checkMarks(["src/info.ts"], () => 'const g = "ℹ";', {});
+    expect(
+      letterlike.length,
+      "a letterlike symbol is a mark, whatever its Unicode category says",
+    ).toBe(1);
+    expect(
+      checkMarks(["src/word.ts"], () => 'const w = "a rôle, naïve";', {}),
+      "and an actual letter is prose",
+    ).toEqual([]);
+
+    // The prose control. 106 literals in the real tree are this, and the rule
+    // passes every one — a limit recorded in the rule's own comment, because an
+    // em dash at `unicode: ascii` is as unsubstituted as `❯` was.
+    expect(
+      violations.some((v) => v.file === "src/prose.ts"),
+      "prose punctuation and comments are not marks",
+    ).toBe(false);
+
+    // The exemption control, and the arm that keeps the reasons honest.
+    expect(violations.some((v) => v.file === "src/excused.ts")).toBe(false);
+    const stale = checkMarks(files, read, {
+      "src/excused.ts": "the vocabulary itself",
+      "src/prose.ts": "this file has no mark, so the entry has outlived its reason",
+    });
+    expect(
+      stale.some((v) => v.file === "src/prose.ts" && v.message.includes("carries no mark")),
+      "an exemption that outlives its reason is a violation of its own",
+    ).toBe(true);
+  });
+
+  it("MG27 fires: a block field no builder sets, and the reason list expires", () => {
+    // **Fabricated from the real first run**, where the three below came back:
+    // `patch.collapsedAfter` (filed as F41 by a consumer who wanted it),
+    // `patch.actions` and `table.sort` (found by this rule and nothing else).
+    //
+    // The fixture carries both corrections the rule needed before it was
+    // trustworthy, because a rule that over-reports is not a rule anyone keeps:
+    // a `Hunk` whose line `kind` is `"add"` — which the first version read as a
+    // block kind that does not exist — and a single-line `Readonly<{…}> & Gap`
+    // declaration, which a multi-line body regex read straight past.
+    const types = [
+      'export type Hunk = Readonly<{ lines: readonly Readonly<{ kind: "add"; text: string }>[] }>;',
+      'export type Rule = Readonly<{ kind: "rule"; id: string; label: string }> & Gap;',
+      "export type Widget = Readonly<{",
+      '  kind: "widget";',
+      "  id: string;",
+      "  shown: string;",
+      "  hidden: number;",
+      "  excused: boolean;",
+      "}> & Gap;",
+      "",
+      "export type Block =",
+      "  | Rule",
+      "  | Widget;",
+      "",
+    ].join("\n");
+
+    const builders = [
+      "function finish(spec, opts, gapDefault) { return gapBefore; }",
+      "function widget(spec) {",
+      '  return finish({ kind: "widget", id: idOf(spec), shown: spec.shown }, spec, true);',
+      "}",
+      "function rule(label) {",
+      '  return finish({ kind: "rule", id: idOf(), label }, undefined, true);',
+      "}",
+    ].join("\n");
+
+    const files = ["src/data/viewmodel/types.ts", "src/shell/builders/index.ts"];
+    const read = (f: string): string =>
+      f.endsWith("types.ts") ? types : f.endsWith("builders/index.ts") ? builders : "";
+
+    // With `excused` accounted for and `hidden` not, exactly one field is a
+    // violation — which is the discriminator: a rule reporting both would be
+    // ignoring the reason list, and one reporting neither would be vacuous.
+    const violations = checkBuilderCoverage(files, read, { "widget.excused": "no surface has one" });
+    expect(
+      violations.map((v) => v.message.match(/`(\w+)` and no builder/u)?.[1]),
+      "`hidden` alone — `shown` is set, `excused` has a reason, `rule` is intact",
+    ).toEqual(["hidden"]);
+    expect(violations[0]?.rule).toBe("MG27");
+
+    // **The `Hunk` control.** `kind: "add"` is a *line's* kind, and the first
+    // version of this rule invented three block kinds from literals like it.
+    expect(
+      violations.some((v) => v.message.includes("`add`")),
+      "a line kind is not a block kind",
+    ).toBe(false);
+
+    // **The single-line control.** `Rule` is `{ kind, id, label }` and `label`
+    // is set; a body regex that ran past `}> & Gap;` would attribute `Widget`'s
+    // fields to it and report them here.
+    expect(
+      violations.some((v) => v.message.includes("`rule` carries")),
+      "a one-line declaration is read as its own",
+    ).toBe(false);
+
+    // The bidirectional arm, as `UNCONSUMED_MEMBERS` has: an entry naming a
+    // field the builder now sets is itself a violation, or the list stops being
+    // read the first time someone closes a gap without tidying up.
+    const stale = checkBuilderCoverage(files, read, {
+      "widget.excused": "no surface has one",
+      "widget.shown": "this one is set, so the entry has outlived its reason",
+    });
+    expect(
+      stale.some((v) => v.message.includes("which the builder now sets")),
+      "an exemption that outlives its reason is a violation of its own",
+    ).toBe(true);
   });
 
   it("MG25 fires: an exported function no other file in src/ names", () => {
@@ -712,6 +995,33 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     const fired = violations.filter((v) => v.rule === rule);
     expect(fired, `${rule} matched nothing — it would pass on a real violation`).toHaveLength(1);
     expect(fired[0]!.spec, `${rule} must name the spec that declared it`).toBeTruthy();
+  });
+
+  it("MG3 fires on a fabricated *type-only* cross-half edge, which it could not see at all", () => {
+    // **The arm's only proof, because the tree has no subject for it.** The walk
+    // over `src/` finds zero cross-half edges of either kind, so a green run says
+    // nothing — F83's lesson one rule over. Measured by hand before this row
+    // existed: a real type-only edge in `data/adapters/types.ts` left
+    // `make enforce` green at 175 files and 6927 references, and the same edge
+    // written as a value import fired MG3 at once. The rule worked; half its
+    // subject was invisible (FINDINGS F127).
+    // **Not `adapters/types.ts`.** That file holds the one entry
+    // `CROSS_HALF_TYPES` excuses, so fabricating there tests the exemption
+    // rather than the arm — the row would pass with the walk switched off.
+    const file = "src/data/manifest/parse.ts";
+    const read = (f: string): string =>
+      f === file ? 'import type { TerminalCapabilities } from "../../terminal/capabilities.js";' : "";
+
+    const fired = checkModuleGraph([file], read).filter((v) => v.rule === "MG3");
+    expect(fired, "MG3 does not walk `import type` — the arm is off").toHaveLength(1);
+    expect(fired[0]!.message).toContain("type-only");
+
+    // The control, and it is what tells the arm from the walk it sits beside:
+    // the same file with no cross-half import at all must be silent, or the row
+    // above passes against a rule that fires on everything.
+    const clean = (f: string): string =>
+      f === file ? 'import type { RawResult } from "../transport/types.js";' : "";
+    expect(checkModuleGraph([file], clean).filter((v) => v.rule === "MG3")).toHaveLength(0);
   });
 
   it("SS40's annotation is honoured on all three branches, and is a claim", () => {

@@ -19,6 +19,7 @@ import { cells } from "../text.js";
 import { atLeastOne, normaliseWidth } from "../../data/viewmodel/index.js";
 import { collapseText } from "./collapse.js";
 import { hunkRows, isCollapsed, layoutFor, patchHeight, type Layout } from "./height.js";
+import { windowRows } from "./window.js";
 import { blankSide, dress, gutterSpans, line, textSpans } from "./lines.js";
 import { patchLayout, type PatchLayout } from "./layout.js";
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
@@ -193,6 +194,22 @@ export const patchDefinition: BlockDefinition<Patch> = {
   // than deriving anything — which is what keeps this cheap enough for C14 to call
   // per block per frame.
   measure: (block: Patch, width: number): number => atLeastOne(patchHeight(block, normaliseWidth(width))),
+
+  /**
+   * C09 I25 — rows `[from, to)`, as a smaller `patch` plus leading slack.
+   *
+   * **The kind F134 was filed about, and the half the pin does not fix.** The
+   * transcript path renders a patch whole at every scroll position: opening a
+   * 5,000-line diff is 3.7 s and each drag step 3.2 s, against `logs`'s 85.9 ms
+   * and 8.4 ms measured under identical load.
+   *
+   * `skipRows` carries the path header and any hunk header the range does not
+   * contain — forced by the block shape (C25 I18), so they are slack rather
+   * than a budget the caller never asked to spend. The gutter travels pinned
+   * (C25 I21a), which is what stops the window narrowing it from its own slice.
+   */
+  window: (block: Patch, width: number, from: number, to: number) =>
+    windowRows(block, normaliseWidth(width), from, to),
 
   render(block: Patch, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);

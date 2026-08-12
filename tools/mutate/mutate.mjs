@@ -35,6 +35,19 @@ export function killed(output) {
   return /Tests\s+\d+ failed/.test(strip(output));
 }
 
+/** Did the run reach a summary at all — pass *or* fail?
+ *
+ * **`killed` cannot answer this and must not be asked to.** A run that never
+ * finished and a run that finished green are the same `false`, and they mean
+ * opposite things. The control pair catches a harness that is blind from the
+ * start; this catches one that goes blind in the middle, which is what happened:
+ * a suite piped into `grep -q` under `pipefail`, the writer taking SIGPIPE, exit
+ * 141 and a buffer cut before the summary. Every mutation after it would have
+ * reported a survivor. */
+export function ran(output) {
+  return /Tests\s+\d+ (failed|passed)/.test(strip(output));
+}
+
 /** A named error rather than a boolean, so a miss cannot be read as a survivor. */
 export class AnchorError extends Error {
   constructor(file, from) {
@@ -92,12 +105,14 @@ export function runPass({ mutations, control, read, write, run }) {
     try {
       write(m.file, apply(originals.get(m.file), m));
       const output = run();
-      outcome = {
-        name: m.name,
-        expect: m.expect,
-        killed: killed(output),
-        byNamedTest: output.includes(m.expect),
-      };
+      outcome = ran(output)
+        ? {
+            name: m.name,
+            expect: m.expect,
+            killed: killed(output),
+            byNamedTest: output.includes(m.expect),
+          }
+        : { name: m.name, expect: m.expect, killed: false, noSummary: true };
     } catch (err) {
       if (!(err instanceof AnchorError)) throw err;
       outcome = { name: m.name, expect: m.expect, killed: false, anchorMissed: true };
@@ -113,7 +128,9 @@ export function runPass({ mutations, control, read, write, run }) {
 
 export function report(results) {
   const lines = results.map((r) => {
-    const state = r.anchorMissed
+    const state = r.noSummary
+      ? "NO SUMMARY      "
+      : r.anchorMissed
       ? "ANCHOR MISSED   "
       : r.killed
         ? r.byNamedTest
@@ -122,11 +139,22 @@ export function report(results) {
         : "SURVIVED        ";
     return `${state} ${String(r.expect).padEnd(8)} ${r.name}`;
   });
-  const survivors = results.filter((r) => !r.killed);
+  // **A run that did not finish is not a survivor and is not counted as one.**
+  // Both exit non-zero, so the gate is the same; the report is not, and reading
+  // `9 survived` off a harness that stopped producing output is the failure the
+  // control pair exists to prevent, arriving after the control pair has passed.
+  const blind = results.filter((r) => r.noSummary);
+  // An anchor miss stays in this count, as it always has: it is not caught, and
+  // the line above it already says which kind of not-caught it is. Whether a
+  // stale anchor should be counted apart is a separate question from this one.
+  const survivors = results.filter((r) => !r.killed && !r.noSummary);
   lines.push(
-    survivors.length === 0
-      ? "\nevery mutation was caught"
-      : `\n${survivors.length} survived — a finding about the tests, or about the sentence they were written from`,
+    blind.length > 0
+      ? `\n${blind.length} run(s) produced no summary — the harness went blind mid-pass. ` +
+          `Nothing above those rows means anything`
+      : survivors.length === 0
+        ? "\nevery mutation was caught"
+        : `\n${survivors.length} survived — a finding about the tests, or about the sentence they were written from`,
   );
   return lines.join("\n");
 }

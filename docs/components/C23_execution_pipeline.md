@@ -32,7 +32,7 @@ C18 classifies; C23 routes. Seven kinds, seven paths.
 | `builtinThenShell` | Apply, **then** delegate the remainder (C18 §4 rule 2b) |
 | `local` | Run an in-process handler, append its document |
 | `app` | Transport → adapt → append (§3) |
-| `shell` | `spawnShell` → `raw` document (C18 §5) |
+| `shell` | `spawnShell` → `raw` document (C18 §5); **on a non-zero exit, an error document carrying the shell's own stderr** (I50) |
 
 ### Composition inserts no spacing of its own
 
@@ -57,8 +57,20 @@ made by accident.
 
 ```typescript
 type LocalHandler = (args: readonly string[], ctx: LocalContext) =>
-  ViewDocument | Promise<ViewDocument>;
+  LocalDocument | Promise<LocalDocument>;
   // `args` is what follows the verb, not `ParseResult.argv`
+  // `LocalDocument`, not `ViewDocument` — `runLocal` fills `meta` (I15, F13)
+
+interface LocalContext extends ProducerContext {   // C07 §3 — the four facts
+  readonly command: string;          // as typed, for `doc.command`
+  ask(opts: AskOptions): Promise<string>;
+}
+
+type AskOptions = Readonly<{
+  question: string;
+  detail?: Block;                    // what the answer will affect
+  choices: readonly Readonly<{ key: string; label: string; default?: true }>[];
+}>;
 
 interface LocalContext {
   readonly command: string;          // as typed, for `doc.command`
@@ -76,6 +88,22 @@ interface LocalRegistry {
   seal(): void;
 }
 ```
+
+#### The context is obligatory, and a wider parameter is refused (I39)
+
+**A grant a consumer may decline to name is a grant that reaches nobody.** `LocalContext` gained `ask` and was published for exactly this reason, and the sentence that justified it — *"a handler that asks cannot name the type of the thing it is asking through"* — is **true about the handlers that ask and silent about the rest**. Measured across the reference app's eight local-handler families: four name `LocalContext`, four declare `ctx: { command: string }` by hand, and **the split is exact — the four that name it are the four that call `ask`** (F125).
+
+A parameter type may always be **wider** than what is passed. That is not a gap in the declaration; it is how function assignability works and it always will be. So a field added here arrives at the four families that had no complaint and does not arrive at the four that filed the findings, and nothing about granting fixes it.
+
+So `TuiConfig.localHandlers` **reads the handler's declared parameter type and compares it to `LocalContext` in both directions.** A handler declaring one field stops compiling at the registration boundary rather than compiling and receiving a context it cannot see, and so does one declaring the context *optional* — `ctx?: …` says the handler may run without one, which is the direct-call shape.
+
+**It is a check on the declaration, not on assignability, and that distinction is the mechanism.** Saying *the parameter is invariant* would be the wrong claim: variance governs whether a function is assignable to `LocalHandler`, and this never asks that question — it recovers the declared type through `infer` and tests it directly. Which is why the shape variance would have let through is refused too: an **object method**, whose parameters are bivariant, is rejected exactly as an arrow is. Probed across four declaration positions before this was written down — a named const, an inline arrow in the config literal, an object method, and a pre-typed record — and all four are refused. `NoInfer` has nothing to move: there is no inference site to shift.
+
+**Only one direction is new, and the mutation pass is what said so.** A handler declaring `LocalContext & { extra }` is *already* refused by assignability alone — a parameter wider than what is passed has never been legal. What the boundary adds is the **narrower** arm and the **optional** one; the mutual form is how the check is written, not the work it does. Measured by removing it: the wider row still fails, the other three stop.
+
+**This is C07 I13's mechanism in reverse.** There the seven registry-owned `meta` keys are typed `never`, so supplying a discarded value fails to compile rather than failing to matter. Here the refusal is on the parameter rather than the return, and it is the direction that has something to bite on: F13's narrowing landed correctly and changed nothing at four call sites, because a hand-written shape was structurally assignable.
+
+**Its first catch was a direct call.** The reference app invokes a handler outside the shell for its greeting, with an object literal that is not a `LocalContext`, has no `ask`, and compiled. Once the handler names the type the literal is a compile error — the obligation reaches the call site through the declaration, without a rule that walks call sites.
 
 #### `ctx.ask` — a question the handler awaits
 
@@ -210,6 +238,7 @@ C23 is the only component that appends documents, so it is the only one that can
 | `user` | A typed submission from the prompt |
 | `action` | An `exec` action dispatched from a block (§3a) |
 | `refresh` | **A system notice with no user behind it**: an identity transition signalled by C22 (§3b), C13's cap marker, and the two startup warnings C22 composes. Not the mechanism, the *provenance* — nothing the user typed produced it, so `↑` recalls nothing and `/debug` has no argv to show. It was written as *the identity notice is the only path that sets it*, and three others already did; the stall notice and a part refresh set it neither, because both *patch* and a patch carries no `meta` |
+| `defect` | **The framework contained a failure and is saying so** — §5a's fault notice, and nothing else. Not `refresh`, which is a system notice about the *session*, and not `action`, which names a mechanism that did not produce this. The distinction has a reader: `/debug` renders `origin` as a row, which was checked before the arm was added rather than assumed — a fifth arm nothing displays would be a field with no consumer, which is the class this whole row is about |
 | `agent` | Reserved. Nothing produces it in v1 |
 
 `origin` is not a debugging field. It is what makes a transcript legible once more than one thing is putting entries into it, and a provenance field that can be absent is one nobody trusts.
@@ -258,11 +287,21 @@ type ViewRefresh = Readonly<{
   id:           string;            // which part — never which host
   title:        string;            // the panel's; where state is said
   intervalMs:   number;            // 0 → one-shot, no retry
-  offsetMs:     number;            // stagger, assigned; see below
   staleAfterMs: number;
+  source:       string | null;     // the declared key, or null → its own (§3c)
   fetch:        () => Promise<unknown>;
+  derive:       { key: string; compute: (data: unknown, prev: unknown) => unknown } | null;
   render:       (data: unknown) => Block;
   renderError:  (err: ErrorLike, retryInMs: number | null) => Block;
+}>;
+
+// `offsetMs` left `ViewRefresh` with §3c: the stagger belongs to the thing that
+// polls, and after §3c that is the source rather than the part.
+type Source = Readonly<{
+  key:          string;
+  intervalMs:   number;
+  offsetMs:     number;            // stagger, assigned across the session
+  fetch:        () => Promise<unknown>;
 }>;
 
 type RefreshHost =
@@ -295,7 +334,148 @@ it is one map key, and `release(host)` becomes **the single path every teardown
 trigger routes through**, which is what makes the list below checkable rather than
 five call sites agreeing by inspection.
 
-C23 drives each on the injected clock and patches its host. **Offsets are assigned so no two fire in the same tick** — synchronised refreshes produce a periodic load spike and a whole-screen flicker, and staggering costs nothing.
+C23 drives each on the injected clock and patches its host. **Offsets are assigned so no two fire in the same tick** — synchronised refreshes produce a periodic load spike and a whole-screen flicker, and staggering costs nothing. After §3c the thing staggered is the **source**, because the source is what polls.
+
+---
+
+## 3c. Sources, derivations and parts
+
+**The correctness half is the argument, and the saving is a consequence.** Every part owning
+its own `fetch` means two parts reading one source poll it at different moments and **hold
+different data** — one plot and one sparkline diverge on screen, and two renderings of one
+fact showing different numbers is a defect rather than a cost. Measured before anything was
+built: two parts, one logical source, read from **one composed frame**, showing `19` and
+`20` (`docs/notes/TUI_NOTE_shared_pollers_baseline.md` §2).
+
+Three layers, and **two levels rather than a reactive graph**:
+
+```
+SOURCE       fetch, shared, versioned            one poll per key per tick
+DERIVATION   a fold over versions, shared        the ring · the parse · averages
+PART         render, per instance                one expanded, one collapsed
+```
+
+> **Per-part state is view state only. Anything that accumulates belongs in a derivation.**
+
+That rule is what makes the rest safe, and §3d's pause rests on it entirely: expanded /
+collapsed / which-tab do not need updating while nobody is looking, and a ring buffer does —
+so **a paused part cannot fall behind, because it holds nothing that could.**
+
+**`source → derivation → part` is where this stops.** Arbitrary depth is a different and
+much larger thing, and the shallow answer is the same call as `b.row` being a container
+rather than a layout engine and windowing being block-boundary rather than mid-row — three
+rulings with one shape, which is the evidence it is the right one.
+
+### The key declares sameness, because functions cannot be compared
+
+`LiveSpec.source` is a string (C24 §5). Two parts naming one key share the fetch **and** the
+derivation; only the render is per instance.
+
+**Every part has a source; `source` only says when two of them are the same one** (I42). A
+part omitting it is its own source, so the driver has **one code path** and the unshared case
+is the degenerate one rather than a branch that could be removed — which is C09's
+atomicity-by-absence applied to a seam instead of a block kind. The implicit key is derived
+from the host and the part id and lives in a namespace **no declared string can spell**;
+without that, a consumer's key could collide with another part's private one and two
+unrelated parts would silently share a fetch (§8d D5).
+
+**A conflicting cadence is refused at declaration, not arbitrated** (I43). Two parts naming
+one key with different `every` is a programming error, and refusing is available here, so
+first-wins and shortest-wins are both wrong: whichever loses is stored, reads as honoured,
+and silently is not — the two-records-of-one-fact class with a timing symptom. The refusal
+names both parts and both values, which is C05's duplicate-tool precedent.
+
+**The refusal is drawn in the losing part's panel and is not thrown, and that ruling was
+made by measuring the throw.** The first implementation threw from `declare`, which is where
+the argument for refusing points — and `declareLive` runs inside `appendAndCommit`, whose
+bare `catch` is C23 §5's deliberate one (F15). Measured from the public entry: **two panels
+sitting at `◌ loading` for the life of the session, no notice, no exception, nothing on
+stderr.** That is strictly worse than the arbitration it was chosen over, which at least
+ticks — a refusal nobody can see refuses nothing and reports nothing.
+
+So the losing part is declared, does not join the source, does not tick, and its panel
+carries the message. Visible where the author is already looking, contained by the panel
+border the way every other part failure is (A02 §7 rule 1), and one behaviour on every route
+rather than a throw the transcript route swallows and the view route does not.
+
+**This is §8a A4's lesson a third time**: a ruling correct about the interaction, assuming a
+mechanism the layer below does not have. The walk asked what a throw *leaves behind* — a
+half-registered host — and answered it by validating before applying. It did not ask **who
+sees the throw**, and no row of either artefact covers that, because the reader is not a rule.
+
+**`fetch` cannot be compared, so it is not checked, and this sentence is the ruling rather
+than a gap in one.** The key **is** the claim that these fetches are the same, and the
+framework takes it; the first declaration's closure runs. That is exactly the standing of
+`source` being a string at all, and stating it is what stops a later reader adding a check
+that cannot exist.
+
+### A derivation is a fold, and it is why the source can be shared at all
+
+`derive` is `{ key, compute(data, prev) }`, run **once per source version** and shared by
+key; its result reaches `render` in the fetched data's place. A pure map ignores `prev`; a
+ring buffer uses it. One shape covers both, and a part with no `derive` receives the source
+data exactly as it does today.
+
+**The layer is not optional and the reference app is why** (F91). `createCpuTick`
+(`examples/docker/src/container.ts:227`) pushes its sample into the ring **inside the
+fetch**, with its own comment recording why the sample must not land in `render` — a render
+failure would lose it. So one part's fetch has a side effect and its sibling's does not, and
+**sharing one fetch between them silently stops the ring.** A source layer without a
+derivation layer therefore has no consumer in the app it was filed against.
+
+`compute` is deterministic in the sense A02 §7 rule 2 means: **it throws like a `render` and
+not like a `fetch`**, so it does not retry, and the parts reading it render their error arm.
+The version is not consumed, because a fold that threw has not advanced.
+
+### What a shared source does at each moment
+
+**One fetch per source per tick**, and **every part referring to the source when it resolves
+renders that one result** (I44) — including a part declared while the fetch was in flight, so
+a part joining a shared source draws on the next resolution rather than waiting a full
+interval of its own. The whole set is applied, and **then** one commit.
+
+**A source with no referring parts is retired on the next sweep, not at release** (I45), and
+that ruling exists because of one sequence rather than for tidiness. I33a's declaration at
+settlement is **release-then-declare**: retiring at `release` drops the refcount to zero
+between two synchronous calls, destroys the source and its derivation, and rebuilds them
+empty — **so the ring would reset on every settle, with the panel still drawing and every
+assertion about it passing.** Retiring on the next sweep is the same *heard rather than
+checked* disposition I33 already takes for eviction, one level down.
+
+---
+
+## 3d. Off screen, a source does not poll
+
+**A source polls iff some part referring to it belongs to a visible host** (I46). Paused
+means no fetch, no derivation, no render and no patch; on return the source is due
+immediately and the part renders the result. Unlike the render cost, this one **spawns
+processes and reaches the far side** — measured at 20 fetches a second for two parts reading
+one source, unchanged by scrolling, because `refresh.ts` consulted no viewport at all.
+
+**I9 is not violated, and the distinction is the ruling.** I9 protects a *frozen* entry — a
+newer entry appeared, the thing is still running, patches keep arriving — and the table above
+strikes *freeze* out for exactly that reason. **Scrolled-off is a different state**: nobody
+is looking now, and the data must be fresh the moment they look. With a shared source one
+visible part keeps it polling for everything sharing it, so returning is frequently free.
+
+**It applies to every part, not only the ones that declared a `source`**, and the asymmetry
+is what decides it. A part accumulating inside its `fetch` is **already broken by the rule
+above**, so pausing does not create that defect — it surfaces one that was already there.
+Pausing only the parts that opted into sharing would make the framework's off-screen
+semantics depend on an unrelated declaration: an app adds a key to share a fetch and finds
+its polling behaviour changed, two features entangled by an implementation detail.
+
+**Granularity is the host, and the limits are recorded rather than left to be discovered.**
+C14 answers which *entries* are visible (`VisibleRange.entries`) and nothing gives per-block
+offsets, so a part inside a partly-visible entry counts as visible. And a `view` host is
+visible while its layer exists, so the pause reaches transcript-hosted parts and does not
+reach a pushed view at all. An unrecorded limit reads as strength.
+
+**Two things this does not do.** A fetch already in flight when the host leaves the screen is
+applied rather than discarded — the cost has been spent and throwing the answer away buys
+nothing. And staleness is still measured per part from its own `lastOk`, so two parts on one
+`sourceVersion` can disagree in their titles; that is named in §8d D10 and left owed rather
+than decided from inside a sharing change.
 
 ### A part is one block, and the block is a `panel`
 
@@ -361,6 +541,7 @@ Five triggers, all through `release(host)`, and one that is deliberately absent:
 | the entry is **evicted**, or the transcript **cleared** | C13's cap removes on its own schedule and says so; a refresh that outlived it patches an id that no longer resolves, and `{ok:false, reason:"unknown"}` would read as a failure worth backing off. C25's pushed view listens for exactly this |
 | `session.stopping` | below |
 | ~~the entry **freezes**~~ | **no.** I9 is that a frozen entry keeps receiving patches until settled, and *frozen ≠ not updating* is the whole of what I9 protects: a `--watch` scrolled out of view is still running. C24 §5's table said *teardown on freeze, settle or pop* and is corrected — an invariant with a stated reason outranks a row inside a section marked not-shipped |
+| ~~the host **scrolls off screen**~~ | **no, and it is not the same *no* as freeze.** Freeze changes nothing at all; scrolling off **pauses the source** (§3d, I46). Nothing is released, nothing is torn down, the parts stay declared, and the source is due the moment a referring host is visible again. The two are one row apart and one is a teardown question while the other is a scheduling one — which is why *"a `--watch` scrolled out of view is still running"* was the right sentence for I9 and is **not** an argument for polling it |
 
 **Eviction was in neither document.** §5's containment table had no refresh row and
 I9 speaks only of freezing, so the one trigger that removes a host without any
@@ -463,7 +644,11 @@ already declared and the architecture's table did not.
 
 **The `Child process needing a TTY` row takes an explicit opt-in, and it is two mechanisms because the two routes have different knowledge.** C21 §5 builds `handoff` for children that need the terminal — `vim`, `less`, `kubectl exec` — and this table sequences it. **Nothing decides which commands take it.** The manifest has no field, C18's `ParseResult` carries no signal, and `shell` results are arbitrary text; so the row is specified, agreed by two components, and unreachable — the shape the default transport, `origin: "refresh"` and `settle(id, doc)` each had.
 
-**App verbs: `interactive: true` on the `ToolDef`.** The app author knows `prism shell` drops into a REPL and nobody else can. Declarative, in the single source C18 already reads, and it costs one field on the verbs that need it.
+**App verbs: the contract C05 resolves for the invocation.** The app author knows `prism shell` drops into a REPL and nobody else can — but not always about the *verb*: `docker run` attaches by default and detaches with `-d` (F80). So C05 I23 resolves it per invocation from the tool's declaration and the flags present, C18 carries the answer on its `app` arm, and C23 reads `result.interactive` on both routes. **One field name, two arms, no branch that knows which kind it is looking at.**
+
+**And the gate is above the interactive split, never inside one arm of it (I38).** The `validation.ok` check lived in `runApp` — the *non-interactive* arm — while the split itself read `tool.interactive`, so a malformed invocation of an interactive verb was handed the terminal and spawned unvalidated. D17's argument is that a malformed invocation costs nothing rather than an interpreter's startup, and the route stepping over it was the one whose failure takes the screen. F119.
+
+**One check, held by a type rather than repeated.** `runApp`'s parameter demands the narrowed `ValidationResult`, so the gate cannot drift back into it; two runtime guards of one condition are indistinguishable from one in every test, since each defeats the other's mutation.
 
 **The `shell` route: `/tty <command>`, stripped by C18** (C18 §5a). The user is typing the command, so the user is the only party with the knowledge — and C05 cannot help here, which the check settles rather than assumes. C05 describes *tools*; §5 hands anything with a shell operator to `sh -c` **whole**, and a shell line has no flags C05 could describe, because `sh` is what parses it. The marker is read through the command policy, so a consumer using `prefixPolicy(":")` writes `:tty`.
 
@@ -477,7 +662,7 @@ So two mechanisms, and honestly two: the routes differ in who knows.
 
 **Discoverability covers one of the two halves, and the sentence used to claim both.** `/help` renders from the manifest, so an `interactive` app verb is discoverable without being remembered — that half holds. The marker is not a manifest tool and cannot be (C18 §5a), so it is exactly as discoverable as `cd`, which is to say not from `/help` at all. Stated rather than left implied: the shell half is documentation and habit, and if that turns out to cost more than it looks, the remedy is a section in `/help` for the things C18 recognises structurally, not a field on a `ToolDef` that would have nowhere to live.
 
-**And C05 refuses two combinations rather than C23 arbitrating them** (C05 I19). `interactive` with `streams` is a verb whose child owns the terminal and whose stdout is being read into the transcript at the same time; `interactive` with `local: true` is a handoff to a child that is never spawned. Neither has an arbitration that is not a guess, and refusing at parse puts the report in front of the author who wrote the manifest rather than the user watching a terminal misbehave.
+**And C05 refuses the impossible combinations rather than C23 arbitrating them** (C05 I19, I24), wherever they are declared — on the tool or on a flag, since an arm re-creates the same impossible verb. `interactive` with `streams` is a verb whose child owns the terminal and whose stdout is being read into the transcript at the same time; `interactive` with `local: true` is a handoff to a child that is never spawned. Neither has an arbitration that is not a guess, and refusing at parse puts the report in front of the author who wrote the manifest rather than the user watching a terminal misbehave.
 
 **`Scroll` is not here, and it was.** A02 Seam 4 assigns it to C22 with C14 I12 cited — C14 moves and C22 commits — and `src/shell/construct.ts` step 11 implements it there. A row listed in both places is a row with two owners, which is the condition the owner column was added to remove.
 
@@ -499,10 +684,59 @@ Every stage can fail, and none may kill the session (A02 §7).
 | A refresh part's `fetch` rejects | Contained to that part (I21): its panel renders the error at its own size, backoff doubles to the five-minute cap, siblings and the rest of the host are untouched. **A `render` that throws does not retry** — A02 §7 rule 2, and a one-shot part does not retry either, rule 3 |
 | A refresh patch returns `{ok:false}` | Not a failure and never a backoff. `"unknown"` means the host was evicted and `"settled"` that it finalised between arming and firing; both mean the part is over, so it is released. Treating either as a transport failure would back off against a host that is gone |
 | A local handler throws | Error document naming the verb |
-| `transcript.append` throws | The only stage whose failure loses the outcome. Logged as a defect, the frame still commits, and I1's second exception names it rather than leaving the invariant false. **The machine still returns to `idle`** (§8a A5) — I1's exception is about the entry, not a licence to keep the guard, and a stranded guard refuses every submission for the life of the session |
+| `transcript.append` throws | The only stage whose failure loses the *entry*. **Recorded as a fault and reported** (I48), the frame still commits, and I1's second exception names it rather than leaving the invariant false. **The machine still returns to `idle`** (§8a A5) — I1's exception is about the entry, not a licence to keep the guard, and a stranded guard refuses every submission for the life of the session |
+| The append succeeded and a later statement threw | **Not this row, and §5 read as though it were** — the catch covers five statements and only the first is `append` (§8e). The entry exists; what is lost is the rest of the sequence. **The catch finishes what the try did not** (I49) |
 | Commit throws | C03 contains it; contamination is flagged for the next frame |
 
 **Cancellation is not a failure.** Ctrl-C routes through C16 to C06's ladder; whatever the child produced is retained and the document settles as `partial` (C07 §4). The transcript keeps forty log lines rather than discarding them because the user stopped watching.
+
+---
+
+## 5a. A swallowed failure is reported, on two channels
+
+**The reporting path is the path that failed**, so there is no single channel that works.
+§8e's table is what forces two: in the row where `transcript.append` throws, appending is
+precisely what cannot be relied on.
+
+### The correction this section is
+
+Until now §5's row, I1's second exception and §8a A5 all said the failure was *"logged as a
+defect"*. **Nothing anywhere logged anything**, in any component — there was no sink to log
+to. One unmeasured claim, restated in three places, reading as a mechanism because three
+documents agreed; the instrument is *ask where a settled claim is written down*, pointed at
+this spec. F15 is the cost: an invalid document produced no entry, no error and nothing on
+stderr, with the precise violation in hand and discarded, and the route to it was four wrong
+turns against a framework that had the answer in one sentence.
+
+### The moment was already chosen, twice
+
+C02 rules that a component *decides what is wrong, never when the user is told* — detection
+runs before the terminal is acquired, and C22 §8 restores the screen before printing because
+a diagnostic painted onto the alternate screen is discarded with it. C20 §Warnings says that
+ruling "transfers whole". **C23 is the third instance and it takes the same shape**: C23 has
+no logger, `console.*` is banned outright (SS33), and the moment belongs to C22 §8 step 3.
+
+So the two channels are:
+
+- **An entry, at the moment** — a fault notice carrying the caught reason, which is the thing
+  F15 says was in hand and destroyed. It is **not the submission's entry** (§8b B1), so I1's
+  count is untouched, and `stopping` halts it exactly as B1 ruled for B1's own three.
+  Deduplicated by message: a source failing every tick would otherwise fill the transcript
+  with one sentence, and *logged once* is what C20 already means by it. **One swallow is one
+  notice**: a containment that fails a second way — the catch's own `resetFocus` throwing —
+  records the second cause and does not draw it, because the reader already has the first and
+  two sentences for one event describes the machinery rather than the fault.
+- **An accumulation, at shutdown** — `faults`, drained by C22 §8 step 3 onto the restored
+  primary screen with the capability warnings and the history warnings. **This is the channel
+  that survives §8e's first row**, where nothing can be appended at all.
+
+### The ladder ends, and where it ends is stated
+
+If the fault notice itself throws, only the accumulation survives. That is the end of the
+ladder and there is no third channel — a framework whose transcript store is refusing every
+document has nothing left to say through it. **It is fabricated rather than asserted in
+prose** (T3.38): a construction path claimed to be safe is a claim, and the glyph defect is
+how F15 was found in the first place.
 
 ---
 
@@ -523,7 +757,7 @@ Per submission.
 
 ## 7. Invariants
 
-- **I1** — Every submission produces exactly one transcript entry, with two named exceptions: `empty` produces none, and a failure of `transcript.append` itself produces none and is logged as a defect. No other path may produce zero or two.
+- **I1** — Every submission produces exactly one transcript entry, with two named exceptions: `empty` produces none, and a failure of `transcript.append` itself produces none — **and a fault notice in its place**, which is not the submission's entry (§5a, §8b B1) and so does not make the count two. The exception is about the entry the submission asked for, not about the session going silent. No other path may produce zero or two.
 - **I2** — No stage failure escapes; every one produces a document. For patch application the mechanism is C04's `PatchResult` (C04 I15) rather than a caught throw: the failure is a value on the return path, so "settled with what it had" is something C23 *does* with a result, not something it recovers from.
 - **I3** — The pending entry is appended before the transport is invoked.
 - **I4** — Validation is carried from C18, never recomputed.
@@ -560,7 +794,22 @@ Per submission.
 - **I34** — A refresh applies its result as **one `replace` of one block**, and that block is a `panel` whose children are what the consumer rendered. One op, one `rev`, atomic: several patches for one logical refresh would invalidate C14 N times and leave a frame composable half-applied. The kind is not free — `Panel` is the only one carrying a `title`, and every state a live part announces (I35, A02 §7 rule 1) is announced there.
 - **I35** — Past `staleAfter` — default twice the interval — a part's panel is replaced by the same panel with its age in the title, and **staleness never stops the refresh**: a stale part is one still trying, and the marker clears on the next success. S13 commitment 4 has required this since before the mechanism existed, and C24 §5 cited §3b for it while §3b had nothing to cite.
 - **I36** — **A question raised by `ctx.ask` is pushed with `dismissable: false`, and it resolves with a choice on every path.** The two halves are one invariant because either alone is a defect. `dismissable: false` is what C16 I8's first clause reads, so no key reaches the surface beneath an open question — and it also stops C16's rung 4 from popping the layer on `⌃c`, which would close the question while the handler's promise stayed pending and the entry never settled. **The flag says the router may not discard this layer without telling its owner; it does not say the user cannot escape it.** Those are two meanings of one word and the layer needs opposite answers to them: `Esc` and `⌃c` resolve with the default choice, which the answer handler does (C16 I25), so the escape the user sees is the owner resolving rather than the router discarding. Resolving with a choice on every path is the second half: `ask` returns `Promise<string>` and never null, because declining **is** the choice marked `default` and a second representation of *nothing happened* is one every caller must handle and none can act on differently.
+- **I37** — **`enter` on a focused row fires that row's first action, through the same dispatcher every other route uses.** C16 owns the binding and C23 owns the dispatch; the shell supplies the join, because the component that knows a live entry's blocks is the one that already answers C16 I22's *which rows are focusable*, and a second walk would be a second answer to *what is here*. **The first action, and C04 I19 is why that is safe** — a row lists its actions in order and `fill` is the default kind, so the first action of a well-formed row is the one a reader expects; a row declaring `exec` first has declared a reversible operation, which is what I19 reserves that kind for. A row with no actions does nothing and says nothing: `focusableRowIds` returns every row because navigating to read is worth doing alone, so a refusal per keystroke would be noise on most of a table. The refusals that matter — a frozen entry (I18), a disallowed scheme (I17) — are the dispatcher's and are unchanged. **Until this existed `actions.ts` implemented all five arms and nothing in `src/` reached it** (F21): an app could build a `view` action, have C04 validate it and C09 render its label, and no keystroke would arrive. C24 I16's subject arriving on `Action`.
+- **I38** — **The `app` route reads `result.interactive`, and it reads it after `validation.ok`.** The first half is C05 I23 arriving: the contract belongs to the invocation, so C23 has no business consulting a `ToolDef` field that cannot describe one, and the `shell` arm has carried the resolved form since C18 §5. The second half is the ordering, and it is the one that was wrong: the gate sat inside the non-interactive arm of the split it was supposed to precede, so an unvalidated invocation was spawned on exactly the verbs where the failure is a terminal handed to a child that should never have started (F119). **A gate inside one arm is a gate for the arm that was easy to gate.** It stays single: `runApp` takes the narrowed result, so a caller that has not gated does not compile. **The `local` route has never had this check and still does not** — the same shape one case over, observed rather than measured, and named here so it is a known gap rather than a discovery.
+- **I39** — **A local handler's context is obligatory: `TuiConfig.localHandlers` refuses a handler whose `ctx` is not mutually assignable with `LocalContext`.** A parameter type may always be *wider*, so a handler declaring `ctx: { command: string }` is legal TypeScript that compiles, registers, runs, and cannot see a field the framework adds — measured at four of the reference app's eight families, and the split is exact: the four that name the type are the four that call `ask` (F125). **The sentence that published `LocalContext` was true about the handlers it described and silent about the other half**, which is MG24's shape (F84) and the second instance of it. This is C07 I13's `never` keys in reverse — there the refused thing is a supplied return value, here it is a declared parameter — and it is the direction with something to bite on, because F13's narrowing landed correctly and changed nothing at four call sites that were structurally assignable. The obligation reaches direct calls through the declaration: once a handler names the type, an object literal missing `ask` is a compile error at the call site, with no rule walking call sites.
+- **I40** — **Every route that produces a document is handed the same `ProducerContext`** (C07 §3, I17): the adapter route, the local route, a live part's `render` and the greeting. One shape, because four shapes is four places for the four facts to diverge — which is the defect the grant exists to close, reproduced inside the framework.
+- **I41** — **`height` is non-null on the view route and `null` everywhere else**, decided from `isViewInvocation` before step 3 (C07 I18, C22 I45). The decision is already read there because after step 3 it is too late; this adds a consumer, not a second read.
+- **I42** — **Every live part has a source, and `source` only declares when two parts' sources are the same one** (§3c). A part omitting it is its own source under an implicit key derived from its host and id, in a namespace **no declared string can spell** — without which a consumer's key could collide with another part's private one and two unrelated parts would share a fetch, silently and correctly-looking (§8d D5). One code path, and the unshared case is the degenerate one rather than a branch: the same atomicity-by-absence C09's optional `window` uses.
+- **I43** — **One source, one cadence, and a conflict is refused at declaration** naming both parts and both values. Arbitrating it — first-wins, shortest-wins — stores the loser's declaration where it reads as honoured and is not, which is the two-records-of-one-fact class with a timing symptom; refusing is available, so arbitrating is not the answer. **The refusal is drawn in the losing part's panel and not thrown**, and that half was measured rather than reasoned: thrown from `declare` it is swallowed by `appendAndCommit`'s deliberate bare catch (§5, F15), and the author gets two panels at `◌ loading` for the session with nothing anywhere reporting a fault — strictly worse than the arbitration it was chosen over. The losing part is declared, joins no source and never ticks; one behaviour on every route, contained by the panel border like every other part failure. **`fetch` cannot be compared and is therefore not checked, and that is a ruling rather than a gap**: the key *is* the claim that these fetches are the same and the framework takes it, exactly as it takes `source` being a string at all. A one-shot part (`intervalMs: 0`) sharing a key with a periodic one is this rule and not a separate case.
+- **I44** — **One fetch per source per tick, and every part referring to the source when it resolves renders that one result**, applied as a set before a single commit. Including a part declared while the fetch was in flight, so joining a shared source draws on the next resolution rather than after a full interval of its own. This is the invariant the whole row exists for: two parts of one document cannot hold two samples of one instant, because there is one sample.
+- **I45** — **A source with no referring parts is retired on the next sweep, not at release.** I33a declares at settlement by **release-then-declare**, so retiring at `release` drops the refcount to zero between two synchronous calls, destroys the source and its derivation, and rebuilds them empty — the accumulated history reset on every settle, with the panel still drawing and every assertion about it passing. The same *heard rather than checked* disposition I33 takes for eviction, one level down (§8c C3).
+- **I46** — **A source polls only while some part referring to it belongs to a visible host**: paused means no fetch, no derivation, no render and no patch, and on return the source is due immediately. **It is not I9's freeze and not a violation of it** — I9 protects a frozen entry that is still receiving patches, and scrolled-off is a different state where nobody is looking and the data must be fresh the moment they look. It applies to **every** part rather than only those declaring a `source`, because a part accumulating inside its `fetch` is already broken by §3c's rule and pausing surfaces that rather than causing it. Granularity is the **host**: C14 answers per entry and nothing gives per-block offsets, so a part inside a partly-visible entry counts as visible, and a `view` host is visible while its layer exists. A fetch already in flight is applied rather than discarded.
+- **I47** — **A derivation is a fold over a source's versions, run once per version and shared by key**, and its result reaches `render` in the fetched data's place. `compute` throws like a `render` and not like a `fetch` (A02 §7 rule 2): deterministic, so it does not retry, and the version is not consumed because a fold that threw has not advanced. **Anything that accumulates belongs here and per-part state is view state only** — which is what makes I46's pause safe, since a paused part holds nothing that could fall behind.
+- **I48** — **A swallowed failure is recorded and reported on two channels, and C23 chooses neither moment for the second** (§5a). Every bare `catch` in the pipeline records the reason in `faults`, deduplicated by message; C22 §8 step 3 drains it onto the restored primary screen beside C02's capability warnings and C20's history warnings. This is C02's ruling taken a third time — *the component decides what is wrong, never when the user is told* — and it is why `faults` is a readable collection rather than a callback: a callback chooses the moment, and the moment is after the terminal is released. The other channel is the fault notice, which speaks at the time and cannot be relied on, because in §8e's first row appending is what failed. **The prose it replaces claimed a defect log that no component had.**
+- **I49** — **The catch finishes what the try did not.** `resetFocus` and the commit run on every path out of `appendAndCommit`, and the entry id is returned whenever the entry exists. §8e's table is the argument: four of five rows leave the append done and the sequence after it abandoned, and the reset is the one whose absence is permanent — T4.7b asserts its position because a frame painted with focus in a frozen block is the failure it prevents. The same reasoning §8a A5 applied to the guard, applied to the four statements that ruling did not look at.
 
+
+- **I50** — **The `shell` route's failure is a document like any other: `error` filled, and the shell's own stderr in it.** A non-zero exit composed `status: "error"` with no `error` field, which C04 I3 forbids in both directions, so `transcript.append` refused every one of them (C13 I10) and the route produced **no entry at all** — the user seeing F15's fault notice cite two invariant numbers instead of the command they typed. This is the **third instance of the class `documents.ts` closed at `noticeDoc`**, and the argument recorded there — *filling the field here rather than at the two call sites is the class rather than the instances* — is why it recurred: the class was closed at one composer, and this route does not go through it. **Closing a class means checking the class has one member.** The second half is `stderr`: `ChildHandle` delivers it separately (C21 I3) and the route read only `stdout`, so a failing command's one explanatory sentence was produced, delivered and dropped — leaving a raw block that was empty as well as unappendable. §3's verb route already reads it, which is both the precedent and the proof it was reachable. **A bare word is the likeliest thing an unfamiliar reader types**, and it is the input this route exists for.
 ---
 
 ## 8. Commitments
@@ -593,11 +842,22 @@ Per submission.
 25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 26. `seal()` reconciles the local registry against the manifest, both directions, and fails construction on a mismatch (I27).
 27. C23 counts stream patches and supplies `seq`; C07 spends it as an id namespace and a reset, so a constant breaks both (I30, C07 I15).
+28. A `view` action resolves its target within the source entry and refuses two things — an unresolvable target, and a view raised onto a non-empty stack — rather than ignoring the first or letting C15's throw cross a renderer's callback (I31).
 29. A refresh names its part and is registered against its host, so one `release(host)` is every teardown path (I32).
 30. A refresh stops on settle, pop, evict, clear and `stopping`, and keeps running through a freeze (I33, I9).
 31. A refresh patches one `panel` in one op, and past `staleAfter` that panel's title carries its age rather than the screen going quietly wrong (I34, I35).
 32. A local handler may ask a question and await the answer. It is a choice list, it is modal by C15's flag rather than by a second mechanism, and it resolves with a choice on every path including `Esc` and `⌃c` — so no caller distinguishes declining from cancelling, because nothing downstream could act on the difference (I36, C16 I25).
-28. A `view` action resolves its target within the source entry and refuses two things — an unresolvable target, and a view raised onto a non-empty stack — rather than ignoring the first or letting C15's throw cross a renderer's callback (I31).
+33. `enter` on a focused row fires its first action through C23's dispatcher. The binding is C16's, the dispatch is C23's, and the join is answered where C16 I22's focusable rows are — one walk, one answer (I37, C16 I26, F21).
+34. The terminal contract is read from the invocation rather than the declaration, and it is read after validation — so both routes name one field and no verb is spawned ungated (I38, C05 I23).
+35. A local handler that declines to name its context does not compile. The grant is only a grant if every consumer can see it, and four of eight could not (I39, F125).
+36. Four producing routes are told one thing, in one shape, from one source (I40, C07 I17).
+37. A bound is stated where a region defines the document and `null` where nothing does (I41, C07 I18).
+38. Two parts reading one source read one sample of one instant: the key declares sameness, one fetch serves every part referring to it, and the whole set is applied before one commit (I42, I44).
+39. A conflicting cadence on one key is refused at declaration rather than arbitrated, and the fetches themselves are taken on the key's word because nothing can compare them (I43).
+40. Anything that accumulates is a fold over the source's versions, run once per version and shared; per-part state is view state only (I47).
+41. A source polls only while something is looking at it, and stops nothing when it is not — no teardown, no release, and due again the moment a referring host is visible (I46, I45, I9).
+42. A failure the pipeline swallows is said twice — once in the transcript at the time, once on the restored primary screen at exit — and C23 chooses only the first moment (I48).
+43. A stage failure after the append finishes the sequence rather than abandoning it, and the entry id is returned whenever the entry exists (I49).
 
 ---
 
@@ -747,6 +1007,7 @@ else can happen while they are running.
 | SIGWINCH during the suspend | handoff × C01 | Nothing. While suspended the dimensions belong to the child (C01 §3), and the terminating `invalidate` is a full repaint at whatever size the terminal now is. The resize path's `commit("resize")` would paint onto the child's screen |
 | an entry still streaming when `suspend()` is called | handoff × §3's stream path | Cannot arise on the accepted path — the guard is held, so no stream is in flight when a submission begins. But §3b's stall detection is **not** a submission and does patch on a timer, so it fires onto a suspended terminal. Ruled: `commit` during a suspend is dropped, and the trailing `invalidate` is what makes that safe. The patch still lands in the store; only the paint waits |
 | `runner.handoff` rejects | **the throw path** | See below |
+| an app verb whose flags decide the contract | structural, not sequential | Resolved at C05 (I23), and the rows where two declarations meet are C05 §8a's table. It is here to record that a trace was asked and is the wrong artefact: there is no event between a tool's declaration and a flag's |
 | an app verb declaring `interactive` and `streams` | structural, not sequential | Refused at parse (C05 I19). It is in this table only to record that it was asked and answered somewhere else — the interaction is between two manifest fields with no event between them, so it is C05's classification rule and not a row of this trace |
 
 **A6.5 — the rejected handoff leaves a suspended terminal, and nothing resumes
@@ -902,6 +1163,195 @@ its exception.
 
 ---
 
+## 8c. The sequence trace — a shared source through its lifetime
+
+§3c's mechanism has state **and** structure, so it gets both artefacts. This one takes the
+event-mediated interactions: two rules that meet because something happened in between. §8d
+takes the structural ones, and taking the trace alone because a driver is the obvious state
+machine is how the structural half goes unexamined.
+
+| # | Sequence | Rules meeting | Outcome |
+|---|---|---|---|
+| C1 | fetch in flight → one referring host released → **resolves** | I21's `unknown`-is-not-a-failure × I44 | That part is released; the source polls on for the others — correct |
+| C2 | fetch in flight → **every** referrer released → resolves | C1 × I45 | Result dropped, **no backoff**: nothing failed. See below |
+| C3 | settle: `release(host)` → `declare(host)`, one key in both documents | I33a's ordering × the refcount | **Defect C3.** The source and its derivation are destroyed and rebuilt empty, on every settle |
+| C4 | fetch in flight → a second host declares the key → resolves | I44 × "one fetch per tick" | The new part renders this resolution, not the next — correct, and it is I44's second clause |
+| C5 | source fails → backoff → a new part declares the key | I21's backoff × declaration | It inherits the backed-off cadence and renders a failure it did not witness — correct, and §8d D6 is why |
+| C6 | host scrolls off **while a fetch is in flight** | I46 × I44 | The resolution is applied; the *next* tick does not happen (I46's last clause) |
+| C7 | `stopping` set while a shared fetch is in flight | §8b B1 × I46 | Unchanged: the driver is released where `stopping` is set, above the ticks |
+| C8 | one of two hosts sharing a key is **evicted** | I33's heard-not-checked × the refcount | Decrement; the source keeps polling for the survivor |
+
+### C3 — release-then-declare resets what a derivation exists to accumulate
+
+**The refcount is the obvious implementation and it is wrong at exactly one moment.**
+
+I33a settles by releasing the host's parts and then declaring the settled document's, in that
+order, synchronously — C13 emits `settle` inside the `settle()` call, so the teardown runs
+first and the declaration follows it. A source retired the instant its last part is released
+is therefore retired *between those two calls*, and rebuilt by the second one with an empty
+derivation.
+
+**Nothing about the frame would say so.** The panel still draws, the fetch still runs, the
+title is still right; what is gone is the history — a sparkline that resets to one point
+every time its entry settles, which is a state no assertion about the *current* value can
+see. It is the class A03 §2 names: each operation is correct and the sequence is not.
+
+**So a source with no referrers is retired on the next sweep, not at release** (I45). That is
+the same disposition I33 already takes for eviction — *heard rather than checked*, one tick's
+grace — and it makes C2 fall out of the same rule instead of needing its own: a resolution
+arriving for a source nobody refers to has somewhere to be dropped, and a source that is
+genuinely finished is collected one sweep later at no cost.
+
+**And it is a ruling whose rejection path was asked about.** Retiring lazily means a source
+can exist with a refcount of zero, so the sweep must not treat *no referrers* as *nothing to
+do* and re-arm forever on it. The retirement is the sweep's, and the timer arms to the
+soonest **referred** source.
+
+### C2 — nothing failed, so nothing backs off
+
+A resolution whose every referrer has gone is not a failure and must not touch
+`consecutiveFailures`. The distinction is I21's own — `{ok:false, reason:"unknown"}` means
+the host is gone rather than the far side is unwell — and sharing gives it a second instance
+one level up. Backing off here would mean a source that lost its readers polls *more slowly*
+when they come back, which is the opposite of what I46 promises.
+
+---
+
+## 8d. The classification table — two parts and one key
+
+The structural half: rules that both hold at rest, with no event between them. Indexed by
+rule interaction, so every row is a cell where two correct statements overlap; a row governed
+by one rule restates that rule and finds nothing.
+
+| # | Cell | Rules meeting | Ruling |
+|---|---|---|---|
+| D1 | one key, different `every` | I43 × "a part declares its interval" | **Refused at declaration**, naming both parts and both values, **in the losing part's panel** — a throw here is swallowed by §5's bare catch and the author sees nothing |
+| D2 | one key, different `fetch` closures | I42's claim-of-sameness × functions are incomparable | First declaration's closure runs, **unchecked**, and I43 says so outright |
+| D3 | one-shot sharing a key with a periodic part | A02 §7 rule 3 × I43 | **This is D1**: `0 ≠ N`. Not a separate case, and saying so is what stops a second arm appearing |
+| D4 | two one-shots, one key | rule 3 × I44 | One fetch, both parts render it, the source is `done` after one attempt |
+| D5 | a declared key spelling another part's **implicit** one | I42's *every part has a source* × the key declares sameness | **Defect D5.** The namespaces must be disjoint by construction |
+| D6 | a failing source, one part with a custom `renderError` and one with the default | I21's containment × the source's backoff | Each part renders its own error at its own size; the backoff is the **source's** and is counted once |
+| D7 | one key across an entry host and a view host | I32's `release(host)` × the refcount | The source outlives one host's release while the other refers to it |
+| D8 | a part with `derive` and one without, one source | I47 × "render receives the derivation's output" | Independent: the underived part receives the source data unchanged |
+| D9 | one source key, one derive key, different `compute` | D2 one level down | First wins, unchecked — the same sentence, and it is stated once rather than twice |
+| D10 | `staleAfter` per part on a shared source | I35 × I44 | **The axis I44 does not check.** Owed, below |
+
+### D5 — an implicit key a consumer can spell is two parts sharing a fetch by accident
+
+I42 makes every part have a source so there is one code path. The implicit key is built from
+the host and the part id — and if it is built as, say, `entry:e1:cpu`, then a consumer whose
+`source` string happens to be `entry:e1:cpu` shares a fetch with a part that never asked to.
+
+**Two unrelated parts polling one source is the exact inverse of the defect this row fixes**,
+and it would look correct: one fetch, two panels, consistent numbers. The frame would be
+*more* self-consistent than before.
+
+So the two namespaces are disjoint by construction rather than by convention — the implicit
+key carries a prefix no `LiveSpec.source` can contain, and the check is the construction
+rather than a validation. **A rule that depends on nobody choosing a particular string is not
+a rule.**
+
+### D6 — containment is the part's and backoff is the source's, and they are different words
+
+I21 says a failing refresh is *contained to its declared part*. With one fetch behind two
+parts, "the failure" is one event and "the part it is contained to" is two panels — so the
+sentence has to be split rather than reinterpreted:
+
+- **Rendering** is per part: each draws its own `renderError` at its own size, and a part
+  that overrode it still gets its override. A02 §7 rule 1 is structural because the panel
+  border *is* the part's size, and that is unchanged.
+- **Backoff** is per source, counted once. Doubling it once per referring part would treat
+  one unwell far side as N of them and reach the five-minute cap in `log₂N` fewer steps.
+
+The two halves were one word in I21 because until now a part and a poll were the same thing.
+
+### D10 — the axis I44 does not check, and it is left owed
+
+**I44 guarantees the data and says nothing about the moment.** Two parts on one
+`sourceVersion` hold one sample — and their *titles* can still disagree, because staleness is
+measured per part from its own `lastOk` (I35). A part that was paused and has just returned
+carries `· 14s ago` beside a sibling reading the same version with no marker at all.
+
+That is the same shape as row 1's window property, which held exactly while every row moved
+sideways: **an invariant satisfied on the axis it names, and silent on the one the reader
+sees.** It is recorded here rather than fixed, because moving staleness from the part to the
+source is a decision about I35 and taking it from inside a sharing change is deciding one
+invariant to suit another.
+
+---
+
+## 8e. The classification table — five statements under one catch
+
+The subject is `appendAndCommit`'s bare `catch`, and the index is **which statement threw**.
+A sequence trace cannot reach these: nothing happens *between* the statements, so the rules
+that meet here meet at rest. §5's own row is written as though the first statement were the
+only one that can throw, and that is the finding rather than a consequence of it.
+
+The try body is `append` → `declareLive` → `recordHistory` → `resetFocus` → `commit`.
+
+| threw | entry | parts | history | focus reset | commit | `return` |
+|---|---|---|---|---|---|---|
+| `append` | — | — | — | not needed | catch | `null`, **true** |
+| `declareLive` | **yes** | none | **no** | **no** — E1 | catch | `null`, **false** — E2 |
+| `recordHistory` | yes | yes | no | **no** — E1 | catch | `null`, **false** — E2 |
+| `resetFocus` | yes | yes | yes | no — E1 | catch | `null`, **false** — E2 |
+| `commit` | yes | yes | yes | yes | **twice** — E3 | `null`, **false** — E2 |
+
+### E1 — the catch abandons `resetFocus`, and T4.7b says what that costs
+
+**The reset sits between the append and the commit and the order is load-bearing**: T4.7b
+asserts the call order because *"a reset issued after the commit paints one frame with focus
+in a frozen block"*. Skipping it entirely is that failure without a bound — the append froze
+the previous entry and focus is still inside it, on every frame from then on, until something
+unrelated resets it.
+
+**Ruled: the catch finishes what the try did not** (I49). It is the same argument §8a A5 made
+for the guard — a stage failure is not a licence to abandon the rest of the sequence — and
+that ruling was taken about `running` while three of the four statements after the append
+went unexamined.
+
+**Reachability is stated rather than assumed.** Row 2 of this table is the one that happened:
+the cadence refusal thrown from `declare` (I43, F15). Since that refusal is drawn rather than
+thrown, `declareLive` has no *known* throw today, and rows 3–5 have none either. The remedy
+is structural because the table is — a catch that covers five statements and repairs one is
+wrong independently of which of the other four currently throws.
+
+### E2 — the return value is a lie in four rows of five, and nothing reads it
+
+`appendAndCommit` returns `string | null` and **all nineteen call sites discard it**, several
+with an explicit `void`. So the function's only channel back to its caller is unused — which
+is why the swallow is total by construction, and why the fix has to be a channel rather than
+a return code.
+
+`null` means *no entry* to any reader of the signature, and in rows 2–5 the entry exists.
+**Ruled: the id is returned when the entry exists**, which costs one variable and removes a
+statement that is currently false. It is latent only because nothing reads it, and that is
+the class that bites on the day something does.
+
+**And it has no test row, which is the same fact stated from the other side.** Nothing can
+observe the return value without adding the consumer the row would be testing for, so the
+correction lands in the code and is named here as unobservable rather than given a row that
+asserts against a caller written to make it pass. T1.47 covers the reset, which is the half
+this table found and the half that reaches a frame.
+
+### E3 — a `commit` that throws is committed again by the catch
+
+§5's own last row says C03 contains a commit failure and flags contamination for the next
+frame, so this row is very likely unreachable — and **a row governed by one rule restates the
+rule and finds nothing**, which is what makes it worth writing down rather than deleting.
+It is not made unreachable by anything in C23, so the catch's commit is the last statement in
+it and nothing follows that could depend on it.
+
+### What the table settled about the fix itself
+
+**The reporting path is the path that failed**, and that is the constraint the whole row
+turns on. Every other containment path in C23 ends in an appended document; this one cannot
+assume it can append, because the append is what threw in row 1. So the report has two
+channels and they fail independently: an entry at the moment (§5a), and an accumulation read
+after the terminal is restored (I48). The second one is the one that survives row 1.
+
+---
+
 ## 9. Tests
 
 Six tiers. Every cell of the §6 table is covered.
@@ -941,6 +1391,17 @@ Fake transport, fake stores.
 - **T1.36** (I35): a part whose data is older than `staleAfter` → its panel's title carries the age; the next success clears it **and the part never stopped ticking**.
 - **T1.38** (I33a): a `b.live` part returned by an **adapter** is driven — the document reaches the transcript through `settle(id, doc)`, and the part ticks. Asserted on both routes in one row, because a test exercising only `append` passes against the defect: that is the whole of how it survived. The local-route half is the control, and it must be shown to tick before the adapter half's failure means anything.
 - **T1.37** (I25): a stall notice is appended once per silence, not once per tick — the row that fails when the timer is armed inside the loop rather than around it.
+- **T1.39** (I42, I44): two parts naming one `source` → **one** `fetch` call per tick and both panels carrying the same value. **The control is the same two parts with no `source`**, which must show two calls and two different values — without it the row passes against a driver that never fetches at all, and the two-values half is the defect F91 was filed on.
+- **T1.40** (I43): two parts, one key, different `every` → the losing part's panel carries a message naming **both** part ids and **both** values, and that part never fetches. Asserted on the rendered block rather than on a throw: the throw was the first implementation and it was invisible from every transcript route, so a row that caught an exception would have passed against a session showing two loading panels for ever. The fetch count is the second half — a refusal that still polls is not one.
+- **T1.41** (I47): a derivation read by two parts → `compute` runs **once per source version**, not once per part, and `prev` carries the previous fold. Three versions, because two pass against an implementation that recomputes from scratch each time.
+- **T1.42** (I45): settlement's release-then-declare on a key both documents name → the derivation's accumulation **survives**. The assertion is the accumulated history and not the current value: a source destroyed and rebuilt renders a perfectly correct latest sample.
+- **T1.43** (I46): a host off screen → no `fetch` across several intervals; visible again → a `fetch` immediately, not on the next interval. Both halves in one row, because a driver that pauses and never resumes satisfies the first.
+- **T1.44** (I42): a part whose `source` string is spelled to look like another part's implicit key → the two do **not** share. A fabricated violation, because the namespaces are disjoint by construction and the row is otherwise vacuous.
+- **T1.45** (I48): a `transcript.append` that throws → the reason appears in `pipeline.faults`, carrying the store's own sentence rather than a summary of it. F15's document — two blocks with one id — is the input, so the row fails if the message is replaced by a generic one.
+- **T1.46** (I48): the same cause swallowed five times → one entry in `faults` and one notice in the transcript. A per-tick failure would otherwise fill both.
+- **T1.47** (I49): a throw from a statement **after** the append → `resetFocus` is still called and the entry id is still returned. Asserted on the spy and the return value together: the reset alone passes against a catch that resets and still returns `null`, which is §8e E2 unfixed.
+- **T1.49** (→ C04 I13): `/debug` renders `origin` for a fault notice. **The arm's justification, made durable** — `defect` earns a fifth arm on a public union only because it separates a contained failure from a verb that did nothing *in the one field that could say so*, and that holds only while something displays it. Checked by reading the handler before the arm landed; this is the same answer for whoever edits that handler next.
+- **T1.48** (I1, §8b B1): a swallowed append → the transcript holds **one** entry, and it is the fault notice rather than the submission's. The count and the identity, because a row asserting only the count passes on the day the notice is the wrong document.
 
 ### Tier 2 — contract / interface
 
@@ -955,6 +1416,8 @@ Fake transport, fake stores.
 - **T2.20** (I32): `release(host)` is reached on all five triggers of I33 — enumerated from the trigger list rather than written out, so a sixth trigger added later fails here.
 - **T2.21** (I33): a **frozen** host keeps receiving refresh patches, and a settled one does not. Both halves, because a driver that released on neither passes the first alone.
 - **T2.22** (I22, SS46): every append in `src/` carrying `origin: "refresh"` is one of the four §3a names, and every one of the four is reached. A count alone passes for a fifth site added beside an existing one.
+- **T2.23** (I44): **one commit per source tick**, whatever the number of parts sharing it — one, two and five, so the row is a property rather than a case. The frame count is already coalesced by C03's 33 ms `stream` window, so the assertion is on the commit calls: the thing this constrains is `rev` bumps and C14 invalidations, and only the commit count can see them.
+- **T2.24** (I46, I33): pausing releases **nothing**. Across a scroll away and back the host stays declared, its part set is unchanged, and I33's five triggers remain the only teardown — enumerated from the same trigger list T2.20 uses, so a pause implemented as a release fails both rows.
 
 ### Tier 3 — edge cases
 
@@ -979,12 +1442,17 @@ Fake transport, fake stores.
 - **T3.17** (I5): a refused submission → no pending entry is created and none is orphaned.
 - **T3.18**: an auth-envelope failure → the notice is appended **here**, and `session.retained` holds the failed command (C22 §7 from this side).
 - **T3.30** (I32): a tick whose host was **evicted between arming and firing** → the patch is refused `"unknown"`, the part is released, and the backoff does not move. A host gone is not a transport that failed.
+- **T3.31** (I43, §8d D3): a one-shot part sharing a key with a periodic one → refused **by D1's message**, in the losing panel, with no second wording. The row exists so that a later arm for one-shots fails here rather than reading as a feature.
+- **T3.32** (I45, §8c C2): every referrer released while a shared `fetch` is in flight → the result is dropped and `consecutiveFailures` is **unmoved**. The counter is the assertion; a row checking only that nothing crashed passes against a driver that backed off.
+- **T3.33** (I21, §8d D6): a shared source failing, one part with a custom `renderError` and one with the framework's → each part renders **its own** arm, and the backoff doubles **once**. Two assertions, because I21's single word *contained* split into two: rendering is the part's and backoff is the source's.
 - **T3.31** (I33): a tick whose host **settled between arming and firing** → refused `"settled"`, released, no notice.
 - **T3.32** (I21): a tick firing while that part's previous `fetch` is still in flight → the second is not started. Without the guard a slow source stacks ticks until the interval is meaningless.
 - **T3.33** (I12): `stopping` set after a `fetch` resolves and before its patch → nothing lands.
 - **T3.34** (I20): more parts than the smallest interval has milliseconds → offsets remain distinct. `floor(smallest / n)` is zero here, which is I20 violated by the function written to satisfy it.
 - **T3.35** (I34): a `render` returning a block whose id differs from the part's → the mismatch is reported, not silently applied to nothing.
 - **T3.36** (I35): `staleAfter` below the interval → warned at declaration; staleness would otherwise fire on every tick.
+- **T3.37** (I48, §8b B1): a swallow while `stopping` → recorded in `faults`, **no notice appended**. B1's ruling reaching a fourth non-submission append rather than a fourth exception to it.
+- **T3.38** (§5a): a transcript whose `append` throws **unconditionally** → the fault notice cannot land either, and `faults` still carries the reason. The end of the ladder, fabricated rather than stated: the frozen shape is a claim about a construction path, and the glyph defect is how F15 was found.
 
 ### Tier 4 — integration
 
@@ -1001,6 +1469,9 @@ Fake transport, fake stores.
 - **T4.20** (with C13, C24): a `b.live` part in a real entry ticks, patches, and stops when C13 evicts the entry — the eviction heard from the store rather than checked on the next tick.
 - **T4.21** (with C15, C24): the same part declared on a pushed view is driven by the same code path, and popping the view releases it (C24 I12, from this side).
 - **T4.22** (with C22): the driver is released at C22 §8 step 1, **before** `beforeRelease` — asserted on call order, since a release afterwards is invisible to any test that does not have a fetch in flight.
+- **T4.25** (I44, with C22, C13, C14): the reference app's shape through a real session — two parts of **one document** sharing a key, read from **one composed frame**, showing one value. The frame and not the fetch count: an arithmetically consistent driver can still be patching two panels from two samples, and only the frame says which was on screen. This is the row `tools/bench/pollers.mjs` measured `19 vs 20` against before the change.
+- **T4.26** (I46, with C14): the same document scrolled out of the viewport → the fetch count stops advancing; scrolled back → it advances again and the first frame after the return is current. The count is taken from a spy on `fetch` rather than from the panel, because a paused part still draws whatever it last held.
+- **T4.27** (I48, with C22, C24): **the row belongs at the public entry**, because every driver-level assertion could already see these throws and no app author ever could. Through `createTui`: a local handler returning F15's exact document, the frame read for a fault notice carrying the store's sentence, then `stop()` and the **restored primary screen** read for the same reason among the diagnostics. One row spanning both channels, since either alone is satisfied by the half that is easy.
 
 ### Tier 5 — e2e
 
@@ -1039,7 +1510,23 @@ Fake transport, fake stores.
 - **T6.34** (I34): applying one patch per rendered block → T1.35 fails, and C14 invalidates N times for one refresh.
 - **T6.35** (I35): dropping the staleness marker → T1.36 fails, and a frozen panel is indistinguishable from a quiet cluster (S13 T6.3, from this side).
 - **T6.36** (I21): retrying a `render` throw → T1.33 fails; the screen flickers at the interval and the outcome never changes.
+- **T4.23** (I38, C05 I23): a manifest declaring `run` interactive with `detach` carrying the arm. `/run -d nginx` reaches the transport and its document carries the far side's output; `/run -it alpine sh` reaches `handoff`. **Both halves in one row**, because a route that always spawns satisfies the first and a route that always hands off satisfies the second.
+- **T4.24** (I38): `/exec` with its required argument missing → an error document, and `runner.handoff` is never called. The fake's call count is the assertion; a test checking only the document passes on the ordering that spawns first and reports afterwards.
 - **T6.37** (I12): moving the driver's release into `beforeRelease` → T4.22 fails. The ordering C22 §8 already keeps for `killAll`, arriving for the mechanism that has a promise in flight.
+- **T6.38** (I38): reading `tool.interactive` in the `app` route → T4.23's `-d` row fails. The verb is handed the terminal, its output is written to a screen repainted a frame later, and the transcript says it finished — a defect no assertion about the transcript can see, because the transcript is correct.
+- **T6.39** (I38): routing above the `validation.ok` check → T4.24 fails. It is the ordering the pipeline shipped with, and every test of the gate passed, because they all drove non-interactive verbs.
+- **T6.40** (I43): arbitrating a cadence conflict — first-wins or shortest-wins — instead of refusing → T1.40 fails. The revert that reads as robustness: nothing crashes, both parts tick, and the one whose declared interval lost is stored where a reader will find it and believe it.
+- **T6.40a** (I43): throwing the refusal instead of drawing it → T1.40 fails on the *message* half while the fetch half still passes. **This was the first implementation.** `declareLive` runs inside `appendAndCommit`, whose bare catch is deliberate, so the entry is already appended and the exception goes nowhere: two panels at `◌ loading`, no notice, nothing on stderr. The revert is one line and its symptom is silence.
+- **T6.41** (I45): retiring a source **at** release rather than on the next sweep → T1.42 fails, and every settlement resets what a derivation exists to accumulate. Invisible from any frame: the panel draws, the value is right, and only the history is gone (§8c C3).
+- **T6.42** (I42): building the implicit source key inside the namespace a declared `source` can spell → T1.44 fails, and two unrelated parts share a fetch **while looking more consistent than before** — the inverse of the defect this row fixes, wearing its evidence.
+- **T6.43** (I46): pausing an invisible source without resuming it → T1.43 fails. Pairs with the opposite revert, treating any visible host as making every source due, which fails T4.26 instead — two directions, because a one-directional pause passes half of each row.
+- **T6.44** (I44): committing per part rather than per source → T2.23 fails. A frame-level assertion cannot see it: C03's 33 ms `stream` window already coalesces them into one frame, which is why the row counts commits.
+- **T6.45** (I47): running `compute` once per part rather than once per version → T1.41 fails, and a fold advances N times per tick — a ring buffer that fills N× too fast, with every sample in it genuine.
+- **T6.46** (I48): restoring the bare `catch` — recording nothing — → T1.45 fails. **The revert is the shipped behaviour of every version before this one**, and its symptom is that there is none: no entry, no message, no exit code, and a green suite. F15 took four wrong turns to find because of exactly this.
+- **T6.47** (I48): keeping the collection and dropping the fault notice → T1.48 fails while T1.45 still passes. The half that is easy: `faults` is a field a test can read, and a reader who never reaches `stop()` learns nothing at the moment it matters.
+- **T6.48** (I48): keeping the notice and dropping the collection → T3.38 fails. The opposite half, and the one that looks sufficient until §8e's first row, where appending is what threw.
+- **T6.49** (I48, with C22): draining the diagnostics **before** `lifecycle.release()` rather than after → T4.27 fails on its second half. The revert that reads as an ordering preference: the lines are written, to the alternate screen, and discarded with it — a flash and an empty shell, which is C22 I6's own argument arriving at a third source.
+- **T6.50** (I49): restoring the catch that skips `resetFocus` → T1.47 fails. Nothing crashes and no frame is wrong at the moment; focus sits in a frozen block from then on, which is T4.7b's failure without T4.7b's bound.
 - **T6.13** (I30, C07 I15): pinning `seq` to a constant in `streamInto` → T1.7b fails on both halves. This was the tree's state: the second `data` patch of every stream collided with the first under C04 I14, so a streaming verb could render exactly one block, and the per-stream reset fired on every patch. Found by the first tier-5 row to drive a `streams: true` verb through a real session; the unit suite passed throughout, because its `adaptPatch` double took no arguments and so could not see the one that was wrong.
 
 ---

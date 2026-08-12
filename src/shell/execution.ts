@@ -29,11 +29,13 @@ import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
 import { block } from "../data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { blockId, compose, errorDoc, noticeDoc } from "./documents.js";
+import { blockId, completeLocal, compose, errorDoc, noticeDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver } from "./refresh.js";
 import { DOCUMENT_VIEW_ID } from "./document-view.js";
+import type { ProducerContext } from "../data/adapters/types.js";
 import { isViewInvocation } from "../data/manifest/index.js";
+import type { ValidationResult } from "../data/manifest/index.js";
 import { liveDeclarations } from "./builders/live.js";
 import type { LiveSpec } from "./builders/types.js";
 import { shippedHandlers } from "./local/handlers.js";
@@ -100,6 +102,28 @@ class Guard {
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
+  /**
+   * The producer context, **built at the call and never captured** (C07 §3a).
+   *
+   * Every route that produces a document or a block is told the same four facts
+   * (C23 I40). Reading them here, per call, is what makes them true when the
+   * producer runs rather than when its document was made — a live part renders
+   * repeatedly and a stream adapts per patch, and a captured width is stale by
+   * the first resize. That is the half of F24 that survives.
+   *
+   * `height` is the caller's, because only the caller knows whether this
+   * document is bound: `null` on every route but a view invocation, which C23
+   * reads before step 3 for its own reasons (C22 I45).
+   */
+  const producerContext = (height: number | null): ProducerContext => ({
+    width: deps.lifecycle.size().columns,
+    height,
+    capabilities: deps.capabilities,
+    // The frame's own measurer, not a second one (C09 I1, C07 I20). The
+    // registry is sealed at composition, so this closure cannot go stale.
+    measure: (block, width) => deps.blocks.measure(block, width),
+  });
+
   const guard = new Guard();
   const local = createLocalRegistry();
 
@@ -176,6 +200,63 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   };
 
   /**
+   * C23 I48 — what the bare catches record, drained by C22 §8 step 3.
+   *
+   * **A collection and not a callback**, which is C02's ruling taken a third
+   * time: C23 decides what is wrong, never when the user is told. A callback
+   * would choose the moment, and the moment is after the terminal is released —
+   * a diagnostic painted onto the alternate screen is discarded with it.
+   *
+   * Deduplicated by message, which is what C20 already means by *logged once*:
+   * a refresh notice failing on every tick would otherwise fill both channels
+   * with one sentence.
+   */
+  const faults: string[] = [];
+
+  /** Whether this is the first time — the notice's gate as well as the list's. */
+  const recordFault = (stage: string, cause: unknown): boolean => {
+    const text = `${stage}: ${String(cause)}`;
+    if (faults.includes(text)) return false;
+    faults.push(text);
+    return true;
+  };
+
+  /**
+   * The other channel — an entry, at the moment (C23 §5a, F15).
+   *
+   * **Not the submission's entry** (§8b B1), so I1's count is untouched: it is a
+   * fourth thing that appends without being a submission, beside the identity
+   * notice, a stall patch and a refresh tick. `origin: "defect"` is the only
+   * field that can distinguish this from a verb that did nothing, and `/debug`
+   * renders it.
+   *
+   * **Deduplicated by the same collection**, which is why `recordFault` answers
+   * whether it was new: a refresh notice failing every tick would otherwise fill
+   * the transcript with one sentence at 1 Hz.
+   *
+   * **`stopping` halts it, as B1 ruled for B1's own three.** After shutdown
+   * begins the transcript is being torn down, and the accumulation is what the
+   * reader gets — which is right, because step 3 has not run yet.
+   *
+   * The append is direct rather than through `appendAndCommit`: no history, no
+   * live parts, and nothing that could recurse into the catch that called this.
+   * If it throws, the accumulation is all that survives, and that is the end of
+   * the ladder (T3.38).
+   */
+  const contain = (stage: string, cause: unknown): void => {
+    if (!recordFault(stage, cause)) return;
+    if (deps.session().stopping) return;
+    try {
+      deps.transcript.append(
+        noticeDoc("", `${stage}: ${String(cause)}`, "error", { origin: "defect" }, "error"),
+      );
+    } catch {
+      // Nothing left to say it with. `faults` already has it, and that is the
+      // end of the ladder.
+    }
+  };
+
+  /**
    * The one place a document reaches the transcript, and the one place the
    * frame is committed for a submission (Seam 4's submit row).
    *
@@ -183,25 +264,46 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * whole of C23 T4.7b: a reset issued before the append is undone by nothing,
    * and one issued after the commit paints a frame with focus in a block that
    * has just been frozen.
+   *
+   * **The catch covers five statements and §5 was written about the first**
+   * (§8e). `id` is a `let` because four of the five rows leave the entry
+   * appended, and the catch that returned a flat `null` was telling every caller
+   * the entry did not exist. Nothing reads it today, which is what made the lie
+   * survivable rather than what made it true.
    */
   const appendAndCommit = (
     doc: Parameters<typeof deps.transcript.append>[0],
     /** The line as typed, when this append settles a submission (I29). */
     line?: string,
   ): string | null => {
+    let id: string | null = null;
     try {
-      const id = deps.transcript.append(doc);
+      id = deps.transcript.append(doc);
       declareLive(id, doc.blocks);
       if (line !== undefined) recordHistory(line, doc);
       deps.resetFocus();
       deps.scheduler.commit("input");
       return id;
-    } catch {
-      // §5's one stage whose failure loses the outcome, and C23 I1's second
-      // exception. The frame still commits; the guard is still released by the
-      // caller's `finally`.
+    } catch (cause) {
+      // §5's stage whose failure loses the *entry*, and C23 I1's second
+      // exception. The guard is still released by the caller's `finally`.
+      contain("appendAndCommit", cause);
+      // **I49 — the catch finishes what the try did not.** `resetFocus` is
+      // abandoned by every row of §8e but the first, and its absence is the one
+      // that is permanent: the append froze the previous entry and focus is
+      // still inside it, on every frame from here on. Guarded, because a reset
+      // that throws is §8e's fourth row and must not take the commit with it.
+      try {
+        deps.resetFocus();
+      } catch (second) {
+        // **Recorded, not noticed.** One swallow is one notice: a second arm of
+        // the same containment would put two sentences on screen for one event,
+        // and the reader already has the first. The collection keeps both,
+        // because at exit the detail is what tells them apart.
+        recordFault("resetFocus", second);
+      }
       deps.scheduler.commit("input");
-      return null;
+      return id;
     }
   };
 
@@ -297,20 +399,94 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
-  /** C23 §2's `shell` route — `spawnShell`, and a `raw` document (C18 §5). */
+  /**
+   * C23 §2's `shell` route — `spawnShell`, and a `raw` document (C18 §5).
+   *
+   * **I50, and the failure shape is the whole of it** (F151). This composed
+   * `status: "error"` with no `error` field, which C04 I3 forbids in both
+   * directions, so `transcript.append` refused every failing command (C13 I10)
+   * and the route produced **no entry at all** — the reader shown F15's fault
+   * notice citing two invariant numbers in place of the command they typed.
+   *
+   * Fourth instance of one class, and both earlier closures miss it by
+   * construction: `documents.ts` filled the field inside `noticeDoc` *"rather
+   * than at the two call sites"* and this route composes directly, while F35's
+   * app-side closure runs the documents the **app** produces and this one is
+   * the framework's. Closing a class means checking the class has one member.
+   *
+   * **`stderr` is read because it is where the sentence is.** `ChildHandle`
+   * delivers the two streams separately (C21 I3) and this read only `stdout`,
+   * so `sh: 1: list: not found` — the one line that names what went wrong —
+   * was produced, delivered and dropped, leaving a raw block that was empty as
+   * well as unappendable. Concurrently rather than in sequence: a child filling
+   * the pipe nobody is draining blocks, and reading stdout to exhaustion first
+   * is that deadlock.
+   *
+   * **The wording is C07 §4's, deliberately duplicated rather than imported.**
+   * `mapResult` takes a `RawResult` that a shell route has no way to build, and
+   * two spellings of *the command exited with code N* is a worse outcome than
+   * one sentence written twice; if that pair drifts, this comment is the link.
+   *
+   * **A remedy naming the prefix is a separate ruling and not taken here.** The
+   * likeliest cause is a verb typed without one, but `commandPolicy` is
+   * injected (C22) — `slashPolicy` is a default, not a guarantee — so a message
+   * saying *type `/list`* would be wrong for any app that supplied its own.
+   * What is here instead is true under every policy: the exit code, and the
+   * shell's own line naming the token it could not find.
+   */
   const runShell = async (line: string, command: string): Promise<void> => {
     guard.take("shell", headOf(command));
     try {
       const child = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd });
-      let out = "";
-      for await (const chunk of child.stdout) out += chunk;
+      const drain = async (stream: AsyncIterable<string>): Promise<string> => {
+        let text = "";
+        for await (const chunk of stream) text += chunk;
+        return text;
+      };
+      const [out, err] = await Promise.all([drain(child.stdout), drain(child.stderr)]);
       const exit = await child.exited;
+
+      const failed = exit.code !== 0 || exit.signal !== null;
+      const message =
+        exit.signal !== null
+          ? `Killed by ${exit.signal}.`
+          : `The command exited with code ${String(exit.code ?? 1)}.`;
 
       appendAndCommit(
         compose({
           command: line,
-          status: exit.code === 0 ? "ok" : "error",
-          blocks: [block({ kind: "raw", id: blockId("raw"), text: out })],
+          status: failed ? "error" : "ok",
+          // **The success path is byte-identical to what it was**: one raw
+          // block, emitted whether or not the command said anything. Eliding
+          // an empty one there would change every silent command's entry from
+          // one block to none, which is a rendering change this row has no
+          // reason to make and no test covering it.
+          //
+          // The failure path is new, so it chooses: the notice carries the
+          // sentence, and a raw block appears only when it has content — an
+          // empty one is a blank row the reader has to account for, and on
+          // this route both streams are routinely empty.
+          blocks: failed
+            ? [
+                block({
+                  kind: "notice",
+                  id: blockId("shell-failed"),
+                  tone: "error",
+                  glyph: "error",
+                  text: message,
+                }),
+                ...(out === "" ? [] : [block({ kind: "raw", id: blockId("raw"), text: out })]),
+                ...(err === "" ? [] : [block({ kind: "raw", id: blockId("raw-err"), text: err })]),
+              ]
+            : [block({ kind: "raw", id: blockId("raw"), text: out })],
+          ...(failed
+            ? {
+                error: {
+                  message,
+                  code: exit.signal !== null ? "KILLED_BY_SIGNAL" : "UNEXPECTED_EXIT",
+                },
+              }
+            : {}),
           meta: {
             origin: "user",
             exitCode: exit.code ?? 1,
@@ -408,6 +584,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   /** C23 §2's `local` route. §8b B3's missing-handler cell is closed by `seal()`. */
   const runLocal = async (line: string, verb: string, argv: readonly string[]): Promise<void> => {
     guard.take("local", verb);
+    const startedAt = deps.clock();
     try {
       const handler = local.get(verb);
       if (handler === undefined) {
@@ -425,6 +602,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
       }
       const produced = await handler(argv, {
+        // **`null`, and C07 §3a cell B records that it is right by accident.**
+        // The local route cannot open a view — C18 classifies on `tool.local`
+        // first and `isViewInvocation` is read only on the `app` route — so a
+        // local verb has no bound to state. F129 is that gap; when it closes,
+        // this argument changes with it.
+        ...producerContext(null),
         command: line,
         // **The host's own `ask`, not a per-call wrapper** (C23 I36). One layer
         // id and one answer handler exist at a time, so a question asked while
@@ -438,7 +621,27 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // and the handler does not need to say. Six handlers each named their own,
       // and `/theme light` said `/theme` — a displayed command that dropped its
       // argument, which nothing could see while nothing was displayed.
-      const doc = { ...produced, command: line };
+      // **`meta` the same way, and the comment above was already the argument.**
+      // *"The framework knows what was submitted and the handler does not need
+      // to say"* was written for `command` and never applied to `meta`, so four
+      // handlers in the reference app each carried an eleven-line helper writing
+      // `verb` re-derived from `argv[0]`, `durationMs: 0` on a route the shell
+      // times, a `transport` that is a constant and an `origin` it already
+      // holds. Nothing overwrote them, so they were invented rather than
+      // discarded — the mirror of the adapter route, where the same seven are
+      // computed and thrown away. FINDINGS F13.
+      //
+      // `exitCode` is derived from `status` rather than taken: every local
+      // document in the reference app pairs `status: "error"` with `1` and
+      // `"ok"` with `0`, at eight sites, so carrying both is two records of one
+      // fact. **`stderr` is empty because a local route has no far side** — the
+      // failure message belongs in `error.message`, where it already is. F101.
+      const doc = completeLocal(produced, {
+        command: line,
+        verb,
+        argv,
+        durationMs: deps.clock() - startedAt,
+      });
       appendAndCommit(doc, line);
       // A02 Seam 4's theme row: `theme.setVariant` → `scheduler.invalidate`.
       // C10 never invalidates; the sequence is L4's, which is the seam.
@@ -544,7 +747,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           },
         });
         try {
-          await streamIntoView(displayed, verb, transport.stream(invocation));
+          await streamIntoView(displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {});
         } finally {
           forgetStream(DOCUMENT_VIEW_ID);
         }
@@ -555,8 +758,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       const doc = deps.adapters.adapt(raw, {
         command: displayed,
         verb,
-        width: deps.lifecycle.size().columns,
+// **The region's height, because a view's producer is defined by it**
+// (C07 I18, C15 §4). The same source `documentView` reads — a second
+// computation is a producer splitting against an axis the frame does
+// not use, and nothing in the arithmetic would look wrong.
+...producerContext(deps.region().height),
         userRequestedJson: result.argv.includes("--json"),
+        // C05 I21 — the validated values, so a `shellOnly` flag is readable by
+        // the thing that has to act on it. Empty on the failure arm, which
+        // cannot be reached here: a malformed invocation never spawns.
+        flags: result.validation.ok ? result.validation.args : {},
         transport: "subprocess",
         origin: "user",
         tool: result.tool,
@@ -596,27 +807,34 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    *
    * **Validation is read, never recomputed** (C23 I4, §8b B2). C18 ran it and
    * the answer travels on the `ParseResult`. Reading it is not recomputing it —
-   * §2 routes by *shape*, so an `app` result arrives here whatever its validation
+   * §2 routes by *shape*, so an `app` result arrives whatever its validation
    * says, and the check has to happen or an invalid command is spawned.
+   *
+   * **It happens in `route`, above the interactive split** (I38). This function
+   * is the non-interactive arm of that split, so a check here covered half the
+   * verbs — and the half it missed were the ones that take the terminal (F119).
    */
   const runApp = async (
     line: string,
-    result: Extract<ParseResult, { kind: "app" }>,
+    // **The gate's placement, made a compile obligation** (I38). `route` checks
+    // `validation.ok` above the interactive split, and narrowing the parameter
+    // here is what stops that check drifting back into this function: two
+    // runtime guards of one condition are indistinguishable from one in every
+    // test, because each defeats the other's mutation. This one cannot be
+    // satisfied by a caller that has not gated.
+    result: Extract<ParseResult, { kind: "app" }> & {
+      validation: Extract<ValidationResult, { ok: true }>;
+    },
   ): Promise<void> => {
     const verb = result.tool.name;
 
-    // Step 1 — the carried result. C23 §8b B2 is the cell where §2's route table
-    // and §5's containment row named different destinations for one value.
-    if (!result.validation.ok) {
-      appendAndCommit(
-        errorDoc(line, result.validation.errors[0] ?? { message: `${verb}: invalid arguments` }, {
-          origin: "user",
-          verb,
-        }),
-        line,
-      );
-      return;
-    }
+    // Step 1 — the carried result, now read in `route` above the interactive
+    // split (I38). C23 §8b B2 is the cell where §2's route table and §5's
+    // containment row named different destinations for one value; the
+    // destination is unchanged and only the moment moved, because this function
+    // is one arm of two and the gate has to cover both.
+    //
+    // Not left here as well: the parameter type is what holds it now.
 
     // Step 2 — the guard, before the pending entry, so a refusal leaves no
     // orphan (C23 §3, T3.17).
@@ -721,7 +939,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // run for a subscription that had already finished.
         liveStreams.push({ id: pendingId, cancel: cancelThis });
         try {
-          await streamInto(pendingId, displayed, verb, transport.stream(invocation));
+          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {});
         } finally {
           forgetStream(pendingId);
         }
@@ -733,8 +951,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       const doc = deps.adapters.adapt(raw, {
         command: displayed,
         verb,
-        width: deps.lifecycle.size().columns,
+// `null` — a transcript entry is windowed by rows and has no bound
+// (C07 I18). The terminal's height standing in here would be a region
+// nobody promised.
+...producerContext(null),
         userRequestedJson: result.argv.includes("--json"),
+        // C05 I21 — the validated values, so a `shellOnly` flag is readable by
+        // the thing that has to act on it. Empty on the failure arm, which
+        // cannot be reached here: a malformed invocation never spawns.
+        flags: result.validation.ok ? result.validation.args : {},
         transport: "subprocess",
         origin: "user",
         tool: result.tool,
@@ -800,6 +1025,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     displayed: string,
     verb: string,
     patches: AsyncIterable<RawPatch>,
+    /** The invocation's validated flags, for `adaptPatch` (C05 I21, F39). */
+    flags: Readonly<Record<string, unknown>>,
   ): Promise<void> => {
     let seq = 0;
 
@@ -861,8 +1088,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         const view = deps.adapters.adaptPatch(patch, {
           command: displayed,
           verb,
-          width: deps.lifecycle.size().columns,
+  // **The region's height, because a view's producer is defined by it**
+  // (C07 I18, C15 §4). The same source `documentView` reads — a second
+  // computation is a producer splitting against an axis the frame does
+  // not use, and nothing in the arithmetic would look wrong.
+  ...producerContext(deps.region().height),
           userRequestedJson: false,
+          flags,
           transport: "subprocess",
           origin: "user",
           tool: null,
@@ -907,6 +1139,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     displayed: string,
     verb: string,
     patches: AsyncIterable<RawPatch>,
+    /** The invocation's validated flags, for `adaptPatch` (C05 I21, F39). */
+    flags: Readonly<Record<string, unknown>>,
   ): Promise<void> => {
     // **The stream's own counter** (I30, C07 I15). Not decoration: C07 spends it
     // as the namespace for generated block ids *and* as the per-stream reset,
@@ -932,8 +1166,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         const view = deps.adapters.adaptPatch(patch, {
           command: displayed,
           verb,
-          width: deps.lifecycle.size().columns,
+  // `null` — a transcript entry is windowed by rows and has no bound
+  // (C07 I18). The terminal's height standing in here would be a region
+  // nobody promised.
+  ...producerContext(null),
           userRequestedJson: false,
+          flags,
           transport: "subprocess",
           origin: "user",
           tool: null,
@@ -1021,9 +1259,13 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user" }),
           line,
         );
-      } catch {
-        // The document itself is unbuildable. C23 §5's one stage whose failure
-        // loses the outcome, reached from the one direction §5 did not name.
+      } catch (second) {
+        // The document itself is unbuildable. C23 §5's stage whose failure loses
+        // the entry, reached from the one direction §5 did not name — so it
+        // records like the other one (I48). Two causes and both are kept: the
+        // route's, and the failure to say so.
+        contain("pipeline", cause);
+        recordFault("pipeline-report", second);
         deps.scheduler.commit("input");
       }
     });
@@ -1044,6 +1286,26 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * never run — a dead branch being A03 §2's class in code rather than in a rule.
    */
   const route = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
+    // **`--help` is answered here, before the local/app split** (C05 I22, F92).
+    //
+    // Both routes have it, because C05 reserves it on every tool — so putting
+    // the check inside either arm would give half the verbs help and leave the
+    // other half spawning `docker ps --help`, which is F39 with a different
+    // flag. It never travels either way (C05 I21), so this is the only thing
+    // that can answer it.
+    //
+    // `validation.ok` guards it because a malformed invocation should say what
+    // is wrong rather than what is possible: `/ps --nonsense --help` is a
+    // misspelling, and answering with usage hides the error that caused it.
+    if (
+      (result.kind === "app" || result.kind === "local") &&
+      result.validation.ok &&
+      result.validation.args["help"] === true
+    ) {
+      appendAndCommit(usageDoc(line, result.tool), line);
+      return;
+    }
+
     switch (result.kind) {
       case "error":
         appendAndCommit(errorDoc(line, result.error, { origin: "user" }), line);
@@ -1097,18 +1359,46 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         );
         return;
 
-      case "app":
-        // C05 I19's field, read off the `ToolDef` C18 already carries — one
-        // fact with one home, rather than a copy on the result. The transport
-        // is bypassed entirely: an interactive verb's child owns the terminal,
-        // and there is no stdout to read (C05 I19 refuses `streams` with it).
+      case "app": {
+        // **The pre-spawn gate, above the interactive split** (I38, F119). It
+        // lived inside `runApp` — which is the *non-interactive* arm of that
+        // split — so an interactive verb was spawned without its invocation
+        // being looked at. A handoff suspends the alternate screen before the
+        // child starts, so the reader watched their session go away and come
+        // back to learn they had missed an argument. D17's argument is that a
+        // malformed invocation costs nothing rather than an interpreter's
+        // startup, and the route stepping over it was the expensive one.
+        //
+        // One check, not two: `runApp`'s parameter demands the narrowed
+        // validation, so the gate cannot drift back into it.
+        if (!result.validation.ok) {
+          appendAndCommit(
+            errorDoc(
+              line,
+              result.validation.errors[0] ?? { message: `${result.tool.name}: invalid arguments` },
+              { origin: "user", verb: result.tool.name },
+            ),
+            line,
+          );
+          return;
+        }
+
+        // **The invocation's contract, not the verb's** (I38, C05 I23). `docker
+        // run` attaches by default and detaches with `-d`, so a `ToolDef` field
+        // cannot answer this; C05 resolves it from the flags actually given and
+        // C18 carries the answer. Both routes read one field name now.
+        //
+        // The transport is bypassed on the handoff arm: the child owns the
+        // terminal and there is no stdout to read (C05 I19 refuses `streams`
+        // with it).
         start(
           line,
-          result.tool.interactive === true
+          result.interactive
             ? runHandoff(line, [deps.binary, ...result.argv], result.tool.name, "app")
-            : runApp(line, result),
+            : runApp(line, { ...result, validation: result.validation }),
         );
         return;
+      }
     }
   };
 
@@ -1176,7 +1466,17 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     title: spec.title,
     intervalMs: spec.every ?? 0,
     staleAfterMs: spec.staleAfter ?? (spec.every ?? 0) * 2,
-    fetch: spec.fetch ?? ((): Promise<unknown> => Promise.resolve(null)),
+    // **`null` rather than absent, and that is the same choice as the two above.**
+    // The driver's shape is total where the declaration's is optional: a part
+    // that named no key is its own source (C23 I42), so there is one code path
+    // and the unshared case is the degenerate one rather than a branch.
+    source: spec.source ?? null,
+    derive: spec.derive ?? null,
+    // **No `?? Promise.resolve(null)` fallback** (F78). It existed to cover the
+    // `stream` arm, which nothing drove, so its whole effect was to turn an
+    // undriven declaration into a part that rendered `render(null)` once — a
+    // plausible empty panel rather than a failure. `fetch` is required now.
+    fetch: spec.fetch,
     render: spec.render,
     renderError:
       spec.renderError ??
@@ -1279,6 +1579,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     clock: deps.clock,
     schedule: deps.schedule,
     commit: (reason) => void deps.scheduler.commit(reason),
+    // One builder for every route (C23 I40) — this file's.
+    producerContext: () => producerContext(null),
     // **The only path in §3b that appends, and so the only producer of
     // `origin: "refresh"`.** The other two patch, and a patch carries no `meta`.
     append: (text) =>
@@ -1304,22 +1606,38 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       const content = layer.content.map((b) => (b.id === blockId ? next : b));
       return deps.overlays.update(id, { content });
     },
-    viewBlock: (id, blockId) => {
+    // Returns the panel itself, not its child (F22). The caller wants the block
+    // as the view holds it, and handing back a child forced a reconstruction
+    // that silently dropped every field it did not know to set.
+    viewPanel: (id, blockId) => {
       const found =
         id === DOCUMENT_VIEW_ID
           ? deps.documentView.blockAt(blockId)
           : deps.overlays.stack.find((l) => l.id === id)?.content.find((b) => b.id === blockId);
-      return found !== undefined && found !== null && found.kind === "panel"
-        ? (found.children[0] ?? null)
-        : null;
+      return found !== undefined && found !== null && found.kind === "panel" ? found : null;
     },
+    // C23 I46 — C22 answers, because the answer is C14's for an entry and C15's
+    // for a layer (A02 Seam 4).
+    visible: deps.visible,
   });
 
   return {
     submit,
     onAction,
+    /**
+     * C23 I48 — read by C22 §8 step 3, on the restored primary screen.
+     *
+     * A copy, because the collection keeps accumulating and a caller holding the
+     * live array would see it change under them.
+     */
+    get faults() {
+      return Object.freeze([...faults]);
+    },
     identityNotice: (text) => void refresh.identityNotice(text),
     releaseView: () => void refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID }),
+    visibilityChanged: () => void refresh.visibilityChanged(),
+    // C22 I53 — the greeting is a producer, and this is the one builder.
+    producerContext: () => producerContext(null),
 
     // C22 §4 step 7 (C22 I44). Through `appendAndCommit` like everything else,
     // which is what drives a live part in it and what lets `/clear` remove it.

@@ -17,6 +17,7 @@ import { slashPolicy } from "../interaction/parser/index.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
 /**
  * Below this the layout engine cannot produce a sane answer, so the size gate
@@ -28,15 +29,55 @@ import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 export const MIN_COLUMNS = 60;
 export const MIN_ROWS = 16;
 
-/** §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one. */
-export const PROMPT = "❯ ";
+/**
+ * §6 — C22 owns the frame, so C22 passes the gutter; C17 must not assume one.
+ *
+ * **A pair, and both forms are `PROMPT_GUTTER.first` cells** (C22 I52, C09 I22).
+ * `commandRows` draws the prompt and `construct.ts` calls the same function for
+ * `chromeRows`, so a form of unequal width would leave the measurer and the
+ * composer describing the same row differently — C09 I1's divergence on the one
+ * row the reader types into. `promptFor` is the only reader; nothing resolves it
+ * at module scope, which would read a capability before C02 has detected one.
+ */
+const PROMPT_FORMS: readonly [unicode: string, ascii: string] = Object.freeze(["❯ ", "> "]);
+
+export function promptFor(caps: Pick<TerminalCapabilities, "unicode">): string {
+  return caps.unicode === "ascii" ? PROMPT_FORMS[1] : PROMPT_FORMS[0];
+}
+
+/** The pair itself, for the row asserting both forms are the gutter's width. */
+export const PROMPT_SUBSTITUTION: readonly [string, string] = PROMPT_FORMS;
 export const PROMPT_GUTTER = Object.freeze({ first: 2, cont: 2 });
 
 /** C13 §5a — a number rather than "all"; doubling memory is how a debug mode
  * becomes one nobody turns on. */
 export const DEFAULT_RETAIN_PAYLOADS = 50;
 
-export const DEFAULT_STATE_DIR = "~/.prism";
+/**
+ * C22 §3 — **the framework's own name, never a consumer's**.
+ *
+ * It was `~/.prism`, named for one app, in a framework that claims to serve
+ * others: every consumer that said nothing wrote its history and its theme
+ * preference into `prism-tui`'s directory, and two apps shared one file. C22
+ * §141 already refuses `PRISM_TUI_STATE_DIR` inside `src/` for exactly that
+ * reason — the argument was written down, applied to the environment variable,
+ * and not applied to the constant three files away.
+ *
+ * **The default is what an app gets when it says nothing**, which is precisely
+ * when it must not name somebody else.
+ *
+ * **Relative, and the tilde it used to carry was never expanded.** `fs.mkdir` has
+ * no shell in it, so `~/.prism` created a directory *literally named* `~` in the
+ * launch directory — measured, with real history files in it. The path was
+ * already relative and the tilde was decoration; dropping it makes the behaviour
+ * and the documentation one statement rather than adding expansion machinery to
+ * reach a home directory nothing had ever written to.
+ *
+ * So state belongs to the directory the shell was opened in, which is also what
+ * makes C22 §3's injection argument structural: standalone development cannot
+ * append to a developer's real history, because there is no single one.
+ */
+export const DEFAULT_STATE_DIR = ".calcium";
 
 const REQUIRED = ["name", "binary", "manifest", "theme"] as const;
 

@@ -6,37 +6,136 @@
 // A row about it written against `buildGraph` would measure the harness.
 import { describe, expect, it } from "vitest";
 
-import { buildSession } from "../support/session.js";
+import { buildSession, fakeFs } from "../support/session.js";
+import type { TuiConfig } from "../../src/shell/types.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { displayCells } from "../../src/presentation/text.js";
 
 /** Two macrotask turns, so an ambient `setTimeout(0)` has run. */
+/**
+ * `HOME` — the marker of a **whole-frame** write.
+ *
+ * Still exact for the two rows that use it, and for a sharper reason than
+ * before: the first frame of a session has no record to diff against, so it is
+ * always written whole (C22 I55). "The shell painted at all" is therefore still
+ * "a chunk contains HOME"; "what the shell painted" is `screen()`.
+ */
+const HOME_SEQ = "\u001b[H";
+
 const settle = async (): Promise<void> => {
   await new Promise((r) => setImmediate(r));
   await new Promise((r) => setImmediate(r));
 };
 
-const HOME_SEQ = "[H";
-const HIDE_SEQ = "[?25l";
 
-/**
- * The rows of the last frame written, escapes stripped.
- *
- * The same slice C03's T4.9 and `test/support/pty.ts` take: a frame is one
- * write, beginning hide + `HOME` and closing with the cursor's position, so the
- * rows are what sits between `HOME` and the next hide.
- */
-function lastFrame(chunks: readonly string[]): readonly string[] {
-  const framed = chunks.filter((c) => c.includes(HOME_SEQ));
-  const last = framed[framed.length - 1];
-  if (last === undefined) return [];
-  const body = last.slice(last.indexOf(HOME_SEQ) + HOME_SEQ.length);
-  const end = body.indexOf(HIDE_SEQ);
-  return (end === -1 ? body : body.slice(0, end))
-    .replaceAll(/\[[0-9;?]*[A-Za-z]/g, "")
-    .split("\r\n");
-}
+describe("C22 §6b — the write is a difference", () => {
+  it("T4.13 (I55): a keystroke writes less than the frame, and the screen still equals it", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession(
+      { stdin: stdin as never },
+      { columns: 100, rows: 24 },
+    );
+    await settle();
+
+    // **The subject before the claim.** A session that never painted satisfies
+    // "wrote fewer bytes" perfectly.
+    const settled = screen().rows;
+    // **The subject, and `toHaveLength` is not it.** A screen has `size.rows`
+    // rows whether anything was written to them, so the row count is a fact
+    // about the model rather than about the session — a mutation painting one
+    // row short survived that assertion, which is how this was found.
+    //
+    // The claim that distinguishes a full-height frame is **where the prompt
+    // sits**: directly above the footer, which is the last row. The default
+    // footer is empty by design (`chrome.ts`), so "the footer is non-blank" was
+    // the wrong repair and a frame-read is what said so.
+    expect(screen().drawn, "the session drew something").toBe(true);
+    expect(settled[0]?.trim(), "the header is on the screen").not.toBe("");
+    expect(
+      settled.findIndex((r) => r.trimStart().startsWith("❯")),
+      "the prompt sits on the row above the footer",
+    ).toBe(22);
+    const whole = settled.join("\r\n").length;
+
+    const before = stdout.chunks.length;
+    stdin.emit("a");
+    await settle();
+
+    const written = stdout.chunks.slice(before).join("").length;
+    expect(written, "the keystroke did write something").toBeGreaterThan(0);
+
+    // **Both halves, because either alone is satisfied by the wrong thing.** A
+    // diff that simply dropped rows passes the byte count; a full repaint passes
+    // the screen equality. The claim is the conjunction.
+    expect(written, `${String(written)} bytes against a ${String(whole)}-byte frame`).toBeLessThan(
+      whole / 2,
+    );
+
+    const after = screen().rows;
+    expect(after, "the screen is still a whole frame").toHaveLength(24);
+    const prompt = after.findIndex((r, i) => i > 0 && r.trimStart().startsWith("❯"));
+    expect(prompt, "the prompt is on the screen").toBeGreaterThan(0);
+    expect(after[prompt], "and the keystroke is on it").toContain("a");
+
+    // Every row still full width — a diffed row that came up short would leave
+    // the previous frame showing through exactly where it was written.
+    for (const row of after) expect(displayCells(row)).toBe(100);
+  });
+
+  it("T4.14 (I55): a SIGWINCH repaints whole although no row changed", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen, resize } = await buildSession(
+      { stdin: stdin as never },
+      { columns: 100, rows: 24 },
+    );
+    await settle();
+    const rowsBefore = screen().rows;
+
+    const before = stdout.chunks.length;
+    // **The same size.** C14 refuses a resize to the size it holds (C14 I21), so
+    // nothing about the frame can differ — and `contaminated` is then the only
+    // thing that can produce a write at all, which is the point of the row.
+    resize({ columns: 100, rows: 24 });
+    await settle();
+
+    const written = stdout.chunks.slice(before).join("");
+    expect(written, "the resize produced a write").not.toBe("");
+    expect(written, "and it is a whole frame, from HOME").toContain(HOME_SEQ);
+    expect(screen().rows, "showing the same thing it showed before").toEqual(rowsBefore);
+  });
+
+  it("T4.15 (I56): a write that throws leaves the next frame whole", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession(
+      { stdin: stdin as never },
+      { columns: 100, rows: 24 },
+    );
+    await settle();
+    expect(screen().drawn, "a frame is on the screen").toBe(true);
+    expect(
+      screen().rows.findIndex((r) => r.trimStart().startsWith("❯")),
+      "the frame reaches the foot of the terminal",
+    ).toBe(22);
+
+    // The next write throws part-way — the screen keeps a prefix of a frame no
+    // record describes. `throwOn` is what makes this constructible at all.
+    stdout.throwOn(stdout.chunks.length, new Error("the terminal went away"));
+    expect(() => stdin.emit("a"), "the throw reached the writer").toThrow("went away");
+    await settle();
+
+    const before = stdout.chunks.length;
+    stdin.emit("b");
+    await settle();
+
+    const written = stdout.chunks.slice(before).join("");
+    expect(written, "something was written after the fault").not.toBe("");
+    // **Whole, not a difference.** With the record set after the write rather
+    // than cleared before it, this is a diff against the frame *preceding* the
+    // failed one, and the rows the partial write got wrong are the rows it skips.
+    expect(written, "and it is a full repaint").toContain(HOME_SEQ);
+  });
+});
 
 describe("C22 integration — the frame's viewport", () => {
   it("T4.12 (I34, with C14): a document taller than the region stays pinned to its last row at every prompt height", async () => {
@@ -51,7 +150,7 @@ describe("C22 integration — the frame's viewport", () => {
     // this was a red test rather than a green one measuring nothing**, which is
     // exactly what it was written for.
     const stdin = fakeStdin();
-    const { stdout } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 16 });
+    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 16 });
 
     const type = async (bytes: string): Promise<void> => {
       stdin.emit(bytes);
@@ -66,8 +165,13 @@ describe("C22 integration — the frame's viewport", () => {
 
     // **The subject before the claim** — a session that failed to draw would
     // satisfy every assertion below with an empty frame.
-    const settled = lastFrame(stdout.chunks);
-    expect(settled, "a frame was written").toHaveLength(16);
+    const settled = screen().rows;
+    // See T4.13 — the row count is the model's rather than the session's. What
+    // this row needs from the guard is only that something was drawn; its own
+    // control (three prompt heights, and a bottom row that is content rather
+    // than padding) is what carries the claim.
+    expect(screen().drawn, "the session drew something").toBe(true);
+    expect(settled[0]?.trim(), "the header is on the screen").not.toBe("");
 
     // Not the fallback. With the viewport sized to the terminal it selects three
     // rows more than the region has, `paint` refuses (I35) and `drawFallback`
@@ -90,7 +194,7 @@ describe("C22 integration — the frame's viewport", () => {
 
     for (const typed of ["", "x".repeat(140), "x".repeat(320)]) {
       if (typed !== "") await type(typed.slice(-140));
-      const frame = lastFrame(stdout.chunks);
+      const frame = screen().rows;
       expect(frame, `${String(typed.length)}: a frame`).toHaveLength(16);
       expect(frame.join("\n"), `${String(typed.length)}: not the fallback`).not.toContain(
         "Terminal too small",
@@ -121,7 +225,7 @@ describe("C22 integration — the frame's viewport", () => {
 
     // Every row is still the frame's width — the other axis, asserted because a
     // region computed one way and painted another shows up here first.
-    for (const row of lastFrame(stdout.chunks)) {
+    for (const row of screen().rows) {
       expect(displayCells(row)).toBe(100);
     }
   });
@@ -150,7 +254,7 @@ describe("C22 integration — the frame's viewport", () => {
     // invariant claims is that a frame carrying the spinner arrives **with no
     // further input**, and that is what fails for both mutations.
     const stdin = fakeStdin();
-    const { stdout, clock } = await buildSession(
+    const { clock, screen } = await buildSession(
       { stdin: stdin as never, completionSources: [slow] } as never,
       // 20 rows, not 12: below C22 §8b's 60×16 gate the session draws
       // `Terminal too small` and every assertion here is about the fallback.
@@ -158,14 +262,14 @@ describe("C22 integration — the frame's viewport", () => {
     );
 
     const promptOf = (): string => {
-      const frame = lastFrame(stdout.chunks);
+      const frame = screen().rows;
       return [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
     };
 
     stdin.emit("/x");
     await Promise.resolve();
     await Promise.resolve();
-    const before = lastFrame(stdout.chunks);
+    const before = screen().rows;
     const promptRowsBefore = before.length;
     expect(promptOf(), "the line is typed").toContain("/x");
     expect(promptOf(), "and no spinner before the threshold").not.toContain("⠋");
@@ -188,7 +292,7 @@ describe("C22 integration — the frame's viewport", () => {
 
     // **Appearance, never geometry.** The prompt is the same height and the
     // frame the same shape as before the request.
-    const during = lastFrame(stdout.chunks);
+    const during = screen().rows;
     expect(during, "the frame is the same height").toHaveLength(promptRowsBefore);
     expect(new Set(during.map((r) => displayCells(r))).size, "one width").toBe(1);
     expect(promptOf(), "and the typed text is untouched").toContain("/x");
@@ -208,7 +312,7 @@ describe("C22 integration — the frame's viewport", () => {
     // because the thunk agreeing with the keymap is not the claim: the claim is
     // that the help a user reads contains them.
     const stdin = fakeStdin();
-    const { stdout } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
+    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
 
     // **`/help keys`, not `/help`.** The keymap moved behind an argument when
     // `/help` was measured at thirty verbs: it emitted every binding last, and
@@ -220,7 +324,7 @@ describe("C22 integration — the frame's viewport", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const frame = lastFrame(stdout.chunks);
+    const frame = screen().rows;
     expect(frame, "a frame was written").toHaveLength(40);
     const text = frame.join("\n");
 
@@ -262,7 +366,7 @@ describe("C22 §7 — identity, from the app through C23", () => {
     // config field behind it, so no token could arrive to be nearly expired.
     // Either alone leaves the behaviour identical, which is why neither was
     // visible as a defect on its own.
-    const { stdout } = await buildSession({
+    const { screen } = await buildSession({
       clock: () => NOW,
       identity: () => Promise.resolve(nearlyExpired()),
     });
@@ -272,7 +376,7 @@ describe("C22 §7 — identity, from the app through C23", () => {
     // real timer and no number of `Promise.resolve()`s reaches it.
     await settle();
 
-    const text = lastFrame(stdout.chunks).join("\n");
+    const text = screen().rows.join("\n");
     expect(text, "the expiry notice is on the frame").toContain("Token expires in 14h");
   });
 
@@ -280,11 +384,11 @@ describe("C22 §7 — identity, from the app through C23", () => {
     // The default is a *fetcher*, not an absent loop. Without this half, a
     // "default" that skipped construction entirely would pass T1.4e — and the
     // session would have no health transitions at all.
-    const { stdout, tui } = await buildSession({ clock: () => NOW });
+    const { tui, screen } = await buildSession({ clock: () => NOW });
 
     await settle();
 
-    expect(lastFrame(stdout.chunks).join("\n")).not.toContain("Token expires");
+    expect(screen().rows.join("\n")).not.toContain("Token expires");
     expect(tui.session.identity, "no identity, and no throw getting there").toBeNull();
     expect(tui.session.health, "the loop ran and settled").toBe("live");
   });
@@ -399,5 +503,216 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     // Contained, not swallowed into the frame: a welcome that could not reach
     // its far side is not a startup fault and must not become an error entry.
     expect(stdout.chunks.join(""), "and said nothing about it").not.toContain("far side is down");
+  });
+
+  it("T4.x (C23 I37, C16 I26, F21): `enter` on a focused row reaches the dispatcher", async () => {
+    // **The mutation that matters is removing the wiring and watching a real
+    // keystroke fail**, not removing the handler. `actions.ts` implemented all
+    // five arms and `pipeline.onAction` was called only from a unit test, so
+    // eleven rows said nothing about whether anything reached it — a suite that
+    // builds its own version of the thing under test cannot see whether
+    // production builds it correctly.
+    //
+    // So this drives bytes into a real session and reads the frame. A `fill`
+    // action puts its command in the prompt (C04 I19's default kind), which is
+    // visible without asserting on any internal.
+    const stdin = fakeStdin();
+    const { screen } = await buildSession(
+      {
+        stdin: stdin as never,
+        // **The verb is declared here, because C23 I27 refuses a handler with
+        // no manifest row** — which is the reconciliation working, and the
+        // reason the first draft of this test would not construct at all.
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [
+            {
+              name: "rows",
+              local: true,
+              summary: "a table with an action on a row",
+              args: [],
+              flags: [],
+            },
+          ],
+        },
+        localHandlers: {
+          rows: () => ({
+            schema: "tui.view/1",
+            status: "ok",
+            blocks: [
+              {
+                kind: "table",
+                id: "t",
+                columns: [
+                  { key: "name", label: "NAME", align: "left", priority: 1, minWidth: 6 },
+                ],
+                rows: [
+                  {
+                    id: "r1",
+                    cells: { name: { text: "alpha" } },
+                    // **Two, and the second exists to make the ruling
+                    // falsifiable.** With one action, *first* and *last* are the
+                    // same row and the mutation that takes the wrong one
+                    // survives — the convenient setup is the one where both
+                    // readings agree (C23 I37, C04 I19).
+                    actions: [
+                      { kind: "fill", label: "inspect", command: "/inspect alpha" },
+                      { kind: "fill", label: "logs", command: "/logs alpha" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        },
+      } as never,
+      { columns: 80, rows: 20 },
+    );
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    const promptOf = (): string => {
+      const frame = screen().rows;
+      return [...frame].reverse().find((r) => r.trimStart().startsWith("❯")) ?? "";
+    };
+
+    await type("/rows\r");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The subject before the claim: without a rendered row there is nothing to
+    // focus, and every assertion below would hold on an empty screen.
+    expect(screen().rows.join("\n"), "the row is on screen").toContain("alpha");
+    expect(promptOf(), "and the prompt is empty before the action").not.toContain("/inspect");
+
+    // `↓` from the bottom of history enters the live block (C16 I22), then
+    // `enter` activates — the binding that did not exist.
+    await type("\u001b[B");
+    await type("\r");
+
+    expect(promptOf(), "the fill action reached C23's dispatcher").toContain("/inspect alpha");
+    expect(promptOf(), "the *first* action, not whichever the array ends with").not.toContain("/logs");
+  });
+
+});
+
+describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", () => {
+  /**
+   * A manifest with one local verb, so a handler can be registered without
+   * tripping C23 I27's reconciliation.
+   */
+  const withLocal = (name: string): TuiConfig["manifest"] => ({
+    schema: "tui.manifest/1",
+    binary: "prism",
+    version: "1.0.0",
+    tools: [
+      { name, local: true, summary: "a verb whose document C04 refuses", args: [], flags: [] },
+    ],
+  });
+
+  /**
+   * **F15's document**, and it is the input rather than a synthetic error: two
+   * blocks with the id `running`, which C04 I14 forbids because `ViewPatch`
+   * addresses blocks by id. This is what `/dashboard` returned, and what the
+   * shell said nothing at all about.
+   */
+  const duplicateIds = () => ({
+    schema: "tui.view/1" as const,
+    command: "/fault",
+    status: "ok" as const,
+    blocks: [
+      { kind: "notice" as const, id: "running", tone: "info" as const, glyph: "info" as const, text: "one" },
+      { kind: "notice" as const, id: "running", tone: "info" as const, glyph: "info" as const, text: "two" },
+    ],
+  });
+
+  it("T4.27 (C23 I48, I1): a rejected document is said in the transcript and again at exit", async () => {
+    // **The row belongs at the public entry.** Every driver-level assertion
+    // could already see this throw and no app author ever could — F15 cost four
+    // wrong turns against a framework that had the answer in one sentence.
+    const stdin = fakeStdin();
+    const { stdout, screen, tui } = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: withLocal("fault"),
+        localHandlers: { fault: () => duplicateIds() },
+      },
+      { columns: 100, rows: 30 },
+    );
+    await settle();
+
+    // The control: the session is up and the prompt takes keys, so a blank
+    // assertion below would be about this row rather than about the frame.
+    expect(screen().rows.join("\n"), "the shell painted").not.toBe("");
+
+    stdin.emit("/fault\r");
+    await settle();
+    await settle();
+
+    // Channel one — at the moment, where the missing entry should be.
+    expect(
+      screen().rows.join("\n"),
+      "the reason is on screen, not only in a collection",
+    ).toContain("running");
+
+    // Channel two — after the release, on the restored primary screen. Taken
+    // from what is written *after* stop begins, because the frames before it
+    // are on the alternate screen and are discarded with it.
+    const before = stdout.chunks.length;
+    await tui.stop("exit");
+    const after = stdout.chunks.slice(before).join("");
+
+    // **After the release, and the ordering is the assertion** (C22 I6). A
+    // diagnostic written before `lifecycle.release()` goes to the alternate
+    // screen and is discarded with it — the dev sees a flash and an empty
+    // shell. "It appears somewhere after `stop()` began" is satisfied by both
+    // orders, which is what the mutation pass showed.
+    const LEAVE_ALT = "\u001b[?1049l";
+    expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
+    expect(
+      after.indexOf("running"),
+      "and again at exit, on the restored primary screen",
+    ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+  });
+
+  it("T4.20 (I6a, C20 I17): a history warning reaches the same drain", async () => {
+    // **C20's half, and it was the older one.** `HistoryStore.warnings` was read
+    // by nothing in `src/`: a corrupt file, a read-only home and a full disk
+    // were each detected, described and discarded for the life of every session,
+    // with T2.9 passing throughout because what it asserts is the silence.
+    //
+    // Fabricated at the filesystem, which is where the real cause lives.
+    const base = fakeFs();
+    const fs = {
+      ...base,
+      appendFile: () => Promise.reject(new Error("EROFS: read-only file system")),
+      appendFileSync: () => {
+        throw new Error("EROFS: read-only file system");
+      },
+    };
+
+    const stdin = fakeStdin();
+    const { stdout, tui } = await buildSession({ stdin: stdin as never, fs });
+    await settle();
+
+    stdin.emit("/help\r");
+    await settle();
+
+    const before = stdout.chunks.length;
+    await tui.stop("exit");
+    const after = stdout.chunks.slice(before).join("");
+
+    const LEAVE_ALT = "\u001b[?1049l";
+    expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
+    expect(
+      after.indexOf("EROFS"),
+      "the write failure is reported, and after the release",
+    ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
   });
 });

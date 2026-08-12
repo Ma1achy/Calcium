@@ -5,10 +5,7 @@
  * the split is what C22 §13a's deferral rests on: a block taller than the region
  * is the one case block-boundary windowing and the region can disagree.
  */
-import { createBlockRegistry } from "../../../dist/presentation/blocks/index.js";
-import { tableDefinition } from "../../../dist/presentation/table/index.js";
-import { plotDefinition } from "../../../dist/presentation/plot/index.js";
-import { patchDefinition } from "../../../dist/presentation/patch/index.js";
+import { appRegistry } from "./registry.mjs";
 import { parseNdjson } from "../src/ndjson.ts";
 import { containerView } from "../src/container.ts";
 import { readFileSync } from "node:fs";
@@ -17,16 +14,14 @@ const row = parseNdjson(
   readFileSync(new URL("../test/corpus/stats-real.ndjson", import.meta.url), "utf8"),
 ).rows[0];
 /**
- * **The three the defaults do not carry.** `createBlockRegistry()` alone has no
- * `plot`, so a probe built on it measures S3's plot through the fallback and
- * answers 5 rows for a panel that draws 13. The shell registers them at
- * `construct.ts:297`; a probe that does not is measuring a different
- * application.
+ * **The registry is the application's, and it is shared.** A defaults-only
+ * registry has no `plot`, so a probe built on one measures S3's plot through the
+ * fallback and answers 5 rows for a panel that draws 13 — a correct measurement
+ * of a different application. All three probes now go through `registry.mjs`,
+ * and `probes_test.mjs` compares its kinds against `src/shell/construct.ts` by
+ * equality.
  */
-const registry = createBlockRegistry({ defaults: true });
-registry.register(tableDefinition);
-registry.register(plotDefinition);
-registry.register(patchDefinition);
+const registry = appRegistry();
 
 for (const width of [120, 80]) {
   const blocks = containerView(row, width);

@@ -14,7 +14,10 @@
  */
 
 import { block, document } from "../data/viewmodel/index.js";
+import { usageBlocks } from "../data/adapters/index.js";
+import type { ToolDef } from "../data/manifest/index.js";
 import type {
+  LocalDocument,
   Block,
   DocumentMeta,
   DocumentStatus,
@@ -70,7 +73,15 @@ export type DocSpec = Readonly<{
   blocks: readonly Block[];
   status?: DocumentStatus;
   error?: ErrorLike;
-  meta: MetaSpec;
+  /**
+   * **Optional since F13**, because the local route no longer supplies one:
+   * `runLocal` fills every field of a local document's `meta` itself, so a
+   * handler passing `origin` and `transport` here was inventing two values the
+   * shell already holds. Callers that append directly — the refusal notice, the
+   * error arms — still pass one, and the default below is what an empty spec
+   * means rather than a value anyone chose.
+   */
+  meta?: MetaSpec;
 }>;
 
 export function compose(spec: DocSpec): ViewDocument {
@@ -80,8 +91,47 @@ export function compose(spec: DocSpec): ViewDocument {
     status: spec.status ?? "ok",
     blocks: spec.blocks,
     ...(spec.error === undefined ? {} : { error: spec.error }),
-    meta: meta(spec.meta),
+    meta: meta(spec.meta ?? { origin: "user" }),
   });
+}
+
+/**
+ * A local handler's answer, completed — which is what makes it a document.
+ *
+ * **The local route's `authoritativeMeta`** (F13). C07's registry fills seven
+ * `meta` fields on the adapter route; nothing filled them here, so four handlers
+ * in the reference app each carried an eleven-line helper inventing them. This
+ * is that fill, named and exported for the same reason `createAdapterRegistry`
+ * is: an app asserting *"every document this app produces is valid"* has no
+ * other way to obtain one, and a producer the framework can test and a consumer
+ * cannot is a producer whose app-side tests assert against something the user
+ * never sees (C24 I19's `contextAt` argument, third instance).
+ *
+ * `exitCode` is derived from `status` rather than taken — the two agreed at
+ * every one of the reference app's eight sites, so carrying both was two records
+ * of one fact. `stderr` is empty because a local route has no far side; the
+ * failure message belongs in `error.message`, where it already is. F101.
+ */
+export function completeLocal(
+  produced: LocalDocument,
+  where: Readonly<{ command: string; verb: string | null; argv: readonly string[]; durationMs: number }>,
+): ViewDocument {
+  return {
+    ...produced,
+    command: where.command,
+    meta: {
+      verb: where.verb,
+      adapter: produced.meta?.adapter ?? "local",
+      exitCode: produced.status === "error" ? 1 : 0,
+      durationMs: where.durationMs,
+      truncated: produced.meta?.truncated ?? false,
+      ...(produced.meta?.resultId === undefined ? {} : { resultId: produced.meta.resultId }),
+      argv: where.argv,
+      stderr: "",
+      transport: "local",
+      origin: "user",
+    },
+  };
 }
 
 /**
@@ -105,7 +155,23 @@ const GLYPH_OF = Object.freeze({
   error: "error",
 } as const);
 
-/** A single-block notice. The shape most containment paths end in. */
+/**
+ * A single-block notice. The shape most containment paths end in.
+ *
+ * **`status: "error"` carries its own `error`, and it did not.** C04 I3 requires
+ * the field in both directions — present iff the status is `"error"` — so every
+ * notice composed with that status was an invalid document, and `transcript.append`
+ * threw on all of them. Two shipped call sites: a handoff killed by a signal and
+ * a handoff exiting non-zero. **Neither produced an entry.** `vim`, exiting 1,
+ * left a transcript that said nothing had happened.
+ *
+ * That is the same shape as the glyph defect above and as F15 itself, and it was
+ * found by the fabricated row for §5a's ladder — the fault notice was written
+ * with this status and could not be appended either. Filling the field here
+ * rather than at the two call sites is the class rather than the instances: the
+ * message is the notice's own text, which is what an `ErrorLike` carrying
+ * anything else would be paraphrasing.
+ */
 export function noticeDoc(
   command: string,
   text: string,
@@ -117,6 +183,7 @@ export function noticeDoc(
   return compose({
     command,
     status,
+    ...(status === "error" ? { error: { message: text } } : {}),
     blocks: [
       block({
         kind: "notice",
@@ -127,6 +194,26 @@ export function noticeDoc(
       }),
     ],
     meta: metaSpec,
+  });
+}
+
+/**
+ * `/verb --help` — what the verb takes, from the manifest (C05 I22, F92).
+ *
+ * **`usageBlocks` had one caller and it was `raw.exitCode === 2`**, so the only
+ * way to see this document was to invoke the verb wrongly and let the far side
+ * say so. The generator was right and the trigger was missing; this is the
+ * trigger, and the generator is unchanged.
+ *
+ * `status: "ok"` because asking what a verb takes is not an error — the exit-2
+ * route's document is a failure that happens to contain the same blocks.
+ */
+export function usageDoc(command: string, tool: ToolDef): ViewDocument {
+  return compose({
+    command,
+    status: "ok",
+    blocks: [...usageBlocks(tool, blockId("usage"))],
+    meta: { origin: "user" },
   });
 }
 

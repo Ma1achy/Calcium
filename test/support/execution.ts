@@ -25,14 +25,16 @@ import { loadTheme, defaultTheme, type ThemeStore } from "../../src/presentation
 import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { fixture } from "./manifest.js";
-import { doc } from "./blocks.js";
+import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
+import type { RefreshHost } from "../../src/shell/refresh.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import type { ViewDocument } from "../../src/data/viewmodel/index.js";
 import type { HistoryEntry } from "../../src/interaction/history/types.js";
 import type { Exit } from "../../src/data/process/types.js";
 
+import { FULL_CAPABILITIES } from "./producer-context.js";
 export type PipelineScript = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
@@ -46,6 +48,8 @@ export type PipelineScript = Readonly<{
   theme?: ThemeStore;
   /** For the handoff rows: reject to reach C23 §8a A6.5's throw path. */
   handoff?: (argv: readonly string[]) => Promise<Exit>;
+  /** C23 I46 — for the rows about the off-screen pause. Everything visible by default. */
+  visible?: (host: RefreshHost) => boolean;
 }>;
 
 export type PipelineHarness = Readonly<{
@@ -148,6 +152,13 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
     blocks: {} as never,
+    // C07 I19 / I18 — what `ProducerContext` is built from (C23 I40). Real
+    // values rather than stubs: a producer told `ascii` behaves differently, and
+    // a region of zero would make every view-route split agree with nothing.
+    // `blocks` stays the stub above — `measure` is a closure, so a row that
+    // reaches it throws loudly rather than measuring wrongly.
+    capabilities: FULL_CAPABILITIES,
+    region: () => ({ width: 80, height: 24 }),
     // **The real editor, not a stub.** `editor: {} as never` cost a diagnosis
     // once and `{ setText, text }` cost another the day C23 gained
     // `editor.clear()` on the submit path (I28) — a two-method stub is the same
@@ -161,13 +172,27 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     // compiler could not see past the cast at the bottom of this function.
     overlays: harnessOverlays,
     /**
+     * C23 I46 — everything visible unless a row says otherwise.
+     *
+     * **A default of `true` and not a real viewport**, because this harness has
+     * no frame: answering from a store nothing scrolls would make every part
+     * here paused, which is a fake supplying the behaviour under test rather
+     * than standing in for it. Rows about the pause hand in their own predicate,
+     * and T4.26's is a real viewport in an integration test.
+     *
+     * The cast at the bottom of this function is why the absence of this field
+     * was a runtime failure rather than a compile one — the same way `overlays`
+     * cost four suites a `Cannot read properties of undefined`.
+     */
+    visible: script.visible ?? (() => true),
+    /**
      * The real host (C23 I36), for the same reason as `editor` above.
      *
      * A stub returning a fixed key would make every confirming verb take that
      * answer, so a handler that asks and ignores the reply would pass — and the
      * one test that matters is whether declining stops the command.
      */
-    confirm: createConfirmHost({ overlays: harnessOverlays, invalidate: () => undefined }),
+    confirm: createConfirmHost({ capabilities: { unicode: "full" }, overlays: harnessOverlays, invalidate: () => undefined }),
     theme,
     // `append` is real, because C23 I29 records every settled submission
     // through it — a fake without it throws inside the append funnel and the
@@ -246,8 +271,8 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   // The fixture manifest's own local verbs. The framework's six register
   // themselves; `seal()` reconciles both (C23 I27), so omitting either fails
   // construction rather than producing a verb nothing can route to.
-  pipeline.register("guide", () => doc({ command: "/guide" }));
-  pipeline.register("debug dump", () => doc({ command: "/debug dump" }));
+  pipeline.register("guide", () => localDoc({ command: "/guide" }));
+  pipeline.register("debug dump", () => localDoc({ command: "/debug dump" }));
   pipeline.seal();
 
   return {

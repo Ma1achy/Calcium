@@ -387,22 +387,52 @@ Calcium's.
 ```ts
 import { b, createTui, defaultTheme } from "@fmx/calcium";
 import type { Adapter } from "@fmx/calcium";
+
 const manifest = {
   schema: "tui.manifest/1",
   binary: "svc",
   version: "1.0.0",
   tools: [{ name: "list", local: false, summary: "List services", args: [], flags: [] }],
 } as const;
+
 const list: Adapter = {
   schema: "tui.view/1",
   adapt: (raw, ctx) => {
+    const rows = raw.stdoutRaw
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    return {
+      schema: "tui.view/1",
+      command: ctx.command,
+      status: "ok",
+      blocks: [
         b.table({
           columns: [
             b.col("name", { label: "SERVICE", minWidth: 12, flex: true }),
             b.col("state", { label: "STATE", minWidth: 10 }),
             b.col("replicas", { label: "REPLICAS", minWidth: 8, align: "right" }),
           ],
+          rows: rows.map((r) => ({
+            id: String(r["name"]),
+            cells: {
+              name: { text: String(r["name"]) },
+              state: {
+                text: String(r["state"]),
+                tone: r["state"] === "running" ? "ok" : "muted",
+                glyph: r["state"] === "running" ? "running" : "queued",
+              },
+              replicas: { text: String(r["replicas"]) },
+            },
+          })),
+        }),
         b.notice("muted", `${String(rows.length)} services`),
+      ],
+      meta: { adapter: "list" },
+    };
+  },
+};
+
 const tui = createTui({
   name: "svc-tui",
   binary: new URL("bin/svc", import.meta.url).pathname,
@@ -411,6 +441,7 @@ const tui = createTui({
   env: process.env,
   adapters: { list },
 });
+
 await tui.start();
 ```
 
@@ -437,6 +468,13 @@ above is quoted from that file line for line by a test, because a README example
 that has drifted is worse than none: it fails on your machine and not on ours.
 `make proof` runs it from the packed tarball rather than from this workspace, so
 what is verified is the published package.
+
+**This is 0.x, deliberately.** The example above is the surface most likely to
+stay put; the rest of the API will break between minor versions, and it will
+break without a deprecation cycle. Twenty-five specs and their invariants are
+the contract that is stable — the names in front of them are not yet, and saying
+so is the difference between a breaking change and a broken promise. Pin an
+exact version.
 
 ---
 

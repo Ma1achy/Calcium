@@ -262,3 +262,78 @@ describe("C01 e2e — the terminal is given back", () => {
     60_000,
   );
 });
+
+describe("C22 §4 gate 4 — a terminal too small (C22 I8, I9, C01 I12b, F67)", () => {
+  /**
+   * **A tier-5 row because both halves failed only outside a unit test**, and
+   * that is the whole reason F67 existed for as long as it did.
+   *
+   * The unit rows hand `drawFallback` their own spy sink, so a fallback written
+   * into C01's `debug` sink renders perfectly to them. And a fake lifecycle
+   * delivers a resize the real one dropped. Each component was correct on its
+   * own side of the seam and the pair did nothing at all: **0 bytes on stdout
+   * and stderr, the process alive, for ever.**
+   *
+   * The width axis is swept by the golden frames at 60/80/120/160 columns. The
+   * height axis has no equivalent sweep, which is F67's own closing sentence and
+   * the reason it took someone wanting a smaller picture to find it.
+   */
+  for (const [cols, rows] of [
+    [100, 12],
+    [100, 15],
+    [30, 16],
+  ] as const) {
+    it(
+      `T4.21 (C22 I9): ${String(cols)}x${String(rows)} draws the fallback rather than nothing`,
+      async () => {
+        const pty = interactivePty(`${FIXTURE} session`, { cols, rows });
+        try {
+          await pty.waitFor(/Terminal too small/, 15_000);
+          // The size it has and the size it needs, both — a message naming
+          // neither leaves the reader to guess which axis is short, and `30x16`
+          // is short on the axis the golden frames sweep.
+          expect(pty.output).toContain(`${String(cols)}x${String(rows)}`);
+          expect(pty.output).toContain("Needs 60x16");
+          // And nothing was acquired: there is no alternate screen to draw into,
+          // which is why this goes to the primary one.
+          expect(pty.output, "nothing acquired").not.toContain("\u001b[?1049h");
+        } finally {
+          pty.kill();
+        }
+      },
+      30_000,
+    );
+  }
+
+  it(
+    "T4.21b (C22 I8, C01 I12b): it opens when the terminal grows",
+    async () => {
+      // **The half a fake cannot fail.** C01 dropped every `SIGWINCH` outside
+      // `acquired`, and gate 4 deliberately does not acquire — so the deferral
+      // deferred for ever, and any harness with a fake lifecycle delivered the
+      // resize anyway. Measured before the fix: 44 bytes, then zero more.
+      const pty = interactivePty(`${FIXTURE} session`, { cols: 100, rows: 12 });
+      try {
+        await pty.waitFor(/Terminal too small/, 15_000);
+        const atFallback = pty.output.length;
+
+        pty.resize(100, 30);
+
+        // **Waited on the alternate screen, not on the prompt glyph.** `❯` is
+        // capability-dependent — this PTY carries no `LANG`, so C02 resolves the
+        // ASCII pair and the prompt is `>`. A row waiting on the fancy one can
+        // never match here, which is also why the pre-existing C22 T5.6 failure
+        // in this file reads as *never saw /❯/*: its control has the same
+        // dependency. Acquiring the alternate screen is the claim anyway.
+        await pty.waitFor(/\u001b\[\?1049h/, 20_000);
+        expect(
+          pty.output.length,
+          "the resize produced output at all",
+        ).toBeGreaterThan(atFallback);
+      } finally {
+        pty.kill();
+      }
+    },
+    45_000,
+  );
+});

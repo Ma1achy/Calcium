@@ -24,7 +24,7 @@ import {
   containerView,
   cpuBlock,
   cpuErrorBlock,
-  createCpuTick,
+  cpuFold,
   detailsBlock,
   ioBlock,
 } from "../src/container.ts";
@@ -125,37 +125,47 @@ describe("gap 1: the ring keeps the history b.live does not", () => {
 
 // ── The tick ────────────────────────────────────────────────────────────────
 
-describe("the CPU tick, driven directly", () => {
-  it("T1 (walk A2): a rejected fetch is a tick and a miss, and still rejects", async () => {
+describe("the CPU fold, driven directly", () => {
+  it("T1 (walk A2, F137): a transport failure is no longer counted as an attempt", async () => {
+    // **The row that changed, and it is the migration's stated loss.** The tick
+    // used to be the `fetch`, so a rejection ran `began()` on the way past. A
+    // fold runs on a *version* and a version exists only when the fetch
+    // resolved, so `docker` failing is now invisible to the ring.
+    //
+    // Kept as a row rather than deleted, because the old behaviour is what a
+    // reader of `axisCaption` would assume: it says N attempts and M readings,
+    // and after this only the successful attempts are counted. What replaced the
+    // signal is the driver's own error arm, which says `unavailable` in the
+    // panel title — louder than a caption divergence and about the same event.
     const ring = createRing(10);
-    const tick = createCpuTick(ring, () => Promise.reject(new Error("daemon gone")));
+    const fold = cpuFold(ring);
 
-    await expect(tick()).rejects.toThrow("daemon gone");
-    // Both halves matter: the driver must still see the rejection so it renders
-    // its error and backs off, *and* the ring must know the tick happened.
+    // Nothing calls the fold at all on this path; the assertion is the absence.
+    expect(ring.ticks, "no version, so no fold, so no attempt").toBe(0);
+    expect(ring.missed).toBe(0);
+    expect(fold(STATS[0] as Row), "and a resolving poll still folds").toBe(ring);
     expect(ring.ticks).toBe(1);
-    expect(ring.missed).toBe(1);
-    expect(ring.values).toEqual([]);
   });
 
-  it("T2 (walk A3): the sample lands in the fetch, so a render failure cannot lose it", async () => {
+  it("T2 (walk A3): the sample lands in the fold, so a render failure cannot lose it", () => {
     const ring = createRing(10);
-    const tick = createCpuTick(ring, () => Promise.resolve(STATS[0] as Row));
-
-    await tick();
+    cpuFold(ring)(STATS[0] as Row);
     // `render` runs after this and may throw. The ring is already true, and the
-    // next good tick draws the sample whose render failed.
+    // next good tick draws the sample whose render failed. **Structural now
+    // rather than a discipline**: a fold runs once per source version and a
+    // render runs once per part, so a sample recorded in `render` would be
+    // pushed twice the moment a second part read the same source (C23 I47).
     expect(ring.values).toHaveLength(1);
     expect(ring.ticks).toBe(1);
   });
 
-  it("T3 (walk A8): a stopped container samples nothing and is not drawn as idle", async () => {
+  it("T3 (walk A8): a stopped container samples nothing and is not drawn as idle", () => {
     const ring = createRing(10);
     // Docker reports `--` for every measurement once a container has stopped.
+    // **This is the miss that survives the migration** — the poll resolved, so
+    // there is a version and the fold runs. It is also the common one.
     const stopped: Row = { ...(STATS[0] as Row), CPUPerc: "--" };
-    const tick = createCpuTick(ring, () => Promise.resolve(stopped));
-
-    await tick();
+    cpuFold(ring)(stopped);
     expect(ring.ticks).toBe(1);
     expect(ring.missed).toBe(1);
     expect(ring.values).toEqual([]);

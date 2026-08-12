@@ -147,6 +147,31 @@ describe("C05 integration", () => {
   // routing decision is C06's to be driven by and C05's to supply, and it reads
   // better beside the transport than beside the loader. Named here so the pair
   // is findable from the spec that declares them.
+  it("T4.8 (C05 I22, with C23): `/verb --help` answers from the manifest and spawns nothing", async () => {
+    // **`usageBlocks` had one caller and it was `raw.exitCode === 2`** (F92),
+    // so the only way to see this document was to invoke the verb wrongly and
+    // let the far side say so. The generator was right and the trigger missing.
+    //
+    // Both halves are asserted. The document, because that is the feature; and
+    // that nothing was spawned, because the failure mode this replaces is
+    // `docker ps --help` reaching docker — F39 with a different flag, and a
+    // test that only checks the blocks would pass while the child still ran.
+    const h = pipelineHarness();
+    const before = h.spawned.length;
+
+    h.pipeline.submit("/ps --help");
+    await settled();
+
+    const doc = h.transcript.entries.at(-1)?.doc;
+    const rendered = JSON.stringify(doc?.blocks);
+    expect(rendered, "the usage line").toContain("/ps");
+    expect(rendered, "and the flags section, generated").toContain("Flags:");
+    expect(rendered, "including the reserved one, since it is a flag like any other")
+      .toContain("--help");
+    expect(doc?.status, "asking what a verb takes is not an error").toBe("ok");
+    expect(h.spawned.length, "and nothing reached the far side").toBe(before);
+  });
+
   it("T4.7 (with C23): help output is generated wholly from visibleTools", async () => {
     // **C23 I26 — from the manifest and the keymap, never a maintained list.**
     // The claim is `visibleTools`, not `tools`: a hidden verb stays invocable

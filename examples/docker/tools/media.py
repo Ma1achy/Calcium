@@ -35,7 +35,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from beats import QUIET, load  # noqa: E402
+from beats import load, settled_before  # noqa: E402
 from capture import run  # noqa: E402
 
 UTF8 = {"LANG": "en_GB.UTF-8"}
@@ -171,15 +171,16 @@ PRE: dict[str, bytes] = {}
 
 
 def settle(frames: list[tuple[float, bytes]], at: float) -> int:
-    """The last frame at or before `at` that is followed by a pause."""
-    before = [i for i, (t, _) in enumerate(frames) if t <= at]
-    if not before:
-        return -1
-    for i in reversed(before):
-        nxt = frames[i + 1][0] if i + 1 < len(frames) else frames[i][0] + QUIET + 1
-        if nxt - frames[i][0] >= QUIET:
-            return i
-    return before[-1]
+    """The last frame at or before `at` that is followed by a pause.
+
+    **`beats.settled_before`, not a second copy of it.** This was the same eleven
+    lines written out again, differing only in returning the index alone — two
+    implementations of the one rule every image and every beat-read depends on,
+    free to drift apart with nothing comparing them. A03's MG25 is the framework
+    rule for this; the instruments had no equivalent, which is group 9's whole
+    subject.
+    """
+    return settled_before(frames, at)[0]
 
 
 def collapse(cast: str, at: float) -> None:

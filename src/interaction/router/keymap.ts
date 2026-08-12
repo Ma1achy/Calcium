@@ -278,6 +278,11 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "liveBlock", key: { name: "escape" }, action: "focusPrompt" },
   { target: "liveBlock", key: { name: "down" }, action: "rowDown" },
   { target: "liveBlock", key: { name: "up" }, action: "rowUp" },
+  // **The point of being here at all** (C23 I37, F21). `escape`, `down` and `up`
+  // were the whole of this target: a cursor with nothing to press. `enter` is
+  // the same key `overlay` accepts a menu item with, which is the consistency a
+  // reader has already learnt by the time they reach a row.
+  { target: "liveBlock", key: { name: "enter" }, action: "rowActivate" },
 ];
 
 /**

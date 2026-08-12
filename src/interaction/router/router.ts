@@ -13,7 +13,7 @@
 
 import { activeTarget, type FocusInputs, type FocusStore } from "./focus.js";
 import type { Keymap } from "./keymap.js";
-import type { FocusTarget, InputEvent, Key } from "./types.js";
+import type { FocusTarget, InputEvent } from "./types.js";
 
 const EXIT_ARM_MS = 500;
 

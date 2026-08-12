@@ -25,7 +25,7 @@ import {
 } from "../../../data/viewmodel/index.js";
 import type { Block, Group, MeasureFn, Panel } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { glyphs } from "../glyphs.js";
+import { glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, paint, tone } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
@@ -69,7 +69,15 @@ export const panelDefinition: BlockDefinition<Panel> = {
       return shown === "" ? "" : ` ${shown} `;
     };
 
-    const titlePart = railPart(block.title);
+    // **The `live` slot, reachable at last** (C04 I39, F18). It rides in the
+    // title's own text, so the fill arithmetic below is untouched and a panel is
+    // still children + 2 — and it comes through `glyphFor`, so it is `|` under
+    // ASCII rather than a `▌` an app wrote into its title and could not degrade.
+    const titlePart = railPart(
+      block.live === true
+        ? `${glyphFor("live", ctx.capabilities)} ${stripControl(block.title)}`.trimEnd()
+        : block.title,
+    );
     const fill = Math.max(0, inner - cells(titlePart));
 
     const top = paint(

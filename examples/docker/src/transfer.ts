@@ -32,7 +32,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Block, LocalContext, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, LocalContext, ViewDocument } from "@fmx/calcium";
 import type { Runner } from "./mutation.ts";
 
 const run = promisify(execFile);
@@ -40,24 +40,12 @@ const realRunner: Runner = async (args) => await run("docker", [...args], { maxB
 
 type Kind = "cp" | "commit" | "export" | "save" | "load" | "import";
 
-const meta = (argv: readonly string[], exitCode: number): ViewDocument["meta"] => ({
-  verb: argv[0] ?? null,
-  adapter: "transfer",
-  exitCode,
-  durationMs: 0,
-  truncated: false,
-  argv,
-  stderr: "",
-  transport: "local",
-  origin: "user",
-});
-
-const okDoc = (command: string, argv: readonly string[], blocks: readonly Block[]): ViewDocument => ({
+const okDoc = (command: string, argv: readonly string[], blocks: readonly Block[]): LocalDocument => ({
   schema: "tui.view/1",
+  meta: { adapter: "transfer" },
   command,
   status: "ok",
   blocks,
-  meta: meta(argv, 0),
 });
 
 const errorDoc = (
@@ -65,13 +53,13 @@ const errorDoc = (
   argv: readonly string[],
   message: string,
   extra: readonly Block[] = [],
-): ViewDocument => ({
+): LocalDocument => ({
   schema: "tui.view/1",
   command,
   status: "error",
   error: { message, stage: "local" },
   blocks: [b.notice.error(message), ...extra],
-  meta: meta(argv, 1),
+  meta: { adapter: "transfer" },
 });
 
 const USAGE: Readonly<Record<Kind, string>> = {
@@ -125,7 +113,7 @@ const DONE: Readonly<Record<Kind, (pos: readonly string[]) => string>> = {
 export function createTransferHandler(
   kind: Kind,
   runner: Runner = realRunner,
-): (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument> {
+): (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (args, ctx) => {
     const pos = positionals(args);
     if (pos.length < NEEDS[kind]) return errorDoc(ctx.command, [kind], USAGE[kind]);
@@ -171,7 +159,7 @@ export function createTransferHandler(
 
 export function transferHandlers(
   runner: Runner = realRunner,
-): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument>> {
+): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument>> {
   const kinds: readonly Kind[] = ["cp", "commit", "export", "save", "load", "import"];
   return Object.fromEntries(kinds.map((k) => [k, createTransferHandler(k, runner)]));
 }

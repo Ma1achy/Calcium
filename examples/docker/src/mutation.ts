@@ -52,7 +52,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Block, LocalContext, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, LocalContext, ViewDocument } from "@fmx/calcium";
 
 const run = promisify(execFile);
 
@@ -104,19 +104,7 @@ export async function inspectState(runner: Runner, ref: string): Promise<State |
   }
 }
 
-const meta = (argv: readonly string[], exitCode: number, stderr = ""): ViewDocument["meta"] => ({
-  verb: argv[0] ?? null,
-  adapter: "mutation",
-  exitCode,
-  durationMs: 0,
-  truncated: false,
-  argv,
-  stderr,
-  transport: "local",
-  origin: "user",
-});
-
-function errorDoc(command: string, argv: readonly string[], message: string): ViewDocument {
+function errorDoc(command: string, argv: readonly string[], message: string): LocalDocument {
   return {
     schema: "tui.view/1",
     command,
@@ -125,12 +113,12 @@ function errorDoc(command: string, argv: readonly string[], message: string): Vi
     // C13 throws, C23 discards, and the reader gets no entry at all (F35).
     error: { message, stage: "local" },
     blocks: [b.notice.error(message)],
-    meta: meta(argv, 1, message),
+    meta: { adapter: "mutation" },
   };
 }
 
-function okDoc(command: string, argv: readonly string[], blocks: readonly Block[]): ViewDocument {
-  return { schema: "tui.view/1", command, status: "ok", blocks, meta: meta(argv, 0) };
+function okDoc(command: string, argv: readonly string[], blocks: readonly Block[]): LocalDocument {
+  return { schema: "tui.view/1", command, status: "ok", blocks, meta: { adapter: "mutation" } };
 }
 
 /**
@@ -229,7 +217,7 @@ function argvFor(verb: Verb, ref: string, args: readonly string[]): readonly str
 export function createMutationHandler(
   verb: Verb,
   runner: Runner = realRunner,
-): (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument> {
+): (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (args, ctx) => {
     const ref = args[0];
     const usage = verb === "rename" ? `usage: /rename <container> <new-name>` : `usage: /${verb} <container>`;
@@ -284,7 +272,7 @@ export function createMutationHandler(
 /** Every handler, keyed by verb — spread into `localHandlers`. */
 export function mutationHandlers(
   runner: Runner = realRunner,
-): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument>> {
+): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument>> {
   const verbs: readonly Verb[] = [
     "stop",
     "start",

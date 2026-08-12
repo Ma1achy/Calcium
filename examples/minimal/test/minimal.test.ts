@@ -71,9 +71,18 @@ describe("the smallest complete example", () => {
     // the comments — it may not disagree with the code.
     const meaningful = (s: string): string[] =>
       s.split("\n").map((l) => l.trimEnd()).filter((l) => l !== "" && !/^\s*(\/\*|\*|\/\/)/.test(l));
-    for (const line of meaningful(fenced?.[1] ?? "")) {
-      expect(meaningful(source), `README line not found in main.ts: ${line}`).toContain(line);
-    }
+    // **Compared by equality, in both directions** (F150). This asserted only
+    // that every README line appears in `main.ts` — a subset check, one way —
+    // so the block could omit anything and stay green. It did: 27 lines against
+    // the file's 64, missing the `rows` binding, the `return`, the whole
+    // `meta` object and every closing brace. **The published example did not
+    // parse**, under prose claiming it was quoted line for line.
+    //
+    // The same shape as SP6's inventory one document over: a subset check lets
+    // an omission outlive the thing that would report it.
+    expect(meaningful(fenced?.[1] ?? ""), "the README block and main.ts must agree").toEqual(
+      meaningful(source),
+    );
   });
 
   it("it opens a shell, spawns the far side, and draws the table", async () => {

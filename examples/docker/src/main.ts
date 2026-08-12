@@ -15,7 +15,7 @@ import { promisify } from "node:util";
 import { createTui, defaultTheme } from "@fmx/calcium";
 import { BINARY, buildManifest } from "./manifest.ts";
 import { createPsAdapter } from "./ps.ts";
-import { createDashboardHandler } from "./dashboard.ts";
+import { createDashboardHandler, dashboardBlocks } from "./dashboard.ts";
 import { createContainerAdapter } from "./container.ts";
 import { createInspectAdapter } from "./inspect.ts";
 import { createLogsAdapter } from "./logs.ts";
@@ -52,35 +52,36 @@ const run = promisify(execFile);
 const width = (): number => process.stdout.columns || 80;
 
 /**
- * Whether the terminal can draw anything outside ASCII.
+ * **`unicodeText` was here and is gone** (F54, F124, F43).
  *
- * **It was called `blockElements` and the name was already too narrow.** It was
- * written for the banner's `▄ ▀ █`; the second consumer is S3's `█`/`░` bar and
- * the third is a `·` in a caption, which is not a block element at all. The
- * predicate never was about block elements — it is C02's `unicode` axis, which
- * the app has to compute for itself because no consumer is handed the record
- * (F43).
+ * It computed C02's `unicode` axis from three environment variables joined into
+ * one string, and disagreed with the framework on **three of the four locale
+ * shapes anyone tests** — in both directions. `LC_ALL=C` beside a UTF-8 `LANG`
+ * drew block elements into a frame the renderer had already decided could not
+ * show them; `LC_CTYPE` alone degraded a terminal that could have drawn, and
+ * cost a reader the banner for nothing. C02 resolves `lcAll ?? lcCtype ?? lang`
+ * — POSIX precedence, first variable set wins — against a concatenation.
  *
- * **Decided by the app, and that is a finding rather than a design** (F43).
- * `detectCapabilities` is not exported and a local handler is handed no
- * capabilities at all, so the one route an app writes entirely itself cannot
- * ask the framework what the terminal supports — the third instance of a fact
- * the consumer needs and is not offered (F14, F36).
+ * **Two things had to be true to delete it, and the second is why this note
+ * exists rather than a smaller one.** The adapter half went when
+ * `ProducerContext` grew `capabilities`, C02's *resolved* record with the app's
+ * own overrides applied — so `container.ts` asks instead of being told. That
+ * left this function with **no caller at all**, which nothing reported: neither
+ * tsconfig sets `noUnusedLocals`, and the example typechecks clean under
+ * `strict` with a dead function in it.
  *
- * It matters because **capability substitution covers glyphs the framework
- * picks, not text an adapter supplies** — step 1's em-dash finding, eight rows
- * high. `▄▀█` in a `raw` block pass through untouched and draw as garbage on a
- * terminal that cannot show them, so choosing is unavoidably the app's job and
- * carrying an ASCII variant is the correct app-side answer.
+ * And its justification had gone stale in place. The comment argued that *a
+ * local handler is handed no capabilities at all, so the one route an app writes
+ * entirely itself cannot ask the framework what the terminal supports* —
+ * `LocalContext` is `ProducerContext & …`, and has carried the resolved record
+ * since C23 I39 landed. A correct-sounding reason for keeping something,
+ * outliving the fact it rested on, is what kept this readable and dead.
  *
- * The test is deliberately crude: a UTF-8 locale and a terminal that is not
- * `dumb`. Getting it wrong costs a wordmark, not correctness.
+ * The half that was never wrong and is worth keeping: **capability substitution
+ * covers glyphs the framework picks, not text an adapter supplies.** `▄▀█` in a
+ * `raw` block passes through untouched. Choosing an ASCII variant is the app's
+ * job — it just asks `ctx.capabilities.unicode` now instead of guessing.
  */
-const unicodeText = (): boolean => {
-  const term = process.env["TERM"] ?? "";
-  const locale = `${process.env["LC_ALL"] ?? ""}${process.env["LANG"] ?? ""}`;
-  return term !== "" && term !== "dumb" && /utf-?8/iu.test(locale);
-};
 
 /**
  * S12's depth, resolved by the app because that is where an environment variable
@@ -151,7 +152,7 @@ const tui = createTui({
     ps: createPsAdapter(),
     // The same flag the banner uses, for the same reason and a second time —
     // which is what makes F43 a finding rather than a one-off inconvenience.
-    "container stats": createContainerAdapter(unicodeText),
+    "container stats": createContainerAdapter(),
     inspect: createInspectAdapter(),
     logs: createLogsAdapter(),
     diff: createDiffAdapter(),
@@ -163,7 +164,7 @@ const tui = createTui({
     ...resourceAdapters(),
   },
   localHandlers: {
-    dashboard: createDashboardHandler(engine, width, unicodeText),
+    dashboard: createDashboardHandler(engine),
     drift: createDriftHandler(),
     compare: createCompareHandler(),
     config: createConfigHandler(),
@@ -196,7 +197,37 @@ const tui = createTui({
    * scrolled out of view is still running. S1's drawing said it froze; the
    * drawing was wrong about Calcium's own rules (FINDINGS F17a).
    */
-  greeting: () => createDashboardHandler(engine, width, unicodeText)([], { command: "" }),
+  greeting: async (ctx) => {
+    // **The one producer that is both.** As a local handler the dashboard's
+    // answer is a `LocalDocument` and `runLocal` fills its `meta` (F13); as the
+    // greeting it is appended directly, so nothing fills anything and the app
+    // owns the whole of it. Wrapped here rather than widening the handler,
+    // because the handler's route is the one with a framework behind it.
+    //
+    // **The context comes from the framework now** (C22 I53). This line used to
+    // read `([], { command: "" })` — an object literal that is not a
+    // `LocalContext`, has no `ask`, and compiled, which is F125's sharpest
+    // instance. It stopped compiling the moment the handler named its type, with
+    // no rule walking call sites: the obligation reached here through the
+    // declaration.
+    return {
+      schema: "tui.view/1",
+      command: "",
+      status: "ok",
+      blocks: await dashboardBlocks(ctx, engine),
+      meta: {
+        verb: null,
+        adapter: "dashboard",
+        exitCode: 0,
+        durationMs: 0,
+        truncated: false,
+        argv: [],
+        stderr: "",
+        transport: "local",
+        origin: "refresh",
+      },
+    } as const;
+  },
   /**
    * A02 §6 hook 4 — the domain half of completion, which no app had supplied.
    *

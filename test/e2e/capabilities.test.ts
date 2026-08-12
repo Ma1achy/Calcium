@@ -176,14 +176,19 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
         // nothing else (C11 I14), so the stripped text of a focused row is
         // identical to an unfocused one — comparing `pty.frame` would assert
         // that focus is invisible, which is what it was.
-        const rawRows = (): string[] => {
-          const at = pty.output.lastIndexOf("\u001b[H");
-          if (at === -1) return [];
-          return pty.output
-            .slice(at)
-            .split(/\r*\n/)
-            .filter((r) => r.includes("a3f9b21") || r.includes("7c2d4e1"));
-        };
+        // **This used to slice `output` from the last `CSI H` and split on
+        // newlines, and it counted one row where two were on the screen** — the
+        // third independent copy of F149's premise. The shell writes one home
+        // ever (C22 I55 §6b); two table rows are separated by an *address*, not
+        // a newline, so both landed in one string.
+        //
+        // `styledFrame` is what the comment above was asking for and the
+        // harness did not have: the screen, with the attributes each cell was
+        // written under. It keeps the property this row depends on — a focused
+        // row differs from an unfocused one — without re-deriving a screen from
+        // a stream of edits.
+        const rawRows = (): string[] =>
+          pty.styledFrame.filter((r) => r.includes("a3f9b21") || r.includes("7c2d4e1"));
 
         // A beat before the baseline: `waitForFrame` resolves on the first poll
         // that satisfies it, which can be a frame still arriving, and a partial

@@ -588,8 +588,28 @@ the log streaming into it, `esc` pops back.
   └─ n/p scroll · g/G ends · f follow · esc back ────────────────────────────┘
 ```
 
-**Exercises:** the pushed view, streaming into it, tone on individual lines (WARN/ERROR
-coloured), the follow toggle. The transport streaming path handles `-f`.
+**Exercises:** the pushed view, streaming into it, the follow toggle. The transport streaming
+path handles `-f`.
+
+> **Corrected in place, and the drawing above is kept as what was intended** (FINDINGS F64).
+> This line used to claim *tone on individual lines (WARN/ERROR coloured)*, and the app does
+> not do it: `src/logs.ts:58` builds `b.raw(text, …)` — one block per line, no timestamp, no
+> level, no tone — so the `▐` annotated on the `WARN` row above has never been rendered.
+>
+> **Every step that removed the information is correct on its own.** `docker logs` emits plain
+> text (F46: half of it on stderr); the shim wraps each line as `{"line":"…"}` because C07's
+> fallback would otherwise grow one `raw` block for the whole follow (F45); so the adapter
+> holds one opaque string per line, and `b.logs` wants `{ts, level, message}`. Parsing a level
+> back out is what R01 commitment 5 forbids for `Ports` and forbids here for the same reason —
+> nginx, postgres and a shell script agree on nothing, and a parser is wrong within a release.
+>
+> **`b.logs` has no consumer anywhere, which is wider than the finding said.** F64 recorded it
+> as unexercised *by this application*; the whole tree has exactly one caller and it is a
+> contract-test fixture. Calcium's own logs surface composes the view from `raw` as well —
+> `docs/surfaces/S12_logs_view.md` §Blocks lists *`panel` … wrapping `raw` (5 log lines)*. So
+> the block is unreached by the reference app **and** by the design that specified the view.
+>
+> Filed rather than fixed, and this line is the fix: what it cost was a claim, not a feature.
 
 ---
 

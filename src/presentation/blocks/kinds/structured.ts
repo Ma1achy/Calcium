@@ -11,11 +11,11 @@
  */
 import type { ReactElement } from "react";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Comparison, Events, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
+import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate } from "../../text.js";
-import { glyphs, spinnerFrames } from "../glyphs.js";
+import { glyphFor, glyphs, spinnerFrames } from "../glyphs.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
-import type { BlockDefinition, RenderContext } from "../types.js";
+import type { BlockDefinition, RenderContext, Windowed } from "../types.js";
 
 /** §3: the key column is sized to the longest key and capped here. */
 const KEY_COLUMN_CAP = 20;
@@ -98,6 +98,37 @@ export const logsDefinition: BlockDefinition<Logs> = {
 
   measure: (block: Logs): number => atLeastOne(block.lines.length), // cells-ok
 
+  /**
+   * C09 I25 — rows `[from, to)`, as a smaller `logs`.
+   *
+   * **`logs` is the one divisible kind whose rows are independent of each
+   * other**, which is what makes the window exact rather than merely the right
+   * height. The level column is a constant `LEVEL_WIDTH` and the message takes
+   * the residual and truncates; nothing here is derived from lines outside the
+   * slice. **`patch` is the second, and it got there differently**: its gutter
+   * *is* derived from the whole block, so its window carries the width pinned
+   * rather than deriving it again (C25 I21a) — the layout travels with the
+   * window instead of being independent of it. `widest` a whole `keyValue` and
+   * `tokenise` a whole code block are the two still open, and a layout that
+   * changes with the scroll position is the drift C14 exists to prevent
+   * (C09 §2a). `planColumns` is **not** one of them and was listed here in
+   * error: it reads the column definitions and the width, never the rows
+   * (F134).
+   *
+   * `atLeastOne` is why the empty slice is refused rather than returned: a
+   * `logs` with no lines measures 1, so a zero-row window would break I26. The
+   * viewport never asks for one (`takeRows ≥ 1`), and the clamp says so here
+   * rather than relying on it.
+   */
+  window: (block: Logs, _width: number, from: number, to: number): Windowed => {
+    const lo = Math.max(0, Math.min(Math.trunc(from), block.lines.length)); // cells-ok
+    const hi = Math.max(lo + 1, Math.min(Math.trunc(to), block.lines.length)); // cells-ok
+    return Object.freeze({
+      block: { ...block, lines: block.lines.slice(lo, hi) },
+      skipRows: 0,
+    });
+  },
+
   render(block: Logs, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
 
@@ -161,7 +192,10 @@ export const eventsDefinition: BlockDefinition<Events> = {
             [
               { text: ts, style: tone("meta", ctx.theme, ctx.capabilities) },
               { text: " ".repeat(COLUMN_GAP) },
-              { text: type, style: tone("accent", ctx.theme, ctx.capabilities) },
+              // `accent` when the producer says nothing — the behaviour before
+              // the field existed, so an app that does not set it sees no
+              // change (C04 I35, F51).
+              { text: type, style: tone(event.tone ?? "accent", ctx.theme, ctx.capabilities) },
               { text: " ".repeat(COLUMN_GAP) },
               {
                 text: truncate(stripControl(event.message), room, ctx.capabilities),
@@ -179,18 +213,76 @@ export const eventsDefinition: BlockDefinition<Events> = {
 
 // --- diff ------------------------------------------------------------------
 
-/** A comparison's tone. `changed` is deliberately neutral: it is not a verdict. */
-function comparisonTone(comparison: string | undefined): Tone {
-  switch (comparison) {
+/**
+ * The judgement half, and the only half that takes a colour (C04 I36).
+ *
+ * The change half is rendered by {@link CHANGE_MARKERS} instead — it was always
+ * neutral here (`same`→`muted`, `changed`→`default`), which is the renderer
+ * having split the union before the type did.
+ */
+function verdictTone(verdict: "better" | "worse" | undefined): Tone {
+  switch (verdict) {
     case "better":
       return "ok";
     case "worse":
       return "error";
-    case "same":
-      return "muted";
     default:
       return "default";
   }
+}
+
+/**
+ * The judgement half's mark, derived from the same field as its tone (C04 I38).
+ *
+ * **Without it `better` and `worse` render identically to each other and to an
+ * unmarked row, at every colour depth** — F34's measured half, and the reason
+ * it is the half that survived that finding's own correction: `200ms` against
+ * `150ms` says nothing about which is wanted, so unlike `same`/`changed` a
+ * reader cannot recover it from the two cells.
+ *
+ * Derived rather than supplied, because `verdict` already names the fact. A
+ * glyph field here would let a producer say `worse` and draw `✓`.
+ */
+function verdictGlyph(verdict: "better" | "worse" | undefined): Glyph | null {
+  switch (verdict) {
+    case "better":
+      return "ok";
+    case "worse":
+      return "error";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The change axis, carried without colour (C04 I35).
+ *
+ * The same construction as `patch`'s `MARKERS` and for the same reason: at
+ * `colourDepth: 1` the marker is all that is left, so the distinction survives
+ * by construction rather than by a lint.
+ */
+const CHANGE_MARKERS: Readonly<Record<"unchanged" | "changed" | "added" | "removed", string>> =
+  Object.freeze({ unchanged: " ", changed: "~", added: "+", removed: "-" });
+
+/** The marker column's width, or 0 when no row in the block declares a change. */
+const MARKER_WIDTH = 2;
+
+/**
+ * A verdict's mark, padded to the reserved width — blank when the block
+ * reserved none, and blank for a row with no verdict inside a block that did.
+ *
+ * `glyphFor` is the single place either character enters a frame (C09 §4), so
+ * the ASCII substitution is 1:1 by construction and this stays one cell wide at
+ * both depths.
+ */
+function markFor(
+  verdict: "better" | "worse" | undefined,
+  reserved: number,
+  ctx: RenderContext,
+): string {
+  if (reserved === 0) return "";
+  const token = verdictGlyph(verdict);
+  return pad(token === null ? "" : glyphFor(token, ctx.capabilities), reserved);
 }
 
 export const comparisonDefinition: BlockDefinition<Comparison> = {
@@ -203,14 +295,24 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
 
   render(block: Comparison, ctx: RenderContext): ReactElement {
     const width = normaliseWidth(ctx.width);
+    // The marker column appears only when a row declares a change, so a block
+    // that uses the verdict half alone renders exactly as it did before the
+    // split. Per-block and deterministic: every row of one block agrees, which
+    // is what keeps the field column aligned.
+    const marked = block.rows.some((r) => r.change !== undefined) ? MARKER_WIDTH : 0;
+    // The verdict's mark, on the same terms and inside the `b` column: it
+    // qualifies one cell rather than the row, which is where the tone already
+    // sits (C04 I38).
+    const judged = block.rows.some((r) => r.verdict !== undefined) ? MARKER_WIDTH : 0;
     // Three equal columns (§3), the residual going to the field name.
-    const column = Math.max(1, Math.floor((width - COLUMN_GAP * 2) / 3));
-    const fieldWidth = Math.max(1, width - column * 2 - COLUMN_GAP * 2);
+    const column = Math.max(1, Math.floor((width - COLUMN_GAP * 2 - marked) / 3));
+    const fieldWidth = Math.max(1, width - marked - column * 2 - COLUMN_GAP * 2);
 
     const dim = tone("dim", ctx.theme, ctx.capabilities);
     const header = paint(
       clampSpans(
         [
+          ...(marked > 0 ? [{ text: " ".repeat(marked) }] : []),
           { text: pad("field", fieldWidth), style: dim },
           { text: " ".repeat(COLUMN_GAP) },
           // **`a` and `b`, not `before` and `after`** — the rename's ruling,
@@ -219,9 +321,23 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
           // compares two runs, and calling one of them "before" is wrong for
           // half this kind's consumers. Nothing asserted these labels, which is
           // why the type carried `a`/`b` while the screen said otherwise.
-          { text: pad("a", column), style: dim },
+          // Truncated to the column like any other cell, so a long container
+          // name cannot push the header wider than the rows beneath it (F33).
+          {
+            text: pad(
+              truncate(stripControl(block.labels?.[0] ?? "a"), column, ctx.capabilities),
+              column,
+            ),
+            style: dim,
+          },
           { text: " ".repeat(COLUMN_GAP) },
-          { text: pad("b", column), style: dim },
+          {
+            text: pad(
+              truncate(stripControl(block.labels?.[1] ?? "b"), column, ctx.capabilities),
+              column,
+            ),
+            style: dim,
+          },
         ],
         width,
         ctx.capabilities,
@@ -232,6 +348,14 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
       paint(
         clampSpans(
           [
+            ...(marked > 0
+              ? [
+                  {
+                    text: pad(CHANGE_MARKERS[entry.change ?? "unchanged"], marked),
+                    style: tone("muted", ctx.theme, ctx.capabilities),
+                  },
+                ]
+              : []),
             {
               text: pad(
                 truncate(stripControl(entry.field), fieldWidth, ctx.capabilities),
@@ -246,8 +370,15 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
             },
             { text: " ".repeat(COLUMN_GAP) },
             {
-              text: pad(truncate(stripControl(entry.b), column, ctx.capabilities), column),
-              style: tone(comparisonTone(entry.comparison), ctx.theme, ctx.capabilities),
+              // The mark and the value share the column, so the block's width
+              // is what it was and `measure` — rows plus a header — is
+              // untouched either way.
+              text: pad(
+                markFor(entry.verdict, judged, ctx) +
+                  truncate(stripControl(entry.b), Math.max(1, column - judged), ctx.capabilities),
+                column,
+              ),
+              style: tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities),
             },
           ],
           width,

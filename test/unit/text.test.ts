@@ -254,3 +254,64 @@ describe("sliceCells (C09 §5a, I20)", () => {
     expect(sliceCells("abc", 2, 2)).toBe("");
   });
 });
+
+describe("C09 §5 — the printable-ASCII path", () => {
+  // **The path is an equality, so it is tested as one.** A fast path that is
+  // *nearly* right is worse than none: it puts the frame one cell into a row
+  // nobody counted, and only for some strings.
+  //
+  // **The reference is a table of measured values, not a reconstruction of the
+  // walk.** The first version rebuilt the walk with `Intl.Segmenter` and summed
+  // `cells(segment)` — which calls the function under test, so a mutation that
+  // widened the fast path changed both sides and survived. A fake must not
+  // supply the behaviour it is standing in for.
+  const EXPECTED: readonly (readonly [string, number])[] = [
+    ["", 0],
+    [" ", 1],
+    ["plain ascii", 11],
+    ["0123456789", 10],
+    ["a".repeat(200), 200],
+    [String.fromCharCode(0x20), 1],
+    [String.fromCharCode(0x7e), 1],
+    // Below and above the range: DEL and C1 are stripped, so they cost nothing.
+    [String.fromCharCode(0x1f), 0],
+    [String.fromCharCode(0x7f), 0],
+    // Tab and newline survive `stripControl` and are excluded from the fast
+    // path anyway — see T1.26.
+    ["a\tb", 3],
+    ["a\nb", 3],
+    // The walk's own subjects.
+    ["café", 4],
+    ["日本語", 6],
+    ["e\u0301", 1],
+    ["a\u200bb", 2],
+    ["🇬🇧", 2],
+  ];
+
+  it("T1.24 (I6): every string measures what it measured before the fast path", () => {
+    for (const [text, width] of EXPECTED) {
+      expect(cells(text), JSON.stringify(text)).toBe(width);
+    }
+  });
+
+  it("T1.25 (I6): the corpus reaches both paths", () => {
+    // **The subject before the claim.** A corpus of only ASCII would pass the
+    // row above against a fast path wrong for everything else.
+    const ascii = EXPECTED.filter(([t]) => /^[\x20-\x7e]*$/.test(t));
+    expect(ascii.length, "strings on the fast path").toBeGreaterThan(4);
+    expect(EXPECTED.length - ascii.length, "and strings on the walk").toBeGreaterThan(4);
+  });
+
+  it("T1.26 (I6): tab and newline are excluded, and the exclusion is conservative", () => {
+    // **Recorded because a mutation said so.** Widening the range to admit tab
+    // and newline changes no measurement: `stripControl` keeps them and
+    // `clusterCells` already answers 1 for each, so both paths agree. The
+    // exclusion is therefore not fixing a defect — it keeps the fast path's
+    // equality argument true *by construction* rather than by a coincidence in
+    // a function two hundred lines away. A mutation that fails nothing is a
+    // finding, and this is the finding: it is behaviour-preserving today and
+    // the guard is what keeps it so.
+    expect(cells("\t"), "one cell, by clusterCells").toBe(1);
+    expect(cells("\n"), "and so is a newline").toBe(1);
+  });
+});

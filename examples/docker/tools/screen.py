@@ -17,7 +17,23 @@ import re
 import sys
 
 CSI = re.compile(r"\x1b\[([0-9;?]*)([a-zA-Z])")
-OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+# **An unterminated OSC is discarded, not printed** (FINDINGS F86).
+#
+# This pattern used to require a terminator — `(?:\x07|\x1b\\)` — so
+# `\x1b]0;docker-tui` with no BEL matched nothing, the render loop skipped the
+# two escape bytes as "an escape we do not model", and `0;docker-tui` was written
+# into the grid as text. Measured at the top of a captured frame.
+#
+# **That is the opposite of the mechanism F79 proposed**, which was that an
+# unterminated OSC would *consume an arbitrary span*. `[^\x07\x1b]*` cannot
+# cross an ESC, so it could never have eaten more than the title; the real defect
+# was that it ate nothing and the leftovers were printed. A hypothesis in a
+# finding reads exactly like a measurement in one.
+#
+# A terminal abandons an OSC when the next ESC arrives and discards it at end of
+# input, so both are terminators here. The lookahead consumes the body without
+# swallowing the escape that follows, which would take the CSI with it.
+OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\|(?=\x1b)|$)")
 
 
 class Screen:

@@ -78,25 +78,29 @@ const importVerb: ToolDef = {
 /**
  * The handoff verbs — the first consumers of `/tty`'s route since it was built.
  *
- * **`interactive: true` is the whole declaration.** C23 §4 already implements
+ * **The declaration is the whole of it.** C23 §4 already implements
  * `lifecycle.suspend` → `runner.handoff` → `lifecycle.resume` →
  * `scheduler.invalidate`; nothing here writes any of it. These verbs are
  * `local: false` because C05 I19 refuses `interactive` with `local` — a local
  * verb is never spawned, so there is no child to hand the terminal to.
  *
- * ## `run` is interactive or not depending on its flags, and the type cannot say so
+ * ## `run` and `exec` decide per invocation, and now the type says so
  *
- * `interactive` is on `ToolDef` and not on `FlagDef`, so a verb is interactive
- * whole. `docker run` attaches by default and detaches with `-d` — the same verb,
- * two terminal contracts, chosen per invocation. C05's comment says the app
- * author is the only party who can know; for this verb the author cannot know
- * either, because it is not a property of the verb. FINDINGS F80.
+ * F80, ruled as C05 I23. `interactive` is on `FlagDef` as well as on `ToolDef`,
+ * and an arm equal to the tool's default is refused at parse — so every arm on a
+ * verb reads the opposite of its default and two flags cannot disagree.
  *
- * **Declared interactive, which is the safe direction of a choice with no right
- * answer.** Wrong that way, `/run -d nginx` suspends and resumes around a call
- * that returns at once — a flicker. Wrong the other way, `/run -it alpine sh`
- * spawns a shell with no terminal and the session waits on a child that will
- * never be answered.
+ * `run` attaches by default, so `--detach` carries `false`. `exec` does not, so
+ * `-i` and `-t` carry `true`. **`/run -dit` resolves to not-interactive without
+ * any precedence rule**, because `-i` and `-t` could only carry `run`'s default
+ * and therefore carry nothing.
+ *
+ * **The old declaration was `interactive: true` whole, chosen as the safe
+ * direction, and the measurement inverted it.** `/run -d nginx` suspended, docker
+ * wrote the container id to the real terminal, and `resume()` repainted over it —
+ * the invocation's only output, gone, with the transcript reading `run finished`.
+ * The direction called catastrophic turned out to be `docker run -it` exiting 1
+ * at once against a non-terminal stdin. See F80's amendment.
  */
 const runVerb: ToolDef = {
   name: "run",
@@ -105,7 +109,8 @@ const runVerb: ToolDef = {
   summary: "Create a container and start it",
   args: [{ name: "image", type: "string", required: true, summary: "Image reference" }],
   flags: [
-    { name: "detach", short: "d", type: "bool", summary: "Run in the background" },
+    // The arm. `run` is interactive; `-d` is the invocation that is not.
+    { name: "detach", short: "d", type: "bool", interactive: false, summary: "Run in the background" },
     { name: "rm", type: "bool", summary: "Remove it when it exits" },
     { name: "name", type: "string", summary: "Name for the container" },
     { name: "interactive", short: "i", type: "bool", summary: "Keep stdin open" },
@@ -116,15 +121,18 @@ const runVerb: ToolDef = {
 const exec: ToolDef = {
   name: "exec",
   local: false,
-  interactive: true,
+  // **Not interactive by default, which is the other direction of the same
+  // ruling.** `docker exec c ls` runs and returns; only `-i`/`-t` want the
+  // terminal. Declared whole, `/exec c ls` suspended the screen to print one
+  // line of output that the resume then discarded.
   summary: "Run a command inside a running container",
   args: [
     { name: "container", type: "string", required: true, summary: "Container id or name" },
     { name: "command", type: "string", required: false, summary: "What to run — defaults to the image's shell" },
   ],
   flags: [
-    { name: "interactive", short: "i", type: "bool", summary: "Keep stdin open" },
-    { name: "tty", short: "t", type: "bool", summary: "Allocate a terminal" },
+    { name: "interactive", short: "i", type: "bool", interactive: true, summary: "Keep stdin open" },
+    { name: "tty", short: "t", type: "bool", interactive: true, summary: "Allocate a terminal" },
     { name: "user", short: "u", type: "string", summary: "Run as this user" },
   ],
 };

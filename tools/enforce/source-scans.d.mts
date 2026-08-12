@@ -23,3 +23,17 @@ export declare function checkSourceScans(
   files: readonly string[],
   readFile?: (file: string) => string,
 ): Violation[];
+
+/**
+ * SS47's exemptions, keyed by file, with the reason each rests on — the shape
+ * `UNCONSUMED_MEMBERS` and `BUILDER_OMISSIONS` have (F102: an exemption records
+ * its premise so the premise can be re-checked).
+ */
+export declare const MARK_EXEMPTIONS: Readonly<Record<string, string>>;
+
+/** SS47 — a mark the framework draws and cannot substitute (C09 I22). */
+export declare function checkMarks(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  exemptions?: Readonly<Record<string, string>>,
+): (Violation & { line: number })[];

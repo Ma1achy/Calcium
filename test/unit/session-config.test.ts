@@ -11,11 +11,13 @@ import {
   DEFAULT_STATE_DIR,
   MIN_COLUMNS,
   MIN_ROWS,
-  PROMPT,
+  promptFor,
+  PROMPT_SUBSTITUTION,
   PROMPT_GUTTER,
   resolveConfig,
   validateConfig,
 } from "../../src/shell/config.js";
+import { cells } from "../../src/presentation/text.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "../../src/shell/types.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 
@@ -145,7 +147,7 @@ describe("C22 §2 — config", () => {
   });
 
   it("T1.5d (I20): stateDir defaults and no environment is read", () => {
-    expect(resolveConfig(minimal(), AMBIENT).stateDir).toBe("~/.prism");
+    expect(resolveConfig(minimal(), AMBIENT).stateDir).toBe(".calcium");
     expect(resolveConfig({ ...minimal(), stateDir: "/tmp/x" }, AMBIENT).stateDir).toBe("/tmp/x");
   });
 
@@ -162,7 +164,16 @@ describe("C22 §2 — config", () => {
     // (I13). Asserted so that a second copy anywhere else has something to
     // disagree with.
     expect([MIN_COLUMNS, MIN_ROWS]).toEqual([60, 16]);
-    expect(PROMPT).toBe("❯ ");
     expect(PROMPT_GUTTER).toEqual({ first: 2, cont: 2 });
+
+    // **The pair, and both forms are the gutter's width** (C22 I52, C09 I22).
+    // The equality is the load-bearing half: `commandRows` draws the prompt and
+    // `construct.ts` calls the same function for `chromeRows`, so a form of a
+    // different width puts the measurer and the composer on different rows for
+    // one entry — and only on a terminal nobody develops on.
+    expect(promptFor({ unicode: "full" })).toBe("❯ ");
+    expect(promptFor({ unicode: "bmp" })).toBe("❯ ");
+    expect(promptFor({ unicode: "ascii" })).toBe("> ");
+    expect(PROMPT_SUBSTITUTION.map((f) => cells(f))).toEqual([2, 2]);
   });
 });
