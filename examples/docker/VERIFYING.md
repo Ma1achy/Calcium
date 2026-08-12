@@ -3,6 +3,21 @@
 Three instruments and three rules. Every one of them exists because reading a result
 wrongly cost more than getting the code wrong, and each names the occasion.
 
+**And the instruments now have instruments.** `make tools-test` here, `make instruments` at the
+root — the same target — runs every tool's own fixture: known bytes in, stated output out, **16
+of 16, 113 rows**, inside `make all`. It closes group 9, and the reason it is a *runner* rather
+than sixteen fixtures is the fifth class below: eleven fixtures nobody runs is a gate nobody
+reports, arriving in the gate built to answer it.
+
+**The inventory is derived and compared by equality**, not listed. The hand-list said eleven and
+the directories hold sixteen — `tools/bench`'s three were never in it, and the waiter had no
+file at all, which is exactly why it had no fixture. An instrument added without one fails the
+target on the day it lands.
+
+Three of the sixteen were repaired by the exercise: two probes that had not run since an
+interface moved (F144), a cast writer that lost a whole recording on a capture cut mid-character
+(F143), and a guard that printed `← DRIFT` and carried on (F145).
+
 ---
 
 ## Which container
