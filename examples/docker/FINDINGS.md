@@ -7261,7 +7261,27 @@ merely just left. Both are the same lesson about believing a single reading of a
 
 What caught it was re-running after waiting — measuring the case that would falsify the
 falsification. **A retraction is a claim too**, and it gets the same treatment as the thing it
-retracts. `tools/scan-cost.mjs` now carries the method as code — discard the cold pass, median
+retracts.
+
+### The reboot settles it, and the variance is the part worth keeping
+
+Re-measured on a rebooted host, settled to `0.01 / 0.01 / 0.00` with a discarded warm-up:
+**65, 65, 65, 66, 66 ms** — a spread of **1 ms** against the pre-reboot settled run's 70-78, and
+0.7× the recorded 89.
+
+**The mean moved a little and the spread collapsed from 11% to 1.5%.** A machine that looked
+settled by every instrument available was still carrying something no reading could name. So the
+lesson is not *the old figure was wrong* — it reproduces — but that **the quietest reading a
+long-lived host can give is noisier than a cold boot's**, which is the same sentence as F155's
+first half approached from the other end.
+
+Per the standing instruction, **no budget was lowered.** A threshold tightened to a rebooted
+developer machine fails on every other machine, and CI is the one that matters.
+
+**And the e2e drift closes.** 228 s → 371 s across one session was recorded as observed and
+unexplained; post-reboot it is **196.7 s**, faster than either, so it was the host and not the
+tree. Kept rather than deleted, because the next unexplained wall-clock growth on a long-lived
+host now has a precedent and a cheap first thing to try. `tools/scan-cost.mjs` now carries the method as code — discard the cold pass, median
 of five — because a figure without one cannot be reproduced or compared, in either direction.
 
 ---

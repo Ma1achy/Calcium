@@ -87,6 +87,61 @@
  * needs to tell a regression from growth* is a claim a single unlabelled sample
  * cannot support in either direction.
  *
+ * ---
+ *
+ * **Re-measured after a reboot, and every budget below stays where it is.**
+ *
+ * The host these figures were taken on had been up thirteen days. Post-reboot,
+ * settled to `0.01 / 0.01 / 0.00` on all three averages and given a discarded
+ * warm-up first, five runs gave **65, 65, 65, 66, 66 ms** — a spread of 1 ms
+ * against the pre-reboot settled run's 70–78, and **0.7×** the recorded 89.
+ *
+ * **The variance is the finding, not the mean.** 11% spread became 1.5%. A
+ * machine that looked settled by every instrument to hand was still carrying
+ * something; a rebooted one is not. That is F155's lesson again from the other
+ * side — there, a number reading as idle meant load had just left; here, the
+ * quietest reading available on a long-lived host is still noisier than a cold
+ * boot's.
+ *
+ * | | pre-reboot, settled | post-reboot, settled |
+ * |---|---|---|
+ * | scan pass | 70–78 ms | **65–66 ms** |
+ * | tiers 1–4, whole suite | 45.9 s (best of three) | **18.8 s** |
+ * | tier 5, whole tier | 228 s, then 371 s | **196.7 s** |
+ *
+ * **The e2e drift closes, and the answer is the machine.** 228 → 371 s across
+ * one session was recorded as observed and unexplained; 196.7 s post-reboot is
+ * faster than either, so it was not the tree. Recorded rather than deleted: the
+ * next unexplained wall-clock growth on a long-lived host has a precedent now,
+ * and the cheap thing to try first.
+ *
+ * **Nothing below is lowered.** The instruction at the foot of this comment is
+ * about raising, and it is silent on lowering for the reason a reader might
+ * miss: a budget tightened to a rebooted developer machine is one that fails on
+ * every other machine, and CI is the one that matters. The numbers move; the
+ * thresholds do not.
+ *
+ * Headroom as it now stands, worst row per budget on the quiet host:
+ *
+ * | budget | worst row | headroom |
+ * |---|---|---|
+ * | `SCAN_BUDGET_MS` 15 s | T2.8, 1.05 s | **14×** |
+ * | vitest's 5 s default | T3.13, 3.02 s | 1.7× |
+ * | tier 5's 75 s | T5.6 and T5.2, **60.4 s** | **1.25×** |
+ *
+ * **Tier 5's margin is not a multiple of a measured cost and that is why it
+ * fails first.** Its two longest rows *sleep* — sixty seconds idle, sixty
+ * seconds of streaming — so 75 s is a fixed 60 s floor plus 15 s of slack for
+ * everything around it. No amount of a quiet host shortens the floor. A scan
+ * row has fourteen times its cost in hand and a tier-5 row has a quarter,
+ * which is the whole explanation for why every contention failure this session
+ * landed in tier 5 or on a fuzz row and never on a scan.
+ *
+ * The four scan rows that timed out at 15 s earlier in that session did so at
+ * roughly **fourteen times** their quiet cost. That is a statement about the
+ * host, not about the budget, and it is the sentence `make regime` exists to
+ * put in a run's own output.
+ *
  * ** is the method, executable.** It prints this machine's
  * figure beside both recorded ones and their ratio, and CI runs it — because a
  * budget is a claim about a regime, and a runner is not this regime. It does
