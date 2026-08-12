@@ -17,6 +17,23 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 	npm rebuild node-pty --ignore-scripts=false
 	@node -e "require('node-pty')" \
 	  || (echo "node-pty did not build — tier 5 cannot run" && exit 1)
+	@# **The examples are dependencies of `make check`, and this is where they
+	@# arrive** (F156). F150 wired both examples' own `check` scripts into that
+	@# target and did not wire their install, so it passed on a machine that had
+	@# run them before and failed on the first clean checkout — CI's `fast` job,
+	@# 19 seconds in, `TS2307: Cannot find module '@fmx/calcium'`.
+	@#
+	@# Two things are needed and only one is obvious. Their `node_modules` is
+	@# the obvious half. The other is `dist/`: an example resolves the package
+	@# through `file:../..`, and this package's `exports` name `dist/index.d.ts`
+	@# — so `tsc --noEmit` in an example needs a build that `tsc --noEmit` at the
+	@# root never performs. A04 §3 says install ends in *the one named build*,
+	@# and it did not.
+	npm run build
+	cd examples/minimal && npm ci --ignore-scripts
+	@# No lockfile here — `npm install` rather than `npm ci`, said out loud so
+	@# the asymmetry reads as known rather than as an oversight.
+	cd examples/docker && npm install --ignore-scripts --no-audit --no-fund
 
 hooks:              ## point git at .githooks — pre-commit runs `make enforce` (A04 §5)
 	git config core.hooksPath .githooks

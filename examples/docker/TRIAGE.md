@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
 | **9** | [**The instrument was wrong**](#9) | 20 | **11** | — | **new at F80** · tooling — and F155 is the first where the instrument is not ours |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 27 | **9** | — | 6 closed · **2 open, both about a rule's reach** |
+| **11** | [A gate that passes without checking](#11) | 28 | **9** | — | 7 closed · **2 open, both about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -489,6 +489,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F60** | `make proof` | red on `main` for two merged PRs, because it is the one target CI does not run |
 | **F150** | **the README's quoting test** | a subset check in one direction, so the published block could omit anything and stay green. It did: 27 lines of 64, and **the example did not parse**. Under it, `examples/minimal` had not typechecked since F58b — a `check` script the `Makefile` never ran. **Fixed** — equality both ways, and `make check` runs both examples |
 | **F154** | **`make instruments`** | `make all` runs seven targets and the workflow ran six. Group 9's remedy — *in the gate rather than run by hand* — landed in the gate a contributor runs by hand and not in the one that gates a merge. Found by diffing two lists, both correct on their own. **Fixed** — in the `fast` job |
+| **F156** | **`make check`, as this session wired it** | F150 added both examples' `check` scripts and not their install, so the target read `node_modules` the developer's machine happened to hold. Green everywhere, red 19 s into the first clean CI run. `dist/` was the non-obvious half — A04 §3 says install ends in the build and the recipe did not. **Fixed** in `make install` |
 | **F82** | **SP5's own `citations` counter** | itself — **the field added because the rule had shipped vacuous twice, shipped vacuous** |
 | **F148** | **`validateInvocation`, one layer below both suspects** | `transmitted` pushes one token per iteration and a valued flag spans two, so `/ps --limit 400` reached the far side as `ps --limit`. Every type, both forms, repeatable losing one value each; only `--limit=400` ever worked. **Fixed** — T1.16b, T2.9c, T6.13 |
 | **F147** | **tier 5's own terminal** | `interactivePty` passes `TERM` and `PATH` and no `LANG`, so C02 resolves ASCII and the prompt is `>` while 44 rows wait on `❯`. Every interactive row in the tier has been asserting against a degraded rendering. **Open** — the remedy is measured and is a ruling |

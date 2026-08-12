@@ -7302,3 +7302,43 @@ done: `budget.ts` carries the 411 → 89 ms and 17.7 → 3.8 s table with the ar
 What was *not* there is the half that matters for a foreign runner — **the numbers were in a
 source comment and not in any run's output.** A figure nobody opens while a job is red is not
 available at the moment it is needed, which is what `make regime` fixes rather than the record.
+
+---
+
+## F156 — the gate wired in item 3 passed on every machine that had already run it ★★★
+
+| | |
+|---|---|
+| **Surface** | `Makefile`'s `install` and `check` recipes |
+| **Reached for** | nothing. **The first foreign CI run found it**, 19 seconds in |
+| **Verdict** | **a gate that passes without checking**, and the gate is one this session added |
+
+F150 wired both examples' own `check` scripts into `make check` — the fix for a `check`
+script the Makefile never ran. It did not wire their **install**. So the target passed on every
+machine that had ever run the examples, and failed on the first clean checkout:
+
+```
+main.ts(1,44): error TS2307: Cannot find module '@fmx/calcium' or its type declarations
+```
+
+**Two things were missing and only one is obvious.** `node_modules` in each example is the
+obvious half. The other is `dist/`: an example resolves the package through `file:../..`, and
+this package's `exports` name `dist/index.d.ts` — so `tsc --noEmit` inside an example needs a
+build that `tsc --noEmit` at the root never performs. **A04 §3 says install ends in *the one
+named build*, and the recipe did not build.** The prose was right and the recipe had drifted
+from it, which nothing compares.
+
+### Why local verification could not have caught it
+
+Every check run in this session was on a tree where `examples/minimal/node_modules` already
+existed, put there by earlier work on the example itself. The gate was reading state the
+developer's machine happened to hold. That is the same shape as the four scan rows that only
+failed under load and the e2e drift that only existed on a thirteen-day-old host: **a result
+that depends on the machine's history rather than on the tree.**
+
+It is also the exact thing publication prep item 3 said to do — *wire it, then read the first
+foreign run rather than assuming it carries* — paying out against the work of that same item.
+The instruction was written about budgets and the first foreign run answered about a gate.
+
+Fixed in `make install`, verified in a clean clone in the container: install 0, check 0. The
+failing case needs no fabrication — CI's `fast` job is the measurement.
