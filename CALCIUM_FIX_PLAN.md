@@ -333,6 +333,7 @@ leaves a constructed graph — measured identical on the pre-gate tree, so inher
 | ~~**Group 12** F69, F73 — time-based assertions under contention~~ | — | **NOT WORK** — ruled in this document, and `test/support/budget.ts` holds the measured half |
 | ~~**Group 7** 14 artefact findings~~ | — | **NOT WORK** — *habit, not a patch*, and the 14-vs-15 is measured and explained by F87 |
 | **Group 10** 5, all disproved | → `CLAUDE.md` | — |
+| **F147** tier 5's own terminal has no `LANG`, so 44 rows wait on a glyph the app is right not to draw | **ruling**, then a change | new, and it blocks a green `make all` |
 | **F142** the triage's inventory certifies 89 ids against 147 | **change** — a derived count or none | new, from this pre-check |
 
 ### The tier-5 pre-check, run before any of the three was planned

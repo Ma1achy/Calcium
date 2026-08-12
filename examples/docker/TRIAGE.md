@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 10 | **3 open** (5 closed) | partly | real Calcium work · **5 of 8 fixed** |
 | **9** | [**The instrument was wrong**](#9) | 18 | **10** | — | **new at F80** · tooling, and it has no test |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 23 | **7** | — | 4 closed · **2 open, both about a rule's reach** |
+| **11** | [A gate that passes without checking](#11) | 24 | **8** | — | 4 closed · **2 open, both about a rule's reach** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits and does not substitute](#13) | 1 | 1, *and every consumer has it* | — | real Calcium work · needs a ruling |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -477,7 +477,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **7: 5 closed, 2 open**
+## 11 · A gate that passes without checking — **8: 5 closed, 3 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
@@ -485,6 +485,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F56** | `package.json`'s `bin` | a claim about an executable, accepted by install, pack, `publish --dry-run` and `make proof`. Three consumers existed and **all three reached around the entry point** |
 | **F60** | `make proof` | red on `main` for two merged PRs, because it is the one target CI does not run |
 | **F82** | **SP5's own `citations` counter** | itself — **the field added because the rule had shipped vacuous twice, shipped vacuous** |
+| **F147** | **tier 5's own terminal** | `interactivePty` passes `TERM` and `PATH` and no `LANG`, so C02 resolves ASCII and the prompt is `>` while 44 rows wait on `❯`. Every interactive row in the tier has been asserting against a degraded rendering. **Open** — the remedy is measured and is a ruling |
 | **F146** | **commitment 14b's own registration list** | SP6 was implemented, inventoried and fabricated, and `SPEC_RULES` never learned it existed — so `make test` was red for two commits while `npm run enforce` stayed green and correct. **Fixed**, and the bundled fabrication split into three rows |
 | **F83** | **MG24's definition of a consumer** | the implementing module counts as one, so an interface in `types.ts` implemented in `store.ts` gives every member a consumer by construction. **Open** |
 | **F84** | **MG24's scope** | it walks `export interface` only. **798 members published as `export type` are outside every rule in the suite** — nearly three times the 280 it watches. **Open** |

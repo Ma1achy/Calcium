@@ -6672,3 +6672,42 @@ proving the sum check is live rather than inert behind the completeness check.
 This one is narrower and worse — the gate was checking, and the *registration* that tells the
 meta-gate it exists was missing. A rule can be fully built, fully tested, running in production
 and still invisible to the check that asks whether it was built.
+
+---
+
+## F147 — every interactive tier-5 row runs in a mode nobody chose ★★★
+
+| | |
+|---|---|
+| **Surface** | `test/support/pty.ts` — `interactivePty`'s default `env` |
+| **Reached for** | nothing. Found by running `make all` for group 9's row and reading the failing set |
+| **Verdict** | **harness-side.** Inherited: `src/`, `test/e2e/` and `test/support/` are byte-identical to the start of the session that found it |
+
+`make all` is red at **e2e: 44 rows, 13 of 16 files**, every one a 15-second timeout on
+`never saw /❯/`. Measured on an idle host — load 0.49 before and after, and one file alone
+fails the same five rows at the same budget — so it is **not** the contention class.
+
+**One cause, reproduced.** `interactivePty` builds the child's environment as
+`{ TERM, PATH, ...opts.env }`. There is no `LANG`, so C02 resolves the ASCII pair and the
+prompt renders `>`; the rows wait on `❯`. Driving the same fixture through `node-pty` with the
+full environment prints `❯` and with the harness's two variables prints `>` — 3251 bytes either
+way, the same frame, one glyph apart.
+
+**The mechanism was already written down**, in the third place: `test/e2e/lifecycle.test.ts:322`
+says *this PTY carries no `LANG`, so C02 resolves the ASCII pair and the prompt is `>`* and
+names one row's failure as pre-existing because of it. The finding here is the **scale** — it is
+not one row's control, it is every interactive row in the tier — and that the tier has therefore
+been asserting against a degraded rendering it never asked for. `DEGRADATION.md` is where ASCII
+is the subject; a completion row is not.
+
+**And my first reproduction was wrong, which is worth recording.** `script -qc` allocates a
+**0×0** PTY, so the app painted nothing and I nearly diagnosed a blank-screen defect from it.
+The fixture has to be shown to respond before it is asserted against — `test/support/README.md`,
+and this is the third instance.
+
+**Measured remedy, not landed.** Adding `LANG: "en_GB.UTF-8"` to that default takes
+`completion.test.ts` from **5 failures to 2**, and the two that remain are ordinary assertion
+failures rather than deadlines — *expected `'❯ /inv…'` to be `'❯ /invo'`*. So the change is
+right and it uncovers real work beneath, which is a ruling rather than a repair: what tier 5's
+default terminal *is* decides what a hundred rows are about. C02's own rows set `env`
+explicitly and spread last, so they keep winning either way.
