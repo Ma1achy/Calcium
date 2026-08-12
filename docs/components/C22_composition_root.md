@@ -41,11 +41,11 @@ type TuiConfig = Readonly<{
 
   debug?:   Readonly<{ retainPayloads?: number }>;   // off by default; 50 when enabled without a count
 
-  env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` degrades to ASCII (I20)
+  env?:      Readonly<NodeJS.ProcessEnv>;  // the app's; `{}` refuses at gate 3b (I20, I61)
   capabilities?: Partial<TerminalCapabilities> | undefined;   // C02's overrides, wired (I49)
   clock?:    () => number;
   fs?:       FileSystem;
-  stateDir?: string;                       // default ~/.prism; the app resolves PRISM_TUI_STATE_DIR (I20)
+  stateDir?: string;                       // default .calcium, beside the project; the app resolves its own (I20)
   openUrl?: (url: URL) => Promise<void>;   // default: the OS handler, http/https only
   stdout?: NodeJS.WriteStream;
   stdin?:  NodeJS.ReadStream;
@@ -100,11 +100,46 @@ Found by running the fixture manifest through a real session for the first time.
 
 They arrive as config because that is where everything an app supplies arrives, and they are registered at step 10 **before** `seal()`, which is what makes the reconciliation see them. Registering after the seal would be a second window in which the two records can differ, and the seal exists to close the first.
 
-`stateDir` defaults to `~/.prism`. It is injected for a concrete reason: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable.
+`stateDir` defaults to **`.calcium`** — the framework's own name, and a path relative to where the shell was launched.
+
+**The name was one consumer's.** It read `~/.prism`, in a framework that claims to serve others, so every app that did not override it wrote its history and its theme preference into `prism-tui`'s directory and two apps shared one file. The argument against that was already in this section, twenty lines down: §141 refuses `PRISM_TUI_STATE_DIR` inside `src/` because *a variable named for one consumer has no business inside a framework that claims to serve others*. Correct, applied to the environment variable, and not applied to the constant three files away — F84's shape.
+
+**And the tilde was never expanded, so the old default never meant what six documents said it meant.** `fs.mkdir` has no shell in it: `~` is an ordinary path segment, so `~/.prism` created a directory *literally named* `~` in whatever directory the shell was launched from. Measured, not inferred. The path was therefore already relative and the tilde was decoration on top of it; dropping it makes the documented behaviour and the actual behaviour the same statement rather than adding expansion machinery to reach a home directory nothing had ever written to.
+
+**So state is per project, and that is the behaviour rather than a side effect.** History and the theme preference belong to the directory the shell was opened in, the way a repository's own dotfiles do. It also makes the injection argument structural instead of advisory: standalone development cannot append to the developer's real history, because there is no single real history to append to.
+
+**The argument against it was already in this section**, twenty lines down: §141 refuses `PRISM_TUI_STATE_DIR` inside `src/` because *a variable named for one consumer has no business inside a framework that claims to serve others*. That reasoning is right, it was applied to the environment variable, and it was not applied to the constant three files away — **a correct sentence justifying the scope it was attached to and silent about the identical case beside it**, which is F84's shape (MG24 scoped to `export interface` for a true reason about a different question).
+
+It is still injected, for the reason it always was: standalone development would otherwise append to the developer's real history and read their real config, which makes a clean-clone run neither clean nor repeatable. **The default is what an app gets when it says nothing, and that is exactly when it must not name somebody else.**
 
 **`env` is the environment record, and the app supplies it** (I20). C02 takes one (`detectCapabilities(env, overrides)`) and C21 takes one (`ProcessRunnerDeps.env`, for `$SHELL`), and **no file under `src/` reads `process.env`** — not even C02, which is allow-listed for it and does not use the allowance. So the record enters through config, from the app's entry point, along with `stateDir` and `transport`.
 
-It is optional and defaults to `{}`, which costs something worth naming: an app that omits it gets a capability record for a terminal that declares nothing, so the shell degrades to ASCII and no colour. That is the right default — it is the safe direction, and the alternative is a fifth required field, which I17 forbids for a reason R01 §1 tests. It is not the right *silence*, so C02's warnings surface on the restored primary screen (C02 §2) and an empty record is one of them.
+It is optional and defaults to `{}`, and **this paragraph used to describe that default
+wrongly, in the reassuring direction** (F8). Measured:
+
+```
+env {} → altScreen: false   colourDepth: 1   unicode: ascii   warnings: []
+```
+
+`detect` derives `bracketedPaste`, `mouse` and `altScreen` from a single `usable` flag, which
+is false when `TERM` is absent. So an omitted `env` degrades colour and unicode — two of the
+three consequences, and the two the old sentence named — and **clears the one capability that
+is not a fallback but a requirement** (C02 I7). The shell does not degrade to ASCII; it does
+not open. *The safe direction* was the exact opposite of what the default does, and it read as
+reassurance while being the failure.
+
+**Two of the three claims here were false and the third was false in a way nothing could
+check.** *"C02's warnings surface … and an empty record is one of them"* names a mechanism
+that has never existed: C02 produces a warning for a **rejected override** (I4, T3.5) and for
+nothing else, so `warnings` is empty on this path and always was. It is the sixth blind spot
+pointed at this document — a remedy asserted across a restatement, never measured, and the
+kind that survives because it describes something that ought to be true. And the remedy was
+wrong twice over: it routed the notice to §8 step 3, which `stop()` reaches and **this path
+never calls**.
+
+The default itself stands, for the reason it always had: a fifth required field is what I17
+forbids and R01 §1 tests. What changes is that the failure is now **named at the point of
+exit** by gate 3b (I61), where the config and the capability record are both in hand.
 
 **`capabilities` is C02's `overrides` argument, and it had no producer** (I49). C02 §2
 takes `detectCapabilities(env, overrides)`; I4 makes a valid override win unconditionally,
@@ -435,6 +470,7 @@ cell that value was reserved for.
                                             unless the verb declares one-shot output
  2  load app config                       → missing or no context: dispatch config init
  3  construct the graph (§3)
+3b  check the terminal is usable          → no alternate screen: refuse, naming the cause
  4  check terminal size                   → below 60 × 16: fallback render, await resize
  5  acquire the terminal                     C01
  6  first paint: empty frame
@@ -454,6 +490,47 @@ It must be **non-empty**, and that is the half worth stating. A gate that exits 
 >
 > **How it resolves**: `oneShot` reaches C22 through `config`, with the app parsing argv. That is what every other environment-derived value in this project does — C06 I18 settled exactly that pattern for `PRISM_TUI_TRANSPORT`, and §12a's theme persistence is the same shape. C22 growing an argv parser is the alternative and it is the wrong one: the framework would then own a CLI surface it has no other reason to have.
 
+
+**Gate 3b refuses, and it refuses where gate 4 defers** (I61). The two gates read the same
+terminal one line apart and take opposite decisions, so the difference is stated rather than
+left to the reader: gate 4's subject can change while the session waits and gate 3b's cannot.
+`altScreen` follows from `TERM`, which is fixed for the life of the process — so this is
+**gate 1's argument, not gate 4's**: a pipe cannot become a terminal, and a terminal that
+declares nothing cannot start declaring something.
+
+**It runs before gate 4, and the first ruling put it after** — the implementation is what
+falsified that, which is the class this project already has a name for. Both gates read the
+same terminal, gate 4 was already there, and *after* looked like the smaller change. It is
+not: a terminal that is **both** too small and unusable would then defer, drawing the fallback
+and waiting for a resize that cannot cure an absent `TERM`. When the resize arrives, `#open()`
+reaches C01's fatal from inside `onResize` — and `resizeSubscribers` dispatches unguarded, so
+the throw leaves the SIGWINCH handler with `start()` long since resolved. **The author's
+`catch` cannot see it, gate 3b never runs, and the message is C01's unnamed one**: F8's exact
+silence, restored by the fix for F8. So the incurable condition is answered before the curable
+one, or the curable one hides it.
+
+**It sits after construction, and that is forced rather than chosen.** C02 I4 makes a valid
+`capabilities` override win unconditionally *including for `altScreen`*, so an app that
+supplies one is entitled to open — and the override is resolved inside `detectCapabilities`,
+during construction. A gate reading `config.env` ahead of step 3 would therefore refuse
+exactly the app that had said what to do about it. It reads the **resolved** record, which
+means accepting I36's cost knowingly: a history file is opened for a process about to exit.
+That cost is real and it is smaller than the alternative, which is refusing a legal
+configuration.
+
+**What it must say, and this is the whole finding** (F8). The refusal that existed before this
+gate was C01's, and C01 is entitled only to the capability record: *"alternate screen
+unsupported — the shell cannot open"* names the **consequence** and cannot name the **cause**,
+because the cause is an environment record C01 has never seen. An author who omitted `env` was
+told about a terminal capability they never mentioned. C22 holds both the record and the
+config, and is the only layer that does, so it is the only place the two can be said in one
+sentence — which is A02 Seam 4 rather than a convenience.
+
+**And the moment is why this is a refusal rather than a warning.** C02's channel is *returned,
+never emitted*, drained by §8 step 3 on the restored primary screen — and step 3 is reached
+from `stop()`, which this path never calls: `start()` rejects and the session never runs.
+Measured, not reasoned. A warning routed there would be **the same silence with more
+machinery**, which is the trap §117 fell into.
 
 Gates 1, 2 and 4 are `t01`'s. **Gate 4 does not block construction** — the graph is built, the fallback is drawn, and a resize continues from step 5 with session state intact. The too-small render is C22's, deliberately layout-engine-free, because it must work in a terminal too small for the layout engine to produce a sane answer. The 60 × 16 threshold is C22's number and not C02's: C02 §8 assigns it to L4 explicitly, on the grounds that a minimum size is an app policy rather than a terminal capability. An earlier draft cited it as `C02 §Size`, a section C02 has never had — a dangling reference, and A03 §9a records what happens to those when a renumber gives them something to resolve against.
 
@@ -482,6 +559,28 @@ resume:    lifecycle.resume()       → the listener is re-attached
 **`decoder.reset()` is on the resume path and cannot be anywhere else.** C01 knows the terminal came back and holds no decoder; C16 holds the state and cannot see the gap, because a gap in bytes is what a slow link looks like (C16 I18). Only this file knows both. Without it, the first keystroke after a `vim` session completes a sequence begun before it started.
 
 The ordering is asserted rather than the outcome (C01 T4.4b). "The child received its keystrokes" passes wherever the parent's listener happens to lose the race and fails intermittently elsewhere — the same shape as `killAll` before release, where only the order is checkable.
+
+---
+
+### 4a. The frame is a named unit, and `session.ts` calls it (I54)
+
+**Nothing in the tree composed a frame as a value.** The composition existed only inside a private method returning `void`:
+
+```
+guard on acquired → #composed() → viewport.resize(width, region.height)
+  → paint(frame, deps)               ← FrameError falls back to drawFallback
+  → cursorFor(frame, deps) → cursorSequence(null) → assemble → write
+```
+
+`lines` was a local. It was never returned, never yielded, never handed to anything.
+
+**The class is one level up from the one every rule here can see.** Every prior instance of *a complete mechanism unreachable across a seam* is **a member nobody could call**; this is **a sequence nobody named**, and no rule that walks members reaches it — MG24 counts consumers of exported members, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree in which every member is consumed and the only thing missing is the order they go in. **A private method is the perfect hiding place**, because the composition *is* consumed — sixty times a second — by the one caller inside the class.
+
+So it is `composeFrame`, and `session.ts` calls it. **Not a second implementation**: the value of a consumer reading a frame is that it is the frame the shell draws, and the render chain is about to gain output diffing, render caching, block windowing and a cap. A copy would diverge on the first of those and say nothing. A03's **SS48** carries it — a `paint(` call under `src/shell/` outside the unit that owns it — and the row landed with the extraction rather than ahead of it (commitment 14b): **one composition, one caller**.
+
+**What the extraction does not decide.** Where the seam falls between *compose a frame* and *put it on a terminal* is a separate question and is not answered here. The write is C01's writer and the fallback is a side effect; the unit is the composition, and the boundary is where it was.
+
+**Every comment survives the move**, and they are the most careful in the file: the size read once by `compose` so a resize between compose and paint is the next frame's problem, the fallback rather than a short frame, the viewport resized from the composed frame before its rows are read (I34), and the cursor sequence embedded in the single write so it cannot straddle C03's synchronised-update window.
 
 ---
 
@@ -545,7 +644,9 @@ type ChromeContext = Readonly<{
 
 The default chrome renders name, binary and clock. Prism's renders cluster, identity, health and clock (`t01` §The header).
 
-The prompt is `❯ ` and its gutter is `{ first: 2, cont: 2 }`, passed to C17's `displayRows` (D24a, C17 §2). C22 owns that number because C22 owns the frame; C17 must not assume one.
+The prompt is `❯ ` at `unicode: full` or `bmp`, `> ` at `ascii`, and its gutter is `{ first: 2, cont: 2 }`, passed to C17's `displayRows` (D24a, C17 §2). C22 owns that number because C22 owns the frame; C17 must not assume one.
+
+**Both forms are two cells, and that is a requirement rather than a coincidence** (I52, C09 I22). `commandRows` draws the prompt and `construct.ts` calls the same function for `chromeRows` — the height C14 virtualises against — so a prompt whose ASCII form were a different width would make the measurer and the composer describe the same row differently, with `PROMPT_GUTTER.first` right for one of them. That is C09 I1's divergence in the one place both sides are the framework's own, and it is why the prompt takes a **pair** rather than a free-form config field: a `TuiConfig` prompt would be a string an app supplies, unmeasured, on the row the reader types into (F122).
 
 ---
 
@@ -624,6 +725,139 @@ adjust.
 
 ---
 
+## 6b. The write, walked by hand
+
+The frame is composed whole and **written as a difference** against the last frame
+this session put on this screen. `docs/notes/TUI_NOTE_render_chain_baseline.md` has
+the measurement that makes it worth doing: 25.7 KB reach the terminal per frame
+regardless of what changed, and 10.2 KB of that with an empty transcript.
+
+**The invalidation story already existed and had no consumer.** `contaminated` is
+C03's, set eagerly at commit time for a resize (C03 I7) and by `invalidate()` on
+resume, on handoff and on a theme change. `frame-scheduler.ts` even reasons about
+*"diffing against a screen whose contents nobody knows"* — a sentence that only means
+something if diffing is the normal case. Until this, `render` and `repaint` were the
+same function, so the whole mechanism reached nothing.
+
+The write has structure — which rows differ — **and** state — what the screen already
+holds — so it takes both artefact shapes.
+
+### The classification table — which rows go on the wire
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | Row equal, nothing else true | skip it | — | Skipped. The screen holds it |
+| 2 | **Every** row equal | skip them all | the cursor may still have moved | **Hide and cursor, no rows.** An empty diff is a legitimate write rather than a skipped one — the cursor is the frame's too |
+| 3 | `contaminated`, frame identical to the last | skip them all | the screen's contents are unknown | **Contamination wins.** It is a claim about the screen, not about the frame, and the two are only usually the same |
+| 4 | Previous record is a different size | rows compare | the screen is a different shape | **Full write.** A resize contaminates already (C03 I7), so this is defence and not a path — and it is what makes keeping a record across a resize safe rather than lucky |
+| 5 | Row differs only in SGR bytes | strings compare | the glyphs are identical | **Rewritten.** String equality is the rule, and it errs towards writing |
+| 6 | An overlay opened or closed | rows differ where the box is | overlays take no rows (I29) | Ordinary diff. Nothing special |
+| 7 | Row *i* unchanged, row *i−1* changed and ends with a live attribute | skip *i* | SGR is terminal state, not per-row | **Skipped — and every written row carries a leading reset.** See below |
+
+**Row 7 is the one the walk was written for, and the ruling did not survive
+measurement.** The reasoning is sound: with a full frame the rows go out in order, so
+each inherits the last one's SGR state; a diff writes them out of order, so a row can
+inherit a state that was never above it. The remedy — reset each written row — follows.
+
+Then the frame was read. **Zero of fifty composed rows end with a live attribute**:
+every block renderer closes its own styling and `fitStyled` pads with plain spaces. So
+the rule as first written forbids nothing, and would read exactly like a rule that
+holds — A03 §2's vacuity class arriving in a *remedy* rather than in a check.
+
+**What keeps the prefix is the asymmetry, and both figures are recorded.** Four bytes
+per changed row against a colour that bleeds down every row below it and survives the
+frame, on the day a renderer stops closing its own. The property the diff would
+otherwise depend on is asserted nowhere; the prefix is what makes the writer
+independent of it. A justification the next reader checks and cannot reproduce is one
+they delete, so this one says which argument it rests on.
+
+### The sequence trace — what the screen holds
+
+| # | Sequence | Written |
+|---|---|---|
+| 1 | acquire → first frame | Everything. There is no record |
+| 2 | keystroke | The prompt's rows, and whatever the transcript moved |
+| 3 | `SIGWINCH` | Everything — C03 set `contaminated` at commit (I7) |
+| 4 | `SIGWINCH` *during* a write | The **next** frame, whole. The flag is set eagerly and read at the top of the next `writeFrame` |
+| 5 | `SIGCONT` after a suspend | Everything — `onResume` → `invalidate` (§3, construct step 8a) |
+| 6 | A handoff returns | Everything — C23 invalidates (C23 §4) |
+| 7 | A theme change | Everything — the sequence is L4's (A02 Seam 4) |
+| 8 | A stream commit coalesced with an input one | One frame, one diff. Coalescing is C03's and sits above this |
+| 9 | `paint` refuses and the fallback is drawn | The record is dropped: the fallback put something else on the screen |
+| 10 | **The write itself throws** | The screen holds a *prefix* of a frame, and no record describes it |
+
+**Row 10 is the second finding, and it is why the record is cleared before the write
+rather than merely set after it.** *Set the record after the write returns* is the
+obvious rule and it is not enough: on a throw the record still holds the frame
+**before** the failed one, which is a frame the screen no longer shows. The next diff
+would then compare against a screen that never existed and skip precisely the rows the
+partial write got wrong. So the record is dropped before the bytes go out and restored
+only when they have all gone — which makes a throw a full repaint by construction
+rather than by a handler someone must remember to write.
+
+This is the rejection-path question CLAUDE.md asks of any ruling that throws: a
+decision leaves state, and the invariant that forbids the resulting state is usually
+not in the component that took the decision.
+
+---
+
+## 6c. The rendered lines are cached, walked by hand
+
+`visibleRows` calls `renderSequenceToLines` for every visible entry on every
+frame, and nothing keeps the result — only `measure` is cached, by C14. The
+measurement says what that costs: a keystroke against a 250-line patch is 160 ms
+and against 5,000 lines 2.8 s, **linear in the lines the block holds and flat in
+the rows the screen shows** (`docs/notes/TUI_NOTE_render_chain_baseline.md`).
+
+**Alone this is not a fix, and saying so is the point of stating it here.** It
+makes the *second* frame free while the first still renders every line, so it
+converts continuous lag into one long stall. Landing it and reporting the problem
+solved is the failure mode the ordering exists to prevent; §6d is the stage that
+fixes it.
+
+### The key, and `(entryId, rev, width)` is not it
+
+The obvious key is C14's, and C14's `HeightCache` says in its own header why
+**theme and capabilities are deliberately absent**: C09 §4 makes capability
+substitutions 1:1 by cell count and C10 T4.1 asserts geometry is identical across
+themes, so a theme switch invalidates the *frame* and not one cached height.
+
+None of that transfers, because **this caches appearance and that caches
+geometry**. Two axes are added and each is measured rather than assumed:
+
+- **Focus.** `visibleRows` passes `focus: focusFor(graph, entry.id)` into the
+  render, and C11 draws the focused row in a different tone (C11 I14). Two frames
+  of one entry at one `rev` and one width differ. `focusFor` returns non-null only
+  for the live entry, so at most one slot is ever affected — which is what makes
+  a per-slot discriminator cheap rather than a reason to clear.
+- **The theme's identity, carried in the key rather than hooked.** `ResolvedTheme.name`
+  already changes on a variant switch **and** on an override, and C10 I11 already
+  depends on exactly that for its own memo. So this needs no invalidation call and
+  cannot be left out of one — the fact travels with the value. An `invalidate`
+  hook someone must remember to add at a fourth call site is the shape this
+  project keeps finding unwired.
+
+### The sequence trace — event-mediated, because a document changes under it
+
+| # | Sequence | Which rules meet | Ruling |
+|---|---|---|---|
+| 1 | append, render, patch the same entry, render | validity by `rev` | Re-rendered. One slot per entry, so the old value is overwritten rather than kept beside |
+| 2 | two patches inside one `stream` window | C03 coalesces at 33 ms | One render, at the later `rev`. The cache never sees the intermediate, because the frame does not |
+| 3 | `settle(id, doc)` | C13 moves `rev` (C13 I13) | Re-rendered — the same arm C14 gives it, and for the reason C14 records: a bare settle costs a lookup that returns the same value |
+| 4 | focus moves between two rows of one table | focus, not `rev` | Re-rendered. `rev` and width are unchanged, so this is the axis that would otherwise serve a stale frame |
+| 5 | focus moves to an entry that is not live | `focusFor` returns null for it | Nothing re-renders. The discriminator must normalise *no focus* to one value, or a session alternates between two keys for one appearance |
+| 6 | `/theme dark` | `ResolvedTheme.name` moves | Every slot's key changes. No hook, no clear |
+| 7 | a width change | width | Every slot's key changes, exactly as C14's does |
+| 8 | evict, then the same id appended again | C13 ids are not reused | Deleted on evict; a fresh id could not collide in any case |
+| 9 | `/clear` | | Cleared |
+| 10 | **a `steps` block animating through `ctx.tick`** | the key has no `tick` axis | **Not reachable, and recorded because it is one line from being reachable.** `visibleRows` passes no `tick`, so every transcript render is at 0. The day it is threaded, an animating entry serves its first frame forever and no assertion here would fail — so either the key gains the axis or live entries stop being cached, and this row is where that decision is owed |
+
+**Row 10 is A03 §2's shape pointed at a cache.** A key that omits an axis nothing
+currently varies is indistinguishable from a key that is complete, and the
+difference appears the day someone threads one value through one call.
+
+---
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -664,6 +898,21 @@ An unreachable cluster sets `health: "offline"` and nothing else. Verbs fail wit
 3  print diagnostics, if any        only now, on the restored primary screen
 4  exit with the caller's code
 ```
+
+**Step 3 has three sources, and it had one** (I6a). C02's capability warnings, C20's history
+warnings and C23's `faults`, in that order — construction, then the session, then what the
+session contained. Two of the three were collected and never read: C20's `warnings` were
+reached by nothing in `src/`, so a corrupt history file or a failed write was silent for
+ever, and C23 collected nothing at all (C23 §5a, F15).
+
+**That is one mechanism with three subjects and only one of them had a reader**, which is why
+this is a step-3 change rather than three component changes. C02 and C20 both state the
+ruling — *the component decides what is wrong, never when the user is told* — and it is only
+true of a component whose warnings something drains.
+
+**Read at step 3, not captured before it.** `history.drain()` is step 2b, inside
+`beforeRelease`, and a synchronous append that fails produces its warning there. A collection
+snapshotted at step 1 holds every warning except the one the exit path itself caused.
 
 with `beforeRelease` — supplied by C22 at construction — doing:
 
@@ -758,9 +1007,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I4a** — `session.stopping` is not set on the signal and fault paths, and nothing may make either of them asynchronous. `process.exit` inside the handler is what stops a submission interleaving; the flag is unnecessary only for as long as that is true.
 - **I5** — Cleanup runs inside `beforeRelease` and nowhere else; it can therefore never run twice.
 - **I6** — Release precedes diagnostics on every path.
+- **I6a** — **Step 3 drains every component that accumulates a diagnostic**, in construction order: C02's capability warnings, C20's `warnings`, C23's `faults`. A component that returns warnings rather than emitting them is only honouring C02's ruling if something reads them — and two of these three were collected and read by nothing, with a passing invariant each (C20 T2.9 asserts that neither stream is written to, which is satisfied by the silence it was meant to make safe). **The collections are read here rather than snapshotted earlier**, because `history.drain()` runs at step 2b and its own failure is a warning.
 - **I7** — History flushes on every path, faults included. A fault before the lifecycle exists flushes nothing and does not violate this: nothing can be appended before input is accepted, which is four steps later. The day anything appends earlier, I7 and I5 conflict for real (§8a).
 - **I7a** — `createTui` runs step 1 — validation — and returns; steps 2 to 12 run inside `start()`. §9's `created` state, T1.9's "nothing acquired" and a manifest given as a path all require it, and validation is the one step that can be eager because it needs nothing constructed.
-- **I8** — A failed size gate does not abort construction; session state survives until a resize.
+- **I8** — A failed size gate does not abort construction; session state survives until a resize. **Both halves of it were unbuilt and each failed silently** (F67). The fallback was drawn through `config.stdout`, which C01 redirects into its `debug` sink at *construction* rather than at acquire (C01 I3, I9), so nothing was drawn: 0 bytes on both channels with the process alive. And the `onResize` this registers could never fire, because C01 dropped every `SIGWINCH` outside `acquired` and gate 4 deliberately does not acquire (→ C01 I12b). **The deferral deferred for ever**, which is the claim this invariant makes read back as a measurement. Both are one class: a correct reason attached to a wider condition than it justifies — *the terminal was never acquired, so write to the primary screen directly* conflates not-acquired with not-redirected, and *the dimensions belong to the child* is true of suspended and of nothing else. The fallback now draws through `lifecycle.writer`, as the mid-session call site always did.
 - **I9** — The too-small render uses no layout engine, and it takes its writer rather than reaching for one: at launch it draws to the primary screen because the terminal is never acquired, and mid-session it draws through the scheduler or the next frame overwrites it (§8b).
 - **I10** — Clock and filesystem enter the graph only here.
 - **I11** — Session state has exactly one writer per field, and the two fields with no writer say so. `cluster` and `version` are set at construction and never written after; a field absent from §5's table would read identically to a field nobody writes, and only one of those is a claim.
@@ -810,17 +1060,27 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I49** — **C02's capability overrides have a producer, and it is `TuiConfig.capabilities`.** The parameter, its validation, its precedence rule (C02 I4) and its e2e row all existed while nothing an application could call supplied it; `construct.ts` passed one argument and the only other caller was a test fixture reaching in by deep import. A parameter with no producer passes every test written about it, which is why this survived: A03 §2's vacuity class reached through an argument, where C24 I16 is written about exports and MG25 scans functions and constants. **The measured consequence is that `colourDepth: 1` was unreachable by any application** — the only rule producing it is the `dumb` gate, which also clears `altScreen`, and C02 I7 makes that the one refusal that stops the shell. Overrides are still C02's to validate; C22's duty is to hand them over and to surface the warnings where it surfaces C02's others.
 - **I50** — **Ghost text is composited into the prompt, and it is appearance rather than geometry.** T4.7 has claimed this since C22 was written and nothing implemented it: `ghost()` had exactly one caller in the tree — the accept path in `keys.ts`, which *inserts* it — so the suggestion existed, was computed on every keystroke, and was invisible until the key that consumed it. `test/contract/editor.test.ts` recorded the other half as deferred *"when C22 lands"*; C22 landed and the row was never written, which is a deferral expressed as a comment and therefore one that could not expire.
 - **I51** — **An overlay that is chrome for the prompt forwards what it does not bind to the `prompt` handler.** C19's menu is the case: `activeTarget` answers `overlay` for anything on the stack (C16 §3), the overlay handler consumes only its six actions, and step 3's `global` binds no printable key — so a character typed while the menu is up is dropped, measured against a control with no layer open. A menu that opens by itself (C19 I19) cannot live with that, because it would stop typing at the moment it appeared — and a menu the user requested must not either, since C19 §8's keystroke cell narrows it in place and that cell is unreachable while the character never arrives. So the forward is the menu's, whichever opened it, and **while it holds no selection the prompt's bindings resolve first** (C19 I20). **The decision is C22's rather than C16's**: the ladder is right, and which layers are an extension of the prompt is a fact about this shell's composition — L4 is where the menu's and the search's identities are both known. C20's reverse search is the same shape and is not wired here: its `type()` has no caller in `src/`, so a query typed after `⌃R` is dropped exactly as the character was, and the rules for narrowing to a hit are C20 §5's.
+- **I52** — **The prompt has a form per capability and both are `PROMPT_GUTTER.first` cells wide.** It is resolved where it is drawn, in `commandRows`, which takes the capability because the measurer calls it too — resolving at module scope would read a capability before C02 has detected one. The width equality is asserted rather than commented: it is the one substitution in the tree that a *measurement* depends on, so a second form of unequal width is the measure/render divergence class arriving on the input line (C09 I22, F122).
 
   It follows I38's shape exactly and for the same reason. The ghost is **read fresh at paint** rather than captured when it was computed, and it is drawn into padding the prompt already has: it never lengthens a row, so `measure` does not see it, `promptRows` is the same number with a suggestion and without one, and a suggestion that would not fit is simply not drawn. **A suggestion that changed the prompt's height would move the viewport underneath it on every keystroke** — the geometry defect I38 exists to forbid, arriving through the other affordance that lives in the same row.
 
   **The spinner wins the row when both would draw.** They occupy the same cells — immediately after the text — and both are true at once whenever a `Tab` is in flight over a prefix that also has a static suggestion. Showing a stale suggestion beside *still thinking* states two things, one of which is about to stop being true; the spinner is the one the reader needs.
 
+- **I53** — **The greeting is a producer and is handed the producer context** (C23 I40, C07 §3). It returns a document and was told nothing, which is the same omission the local route had at four other sites; a producer told nothing decides anyway, from a worse copy of the fact. It falls out of the producer ruling rather than extending it.
+- **I54** — **The frame composition is a named unit and `session.ts` calls it. There is no second composition, and a scan says so.** The class no rule here could see: every prior instance of a mechanism unreachable across a seam was *a member nobody could call*, and this was *a sequence nobody named* — MG24, MG25 and MG27 are all satisfied by a tree where every member is consumed and only the order is missing. It matters now rather than in the abstract because the render chain gains diffing, caching, windowing and a cap as one change, and a copy would diverge on the first of them in silence (F126, C24 I25).
+- **I55** — **The frame is written as a difference against the last frame this session put on this screen, and whole whenever no record describes it.** Four things leave no record: the first frame, a `contaminated` write, a refused frame that drew the fallback, and a record whose size differs from the frame's. `contaminated` is a claim about the *screen* rather than about the frame, so a repaint happens even when the composed rows are identical to the last (§6b table row 3) — and until this invariant existed `render` and `repaint` were the same function, so C03's whole invalidation mechanism reached nothing.
+- **I56** — **The record is dropped before the bytes go out and restored only when they have all gone.** Setting it after the write returns is the obvious rule and leaves the fault case wrong: a write that throws puts a *prefix* of a frame on the screen, and a record surviving the throw describes the frame *before* it — so the next diff compares against a screen that never existed and skips exactly the rows the partial write got wrong. Clearing first makes a throw a full repaint by construction rather than by a handler someone must remember to add (§6b trace row 10).
+- **I57** — **Every row the diff writes carries a leading reset, and the rule rests on asymmetry rather than on a live defect.** Measured at the time of writing, **0 of 50 composed rows end with a live SGR attribute** — every renderer closes its own styling and `fitStyled` pads with plain spaces — so a rule justified as *otherwise colour bleeds* would forbid nothing and read exactly like a rule that holds (A03 §2, in a remedy rather than in a check). What keeps it: four bytes per changed row, against a colour bleeding down every row below it and surviving the frame, on the day a renderer stops closing its own. A diff writes rows out of order, so a row can inherit a state that was never above it; nothing else asserts the property that would make the prefix unnecessary (§6b table row 7).
+- **I58** — **An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry.** The first three are C14's and the last two are the difference between caching *appearance* and caching *geometry*: `HeightCache` records that theme and capabilities are deliberately absent from it because C09 §4 and C10 T4.1 make height theme-invariant, and neither argument reaches colour. Focus enters because C11 draws the focused row in another tone (C11 I14) and `visibleRows` passes it in; the theme enters as `ResolvedTheme.name`, which already moves on a variant switch and on an override and which C10 I11 already relies on for the same purpose — carried in the key rather than through an invalidation call, because a hook at a fourth call site is the shape this tree keeps finding unwired. One slot per entry makes the cache bounded by the entry count by construction rather than by an eviction rule, which is the argument C14 §4 makes for the same shape.
+- **I59** — **The cache makes the second frame free and the first no cheaper, and that is why it is not the fix.** A 5,000-line block still renders every line the first time it is drawn at a width, so this stage on its own converts continuous lag into one long stall. It is recorded as an invariant rather than as a note because the failure mode is *reporting the problem solved* — §6d is what bounds the first frame, and the ordering is the finding (F90).
+- **I60** — **`ctx.tick` is not in the key and no transcript render receives one.** `visibleRows` passes no tick, so every entry renders at 0; a `steps` block animating in the transcript would serve its first frame for the life of the session and nothing here would fail. The invariant is the *pair*: the axis is absent **and** the value is constant, so the day one is threaded the other is owed — either the key gains it or live entries stop being cached (§6c trace row 10, A03 §2).
+- **I61** — **A resolved capability record that cannot open the terminal refuses at gate 3b, and the refusal names the cause rather than the consequence.** `isUsable` is the test (C02 I7), read from the **resolved** record so that a valid `capabilities` override still opens (C02 I4) — which is what forces the gate after construction and makes it accept I36's cost knowingly. It throws rather than returning, because `start()` rejecting is the only channel this path has: §8 step 3 is reached from `stop()`, and a session that never ran never calls it, so a warning into C02's collection would be **unread by construction**. The message names `env` when the record is empty or carries no `TERM`, because the cause is a config field and C01 — which raised the only prior refusal — is entitled to the capability record alone and can only name the consequence (F8).
 ---
 
 ## 11. Commitments
 
 1. Four required config fields; every other has a working default, `pipeline` included (I17, I22).
-2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `~/.prism` and the **app's entry point** resolves `PRISM_TUI_STATE_DIR` (I10, I20).
+2. Clock, filesystem, opener and state directory are injected here and nowhere else; `stateDir` defaults to `.calcium` — the framework's name, never a consumer's, and relative to the launch directory because the tilde it used to carry was never expanded — and the **app's entry point** resolves its own variable (I10, I20).
 3. Stores and the runner precede the lifecycle, which precedes any acquire (I1, I2). §3a walks every pair, including the ones that carry no weight.
 3a. Handler registration is its own step, after the pipeline: the submit handler closes over the pipeline and the pipeline closes over the router (I3, A02 Seam 4).
 3b. `createTui` validates and returns; steps 2 to 12 run inside `start()` (I7a).
@@ -862,7 +1122,17 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 23. C02's capability overrides reach C02, because a parameter no application can supply is tested and unreachable at once (I49, §2).
 24. **Ghost text reaches the frame**, composited into the prompt as appearance and never as geometry: the spinner wins the row, a suggestion that does not fit is dropped rather than truncated, and `measure` never sees it (I50, C19 I7).
 25. A layer that is chrome for the prompt does not stop typing. What the overlay handler does not bind is forwarded to the prompt's, because the alternative is measured and is not "the menu takes the key" but "nobody does" (I51, C19 I20).
+26. The prompt is a capability pair of equal cell width, resolved where it is drawn and not at module scope, because the function that draws it is the function that measures it (I52, C09 I22).
+27. **The frame goes to the terminal as a difference**, whole whenever no record describes the screen — which `contaminated` is the existing and until now unconsumed statement of (I55, §6b).
+28. The record is cleared before the write and restored after it completes, so a write that throws repaints rather than diffing against a screen that never existed (I56, §6b).
+31. A terminal too small draws a legible message through C01's writer and opens when it grows, and both halves are asserted against a real terminal (I8, I9) (→ C01 I12b).
+32. A terminal that cannot open is refused at gate 3b with the cause named, not the consequence — and refused rather than warned, because the channel a warning would use is reached only from `stop()` (I61, → C02 I7).
+30. Step 3 drains every component that accumulates a diagnostic, read after the release rather than snapshotted before it — and two of the three had no reader at all (I6a) (→ C20 I17) (→ C23 I48).
+29. Each written row opens with a reset, kept on the asymmetry between four bytes and a colour that survives the frame, with the measurement that shows it is currently inert recorded beside it (I57, §6b).
 
+30. An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry — the two axes C14's height cache deliberately omits are the two this one cannot (I58, C10 I11).
+31. **This stage makes the second frame free and the first no cheaper**, so it is not the fix and the spec says so where someone would otherwise stop (I59, F90).
+32. No transcript render receives a `tick`, and the key has no axis for one; threading either obliges the other (I60).
 ---
 
 ## 12. Tests
@@ -931,6 +1201,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.32** (I42): the entry is evicted while its view is open → the layer is dismissed with `anchorEvicted`, and `Esc` afterwards reaches the prompt rather than a dangling view.
 - **T3.1**: every illegal transition in §9 throws with a named error — two cases.
 - **T3.19**: `stop` sets `session.stopping` before releasing, so a submission racing shutdown is refused.
+- **T3.20** (I61): an omitted `env` in a TTY → `UnusableTerminalError`, the message names the **field**, and no alternate-screen sequence is emitted. The class is asserted, not the wording: C01's plain `Error` would satisfy a message assertion and is the thing this gate exists to replace.
+- **T3.20b** (I61, → C02 I4): the same empty `env` **with** `capabilities: { altScreen: true }` → the shell opens, asserted by the alternate screen being entered rather than by the absence of a throw. This is the row a gate reading `config.env` ahead of construction fails while passing T3.20.
+- **T3.20c** (I61): `TERM=dumb` names the **variable** and not the field. A constant message satisfies T3.20 completely.
+- **T3.20d** (I8, I61): a terminal that is both too small and unusable **refuses** — gate 3b is reached first. The row the first ruling had backwards: deferring here waits for a resize that cannot cure it and then throws C01's unnamed fatal out of an unguarded `onResize`, after `start()` has resolved. Asserted with both conditions true, because either alone restates the gate that owns it.
+- **T3.20e** (I8): the control — a small terminal that *can* open still defers. Without it T3.20d is satisfied by a tree that refuses every small terminal, which is what gate 4 exists not to do.
 - **T3.2**: `start` twice → no-op, nothing constructed twice.
 - **T3.3**: `stop` during construction → nothing acquired, no cleanup attempted.
 - **T3.4**: `stop` while a handed-off child is running → `beforeRelease` signals every handle in `runner.live` and **the handed-off child is not among them**, then the terminal is released.
@@ -972,6 +1247,18 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.11** (I13a): header and footer receive the same `now` within one frame, asserted with a clock that advances on every read — a fake returning a fresh value per call, so two reads cannot agree by accident. A monotonic fake would pass whether the value were sampled once or twice, which is the setup where both readings agree (A03 §2).
 - **T4.10** (with C13, C20): `/clear` empties the transcript and leaves history intact.
 - **T4.12** (I34, with C14): a document taller than the region, scrolled to the bottom → **the document's last row is on the frame**, at three prompt heights: one row, three rows, and a prompt long enough to hit S01 §3's half-terminal cap. Asserted from the painted frame rather than from a spy on `resize`, because `TuiInstance` exposes no graph and a value read at the seam is not the claim — the claim is that the last row can be reached. Three heights and not one: at a one-row prompt the terminal's height and the region's differ by a constant, so a `rows − 3` written anywhere agrees with the right answer exactly there.
+- **T4.16** (I58): one entry, drawn twice with nothing changed → the registry's `renderSequence` is called **once**. Asserted with a counting registry rather than by timing, because a timing assertion under contention is a flake and the claim is *it did not render again*, not *it was faster*.
+- **T4.17** (I58): one entry, a width change and then focus entering the block and moving between two rows → a render for each. Three sub-cases and not one, because a key missing any single axis passes every assertion about the others; **two rows and not one**, because with a single row *focused* and *unfocused* are the only states and a key that merely knew whether anything is focused would pass. **`rev` is named as not driven** — it needs a stream or a `settle(id, doc)`, neither reachable from a local handler, and a second invocation makes a new entry rather than a new revision. It is C14's axis and not one this cache had to decide; the row says so rather than letting its title imply coverage.
+- **T4.17d** (I58, C10 I11): `/theme light` → a render. **Its own session, because focus is stateful**: written as a fourth step of T4.17 it failed against working code, since after two `↓` the keys are going to the live block and the command never reached the prompt. `light` and not `dark` because the session starts dark and `setVariant` is correctly a no-op for the active variant (C10 T3.6) — the first draft failed on that too. Both are the fixture not responding to the thing under test, and the number each produced was indistinguishable from a key that omits the theme.
+- **T4.18a** (I58): `delete` drops one slot and leaves its neighbours. **The class, not the wiring**, and the row says so.
+- **T4.18b** (I58): `/clear` through the real graph drops every slot, asserted on **`size`** rather than on a render count. The first version of this row was inert and removing the arm left it green: an evicted or cleared entry is gone from the transcript and `visibleRows` never asks for it again, so a render count cannot see an eviction at all. The claim is about memory, and `Viewport.stats` is the precedent for making a cache's size observable (C14 T2.3b).
+- **The `evict` arm's wiring is not drivable and the gap is named rather than papered over.** C13's cap is 100,000 blocks (C13 I17) and `construct.ts` passes no cap — `createTranscriptStore` accepts one and only `retainPayloads` is threaded through — so reaching an eviction through the real graph would take 100,001 appends. `clear` exercises the same subscription in the same wiring; the `evict` branch inside it is covered by reading. A citation reads as coverage, and this is where that would have happened.
+- **T4.21** (I8, I9, with C01, tier 5): the real shell in a real PTY at **100x12**, **100x15** and **30x16** — F67's own table — draws the fallback, and resized to 100x30 it opens. **A tier-5 row, because both halves failed only outside a unit test**: the unit rows pass their own spy sink, so a fallback written into C01's `debug` sink renders perfectly to them, and a fake lifecycle delivers a resize C01 would have dropped. The width axis is swept by the golden frames at 60/80/120/160; the height axis had no equivalent sweep, which is F67's closing sentence and the reason it took someone wanting a smaller picture.
+- **T4.20** (I6a, with C20, C23): a session whose history file is unwritable and whose pipeline swallowed an append → `stop()` writes **both** reasons to stdout, after the release. Two sources in one row because a drain over one collection satisfies a row that reads only the other, and the release ordering is asserted on the call order for the same reason C23 T4.7b asserts `resetFocus`'s.
+- **T4.19** (I59): a 2,000-line block drawn for the first time renders every line, and the second frame renders none — **the stall stated as a test**, so a later reader who finds this stage and stops has an executable statement of what it did not do.
+- **T4.13** (I55): a keystroke into a settled session writes **fewer bytes than the frame it produced**, and the screen folded from every write equals the frame `paint` composed. Two assertions and neither is sufficient alone: the byte count alone is satisfied by a diff that drops rows, and the screen equality alone is satisfied by writing everything. The screen comes from `test/support/screen.ts`, which is verified against its own control before anything is read through it.
+- **T4.14** (I55): a `SIGWINCH` writes the frame **whole** even when the composed rows are identical to the last — the terminal is resized to the size it already holds, so C14 refuses the resize (C14 I21) and the rows cannot differ, and `contaminated` is the only thing that can produce the repaint. The row that makes contamination a claim about the *screen* rather than about the frame.
+- **T4.15** (I56): a write that throws, then a successful frame → the successful frame is **whole**. Asserted with `FakeStdout.throwOn`, which is what makes the fault path constructible at all; without I56 the record survives the throw and the next frame diffs against a screen holding a prefix of a frame nobody has.
 
 ### Tier 5 — e2e
 
@@ -1025,6 +1312,14 @@ PTY harness.
 - **T6.36** (I40): treating an unreadable `theme` file as fatal, or as silently absent → T1.19b fails on the notice or on the session opening at all. The two halves of C20's repair, arriving one component up.
 - **T6.34** (I39): removing the `cancel()` from the printable path → C19 T5.2 fails on its last assertion, and a menu opens for a prefix the user has typed past. The effect table's own `mine !== seq` guard does not cover it: a printable keystroke does not advance that sequence, which is why the guard looked like the mechanism and was not.
 - **T6.33** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.
+- **T6.41** (I58): dropping `focus` from the key → T4.17's focus case fails, and moving the selection down a table leaves the highlight where it was until something else moves the entry's `rev`. The mutation nothing else catches: `rev`, width and theme are all unchanged, so every other row agrees.
+- **T6.42** (I58): dropping the theme identity from the key → T4.17's theme case fails, and `/theme light` repaints the chrome while the transcript keeps its dark colours. C03's `invalidate` still fires, which is what makes this survivable-looking: the *frame* is repainted from a cache that was not.
+- **T6.43** (I58): keying on `(entryId, rev)` alone — C14's key minus width, which is the key F90 proposed → T4.17's width case fails, and a resize redraws the transcript at the old wrapping.
+- **T6.44** (I59): deleting T4.19 → nothing fails, and that is the point of the row: it is the only executable statement that this stage leaves the first frame alone.
+- **T6.45** (I58): removing the `clear` arm from the subscription → T4.18b fails. **It did not fail the row this replaced**, which asserted a render count: the mutation was applied, the suite stayed green, and the survivor is what said the assertion was about the wrong thing.
+- **T6.38** (I55): handing C03 the same callback for `render` and `repaint` — which is what the tree did before this — → T4.14 fails, and a `SIGWINCH`, a `SIGCONT`, a handoff and a theme change all diff against a screen nobody knows. The mutation is a deletion of two lines and it restores a state in which C03's entire invalidation mechanism, and the comment in `frame-scheduler.ts` reasoning about it, reach nothing.
+- **T6.39** (I56): setting the record after the write instead of clearing it before → T4.15 fails. Nothing else does: every frame on a healthy path is identical under both orders, so this is a row about the fault path or it is not a row at all.
+- **T6.40** (I55): converting to CUP's 1-based form at the call site as well as inside `cursorTo` → T4.12 fails with the screen lagging its input by exactly one frame. **Found by a test rather than by reading**, and `escapes.ts` had already written the warning: *one place to be off by one, and it is the place with the test*. Every row landed one down and one right, and the frame produced was internally consistent.
 - **T6.24** (I13): putting `now` on `SessionSnapshot` → T1.11 fails, because a field written on every frame has no writer §5's table can name.
 
 ---

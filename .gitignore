@@ -5,3 +5,13 @@ coverage/
 .DS_Store
 test/golden/__received__/
 __pycache__/
+
+# The default state directory (C22 §3) — history and the theme preference,
+# beside whatever project the shell was opened in.
+.calcium/
+
+# A directory *literally named* `~`, which the old default created because
+# `fs.mkdir` has no shell in it and never expanded the tilde. Ignored rather
+# than assumed gone: any build predating `9bfcbdf` still writes one, and a
+# session's history was committed from this exact path once.
+~/

@@ -2,8 +2,11 @@
 // the reader injected, so no fixture touches src/.
 import { describe, expect, it } from "vitest";
 import { readdirSync, statSync } from "node:fs";
+import { checkMarks, MARK_EXEMPTIONS } from "../../tools/enforce/source-scans.mjs";
 import {
   checkModuleGraph,
+  checkBuilderCoverage,
+  BUILDER_OMISSIONS,
   checkOneStorePerComponent,
   STORE_SYMBOLS,
   storeNamesAreReal,
@@ -13,18 +16,52 @@ const check = (files: Record<string, string>) =>
   checkModuleGraph(Object.keys(files), (f) => files[f] ?? "");
 
 describe("A03 module graph", () => {
-  it("MG3: a type-only import across L0's halves is not an edge", () => {
-    // C01 needs C02's TerminalCapabilities while genuinely not importing C02.
-    // The same shape across the halves is what this asserts is permitted.
+  it("MG3: a type-only import across L0's halves IS an edge, and the reason it was not is the finding", () => {
+    // **This row asserted the opposite for the life of the table, and its
+    // justification was true.** It read:
+    //
+    //   > C01 needs C02's TerminalCapabilities while genuinely not importing
+    //   > C02. The same shape across the halves is what this asserts is
+    //   > permitted.
+    //
+    // The first sentence is correct. The second generalises it to a case where
+    // the argument does not hold: C01 → C02 is `terminal/` → `terminal/`, where
+    // no independence claim exists to break, and erasure settles it. **L0's
+    // halves are a different claim** — A02 §1 protects each half type-checking
+    // with the other absent, and a type-only edge is exactly what removes that.
+    //
+    // A true observation promoted to a general claim, and the third instance of
+    // a correct sentence justifying a scope it does not reach (F84, F125, F127).
+    // It is also why `make enforce` was green over the edge A03 §262 calls
+    // hardest to undo: the rule worked, half its subject was invisible, and the
+    // suite said so on purpose.
+    const both = [
+      `import type { Row } from "../data/viewmodel/index.js";`,
+      `export type { Row } from "../data/viewmodel/index.js";`,
+    ];
+    for (const source of both) {
+      const violations = check({ "src/terminal/lifecycle.ts": source });
+      expect(violations, source).toHaveLength(1);
+      expect(violations[0]!.rule).toBe("MG3");
+      expect(violations[0]!.message).toContain("type-only");
+    }
+  });
+
+  it("MG3: type-only *within* a half is still not an edge, which is the distinction", () => {
+    // The control, and the half of the old row that was right. C01 naming C02's
+    // capability record is `terminal/` → `terminal/`: MG3 has no business in it,
+    // and a rule that fired here would be the arm firing on correct code.
     expect(
       check({
-        "src/terminal/lifecycle.ts": `import type { Row } from "../data/viewmodel/index.js";`,
+        "src/terminal/lifecycle.ts": `import type { TerminalCapabilities } from "./capabilities.js";`,
       }),
     ).toEqual([]);
-
+    // Not `adapters/types.ts`: that file carries MG3's one exemption, so a run
+    // scoped to it answers a different question — the exemption's, not the
+    // arm's.
     expect(
       check({
-        "src/terminal/lifecycle.ts": `export type { Row } from "../data/viewmodel/index.js";`,
+        "src/data/manifest/parse.ts": `import type { RawResult } from "../transport/types.js";`,
       }),
     ).toEqual([]);
   });
@@ -93,6 +130,48 @@ describe("A03 MG23 — one store per component, above L0", () => {
       });
     return walk("src");
   };
+
+  it("SS47: the real tree is clean, and every exemption still has a subject", () => {
+    // **F116's row.** A rule whose only reader is a Makefile target is a rule a
+    // `npm test` refactor can silence, and every other real-tree guard in this
+    // file exists because that happened once already.
+    //
+    // The counter is read rather than the exit status: zero violations is the
+    // same number for *clean* and for *the scan matched nothing*, so the second
+    // assertion is what tells them apart — ten exemptions, each of which must
+    // still find a mark or the bidirectional arm reports it.
+    const files = srcFiles();
+    expect(checkMarks(files), "run `make enforce` for the detail").toEqual([]);
+    expect(Object.keys(MARK_EXEMPTIONS).length).toBeGreaterThan(0);
+    for (const f of Object.keys(MARK_EXEMPTIONS)) {
+      expect(files, `${f} is excused and must be in scope`).toContain(f);
+    }
+  });
+
+  it("MG27: the real tree is clean, and the rule can see it", () => {
+    // **The row the mutation pass asked for.** Deleting
+    // `...(sort === undefined ? {} : { sort })` from `b.table` is caught by
+    // `make enforce` and by nothing in the suite, so the mutation survived a
+    // vitest run — which is a finding about where the guard lives, not about
+    // the guard. A rule whose only reader is a Makefile target is a rule a
+    // `npm test` refactor can silence.
+    //
+    // The counter is read, not the exit status: a rule matching nothing passes
+    // exactly like a rule that is satisfied (A03 §2), and this is the arm that
+    // tells them apart.
+    const files = srcFiles();
+    const violations = checkBuilderCoverage(files);
+    expect(violations, "run `make enforce` for the detail").toEqual([]);
+
+    // The subject exists, or the row above holds trivially. Both files must be
+    // in `SOURCES` for the rule to have anything to compare.
+    expect(files).toContain("src/data/viewmodel/types.ts");
+    expect(files).toContain("src/shell/builders/index.ts");
+
+    // And the reason list is non-empty, so the excusing arm is exercised by the
+    // real tree rather than only by the fabrication.
+    expect(Object.keys(BUILDER_OMISSIONS).length).toBeGreaterThan(0);
+  });
 
   it("MG23: the real tree is clean, and the rule can see it", () => {
     // Corpus before cleanliness, for SP2's reason: a rule whose scopes stopped

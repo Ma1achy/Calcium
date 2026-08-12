@@ -14,14 +14,22 @@
  */
 
 import { appendFileSync } from "node:fs";
-import { access, appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdir,
+  readdir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { resolveConfig, type Ambient, type ResolvedConfig } from "./config.js";
 import { constructGraph, type FrameQueries, type Graph } from "./construct.js";
-import { CURSOR_HOME as HOME } from "../terminal/escapes.js";
 import { drawFallback, tooSmall } from "./fallback.js";
+import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, type Composed } from "./frame.js";
-import { commandRows, cursorFor, paint, FrameError, type PaintDeps } from "./paint.js";
+import { commandRows, type PaintDeps } from "./paint.js";
+import { composeFrame } from "./render-frame.js";
+import { focusKey } from "./render-cache.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { focusableRowIds } from "../presentation/table/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
@@ -30,11 +38,13 @@ import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
 import {
   SessionStateError,
+  UnusableTerminalError,
   type FileSystem,
   type SessionSnapshot,
   type SessionState,
   type StopReason,
   type TuiConfig,
+  type TuiConfigInput,
   type TuiInstance,
 } from "./types.js";
 
@@ -69,12 +79,36 @@ const nodeFileSystem: FileSystem = {
       name: e.name,
       directory: e.isDirectory(),
     })),
-  exists: (path) =>
-    access(path).then(
-      () => true,
-      () => false,
-    ),
 };
+
+/**
+ * What the reader has to go and edit, for gate 3b's refusal (I61, F8).
+ *
+ * **Ordered from the omission outwards**, because the case that produced the
+ * finding is the one an author reaches first: `env` is optional, `{}` is what
+ * they get for saying nothing, and every consequence below follows from a
+ * `TERM` that record does not have. Naming the variable before the field would
+ * be true and useless — nobody who omitted `env` is thinking about `TERM`.
+ *
+ * **The remedy names the field and not the expression**, and SS10 is why rather
+ * than style: the scan bans the environment accessor across `src/` with a
+ * one-file allow-list, and it does not read strings from code — correctly, since
+ * a reader auditing I20 by grep must not have to clear a hit every time. So the
+ * message says *the process environment* where it wants to say the expression.
+ *
+ * The last arm is not a fallback. C02 I4 lets a valid override win for
+ * `altScreen`, so an app can switch this off deliberately, and a refusal that
+ * blamed the environment for a decision the config made would send the reader
+ * to the wrong file.
+ */
+function unusableCause(env: Readonly<NodeJS.ProcessEnv>): string {
+  if (Object.keys(env).length === 0)
+    return "`TuiConfig.env` is empty, which is what an omitted `env` defaults to — pass the process environment as `env`";
+  const term = env["TERM"];
+  if (term === undefined) return "`TERM` is not set in the `env` the app supplied";
+  if (term === "dumb") return "`TERM` is `dumb`, which declares no alternate screen";
+  return "`TuiConfig.capabilities` overrides `altScreen` to false";
+}
 
 /** The ambient reads, in the one file allowed to perform them. */
 function ambient(): Ambient {
@@ -90,7 +124,9 @@ function ambient(): Ambient {
   };
 }
 
-export function createTui(config: TuiConfig): TuiInstance {
+export function createTui<C extends TuiConfig>(
+  config: TuiConfigInput<C>,
+): TuiInstance {
   // **Step 1, and nothing else** (I7a). Validation needs nothing constructed
   // and a bad config should fail at the call site; steps 2 to 11 run inside
   // `start()`, because step 3 may read a manifest from a path and a constructor
@@ -104,6 +140,17 @@ class Session implements TuiInstance {
   #identity: ReturnType<typeof createIdentityLoop> | null = null;
   /** §8's idempotency. `stop` twice is a no-op, not a second release (T1.10). */
   #stopping: Promise<number> | null = null;
+  /**
+   * The last frame put on **this** screen, or `null` when nothing describes it
+   * (I55, §6b).
+   *
+   * Held here rather than inside `composeFrame` because the write is here: the
+   * composition returns bytes and cannot know whether they landed. `null` is not
+   * *no frame yet* — it is *the screen's contents are unknown*, which is the
+   * statement `contaminated` makes; `repaint` below is where the two meet, and
+   * it is the only place C03's flag needs an expression here.
+   */
+  #lastFrame: readonly string[] | null = null;
 
   constructor(private readonly config: ResolvedConfig) {}
 
@@ -114,7 +161,8 @@ class Session implements TuiInstance {
   async start(): Promise<void> {
     // §9's two illegal cells. `stopped` is terminal, matching C01's released
     // state — a second session constructs a new instance (I16).
-    if (this.#state === "stopped") throw new SessionStateError("start", this.#state);
+    if (this.#state === "stopped")
+      throw new SessionStateError("start", this.#state);
     if (this.#state === "running") return; // T3.2 — nothing constructed twice.
 
     // **Gate 1** (§4 step 1, I36, I37) — above `constructGraph`, and that is the
@@ -138,8 +186,18 @@ class Session implements TuiInstance {
 
     this.#graph = await constructGraph(this.config, {
       stop: (reason) => this.stop(reason),
+      // **Two functions now, and they were one** (I55). C03 has distinguished
+      // them since it was written — `writeFrame` calls `repaint` when the
+      // screen's contents are unknown and `render` otherwise — and L4 handed it
+      // the same callback twice, so the entire invalidation mechanism reached
+      // nothing. `frame-scheduler.ts` reasons about *"diffing against a screen
+      // whose contents nobody knows"*, which only means something once one of
+      // these two diffs and the other does not.
       render: () => this.#render(),
-      repaint: () => this.#render(),
+      repaint: () => {
+        this.#lastFrame = null;
+        this.#render();
+      },
       frame: this.#frameQueries(),
       onFatal: (err) => {
         // C01's only fatal case, and it has already unwound what it held
@@ -154,9 +212,62 @@ class Session implements TuiInstance {
     // fallback is drawn on the *primary* screen — nothing was acquired, so
     // there is no alternate screen to draw into — and a resize continues from
     // startup step 5 with session state intact.
+    // **Gate 3b — refuse, naming the cause** (I61, F8).
+    //
+    // One line above gate 4, reading the same terminal, taking the opposite
+    // decision — so the difference is asserted rather than left to the reader.
+    // Gate 4's subject can change while the session waits; this one cannot,
+    // because `altScreen` follows from `TERM` and `TERM` is fixed for the life
+    // of the process. That is **gate 1's argument, not gate 4's**: a pipe
+    // cannot become a terminal, and a terminal that declares nothing cannot
+    // start declaring something.
+    //
+    // **It goes first, and the ruling that put it second was wrong** — the code
+    // is what falsified it. Deferring an unusable terminal on size waits for a
+    // resize that cannot cure it, and when the resize arrives `#open()` reaches
+    // C01's fatal from inside `onResize`, which nothing guards: the throw leaves
+    // the SIGWINCH handler with `start()` long since resolved, so the author's
+    // `catch` cannot see it and neither can gate 3b. The incurable condition is
+    // answered before the curable one, or the curable one hides it.
+    //
+    // **The resolved record, which is what puts the gate here** rather than
+    // beside gate 1. C02 I4 makes a valid `capabilities` override win
+    // unconditionally including for `altScreen`, and the override resolves
+    // inside `detectCapabilities` during construction — so a gate reading
+    // `config.env` ahead of step 3 would refuse exactly the app that had said
+    // what to do about it. It accepts I36's cost knowingly: a history file is
+    // opened for a process about to exit, which is smaller than refusing a
+    // legal configuration.
+    //
+    // **A throw, not a warning, and the moment is the reason.** C02's channel
+    // is *returned, never emitted*, drained by §8 step 3 — which `stop()`
+    // reaches and this path never calls, because `start()` rejects and the
+    // session never runs. A warning routed there is unread by construction:
+    // the same silence with more machinery. Measured under a PTY.
+    if (!isUsable(this.#graph.capabilities)) {
+      throw new UnusableTerminalError(unusableCause(this.config.env));
+    }
+
     const size = this.#graph.lifecycle.size();
     if (tooSmall(size)) {
-      drawFallback(size, (s) => void this.config.stdout.write(s));
+      // **C01's writer, not `config.stdout`** — F67, and the one-line difference
+      // between this working and the shell drawing nothing for ever.
+      //
+      // `config.stdout.write` is *not* a route to the primary screen once the
+      // lifecycle exists. C01 redirects `stdout.write` into its `debug` sink at
+      // **construction** (C01 I3, I9) rather than at acquire, and `writer` is
+      // the only handle that still reaches the real stream. `constructGraph`
+      // has already run by the time this gate is read, so the fallback went to
+      // a sink nobody reads: 0 bytes on both channels, the process alive, for
+      // ever — which is F67's measurement exactly.
+      //
+      // **The reasoning was right and the handle was wrong**, which is why it
+      // survived review: *the terminal was never acquired, so there is no
+      // alternate screen, so write to the primary one directly* is true in
+      // every clause. It conflates *not acquired* with *not redirected*, and
+      // C01 separates them deliberately. The mid-session call site below has
+      // always used `writer`.
+      drawFallback(size, (s) => void this.#graph?.lifecycle.writer.write(s));
       this.#graph.lifecycle.onResize((next) => {
         if (!tooSmall(next)) this.#open();
       });
@@ -172,6 +283,7 @@ class Session implements TuiInstance {
     if (graph === null || graph.lifecycle.acquired) return;
 
     graph.lifecycle.acquire();
+
     graph.scheduler.commit("input");
 
     /**
@@ -197,7 +309,12 @@ class Session implements TuiInstance {
     if (greeting !== undefined) {
       void (async () => {
         try {
-          graph.pipeline.greeting(await greeting());
+          // **The context comes from the pipeline, not from here** (C22 I53).
+          // This file holds the lifecycle, the capabilities and the registry
+          // and could assemble a second one; one builder is the point.
+          graph.pipeline.greeting(
+            await greeting(graph.pipeline.producerContext()),
+          );
         } catch {
           // Contained. The prompt is already usable and the session is running;
           // a welcome that could not reach its far side is not a startup fault.
@@ -300,7 +417,13 @@ class Session implements TuiInstance {
     // printed onto the alternate screen is discarded when the screen is
     // released, so the dev sees a flash and an empty shell (I6). C02's warnings
     // wait here for the same reason (C02 §2).
-    for (const line of graph.capabilityWarnings) this.config.stdout.write(`${line}\n`);
+    //
+    // **Three sources, and it had one** (I6a). C20's warnings and C23's faults
+    // were both accumulating where nothing read them — *returned, never
+    // emitted* honoured on the half that is easy. **Read here rather than
+    // captured earlier**: `history.drain()` is step 2b, inside the release
+    // above, so the warning from a failed final append exists only now.
+    for (const line of graph.diagnostics()) this.config.stdout.write(`${line}\n`);
 
     // 4 — the caller's code, returned rather than exited: the caller owns the
     // process, and a library that calls `process.exit` cannot be embedded.
@@ -325,49 +448,46 @@ class Session implements TuiInstance {
     const graph = this.#graph;
     if (graph === null || !graph.lifecycle.acquired) return;
 
-    const frame = this.#composed();
+    // **The composition is `render-frame.ts`'s and this calls it** (C22 I54,
+    // C24 I25). It lived here as a private method returning `void`, which made
+    // it a sequence nobody could name — and the reason that matters now rather
+    // than in the abstract is the render chain: diffing, caching, block
+    // windowing and a cap arrive as one change, and a consumer reading frames
+    // through `expectDocument().lines()` stays on the production path across
+    // all four only if there is one composition. A03's SS48 says so.
+    const result = composeFrame({
+      composed: () => this.#composed(),
+      paintDeps: (frame) => this.#paintDeps(graph, frame),
+      resizeViewport: (size) => void graph.viewport.resize(size),
+      cursorSequence: (cursor) => graph.lifecycle.cursorSequence(cursor),
+      // **The record is the caller's, because the write is** (I55, §4a).
+      // `composeFrame` returns bytes and never puts them on a terminal, so it
+      // cannot know whether they landed; this does.
+      previous: () => this.#lastFrame,
+    });
 
-    // **C22 I34 — the viewport is as tall as the region, and this is where the
-    // region's height is known.** It is `rows − header − footer − promptRows`,
-    // and the prompt's height changes with what is typed rather than with the
-    // terminal, so no handler on a terminal event can compute it. Set from the
-    // composed frame, before the visible rows are read from it.
-    //
-    // Per frame, and cheap because C14 refuses a resize to the size it holds
-    // (C14 I21) — the guard is what makes one owner affordable.
-    //
-    // It was `size.rows` in the resize handler: three rows too tall from the
-    // first frame, so `#maxTop()` stopped short by exactly the chrome and the
-    // last rows of a tall entry were unreachable by `End`, `PageDown` or `↓`.
-    // Nothing could see it, because the surplus rows were discarded below.
-    graph.viewport.resize({ width: frame.size.columns, height: frame.region.height });
-
-    let lines: readonly string[];
-    try {
-      lines = paint(frame, this.#paintDeps(graph, frame));
-    } catch (err) {
-      if (!(err instanceof FrameError)) throw err;
-      drawFallback(frame.size, (s) => void graph.lifecycle.writer.write(s));
+    // The two side effects the unit deliberately does not perform: the write is
+    // C01's writer, and the fallback is a side effect rather than a frame.
+    // Where the seam falls between *compose* and *put on a terminal* is a
+    // question C22 §4a leaves open, and this is the boundary it had.
+    if (result.kind === "fallback") {
+      // The fallback put something else on the screen, so no record describes
+      // it (I55).
+      this.#lastFrame = null;
+      drawFallback(result.size, (s) => void graph.lifecycle.writer.write(s));
       return;
     }
 
-    // **Hide, move, show — and the order is not made moot by the sync window**
-    // (C15 I19). `synchronisedUpdate` is a capability, so the unwrapped path is
-    // real: on a terminal without DECSET 2026 a visible cursor is dragged
-    // across the frame by `HOME` and every row after it, which is a cursor
-    // racing over the screen sixty times a second. So the hide leads the write
-    // and the position and show close it, all inside one `write` — one string,
-    // so it cannot straddle the scheduler's window either.
-    // **The sequence is C01's** (C01 I19, MG20). The cursor's visibility is a
-    // mode C01 holds and restores at release, so this file may not write it —
-    // and the bytes still have to land inside the one `write`, because a
-    // separate call cannot be kept inside C03's synchronised-update window. The
-    // owner yields them; the frame embeds them.
-    const cursor = cursorFor(frame, this.#paintDeps(graph, frame));
-    const hide = graph.lifecycle.cursorSequence(null);
-    graph.lifecycle.writer.write(
-      `${hide}${HOME}${lines.join("\r\n")}${graph.lifecycle.cursorSequence(cursor)}`,
-    );
+    // **Cleared before the bytes go out, restored when they have all gone**
+    // (I56). Setting it afterwards alone is the obvious rule and leaves the
+    // fault case wrong: a write that throws puts a *prefix* of a frame on the
+    // screen while the record still names the frame *before* it, so the next
+    // diff would compare against a screen that never existed and skip exactly
+    // the rows the partial write got wrong. This way a throw is a full repaint
+    // by construction rather than by a handler someone must remember to add.
+    this.#lastFrame = null;
+    graph.lifecycle.writer.write(result.write);
+    this.#lastFrame = result.lines;
   }
 
   #paintDeps(graph: Graph, frame: Composed): PaintDeps {
@@ -407,7 +527,11 @@ class Session implements TuiInstance {
       // recorded the other half as deferred "when C22 lands".
       ghost: () =>
         graph.completion.ghost(
-          contextAt(graph.editor.text, graph.editor.cursor, graph.manifest.manifest),
+          contextAt(
+            graph.editor.text,
+            graph.editor.cursor,
+            graph.manifest.manifest,
+          ),
         ),
       // **The region comes from the frame, not from a fresh one** (C22 I28).
       // `#frameQueries` serves the same value to the router, and a second
@@ -492,7 +616,8 @@ class Session implements TuiInstance {
       // composed frame against itself, and 1 + 1 + region + 1 is consistent at
       // every width. Two records of one number, and T1.5c is the only thing
       // comparing them.
-      promptRows: (width, gutter) => graph?.editor.layout(width, gutter).length ?? 1,
+      promptRows: (width, gutter) =>
+        graph?.editor.layout(width, gutter).length ?? 1,
     });
   }
 }
@@ -513,20 +638,66 @@ function visibleRows(graph: Graph, width: number): readonly string[] {
     // C22 I33 — the command that produced the entry, above it, as chrome. Its
     // rows are part of the entry's height (C14 I20), which is why the slice
     // below is taken over `chrome ++ blocks` rather than over the blocks alone.
-    const chrome = commandRows(entry.doc.command, width);
-    const lines = renderSequenceToLines(graph.blocks, entry.doc.blocks, width, {
-      theme: graph.theme.current,
-      capabilities: graph.capabilities,
-      // **The third field, and the context was shipped with two** (C16 §3).
-      // Focus was stored, derived and routed, and a focused row rendered
-      // exactly like an unfocused one because nothing ever put it in the
-      // context C09 reads it from. Every reference existed and the seam was
-      // still broken — a partially-populated context, which counting
-      // references cannot see.
-      focus: focusFor(graph, entry.id),
-    });
-    const rows = [...chrome, ...lines];
-    out.push(...rows.slice(ve.skipRows, ve.skipRows + ve.takeRows));
+    const chrome = commandRows(entry.doc.command, width, graph.capabilities);
+
+    // **Cached on all five axes, and the last two are the ones a height cache
+    // does not need** (I58, §6c). `focusFor` changes the rendering without
+    // moving `rev`, and `ResolvedTheme.name` moves on a variant switch and on an
+    // override — the same value C10 I11 keys its own memo on, carried here
+    // rather than reached for through an `invalidate` someone must remember.
+    const focus = focusFor(graph, entry.id);
+    const key = focusKey(focus);
+    const theme = graph.theme.current.name;
+
+    // **The window, and the range is the entry's rows less its chrome** (C09
+    // I25, §2a). C14 measured `chrome ++ blocks` (C14 I20) and addresses rows in
+    // that space, so the blocks' own range starts where the chrome ends. A
+    // window that forgot the offset would be short by exactly the command line.
+    //
+    // `windowSequence` keeps a kind that declares no window whole and pays for
+    // it out of `skipRows`, so this is correct for every document and cheaper
+    // only for the ones holding a kind that divides.
+    const from = Math.max(0, ve.skipRows - chrome.length);
+    const to = Math.max(from, ve.skipRows + ve.takeRows - chrome.length);
+    const windowed = graph.blocks.windowSequence(entry.doc.blocks, width, from, to);
+
+    // The key carries the range, because the cached lines are now the *window's*
+    // (I58). A small entry windows to itself and its key is stable, which is the
+    // common case; a large one re-renders as it scrolls, and only the rows on
+    // screen.
+    const range = `${String(from)}\u0000${String(to)}`;
+    const held = graph.rendered.get(entry.id, entry.rev, width, `${key}\u0000${range}`, theme);
+    const lines =
+      held ??
+      renderSequenceToLines(graph.blocks, windowed.blocks, width, {
+        theme: graph.theme.current,
+        capabilities: graph.capabilities,
+        // **The third field, and the context was shipped with two** (C16 §3).
+        // Focus was stored, derived and routed, and a focused row rendered
+        // exactly like an unfocused one because nothing ever put it in the
+        // context C09 reads it from. Every reference existed and the seam was
+        // still broken — a partially-populated context, which counting
+        // references cannot see.
+        focus,
+      });
+    if (held === undefined) {
+      graph.rendered.set(entry.id, entry.rev, width, `${key}\u0000${range}`, theme, lines);
+    }
+
+    // **The chrome is unwindowed and the blocks are**, so the slice is taken
+    // over the chrome at its own offset and over the window's rows at theirs.
+    // `windowed.skipRows` is the slack the seam could not remove — an
+    // indivisible unit or a sticky header — and dropping it here is what makes
+    // the window invisible.
+    // **The offsets are already spent, so the slice starts at zero.** The
+    // chrome is dropped by `skipRows` directly; the blocks were windowed *from*
+    // `skipRows − chrome.length`, so their rows already begin where the viewport
+    // asked. Slicing the concatenation by `ve.skipRows` a second time — which is
+    // what the unwindowed version correctly did — takes the same offset twice
+    // and drops the top of a tall entry. T4.12 is what said so.
+    const keptChrome = chrome.slice(Math.min(ve.skipRows, chrome.length));
+    const rows = [...keptChrome, ...lines.slice(windowed.skipRows)];
+    out.push(...rows.slice(0, ve.takeRows));
   }
   return out;
 }
@@ -551,7 +722,10 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
 
   for (const block of entry.doc.blocks) {
     if (block.kind !== "table") continue;
-    if (stored.rowId === null || focusableRowIds(block).includes(stored.rowId)) {
+    if (
+      stored.rowId === null ||
+      focusableRowIds(block).includes(stored.rowId)
+    ) {
       return Object.freeze({ blockId: block.id, rowId: stored.rowId });
     }
   }

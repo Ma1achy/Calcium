@@ -12,7 +12,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, Events, Group, Notice, Panel, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, Events, Group, Notice, Panel, ViewDocument } from "@fmx/calcium";
 import {
   ACTIONS,
   CAP,
@@ -28,6 +28,7 @@ import {
 import { parseNdjson } from "../src/ndjson.ts";
 import type { Row } from "../src/ndjson.ts";
 
+import { localContext } from "@fmx/calcium/testing";
 const CORPUS = parseNdjson(
   readFileSync(new URL("./corpus/events-real.ndjson", import.meta.url), "utf8"),
 ).rows;
@@ -147,13 +148,13 @@ describe("the ring — §8b's trace", () => {
         : Promise.reject(new Error("daemon down"));
     });
 
-    const first = await handler([], { command: "/events" });
+    const first = await handler([], { ...localContext(), command: "/events" });
     const before = eventsIn(first.blocks[0] as Block).events.length;
     expect(before).toBeGreaterThan(0);
 
     // The failing fetch does not reject the command: refusing to render would
     // take the surface away for a condition that clears in three seconds.
-    const second = await handler([], { command: "/events" });
+    const second = await handler([], { ...localContext(), command: "/events" });
     expect(eventsIn(second.blocks[0] as Block).events).toHaveLength(before);
     expect(calls).toBe(2);
   });
@@ -189,7 +190,7 @@ describe("the rendering", () => {
     const handler = createEventsHandler(() =>
       Promise.resolve(CORPUS.map((r) => JSON.stringify(r)).join("\n")),
     );
-    const doc = await handler([], { command: "/events" });
+    const doc = await handler([], { ...localContext(), command: "/events" });
     // `loading…` as the opening frame of a surface whose data is in hand is the
     // dashboard's ruling, one verb over — and `b.live` calls `renderLoading` at
     // construction, so the events are in the panel the document carries.
@@ -255,7 +256,10 @@ describe("the rendering", () => {
 
   it("R6: an empty daemon still produces a document, and it says so", async () => {
     const handler = createEventsHandler(() => Promise.resolve(""));
-    const doc: ViewDocument = await handler([], { command: "/events" });
+    // `LocalDocument`: a handler's answer is not a document until `runLocal`
+    // fills the seven `meta` fields the shell owns (F13). This row asserts
+    // `status` and a block, neither of which the fill touches.
+    const doc: LocalDocument = await handler([], { ...localContext(), command: "/events" });
     expect(doc.status).toBe("ok");
     expect(noticeIn(doc.blocks[0] as Block).text).toContain("no container lifecycle events");
   });

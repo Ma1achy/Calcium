@@ -20,17 +20,6 @@ import type { Candidate } from "./types.js";
 /** The id C15 knows the menu by; one layer for a whole completion (§6). */
 export const MENU_ID = "completion-menu";
 
-/** Padding either side of the widest entry, plus C15's border. */
-const CHROME_CELLS = 4;
-
-/**
- * How wide the menu wants to be (I8, C15 I16).
- *
- * **C19 declares this because nothing downstream can work it out.** A
- * `BlockRegistry` answers height at a width and never the reverse, so C15 knows
- * the region and this component knows the longest candidate, and neither can
- * supply the other's half.
- */
 /**
  * The selection glyph and its separator, which the value column must also hold.
  *
@@ -174,7 +163,12 @@ export function menuBlocks(
   return Object.freeze([
     top,
     body,
-    { kind: "raw", id: `${MENU_ID}-more`, text: `… ${String(remainder)} more` } satisfies Block,
+    // **ASCII, because this text is authored where the capability is not**
+    // (C09 I22, F122). C19 is L3 and the substitution happens at L1; a `raw`
+    // block carries text rather than a slot, so the ellipsis could never have
+    // been resolved. `…` has no `Glyph` either — C09 I5 wants 1:1 by cell
+    // count and the ASCII form is three cells.
+    { kind: "raw", id: `${MENU_ID}-more`, text: `+ ${String(remainder)} more` } satisfies Block,
     edge,
   ]);
 }

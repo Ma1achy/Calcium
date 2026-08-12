@@ -278,20 +278,16 @@ it("T4.7 (C17 §2, C22 I13): the prompt's rendered height equals displayRows, on
   // elision marker with every arithmetic check passing.
   const stdin = fakeStdin();
   const COLUMNS = 60;
-  const { stdout } = await buildSession(
+  const { screen } = await buildSession(
     { stdin: stdin as never },
     { columns: COLUMNS, rows: 24 },
   );
 
-  const frameRows = (): readonly string[] => {
-    const framed = stdout.chunks.filter((c) => c.includes("\u001b[H"));
-    const last = framed[framed.length - 1] ?? "";
-    const body = last.slice(last.indexOf("\u001b[H") + 3);
-    const end = body.indexOf("\u001b[?25l");
-    return (end === -1 ? body : body.slice(0, end))
-      .replaceAll(/\u001b\[[0-9;?]*[A-Za-z]/g, "")
-      .split("\r\n");
-  };
+  // **The screen, not the last write.** This took the last chunk containing
+  // `HOME` and split it on CRLF, which is a frame exactly while every frame is
+  // written whole; C22 I55 writes only the rows that changed. The question is
+  // unchanged — what is on the screen — and only the answer's source moved.
+  const frameRows = (): readonly string[] => screen().rows;
 
   // The prompt is every row from the first wearing the glyph down to the
   // footer — read off the frame, so the arithmetic under test is not also the

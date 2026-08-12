@@ -18,7 +18,6 @@ import {
   compareResults,
   drain,
   endResultOf,
-  fakeChild,
   fakeRunner,
   invocation,
   rawResultKeys,

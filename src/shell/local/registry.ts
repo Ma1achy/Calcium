@@ -17,7 +17,8 @@
  */
 
 import type { Manifest } from "../../data/manifest/index.js";
-import type { Block, ViewDocument } from "../../data/viewmodel/index.js";
+import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
+import type { ProducerContext } from "../../data/adapters/types.js";
 
 export type Choice = Readonly<{ key: string; label: string; default?: true }>;
 
@@ -35,7 +36,16 @@ export type AskOptions = Readonly<{
   choices: readonly Choice[];
 }>;
 
-export type LocalContext = Readonly<{
+/**
+ * C23 §2 — the producer context (C07 §3), plus the local route's own `ask`.
+ *
+ * **The context is obligatory at registration** (C23 I39). A parameter type may
+ * always be wider, so a handler declaring `{ command: string }` compiles, runs,
+ * and can never see a field added here — measured at four of the reference app's
+ * eight families. `TuiConfig.localHandlers` refuses the declaration;
+ * `ExactLocalHandlers` in `shell/types.ts` is the mechanism.
+ */
+export type LocalContext = ProducerContext & Readonly<{
   /** As typed, for `doc.command`. */
   command: string;
   /**
@@ -52,7 +62,7 @@ export type LocalContext = Readonly<{
 export type LocalHandler = (
   argv: readonly string[],
   ctx: LocalContext,
-) => ViewDocument | Promise<ViewDocument>;
+) => LocalDocument | Promise<LocalDocument>;
 
 export interface LocalRegistry {
   register(verb: string, handler: LocalHandler): void;

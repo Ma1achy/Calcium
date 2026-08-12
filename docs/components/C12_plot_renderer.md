@@ -87,6 +87,18 @@ Width is `ctx.width`. For an axed line plot the plot area is `width − yLabelWi
 
 **Scaling.** `yMin`/`yMax` over all series unless the block pins them. Values map linearly to dot rows, inverted so larger is higher.
 
+**`yFormat` names the unit in, not the unit out** (C04 I41, F31). `fraction` takes `0.84` and
+`percent` takes `100.2`; both render a per-cent sign, which is why naming them by the rendered
+form gave one member two plausible meanings. `fraction` is the old `percent` renamed — same
+arithmetic, different name — because the arm that multiplies by 100 is the surprising one and a
+CLI-wrapping consumer holds `100.2`.
+
+**It is geometry and not appearance**, which is easy to miss because a format looks like
+styling: §3's gutter is measured with `labelWidth` over the *rendered* labels, so an arm that
+changes a label's width changes the plot area. The rename moves both arms' widths for a caller
+who does not update, and that is the visible half of a breaking change taken deliberately
+before the freeze.
+
 **Axes.** Up to three y-labels — max, midpoint, min — formatted per `yFormat`, right-aligned in the label column, placed at the max, mid and min row indices of the plot area. **They collapse when the height cannot hold three**: at `height: 2` the max and the min, at `height: 1` the max alone. The midpoint goes first because the extremes bound the data and the midpoint is interpolation between them. Without this clause the section contradicted T3.2, which renders `height: 1` with axes.
 
 The x-axis is a rule under the plot area; x-labels sit at left, centre and right of it.
@@ -220,7 +232,9 @@ Six tiers. No state machine — C12 is pure over the block.
 - **T1.9**: an all-non-finite series → treated as empty.
 - **T1.10** (I5): 10,000 points into a 56-cell plot with one spike → the spike survives downsampling.
 - **T1.11**: three points into a 56-cell plot → spread across the full width, joined.
-- **T1.12**: y-labels formatted per `yFormat` — four cases.
+- **T1.12**: y-labels formatted per `yFormat` — five cases, one per arm.
+- **T1.12b** (C04 I41): `fraction` and `percent` on the **same value** produce different labels — `0.84` → `84%` and `1%`. The row a per-arm table cannot express: each arm alone is a restatement of its own rule, and the defect was that two arms meant one thing.
+- **T1.12c** (C04 I41): the two arms produce different `labelWidth`s for one range, so the gutter differs. `yFormat` is geometry; a test that only reads the label text passes against a renderer that measures the wrong set.
 - **T1.13** (I13): sparkline at widths 1, 8, 80 → exactly one row each; the series windows to fit.
 - **T1.14**: pinned `yMin`/`yMax` override the computed range, and out-of-range points clamp to the edge rather than escaping the grid.
 

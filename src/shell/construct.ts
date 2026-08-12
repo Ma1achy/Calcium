@@ -45,6 +45,7 @@ import { patchDefinition } from "../presentation/patch/index.js";
 import { loadTheme, type ThemeStore } from "../presentation/theme/index.js";
 import { createTranscriptStore } from "../viewport/transcript/index.js";
 import { createViewport } from "../viewport/viewport/index.js";
+import { RenderCache } from "./render-cache.js";
 import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
@@ -58,7 +59,7 @@ import { createKeyEffects } from "./keys.js";
 import { createDocumentView } from "./document-view.js";
 import { createPatchView } from "./patch-view.js";
 import type { FocusTarget, InputEvent, Key, KeyAction } from "../interaction/router/types.js";
-import { openHistory } from "../interaction/history/index.js";
+import { openHistory, SEARCH_ID } from "../interaction/history/index.js";
 import { detectCapabilities, type TerminalCapabilities } from "../terminal/capabilities.js";
 import { createFrameScheduler } from "../terminal/frame-scheduler.js";
 import {
@@ -202,13 +203,34 @@ export type Graph = Readonly<{
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   capabilities: TerminalCapabilities;
-  capabilityWarnings: readonly string[];
+  /**
+   * C22 I6a — every component that accumulates a diagnostic, drained at §8
+   * step 3 in construction order.
+   *
+   * **A function and not an array**, because step 2b's `history.drain()` is a
+   * synchronous append that can fail, and its warning exists only after the
+   * release. A collection snapshotted at construction holds every warning
+   * except the one the exit path itself caused.
+   */
+  diagnostics: () => readonly string[];
   blocks: ReturnType<typeof createBlockRegistry>;
   adapters: ReturnType<typeof createAdapterRegistry>;
   manifest: ReturnType<typeof createManifestStore>;
   completion: ReturnType<typeof createEngine>;
   transcript: ReturnType<typeof createTranscriptStore>;
   viewport: ReturnType<typeof createViewport>;
+  /**
+   * An entry's rendered lines (C22 I58, §6c).
+   *
+   * **Here rather than on `Session`, because the wiring is here.** Its two
+   * C13 arms sit beside C14's, which take the same two changes for the same
+   * reason — and a cache whose subscription lives in one file while its owner
+   * lives in another is the seam that goes unwired. `size` is exposed on C14's
+   * `stats` precedent: the claim *one slot per entry* is about memory, and a
+   * render count cannot see an eviction arm because an evicted entry is never
+   * asked for again.
+   */
+  rendered: RenderCache;
   overlays: ReturnType<typeof createOverlayManager>;
   history: Awaited<ReturnType<typeof openHistory>>;
   editor: ReturnType<typeof createEditor>;
@@ -417,9 +439,56 @@ export async function constructGraph(
       // it is part of the height the index virtualises against. **The same
       // function that draws it**, or the two arithmetics part company and the
       // viewport describes a document it is not showing.
-      chromeRows: (entry, width) => commandRows(entry.doc.command, width).length,
+      chromeRows: (entry, width) => commandRows(entry.doc.command, width, detection.capabilities).length,
     });
+
+    // **The render cache's two C13 arms, beside C14's** (I58, §6c trace rows 8
+    // and 9). `rev`, width, focus and theme are all *in the key*, so `append`,
+    // `patch` and `settle` need no handler — a moved `rev` simply misses. What
+    // the key cannot express is an entry that no longer exists: its slot would
+    // hold a rendered document nothing can reach, for the life of the session.
+    // C14's `HeightCache` takes the same two changes for the same reason.
+    const rendered = new RenderCache();
+    transcript.subscribe((change) => {
+      if (change.kind === "evict") for (const id of change.ids) rendered.delete(id);
+      else if (change.kind === "clear") rendered.clear();
+    });
+
     const overlays = createOverlayManager({ registry: built.blocks });
+    // **The state directory has to exist before anything writes into it**, and
+    // nothing created it. `FileSystem.mkdir` was declared, implemented at
+    // `session.ts`, and called by nowhere in `src/` — so on a machine without
+    // the directory every history write failed ENOENT, C20 rewound correctly
+    // rather than dropping the row, and the retry failed identically forever.
+    // Correct error handling one layer up is what turned a missing call into a
+    // permanent silent failure. FINDINGS F96.
+    //
+    // **C22's, not C20's.** `HistoryFs` deliberately omits `mkdir` — its own
+    // declaration says a wider type would let a later edit reach for something
+    // the component never needed — so widening it to fix this would trade one
+    // defect for the shape F58b and F85 are about. C22 owns `FileSystem` and
+    // owns `stateDir`, and directory management belongs with both.
+    //
+    // **Warn and continue, never throw**, which is the precedent thirty lines
+    // below: history repairs a corrupt file at open rather than failing,
+    // because a session that refuses to start over a preference file has made a
+    // preference into a dependency. An unwritable state directory costs
+    // persistence, not the session.
+    // `mkdir` is `recursive: true` at the one place it is implemented, so the
+    // ordinary case — the directory already exists — succeeds silently and no
+    // notice is drawn. Only a genuinely unwritable path reaches the catch.
+    try {
+      await config.fs.mkdir(config.stateDir);
+    } catch {
+      transcript.append(
+        noticeDoc(
+          "",
+          `history will not persist: \`${config.stateDir.slice(0, 60)}\` could not be created`,
+          "warn",
+          { origin: "refresh" },
+        ),
+      );
+    }
     const history = await openHistory({
       fs: config.fs,
       clock: config.clock,
@@ -499,7 +568,7 @@ export async function constructGraph(
       );
     }
 
-    return { transcript, viewport, overlays, history, editor, theme: themed.value };
+    return { transcript, viewport, rendered, overlays, history, editor, theme: themed.value };
   })().catch((cause: unknown) => {
     throw cause instanceof ConstructionError ? cause : new ConstructionError("stores", cause);
   });
@@ -596,6 +665,7 @@ export async function constructGraph(
    */
   const confirm = createConfirmHost({
     overlays: stores.overlays,
+    capabilities: detection.capabilities,
     invalidate: () => void scheduler.commit("input"),
   });
 
@@ -664,10 +734,32 @@ export async function constructGraph(
       adapters: built.adapters,
       manifest: built.manifest,
       blocks: built.blocks,
+      // C07 I19 — the **resolved** record, which is what `detection` holds after
+      // C22 I49's overrides. Deriving it again anywhere else is F124.
+      capabilities: detection.capabilities,
+      // C07 I18 — the same region `documentView` reads, not a second one.
+      region: deps.frame.overlayRegion,
       editor: stores.editor,
       overlays: stores.overlays,
       patchView,
       documentView,
+      /**
+       * C23 I46 — whether anyone is looking at a live part's host.
+       *
+       * **The entry arm is C14's answer and nothing else's.** Asking the
+       * transcript whether an entry exists would answer a different question:
+       * an entry scrolled a thousand rows above the viewport is present, live
+       * and invisible, and it is exactly the one that should stop spawning.
+       *
+       * **A `view` host is visible while it is declared**, which is a ruling and
+       * not a shortcut: popping the view is one of C23 I33's five release
+       * triggers, so a declared view host is on screen by construction. The
+       * consequence is recorded rather than left to be found — the pause reaches
+       * transcript-hosted parts and does not reach a drill-in at all.
+       */
+      visible: (host) =>
+        host.kind === "view" ||
+        stores.viewport.visible().entries.some((e) => e.id === host.id),
       confirm,
       theme: stores.theme,
       // **On the change, not at exit** (I40). Fire-and-forget for the same
@@ -706,6 +798,16 @@ export async function constructGraph(
       p.register(verb, handler);
     }
     p.seal();
+    // **C23 I46's resume, heard rather than polled.** A source nobody is looking
+    // at is not what the part timer arms to — arming to an overdue paused source
+    // would spin it at zero — so the scroll back into view has to say so. C14
+    // emits on `scroll`, `content` and `resize`, and all three can change which
+    // entries are on screen.
+    //
+    // The same disposition C23 I33 takes for eviction, and the same reason: a
+    // check on the next tick is correct and arrives one interval late, which is
+    // long enough for a reader to see a panel that has not caught up.
+    stores.viewport.subscribe(() => void p.visibilityChanged());
     return p;
   });
 
@@ -741,6 +843,32 @@ export async function constructGraph(
         if (block.kind === "table") out.push(...focusableRowIds(block));
       }
       return out;
+    },
+    /**
+     * **Beside `liveRows`, because it is the same question** (C23 I37, F21).
+     * That comment says this is the one place that knows a live entry's blocks;
+     * a second walk elsewhere would be a second answer to *what is here*, and
+     * the two would disagree the first time a block kind became navigable.
+     *
+     * The first action, per C23 I37 — C04 I19 makes `fill` the default kind, so
+     * a well-formed row's first action is the one `enter` should do.
+     */
+    liveRowAction: (rowId: string) => {
+      const id = stores.transcript.liveId;
+      if (id === null) return null;
+      const entry = stores.transcript.entries.find((e) => e.id === id);
+      if (entry === undefined) return null;
+      for (const blk of entry.doc.blocks) {
+        if (blk.kind !== "table") continue;
+        const row = blk.rows.find((r) => r.id === rowId);
+        const action = row?.actions?.[0];
+        if (action !== undefined) return { action, from: id };
+      }
+      return null;
+    },
+    // C23 I16 — the dispatcher is C23's and is supplied, never built here.
+    onAction: (action, from) => {
+      pipeline.onAction(action, from);
     },
     // **I31 — an effect that settles after its batch commits its own frame.**
     // `"completion"` because its window is zero (C03 I2): by the time this
@@ -859,6 +987,23 @@ export async function constructGraph(
       // cell narrows it in place, and that cell is unreachable while the
       // character is dropped before it arrives.
       if (stores.overlays.top?.id === MENU_ID) return promptKeys(e);
+
+      // **A reverse search narrows as you type** (C20 §7), and this branch is
+      // the one that did not exist. The forward above is the menu's, so a
+      // printable key under a *search* matched no overlay binding, reached the
+      // `return false` below, and was dropped — C20 declared `searchType` and
+      // `searchBackspace`, `store.ts` implemented them, a revert test covered
+      // them, and no caller existed anywhere in `src/`. FINDINGS F97.
+      if (stores.overlays.top?.id === SEARCH_ID && e.kind === "key") {
+        if (e.key.name === "backspace") {
+          keys.searchTyped(null);
+          return true;
+        }
+        if (isPrintable(e.key)) {
+          keys.searchTyped(e.key.sequence);
+          return true;
+        }
+      }
       return false;
     });
 
@@ -975,7 +1120,22 @@ export async function constructGraph(
      */
     promptUnderMenu,
     capabilities: detection.capabilities,
-    capabilityWarnings: detection.warnings,
+    /**
+     * C22 I6a — construction, then the session, then what the session contained.
+     *
+     * **Two of these three were collected and read by nothing**: C20's
+     * `warnings` reached no caller in `src/`, so a corrupt history file or a
+     * read-only home was detected, described and discarded for the life of every
+     * session, and C23 collected nothing at all (F15). C02's ruling —
+     * *the component decides what is wrong, never when the user is told* — is
+     * only half a ruling until something drains them.
+     */
+    diagnostics: () =>
+      Object.freeze([
+        ...detection.warnings,
+        ...stores.history.warnings,
+        ...pipeline.faults,
+      ]),
     blocks: built.blocks,
     adapters: built.adapters,
     manifest: built.manifest,

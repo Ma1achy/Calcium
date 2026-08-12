@@ -95,6 +95,20 @@ export function measurable(
   renderToLines: (block: Block, width: number) => readonly string[];
   kinds: readonly string[];
   registry: BlockRegistry;
+  /**
+   * A kind's window, dispatched (C09 I25, I26).
+   *
+   * **Present here so the conformance suite can check it at all.** The suite
+   * takes a structural shape rather than C09's registry — a consumer's registry
+   * is not C09's — so the window has to arrive the same way `measure` does, or
+   * the height property is declared and checked nowhere.
+   */
+  window: (
+    block: Block,
+    width: number,
+    from: number,
+    to: number,
+  ) => Readonly<{ block: Block; skipRows: number }> | undefined;
 }> {
   const r = registry(options.definitions ?? []);
   const render: RenderOptions = {
@@ -109,6 +123,10 @@ export function measurable(
     renderToLines: (block, width) => renderToLines(r, block, width, render),
     kinds: r.kinds,
     registry: r,
+    window: (block, width, from, to) => {
+      const definition = r.get(block.kind);
+      return definition?.window?.(block, width, from, to);
+    },
   };
 }
 

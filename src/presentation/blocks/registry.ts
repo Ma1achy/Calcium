@@ -13,7 +13,7 @@ import { normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { paint, rows, tone } from "./paint.js";
-import type { BlockDefinition, BlockRegistry, RenderContext } from "./types.js";
+import type { BlockDefinition, BlockRegistry, RenderContext, RenderContextInput } from "./types.js";
 
 /**
  * The definition of last resort: a registry with no `raw` at all, which is
@@ -132,6 +132,72 @@ class Registry implements BlockRegistry {
   measureSequence = (blocks: readonly Block[], width: number): number =>
     sequenceHeight(blocks, normaliseWidth(width), this.measure);
 
+  /**
+   * Rows `[from, to)` of a sequence, as a smaller sequence plus an offset (I25).
+   *
+   * **The gap is the sequence's and never the block's** (C04 §3a), so it is
+   * counted here: a `gapBefore` row belongs to the run and a driver that
+   * windowed block by block and summed would be one row short per gap. That is
+   * the defect `document-view.ts` had against `measure` and it would arrive
+   * identically here.
+   *
+   * **A kind without `window` is kept whole**, and its rows are paid for out of
+   * `skipRows`. That is what makes the seam optional rather than obligatory: an
+   * atomic block inside a windowed run costs its full height in slack and the
+   * caller still gets exactly the rows it asked for.
+   */
+  windowSequence = (
+    blocks: readonly Block[],
+    width: number,
+    from: number,
+    to: number,
+  ): Readonly<{ blocks: readonly Block[]; skipRows: number }> => {
+    const w = normaliseWidth(width);
+    const lo = Math.max(0, Math.trunc(from));
+    const hi = Math.max(lo, Math.trunc(to));
+
+    const kept: Block[] = [];
+    let skipRows = -1;
+    let row = 0; // cells-ok — a row cursor, not a width
+
+    for (const block of blocks) {
+      const gap = block.gapBefore === true ? 1 : 0;
+      const height = this.measure(block, w);
+      const top = row + gap;
+      const bottom = top + height;
+      row = bottom;
+
+      // Entirely above or entirely below the window, gap included.
+      if (bottom <= lo || top - gap >= hi) continue;
+
+      const resolved = this.#resolve(block);
+      const windowable = resolved.definition.window;
+
+      // The gap row, when the window opens on or above it, is kept by keeping
+      // the block's own `gapBefore`; when the window opens *below* it the gap is
+      // dropped with it, which is why the flag is rewritten rather than carried.
+      const gapKept = gap === 1 && top - gap >= lo;
+      const localFrom = Math.max(0, lo - top);
+      const localTo = Math.min(height, hi - top);
+
+      let piece: Block = block;
+      let dropped = localFrom;
+      if (windowable !== undefined && (localFrom > 0 || localTo < height)) {
+        const out = windowable(resolved.block, w, localFrom, localTo);
+        piece = out.block;
+        dropped = out.skipRows;
+      }
+      if (gapKept !== (block.gapBefore === true)) {
+        piece = gapKept ? { ...piece, gapBefore: true } : stripGap(piece);
+      }
+
+      if (skipRows < 0) skipRows = dropped + (gapKept ? 0 : 0);
+      kept.push(piece);
+    }
+
+    return Object.freeze({ blocks: Object.freeze(kept), skipRows: Math.max(0, skipRows) });
+  };
+
   renderSequence = (blocks: readonly Block[], ctx: RenderContext): ReactElement => {
     const width = normaliseWidth(ctx.width);
     const children: ReactElement[] = [];
@@ -152,7 +218,7 @@ class Registry implements BlockRegistry {
     return createElement(Box, { flexDirection: "column", width }, children);
   };
 
-  render = (block: Block, ctx: RenderContext): ReactElement => {
+  render = (block: Block, ctx: RenderContextInput): ReactElement => {
     const width = normaliseWidth(ctx.width);
     const childContext: RenderContext = {
       ...ctx,
@@ -194,4 +260,10 @@ class Registry implements BlockRegistry {
  */
 export function createBlockRegistry(opts: { defaults?: boolean } = {}): BlockRegistry {
   return new Registry(opts.defaults === false ? [] : DEFAULT_DEFINITIONS);
+}
+
+/** A block without its `gapBefore`, so a dropped gap row is genuinely dropped. */
+function stripGap(block: Block): Block {
+  const { gapBefore: _gapBefore, ...rest } = block as Block & { gapBefore?: boolean };
+  return rest as Block;
 }

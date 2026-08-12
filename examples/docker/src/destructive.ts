@@ -33,31 +33,19 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Block, LocalContext, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, LocalContext, ViewDocument } from "@fmx/calcium";
 import type { Runner } from "./mutation.ts";
 import { inspectState } from "./mutation.ts";
 
 const run = promisify(execFile);
 const realRunner: Runner = async (args) => await run("docker", [...args], { maxBuffer: 8 << 20 });
 
-const meta = (argv: readonly string[], exitCode: number, stderr = ""): ViewDocument["meta"] => ({
-  verb: argv[0] ?? null,
-  adapter: "destructive",
-  exitCode,
-  durationMs: 0,
-  truncated: false,
-  argv,
-  stderr,
-  transport: "local",
-  origin: "user",
-});
-
-const okDoc = (command: string, argv: readonly string[], blocks: readonly Block[]): ViewDocument => ({
+const okDoc = (command: string, argv: readonly string[], blocks: readonly Block[]): LocalDocument => ({
   schema: "tui.view/1",
+  meta: { adapter: "destructive" },
   command,
   status: "ok",
   blocks,
-  meta: meta(argv, 0),
 });
 
 const errorDoc = (
@@ -65,13 +53,13 @@ const errorDoc = (
   argv: readonly string[],
   message: string,
   extra: readonly Block[] = [],
-): ViewDocument => ({
+): LocalDocument => ({
   schema: "tui.view/1",
   command,
   status: "error",
   error: { message, stage: "local" },
   blocks: [b.notice.error(message), ...extra],
-  meta: meta(argv, 1, message),
+  meta: { adapter: "destructive" },
 });
 
 const stderrOf = (cause: unknown): string =>
@@ -81,7 +69,7 @@ const stderrOf = (cause: unknown): string =>
 
 export function createRmHandler(
   runner: Runner = realRunner,
-): (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument> {
+): (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (args, ctx) => {
     const ref = args[0];
     if (ref === undefined || ref === "") {
@@ -132,7 +120,7 @@ export function createRmHandler(
 
 export function createRmiHandler(
   runner: Runner = realRunner,
-): (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument> {
+): (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (args, ctx) => {
     const ref = args[0];
     if (ref === undefined || ref === "") {
@@ -234,7 +222,7 @@ function filterOf(args: readonly string[]): readonly string[] {
 export function createPruneHandler(
   kind: PruneKind,
   runner: Runner = realRunner,
-): (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument> {
+): (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   const verb = DOCKER_VERB[kind];
   return async (args, ctx) => {
     const filter = filterOf(args);
@@ -305,7 +293,7 @@ export function createPruneHandler(
 
 export function destructiveHandlers(
   runner: Runner = realRunner,
-): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<ViewDocument>> {
+): Record<string, (args: readonly string[], ctx: LocalContext) => Promise<LocalDocument>> {
   return {
     rm: createRmHandler(runner),
     rmi: createRmiHandler(runner),

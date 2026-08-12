@@ -42,7 +42,7 @@ export interface PatchAdapter {
  * Stateful, and it has to be: the §6 table is a function of the patch *and* of
  * whether `degraded` has arrived, which is history. One instance per stream.
  */
-export function createPatchAdapter(fallback: Adapter): PatchAdapter {
+export function createPatchAdapter(): PatchAdapter {
   let degraded = false;
   /** The remainder so far, so each `malformed` line extends one block. */
   let remainder: string[] = [];

@@ -638,6 +638,9 @@ export const TOPICS = {
   fixture: "C01",
   fixtures: "C08",
   "frame-scheduler": "C03",
+  "block-window": "C09",
+  "render-cache": "C22",
+  screen: "C22",
   lifecycle: "C01",
   manifest: "C05",
   "measurement-conformance": "C09",
@@ -985,4 +988,11 @@ export function checkReferences(
 }
 
 /** SP1, SP2, SP3 — the ids A03 §7a inventories, so 14b's equality can see them. */
-export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5"];
+// **SP6 was missing from this list for two commits and `make test` was red for
+// both.** The rule landed in `findings.mjs`, its row landed in A03's table, its
+// fabrications landed in `enforce-commitments.test.ts` — and this list, which is
+// how commitment 14b learns a rule exists, was not touched. `npm run enforce`
+// was green throughout, because the rule *was* implemented and running; the only
+// thing that could see the gap was the suite, and the suite is not what was run.
+// That is A03 §2's own subject reaching the list that enforces it.
+export const SPEC_RULES = ["SP1", "SP2", "SP3", "SP4", "SP5", "SP6"];

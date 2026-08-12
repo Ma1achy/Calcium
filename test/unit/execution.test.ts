@@ -24,7 +24,7 @@ import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createSessionStore } from "../../src/shell/state.js";
 import { fixture } from "../support/manifest.js";
-import { doc } from "../support/blocks.js";
+import { doc, localDoc } from "../support/blocks.js";
 import { result } from "../support/transport.js";
 import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { assignOffsets, backoffOf, BACKOFF_CAP_MS } from "../../src/shell/refresh.js";
@@ -37,6 +37,8 @@ import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import { createDocumentView } from "../../src/shell/document-view.js";
 import type { Block, ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 
+import { FULL_CAPABILITIES } from "../support/producer-context.js";
+import type { AdapterContext, StreamContext } from "../../src/data/adapters/types.js";
 type Scripted = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
@@ -52,7 +54,26 @@ type Scripted = Readonly<{
   /** A live part returned by the `/guide` local handler — T1.38's control arm. */
   localLive?: () => Block;
 
-  spawnShell?: () => { stdout: AsyncIterable<string>; exited: Promise<{ code: number | null }>; overflowed: boolean };
+  /**
+   * **`stderr` is here because `ChildHandle` has it** (C21 I3, F151). The fake
+   * carried `stdout` alone for as long as the route read `stdout` alone, so the
+   * two agreed about a field neither of them used — and the route's failure
+   * path, which needs it, was the half nothing could construct.
+   */
+  spawnShell?: () => {
+    stdout: AsyncIterable<string>;
+    stderr: AsyncIterable<string>;
+    exited: Promise<{ code: number | null; signal?: string | null }>;
+    overflowed: boolean;
+  };
+
+  /**
+   * Make `resetFocus` throw — §8e's fourth row, and the only statement after the
+   * append this harness can reach. `declareLive` and `recordHistory` are driven
+   * by the document and by C20, so a throw from either would be a fake supplying
+   * a behaviour rather than standing in for one.
+   */
+  focusThrows?: boolean;
 }>;
 
 const blocks = createBlockRegistry();
@@ -72,6 +93,8 @@ function harness(script: Scripted = {}) {
   const calls: string[] = [];
   const typed: string[] = [];
   const recorded: { command: string; exitCode: number }[] = [];
+  /** Every `ProducerContext` C23 built, by route (C07 §3a). */
+  const contexts: { where: string; ctx: AdapterContext }[] = [];
   /** Every `seq` C23 handed C07, in order. */
   const seqs: number[] = [];
   /**
@@ -120,6 +143,12 @@ function harness(script: Scripted = {}) {
     session: () => session.snapshot,
     writes: session.execution,
     transcript,
+    // C07 I18/I19 — what the producer context is built from (C23 I40). `blocks`
+    // is already the real registry below, so `measure` is the frame's rather
+    // than a stub's; this adds the two the context also needs, with the same
+    // region `documentView` is given.
+    capabilities: FULL_CAPABILITIES,
+    region: () => ({ width: 80, height: 24 }),
     scheduler: {
       commit: (r: string) => void commits.push(r),
       flush: () => undefined,
@@ -129,8 +158,15 @@ function harness(script: Scripted = {}) {
     },
     transport,
     adapters: {
-      adapt: (_raw: unknown, ctx: { command: string }) => {
+      // **`AdapterContext`, not `{ command: string }`.** The narrowed parameter
+      // was here for the same reason it was in four of the reference app's
+      // handler families: it compiled. It also erased every field the producer
+      // grant added, so `height`, `capabilities` and `measure` were invisible
+      // to every row in this file — which is how making `height` unconditional
+      // passed the whole suite (C07 I18, F125's shape in a double).
+      adapt: (_raw: unknown, ctx: AdapterContext) => {
         commands.push({ where: "settle", command: ctx.command });
+        contexts.push({ where: "adapt", ctx });
         return script.adapt === undefined ? doc({ command: "adapted" }) : script.adapt(ctx);
       },
       // **The context is read, not discarded.** This fake took no arguments at
@@ -138,9 +174,10 @@ function harness(script: Scripted = {}) {
       // `seq: 0` — the parameter that was wrong was the one the double erased.
       // A fake narrower than the interface it stands for cannot fail on the
       // difference.
-      adaptPatch: (_patch: RawPatch, ctx: { seq: number; command: string }) => {
+      adaptPatch: (_patch: RawPatch, ctx: StreamContext) => {
         seqs.push(ctx.seq);
         commands.push({ where: "patch", command: ctx.command });
+        contexts.push({ where: "adaptPatch", ctx });
         return script.adaptPatch === undefined
           ? { op: "append" as const, block: { kind: "notice" as const, id: `s${String(ctx.seq)}`, tone: "info" as const, text: "tick" } }
           : script.adaptPatch();
@@ -196,7 +233,8 @@ function harness(script: Scripted = {}) {
         calls.push("spawnShell");
         return (script.spawnShell ?? (() => ({
           stdout: (async function* () { yield "out"; })(),
-          exited: Promise.resolve({ code: 0 }),
+          stderr: (async function* () { /* a successful command says nothing */ })(),
+          exited: Promise.resolve({ code: 0, signal: null }),
           overflowed: false,
         })))();
       },
@@ -206,7 +244,10 @@ function harness(script: Scripted = {}) {
       killAll: () => Promise.resolve(),
     },
     lifecycle: { size: () => ({ columns: 80, rows: 24 }) },
-    resetFocus: () => void resets.push(1),
+    resetFocus: () => {
+      resets.push(1);
+      if (script.focusThrows === true) throw new Error("focus exploded");
+    },
     stop: () => Promise.resolve(0),
     clock: () => now,
     schedule: (fn: () => void, ms: number) => {
@@ -227,7 +268,16 @@ function harness(script: Scripted = {}) {
     // `/theme` alike. This is the second harness in the tree with its own
     // `as unknown as PipelineDeps`, and the cast is why the compiler saw
     // neither.
-    confirm: createConfirmHost({ overlays, invalidate: () => undefined }),
+    confirm: createConfirmHost({ capabilities: { unicode: "full" }, overlays, invalidate: () => undefined }),
+    // C23 I46 — everything visible. This harness has no viewport, so answering
+    // from one would pause every part in the file: a fake supplying the
+    // behaviour under test rather than standing in for it. The pause has its own
+    // rows, against a real viewport.
+    //
+    // **The third harness in the tree whose cast hid a missing field**, which is
+    // what `as unknown as PipelineDeps` buys and costs — `overlays` and `confirm`
+    // are the two the comment above already records.
+    visible: () => true,
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);
@@ -235,15 +285,16 @@ function harness(script: Scripted = {}) {
   // are the fixture manifest's, and `seal()` reconciles both (C23 I27).
   pipeline.register("guide", () =>
     script.localLive === undefined
-      ? doc({ command: "/guide" })
-      : doc({ command: "/guide", blocks: [script.localLive()] }),
+      ? localDoc({ command: "/guide" })
+      : localDoc({ command: "/guide", blocks: [script.localLive()] }),
   );
-  pipeline.register("debug dump", () => doc({ command: "/debug dump" }));
+  pipeline.register("debug dump", () => localDoc({ command: "/debug dump" }));
   
   
   pipeline.seal();
 
   return {
+    contexts,
     pipeline,
     transcript,
     session,
@@ -649,6 +700,169 @@ describe("C23 §2 — the seven routes", () => {
       "something reached the user, or the frame committed",
     ).toBeGreaterThan(0);
   });
+
+  it("T1.45 (I48): a rejected document's reason survives, in the store's own words", async () => {
+    // **F15's document is the input**, not a synthetic error: two blocks with one
+    // id, which C04 I14 forbids because `ViewPatch` addresses blocks by id. The
+    // shell said nothing at all about it, and the sentence naming the violation
+    // was in hand and discarded.
+    //
+    // Asserted on the *sentence* rather than on the collection being non-empty,
+    // because a generic "a document was rejected" satisfies every count-based
+    // row while destroying exactly what F15 says was destroyed.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error('blocks: id "running" appears 2 times (C04 I14)');
+    }) as typeof h.transcript.append;
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.pipeline.faults.join("\n")).toContain('id "running" appears 2 times');
+  });
+
+  it("T1.46 (I48): one cause swallowed five times is recorded once", async () => {
+    // C20's *logged once*, which is what makes this safe to put on a path that
+    // can fail per tick. A refresh notice failing every second would otherwise
+    // grow the collection without bound and print a wall of one sentence.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error("the same thing, again");
+    }) as typeof h.transcript.append;
+
+    for (let i = 0; i < 5; i += 1) h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.pipeline.faults.filter((f) => f.includes("the same thing"))).toHaveLength(1);
+  });
+
+  it("T1.47 (I49): a throw after the append still resets focus and still returns the id", async () => {
+    // **§8e's second row, and the one that happened** — row 2's cadence refusal
+    // threw from `declareLive` with the entry already appended. Four of the five
+    // statements under the catch leave the entry there and the sequence after it
+    // abandoned, and `resetFocus` is the one whose absence is permanent: T4.7b
+    // asserts its position because one frame with focus in a frozen block is the
+    // failure it prevents.
+    //
+    // **The entry count is what says the append itself succeeded**, so the row
+    // is about a later statement rather than the first. §8e E2's other half —
+    // returning the id instead of a flat `null` — is corrected in the code and
+    // has **no row**, because all nineteen call sites discard the return: there
+    // is nothing that can observe it, and a row asserting it would have to add
+    // the consumer it is testing for.
+    const h = harness({ focusThrows: true });
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    // Two entries: the submission's, which the append *did* produce, and the
+    // fault notice beside it. The count is what says this is a later row of §8e
+    // rather than the first — in row one there is no submission entry at all.
+    expect(h.transcript.entries).toHaveLength(2);
+    expect(
+      h.transcript.entries[0]?.doc.command,
+      "the append succeeded — this is not row one",
+    ).toBe("/help");
+    // **Twice, and the number is the assertion.** The try's reset ran and threw;
+    // the catch's is the one under test, and `> 0` is satisfied by the first
+    // alone — which is what the mutation pass showed: removing the catch's reset
+    // survived a row written to cover it.
+    expect(h.resets.length, "the sequence reset, and so did the catch").toBe(2);
+    expect(h.commits.length, "and the frame still committed").toBeGreaterThan(0);
+    expect(h.pipeline.faults.join("\n")).toContain("focus exploded");
+  });
+
+  it("T1.48 (I1, §8b B1): the swallow leaves one entry, and it is the fault notice", async () => {
+    // **The count and the identity.** A row asserting only the count passes on
+    // the day the notice is the wrong document, and a row asserting only the
+    // notice passes on the day I1's count went to two — the fault notice is a
+    // fourth non-submission append, not a second entry for one submission.
+    const h = harness();
+    let armed = true;
+    const real = h.transcript.append.bind(h.transcript);
+    h.transcript.append = ((...args: Parameters<typeof real>) => {
+      if (armed) {
+        armed = false;
+        throw new Error("refused");
+      }
+      return real(...args);
+    }) as typeof real;
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.transcript.entries).toHaveLength(1);
+    const only = h.transcript.entries[0]?.doc;
+    expect(only?.meta.origin, "the one field that says a defect from a quiet verb").toBe("defect");
+    expect(only?.command, "and it is nobody's submission").toBe("");
+  });
+
+  it("T1.49 (C04 I13): `/debug` renders the arm the fifth origin was added for", async () => {
+    // **The justification checked rather than asserted.** `defect` is worth a
+    // fifth arm on a public union only because it separates a contained failure
+    // from a verb that did nothing *in the one field that could say so* — and
+    // that is true only if something displays it. A grep answered it for today;
+    // this answers it for the next person to touch the `/debug` handler.
+    const h = harness();
+    let armed = true;
+    const real = h.transcript.append.bind(h.transcript);
+    h.transcript.append = ((...args: Parameters<typeof real>) => {
+      if (armed) {
+        armed = false;
+        throw new Error("refused");
+      }
+      return real(...args);
+    }) as typeof real;
+
+    h.pipeline.submit("/help");
+    await settled();
+    h.pipeline.submit("/debug 1");
+    await settled();
+
+    const shown = h.transcript.entries.at(-1)?.doc.blocks.flatMap((b) =>
+      b.kind === "keyValue" ? b.rows.map((r) => `${r.label}=${r.value}`) : [],
+    );
+    expect(shown, "the reader the arm's justification rests on").toContain("origin=defect");
+  });
+
+  it("T3.37 (I48, §8b B1): a swallow while stopping is recorded and not appended", async () => {
+    // B1's ruling reaching a fourth non-submission append rather than becoming a
+    // fourth exception to it. The transcript is being torn down; the collection
+    // is what the reader gets, and C22 §8 step 3 has not run yet.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error("refused while stopping");
+    }) as typeof h.transcript.append;
+    h.session.beginStopping();
+
+    // Not `submit`, which I12 refuses before it reaches the append at all — the
+    // greeting is one of the paths that appends without being a submission.
+    h.pipeline.greeting({ schema: "tui.view/1", command: "", status: "ok", blocks: [], meta: {
+      verb: null, adapter: "none", exitCode: 0, durationMs: 0, truncated: false,
+      argv: [], stderr: "", transport: "local", origin: "user",
+    } });
+    await settled();
+
+    expect(h.pipeline.faults.join("\n")).toContain("refused while stopping");
+    expect(h.transcript.entries, "and nothing was appended after shutdown began").toHaveLength(0);
+  });
+
+  it("T3.38 (§5a): when the notice cannot land either, the collection still has it", async () => {
+    // **The end of the ladder, fabricated rather than stated.** A frozen shape
+    // is a claim about a construction path, and the glyph defect is how F15 was
+    // found in the first place — this row is what caught the fault notice being
+    // composed with `status: "error"` and no `error` field, which C04 I3 refuses.
+    const h = harness();
+    h.transcript.append = (() => {
+      throw new Error("everything is refused");
+    }) as typeof h.transcript.append;
+
+    h.pipeline.submit("/help");
+    await settled();
+
+    expect(h.transcript.entries, "nothing could be appended at all").toHaveLength(0);
+    expect(h.pipeline.faults.join("\n")).toContain("everything is refused");
+  });
 });
 
 describe("C23 tier 2 — contract", () => {
@@ -780,6 +994,93 @@ describe("C23 tier 3 — edges", () => {
     await settled();
   });
 
+  it("T3.17 (I50, F151): a failing shell command produces an entry rather than a refusal", async () => {
+    // **The row is `toHaveLength(1)`, and that is the whole finding.** This
+    // composed `status: "error"` with no `error` field, C04 I3 forbids that in
+    // both directions, and `transcript.append` refused it — so the route
+    // produced *no entry at all* and the reader saw a fault notice citing two
+    // invariant numbers in place of the command they typed.
+    //
+    // Reached by typing a bare word where the shell wants a prefixed verb,
+    // which is the likeliest thing an unfamiliar reader does and the one input
+    // nothing had ever run.
+    const h = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { /* a command that was not found says nothing here */ })(),
+        stderr: (async function* () { yield "sh: 1: list: not found\n"; })(),
+        exited: Promise.resolve({ code: 127, signal: null }),
+        overflowed: false,
+      }),
+    });
+
+    h.pipeline.submit("list");
+    await settled();
+
+    expect(h.transcript.entries, "the failing command produced no entry").toHaveLength(1);
+    const doc = h.transcript.entries[0]?.doc;
+    expect(doc?.status).toBe("error");
+    // C04 I3's other direction — present *because* the status is `"error"`.
+    expect(doc?.error?.message, "the error field C13 refused the document for").toBe(
+      "The command exited with code 127.",
+    );
+
+    // **And the sentence that names what happened.** `ChildHandle` delivers the
+    // two streams separately (C21 I3) and the route read only `stdout`, so the
+    // one line identifying the token was produced, delivered and dropped —
+    // leaving a raw block that was empty as well as unappendable.
+    const text = JSON.stringify(doc?.blocks);
+    expect(text, "the shell's own line never reached the document").toContain("list: not found");
+    // The empty stdout is not drawn as a blank row beside the notice.
+    expect(doc?.blocks, "an empty stream became a block").toHaveLength(2);
+  });
+
+  it("T3.18 (I50, F151): a signal is named, and a success is unchanged", async () => {
+    const killed = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { /* nothing */ })(),
+        stderr: (async function* () { /* nothing */ })(),
+        exited: Promise.resolve({ code: null, signal: "SIGTERM" }),
+        overflowed: false,
+      }),
+    });
+    killed.pipeline.submit("sleep 99");
+    await settled();
+    expect(killed.transcript.entries[0]?.doc.error?.message).toBe("Killed by SIGTERM.");
+
+    // **The control, and it is what stops this row from being satisfied by a
+    // route that calls everything an error.** The success path is asserted to
+    // be exactly what it was: one raw block, no notice, no `error`.
+    const ok = harness();
+    ok.pipeline.submit("echo hi");
+    await settled();
+    const doc = ok.transcript.entries[0]?.doc;
+    expect(doc?.status).toBe("ok");
+    expect(doc?.error).toBeUndefined();
+    expect(doc?.blocks).toHaveLength(1);
+    expect(doc?.blocks[0]?.kind).toBe("raw");
+
+    // **A command that succeeds and says nothing, which is the arm the
+    // mutation pass found missing.** "The success path is unchanged" was
+    // asserted only where there was output to see, so eliding an empty raw
+    // block survived — a real change (one block becomes none for every silent
+    // `true`, `cd`, `touch`) that no row could observe, because the fake always
+    // yielded text. The fixture agreed with the claim on the only input it had.
+    const silent = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { /* nothing */ })(),
+        stderr: (async function* () { /* nothing */ })(),
+        exited: Promise.resolve({ code: 0, signal: null }),
+        overflowed: false,
+      }),
+    });
+    silent.pipeline.submit("true");
+    await settled();
+    const quiet = silent.transcript.entries[0]?.doc;
+    expect(quiet?.status).toBe("ok");
+    expect(quiet?.blocks, "a silent success lost its block").toHaveLength(1);
+    expect(quiet?.blocks[0]).toMatchObject({ kind: "raw", text: "" });
+  });
+
   it("T3.16 (I5): a shell route holds the guard exactly as an app verb does", async () => {
     // `sleep 30` delegated to the shell is a foreground command, and no shell
     // lets you type another over it. Scoping the guard to app verbs is the
@@ -788,7 +1089,8 @@ describe("C23 tier 3 — edges", () => {
     const h = harness({
       spawnShell: () => ({
         stdout: (async function* () { yield "x"; })(),
-        exited: new Promise((r) => { finish = () => r({ code: 0 }); }),
+        stderr: (async function* () { /* nothing */ })(),
+        exited: new Promise((r) => { finish = () => r({ code: 0, signal: null }); }),
         overflowed: false,
       }),
     });
@@ -1318,6 +1620,54 @@ describe("C23 §4 — the submit row's two other steps", () => {
     h.tick(1500);
     await settled();
     expect(ticks.adapter, "an adapter's b.live must be driven too (I33a)").toBeGreaterThan(0);
+  });
+
+  it("T1.46 (C07 I18, I40): a transcript entry's producer is told `null`, a view's is told the region", async () => {
+    // **The row the mutation pass asked for.** Making `height` unconditional —
+    // handing every producer the region — passed all 2575 tests, because the
+    // adapter double declared `ctx: { command: string }` and erased the field.
+    // A grant nothing observes is a grant nothing can be wrong about.
+    const entry = harness();
+    entry.pipeline.submit("/ps");
+    await settled();
+
+    const onEntry = entry.contexts.find((c) => c.where === "adapt")?.ctx;
+    expect(onEntry, "the adapter route ran").toBeDefined();
+    expect(onEntry?.height, "a transcript entry is windowed by rows and has no bound").toBe(null);
+    expect(onEntry?.width).toBe(80);
+
+    // The view route, where a bound exists and C23 knows it before step 3.
+    const view = harness({
+      stream: async function* () {
+        yield { kind: "data", value: { line: "one" } } as const;
+        await new Promise(() => undefined);
+      },
+      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
+    });
+    view.pipeline.submit("/tail --screen");
+    await settled();
+
+    const onView = view.contexts.find((c) => c.where === "adaptPatch")?.ctx;
+    expect(onView, "the view route ran").toBeDefined();
+    expect(onView?.height, "a view is defined by the region — C15 §4").toBe(24);
+  });
+
+  it("T1.47 (C07 I19, I20): the capabilities are the resolved record and `measure` is the frame's", async () => {
+    // The other two facts, and the same argument: without this, swapping
+    // `deps.capabilities` for any literal, or `measure` for `() => 0`, changes
+    // nothing anywhere in the suite.
+    const h = harness();
+    h.pipeline.submit("/ps");
+    await settled();
+
+    const ctx = h.contexts.find((c) => c.where === "adapt")?.ctx;
+    expect(ctx?.capabilities, "the record C22 resolved, not a re-detection").toBe(FULL_CAPABILITIES);
+
+    // Measured through the context and through the registry directly: one
+    // arithmetic, or a producer's split and the frame's rows disagree (C09 I1).
+    const sample = block({ kind: "raw", id: "m", text: "one\ntwo\nthree" });
+    expect(ctx?.measure(sample, 40)).toBe(blocks.measure(sample, 40));
+    expect(ctx?.measure(sample, 40)).toBeGreaterThan(0);
   });
 
   it("T1.41 (C22 I48): a view+streams verb patches the view and releases the guard", async () => {

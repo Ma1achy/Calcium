@@ -1,4 +1,19 @@
-# The do-first list
+# The do-first list — **RETIRED at F93**
+
+> **This is the F55-era record, and its ranking is superseded.** The live documents are
+> [`CALCIUM_FIX_PLAN.md`](../CALCIUM_FIX_PLAN.md) for the remainder and
+> [`CALCIUM_ROADMAP.md`](../CALCIUM_ROADMAP.md) for the features.
+>
+> **Not deleted, because the ranking is what went stale and the evidence did not.** All four
+> entries below sit inside `CALCIUM_ROADMAP.md`'s phases 1 and 2 — 1 → 1.1, 2 → 1.3, 3 → 2.1,
+> 4 → 1.2 — so the two documents never disagreed; this one is the earlier subset. What it
+> still holds that nothing else does is **43 finding citations and the reasoning behind
+> them**, against the newer file's 24.
+>
+> **The four counts below are all low.** `examples/docker/TRIAGE.md` and
+> `CALCIUM_GAP_PLAN.md` carry the current figures — entry 1 is **twelve** findings behind
+> one ruling, not six, and none of the four moved because anything got more severe. They
+> moved because a fourth or fifth consumer turned up.
 
 Four pieces of Calcium work, each with a real application hitting it. Derived from
 `examples/docker/FINDINGS.md` — sixty-seven entries logged in the order they were hit — by

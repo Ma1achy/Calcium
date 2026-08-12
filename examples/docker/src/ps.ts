@@ -170,17 +170,7 @@ export function createPsAdapter(): Adapter {
               }),
               ...(rows.length === 0 ? [] : [b.notice("muted", summary, undefined, { gapBefore: true })]),
             ],
-        meta: {
-          verb: ctx.verb,
-          adapter: "ps",
-          exitCode: result.exitCode ?? 0,
-          durationMs: result.durationMs,
-          truncated: false,
-          argv: result.argv,
-          stderr: result.stderr,
-          transport: ctx.transport,
-          origin: ctx.origin,
-        },
+        meta: { adapter: "ps", truncated: false },
       };
     },
   };

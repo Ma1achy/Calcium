@@ -2,13 +2,129 @@
 import { describe, expect, it } from "vitest";
 import { displayCells } from "../../src/presentation/text.js";
 import { block } from "../../src/data/viewmodel/index.js";
-import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import {
+  createBlockRegistry,
+  DEFAULT_LANGUAGES,
+  registerGrammar,
+  tokenise,
+  UNSLOTTED,
+} from "../../src/presentation/blocks/index.js";
+import type { RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 
 describe("C09 §6 — the registry's transition table", () => {
+
+  it("T3.31 (C09 I23): a grammar registers after the fact, and the memo does not outlive it", async () => {
+    // **The memo is the subject, not the export.** `tokenise` caches the
+    // *fallback* under `language\u0000text`, so a registration that does not
+    // invalidate leaves every block already rendered as plain text — and every
+    // assertion about `registerGrammar` existing still passes (F123).
+    const text = "SELECT 1;";
+    const before = tokenise(text, "madeuplang");
+    expect(before, "unregistered falls back to one unslotted run").toEqual([
+      { text, slot: null },
+    ]);
+
+    // The control the row needs: the fallback is now *in the memo* under this
+    // key. Without it the assertion below could pass on a tokeniser that never
+    // cached anything, which is a different implementation than the one here.
+    expect(tokenise(text, "madeuplang"), "and it is cached").toBe(before);
+
+    const sql = (await import("highlight.js/lib/languages/sql")).default;
+    registerGrammar("madeuplang", sql);
+
+    const after = tokenise(text, "madeuplang");
+    expect(after.some((t) => t.slot !== null), "highlighted whenever someone registers it").toBe(
+      true,
+    );
+
+    // **And nothing reflows** (I8) — the other half of I23, and the reason
+    // registration is safe at any moment rather than only at composition.
+    const rendered = (lang: string): number =>
+      renderToLines(
+        createBlockRegistry({ defaults: true }),
+        block({ kind: "code", id: "code-r", language: lang, text }),
+        40,
+        { theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0, onAction: () => undefined },
+      ).length;
+    expect(rendered("madeuplang")).toBe(rendered("json"));
+  });
+
+  it("T3.32 (C09 I24): every grammar in the default set colours something", () => {
+    // **Over the set rather than per grammar**, because what this catches is a
+    // grammar added later whose emitted classes nobody checked — and a per-
+    // grammar row can only be written for the ones already known. `markdown`
+    // is the row that failed before `SLOTS` was extended: four runs, none
+    // slotted, which is indistinguishable from not shipping it (F123).
+    const SAMPLES: Readonly<Record<string, string>> = {
+      bash: 'for f in *.ts; do echo "$f"; done # c',
+      css: ".a { color: #fff; } /* c */",
+      diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
+      dockerfile: "FROM node:22\nRUN npm ci\n",
+      go: 'func main() { fmt.Println("hi") } // c',
+      ini: "[s]\nk = v ; c\n",
+      java: "public class A { public static void main(String[] a) {} }",
+      javascript: "async function f(a) { return await g(a); } // c",
+      json: '{"a": 1, "b": [true, null]}',
+      markdown: "# h\n\n`code` and text\n",
+      python: "def f(x):\n    return [i for i in range(x)]  # c",
+      rust: "fn main() { let v: Vec<u8> = vec![1]; } // c",
+      sql: "SELECT id FROM t WHERE x > 1; -- c",
+      typescript: "export const f = (x: number): string => `n`; // c",
+      xml: '<a href="x">t</a><!-- c -->',
+      yaml: "a: 1\nb:\n  - x\n",
+    };
+
+    // The set drives the samples, not the other way round: a grammar added with
+    // no sample fails here rather than being silently uncovered.
+    expect(Object.keys(SAMPLES).sort()).toEqual([...DEFAULT_LANGUAGES]);
+
+    const dead = DEFAULT_LANGUAGES.filter(
+      (lang) => !tokenise(SAMPLES[lang] ?? "", lang).some((t) => t.slot !== null),
+    );
+    expect(dead, "a grammar that colours nothing is a grammar not shipped").toEqual([]);
+
+    // The deliberate omissions, with the bidirectional arm MG27 and SS47 have:
+    // an entry that starts being mapped is a stale reason rather than a pass.
+    for (const [cls, why] of Object.entries(UNSLOTTED)) {
+      expect(why.length, `${cls} needs a reason`).toBeGreaterThan(20);
+    }
+    expect(
+      Object.keys(UNSLOTTED),
+      "the change axis is refused a slot on C04's ruling, not on judgement here",
+    ).toContain("hljs-addition");
+  });
+
+  it("T2.x (C09, F85): a caller cannot supply the two fields the registry owns", () => {
+    // **The narrowing, asserted where it has to hold: at compile time.**
+    // `registry.render` overwrote `measureChild` and `renderChild` on every call
+    // — `{ ...ctx, measureChild: this.measure, renderChild: … }` — while the type
+    // demanded them, so the only way to satisfy it was to write something untrue.
+    // `render-lines.ts` supplied a stub that **threw if called**, correct only
+    // because the overwrite is unconditional, with a comment as the whole of the
+    // guarantee.
+    //
+    // **The fix is narrower, not wider.** Optional fields would stay discarded;
+    // absent ones make supplying them fail to compile rather than fail to matter.
+    const ctx: RenderContextInput = {
+      width: 40,
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+      tick: 0,
+      onAction: () => undefined,
+    };
+    expect(ctx).not.toHaveProperty("renderChild");
+
+    // @ts-expect-error — the registry owns `renderChild`; a caller supplying one
+    // is what F85 is. Removing the `Omit` makes this line compile and the file
+    // stops building, which is the assertion.
+    const illegal: RenderContextInput = { ...ctx, renderChild: () => null as never };
+    void illegal;
+  });
   it("T1.1: register in the open state → get returns it, kinds includes it", () => {
     const registry = createBlockRegistry({});
     registry.register({
@@ -280,6 +396,152 @@ describe("C09 §6 — kinds", () => {
     expect(header, "both of them").toMatch(/\bb\b/);
     expect(header, "and not directional ones").not.toContain("before");
     expect(header, "either of them").not.toContain("after");
+  });
+
+  it("T1.4c (C04 I35, C04 I36): the change axis is a marker, and it survives one bit", () => {
+    // **The ruling's whole content, asserted where it is decidable.** C04 I35 says a
+    // categorical axis is carried by a marker and only *emphasised* by a tone.
+    // The check that it holds is not that the marker is drawn — it is that
+    // nothing is lost when the colour goes, so both depths are rendered and the
+    // markers compared.
+    //
+    // Read off a frame rather than off `CHANGE_MARKERS`, because a test that
+    // reads the renderer's own table agrees with it by construction.
+    const changed = block({
+      kind: "comparison",
+      id: "c",
+      rows: [
+        { field: "image", a: "nginx:1.2", b: "nginx:1.3", change: "changed" },
+        { field: "env.NEW", a: "", b: "on", change: "added" },
+        { field: "env.OLD", a: "off", b: "", change: "removed" },
+        { field: "ports", a: "80", b: "80", change: "unchanged" },
+      ],
+    });
+
+    const full = measurable().renderToLines(changed, 56).map(visible);
+    const mono = measurable({ capabilities: MONO_CAPS }).renderToLines(changed, 56).map(visible);
+
+    // Right-trimmed on both sides: at one bit a run of trailing spaces carries
+    // no background and is dropped, which is a difference about padding rather
+    // than about meaning. Comparing raw made this row fail for the one reason
+    // it is not testing.
+    expect(mono.map((l) => l.trimEnd()), "the axis is not carried by colour").toEqual(
+      full.map((l) => l.trimEnd()),
+    );
+    expect(full[1]?.startsWith("~"), "changed").toBe(true);
+    expect(full[2]?.startsWith("+"), "added — the member F30 had nowhere to put").toBe(true);
+    expect(full[3]?.startsWith("-"), "removed").toBe(true);
+    expect(full[4]?.startsWith(" "), "unchanged is blank, not a fourth mark").toBe(true);
+  });
+
+  it("T1.4e (C04 I35, F51): an event's tone reaches the paint, and the word survives without it", () => {
+    // **Added because the mutation pass found nothing to kill.** Removing
+    // `event.tone ?? ` from the renderer left 33 rows green: the field was in
+    // the type, the builder and the D29 sweep, and no row asserted that
+    // anything painted it. A checker that inspects a document agrees with the
+    // document, not with the screen.
+    const events = (tone?: "error") =>
+      block({
+        kind: "events",
+        id: "e",
+        events: [{ ts: "12:00:01", type: "die", message: "exit 137", ...(tone ? { tone } : {}) }],
+      });
+
+    const kit = measurable();
+    const toned = kit.renderToLines(events("error"), 60);
+    const plain = kit.renderToLines(events(), 60);
+
+    // Raw, not `visible` — the difference under test is the escape sequence.
+    expect(toned, "the tone changes what is emitted").not.toEqual(plain);
+    expect(toned.map(visible), "and changes nothing about the text").toEqual(plain.map(visible));
+
+    // D29's half: the type word is on screen either way, so the colour
+    // emphasises rather than carries (C04 I35).
+    expect(visible(toned[0] ?? "")).toContain("die");
+  });
+
+  it("T1.4f (C04 I38): the verdict's mark is derived, and it is what survives ASCII", () => {
+    // **F34's measured half, and the frame is what settled it.** Before this,
+    // `better`, `worse` and no verdict at all rendered *identically* at every
+    // depth — the tone was the only difference and `200ms` against `150ms` says
+    // nothing about which is wanted, so unlike `same`/`changed` a reader could
+    // not recover it from the two cells.
+    const judged = block({
+      kind: "comparison",
+      id: "j",
+      rows: [
+        { field: "p99", a: "200ms", b: "150ms", verdict: "better" },
+        { field: "auprc", a: "0.912", b: "0.930", verdict: "worse" },
+        { field: "loss", a: "0.03", b: "0.04" },
+      ],
+    });
+
+    const uni = measurable().renderToLines(judged, 48).map(visible);
+    const asc = measurable({ capabilities: ASCII_CAPS }).renderToLines(judged, 48).map(visible);
+
+    expect(uni[1], "better").toContain("✓ 150ms");
+    expect(uni[2], "worse").toContain("✗ 0.930");
+    expect(uni[3], "and no verdict is no mark").not.toMatch(/[✓✗]/u);
+
+    // The mark is the carrier, so it has to survive the substitution — and it
+    // is 1:1 by cell count, which is why the rows stay the same width.
+    expect(asc[1]).toContain("+ 150ms");
+    expect(asc[2]).toContain("x 0.930");
+    for (const [i, line] of asc.entries()) expect(line, `row ${String(i)}`).toHaveLength(48);
+  });
+
+  it("T1.4g (C04 I39): a live panel says so, in a slot that degrades and costs no height", () => {
+    // **A slot reserved and unreachable since C04 was written** — `Glyph` has
+    // carried `live` with both renderings, two surfaces draw it, and nothing in
+    // the tree consumed it (F18). A03 §2's class in the glyph table.
+    const of = (live: boolean) =>
+      block({
+        kind: "panel",
+        id: live ? "p" : "q",
+        title: "containers",
+        ...(live ? { live: true } : {}),
+        children: [block({ kind: "rule", id: live ? "r" : "s", label: "x" })],
+      });
+
+    const kit = measurable();
+    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toContain("▌ containers");
+    expect(visible(kit.renderToLines(of(false), 40)[0] ?? "")).not.toContain("▌");
+
+    // The whole argument for a slot rather than a character in the title.
+    const ascii = measurable({ capabilities: ASCII_CAPS });
+    expect(visible(ascii.renderToLines(of(true), 40)[0] ?? "")).toContain("| containers");
+
+    // It rides in a border drawn either way, so the panel is children + 2 still.
+    expect(kit.measure(of(true), 40)).toBe(kit.measure(of(false), 40));
+    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toHaveLength(40);
+  });
+
+  it("T1.4h (C04 I40): a comparison names its columns, and says nothing when it has nothing to say", () => {
+    const rows = [{ field: "cmd", a: "nginx", b: "nginx" }];
+    const named = block({ kind: "comparison", id: "n", rows, labels: ["nginx:alpine", "dtui-web"] });
+    const bare = block({ kind: "comparison", id: "b", rows });
+
+    const kit = measurable();
+    const head = visible(kit.renderToLines(named, 60)[0] ?? "");
+    expect(head).toContain("nginx:alpine");
+    expect(head).toContain("dtui-web");
+
+    // Positional stays the default: absent labels are not `["a", "b"]` written
+    // in by a builder, they are absent, and the header is what it always was.
+    expect(visible(kit.renderToLines(bare, 60)[0] ?? "")).toMatch(/\ba\b.*\bb\b/u);
+    expect(kit.measure(named, 60)).toBe(kit.measure(bare, 60));
+  });
+
+  it("T1.4d (C04 I36): a block using only the verdict half renders as it did before the split", () => {
+    // **The regression the split could most easily have caused.** The marker
+    // column is per-block, so a comparison that declares no change must be
+    // untouched — and every shipped consumer of this kind is one, which is why
+    // the suite stayed green through a layout change and why this row exists.
+    const kit = measurable();
+    const lines = kit.renderToLines(ONE_PER_KIND.comparison, 56).map(visible);
+
+    expect(lines[0]?.startsWith("field"), "no marker column, no leading pad").toBe(true);
+    for (const l of lines) expect(l, "and the width is unchanged").toHaveLength(56);
   });
 
   it("T1.12b (I5): under ASCII every glyph is one cell and the row count is unchanged", () => {

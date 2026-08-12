@@ -149,29 +149,17 @@ if [ "$is_stats" -eq 1 ]; then
   set -- "$@" --no-stream
 fi
 
-# `--raw` is docker-tui's own, and Calcium sends every declared flag to the far
-# side (C06 I4: argv goes over verbatim). There is no way to declare a flag that
-# selects a *rendering* rather than an invocation, so `/inspect <c> --raw` runs
-# `docker inspect <c> --raw` and docker exits 125 with `unknown flag: --raw`.
+# **`--raw` is no longer stripped here, and the strip is what this records.**
+# Calcium sent every declared flag to the far side (C06 I4: argv goes over
+# verbatim), so `/inspect <c> --raw` ran `docker inspect <c> --raw` and docker
+# exited 125. This file absorbed it — honest, and not a fix.
 #
-# Found by reading the frame. Every unit row passed, because they hand argv to
-# the adapter directly and never spawn anything — the suite tests the mechanism
-# and the shim is the wiring. FINDINGS F39.
-#
-# The adapter still sees it: `RawResult.argv` is what Calcium built, and this
-# strips only what reaches docker. Third translation in this file, and the first
-# that is not about the far side's shape at all — it is about the framework
-# having no place to put a presentation flag.
+# C05 I21 is the fix: a flag declared `shellOnly` is validated, readable through
+# `ctx.flags`, and never reaches argv. So the shim has nothing to do, and the
+# translation that was here is deleted rather than left commented — a shim that
+# strips a flag Calcium already removed is a second answer to a settled
+# question. FINDINGS F39.
 case "${1:-}" in
-  inspect)
-    original=$#
-    for arg in "$@"; do
-      if [ "$arg" != "--raw" ]; then
-        set -- "$@" "$arg"
-      fi
-    done
-    shift "$original"
-    ;;
   logs)
     # **`-f` and `--tail` are supplied here for F39's reason.** Calcium builds
     # argv from what the reader typed plus what the manifest declares, so an app

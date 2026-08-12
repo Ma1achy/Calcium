@@ -25,6 +25,7 @@ import {
   type Far,
 } from "../src/config.ts";
 
+import { localContext } from "@fmx/calcium/testing";
 const IMAGE_CONF = [
   "server {",
   "    listen       80;",
@@ -55,7 +56,7 @@ const far = (over: Partial<Far> = {}): Far => ({
   ...over,
 });
 
-const ctx = { command: "/config dtui-cfg /etc/nginx/conf.d/default.conf" };
+const ctx = { ...localContext(), command: "/config dtui-cfg /etc/nginx/conf.d/default.conf" };
 const ARGV = ["dtui-cfg", "/etc/nginx/conf.d/default.conf"];
 
 const patchOf = (doc: { blocks: readonly Block[] }): Patch | undefined =>
@@ -217,7 +218,7 @@ describe("the verb", () => {
     // `.Mounts` gives `Type: "bind"` for a file and for a directory with no
     // distinguishing field, so discovery cannot be ruled in. The set is the
     // honest answer; picking from it would be a guess wearing a feature's name.
-    const doc = await createConfigHandler(far())(["dtui-cfg"], { command: "/config dtui-cfg" });
+    const doc = await createConfigHandler(far())(["dtui-cfg"], { ...localContext(), command: "/config dtui-cfg" });
     expect(doc.status).toBe("error");
     expect(doc.error).toBeDefined();
     expect(JSON.stringify(doc.blocks)).toContain("/etc/nginx/conf.d/default.conf");
@@ -232,7 +233,7 @@ describe("the verb", () => {
   it("C13: a container that does not exist is refused before either read", async () => {
     const doc = await createConfigHandler(far({ facts: () => Promise.resolve(null) }))(
       ["nope", "/x"],
-      { command: "/config nope /x" },
+      { ...localContext(), command: "/config nope /x" },
     );
     expect(doc.status).toBe("error");
     expect((doc.blocks[0] as Notice).text).toContain("no such container");

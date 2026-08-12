@@ -2,9 +2,12 @@
  * Step 13's declarations, and the shim translation they imply.
  *
  * **There is no handler to test.** C23 §4 implements the whole sequence and the
- * app writes none of it — `interactive: true` is the entire declaration. So what
+ * app writes none of it — the declaration is the entire contribution. So what
  * this file can assert is that the declaration is right and that the shim
  * supplies what it implies, and the round trip itself is a frame-read.
+ *
+ * F80 changed what *right* means: the contract belongs to the invocation, so
+ * `run` and `exec` declare arms on the flags that decide (C05 I23).
  */
 
 import { execFileSync } from "node:child_process";
@@ -17,10 +20,14 @@ const tools = buildManifest("29.4").tools;
 const named = (n: string) => tools.find((t) => t.name === n);
 
 describe("the handoff verbs", () => {
-  it("T1 (C05 I19): the three that take the terminal declare it, and `create` does not", () => {
-    for (const n of ["exec", "attach", "run"]) {
-      expect(named(n)?.interactive, `${n} takes the terminal`).toBe(true);
-    }
+  it("T1 (C05 I19, I23): each verb declares the default its flags then decide against", () => {
+    // `attach` has one contract and no flags; `run` attaches unless detached;
+    // `exec` returns unless `-i`/`-t`. Three shapes, and the default is only
+    // half of each of the last two.
+    expect(named("attach")?.interactive, "attach takes the terminal, always").toBe(true);
+    expect(named("run")?.interactive, "run attaches by default").toBe(true);
+    expect(named("exec")?.interactive, "exec does not — `docker exec c ls` returns").toBeUndefined();
+
     // `create` makes a container and never attaches; declaring it interactive
     // would suspend the screen around a call that prints an id.
     expect(named("create")?.interactive).toBeUndefined();
@@ -36,13 +43,28 @@ describe("the handoff verbs", () => {
     }
   });
 
-  it("T3 (F80): `run` carries both `-d` and `-t` flags, which is why one slot cannot describe it", () => {
-    const run = named("run")!;
-    const flags = run.flags.map((f) => f.name);
-    // The two that contradict each other. `interactive` is declared on the tool
-    // and true for both invocations, which is the finding.
-    expect(flags).toContain("detach");
-    expect(flags).toContain("tty");
+  it("T3 (F80, C05 I23): the arms are on the flags that decide, and only on those", () => {
+    const armsOf = (n: string): Record<string, boolean | undefined> =>
+      Object.fromEntries(named(n)!.flags.map((f) => [f.name, f.interactive]));
+
+    // **`run` attaches by default, so the arm is `--detach` and it reads
+    // `false`.** `-i` and `-t` carry nothing: an arm equal to the tool's default
+    // is refused at parse, which is what stops two flags disagreeing. So
+    // `/run -dit` is not interactive with no precedence rule consulted.
+    expect(armsOf("run")).toEqual({
+      detach: false,
+      rm: undefined,
+      name: undefined,
+      interactive: undefined,
+      tty: undefined,
+    });
+
+    // **`exec` is the other direction**, which is why one field on the tool
+    // could not describe this family whichever way it was set.
+    expect(armsOf("exec")).toEqual({ interactive: true, tty: true, user: undefined });
+
+    // And a verb with one contract carries no arms at all.
+    expect(named("attach")!.flags).toEqual([]);
   });
 });
 

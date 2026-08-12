@@ -58,7 +58,7 @@ export type {
 };
 
 // adapters — the extension point they use most
-export type { Adapter, AdapterContext, StreamContext, RawResult, RawPatch };
+export type { Adapter, AdapterContext, ProducerContext, StreamContext, RawResult, RawPatch };
 
 // manifest — written by hand
 export type { Manifest, ManifestDocument, ToolDef, FlagDef, ArgDef, ArgType, ValidationResult };
@@ -68,6 +68,7 @@ export type { ThemeTokens, ThemeSet, PaletteSpec, ColourRef, Style };
 export { defaultTheme };
 
 // hooks
+export type { LocalHandler, LocalContext, AskOptions, Choice };   // C23 §2 — and `localHandlers` refuses a wider ctx (C23 I39)
 export type { CompletionSource, CompletionContext, Candidate, Slot };
 export type { LiveSpec, ViewRefresh };
 export type { Identity };
@@ -88,8 +89,13 @@ step with a name and no mechanism. `TuiConfig` had no field, nothing fired
 anything, and C22's own T3.10 and T3.11 tested it and had never been written.
 
 ```ts
-greeting?: () => ViewDocument | Promise<ViewDocument>;
+greeting?: (ctx: ProducerContext) => ViewDocument | Promise<ViewDocument>;
 ```
+
+**It takes the context because it is a producer** (C23 I40). The hook returns a
+document and was handed nothing, which is the same omission the local route had
+at four other sites — a producer told nothing decides anyway, from a worse copy
+of the fact. It falls out of the producer ruling rather than extending it.
 
 Fired at step 7 and **not awaited**, so a greeting that hangs or rejects leaves
 the prompt usable and simply produces no entry. It appends through C23's ordinary
@@ -138,10 +144,20 @@ notice.** It took a consumer that respected the boundary — docker-tui, whose
 first act was a test asserting a deep import is a resolution error — and it
 failed on that app's first start. See `examples/docker/FINDINGS.md` F7.
 
-`parseManifest` is deliberately **still not exported**. Exporting it would make
-the working path *"call this first"*, which leaves `TuiConfig.manifest: Manifest`
-exactly as misleading as it was. The framework's own verbs are the framework's to
-add, and construction now parses both arms itself (C22 §3a, C22 I23).
+`parseManifest` was deliberately **not exported**, and that ruling was reversed
+by I19 without this paragraph hearing about it. Exporting it would have made the
+working path *"call this first"*, which leaves `TuiConfig.manifest: Manifest`
+exactly as misleading as it was; construction parses both arms itself (C22 §3a,
+C22 I23) and that is still true and still the reason `createTui` needs no such
+call. What changed is a *second* consumer: `contextAt` takes a `Manifest` and an
+app hands `createTui` an unparsed document, so a consumer implementing
+`CompletionSource` had no producer for the type its own hook receives. It is
+exported, for I19's reason and not as the entry path.
+
+**Recorded rather than corrected quietly**, because a spec paragraph and an
+export that disagree is the state `CLAUDE.md` calls worse than either being
+wrong on its own — and this one read as a live ruling for as long as it was
+false.
 
 **`planColumns` is public** because a custom table-like kind needs it and it is pure. `cells` and `truncate` likewise — a kind that measured width itself would be wrong in a different way from every other kind.
 
@@ -168,6 +184,21 @@ A consumer never constructs, inspects or drives any of them. If one is ever need
 | `ExecutionWrites.setRetained` | C22 session state | **Drop.** `SessionSnapshot` already carries the readable half of the session; the writable half is the shell driving itself, and a consumer that could write it could contradict the shell. |
 
 None of the three moves the export list, and all three stay in `UNCONSUMED_MEMBERS` naming their owner — this ruling says they are not public, not that they are finished.
+
+### What a producer is told, and what stays interior
+
+`ProducerContext` is on the surface and three of the things it replaces are not. The pairing is the point: **a refusal with no mechanism named is a deferral wearing a ruling's clothes**, and each of these was filed as a missing export by a consumer that had a real need.
+
+| filed as | ruling | what the consumer uses instead |
+|---|---|---|
+| export `detectCapabilities` (F43, F54, F124) | **refused** | `ProducerContext.capabilities` — C02's **resolved** record. An app re-deriving from the environment reads seven variables it does not know about and misses the overrides it supplied itself; measured wrong at three of four locale shapes, in both directions, inside the fix written for the finding that asked for it. |
+| export `createBlockRegistry` (F37) | **refused** — it is one of the eleven | `ProducerContext.measure` for production, `expectDocument().lines()` for evidence (§7, I23) |
+| export `validateDocument` (F36) | **refused**, and it was already served | `expectDocument().isValid()`, which has shipped since this section was written. What survived was a deep import nobody re-checked against the surface — a workaround to delete, not a gap to close. |
+| export `liveDeclarations` (F28) | **refused on this entry** | `liveParts` on `@fmx/calcium/testing` (§7, I24). The cost is to testing by the finding's own text; a production consumer reading back its own declaration holds a second record of the document. |
+| an adapter that can `ask` (F77) | **refused** | the local route (C23 §2). C07 specifies a pure mapping from result to document. The 185 lines that finding measured are `meta`, the failure arm, the invocation record and the spawn — the confirm was never the expensive part, and the producer grant closes the rest. |
+| tell a live part the width so it can size its own history (F24, F25) | **refused, and nothing replaces it** | C12 already buckets N samples into the available dot columns, with I5 keeping each column's vertical span. The finding reports a view opened at 120 and read at 80 drawing *"two samples per column"*; that is C12 working. The ring's length is retention, which the producer owns and no terminal bounds. **Measured against `plot/curve.ts`, and the direction inverts** — over-wide is handled, under-wide is a resolution loss rather than a wrong frame. `render` still receives the context, for `capabilities`: a live panel drawing `░█` is F54's list inside F24's route. |
+
+**Six findings, one question, and the answer is not uniform** — which is what makes it a ruling. Four grants, five refusals, and every refusal names the thing that does the work instead.
 
 **`ViewRefresh` was off the hooks list until C23 drove it, and it is on now.** It is the declaration type for C23 §3b's part refresh, and for the whole of C22 and C23 that section implemented two of its three mechanisms: stall detection and the identity notice had drivers, part refresh had none. `ViewRefresh`, `assignOffsets` and `backoffOf` were a complete producer whose only consumer was a unit test, and exporting the declaration type of a mechanism nothing runs is A03 §2's vacuity class arriving as an export — a consumer declares a refreshing part, everything type-checks, and nothing ever fires. **The condition was the driver, not a release date**, which is why the sentence named one; C23 I32, C23 I33, C23 I34 and C23 I35 satisfied it and the type crossed with
 `b.live` (§5).
@@ -297,11 +328,24 @@ The other three stay off the builder, each for its own reason, **written here
 rather than left as an omission** so the next consumer knows the cost of taking
 one:
 
-- **`yFormat` is a trap in the shape a caller wants it.** `percent` multiplies by
-  100, so it expects a fraction — and the far sides that emit a field called a
-  percentage mostly emit `100.2`, not `1.002`. The obvious call renders
-  `10020%`. Exposing it wants either a second format or a sentence at the call
-  site, and neither is a builder change.
+- **`yFormat` was a trap in the shape a caller wants it, and it is on the builder
+  now** (C04 I41, F31). The reasoning above was right about the trap and wrong
+  about the disposal: *exposing it wants either a second format or a sentence at
+  the call site, and neither is a builder change* treated the trap as a reason to
+  withhold the field, when the trap was in the **naming** and the withholding is
+  what left it unfixed. `percent` multiplied by 100, so it expected a fraction,
+  and the far sides that emit a field called a percentage emit `100.2` — the
+  obvious call rendered `10020%`.
+
+  So the arms are named for the unit that **arrives**: `fraction` takes `0.84`,
+  `percent` takes `100.2`. `fraction` is the old `percent` renamed. With that
+  settled there is no sentence left to put at the call site, and the field goes
+  on `b.plot` with the pin.
+
+  **An omission with a recorded reason is a decision until something needs it.**
+  This entry is the measured case for that: the reason was written down, it was
+  accurate, and it survived because nothing pressed on it — which is what tier 4
+  is, and F31 is the consumer that pressed.
 - **`xLabels` is a fixed three-tuple**, which cannot hold the one thing S3's plot
   actually needed to say about its horizontal axis — that it counts ticks and how
   many returned nothing. A surface whose axis is a sentence has to put it in a
@@ -449,14 +493,63 @@ type LiveSpec = Readonly<{
   id:     string;
   title:  string;                                  // the panel's, and where state is said
   every?: number;                                  // omit → one-shot, no retry
-  fetch?: () => Promise<unknown>;
-  stream?: () => AsyncIterable<unknown>;           // → stall detection
-  render: (data: unknown) => Block;
+  fetch:  () => Promise<unknown>;                  // required — I21, F78
+  source?: string;                                 // shared with every part naming it
+  derive?: { key: string; compute: (data: unknown, prev: unknown) => unknown };
+  render: (data: unknown, ctx: ProducerContext) => Block;
   renderError?:   (err: ErrorLike, retryInMs: number | null) => Block;
   renderLoading?: () => Block;
   staleAfter?: number;                             // default 2 × every
 }>;
 ```
+
+> **`stream` is gone and `fetch` is required** (I21, F78) — the block above carried both for
+> as long as this section was specified-and-not-shipped, which is the state that lets a type
+> in a spec disagree with an invariant two hundred lines below it.
+
+### `source` and `derive` — one poll behind several parts (C23 §3c)
+
+**`source` is a key and not a fetch**, because functions cannot be compared and sharing needs
+a declared claim of sameness. Every part naming one key shares **one** `fetch` and one
+derivation; only `render` is per instance, so two panels of one document cannot show two
+samples of one instant — which is what they did, measured at `19` against `20` in a single
+composed frame before this existed.
+
+**`derive` is a fold over that source's versions**, run once per version and shared by key,
+and its result reaches `render` in the fetched data's place. It exists because the rule below
+has to be satisfiable:
+
+> **Per-part state is view state only. Anything that accumulates belongs in a derivation.**
+
+A ring buffer maintained inside `fetch` is the shape that rule forbids, and it is what the
+reference app did — so `derive` is not a convenience beside `source`, it is what makes
+`source` usable at all.
+
+**Two rulings a consumer will meet.** Two parts naming one key with different `every` is
+**refused**, naming both parts and both values — a conflicting cadence is a programming error
+and refusing is available, so arbitrating it would store the loser's declaration where it
+reads as honoured. **The refusal is drawn in the losing part's panel**, because a thrown one
+never reaches you: the declaration happens inside the append, whose bare catch is deliberate,
+and the measured result was two panels at `◌ loading` for the whole session with nothing
+anywhere saying why. And two parts naming one key with different `fetch`
+closures is **not checked**: the key is the claim that these fetches are the same and the
+framework takes it, which is exactly the standing of `source` being a string.
+
+### A behaviour change for parts that declared nothing
+
+**A source polls only while something is looking at it** (C23 I46). Scroll a hosting entry
+out of the viewport and the fetch stops; scroll back and it is due immediately. This applies
+to **every** live part and not only those declaring a `source`.
+
+**It is not configurable, which is I6**, and the asymmetry is why it is safe to make it
+unconditional: a part accumulating inside its `fetch` is already broken by the rule above, so
+pausing surfaces that defect rather than causing it. The alternative — pausing only parts
+that opted into sharing — would make off-screen behaviour depend on an unrelated declaration,
+so an app adding a key to share a fetch would find its polling semantics changed with it.
+
+**What does not change**: nothing is released, the part stays declared, and C23 I33's five
+triggers remain the only teardown. A pushed view is visible while its layer exists, so the
+pause reaches transcript-hosted parts and does not reach a drill-in at all.
 
 **`b.live` returns a `panel`, and the three renderings supply its child.** Both
 halves were forced rather than chosen, and by different things.
@@ -548,7 +641,13 @@ interface DocumentAssertions {
   degradesTo1Bit(): this;                          // B04 B4.3 — glyph or word carries it
   hasNoColourOnlyDistinction(): this;              // D29
   matchesGolden(name: string): this;
+
+  lines(width: number, opts?: RenderOpts): readonly string[];   // I23 — the frame, not a property of it
 }
+
+export function liveParts(doc: ViewDocument): readonly LivePart[];   // I24 — what `b.live` declared
+export function producerContext(over?: Partial<ProducerContext>): ProducerContext;   // I26 — with the real measurer
+export function localContext(over?: Partial<LocalContext>): LocalContext;            // I26 — plus `ask`, defaulting to decline
 
 export function adaptFixture(id: string, adapter: Adapter): ViewDocument;
 export function fakeClock(): FakeClock;
@@ -578,8 +677,23 @@ decidable from the text. Closing it means giving those two kinds a glyph field,
 which is a C04 change.
 
 **`matchesGolden` is specified and unbuilt.** It needs somewhere to keep frames
-and a policy for updating them, and §8a records the prerequisite the probe found
-independently: nothing in the surface lets a consumer obtain a frame at all.
+and a policy for updating them. §8a recorded the prerequisite the probe found
+independently — *nothing in the surface lets a consumer obtain a frame at all* —
+and `lines()` is that prerequisite met.
+
+### `lines()` — a picture of a document, not a property of one (I23)
+
+**Every other method on this interface measures or asserts and none of them returns a frame.** That is the whole surface's blind spot, and it is not an ergonomic one: the reference app documents its workaround as *"a row is a complete description of what will be drawn"*, which is true of a table and false of the change axis, whose rows say `added` while only the frame says `+`. So the app asserts a value whose rendering it cannot see, and the framework's own testing surface could not have caught the class the change axis produced.
+
+**It is the production renderer, not a second one.** `expectDocument` already holds a registry internally — which is why `renderToLines` was never usable and this is — and already calls `renderSequenceToLines` to do its own work. `lines()` returns what that call produces instead of asserting about it. A parallel renderer here would be the fifth instance of a suite building its own version of the thing under test, and it would diverge silently the first time the render chain changes.
+
+**Which it will.** The render chain gains diffing, caching, block windowing and capping, in that order and as one change. A consumer reading frames through this stays on the production path across all four **only** if `session.ts` composes through the same unit — which is why the extraction is a rule and not a convention (C22 §4).
+
+### `liveParts` — the declaration, readable from the side that made it (I24)
+
+`b.live` records its `LiveSpec` beside the document rather than inside it, and nothing read it back. So a consumer could declare a refreshing part and had no way to exercise the `fetch` or the `render` it supplied without a shell, a transport and a clock — the reference app worked around it by exporting its own tick, which is an app building a testing affordance the framework withheld.
+
+**On this entry rather than the runtime one, and the distinction is the finding's own.** F28's cost is to testing by its own text. A production consumer reading back what it just declared holds a second record of the document, and two records of one fact is the class this repository removes; a test reading it is exercising the thing it declared.
 
 **`degradesTo1Bit` is the one that earns the module.** It is B04's compliance sweep — every distinction carried by a glyph or a word — and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 
@@ -722,8 +836,18 @@ carries the state — and §7 records what that changed.
 - **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The explicit value arrives through `BlockOpts`, which every one of them accepts; before that argument existed the invariant was unwritable as a test, and so was the half of §4 that promised it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 - **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over free functions and constants; a declaration type is caught by the producer it belongs to appearing there.
 - **I17** — `b.seq` is the only place a block's position changes what it carries, and it changes it at construction rather than at measurement (§4a). C04 §3a's ruling stands: a block measures the same wherever it is concatenated. Before this, no code anywhere stripped a first block's gap — the rule every S-series figure depends on was discipline, and the one file in `src/` that set `gapBefore` set it by hand, per position.
-- **I18** — Every `KeyValue` the block type can hold is one `b.kv` can build. The record arm cannot express a repeated label and `KeyValue.rows` is an array, so the array arm is what closes the gap (§4). **The narrowing that C24 had already ruled on was a different one** — `KeyValueInput` against `CellInput`, which is about a value with nowhere to go — and the container was unremarked, which is how it went eleven builders and one whole app without being noticed. A builder narrower than its block is either a ruling with a reason written down or a defect; there is no third state, and the reason is what tells them apart.
+- **I18** — Every `KeyValue` the block type can hold is one `b.kv` can build. The record arm cannot express a repeated label and `KeyValue.rows` is an array, so the array arm is what closes the gap (§4). **The narrowing that C24 had already ruled on was a different one** — `KeyValueInput` against `CellInput`, which is about a value with nowhere to go — and the container was unremarked, which is how it went eleven builders and one whole app without being noticed. A builder narrower than its block is either a ruling with a reason written down or a defect; there is no third state, and the reason is what tells them apart. **The rule now has a mechanism, and it fired the day it was written**: MG27 compares every block type's fields against the builder that constructs it, and found `patch.collapsedAfter`, `patch.actions` and `table.sort` unreachable. This invariant and commitment 16 had both stated the rule correctly for as long as they had existed, which is what a rule with nothing reading it looks like from the inside (F114).
 - **I19** — The producers of a hook's argument types are exported wherever the hook is: a consumer implementing `CompletionSource` can build the `CompletionContext` it receives, through `contextAt` and `parseManifest`. A type without its producer is testable only by a hand-built literal that agrees with the test rather than with the derivation.
+- **I20** — Every field a block type carries is reachable from its builder, or `BUILDER_OMISSIONS` names it with the reason. I18 stated this and nothing read it; MG27 is the mechanism, and it found `patch.collapsedAfter`, `patch.actions` and `table.sort` on the run that created it (F41, F114). The reasons are data rather than prose for the reason C09 §4a gives: a rule with nothing reading it passes exactly like a rule that is satisfied.
+- **I21** — A public option is implemented or it is not declarable. `LiveSpec.stream` was accepted, validated by two throws policing a choice against `fetch`, and read by nothing — so a part declared with it rendered `render(null)` once, and a part that streams nothing looked exactly like a part that produced nothing. **Accepted, validated and inert is the third state, and it is A03 §2's vacuity class arriving in an API rather than in a rule.** The remedy is removal and a required `fetch`, because a compile error is where a runtime throw was and the option is additive to restore the day something drives it (F78).
+- **I22** — **`registerGrammar` is exported, because a block kind whose vocabulary is closed is a kind an app cannot use for its own domain.** C09 §4a promised registration and shipped none; the default set is sixteen grammars and a mainstream set never covers a consumer's nouns. Exported block kinds with unexported grammars is the asymmetry a factory you can import and cannot install has, and it is the one this API exists to refuse (F93, C09 I23).
+- **I23** — **A consumer can obtain a frame, and it is the frame the shell draws.** `expectDocument().lines()` returns what `renderSequenceToLines` produced rather than asserting about it; the registry it needs is the one `expectDocument` already holds, which is why this is publishable where `renderToLines` was not. Every other method on that interface measures or asserts a *property*, and a property of a document is not a picture of one — which is why the surface could not have caught the class the change axis produced, where the rows say `added` and only the frame says `+` (F37, F81, F126).
+- **I24** — **What `b.live` declared is readable from the testing entry and not from the runtime one.** A `fetch` exercisable only by running the whole refresh driver pushes every consumer toward whole-stack tests or none — the shape that let four defects survive a green suite — and a *production* consumer reading its own declaration back holds a second record of the document (F28).
+- **I25** — **No component composes a frame twice.** The composition `session.ts` performs is a named unit that `session.ts` calls, and a source scan says so, because the render chain's four coming stages — diffing, caching, windowing, capping — would diverge silently from any copy. **The class is one level up from an unreachable member**: every prior instance was *a member nobody could call*, this was *a sequence nobody named*, and no rule that walks members can see it — MG24 counts consumers, MG25 and MG27 compare declared shapes against builders, and all three are satisfied by a tree where every member is consumed and only the order is missing. A private method is the perfect hiding place, because the composition **is** consumed, sixty times a second, by the one caller inside the class (F126).
+- **I26** — **A consumer can build a `ProducerContext`**, with the real measurer in it. `ProducerContext.measure` is the frame's own — one arithmetic, or a split decided in a producer and the rows drawn on screen disagree — and `BlockRegistry` stays interior (§3), so a consumer whose adapter or handler *takes* a context could not call it outside a session. That is I19's argument a second time: a producer the framework can test and a consumer cannot is a producer whose app-side tests assert against something the user never sees. **Found by deleting the reference app's reimplementation of the measurer** (F37), which was also the fixture its own suite measured with. `localContext` comes with it for the same reason and adds `ask`, defaulting to the **decline** path — C23 I36's own semantics, so a handler tested without a scripted answer takes the route `Esc` takes rather than a stub's.
+
+- **I27** — **`LiveSpec.source` declares sameness and `LiveSpec.derive` is what makes it usable.** Two parts naming one key share one `fetch` and one fold, so two panels of one document cannot show two samples of one instant (C23 I44). The pairing is not a convenience: a part accumulating inside its `fetch` cannot share one, which is what the reference app did, so `source` without `derive` has no consumer. A conflicting `every` on one key is **refused, in the losing part's panel, naming both parts** — thrown, it is swallowed by the append's deliberate bare catch and the author sees two loading panels for ever — and conflicting `fetch` closures are **not checked** — the key is the claim that they are the same and the framework takes it, which is the standing of a string key at all (C23 I42, C23 I43, C23 I47).
+- **I28** — **A live part does not poll while nothing is looking at it, and this is not configurable** (I6, C23 I46). It reaches every part rather than only those declaring a `source`, because a part accumulating inside `fetch` is already broken by I27's rule and pausing surfaces that rather than causing it; the alternative would make off-screen behaviour depend on an unrelated declaration. **Nothing is released** — the part stays declared and C23 I33's five triggers remain the only teardown — and a pushed view is visible while its layer exists, so the pause reaches transcript-hosted parts and not a drill-in. It is a stated behaviour change for declarations that predate it, which is why it is an invariant here and not only in C23.
 
 ---
 
@@ -744,8 +868,18 @@ carries the state — and §7 records what that changed.
 13. Every block-returning builder sets a `gapBefore` default of its own, and an explicit value always wins (I15, §4).
 14. Nothing is exported that declares work no code performs; *available* is not an argument for *exported*, and neither is *specified* (I16, §3).
 15. `b.seq` holds the rule that a first block does not gap, and it is the only place a block's position changes what it carries (I17, §4a).
-16. A builder can build every block its kind can hold, or the narrowing is a ruling with its reason beside it (I18, §4).
+16. A builder can build every block its kind can hold, or the narrowing is a ruling with its reason beside it (I18, §4). Checked by MG27 rather than asserted; the reasons live in `BUILDER_OMISSIONS` where a rule can resolve them.
 17. **A hook's argument types come with their producers** (I19, §8b). An app can write a completion source and could not construct a context to test it with, which the second consumer found the way the first found the builders — by using the thing.
+18. Every block field is reachable from its builder or named with a reason a rule can resolve — checked, not promised (I20, MG27).
+19. A public option is implemented or it is not declarable. Two throws policing a choice between an implemented arm and an inert one is the shape to look for, and the remedy is removal rather than a third throw (I21).
+20. `registerGrammar` is public: a `code` block accepts any language name, and until this existed only two of them meant anything (I22). The mechanism is C09's (→ C09 I23).
+21. A consumer can obtain the frame the shell would draw, from the code that draws it. Every other assertion on this surface is a property of a document, and a property is not a picture (I23).
+22. What `b.live` declared is exercisable from the testing entry without a shell, a transport or a clock (I24).
+23. The composition exists once. A named unit `session.ts` calls, checked by a scan, because the coming render chain would diverge from a copy in silence (I25).
+24. Each refused export names the mechanism that replaces it, and the one that replaces nothing says which component already does the work (§3, C07 I17).
+25. A consumer can build the context its own producer receives, measurer included — the grant is testable from the side that consumes it (I26).
+26. Parts sharing a declared key share one poll and one fold, so two views of one source cannot disagree; a conflicting cadence is refused **where the author can see it** and conflicting fetches are taken on the key's word (I27).
+27. A live part does not poll while nothing is looking at it, for every part and not only the sharing ones — a stated behaviour change, unconditional, and releasing nothing (I28).
 
 ---
 
@@ -795,6 +929,7 @@ carries the state — and §7 records what that changed.
 - **T3.10**: nesting `b.panel` inside `b.group` inside `b.panel` → valid, measured correctly.
 - **T3.11**: an adapter registered for an absent verb → warning at startup, session opens.
 - **T3.12**: a theme failing contrast → construction throws before the terminal is acquired.
+- **T3.13 (I27)**: two `b.live` parts naming one `source` with different `every` → the losing part's panel names **both** ids and **both** values, and neither part is left at `◌ loading`. **From the public entry, and that is the whole row**: the first implementation threw, which every unit test of the driver could see and no consumer ever could.
 
 ### Tier 4 — integration
 
@@ -802,6 +937,8 @@ carries the state — and §7 records what that changed.
 - **T4.2** (with C09): every builder's output measures correctly at seven widths.
 - **T4.3** (with C23): a `b.live` part in a transcript entry and one in a pushed view are driven by the same code path.
 - **T4.4** (with C23): a failing `b.live` part leaves its siblings rendering.
+- **T4.4a** (I27, with C23): two parts naming one `source`, from the public entry only — one `fetch` per tick and one value in both panels. **The control is the same pair without the key**, and it must show two calls and two values: the row's subject is the divergence, so a fixture that cannot produce one asserts nothing.
+- **T4.4b** (I28, with C23, C14): a hosting entry scrolled out of the viewport → the `fetch` spy stops advancing; scrolled back → it advances again. Both halves, because a pause that never resumes satisfies the first.
 - **T4.5** (with C10): `defaultTheme` passes every contrast floor at every colour depth.
 - **T4.6** (with C07): an adapter written using only the public surface produces a document indistinguishable from one written against internals.
 - **T4.7** (with the reference app): the docker app compiles against the public entry only — no deep imports.
@@ -821,6 +958,8 @@ carries the state — and §7 records what that changed.
 - **T6.2** (I3): a builder returning a description → T2.4 fails, and consumers learn two type families.
 - **T6.3** (I5): inferring a tone from a field name → T2.7 fails, and the fifth verb breaks silently.
 - **T6.4** (I6): making backoff configurable → the isolation guarantee becomes optional.
+- **T6.14** (I27): arbitrating a conflicting `every` instead of refusing → T3.13 fails. The revert that reads as tolerance: nothing throws, both parts tick, and the losing declaration is stored where an author will read it and believe it.
+- **T6.15** (I28): making the off-screen pause opt-in — reaching only parts that declared a `source` → T4.4b fails for a part with no key, and off-screen behaviour starts depending on an unrelated declaration.
 - **T6.5** (I7): passing `tick` to `measure` → T2.5 fails, and a spinner shifts the viewport.
 - **T6.6** (I8): `testing` reachable from the runtime entry → T2.3 fails.
 - **T6.7** (I1): an export nothing consumes → T2.2 fails, and the surface starts accreting.

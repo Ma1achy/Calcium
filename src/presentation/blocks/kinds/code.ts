@@ -16,7 +16,22 @@
  */
 import type { ReactElement } from "react";
 import { createLowlight } from "lowlight";
+import type { LanguageFn } from "highlight.js";
+import bash from "highlight.js/lib/languages/bash";
+import css from "highlight.js/lib/languages/css";
+import diff from "highlight.js/lib/languages/diff";
+import dockerfile from "highlight.js/lib/languages/dockerfile";
+import go from "highlight.js/lib/languages/go";
+import ini from "highlight.js/lib/languages/ini";
+import java from "highlight.js/lib/languages/java";
+import javascript from "highlight.js/lib/languages/javascript";
 import json from "highlight.js/lib/languages/json";
+import markdown from "highlight.js/lib/languages/markdown";
+import python from "highlight.js/lib/languages/python";
+import rust from "highlight.js/lib/languages/rust";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Code } from "../../../data/viewmodel/index.js";
@@ -25,10 +40,32 @@ import { paint, rows, slot, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext } from "../types.js";
 
 /**
- * Only the grammars actually needed (DEPENDENCIES.md): highlight.js's full set
- * is most of the package's weight and none of its value here.
+ * The default set (§4a, I23), and the **rule** rather than a list, so the next
+ * one is an argument instead of a taste: a grammar ships if a terminal user
+ * plausibly reads it *in this window*.
+ *
+ * The formats a CLI emits — `json` `yaml` `xml` `ini` `diff` `markdown`. The
+ * ones it is configured by — `dockerfile` `sql` `css`. The shell it is typed
+ * into — `bash`. And the languages CLIs are written in, because a stack trace
+ * lands in a transcript — `typescript` `javascript` `python` `go` `rust` `java`.
+ *
+ * **Measured: 121 KB against the package's 9.2 MB** (F93). DEPENDENCIES.md's
+ * objection is to the 384 and survives intact — the full set is most of the
+ * weight and none of the value. What changed is that *actually needed* had been
+ * measured against two consumers, `docker inspect` and an nginx config, and two
+ * grammars satisfied every test in the suite.
  */
-const lowlight = createLowlight({ json, yaml });
+const DEFAULT_GRAMMARS = {
+  bash, css, diff, dockerfile, go, ini, java, javascript,
+  json, markdown, python, rust, sql, typescript, xml, yaml,
+};
+
+/** The set, for the row that asserts every member of it colours something (T3.32). */
+export const DEFAULT_LANGUAGES: readonly string[] = Object.freeze(
+  Object.keys(DEFAULT_GRAMMARS).sort(),
+);
+
+const lowlight = createLowlight(DEFAULT_GRAMMARS);
 
 /**
  * `hljs` class → palette slot, explicit rather than derived (§4a).
@@ -50,6 +87,40 @@ const SLOTS: Readonly<Record<string, string>> = Object.freeze({
   "hljs-function": "function",
   "hljs-operator": "operator",
   "hljs-punctuation": "punctuation",
+
+  // **Added with the default set, by rôle rather than by name** (I24, F93).
+  // `SLOTS` was written for `json` and `yaml`; shipping fourteen more grammars
+  // without extending it ships grammars that highlight nothing — `markdown`
+  // emitted four runs and coloured none of them, which is indistinguishable
+  // from not registering it at all.
+  "hljs-section": "keyword", // a heading is the structural anchor a keyword is
+  "hljs-bullet": "punctuation", // a list marker
+  "hljs-code": "string", // inline code is a literal run
+  "hljs-subst": "string", // and a template substitution is inside one
+  "hljs-variable": "key", // a name being referenced; `key` is the name slot
+  "hljs-name": "type", // an element name names a kind
+  "hljs-selector-class": "type", // so does a selector
+  "hljs-selector-tag": "type",
+  "hljs-selector-id": "type",
+  "hljs-meta": "keyword", // a decorator or a shebang
+  "hljs-tag": "punctuation", // the angle brackets around the name
+});
+
+/**
+ * Classes the default set emits that deliberately have no slot (I24).
+ *
+ * Read by T3.32, so an omission that starts being mapped is a stale entry rather
+ * than a silent pass — the bidirectional arm MG27 and SS47 both have.
+ */
+export const UNSLOTTED: Readonly<Record<string, string>> = Object.freeze({
+  "hljs-params": "parameters are ordinary identifiers and are meant to be plain",
+  "hljs-strong": "bold is appearance, not a rôle, and §4a maps rôles to palette slots",
+  "hljs-emphasis": "italic is appearance, not a rôle, on the same terms as hljs-strong",
+  "hljs-addition":
+    "a change axis, and C04's ruling says a change is a marker and never a tone (F30, F81). " +
+    "A real diff is C25's, where the marker column is",
+  "hljs-deletion":
+    "the other half of the change axis, refused a slot by the same ruling as hljs-addition",
 });
 
 /**
@@ -88,6 +159,30 @@ export function tokenise(text: string, language: string): readonly Token[] {
   if (memo.size >= MEMO_CAP) memo.clear();
   memo.set(key, tokens);
   return tokens;
+}
+
+/**
+ * Register a grammar after construction (I23, C24 I22, F93).
+ *
+ * **The `memo.clear()` is half the invariant, not a tidy-up.** `tokenise` caches
+ * the *fallback* under the same key, so without it a language registered after
+ * anything has been rendered keeps returning plain text until the 256-entry cap
+ * happens to evict — and §4a's *"highlighted whenever someone registers it"*
+ * stays false with a registration path in place. Every assertion about this
+ * function existing passes either way; the case that fails is the block that was
+ * already on screen, which is the only reason the promise was worth making.
+ *
+ * Clearing the whole map rather than the affected keys: the key is
+ * `language\u0000text` and finding one language's entries is a scan of up to 256
+ * strings, against a re-tokenise of whatever is still visible. Registration
+ * happens at composition, once.
+ *
+ * **Measurement is unaffected**, which is what makes this safe at any time: a
+ * token changes appearance and never line count (I8), so nothing reflows.
+ */
+export function registerGrammar(language: string, grammar: LanguageFn): void {
+  lowlight.register(language, grammar);
+  memo.clear();
 }
 
 /** For the test that asserts measurement never tokenises (T2.13). */

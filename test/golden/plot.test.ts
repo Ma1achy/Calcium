@@ -96,8 +96,31 @@ const CASES: readonly Readonly<{ label: string; block: Plot; mono?: boolean }>[]
       axes: true,
       yMin: 0,
       yMax: 1,
-      yFormat: "percent",
+      // **`fraction`, and it was `percent`** (C04 I41, F31). Same arithmetic and
+      // the same frame: the values here are 0..1, so this fixture always meant
+      // the multiplying arm and now says so. The rename is what the snapshot
+      // churn on this case would otherwise have hidden.
+      yFormat: "fraction",
       series: [{ values: [0.2, 0.55, 1.4, 0.8, 0.95, -0.1, 0.6] }],
+    }),
+  },
+  {
+    // **The new arm, and it is here because it is geometry** (C04 I41). Three
+    // digits and a sign is a four-cell label where `fraction`'s is three, so the
+    // gutter differs and the plot area with it — a difference no assertion about
+    // label *text* would show, and the reason this is a golden rather than a
+    // unit row.
+    label: "percent 0..100",
+    block: block({
+      kind: "plot",
+      id: "cpu",
+      form: "line",
+      height: 6,
+      axes: true,
+      yMin: 0,
+      yMax: 100,
+      yFormat: "percent",
+      series: [{ values: [12.5, 44, 100.2, 87, 95.5, 0, 60] }],
     }),
   },
   {

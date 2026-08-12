@@ -16,6 +16,7 @@ import {
   type Hunk,
   type Plot,
   type Table,
+  type LocalDocument,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 
@@ -94,7 +95,7 @@ export const ONE_PER_KIND: Readonly<Record<BlockKind, Block>> = Object.freeze({
   comparison: block({
     kind: "comparison",
     id: "comparison-1",
-    rows: [{ field: "p99", a: "120ms", b: "98ms", comparison: "better" }],
+    rows: [{ field: "p99", a: "120ms", b: "98ms", verdict: "better" }],
   }),
 
   patch: block({
@@ -203,6 +204,20 @@ export const CORPUS: readonly Block[] = Object.freeze([
 ]);
 
 /** A minimal valid document. `meta.origin` is required and never defaulted (I13). */
+/**
+ * The same fixture as a *local handler's* answer, which is not a document.
+ *
+ * `LocalDocument` omits the seven `meta` fields `runLocal` fills (F13), so a
+ * double returning a full `ViewDocument` no longer satisfies `LocalHandler` —
+ * and that is the point: the doubles were writing the same invented `origin`,
+ * `transport` and `durationMs: 0` the reference app's four helpers were.
+ */
+export function localDoc(overrides: Partial<ViewDocument> = {}): LocalDocument {
+  const { meta, ...rest } = doc(overrides);
+  void meta;
+  return rest;
+}
+
 export function doc(overrides: Partial<ViewDocument> = {}): ViewDocument {
   return document({
     schema: "tui.view/1",

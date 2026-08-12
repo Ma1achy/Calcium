@@ -31,7 +31,7 @@ import {
   type Result,
   type ToolDef,
 } from "./types.js";
-import { FRAMEWORK_NAMES, FRAMEWORK_TOOLS } from "./framework.js";
+import { FRAMEWORK_FLAGS, FRAMEWORK_NAMES, FRAMEWORK_TOOLS, RESERVED_FLAGS } from "./framework.js";
 
 const ARG_TYPE_SET: ReadonlySet<string> = new Set<string>(ARG_TYPES);
 
@@ -232,6 +232,8 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
   const requires = takeStringArray(raw, "requires", e, at);
   const conflicts = takeStringArray(raw, "conflicts", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
+  const shellOnly = takeOptionalBoolean(raw, "shellOnly", e, at);
+  const interactive = takeOptionalBoolean(raw, "interactive", e, at);
 
   return {
     name,
@@ -242,6 +244,8 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
     ...(requires === undefined ? {} : { requires }),
     ...(conflicts === undefined ? {} : { conflicts }),
     ...(view === undefined ? {} : { view }),
+    ...(shellOnly === undefined ? {} : { shellOnly }),
+    ...(interactive === undefined ? {} : { interactive }),
     summary,
   };
 }
@@ -393,9 +397,56 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   });
 
   const flags: FlagDef[] = [];
+  const reserved = new Set(RESERVED_FLAGS);
   rawFlags.forEach((f, i) => {
     const parsed = parseFlag(f, e, `${at}.flags[${i}]`);
-    if (parsed !== null) flags.push(parsed);
+    if (parsed === null) return;
+    // **The tool-name collision above, one level down** (I22, F92). Reserving a
+    // name and letting an app declare it anyway is the worse of both: the app's
+    // definition is silently unreachable, or the framework's is, and which one
+    // wins is an ordering detail nobody should have to know.
+    // **`shellOnly` is bool-only and long-form-only, and the narrowness is the
+    // ruling** (I21, F39). Dropping a flag from `argv` means knowing which
+    // tokens it spans, and that grammar lives in `validateInvocation` — a value
+    // may be inline or the next token, a short may be clustered with three
+    // others. A second copy of it here is the drift this codebase has a memory
+    // against, and threading token spans out of the validator is a bigger change
+    // than either consumer needs: `--help` and `--raw` are both switches.
+    //
+    // A switch spans exactly one token, so the strip is a token comparison. If a
+    // surface ever needs `--format=wide` shell-side, the validator grows spans
+    // and this restriction lifts — and until then it fails loudly rather than
+    // stripping half a flag and sending the value on alone.
+    if (parsed.shellOnly === true) {
+      if (parsed.type !== "bool") {
+        fail(
+          e,
+          `${at}.flags[${i}].type`,
+          `"--${parsed.name}" is shellOnly, which is supported for switches only — a flag ` +
+            `with a value spans tokens the shell cannot drop without re-deriving the grammar`,
+        );
+        return;
+      }
+      if (parsed.short !== undefined) {
+        fail(
+          e,
+          `${at}.flags[${i}].short`,
+          `"--${parsed.name}" is shellOnly and cannot have a short form — a short clusters ` +
+            `with others in one token, and dropping it would drop theirs too`,
+        );
+        return;
+      }
+    }
+    if (reserved.has(parsed.name)) {
+      fail(
+        e,
+        `${at}.flags[${i}].name`,
+        `"--${parsed.name}" is a flag Calcium reserves on every verb (C05 §3) — ` +
+          `choose another name, or the framework's handling of it becomes unreachable`,
+      );
+      return;
+    }
+    flags.push(parsed);
   });
 
   checkFlagRelations(flags, e, at);
@@ -406,16 +457,41 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
   const view = takeOptionalBoolean(raw, "view", e, at);
 
+  // **I23 — a flag's arm must differ from the tool's default.** An arm that
+  // restates it decides nothing, which is A03 §2's vacuity class arriving in a
+  // manifest; and refusing it is what makes the arms on a verb agree, so two
+  // flags cannot disagree and C05 needs no precedence rule. Both directions,
+  // because either alone leaves half the vacuous declarations expressible.
+  const toolInteractive = interactive === true;
+  flags.forEach((flag, i) => {
+    if (flag.interactive === undefined) return;
+    if (flag.interactive === toolInteractive) {
+      fail(
+        e,
+        `${at}.flags[${i}].interactive`,
+        `--${flag.name} declares interactive ${String(flag.interactive)} and "${name}" is ` +
+          `already ${toolInteractive ? "interactive" : "not interactive"} — the flag decides ` +
+          `nothing. An arm is the opposite of the verb's default, or it is absent`,
+      );
+    }
+  });
+
   // I19 — the two combinations that describe a verb which cannot exist. Both
   // are cross-field rules of I4's kind and sit where I4 sits, so the report
   // reaches the author who wrote the manifest rather than the user watching a
   // terminal misbehave. `interactive` alone is fine and is not checked here.
-  if (interactive === true) {
+  //
+  // **Read from every declaration, not from the tool's** (I24). A flag arm of
+  // `true` re-creates exactly the verb the tool-level refusal forbids, and a
+  // refusal that reads one of the two ways to write its own combination is the
+  // state I20 shipped in — see F118, found by measuring a claim about this.
+  const interactiveAnywhere = toolInteractive || flags.some((f) => f.interactive === true);
+  if (interactiveAnywhere) {
     if (streams === true) {
       fail(
         e,
         `${at}.interactive`,
-        `"${name}" declares both interactive and streams — a handoff gives the ` +
+        `"${name}" is interactive and declares streams — a handoff gives the ` +
           `terminal to the child and a stream reads its stdout into the transcript; ` +
           `drop whichever one the verb does not do`,
       );
@@ -434,14 +510,24 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   // deliberately absent from them: S12's logs view is a streaming source rendered
   // into a pushed view, so refusing that pair would refuse the surface C22 §13a
   // was ruled for.
-  if (view === true) {
-    if (interactive === true) {
+  //
+  // I24 again, and this is where the rule was found missing: I20's own sentence
+  // says `view` is declarable on a flag, and this refusal read the tool's field
+  // only. Both sides now read every declaration.
+  //
+  // **Conservative on purpose, and the limit is recorded rather than
+  // discovered.** A verb declared interactive whose arm resolves to `false`
+  // beside a `view` flag would be legal, and this refuses it. No app declares
+  // one; the first that wants to is the argument for narrowing this.
+  const viewAnywhere = view === true || flags.some((f) => f.view === true);
+  if (viewAnywhere) {
+    if (interactiveAnywhere) {
       fail(
         e,
         `${at}.view`,
-        `"${name}" declares both view and interactive — both hand input ownership ` +
-          `away, the view to the shell's own keymap and the handoff to a child; ` +
-          `drop whichever one the verb does not do`,
+        `"${name}" declares both view and interactive — on the tool or on a flag, ` +
+          `and either way both hand input ownership away, the view to the shell's ` +
+          `own keymap and the handoff to a child; drop whichever one the verb does not do`,
       );
     }
     if (oneShot === true) {
@@ -543,7 +629,16 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
       // Appended rather than prepended so no index an app could read is shifted:
       // `fail` reports `tools[3]`, and a parse error pointing at a row nobody
       // wrote is worse than no path at all.
-      tools: [...tools, ...FRAMEWORK_TOOLS],
+      // **And every tool gains the reserved flags here**, for the same reason
+      // and with the same consequence: `appTools` is what the app wrote, so the
+      // round-trip re-derives them rather than re-parsing them. Doing it inside
+      // `parseTool` put `--help` into `appTools`, and T2.7 caught it on the
+      // second parse — the reserved-name check cannot tell an app declaring
+      // `--help` from a re-parse of output that already carries it, which is
+      // §3's collision problem one level down and the same test finding it.
+      tools: [...tools, ...FRAMEWORK_TOOLS].map((t) =>
+        Object.freeze({ ...t, flags: Object.freeze([...t.flags, ...FRAMEWORK_FLAGS]) }),
+      ),
       // What the app wrote (§3). `serialise` emits this, so the round-trip
       // property holds exactly: parse re-derives the framework's six.
       appTools: tools,

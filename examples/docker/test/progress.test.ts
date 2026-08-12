@@ -21,6 +21,7 @@ import {
 } from "../src/progress.ts";
 import type { Block, LocalContext } from "@fmx/calcium";
 
+import { localContext } from "@fmx/calcium/testing";
 const fresh = (): Progress => ({
   steps: new Map(),
   layers: new Map(),
@@ -30,7 +31,11 @@ const fresh = (): Progress => ({
   summary: "",
 });
 
-const ctx = { command: "/build .", ask: () => Promise.resolve("y") } as unknown as LocalContext;
+// **The cast is gone with the hand-built context.** It read
+// `as unknown as LocalContext`, which satisfied the type by erasure — the
+// double narrower than the interface it stands for, which is the shape that
+// cost four diagnoses in this tree. `localContext()` is the real record.
+const ctx: LocalContext = { ...localContext(), command: "/build .", ask: () => Promise.resolve("y") };
 
 /** The first `table` block anywhere in a tree, so an assertion can read cells. */
 function findTable(block: Block): Extract<Block, { kind: "table" }> {

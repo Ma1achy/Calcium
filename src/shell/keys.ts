@@ -37,6 +37,8 @@ import type {
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/index.js";
 import type { KeyAction } from "../interaction/router/types.js";
+import type { Action } from "../data/viewmodel/index.js";
+import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
@@ -98,6 +100,30 @@ export type KeyDeps = Readonly<{
    */
   liveRows: () => readonly string[];
   /**
+   * The action a focused row fires, and the entry it fires from (C23 I37, F21).
+   *
+   * **Answered from the block, exactly as `liveRows` is**, and for the same
+   * reason: C16 takes row ids as data and holds no opinion about what a row is,
+   * so the one place that knows a live entry's blocks answers both. Two
+   * functions rather than one returning pairs, because `liveRows` is asked on
+   * every arrow keystroke and this only on `enter`.
+   *
+   * **The first action, and C04 I19 is why that is safe.** A row lists its
+   * actions in order and `fill` is the default kind — populating the prompt
+   * rather than running — so the first action of a well-formed row is the one a
+   * reader would expect `enter` to do. A row declaring `exec` first has declared
+   * a reversible operation, which is what I19 reserves that kind for.
+   *
+   * `null` for a row with no actions, which is most of them: `focusableRowIds`
+   * returns every row, because navigating to read is worth doing on its own.
+   */
+  liveRowAction: (rowId: string) => Readonly<{ action: Action; from: EntryId }> | null;
+  /**
+   * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
+   * a submission by another route, and L4's routing component owns routes.
+   */
+  onAction: (action: Action, from: EntryId | null) => void;
+  /**
    * Commit a frame for something that settled after its batch (C22 I31).
    *
    * The keystroke's own commit is the read loop's (I27) and covers the
@@ -139,6 +165,21 @@ export interface KeyEffects {
    * source (C19 I3, T2.1a).
    */
   afterEdit(): void;
+  /**
+   * A character was typed into an open reverse search, or one was deleted
+   * (C20 §7, `searchType` / `searchBackspace`).
+   *
+   * **Here rather than in the keymap for the same reason `afterEdit` is here**:
+   * a printable key is not a `KeyAction`, so the composition root is its only
+   * caller and a table row could never reach it. C16 I23 forbids a second
+   * keymap in the root, not a second entry point for the keys the keymap does
+   * not name.
+   *
+   * `null` is a backspace. One method rather than two because the two differ
+   * only in which C20 call they make and share the whole of the layer refresh —
+   * `searchEnd` takes its action for the same reason (C20 §7).
+   */
+  searchTyped(text: string | null): void;
   /** The line went away — close the menu and forget `Esc`'s suppression (C19 I19). */
   reset(): void;
 }
@@ -267,6 +308,27 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * the dynamic sources, and every assertion about the candidate set agrees
    * with both. C19 T2.1a is the row that does not.
    */
+  /**
+   * Redraw the search overlay after its query or its hit moved (C15 I19).
+   *
+   * **The cursor goes with the content.** The caret sits at the end of the
+   * query and the query is what just changed, so an update carrying only
+   * `content` leaves it where the previous keystroke put it — a caret that
+   * stops following the text being typed into it.
+   *
+   * Shared by `searchOlder` and `searchTyped` rather than written twice: they
+   * are two ways to move the same overlay, and a second copy is the arm that
+   * gets updated alone.
+   */
+  function refreshSearchLayer(): void {
+    if (deps.history.searchState === null) return;
+    const next = deps.history.searchLayer(deps.anchor());
+    deps.overlays.update(SEARCH_ID, {
+      content: next.content,
+      ...(next.cursor !== undefined && { cursor: next.cursor }),
+    });
+  }
+
   function afterEdit(): void {
     const ctx = ctxNow();
 
@@ -474,6 +536,30 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const next = rows[i + 1];
       if (next !== undefined) deps.focus.focusRow(next);
     },
+    /**
+     * **F21's whole subject: the route from a keystroke to `actions.ts`.**
+     *
+     * `src/shell/actions.ts` implemented all five `Action` arms and nothing in
+     * `src/` called the dispatcher — `pipeline.onAction` was reached only from a
+     * unit test. So an app could build a `view` action, have C04 validate it and
+     * C09 render its label into a row, and no keystroke would ever arrive. C24
+     * I16's subject arriving on `Action`.
+     *
+     * Silent on a row with no action, rather than a notice. Pressing `enter` on
+     * a row that does nothing is a question, not a mistake, and a refusal per
+     * keystroke on a table where most rows have no action is noise the reader
+     * cannot act on. The refusals that matter — a frozen entry, a bad scheme —
+     * are the dispatcher's and are unaffected.
+     */
+    rowActivate: () => {
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const rowId = current.rowId;
+      if (rowId === null || rowId === undefined) return;
+      const found = deps.liveRowAction(rowId);
+      if (found === null) return;
+      deps.onAction(found.action, found.from);
+    },
     rowUp: () => {
       const rows = deps.liveRows();
       const current = deps.focus.current;
@@ -561,17 +647,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     },
     searchOlder: () => {
       deps.history.searchOlder();
-      const state = deps.history.searchState;
-      if (state === null) return;
-      // **The cursor goes with the content** (C15 I19). The caret sits at the
-      // end of the query and the query is what just changed, so an update
-      // carrying only `content` leaves it where the previous keystroke put it —
-      // a caret that stops following the text being typed into it.
-      const next = deps.history.searchLayer(deps.anchor());
-      deps.overlays.update(SEARCH_ID, {
-        content: next.content,
-        ...(next.cursor !== undefined && { cursor: next.cursor }),
-      });
+      refreshSearchLayer();
     },
   });
 
@@ -630,6 +706,16 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   return {
     table,
     afterEdit,
+    // **C20 built both of these and nothing called them** — `⌃r` opened a search
+    // whose query could never become non-empty, because the composition root's
+    // overlay handler forwards printable keys only for the completion menu and
+    // dropped them for everything else. FINDINGS F97.
+    searchTyped: (text) => {
+      if (deps.history.searchState === null) return;
+      if (text === null) deps.history.searchBackspace();
+      else deps.history.searchType(text);
+      refreshSearchLayer();
+    },
     reset: () => {
       closeMenu();
       suppressedAt = null;

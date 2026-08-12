@@ -372,17 +372,13 @@ export function createFallbackAdapter(): Adapter {
         command: ctx.command,
         status: "ok",
         blocks,
-        meta: {
-          verb: ctx.verb,
-          adapter: "fallback",
-          exitCode: raw.exitCode ?? 0,
-          durationMs: raw.durationMs,
-          truncated,
-          argv: raw.argv,
-          stderr: raw.stderr,
-          transport: ctx.transport,
-          origin: ctx.origin,
-        },
+        // **Two of nine survive F58b's narrowing.** The registry fills `verb`,
+        // `exitCode`, `durationMs`, `argv`, `stderr`, `transport` and `origin`
+        // from the raw result and the context on every route — so the seven this
+        // used to compute were discarded, including an `exitCode: raw.exitCode
+        // ?? 0` that never reached a document. The framework's own fallback was
+        // writing them, which is why every adapter written against it did too.
+        meta: { adapter: "fallback", truncated },
       };
     },
   };

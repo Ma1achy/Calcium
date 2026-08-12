@@ -138,6 +138,28 @@ describe("C05 fail-on-revert", () => {
     expect(ss22.pattern.test('const S = ["running", "failed", "queued"];')).toBe(true);
     expect(ss22.scope).toBe("src/interaction/completion/");
   });
+  it("T6.13 (I21, F148): rebuilding `transmitted` as one push per token → T1.16b fails", () => {
+    // The edit this names is the state the code was in for the whole build: the
+    // walk pushes at the top of each iteration, and the two sites that consume a
+    // following value advance past it — so a valued flag transmits its name and
+    // loses its value. It is a *structural* interaction, not an event-mediated
+    // one, which is why no trace could have reached it: "a push per iteration"
+    // and "a value may be its own token" are both true at rest.
+    //
+    // Asserted as the property rather than as one case, because the defect was
+    // uniform across types and forms and a single row invites the one-case fix.
+    for (const argv of [
+      ["--limit", "400"],
+      ["-n", "400"],
+      ["--search", "abc"],
+      ["--since", "1h"],
+    ]) {
+      const r = validateInvocation(toolNamed("ps"), argv);
+      expect(r.ok, argv.join(" ")).toBe(true);
+      if (r.ok) expect(r.transmitted, `${argv.join(" ")} must reach the far side whole`).toEqual(argv);
+    }
+  });
+
   // T6.8 is written, in test/integration/transport.test.ts, beside the T4.4 it
   // names.
 });

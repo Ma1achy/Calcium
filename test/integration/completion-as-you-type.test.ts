@@ -342,7 +342,7 @@ describe("C19 §6 — the menu's bottom edge", () => {
     // candidates over a table block is one box, and one box shown of sixty
     // gives fifty-nine.
     const missing = Number(
-      /… (\d+) more/.exec(String(indicator?.text ?? ""))?.[1] ?? "0",
+      /\+ (\d+) more/.exec(String(indicator?.text ?? ""))?.[1] ?? "0",
     );
     expect(
       missing,

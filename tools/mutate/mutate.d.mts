@@ -1,5 +1,7 @@
 export declare function strip(output: string): string;
 export declare function killed(output: string): boolean;
+/** Did the run reach a summary at all — pass or fail? A truncated run is not a survivor. */
+export declare function ran(output: string): boolean;
 
 export declare class AnchorError extends Error {
   constructor(file: string, from: string);
@@ -25,6 +27,8 @@ export type Outcome = Readonly<{
   killed: boolean;
   byNamedTest?: boolean;
   anchorMissed?: boolean;
+  /** The run produced no summary line — the harness went blind mid-pass. */
+  noSummary?: boolean;
 }>;
 
 export declare function apply(

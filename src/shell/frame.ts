@@ -21,7 +21,7 @@
  */
 
 import { cells } from "../presentation/text.js";
-import { PROMPT, PROMPT_GUTTER } from "./config.js";
+import { PROMPT_GUTTER, PROMPT_SUBSTITUTION } from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { ChromeFn, SessionSnapshot } from "./types.js";
@@ -146,5 +146,11 @@ export function heightsSum(f: Composed): boolean {
  * file and read in two — and the failure is a prompt one row off, months later.
  */
 export function gutterMatchesPrompt(): boolean {
-  return PROMPT_GUTTER.first === cells(PROMPT);
+  // **Both forms, not the one in force** (C22 I52, C09 I22). The prompt is a
+  // capability pair and `commandRows` is also the measurer's, so a form of a
+  // different width would make `chromeRows` and the composed row disagree about
+  // the same entry — and it would do so only on the terminals nobody develops
+  // on. Checking the resolved prompt would pass on every machine that has the
+  // unicode one, which is every machine this has ever been run on.
+  return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form));
 }

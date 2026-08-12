@@ -92,6 +92,36 @@ function checkPlotHeight(plot: Plot): void {
   }
 }
 
+/**
+ * I41 — an unknown `yFormat` is an error, not a silent fall-through to `number`.
+ *
+ * **Both here and in the validator**, which is §3's standing reason rather than
+ * duplication: a document can arrive from a fixture without passing through a
+ * constructor, and a constructed block never reaches the validator. A check in
+ * one of them covers half the ways a plot is built.
+ *
+ * The arm the rename produces is `percentage` — what a reader guesses when
+ * `fraction` and `percent` are the two on offer — and it used to render plain
+ * numbers in silence.
+ */
+const Y_FORMATS: ReadonlySet<string> = new Set([
+  "number",
+  "fraction",
+  "percent",
+  "bytes",
+  "duration",
+]);
+
+function checkPlotFormat(plot: Plot): void {
+  const format: unknown = plot.yFormat;
+  if (format !== undefined && !(typeof format === "string" && Y_FORMATS.has(format))) {
+    throw new BlockShapeError(
+      `plot "${plot.id}": "yFormat" must be one of ${[...Y_FORMATS].join(", ")} (C04 I41) — ` +
+        `an unknown arm used to render plain numbers and say nothing`,
+    );
+  }
+}
+
 /** Every shape check that applies to a block, by kind. */
 function checkShape(block: Block): void {
   switch (block.kind) {
@@ -100,6 +130,7 @@ function checkShape(block: Block): void {
       break;
     case "plot":
       checkPlotHeight(block);
+      checkPlotFormat(block);
       break;
     case "table":
       for (const row of block.rows) {
@@ -121,11 +152,76 @@ function checkShape(block: Block): void {
 }
 
 /**
+ * Keys the literal has and its kind does not, typed `never` (F104).
+ *
+ * **`B extends Block` was satisfied structurally by a type that already had the
+ * extra keys.** `B` is inferred *from the argument*, so the literal's own type
+ * becomes `B`, and nothing was ever checked against `Block` — commitment 29
+ * says *"C04's constructors enforce the shape invariants"* and the compiler was
+ * enforcing nothing. Verified by fabricated violation:
+ * `block({ kind: "rule", id: "r", label: "x", utterGarbage: 42 })` compiled.
+ *
+ * How it surfaced is the more useful half: splitting `Comparison`'s verdict
+ * union removed a field from a public type, `tsc` came back clean across 175
+ * files, and **eleven fixtures were still supplying it**. A narrowing that
+ * removes a field should break every producer and it broke none, because they
+ * all reach the type through here.
+ *
+ * The idiom is `ProducedMeta`'s, one component over, distributed over the union
+ * by `kind`: the forbidden keys are `never` rather than merely absent, because
+ * TypeScript's excess-property check only fires on a *fresh object literal* and
+ * a helper returning a wider object would otherwise still slip through.
+ *
+ * **Its blind spot, stated because an unrecorded limit reads as strength.** A
+ * nested literal — `panel.children`, a table row's `detail` — is checked
+ * against `Block` itself, and excess-property checking against a *union* admits
+ * any key present in any member. So `{ kind: "rule", id, label, rows: [] }`
+ * nested inside a panel is still accepted. Catching that needs the child
+ * positions to take this type too, which is a wider change than this row.
+ */
+type ExcessKeys<B extends Block> = Exclude<keyof B, keyof Extract<Block, { kind: B["kind"] }>>;
+
+/**
+ * **A rest-tuple guard, and the shape is forced rather than chosen.**
+ *
+ * The obvious form is `spec: B & Partial<Record<ExcessKeys<B>, never>>`, the
+ * `ProducedMeta` idiom transcribed. Measured, it does not work here: `keyof B`
+ * inside the parameter's own type feeds constraint resolution, `B` degrades to
+ * `Block`, and two call sites lost the literal they had inferred — `kind`
+ * widened to `string` in a nested literal, and `b.children` stopped existing on
+ * a panel. `NoInfer` recovered the first and not the second.
+ *
+ * A guard in a *separate* parameter leaves `spec: B` alone, so inference is
+ * exactly what it was, and an excess key makes the tuple non-empty — a required
+ * argument that cannot be supplied. The message is the key's own name.
+ */
+type ExcessGuard<B extends Block> = [ExcessKeys<B>] extends [never]
+  ? []
+  : [excess: `not a key of this block kind: ${Extract<ExcessKeys<B>, string>}`];
+
+/**
  * The single constructor. Every kind goes through it, including the three
  * registered elsewhere (`table`, `plot`, `patch`) — C04 owns every shape, so it
  * enforces every shape, and C11, C12 and C25 own only the engines.
  */
-export function block<B extends Block>(spec: B): B {
+export function block<B extends Block>(spec: B, ..._excess: ExcessGuard<B>): B {
+  return rebuild(spec);
+}
+
+/**
+ * The same checks, without the literal guard — for a value already typed as a
+ * block rather than written as one (F104).
+ *
+ * **Two callers, both rebuilding rather than authoring**: `finish` re-emits a
+ * spec with `gapBefore` resolved, and `withoutGap` re-emits one with it dropped.
+ * Their input is a caller's `B extends Block`, so the compiler cannot prove the
+ * guard's tuple is empty and would reject a call that is correct by
+ * construction — the literal it came from was checked where it was written.
+ *
+ * Named and exported rather than reached by a cast at each site, because a cast
+ * is a claim with nowhere to put the reason. This is the reason.
+ */
+export function rebuild<B extends Block>(spec: B): B {
   checkShape(spec);
   for (const child of descendants(spec)) checkShape(child);
   return deepFreeze(spec);

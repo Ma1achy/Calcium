@@ -22,7 +22,7 @@
 import { Box, Text, renderToString } from "ink";
 import { createElement } from "react";
 import type { Block } from "../data/viewmodel/index.js";
-import type { BlockRegistry, RenderContext } from "./blocks/index.js";
+import type { BlockRegistry, RenderContext, RenderContextInput } from "./blocks/index.js";
 import type { ResolvedTheme } from "./theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 
@@ -56,19 +56,13 @@ export function renderToLines(
   width: number,
   options: RenderOptions,
 ): readonly string[] {
-  const ctx: RenderContext = {
+  const ctx: RenderContextInput = {
     width,
     theme: options.theme,
     capabilities: options.capabilities,
     focus: options.focus ?? null,
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
-    // The registry replaces both of these with itself; they are here because
-    // the type requires them, and a caller should not have to know that.
-    measureChild: registry.measure,
-    renderChild: () => {
-      throw new Error("renderChild is supplied by the registry");
-    },
   };
 
   // Counted against a sentinel row rather than by splitting the output.
@@ -109,17 +103,13 @@ export function renderSequenceToLines(
   width: number,
   options: RenderOptions,
 ): readonly string[] {
-  const ctx: RenderContext = {
+  const ctx: RenderContextInput = {
     width,
     theme: options.theme,
     capabilities: options.capabilities,
     focus: options.focus ?? null,
     tick: options.tick ?? 0,
     onAction: options.onAction ?? (() => undefined),
-    measureChild: registry.measure,
-    renderChild: () => {
-      throw new Error("renderChild is supplied by the registry");
-    },
   };
 
   const painted = renderToString(

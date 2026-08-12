@@ -100,17 +100,7 @@ export function createLogsAdapter(): Adapter {
         status: "error",
         error: { message: "logs was invoked without streaming", stage: "adapter" },
         blocks: [b.notice.error("logs was invoked without streaming — this is a wiring fault")],
-        meta: {
-          verb: ctx.verb,
-          adapter: "logs",
-          exitCode: result.exitCode ?? 0,
-          durationMs: result.durationMs,
-          truncated: false,
-          argv: result.argv,
-          stderr: result.stderr,
-          transport: ctx.transport,
-          origin: ctx.origin,
-        },
+        meta: { adapter: "logs", truncated: false },
       };
     },
 

@@ -111,9 +111,9 @@ A vacuous rule reports success it has not earned; an undeclared branch reports a
 
   **And the fold is the only exit, which is the third instance of this now closed.** SS5 was folded into SS4 and SS12 into SS11, both for the same reason: a rule whose scope is contained by a broader rule with the same pattern can never fire on anything the broader one misses. SS7 is the third — its scope is `editor/` and SS1 bans clock reads across all of `src/` with one named exception — and C17's arrival was the moment to see it, because the component that was supposedly blocking it is the one that proves it could never fire. **A pending rule whose reason was false when it was written cannot expire on its own; something has to retire it deliberately, and the fold is what that looks like.** SS8 and SS9 wait on C19 and C20 and are the same entry twice more; each is folded or built when its component lands, and neither is left to expire by itself.
 
-  **SS8 is now folded, on the day C19 landed, and it went exactly as this paragraph predicted.** Its scope was `completion/` and its pattern was clock reads, which SS1 already forbids across all of `src/` with one named exception — so it could never fire on anything SS1 missed, and the component supposedly blocking it was again the one that proved it. C19 T2.3 declares SS1's coverage of `completion/` rather than a rule of its own. **SS9 is the last of the four**, and it is not the same case: its scope adds `fs` and a `~/.prism` literal, neither of which SS1 covers, so C20 builds it rather than folding it.
+  **SS8 is now folded, on the day C19 landed, and it went exactly as this paragraph predicted.** Its scope was `completion/` and its pattern was clock reads, which SS1 already forbids across all of `src/` with one named exception — so it could never fire on anything SS1 missed, and the component supposedly blocking it was again the one that proved it. C19 T2.3 declares SS1's coverage of `completion/` rather than a rule of its own. **SS9 is the last of the four**, and it is not the same case: its scope adds `fs` and a hardcoded state-directory literal, neither of which SS1 covers, so C20 builds it rather than folding it.
 
-  **Built, on the day C20 landed — and half of it was folded after all.** The rule as inventoried read "clock, `fs`, `~/.prism` literal", and the clock clause is the same dead entry the other three were: SS1 bans clock reads across all of `src/`, so a `history/`-scoped clause could not fire on anything SS1 misses. It is gone rather than carried, and C20 T2.4's clock half declares SS1's coverage. What was built is the half SS1 does not speak for. **The lesson the four of them add up to is that a pending rule is a claim about scope, not about a component**, and the honest thing to check when the blocker arrives is not "can I write this now" but "would it ever have fired".
+  **Built, on the day C20 landed — and half of it was folded after all.** The rule as inventoried read "clock, `fs`, state-directory literal", and the clock clause is the same dead entry the other three were: SS1 bans clock reads across all of `src/`, so a `history/`-scoped clause could not fire on anything SS1 misses. It is gone rather than carried, and C20 T2.4's clock half declares SS1's coverage. What was built is the half SS1 does not speak for. **The lesson the four of them add up to is that a pending rule is a claim about scope, not about a component**, and the honest thing to check when the blocker arrives is not "can I write this now" but "would it ever have fired".
 
   **The half a machine can see is now checked, and it found two on its first run.** A reason false at birth cannot expire and needs the fold; a reason that *becomes* false has a moment, and nothing was watching that moment. So a pending entry is now one of two shapes: a bare string, which is a fold or a condition no arrival satisfies, or `{ waitsOn, why }`, which is a claim — and "the component named by `waitsOn` is built" is a question `defaultIsImplemented` already answers. **MG14 had waited on C16 through C16's landing and C17's**, unenforced, reporting exactly like a satisfied rule; SS6 had waited on C16 for a fold it should have taken at the same moment. Both were found by writing the check, neither by reading the list.
 
@@ -210,7 +210,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 |---|---|---|
 | MG1 | No module imports upward across layers | A02 §1 |
 | MG2 | No cycle within a layer | A02 §1 |
-| MG3 | `terminal/` ↮ `data/` — L0's halves never import each other | A02 §1, C01 T2.4, C03 T2.6 |
+| MG3 | `terminal/` ↮ `data/` — L0's halves never import each other, **type-only edges included**. `CROSS_HALF_TYPES` excuses them by file and name, with MG27's bidirectional arm | A02 §1, C01 T2.4, C03 T2.6, C07 I10 |
 | MG4 | C04 imports nothing from `terminal/`, `presentation/` or above | C04 T2.9 |
 | MG5 | C05 imports nothing from `terminal/` or above | C05 T2.6 |
 | MG6 | C06 imports no C04 type | C06 T2.2 |
@@ -233,6 +233,7 @@ The layer rule (A02 §1) made executable. One test walks the compiled graph and 
 | MG23 | A component in L1–L3 imports at most one **store**; several at once is L4's, through C23 | C23 §2, C23 I14, A02 Seam 4 |
 | MG24 | A member of an `export interface` under `src/` is named somewhere else under `src/` — a component complete on its own side of a seam, with nothing on the other | A02 Seam 4, C16 I23, C22 I38, I39 |
 | MG25 | An exported **function or class** under `src/` is named somewhere else under `src/`, comments excluded. MG24's blind spot: a producer expressed as free functions rather than as an interface | A02 Seam 4, C23 §3b, C24 I16 |
+| MG27 | A field a **block type** carries that no builder sets. The reasons live in `BUILDER_OMISSIONS`, keyed `Kind.field`, with the bidirectional arm `UNCONSUMED_MEMBERS` has: an entry the builder now sets is itself a violation | C24 I18, C24 commitment 16, FINDINGS F41 · F114 |
 | MG26 | No module under `src/` outside `testing/` and `fixtures/` value-imports either of them | C24 I8, T2.3 |
 
 **MG10 is the sharpest instance of MG6's third kind, because both its edges go *downward*.** C13 is L2, `terminal/` is L0 and `presentation/` is L1, so MG1 reports an import of either as legal and MG2 sees no cycle. Every rule in this document passes an edge C13 I18 forbids outright — which is why it is a row here and not a consequence of the layer walk. What it guards is knowledge rather than layering: a store that can measure a document will eventually evict by height, and "evict the tallest" reads as more correct than "evict the oldest" while making the transcript depend on a width it has no honest way to obtain. The cap is on blocks (C13 I17) precisely so this component never renders to do its job.
@@ -260,6 +261,24 @@ What MG13 guards is a fix the C15 spec pass rejected, and the fabrication is cop
 
 **MG3 and MG8 are the two that would be hardest to undo.** L0's halves touching collapses the parallel-build property; Calcium reaching into `prism-tui` ends the reuse claim outright.
 
+**And MG3 has never walked `import type`.** `importsOf` takes `includeTypeOnly = false` and every caller uses the default, so for the whole life of this table the rule hardest to undo has been clean about an edge it could not see. Measured when the producer ruling needed one: a fabricated type-only edge from `src/data/adapters/types.ts` into `terminal/capabilities.ts` leaves `make enforce` green at 175 files and 6927 references; the same edge written as a value import fires MG3 immediately. **The rule works and the subject was half absent** — MG24's shape one rule over (F83, F84), and the third instance of a correct rule scoped past most of what it is about.
+
+**The table already holds both answers, in two rows, and neither is wrong.** MG21 says *type-only imports are not edges* for `presentation/` → `terminal/`, which is a **downward** direction the layer walk permits anyway — the row is about which runtime module may be reached, and a type erases. MG22 says *type-only counts*, because it is a **cycle** rule and a reference is a dependency whether or not it survives the build. MG3 is the second kind: what it protects is that `data/` type-checks without `terminal/` present, and a type-only edge is exactly what removes that.
+
+So the arm is on, and the one edge that survives it is named rather than tolerated:
+
+| file | name | why |
+|---|---|---|
+| `src/data/adapters/types.ts` | `TerminalCapabilities` | `ProducerContext` grants a producer the **resolved** capability record (C07 §3, I19). The alternative is a second declaration of it inside `data/`, pinned by a test that agrees with itself — which is two records of one fact, and is the defect the grant exists to close, reproduced one layer in. |
+
+**The runtime edge stays forbidden in both directions**, which is what keeps A02 §1's parallel-build claim true: the halves still build independently as *modules*, and one name crosses as a *declaration*.
+
+**What the arm sees, measured, and it is not one thing.** Twenty-two type-only edges reach `terminal/` from above L0 — eleven from `presentation/`, nine from `shell/`, one each from `src/index.ts` and `src/testing/` — and thirteen files above L0 name both halves. **The arm forbids none of them**, because none is MG3's subject: L1 and L4 importing L0 is *downward*, and `presentation/` could not render C04's blocks onto a terminal without seeing both at once.
+
+**The rule's own name is what makes those look like violations.** MG3 forbids `data/` ↔ `terminal/`, and *"cross-half"* reads as forbidding any module that touches both. Third instance in this pass of a rule whose **name** did work its **body** did not, after MG24's *"unconsumed member"* and MG27's *"coverage"*.
+
+MG3's actual subject — an L0 half importing the other — is **zero runtime edges and one type-only**, which is the entry above. **Zero violations from an arm that can see is a different result from zero from an arm that cannot**, and the figures are what tell them apart: before this, the number was zero because nothing was looked at.
+
 ---
 
 ## 4. Source scans
@@ -278,7 +297,7 @@ Grep-class checks over built output. Each names a directory and a forbidden patt
 | SS6 | — folded into SS1 | — | C16 T2.3 |
 | SS7 | — folded into SS1 | — | C17 T2.3 |
 | SS8 | — folded into SS1 | — | C19 T2.3 |
-| SS9 | `fs`, `~/.prism` literal — the clock clause dropped, being SS1's | `history/` | C20 T2.4 |
+| SS9 | `fs`, any dot-directory path literal (`.x`, `~/.x`) — the clock clause dropped, being SS1's | `history/` | C20 T2.4 |
 | SS10 | `process.env` reads of the seven terminal variables | outside C02 | C02 T2.5 |
 | SS11 | `process.env` | `src/presentation/` | C09 T2.7 |
 | SS12 | `process.env` | `theme/` | C10 T2.6 |
@@ -344,7 +363,10 @@ Two shapes, because there are two ways to write one: a `"--flagname"` literal is
 | SS34 | `render({ … alternateScreen … })` | `src/` | C01 I1, T2.9 |
 | SS35 | A second `type Result` declaration | `src/` outside `data/viewmodel/types.ts` | C04 I26 |
 | SS45 | A tone or glyph literal as an object-literal value | `src/shell/builders/` | C24 I5, T2.7 |
+| SS47 | A non-ASCII mark in a `src/` string literal that is not prose punctuation. The reasons live in `MARK_EXEMPTIONS`, keyed by file, with MG27's bidirectional arm: an entry whose file no longer carries a mark is itself a violation | `src/`, ten sites excused with reasons | C09 I22, C22 I52, FINDINGS F55 · F122 |
+| SS48 | A second frame composition — a `paint(` call under `src/shell/` outside the unit that owns it. `composeFrame` in `render-frame.ts` is the one, and `session.ts` calls it | `src/shell/`, `render-frame.ts` and `paint.ts` excused | C22 I54, C24 I25, FINDINGS F126 |
 | SS46 | `origin: "refresh"` outside the four sites that mean it | `src/` outside `viewport/transcript/cap.ts`, `shell/construct.ts`, `shell/execution.ts` and `shell/types.ts` | C23 §3a, I22 |
+| SS49 | `origin: "defect"` outside the one site that means it | `src/` outside `shell/execution.ts` | C23 §5a, I48 · C04 I13 |
 | SS36 | A string literal assigned to a `colour` field | `src/` | C10 I24, T2.19 |
 | SS37 | An Ink `color=` or `backgroundColor=` prop | `src/presentation/` | C09 I15, T2.17 |
 | SS39 | A character literal in a `glyph` position | `src/` outside C09's glyph table | C04 I6, C09 §4 |
@@ -506,6 +528,7 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP3 | Every invariant reference resolves against the spec that owns it | `src/`, `test/`, `tools/`, `docs/` outside `components/` and `archive/` | A02 §1 |
 | SP4 | A02 Seam 4 and each owner's orchestration table hold the same rows, **both directions** | A02 Seam 4 · C22 §3c · C23 §4 | A02 §Seam 4 |
 | SP5 | Every `Fnn` citation resolves against a finding that exists | FINDINGS · CLAUDE.md §Ask where a settled claim is written down | A03 §7a |
+| SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
 
@@ -524,6 +547,16 @@ Resolution is by explicit qualifier (`C10 I22`) first, then by a declared file-t
 Two things belong here rather than there. **This document has been on the other end of it**: SS37 declared C09 I4 for behaviour that is C09 I15, and MG21 declared a § where an invariant now exists. Both fired correctly the whole time and both were mislabelled, which is what these five are — so the population is one class and not two, and a rule's "Declared" column is as citable-and-wrong as a test's parenthetical. And **the detection method is §2's**: both this and the contradiction class surface when someone implements against the spec and by nothing else, each now three times or more, which is the argument for the by-hand walk being a scheduled step rather than a courtesy.
 
 **A dangling reference is not inert — it arms itself when the number gets used.** C22 §3 cited `C01 I17` twice, about `beforeRelease` running once before the first release, which is C01 I5 and always was. For months C01 declared no I17 at all, so both citations were dangling and nothing looked. Then the C25 commit added a real I17 — the width rule — and the two silently became *resolving* citations pointing at an unrelated invariant. SP3 would have caught them on any day before that one and on no day after, and what found them in the end was reading the renumber's diff. This is the boundary above with a date attached: the rule proves resolution, and resolution is exactly what the new invariant supplied. Qualifying all eleven hundred is not the remedy — that is a diff of pure noise, and `T3.7 (I5)` in `test/unit/capabilities.test.ts` is unambiguous to a reader. Saying where the rule stops is what keeps it from being read as stronger than it is, which is the failure mode of everything in §2's list.
+
+**SP6 makes the triage's self-certification a mechanism instead of a snapshot.** `TRIAGE.md` §*How this file was checked* opened *"the inventory is derived, not hand-copied — `grep '^## F'` yields 89 ids and every one is keyed in a group above"*, followed by a sum that reaches 89. Measured when the rule was written: **145 distinct findings, 55 of them keyed in no group**, and the sum still reached 89 — so the arithmetic offered as evidence passed exactly as it had on the day it was true.
+
+That is F87's mechanism one level out. F87 found a total over group sizes cannot see a duplicate placed twice and counted once — a proxy agreeing with itself — and fixed the disjointness half. This is the same total unable to see **absence**: a sum computed over the groups can only describe the groups, so nothing in it can notice an id that was never keyed at all. Every disposition derived from that partition was a claim about 89 of 145.
+
+**Compared by equality, on `BUILDER_OMISSIONS`' precedent** (§3). The inventory is an exemption list written in prose, and a list checked as a subset lets an entry outlive its reason unread — which is exactly how this one went 55 findings stale. Two allow-lists disposed of their own entries mechanically in the session this rule was written, because equality made it impossible to forget.
+
+**Its blind spot is placement, and it is stated because an unrecorded limit reads as strength.** The triage keys in two forms — a table row's first cell, and bold in prose — and nothing distinguishes a key from a mention: table cells alone find 78 and leave two groups keying nothing. So SP6 proves *coverage*, precisely as SP5 proves a citation's *existence* and not its aim. A finding bolded in passing inside the wrong group passes. Tightening the key form to table rows is real work and is named rather than done.
+
+**And the duplicate counts came out rather than gaining a second check.** Group 9 carried *7 surfaces* in its heading and *"Six findings"* in the sentence below it, because F86 was added to the table and not the sentence — the exact F55-era failure the original count check was built to catch, recurring in the group about instruments being wrong. A number stated twice is a number that can disagree with itself, so the size is now in the ranking table only, where SP6 checks it.
 
 **SP5 closes the citation check on the one document that had none.** SP3 proves every `Inn` reference resolves across specs, source and tests; `FINDINGS.md` is the most-cited document in the application and nothing looked at it. Step 9 cited `F67` for a finding about local handlers — F67 exists and is about the shell drawing nothing below a certain terminal size, so the citation **resolved, against something real and unrelated**, which is the version that survives review. The replacement was chosen by grepping `^## F6[0-9]`, which cannot see F70 and above; the maximum was F76 and that was taken too. `make enforce` was green through all of it.
 
@@ -708,6 +741,52 @@ They are named in `UNCONSUMED_MEMBERS` with their owners rather than deleted, be
 
 **A note on where the rows for new rules live.** SS and MG rows are inventoried in §4 and §3 *with their implementation*, not ahead of it — commitment 14b makes an inventoried-and-unbuilt rule fail on the commit that inventories it, which is deliberate and is the opposite of the usual spec-first order. This section is prose, so it lands with the finding; the row lands with the code.
 
+### MG27 — a block field no builder can set
+
+**The rule existed and the mechanism did not**, which is the whole of why this
+rule is worth its lines. C24 I18 ends *"a builder narrower than its block is
+either a ruling with a reason written down or a defect; there is no third state,
+and the reason is what tells them apart"*, and commitment 16 says the same. Both
+are correct, both were written before the builders were finished, and **three
+block fields were unreachable underneath them** — `patch.collapsedAfter` (F41,
+filed by a consumer who wanted it), `patch.actions` and `table.sort` (found by
+this rule and by nothing else).
+
+**The model it enforces was already in the tree, twice.** `b.plot` exposes
+`yMin`/`yMax` and leaves `yFormat`, `xLabels` and `emptyMessage` out with the
+reason recorded for each. That is the shape: an omission with a reason is a
+decision, and an omission without one is a gap the next consumer rediscovers.
+
+**Its blind spots, because an unrecorded limit reads as strength.**
+
+- It matches a field **name** in the constructed literal — the text from
+  `finish<` onward — so a builder that mentions a field without setting it counts
+  as covering it. The check is reachability, not correctness, and a field exposed
+  with the wrong shape is invisible to it.
+
+  **The scoping is the mutation pass's correction and it is not cosmetic.** The
+  first version searched the whole body, and a builder's text names a field three
+  times: in the spec parameter's type annotation, in the destructure, and in the
+  literal. Only the third sets anything. So deleting
+  `...(sort === undefined ? {} : { sort })` left two mentions standing and **MG27
+  stayed green on precisely the defect it had been written to find** — the rule
+  reported its three gaps once and would then have gone blind to all of them
+  regressing. The blind spot was written down in this section before it was
+  noticed to have that consequence, which is its own small lesson: recording a
+  limit is not the same as following it through.
+- It cannot see a field that should exist and does not — the block type is the
+  authority, so a gap in *C04* is outside its subject.
+- Both are the frame-read's job. Neither is how a field has actually gone
+  missing: every measured case is a field nobody typed into the builder.
+
+**Two parsing corrections it needed before it was trustworthy**, and both had
+produced false rows on the first run. `Hunk.lines[].kind` is
+`"add" | "remove" | "context"`, so scanning for a `kind: "x"` literal invented
+three block kinds — the `Block` union is the authority. And
+`export type Rule = Readonly<{ … }> & Gap;` is one line, which a body regex
+written for the multi-line form silently read past, attributing a neighbour's
+fields to it. A rule that over-reports is not a rule anyone keeps.
+
 ### MG25 — a free function with no consumer
 
 **The paragraph above, "the obvious rule was measured first and cannot work", is where MG24's own blind spot is written down.** It is right about the form it measured and wrong about the rule. Two corrections make it work, and both were found by a case MG24 could not see.
@@ -755,6 +834,22 @@ list that is no longer unconsumed is now itself a violation.
 It only means anything because the scan records what is unconsumed *before*
 consulting the list; checking membership first would make every entry
 permanently justified by its own presence.
+
+**A violation naming something that does not exist is the stalest entry a list
+can hold, and it is the one shape the equality arm cannot clear.** MG24's member
+pattern is line-oriented, so a parameter inside a multi-line signature matched
+it — `take(sourceId, key, ttlMs, run)` contributed four phantom members to one
+interface and two of them reached the violation list, reading exactly like an
+unwired seam. **A phantom cannot be wired and cannot be deleted**, so the only
+available resolution is an allow-list entry justifying a member that is not
+there; and because it is never consumed and never removed, the equality arm
+agrees with it forever. F95.
+
+So the rule is not only *every entry carries a reason* but **every entry names a
+thing that exists**. A reason can be checked by a reader; existence cannot, once
+the entry is what a reader consults instead of the source. The cheapest guard is
+the one that found it: keep the violation list short enough that someone opens
+the file it names.
 
 ### MG26 — the dev-only entry points stay out of the bundle
 
@@ -822,7 +917,7 @@ Nothing sequenced those two. The scans are scoped to `src/` and could not see th
 | `assignOffsets`, `backoffOf` | producer, no driver | allow-listed; ships with `b.live` |
 | `gutterMatchesPrompt` | an assertion evaluated nowhere | wired into `paint` |
 | `promptPrefix` | dead, and no test read it either | deleted |
-| `isUsable`, `plotAreaWidth` | **a rule expressed twice, the second unreachable** | allow-listed against C02 and C12 |
+| `isUsable`, `plotAreaWidth` | **a rule expressed twice, the second unreachable** | `plotAreaWidth` allow-listed against C12; **`isUsable` is disposed of** — C22's gate 3b calls it (C22 I61, F8), and MG25 compares the list by equality, so the entry could not outlive the wiring |
 | `renderToLines` | public surface (C24 §7); its seam is an entry point | allow-listed |
 
 `gutterMatchesPrompt` is the one worth naming on its own. Its declaration says *"asserted here rather than only in a test, because the two are declared in one file and read in two"* — and nothing called it, so the sentence was false and the check ran nowhere. **A03 §2's vacuity class in a function**: an assertion that is never evaluated passes exactly like one that holds, and it sits three lines from `heightsSum`, which *is* called from `paint`. Review reads the pair as symmetric because on the page they are.

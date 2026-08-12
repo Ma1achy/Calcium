@@ -17,6 +17,7 @@ import { createFocusStore } from "../../src/interaction/router/focus.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
+import { producerContext } from "../support/producer-context.js";
 const key = (k: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }): Key => ({
   name: k.name,
   ctrl: k.ctrl ?? false,
@@ -227,7 +228,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     const called = new Set<string>();
     const real = graph.editor;
     const spy = new Proxy(real, {
-      get(target, prop, receiver) {
+      get(target, prop) {
         const value = Reflect.get(target, prop, target);
         if (typeof value !== "function") return value;
         return (...args: unknown[]) => {
@@ -275,6 +276,12 @@ describe("C22 §3 step 11 — the effect table", () => {
       redraw: () => undefined,
       focus: createFocusStore(),
       liveRows: () => ["row-0", "row-1"],
+      // A stand-in, and it must not supply the behaviour: this suite drives the
+      // editing bindings, and whether `enter` on a row reaches C23's dispatcher
+      // is a wiring question a file that builds its own deps cannot answer.
+      // T4.x in session.test.ts is where that is asserted.
+      liveRowAction: () => null,
+      onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
         return { [Symbol.dispose]: () => undefined };
@@ -418,6 +425,36 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(graph.overlays.top?.id).not.toBe(MENU_ID);
   });
 
+  it("T1.4h3a (C20 §7, F97): a search narrows as you type, and backspace widens it", async () => {
+    // **The row F97 did not have.** `searchType` and `searchBackspace` were
+    // declared, implemented and covered by `test/revert/history.test.ts` — which
+    // calls the store *directly*, so it proved the machine worked and said
+    // nothing about whether a keystroke reached it. Nothing did: the overlay
+    // handler forwarded printable keys only for the completion menu, so `⌃r`
+    // opened a search whose query could never become non-empty.
+    //
+    // **This dispatches a key rather than calling the store**, which is the
+    // whole difference — a test that calls the mechanism verifies the mechanism
+    // and never the wiring.
+    const { graph } = await buildGraph();
+    graph.history.append("git push origin", 0);
+    graph.history.append("npm test", 0);
+
+    graph.router.dispatch(press({ name: "r", ctrl: true }));
+    expect(graph.overlays.top?.id).toBe(SEARCH_ID);
+    expect(graph.history.searchState?.query, "opens empty").toBe("");
+
+    graph.router.dispatch(press({ name: "p" }));
+    graph.router.dispatch(press({ name: "u" }));
+    expect(graph.history.searchState?.query, "the keystrokes reached C20").toBe("pu");
+    expect(graph.history.searchState?.hit?.command, "and narrowed to the match").toContain(
+      "git push",
+    );
+
+    graph.router.dispatch(press({ name: "backspace" }));
+    expect(graph.history.searchState?.query, "backspace widens it").toBe("p");
+  });
+
   it("T1.4h4 (C16 I21): each editing action's effect, not merely that C17 was called", async () => {
     // **T2.14 asks which method a binding reaches and this asks what it does.**
     // Rewiring `killWordLeft` to `killTo("wordRight")` passes T2.14 exactly —
@@ -520,6 +557,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         seal: () => undefined,
         sealed: true,
         liveStreams: 0,
+        faults: [],
         cancelNewestStream: () => false,
         inFlight: null,
         cancel: () => undefined,
@@ -527,6 +565,8 @@ describe("C22 §3 step 11 — the effect table", () => {
         onAction: () => undefined,
         identityNotice: () => undefined,
         releaseView: () => undefined,
+        visibilityChanged: () => undefined,
+        producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
       }),
@@ -614,6 +654,7 @@ describe("C22 §3 step 12 — the read loop", () => {
         openFor: "/ps --watch",
       },
       releaseView: () => void order.push("release"),
+      visibilityChanged: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
@@ -621,6 +662,8 @@ describe("C22 §3 step 12 — the read loop", () => {
       redraw: () => undefined,
       focus: createFocusStore(),
       liveRows: () => [],
+      liveRowAction: () => null,
+      onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
         return { [Symbol.dispose]: () => undefined };

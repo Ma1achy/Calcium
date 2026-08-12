@@ -42,10 +42,66 @@ export type RenderContext = Readonly<{
   renderChild: (block: Block, width: number) => ReactElement;
 }>;
 
+/**
+ * What a *caller* of the registry supplies — everything a renderer may read
+ * except the two fields the registry owns.
+ *
+ * **The registry overwrites `measureChild` and `renderChild` unconditionally**
+ * (`registry.ts`, `{ ...ctx, measureChild: this.measure, renderChild: … }`), so
+ * a caller's values were discarded on every call. The type demanded them anyway,
+ * and the only way to satisfy it was to write something untrue: `render-lines.ts`
+ * supplied `registry.measure` for one and a stub that **throws if called** for
+ * the other, with a comment explaining that the registry replaces both and *"a
+ * caller should not have to know that."*
+ *
+ * **The fix is a narrower type, not a wider one.** Making them optional would
+ * leave them discarded; removing them from the construction boundary means
+ * supplying one fails to compile rather than failing to matter. Second instance
+ * of F58b's shape — an adapter computes ten `meta` fields and the registry
+ * honours three — which is what says it generalises past one surface.
+ * FINDINGS F85.
+ */
+export type RenderContextInput = Omit<RenderContext, "measureChild" | "renderChild">;
+
+/**
+ * A block reduced to a smaller one, plus the leading rows of it the caller drops
+ * (C09 §2a, I25).
+ *
+ * **The offset is what makes exactness possible**, not a convenience. A window
+ * that had to be a slice on the nose could not express an indivisible run of
+ * changed lines (C25 I19) or a sticky header (C25 I18) without either inventing
+ * a row C14 never measured or hiding one the reader asked for.
+ *
+ * **`block` is `Block` and not `B`, and the type cannot say what the spec says.**
+ * I25 requires a window to be a block *of the same kind*, and expressing that
+ * puts `B` in return position — which makes `BlockDefinition<B>` invariant, and
+ * every `BlockDefinition<Table>` in the tree stops being assignable to the
+ * `BlockDefinition` the registry stores. TypeScript then infers `never` and the
+ * error surfaces in the *consumer's* test file rather than at the declaration,
+ * which is how this was found. The same-kind rule is a contract held by I26 and
+ * the conformance suite, not by the compiler; saying so here is better than a
+ * variance fight that would move the cost onto every kind.
+ */
+export type Windowed = Readonly<{
+  block: Block;
+  skipRows: number;
+}>;
+
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
   render: (block: B, ctx: RenderContext) => ReactElement;
+  /**
+   * A valid smaller block covering rows `[from, to)` of this one (I25, I26).
+   *
+   * **Optional, and a kind that does not divide omits it** — that is how `plot`
+   * is atomic (I27, C12 I1), because an absent member cannot be deleted by a
+   * later edit while a branch returning the block unchanged can.
+   *
+   * The contract is one line and it is checked generically:
+   * `measure(result.block, width) − result.skipRows === to − from`.
+   */
+  window?: (block: B, width: number, from: number, to: number) => Windowed;
 }
 
 export interface BlockRegistry {
@@ -53,10 +109,25 @@ export interface BlockRegistry {
   get(kind: string): BlockDefinition | undefined;
   seal(): void;
   measure(block: Block, width: number): number;
-  render(block: Block, ctx: RenderContext): ReactElement;
+  render(block: Block, ctx: RenderContextInput): ReactElement;
   /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
   measureSequence(blocks: readonly Block[], width: number): number;
-  renderSequence(blocks: readonly Block[], ctx: RenderContext): ReactElement;
+  /**
+   * Rows `[from, to)` of a *sequence*, as a smaller sequence plus an offset
+   * (C09 §2a, I25).
+   *
+   * The sequence form is where `gapBefore` is applied, so it is where a window
+   * over a document's top level has to be taken: a driver that windowed block by
+   * block and summed would be short by one row per gap, which is the defect
+   * `document-view.ts` already had once against `measure` (C04 §3a).
+   */
+  windowSequence(
+    blocks: readonly Block[],
+    width: number,
+    from: number,
+    to: number,
+  ): Readonly<{ blocks: readonly Block[]; skipRows: number }>;
+  renderSequence(blocks: readonly Block[], ctx: RenderContextInput): ReactElement;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }

@@ -269,6 +269,25 @@ Each row is a claim the framework makes and this app tests.
 - **R4.2**: against real docker: `/ps`, drill into `/inspect`, then `/logs`, then `esc` — the B03 chain in a second app.
 - **R4.3**: `/stats` for two minutes with the daemon killed and restarted → parts degrade and recover independently.
 - **R4.4**: a clean clone, `npm install`, `npm start` → a running shell with no further steps.
+
+  **R4.4 has two halves and only one of them has ever run.** The mechanical half is covered:
+  `make proof` packs the tarball, installs it into a tree that has never seen this repository
+  and runs both examples against it, and `examples/minimal` spawns a real shell in a PTY and
+  asserts on what the terminal received. That half is green and gated on every pull request.
+
+  The other half is the sentence the row exists for — *someone who is **not its author** builds a
+  working TUI from the README* — and it **has never been run, and cannot be run from inside
+  this repository.** `examples/docker` was written by the framework's author, so it is not that
+  test. Nor is a careful re-read by anyone who has worked in the tree: following the README
+  literally from a clean position finds what is *absent or broken* — F150 was found exactly that
+  way, three faults nested inside each other in the one example the reuse claim rests on — but it
+  cannot find **where a reader's existing knowledge filled a gap without their noticing**, which
+  is the whole of the F7 class and the only failure mode that matters here.
+
+  So it is **owed, not closed.** It needs a person who has not seen the codebase, the smallest
+  example, and someone watching without helping. It is the last thing between this and
+  publication, and no instrument in this repository can stand in for it — every other gate here
+  checks an artefact, and this one checks a reader.
 - **R4.5**: bump Calcium to a new minor → builds with no app changes. **Requiring changes means the bump was not minor.**
 
 ### Fail-on-revert

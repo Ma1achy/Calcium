@@ -246,13 +246,13 @@ const S07_IDENTITY: Block = block({
   id: "s07-identity",
   gapBefore: true,
   rows: [
-    { field: "family", a: "digit-classifier", b: "digit-classifier", comparison: "same" },
-    { field: "kind", a: "candidate", b: "experiment", comparison: "changed" },
-    { field: "status", a: "succeeded", b: "succeeded", comparison: "same" },
-    { field: "job", a: "TrainingJob", b: "TrainingJob", comparison: "same" },
-    { field: "owner", a: "malachy", b: "malachy", comparison: "same" },
-    { field: "resources", a: "2×GPU · 16Gi", b: "1×GPU · 8Gi", comparison: "changed" },
-    { field: "duration", a: "14m 20s", b: "22m 04s", comparison: "changed" },
+    { field: "family", a: "digit-classifier", b: "digit-classifier", change: "unchanged" },
+    { field: "kind", a: "candidate", b: "experiment", change: "changed" },
+    { field: "status", a: "succeeded", b: "succeeded", change: "unchanged" },
+    { field: "job", a: "TrainingJob", b: "TrainingJob", change: "unchanged" },
+    { field: "owner", a: "malachy", b: "malachy", change: "unchanged" },
+    { field: "resources", a: "2×GPU · 16Gi", b: "1×GPU · 8Gi", change: "changed" },
+    { field: "duration", a: "14m 20s", b: "22m 04s", change: "changed" },
   ],
 });
 
@@ -261,11 +261,11 @@ const S07_METRICS: Block = block({
   id: "s07-metrics",
   gapBefore: true,
   rows: [
-    { field: "loss", a: "0.0312", b: "0.0372", comparison: "better" },
-    { field: "val_accuracy", a: "0.968", b: "0.958", comparison: "better" },
-    { field: "auprc", a: "0.912", b: "0.930", comparison: "worse" },
-    { field: "calibration", a: "0.061", b: "0.058", comparison: "changed" },
-    { field: "train_time_s", a: "862", b: "1324", comparison: "changed" },
+    { field: "loss", a: "0.0312", b: "0.0372", verdict: "better" },
+    { field: "val_accuracy", a: "0.968", b: "0.958", verdict: "better" },
+    { field: "auprc", a: "0.912", b: "0.930", verdict: "worse" },
+    { field: "calibration", a: "0.061", b: "0.058", change: "changed" },
+    { field: "train_time_s", a: "862", b: "1324", change: "changed" },
   ],
 });
 
@@ -956,7 +956,7 @@ export const SURFACE_FRAMES: readonly SurfaceFrame[] = Object.freeze([
     label: "S14 §2 — config, two table regions",
     width: 78,
     blocks: [
-      block({ kind: "rule", id: "s14-rule", label: "config · ~/.prism/config.toml" }),
+      block({ kind: "rule", id: "s14-rule", label: "config · .calcium/config.toml" }),
       S14_KEYS,
       block({ kind: "rule", id: "s14-contexts-rule", label: "contexts · 2", gapBefore: true }),
       withActions(S14_CONTEXTS, ["⏎ edit", "␣ expand", "↕ switch context", "⊘ reset"]),

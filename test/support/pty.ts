@@ -15,13 +15,308 @@
 // simplify this to a diff should read that sentence first.
 import { spawn } from "node-pty";
 
+import { cells } from "../../src/presentation/text.js";
+
 const MARKER = "__TERMIOS__";
 
-/** The frame's prefix, and the anchor `frame` slices from (C22 §6). */
-const HOME = "\u001b[H";
+/**
+ * A complete escape sequence at position 0 — the boundary test for `feed`.
+ *
+ * The same alternatives the walk matches, anchored. Kept beside them because
+ * two lists that must agree and are written apart is the drift a shared
+ * implementation prevents; if the walk learns a sequence, this must too.
+ */
+const COMPLETE_ESCAPE =
+  /^\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])/u;
 
-/** Every escape, for reading a frame as the rows a user would see. */
-const CSI_ANY = /\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])/g;
+/**
+ * The screen the program is painting, as the rows a user would see (F149).
+ *
+ * **This replaces a slice, and the difference is the whole finding.** `frame`
+ * used to return everything after the last `CSI H`, on a stated shape: *one
+ * write per frame, beginning with a hide and `CSI H`*, cited to S01 §3 and
+ * C22 §6. Measured on a live session at 100×24: **one home, ever.** C22 I55
+ * §6b makes the whole-frame form the *fallback* — the first frame, a
+ * contaminated one, a resize, a refusal — and every ordinary frame a
+ * **difference**, each changed row addressed with `cursorTo(i, 0)`. Stripping
+ * escapes then throws those addresses away, so rows written to line 4 and line
+ * 19 arrived adjacent in one string, and a 400-row transcript read as one line.
+ *
+ * A stream of edits cannot be sliced back into a screen; it has to be
+ * **applied**, which is what the terminal on the other end is doing. So this is
+ * the smallest emulator that makes the getter's own doc-comment true: a row
+ * buffer, a write head, and the four things the shell actually emits.
+ *
+ * **`cells()` is imported from `src/`, deliberately and with the cost stated.**
+ * The instrument now shares a measurer with the thing under test, so a width
+ * defect in `cells()` would move the model and the app together and hide itself
+ * — the shape `test/support/README.md` forbids. A second implementation is the
+ * worse trade: it would drift from the measurer the whole framework uses, and
+ * disagree about exactly the characters that are hard. What makes it safe to
+ * take is that the coupling is **checked rather than assumed** — every row the
+ * shell writes is `exact()`-padded to the frame's width, so a row whose
+ * measured width overruns the frame's is a real defect, not a modelling choice.
+ * `overrun` reports it rather than absorbing it.
+ */
+export function screen(bytes: string, cols: number, rows: number): string[] {
+  const paint = painter(cols, rows);
+  paint.apply(bytes);
+  return paint.rows();
+}
+
+/**
+ * Split a buffer at the last point a complete escape sequence ends (F149).
+ *
+ * **A read can end anywhere, including inside `CSI 12;1H`.** The walk skips what
+ * it cannot match, so feeding `\u001b[12` and then `;1Hrow` would drop the
+ * address entirely and paint `;1Hrow` as text at wherever the head happened to
+ * be — a plausible screen, wrong, with nothing to notice. Held back instead,
+ * and applied when the rest arrives.
+ *
+ * The same class as the multi-byte character split across two reads that
+ * `interactivePty`'s decoder already holds, one layer up: **a chunk boundary is
+ * not a delimiter**, and every reader of a stream has to say so somewhere.
+ *
+ * A trailing `ESC` with nothing after it is itself partial, which the anchored
+ * test gives for free.
+ */
+export function atEscapeBoundary(buf: string): Readonly<{ ready: string; partial: string }> {
+  const last = buf.lastIndexOf("\u001b");
+  if (last === -1 || COMPLETE_ESCAPE.test(buf.slice(last))) {
+    return { ready: buf, partial: "" };
+  }
+  return { ready: buf.slice(0, last), partial: buf.slice(last) };
+}
+
+/** A screen that can be fed the stream in pieces — see `painter` below. */
+export type Painter = Readonly<{
+  /** Apply a chunk. Escape sequences must not be split across calls. */
+  apply: (chunk: string) => void;
+  /** The rows a user would see, padded to the screen's width. */
+  rows: () => string[];
+  /**
+   * Change the screen's shape, **clipping** what no longer fits.
+   *
+   * A terminal does not re-flow and does not remember: cells beyond the new
+   * width are gone, and so are rows beyond the new height. This existed first
+   * as a rebuild — throw the screen away and replay the whole stream at the new
+   * geometry — which is wrong in a way that only a frame-read shows. Replaying
+   * places every historical write at the *current* width, so content painted at
+   * 120 columns survives an 80-column pass that overwrites only the first 80,
+   * and the leftover sits in columns 80–119 looking like a rendering defect in
+   * the application. C04's T5.2 resizes between four widths, and that is
+   * exactly the frame it produced.
+   */
+  resize: (cols: number, rows: number) => void;
+  /**
+   * The rows with the attributes each cell was written under (C11 I14).
+   *
+   * For the one thing stripped rows cannot express: focus is a *tone*, so a
+   * focused row and an unfocused one have identical text. An attribute record
+   * rather than a rendering model — see the pen's note in the walk.
+   */
+  styled: () => string[];
+}>;
+
+/**
+ * The screen model, as state rather than as a function (F149).
+ *
+ * **This exists because the one-shot form is quadratic in a poll loop.**
+ * `waitForFrame` asks for the frame every 20 ms, and a frame derived by
+ * replaying the whole stream costs more every time it is asked. Measured: a
+ * 2.1 MB session parses in 127 ms, so a twenty-second wait over a busy session
+ * spends more than a hundred seconds of CPU deriving the same screen — which is
+ * how `transport` T5.6 went from 3 s to a 75 s timeout with nothing but the
+ * frame reader changed under it. The terminal on the other end does not replay
+ * either; it applies what arrives and keeps the screen.
+ */
+export function painter(initialCols: number, initialRows: number): Painter {
+  let cols = initialCols;
+  let rows = initialRows;
+  /**
+   * **A row is cells, not a string** — and this is the second thing the
+   * mutation pass found rather than the first thing written.
+   *
+   * The model began with `head + text`, which indexes a *cell* cursor into a
+   * *string*. Two consequences, and both are the conflation `cells()` exists to
+   * stop: a write truncated everything to its right, so clearing the screen and
+   * not clearing it produced identical output and the alternate-screen mutation
+   * survived; and a column past a wide glyph was off by one per glyph, which is
+   * invisible until C17's CJK rows run.
+   *
+   * So a row is an array of cells. `null` is a cell nothing has written, and
+   * renders as a space; `""` is the continuation half of a wide glyph, and
+   * renders as nothing, because the glyph before it already occupies both.
+   */
+  const blank = (): (string | null)[][] => Array.from({ length: rows }, () => []);
+  let grid = blank();
+  let pens = blank();
+  let pen = "";
+  let row = 0;
+  let col = 0;
+
+  /** Overwrite `text` into `line` from cell `at`, and answer where the head is. */
+  function place(line: (string | null)[], ink: (string | null)[], at: number, text: string): number {
+    let x = at;
+    for (const ch of text) {
+      const w = cells(ch);
+      while (line.length < x) line.push(null);
+      while (ink.length < x) ink.push(null);
+      line[x] = ch;
+      ink[x] = pen;
+      // The continuation cells of a wide glyph. Written explicitly rather than
+      // left as holes: a later narrow write landing on the second half must
+      // replace it, and a hole would render as a space beside a glyph that is
+      // still two cells wide.
+      for (let k = 1; k < w; k += 1) line[x + k] = "";
+      x += w;
+    }
+    return x;
+  }
+
+  // One pass, one token at a time. Anything not named here is a presentation
+  // escape — SGR, DECSET, the synchronised-update window — and moves no write
+  // head, so it is skipped rather than rendered.
+  const token =
+    /\u001b\[(\d*)(?:;(\d*))?([Hf])|\u001b\[(\d*)J|\u001b\[\?1049([hl])|\u001b\[([0-9;]*)m|\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])|(\r)|(\n)|([^\r\n\u001b]+)/g;
+
+  function apply(chunk: string): void {
+  for (const m of chunk.matchAll(token)) {
+    const [, r, c, cup, erase, alt, sgr, cr, lf, text] = m;
+
+    // **The pen, and what it is and is not** (F149, C11 I14).
+    //
+    // C11 renders focus as a *tone and nothing else*, so the stripped text of a
+    // focused row is identical to an unfocused one — C02's T5.4b reached for
+    // raw output precisely because asserting through the rows would assert that
+    // focus is invisible, which is the defect it exists to catch. So the screen
+    // keeps what was in effect when each cell was written.
+    //
+    // **This is an attribute record, not a rendering model.** It accumulates
+    // the SGR sequences since the last reset rather than resolving them into
+    // foreground, background and flags: two cells written under the same
+    // sequences compare equal and two written differently compare unequal,
+    // which is what a row comparing focused against unfocused needs. It would
+    // *not* answer "what colour is this cell" — `\u001b[31m\u001b[32m` and
+    // `\u001b[32m` are the same green and different pens here. The limit is
+    // stated because an instrument that looks like it resolves colour and does
+    // not is the shape §9 is about.
+    if (sgr !== undefined) {
+      pen = sgr === "" || sgr === "0" ? "" : pen + `\u001b[${sgr}m`;
+      continue;
+    }
+
+    if (cup !== undefined) {
+      // **CUP is 1-based on the wire and 0-based here**, which is `cursorTo`'s
+      // own note one layer down: *one place to be off by one, and it is the
+      // place with the test*. A model that converted twice would produce a
+      // screen that is self-consistent and one row low — the exact defect
+      // C22's T4.12 caught in the renderer, arriving in the instrument that
+      // would have to find it.
+      row = Math.max(0, (r === undefined || r === "" ? 1 : Number(r)) - 1);
+      col = Math.max(0, (c === undefined || c === "" ? 1 : Number(c)) - 1);
+      continue;
+    }
+
+    // `CSI 2J` and the alternate screen both mean *nothing on this screen is
+    // yours any more*. Modelled, because entering the alt screen is the first
+    // thing the shell does and a model that kept the login shell's rows would
+    // show them underneath the application for the life of the session.
+    if (erase !== undefined || alt !== undefined) {
+      grid = blank();
+      pens = blank();
+      if (alt !== undefined) {
+        row = 0;
+        col = 0;
+      }
+      continue;
+    }
+
+    if (cr !== undefined) {
+      col = 0;
+      continue;
+    }
+    if (lf !== undefined) {
+      row += 1;
+      continue;
+    }
+    if (text === undefined) continue;
+
+    // **The head advances whether or not the row exists.** A write below the
+    // last row is dropped — a screen has a height — but the cursor still moved,
+    // and a model that only advanced on rows it kept would put the next write
+    // in the wrong column.
+    const line = row >= 0 && row < rows ? grid[row] : undefined;
+    const ink = row >= 0 && row < rows ? pens[row] : undefined;
+    col =
+      line === undefined || ink === undefined
+        ? col + cells(text)
+        : place(line, ink, col, text);
+  }
+  }
+
+  // **Padded to the screen's width, not trimmed** — and the difference is a row
+  // that failed when this trimmed. C03's T5.5 asserts
+  // `new Set(frame.map((r) => r.length)).size === 1`, which is how *the resume
+  // path repainted everything rather than nothing* is observable from outside:
+  // every row painted to one width. Trailing space is invisible to a reader and
+  // load-bearing to that assertion, so the model keeps the width the program
+  // painted, exactly as the slice it replaces did.
+  return {
+    apply,
+    resize: (nextCols, nextRows) => {
+      cols = nextCols;
+      // Clip rather than re-flow: a terminal drops what no longer fits, and the
+      // shell repaints whole after a resize anyway (C22 I55).
+      for (const line of grid) line.length = Math.min(line.length, cols);
+      for (const line of pens) line.length = Math.min(line.length, cols);
+      grid.length = Math.min(grid.length, nextRows);
+      pens.length = Math.min(pens.length, nextRows);
+      while (grid.length < nextRows) grid.push([]);
+      while (pens.length < nextRows) pens.push([]);
+      rows = nextRows;
+      if (row >= rows) row = rows - 1;
+      if (col > cols) col = cols;
+    },
+    rows: () =>
+      grid.map((line) => {
+        const text = line.map((cell) => cell ?? " ").join("");
+        const width = cells(text);
+        return width >= cols ? text : text + " ".repeat(cols - width);
+      }),
+    styled: () =>
+      grid.map((line, y) => {
+        let out = "";
+        let held: string | null = null;
+        for (let x = 0; x < line.length; x += 1) {
+          const ink = pens[y]?.[x] ?? "";
+          if (ink !== held) {
+            out += ink === "" ? "\u001b[0m" : ink;
+            held = ink;
+          }
+          out += line[x] ?? " ";
+        }
+        return out;
+      }),
+  };
+}
+
+/**
+ * Rows whose painted width exceeds the screen's, as `row: width` (F149).
+ *
+ * Empty on every healthy frame, and it is the check that makes importing
+ * `cells()` honest: the shell pads every row to exactly the frame's width, so
+ * anything over `cols` is a row that wrapped — and a wrapped line scrolls the
+ * alternate screen, which is the one failure that corrupts state the
+ * application can no longer see. A model that silently truncated would be
+ * absorbing precisely the defect it exists to show.
+ */
+export function overrun(rows: readonly string[], cols: number): string[] {
+  return rows
+    .map((line, i) => ({ i, width: cells(line) }))
+    .filter(({ width }) => width > cols)
+    .map(({ i, width }) => `${String(i)}: ${String(width)}`);
+}
 
 export type DecsetState = {
   altScreen: boolean;
@@ -186,7 +481,18 @@ export function runInPty(
       name: opts.env?.["TERM"] ?? "xterm-256color",
       cols: 80,
       rows: 24,
-      env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
+      // **`LANG` is part of the default because the default is a capable
+      // terminal** (F147). It was absent — not as a decision that tier 5 tests a
+      // degraded one, but because an environment built by listing two variables
+      // has whatever you did not list. C02 then resolved the ASCII pair, the
+      // prompt rendered `>`, and 44 rows across 13 files waited fifteen seconds
+      // each for a `❯` the app was right not to draw.
+      //
+      // Tier 5's job is the whole stack as a user meets it, and a user has a
+      // `LANG`. A degraded terminal is what a row **asks** for — `opts.env`
+      // spreads last, so `capabilities.test.ts` setting `LANG: "C"` still wins,
+      // which is how the one file that is about degradation keeps its subject.
+      env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8", PATH: process.env["PATH"] ?? "", ...opts.env },
     });
 
     let output = "";
@@ -291,12 +597,36 @@ export type InteractivePty = {
    * height counts every frame ever written. Four editor rows were written
    * against `output` and three of them failed on exactly that.
    *
-   * The reconstruction is the frame's own shape (S01 §3, C22 §6): one write per
-   * frame, beginning with a hide and `CSI H` and ending with the cursor's
-   * position. So the current frame is everything after the last `CSI H`, and
-   * this is the same slice C03's T4.9 takes in-process.
+   * **It is applied, not sliced** (F149). This used to return everything after
+   * the last `CSI H`, on a stated shape — *one write per frame, beginning with a
+   * hide and `CSI H`* — cited to S01 §3 and C22 §6. The citation was the reason
+   * nobody checked it, and C22 **I55 §6b** says the opposite in a numbered
+   * invariant: the whole-frame form is the *fallback*, and every ordinary frame
+   * is a **difference** with each changed row addressed by `cursorTo(i, 0)`.
+   * Measured on a live session: one home, ever. So the slice returned the first
+   * paint plus every edit since, addresses stripped and rows run together, and a
+   * 400-row transcript read as a single line.
+   *
+   * `screen` applies the stream the way the terminal does. A "contains"
+   * assertion used to pass by accident on a blob that only accumulates; this is
+   * what makes an assertion about a row's position, or about text being *gone*,
+   * mean what it says.
    */
   readonly frame: readonly string[];
+  /**
+   * The frame with the attributes each cell was written under (C11 I14, F149).
+   *
+   * **`frame` cannot express a tone.** C11 renders focus as colour and nothing
+   * else — no marker, no extra row, no width — so a focused row and an
+   * unfocused one have identical stripped text, and a row asserting through
+   * `frame` would be asserting that focus is invisible. C02's T5.4b is that
+   * row, and it reached into `output` for raw bytes because this did not exist.
+   *
+   * An attribute *record*, not a rendering model: cells written under the same
+   * sequences compare equal and cells written differently compare unequal. It
+   * does not answer what colour a cell is.
+   */
+  readonly styledFrame: readonly string[];
   /** Resolve once `pattern` appears, or reject after `ms`. */
   waitFor(pattern: RegExp, ms?: number): Promise<RegExpExecArray>;
   /**
@@ -337,13 +667,41 @@ export function interactivePty(
     name: opts.env?.["TERM"] ?? "xterm-256color",
     cols: opts.cols ?? 80,
     rows: opts.rows ?? 24,
-    env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
+    // The same default, and for the same reason (F147). Both spawners, because
+    // the defect was in what an unlisted variable does rather than in either
+    // function — fixing the one that surfaced it would leave the other live,
+    // which is the mistake the `name`-wins-over-`env` note above records twice.
+    env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8", PATH: process.env["PATH"] ?? "", ...opts.env },
     // Raw bytes rather than per-chunk strings — see `bytes` below.
     encoding: null,
   });
 
   let output = "";
   let exited: number | null = null;
+  /**
+   * The screen's height, live (F149). `screen` applies a stream of edits into a
+   * buffer of this many rows, and a row asserting across a resize would read the
+   * spawn-time option and model a screen the program stopped painting.
+   */
+  let height = opts.rows ?? 24;
+  let width = opts.cols ?? 80;
+  /**
+   * The screen, kept rather than re-derived (F149).
+   *
+   * `paint` is fed each chunk as it arrives; `frame` renders it. Deriving the
+   * frame from the whole stream on every poll is quadratic and measurably so —
+   * a 2.1 MB session parses in 127 ms, and `waitForFrame` asks 50 times a
+   * second.
+   *
+   * **`held` is the half of an escape sequence that has not arrived yet.** A
+   * read can end anywhere, including inside `CSI 12;1H`, and the walk skips what
+   * it cannot match — so feeding `\u001b[12` and then `;1Hrow` would drop the
+   * address and paint `;1Hrow` as text, at whatever position the head happened
+   * to be. The same class as the split multi-byte character two fields down, one
+   * layer up: a boundary is not a delimiter.
+   */
+  const paint = painter(width, height);
+  let held = "";
   /**
    * **A multi-byte character split across two reads is one character, not two
    * replacements.** `node-pty` decodes each chunk it delivers independently, so
@@ -365,7 +723,9 @@ export function interactivePty(
 
   term.onData((d) => {
     // Through the one streaming decoder — see `bytes`.
-    output += bytes.decode(d as unknown as Uint8Array, { stream: true });
+    const text = bytes.decode(d as unknown as Uint8Array, { stream: true });
+    output += text;
+    feed(text);
     for (let i = waiters.length - 1; i >= 0; i -= 1) {
       const m = waiters[i]!.re.exec(output);
       if (m !== null) {
@@ -379,23 +739,41 @@ export function interactivePty(
     for (const w of exitWaiters.splice(0)) w(exitCode);
   });
 
+  /**
+   * Apply what has arrived, holding back a trailing partial escape.
+   *
+   * The boundary is found by looking at the last `ESC` in the buffer and asking
+   * whether a complete sequence starts there. If it does not, the sequence is
+   * still arriving and everything from it is held for the next chunk.
+   */
+  function feed(chunk: string): void {
+    const { ready, partial } = atEscapeBoundary(held + chunk);
+    held = partial;
+    paint.apply(ready);
+  }
+
   return {
     type: (bytes) => term.write(bytes),
-    resize: (cols, rows) => term.resize(cols, rows),
+    resize: (cols, rows) => {
+      width = cols;
+      height = rows;
+      // **Clipped, not replayed** — see `Painter.resize`. Replaying the stream
+      // at the new geometry puts historical writes at the current width, and
+      // C04's T5.2 is the row that shows it: content from a 120-column pass
+      // surviving an 80-column one, in columns 80–119, reading as a rendering
+      // defect in the application.
+      paint.resize(width, height);
+      term.resize(cols, rows);
+    },
     get output() {
       return output;
     },
     get frame() {
-      const at = output.lastIndexOf(HOME);
-      if (at === -1) return [];
-      return output
-        .slice(at + HOME.length)
-        .replaceAll(CSI_ANY, "")
-        // **`\r*\n`, not `\r\n`.** The frame joins its rows with `\r\n` and the
-        // PTY's ONLCR translates the `\n` again, so what arrives is `\r\r\n` —
-        // and splitting on the written separator leaves a stray `\r` on the end
-        // of every row, which breaks any assertion that touches a row's edge.
-        .split(/\r*\n/);
+      // Applied as it arrived, not re-derived — see `paint` and F149.
+      return paint.rows();
+    },
+    get styledFrame() {
+      return paint.styled();
     },
     waitForFrame(ok, ms = 15_000) {
       // Polled rather than driven by the data event: the frame is a derived

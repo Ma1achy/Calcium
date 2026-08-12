@@ -23,9 +23,10 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { b } from "@fmx/calcium";
-import type { Block, ComparisonRow, ViewDocument } from "@fmx/calcium";
+import type { LocalDocument, Block, ComparisonRow, ViewDocument } from "@fmx/calcium";
 import type { Row } from "./ndjson.ts";
 
+import type { LocalContext } from "@fmx/calcium";
 const run = promisify(execFile);
 
 /** One `docker inspect` object — a container's or an image's. */
@@ -206,7 +207,13 @@ const row = (field: string, a: string | null, bb: string | null): ComparisonRow 
   field,
   a: a ?? NONE,
   b: bb ?? NONE,
-  comparison: a === bb ? "same" : "changed",
+  // **The two members F30 asked for, now that they exist.** This row said
+  // `changed` for a field the container adds and for one it drops, because the
+  // union had nowhere else to put them — the finding's own words were *absence
+  // goes in the data*, which left `—` in a cell and the verdict silent about
+  // which side was missing. The marker now says it (C04 I35, I36).
+  change:
+    a === bb ? "unchanged" : a === null ? "added" : bb === null ? "removed" : "changed",
 });
 
 /**
@@ -246,7 +253,7 @@ export function rowsFor(field: Field, imageSide: Insp | null, containerSide: Ins
     // The tally, and it is not decoration: without it a container identical to
     // its image renders nothing for this field at all, and nothing reads exactly
     // like a lookup that failed.
-    out.push({ field: field.label, a: `${String(identical)} identical`, b: "", comparison: "same" });
+    out.push({ field: field.label, a: `${String(identical)} identical`, b: "", change: "unchanged" });
   }
   return out;
 }
@@ -285,18 +292,6 @@ async function inspectOne(kind: "container" | "image", ref: string): Promise<Ins
   }
 }
 
-const META = (verb: string): ViewDocument["meta"] => ({
-  verb,
-  adapter: verb,
-  exitCode: 0,
-  durationMs: 0,
-  truncated: false,
-  argv: ["docker", "inspect"],
-  stderr: "",
-  transport: "local",
-  origin: "user",
-});
-
 /**
  * **`error` is required when `status` is `"error"`** (C04 I3), and omitting it
  * does not fail loudly — it fails *silently*.
@@ -310,13 +305,13 @@ const META = (verb: string): ViewDocument["meta"] => ({
  * Found by reading the frame for `/drift no-such-container` and seeing an empty
  * transcript. FINDINGS F35.
  */
-const errorDoc = (command: string, verb: string, text: string): ViewDocument => ({
+const errorDoc = (command: string, verb: string, text: string): LocalDocument => ({
   schema: "tui.view/1",
   command,
   status: "error",
   error: { message: text, stage: "local" },
   blocks: [b.notice.error(text)],
-  meta: META(verb),
+  meta: { adapter: "drift" },
 });
 
 // ── The handlers ────────────────────────────────────────────────────────────
@@ -340,7 +335,7 @@ export type Lookup = (kind: "container" | "image", ref: string) => Promise<Insp 
  */
 export function createDriftHandler(
   lookup: Lookup = inspectOne,
-): (argv: readonly string[], ctx: { command: string }) => Promise<ViewDocument> {
+): (argv: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const ref = argv[0];
     if (ref === undefined || ref === "") {
@@ -376,26 +371,31 @@ export function createDriftHandler(
         ? tagged[0]
         : imageRef.replace(/^sha256:/u, "").slice(0, 12) || "unknown";
 
+    // **The head block is gone: the columns say it themselves now** (F33). It
+    // named the two sides one block above the columns it explained, which was
+    // the workaround F33 recorded as *not the same thing*.
     const blocks: Block[] = [
-      b.kv({ CONTAINER: ref, IMAGE: label }, { id: "drift-head" }),
       ...missing,
-      b.comparison(driftRows(imageSide, container), { id: "drift-rows" }),
+      b.comparison(driftRows(imageSide, container), {
+        id: "drift-rows",
+        labels: [label, ref],
+      }),
     ];
 
     return {
       schema: "tui.view/1",
+      meta: { adapter: "drift" },
       command: ctx.command,
       status: "ok",
       blocks,
-      meta: META("drift"),
     };
   };
 }
 
 export function createCompareHandler(): (
   argv: readonly string[],
-  ctx: { command: string },
-) => Promise<ViewDocument> {
+  ctx: LocalContext,
+) => Promise<LocalDocument> {
   return async (argv, ctx) => {
     const [left, right] = argv;
     if (left === undefined || right === undefined) {
@@ -413,13 +413,12 @@ export function createCompareHandler(): (
 
     return {
       schema: "tui.view/1",
+      meta: { adapter: "drift" },
       command: ctx.command,
       status: "ok",
       blocks: [
-        b.kv({ A: left, B: right }, { id: "compare-head" }),
-        b.comparison(compareRows(a, bb), { id: "compare-rows" }),
+        b.comparison(compareRows(a, bb), { id: "compare-rows", labels: [left, right] }),
       ],
-      meta: META("compare"),
     };
   };
 }

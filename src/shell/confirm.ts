@@ -25,6 +25,8 @@ import type { Block } from "../data/viewmodel/types.js";
 import type { InputEvent } from "../interaction/router/types.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import { glyphFor } from "../presentation/blocks/index.js";
 
 export const CONFIRM_LAYER_ID = "confirm";
 
@@ -45,6 +47,17 @@ export const CONFIRM_WIDTH = 72;
 
 export type ConfirmDeps = Readonly<{
   overlays: OverlayManager;
+  /**
+   * For the selection marker alone (C09 I22, F122).
+   *
+   * The marker is `▸`, which **is** a member of C09's vocabulary — `expand`,
+   * paired with `>` — and this file wrote the character. A `raw` block carries
+   * text rather than a slot, so the substitution cannot happen at L1 and the
+   * capability has to arrive here. That is the cost of choosing `raw` for a
+   * list, and it is named rather than absorbed: a `list` block would have
+   * carried the slot.
+   */
+  capabilities: Pick<TerminalCapabilities, "unicode">;
   /** The frame is L4's to commit; C15 never paints (A02 Seam 4). */
   invalidate: () => void;
 }>;
@@ -77,7 +90,11 @@ function defaultChoice(choices: readonly Choice[]): Choice {
   return choices.find((c) => c.default === true) ?? choices[choices.length - 1]!;
 }
 
-function render(opts: AskOptions, selected: number): readonly Block[] {
+function render(
+  opts: AskOptions,
+  selected: number,
+  caps: Pick<TerminalCapabilities, "unicode">,
+): readonly Block[] {
   const children: Block[] = [
     block({ kind: "notice", id: "confirm-question", tone: "warn", glyph: "warn", text: opts.question }),
   ];
@@ -91,7 +108,7 @@ function render(opts: AskOptions, selected: number): readonly Block[] {
       id: "confirm-choices",
       gapBefore: true,
       text: opts.choices
-        .map((c, i) => `${i === selected ? "▸" : " "} [${c.key}] ${c.label}`)
+        .map((c, i) => `${i === selected ? glyphFor("expand", caps) : " "} [${c.key}] ${c.label}`)
         .join("\n"),
     }),
   );
@@ -129,7 +146,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         id: CONFIRM_LAYER_ID,
         kind: "overlay",
         placement: { kind: "centred" },
-        content: render(opts, selected),
+        content: render(opts, selected, deps.capabilities),
         dismissable: false,
         // **Declared, and the frame-read is why.** Without it C15 gives a
         // centred layer the region's width, so `Placed.left` is always 0 and
@@ -154,7 +171,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         };
 
         const redraw = (): boolean => {
-          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected) });
+          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected, deps.capabilities) });
           deps.invalidate();
           return true;
         };

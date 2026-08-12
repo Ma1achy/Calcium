@@ -132,7 +132,8 @@ Nothing else in the process may write `acquired`. C01 has no `contaminated` — 
 - **I10** — A capability absent from the record is never acquired. No mouse in the record means no mouse sequence, ever.
 - **I11** — `released` is a terminal state. Every operation on a released instance throws except `release()` itself, which is a no-op (I2).
 - **I12** — `SIGWINCH` produces one coherent `{columns, rows}` snapshot per event (D31). Subscribers never see a mismatched pair. **Per signal, and not per frame** — `writer` is a live handle, so its `columns` is read by whoever holds it at the moment they read it, and nothing here guarantees a frame was composed against one width. §5 states the boundary; the frame path's snapshot belongs with whoever writes it.
-- **I12a** — `size()` reads `columns` and `rows` once, freezes them together and returns them. It is the only route to a dimension outside a `SIGWINCH`, and it is a method rather than a getter so that a caller wanting one snapshot writes one call — a getter reads like a property and invites two reads in one expression, which is the mismatched pair I12 exists to prevent. Unlike `onResize` it answers while `constructed`: C22 needs the size at construction step 5, before anything is acquired.
+- **I12b** — **`onResize` delivers while `constructed` and while `acquired`; it is dropped only while `suspended` or `released`.** The states are named rather than a single positive test, because the guard this replaces was `state !== "acquired"` and its whole defect was covering three states with a reason that holds for one. Suspended: the dimensions belong to the child (T3.18). Released: terminal (I11). Constructed: the terminal is not acquired and the size is still C01's to report — which is what makes C22's gate-4 deferral (C22 I8) a mechanism rather than a sentence.
+- **I12a** — `size()` reads `columns` and `rows` once, freezes them together and returns them. It is the only route to a dimension outside a `SIGWINCH`, and it is a method rather than a getter so that a caller wanting one snapshot writes one call — a getter reads like a property and invites two reads in one expression, which is the mismatched pair I12 exists to prevent. It answers while `constructed`, as `onResize` now also does (I12b): C22 needs the size at construction step 5, before anything is acquired. **This sentence used to read *"unlike `onResize`"*, and that asymmetry was a defect rather than a design — see §5.**
 - **I13** — `columns` and `rows` are read in this file and nowhere else in `src/`. Enforced by A03 SS42, and it is the fourth member of the same family as the clock, `process.env` and the escape literals: one place reads it, everything else is handed the value. Width is the axis that wraps, and a wrap scrolls the alternate screen.
 - **I14** — Failure to acquire the alternate screen is fatal and aborts before first paint. It is the only fatal case in the system (A02 §7).
 - **I15** — `SIGCONT` re-acquires terminal state and reports through `onResume`. It sets no flag: C01 states a fact about the terminal and L4 decides what it means, because a `contaminated` flag under two owners is the failure C01 exists to prevent, applied to itself (D53).
@@ -220,6 +221,27 @@ Eight trappable handlers, registered by the constructor and named individually b
 
 **`SIGCONT` sets no flag.** C01 has no contamination concept (§2, commitment 7); it re-acquires and says so through `onResume`, and the L4 shell calls `scheduler.invalidate()` exactly as it does after an orchestrated `resume()`. An earlier draft of this row set `contaminated` here, which contradicted §2, commitment 7 and T6.7 — three places against one.
 
+### Which states `onResize` delivers in, and the guard that was wider than its reason
+
+**`SIGWINCH` is delivered while `constructed` as well as while `acquired`, and dropped only
+while `suspended` or `released`** (I12b). The guard was `state !== "acquired"`, and its stated
+reason — T3.18's *while suspended the dimensions belong to the child* — is true of `suspended`
+and of nothing else. `released` is terminal. `constructed` has neither property, and C01
+already answers `size()` there for precisely the caller that needs the signal.
+
+**It was a correct sentence attached to a broader condition than it justifies**, which is why
+it survived: a reader checks whether the justification is true, and it is. The question that
+reaches it is whether the justification constrains the condition it is attached to — and one
+clause of three did.
+
+**The cost was a contradiction neither spec could see.** C22 I8 defers a failed size gate
+rather than aborting, *because a terminal too small can become big enough*, and registers an
+`onResize` to continue from startup step 5. Gate 4 deliberately does not acquire, so that
+subscriber could never fire: measured at 100x12, resized to 100x30, **zero further bytes, no
+alternate screen, no frame, process alive**. C22 depended on a delivery C01 declined to make,
+and I12a states the asymmetry — *"unlike `onResize` it answers while `constructed`"* — as
+though it were a decision rather than the gap it is. FINDINGS F67.
+
 ### Where I12's guarantee stops
 
 **I12 guarantees a coherent snapshot per signal. Nothing guarantees one per frame**: `writer` is a live handle and its `columns` is read at access time by whoever holds it. A frame composed against two widths wraps, and wrapping scrolls the alternate screen — the one failure that corrupts state the application cannot see. The per-frame snapshot, and an initial-size accessor to make one possible, belong with whoever writes the frame path.
@@ -274,7 +296,7 @@ Nested suspend is refused — `suspend()` while already suspended throws. There 
 11. C21 never calls C01; the L4 shell orchestrates suspend and handoff (→ A02 §2).
 12. stdout is redirected at construction and restored at release. `writer` is the only handle that reaches the real stream, so "originating from the renderer" is structural rather than a claim nothing can check; everything else goes to the injected `debug` sink, which C01 owns (I9).
 13. `onFatal` is required, not optional — the only fatal case in the system cannot have undefined handling (I14).
-14. C01 owns `SIGWINCH` and emits one coherent dimension snapshot per event; it does not interpret it (I12).
+14. C01 owns `SIGWINCH` and emits one coherent dimension snapshot per event; it does not interpret it (I12). **It delivers while `constructed` as well as while `acquired`** — dropped only where a reason exists to drop it, which is the child owning the dimensions while suspended, and `released` being terminal (I12b).
 15. `release()` while suspended tears down handlers and stdout redirection but emits no terminal sequence (I8).
 16. `beforeRelease` gives layers above L0 a synchronous hook before the process exits; a throw from it never blocks the release (I5).
 17. `released` is terminal — a new instance is constructed per session; the transition table in §5 is exhaustive and every cell is tested (I11).
@@ -364,6 +386,7 @@ Where the real defects live.
 - **T3.16** (I8, C15): `SIGTERM` while suspended → handlers disposed, stdout restored, zero terminal bytes emitted, exit **143**. The child is untouched.
 - **T3.17** (I12): `SIGWINCH` fires → `columns` and `rows` are each read exactly once, and every subscriber receives the same frozen object. "Never sees a mismatched pair" is not directly observable; read-once-and-freeze is, and it is what makes the claim true. Asserted with a stream whose `columns` getter mutates `rows`.
 - **T3.18**: `SIGWINCH` arrives while suspended → no subscriber is notified; the dimensions belong to the child.
+- **T3.18c** (I12b): `SIGWINCH` arrives while **constructed** → every subscriber *is* notified, with the new size. The pair with T3.18 and not a row on its own: one state that drops and one that delivers, because a guard covering both passes any row that only checks the dropping half — which is how `state !== "acquired"` survived, and it made C22 I8 undeliverable.
 - **T3.18b** (I12a): `size()` reads `columns` and `rows` exactly once per call and returns them frozen together — asserted with T3.17's stream, whose `columns` getter mutates `rows`, so a second read inside one call produces a pair that cannot have coexisted. A stable fake would pass whether the accessor read once or twice, which is the setup where both readings agree.
 - **T3.18c** (I12a): `size()` answers while `constructed`, before any acquire, because C22 takes the viewport's dimensions at construction step 5. It is the one dimension route that is not gated on state.
 - **T3.19**: `SIGWINCH` fires three times in one tick → three notifications, not one. C01 does not coalesce, and neither does C03: `resize` is immediate there and cannot be given a window (C03 §3, C03 I2). Nothing in the system debounces it (D31).

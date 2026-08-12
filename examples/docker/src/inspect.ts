@@ -13,7 +13,7 @@
  */
 
 import { cells } from "@fmx/calcium";
-import type { Adapter, Block, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, Adapter, Block, ViewDocument } from "@fmx/calcium";
 import { b } from "@fmx/calcium";
 import { str, type Row } from "./ndjson.ts";
 
@@ -43,32 +43,17 @@ export const SPLIT_FLOOR = 21;
 const MAX_DEPTH = 3;
 
 /**
- * The rows a `code` block will occupy — the app's own arithmetic, because there
- * is none to borrow.
+ * **`codeRows` is gone, and the deletion is the finding closing** (F37).
  *
- * `createBlockRegistry` is not public, so a consumer that must decide *how to
- * divide content* cannot measure the result (FINDINGS F37). `cells` is public
- * and is the same implementation the measurer uses, which is the sanctioned half
- * of this: a `.length` here would disagree with the measurer on every wide
- * character. The other half — that a wrapped code block is the sum of its
- * wrapped lines — is an assumption, and T5.x pins it against the real registry
- * rather than letting it drift silently.
+ * It reimplemented the block measurer's arithmetic because `createBlockRegistry`
+ * is not public — exactly the drift `CLAUDE.md` forbids — and was pinned against
+ * the real registry by deep import, which caught it wrong on its first run: 69
+ * rows against 68, because the first version assumed a code block pays for a
+ * border. `ProducerContext.measure` is the frame's own measurer now, so there is
+ * no second arithmetic and nothing left to drift.
+ *
+ * The pin went with it. Nothing remains to pin.
  */
-export function codeRows(text: string, width: number): number {
-  // **`width`, not `width - 2`.** A code block wraps at the full width — it has
-  // no border to pay for — and the first version of this assumed an inset,
-  // which the pin caught on its first run: 69 against the measurer's 68.
-  const limit = Math.max(1, Math.floor(width));
-  // **A trailing newline terminates the last line rather than starting a blank
-  // one.** `"a\n"` is one row, and counting two makes every value that ends
-  // tidily a row too tall — the measurer says so explicitly and the arithmetic
-  // has to agree.
-  const body = text.endsWith("\n") ? text.slice(0, -1) : text;
-  return Math.max(
-    1,
-    body.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(cells(line) / limit)), 0),
-  );
-}
 
 /**
  * The document, split into blocks no taller than `floor` where it can be.
@@ -82,14 +67,22 @@ export function codeRows(text: string, width: number): number {
 export function splitRaw(
   value: unknown,
   width: number,
+  /**
+   * How many rows a block occupies at a width — `ProducerContext.measure`
+   * (C07 I20). The frame's own, so a split decided here and the rows drawn on
+   * screen are one arithmetic rather than two that agree today.
+   */
+  measure: (block: Block, width: number) => number,
   floor: number = SPLIT_FLOOR,
 ): readonly Block[] {
+  const rows = (text: string): number =>
+    measure({ kind: "code", id: "measure", language: "json", text, wrap: true } as Block, width);
   const out: Block[] = [];
   const walk = (path: string, node: unknown, depth: number): void => {
     const text = `"${path}": ${JSON.stringify(node, null, 2)}`;
     const children =
       node !== null && typeof node === "object" ? Object.entries(node as Record<string, unknown>) : [];
-    if (codeRows(text, width) <= floor || children.length === 0 || depth >= MAX_DEPTH) {
+    if (rows(text) <= floor || children.length === 0 || depth >= MAX_DEPTH) {
       // **`wrap: true`, against the builder's default.** `--raw` exists so the
       // reader has the bytes; seven lines of a real inspect exceed 120 columns
       // and the longest is 2862 characters, so cutting them discards ~2.7KB
@@ -182,7 +175,7 @@ const parseInspect = (raw: string): Row | null => {
 export function createInspectAdapter(): Adapter {
   return {
     schema: "tui.view/1",
-    adapt(result, ctx): ViewDocument {
+    adapt(result, ctx): AdapterDocument {
       const failed = result.exitCode !== 0;
       const inspected = failed ? null : parseInspect(result.stdoutRaw);
       // **A container that answered nothing is a failure, not an empty view.**
@@ -194,7 +187,9 @@ export function createInspectAdapter(): Adapter {
           ? "docker inspect returned nothing that could be read"
           : "";
 
-      const raw = result.argv.includes("--raw");
+      // `ctx.flags`, not `result.argv`: a shellOnly flag is absent from argv by
+      // construction, which is the whole of what F39 asked for (C05 I21).
+      const raw = ctx.flags["raw"] === true;
 
       return {
         schema: "tui.view/1",
@@ -208,19 +203,9 @@ export function createInspectAdapter(): Adapter {
           failure !== "" || inspected === null
             ? [b.notice.error(failure)]
             : raw
-              ? splitRaw(inspected, ctx.width)
+              ? splitRaw(inspected, ctx.width, ctx.measure)
               : structuredBlocks(inspected),
-        meta: {
-          verb: ctx.verb,
-          adapter: "inspect",
-          exitCode: result.exitCode ?? 0,
-          durationMs: result.durationMs,
-          truncated: false,
-          argv: result.argv,
-          stderr: result.stderr,
-          transport: ctx.transport,
-          origin: ctx.origin,
-        },
+        meta: { adapter: "inspect", truncated: false },
       };
     },
   };

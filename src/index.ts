@@ -99,6 +99,48 @@ export type {
   ViewPatch,
 } from "./data/viewmodel/index.js";
 
+/**
+ * What an adapter returns, and the three `meta` keys it owns.
+ *
+ * **Published because an adapter cannot be written without them** (F58b).
+ * `Adapter.adapt` returns an `AdapterDocument`, so an app annotating its own
+ * adapter needs the name — and the seven keys the registry fills are typed
+ * `never`, so writing one is a compile error rather than a value that never
+ * reaches a document.
+ */
+export type {
+  AdapterDocument,
+  AdapterMeta,
+  LocalDocument,
+  ProducedMeta,
+} from "./data/viewmodel/index.js";
+
+/**
+ * The registry, so an app can test its own adapters.
+ *
+ * **An adapter's return is not a document** (F58b) — `AdapterMeta` carries the
+ * three keys it owns and the registry fills the seven it does not — so an app
+ * asserting *"every document this app produces is valid"* has no way to obtain
+ * one without opening a session. That is the gap C24 I19 already closed for
+ * completion sources by exporting `contextAt`, arriving on the adapter surface:
+ * a producer the framework can test and a consumer cannot is a producer whose
+ * app-side tests assert against something the user never sees.
+ *
+ * Found by the reference app's own suite failing the moment the narrowing
+ * landed, which is the second-consumer argument in one commit.
+ */
+export { createAdapterRegistry } from "./data/adapters/index.js";
+
+/**
+ * The local route's completion, so an app can test its own handlers.
+ *
+ * Symmetric with `createAdapterRegistry` above and published for the same
+ * reason: after F13 a local handler returns a `LocalDocument`, and the only
+ * thing that turns one into a document is `runLocal`, which an app cannot
+ * reach without opening a session.
+ */
+export { completeLocal } from "./shell/documents.js";
+
 // --- builders — §4 ----------------------------------------------------------
 
 export { b } from "./shell/builders/index.js";
@@ -122,6 +164,7 @@ export type { ColumnDef } from "./data/viewmodel/index.js";
 export type {
   Adapter,
   AdapterContext,
+  ProducerContext,
   RawPatch,
   RawResult,
   StreamContext,
@@ -199,6 +242,16 @@ export type {
 } from "./interaction/parser/index.js";
 
 export type { BlockDefinition, RenderContext } from "./presentation/blocks/index.js";
+/**
+ * C24 I22 — a `code` block accepts any language name, and until this existed
+ * only two of them meant anything (C09 §4a, F93).
+ *
+ * `DEFAULT_LANGUAGES` beside it because an app cannot otherwise tell whether
+ * it needs to register one: a `code` block with an unregistered language
+ * renders as plain text and reports nothing, by design (C09 I8), so the set
+ * has to be readable or the fallback is indistinguishable from a mistake.
+ */
+export { DEFAULT_LANGUAGES, registerGrammar } from "./presentation/blocks/index.js";
 /**
  * The record a `RenderContext` carries, and what `TuiConfig.capabilities`
  * overrides (C22 I49).

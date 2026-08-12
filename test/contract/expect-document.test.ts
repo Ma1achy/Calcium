@@ -27,7 +27,8 @@ import { describe, expect, it } from "vitest";
 import { block, document } from "../../src/data/viewmodel/index.js";
 import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { b } from "../../src/shell/builders/index.js";
-import { expectDocument } from "../../src/testing/index.js";
+import { expectDocument, liveParts } from "../../src/testing/index.js";
+import { producerContext, FULL_CAPABILITIES as FULL } from "../support/producer-context.js";
 import { CORPUS, doc } from "../support/blocks.js";
 
 const docOf = (blocks: readonly Block[]): ViewDocument =>
@@ -222,6 +223,55 @@ describe("C24 §7 — expectDocument", () => {
     );
   });
 
+  it("T2.13c (C04 I37): an exemption whose premise has expired fails, not passes", () => {
+    // **The half T2.13b cannot reach, and it is the one that fired.** That row
+    // catches a kind the sweep has never heard of. It cannot catch a kind it
+    // knows, exempted on the premise that it carries nothing meaning-bearing,
+    // that has since grown a field — because the set was keyed by *kind*, and
+    // membership was earned once by the fields the kind had that day.
+    //
+    // `events` is the measured instance: it gained a `tone` for F51 and the
+    // exemption did not notice. Verified by fabricated violation before the fix
+    // existed — a bare `error`-toned event passed a sweep whose other four arms
+    // throw on exactly that shape (FINDINGS F102).
+    //
+    // The subject here is a kind still listed under the `no-field` premise, so
+    // the row keeps its teeth after `events` moved out.
+    const contradiction = {
+      kind: "tip",
+      id: "t1",
+      text: "x",
+      tone: "error",
+    } as unknown as Block;
+
+    expect(() => expectDocument(doc({ blocks: [contradiction] })).hasNoColourOnlyDistinction())
+      .toThrow(/premise has expired/u);
+  });
+
+  it("T2.13d (C04 I35, F51): a toned event with no word is caught; with one it passes", () => {
+    // `events` left the exemption when it gained the field, which is the point
+    // of the premise check above. This is the arm it landed in.
+    const bare = block({
+      kind: "events",
+      id: "e1",
+      events: [{ ts: "12:00:01", type: "", message: "", tone: "error" }],
+    });
+    expect(() => expectDocument(doc({ blocks: [bare] })).hasNoColourOnlyDistinction()).toThrow(
+      /empty type/u,
+    );
+
+    // The real shape: `die` is printed in the type column, so the tone
+    // emphasises a word rather than replacing one.
+    const worded = block({
+      kind: "events",
+      id: "e2",
+      events: [{ ts: "12:00:01", type: "die", message: "exit 137", tone: "error" }],
+    });
+    expect(() =>
+      expectDocument(doc({ blocks: [worded] })).hasNoColourOnlyDistinction(),
+    ).not.toThrow();
+  });
+
   it("hasNoColourOnlyDistinction walks into panels, groups and expanded rows", () => {
     // A container that did not recurse would pass every document whose only
     // offence is nested — which is most real ones, since a detail row is where
@@ -263,5 +313,104 @@ describe("C24 §7 — expectDocument", () => {
       }),
     ]);
     expect(() => expectDocument(inDetail).hasNoColourOnlyDistinction()).toThrow(/detail-pills/);
+  });
+});
+
+describe("lines() — a frame, and it is the production renderer (C24 I23, F126)", () => {
+  it("T2.20: it returns what the renderer drew, not a description of it", () => {
+    // **The row the whole export exists for.** Every other method on this
+    // surface asserts a *property*, and a property is not a picture: the change
+    // axis' rows say `added` while only the frame says `+`, which is why the
+    // reference app asserted a value whose rendering it could not see.
+    const doc = docOf([
+      b.comparison(
+        [
+          { field: "LOG_LEVEL", a: "info", b: "debug", change: "changed" },
+          { field: "TZ", a: "", b: "UTC", change: "added" },
+        ],
+        { id: "d" },
+      ),
+    ]);
+
+    const drawn = expectDocument(doc).lines(60);
+    expect(drawn.length).toBeGreaterThan(0);
+    // The marker the *renderer* derives — invisible to any assertion about the
+    // block, because `change: "added"` is what the row carries and `+` is what
+    // the frame says.
+    expect(drawn.join("\n")).toContain("+");
+    expect(drawn.join("\n")).toContain("LOG_LEVEL");
+  });
+
+  it("T2.21: it is the same render `degradesToAscii` checks, so the two cannot disagree", () => {
+    // The control against a parallel renderer. If `lines()` grew its own path,
+    // this passes and the two drift on the first change to the render chain —
+    // which is the divergence C22 I54's scan exists to prevent one layer up.
+    // **A block that demonstrably responds to the capability.** The first
+    // version used a one-column table, which renders identically at `ascii` and
+    // `full` — so the "they differ" control passed against nothing and would
+    // have gone on passing against a `lines()` that ignored `capabilities`
+    // entirely. A fixture must be shown to respond to the thing under test.
+    const doc = docOf([
+      b.rule("containers"),
+      b.notice.ok("nine running"),
+      b.table({ id: "t", columns: [b.col("name")], rows: [b.row("r", { name: "web" })] }),
+    ]);
+
+    const ascii = expectDocument(doc).lines(40, {
+      capabilities: { ...FULL, unicode: "ascii" },
+    });
+    for (const line of ascii) {
+      for (const ch of line) {
+        expect(ch.codePointAt(0), `${line} carries a non-ASCII codepoint`).toBeLessThan(128);
+      }
+    }
+    // …and the full record draws something different, or the row above passes
+    // against a renderer that ignores capabilities entirely.
+    const full = expectDocument(doc).lines(40, { capabilities: FULL });
+    expect(full.join("\n")).not.toBe(ascii.join("\n"));
+  });
+
+  it("T2.22: SGR is stripped by default and kept on request", () => {
+    const doc = docOf([b.notice.ok("done")]);
+    expect(expectDocument(doc).lines(40).join("")).not.toContain("\u001b[");
+    expect(expectDocument(doc).lines(40, { colour: true }).join("")).toContain("\u001b[");
+  });
+});
+
+describe("liveParts — what `b.live` declared (C24 I24, F28)", () => {
+  it("T2.23: the fetch and the render are reachable without a shell, a transport or a clock", () => {
+    // The cost F28 measured: a `fetch` exercisable only by running the whole
+    // refresh driver pushes every consumer toward whole-stack tests or none.
+    let fetched = 0;
+    const doc = docOf([
+        b.live({
+          id: "cpu",
+          title: "CPU",
+          every: 1000,
+          fetch: () => {
+            fetched += 1;
+            return Promise.resolve({ pct: 42 });
+          },
+          render: (data) => b.notice.ok(`cpu ${String((data as { pct: number }).pct)}%`),
+        }),
+    ]);
+
+    const parts = liveParts(doc);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]!.spec.id).toBe("cpu");
+
+    // Driven directly — the thing that was impossible.
+    void parts[0]!.spec.fetch();
+    expect(fetched).toBe(1);
+
+    const rendered = parts[0]!.spec.render({ pct: 42 }, producerContext());
+    expect(JSON.stringify(rendered)).toContain("cpu 42%");
+  });
+
+  it("T2.24: a document with no live part returns nothing, which is the control", () => {
+    // Without this, T2.23 passes against an implementation returning every
+    // block it can find.
+    const plain = docOf([b.notice.ok("fine")]);
+    expect(liveParts(plain)).toEqual([]);
   });
 });

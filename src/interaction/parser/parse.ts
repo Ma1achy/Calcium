@@ -218,16 +218,39 @@ function app(
   // `consumed` counts the verb tokens the match ate, and the first of them is
   // the prefixed one — so the residual is what follows within `expanded`.
   const residual = Object.freeze(expanded.slice(match.consumed - 1));
-  const argv = Object.freeze([...match.tool.name.split(" "), ...residual]);
 
   // I19: validated once, over exactly the array carried on the result.
   const validation = validateInvocation(match.tool, residual);
 
-  return Object.freeze({
-    kind: match.tool.local ? ("local" as const) : ("app" as const),
-    tool: match.tool,
-    argv,
-    residual,
-    validation,
-  });
+  // **`argv` is what reaches the far side; `residual` is what the user typed**
+  // (C05 I21, F39). They were the same array, which is why `/inspect <c> --raw`
+  // ran `docker inspect <c> --raw` and docker exited 125.
+  //
+  // The split comes from `validateInvocation` rather than from a walk here: it
+  // is the one place that knows where a flag ends, and a second copy of that
+  // grammar is the drift a shared implementation prevents. On the failure arm
+  // nothing is spawned, so the residual stands and the displayed line is what
+  // the user typed.
+  const argv = Object.freeze([
+    ...match.tool.name.split(" "),
+    ...(validation.ok ? validation.transmitted : residual),
+  ]);
+
+  const common = { tool: match.tool, argv, residual, validation };
+
+  // **Two returns rather than one with a ternary `kind`** (I28). The `app` arm
+  // carries the resolved terminal contract and the `local` arm does not: C05 I19
+  // refuses `interactive` with `local: true`, so a member there could only ever
+  // be `false` — A03 §2's vacuity class arriving as a field.
+  //
+  // The fallback on the failure arm is the declaration, and it has no reader:
+  // C23 I38 gates on `validation.ok` above the route. Named rather than left to
+  // a `?? false` that would read as a policy someone could come to rely on.
+  return match.tool.local
+    ? Object.freeze({ kind: "local" as const, ...common })
+    : Object.freeze({
+        kind: "app" as const,
+        ...common,
+        interactive: validation.ok ? validation.interactive : match.tool.interactive === true,
+      });
 }

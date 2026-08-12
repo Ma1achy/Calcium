@@ -14,7 +14,7 @@ import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
 import { exact, FrameError, paint, type PaintDeps } from "../../src/shell/paint.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS } from "../support/render.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
 
 const SESSION: SessionSnapshot = Object.freeze({
@@ -58,6 +58,51 @@ function frameAt(columns: number, rows: number, promptRows = 1): Composed {
 }
 
 describe("C22 §6 — the paint", () => {
+  it("T3.30 (C09 I22, C22 I52): an ascii session draws no character above U+007F", () => {
+    // **Over the whole frame, not per site** (F122). A row per fixed character
+    // is a restatement of the fix; what this has to catch is the seventh site,
+    // and a seventh site is by definition one nobody wrote a row for.
+    //
+    // The frame is driven into every state that draws a mark: a long command
+    // that wraps past the prompt's window (the elision), a completion in flight
+    // (the spinner), and the prompt itself on the first row of the region.
+    const drawn = (caps: typeof FULL_CAPS): readonly string[] =>
+      paint(
+        // Ten wanted rows against a cap of `floor(16 / 2)` — the prompt windows,
+        // which is the only state that draws the elision.
+        frameAt(60, 16, 10),
+        deps({
+          capabilities: caps,
+          promptRows: () =>
+            Array.from({ length: 10 }, (_, i) => `/ps --flag${String(i)}=value${String(i)}`),
+          spinning: () => true,
+        }),
+      );
+
+    const ascii = drawn(ASCII_CAPS);
+    const offending = ascii.flatMap((line, row) =>
+      [...line]
+        .filter((c) => (c.codePointAt(0) ?? 0) > 127)
+        .map((c) => `row ${String(row)}: U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase()}`),
+    );
+    expect(offending, "a mark the framework drew and could not substitute").toEqual([]);
+
+    // **Two controls, and the fixture must be shown to respond first.** Without
+    // them a `paint` that returned blank rows would satisfy the assertion above,
+    // and so would a session that never reached the spinner or the elision.
+    const full = drawn(FULL_CAPS);
+    expect(full.some((l) => l.includes("❯")), "the prompt is drawn at all").toBe(true);
+    expect(full.some((l) => l.includes("⋯")), "the elision is reached").toBe(true);
+    expect(full.some((l) => l.includes("⠋")), "the spinner is reached").toBe(true);
+
+    // And the substitution is width-preserving, which is what `commandRows`
+    // being the measurer's function requires (C22 I52).
+    expect(ascii).toHaveLength(full.length);
+    for (const [i, line] of ascii.entries()) {
+      expect(displayCells(line), `ascii row ${String(i)}`).toBe(displayCells(full[i] ?? ""));
+    }
+  });
+
   it("T4.12 (S01 §3): the frame is exactly rows × columns, at every size", () => {
     // The whole rectangle, not a sample. A frame one row over scrolls and a row
     // one cell over wraps, and both are unrecoverable — so the assertion is on

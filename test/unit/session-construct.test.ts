@@ -28,6 +28,7 @@ import { noticeDoc } from "../../src/shell/documents.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { doc } from "../support/blocks.js";
 
+import { producerContext } from "../support/producer-context.js";
 function fakeFs(): FileSystem {
   const files = new Map<string, string>();
   return {
@@ -42,7 +43,6 @@ function fakeFs(): FileSystem {
     },
     appendFileSync: (p, d) => void files.set(p, (files.get(p) ?? "") + d),
     mkdir: () => Promise.resolve(),
-    exists: (p) => Promise.resolve(files.has(p)),
     // A real answer, not an empty list: C19's path and executable sources take
     // this, and a fake returning nothing makes a completion assertion pass for
     // the wrong reason (`test/support/README.md`).
@@ -187,6 +187,7 @@ describe("C22 §3 — construction order", () => {
         seal: () => void (sealed = true),
         // C16's new low rung reads these (C23 §8a, the subscription rung).
         liveStreams: 0,
+        faults: [],
         cancelNewestStream: () => false,
         get sealed() {
           return sealed;
@@ -198,6 +199,8 @@ describe("C22 §3 — construction order", () => {
         onAction: () => undefined,
         identityNotice: () => undefined,
       releaseView: () => undefined,
+      visibilityChanged: () => undefined,
+    producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
       };
@@ -350,6 +353,7 @@ describe("C22 §3 — construction order", () => {
             seal: () => undefined,
             sealed: true,
             liveStreams: 0,
+            faults: [],
             cancelNewestStream: () => false,
             inFlight: null,
             cancel: () => undefined,
@@ -357,6 +361,8 @@ describe("C22 §3 — construction order", () => {
             onAction: () => undefined,
             identityNotice: () => undefined,
       releaseView: () => undefined,
+      visibilityChanged: () => undefined,
+    producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
           };
@@ -578,6 +584,7 @@ describe("C22 §3 — construction order", () => {
         seal: () => undefined,
         sealed: true,
         liveStreams: 0,
+        faults: [],
         cancelNewestStream: () => false,
         get inFlight() {
           return route;
@@ -587,6 +594,8 @@ describe("C22 §3 — construction order", () => {
         onAction: () => undefined,
         identityNotice: () => undefined,
       releaseView: () => undefined,
+      visibilityChanged: () => undefined,
+    producerContext: () => producerContext(),
     greeting: () => undefined,
       dispose: () => undefined,
       }),
@@ -621,7 +630,16 @@ describe("C22 §2a — the app's local handlers", () => {
     const { graph } = await build({
       manifest: local,
       localHandlers: {
-        guide: () => Promise.resolve(noticeDoc("guide", "the app's own verb", "info", { origin: "user" })),
+        // `meta` stripped: a local handler's answer is not a document (F13) —
+        // `runLocal` fills all seven fields, so a double supplying `origin` is
+        // inventing one the shell holds.
+        guide: () => {
+          const { meta, ...rest } = noticeDoc("guide", "the app's own verb", "info", {
+            origin: "user",
+          });
+          void meta;
+          return Promise.resolve(rest);
+        },
       },
     });
     expect(graph.pipeline.sealed, "and the registry still seals").toBe(true);

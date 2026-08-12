@@ -181,9 +181,65 @@ def write_cast(
         header = {"version": 2, "width": cols, "height": rows, "env": {"TERM": "xterm-256color"}}
         fh.write(json.dumps(header) + "\n")
         for i, (at, chunk) in enumerate(frames):
-            text = decoder.decode(chunk, final=i == len(frames) - 1)
+            # **Strict for the body, one replacement at the very end.** The
+            # interior must stay strict: a partial sequence there is carried to
+            # the next chunk, and papering over it is exactly the defect this
+            # decoder replaced. But a PTY read is not obliged to end on a
+            # character boundary, so the *last* chunk of a capture can hold half
+            # of one — and `final=True` then raises, after the raw stream and
+            # the teardown have already been written. The session's recording is
+            # lost, the summary line never prints, and the caller
+            # (`media.py`, `screencast.py`) sees a traceback from the tool
+            # rather than from the app.
+            #
+            # Found by `capture_test.py`, which is the argument for the file:
+            # the docstring reasoned that a failure here would be a real one,
+            # and it is — it is a real failure of the capture, not of the app,
+            # and losing the cast is a worse answer than one U+FFFD in the last
+            # cell. FINDINGS F143.
+            text = decoder.decode(chunk, final=False)
+            if i == len(frames) - 1:
+                try:
+                    text += decoder.decode(b"", final=True)
+                except UnicodeDecodeError:
+                    text += "\ufffd"
             if text:
                 fh.write(json.dumps([round(at, 6), "o", text]) + "\n")
+
+
+# The paste window, and the reason every gap below is seconds rather than
+# milliseconds. C16 coalesces input arriving within `HEURISTIC_WINDOW_MS` and
+# calls more than `HEURISTIC_MIN_CHARS` of it a paste — so a command and its
+# carriage return in one burst *inserts a newline* instead of submitting, and
+# the shell is behaving exactly as specified while the capture shows nothing
+# happening. `capture_test.py` reads the real constant out of
+# `src/interaction/router/decode.ts` rather than trusting this comment.
+TYPE_AT, SUBMIT_AT, FIRST_KEY_AT = 1.5, 3.5, 5.0
+
+
+def parse_tail(tail: list[str]) -> tuple[dict[str, str], bytes]:
+    """Environment overrides and keystrokes, told apart by the `=`.
+
+    The keystroke argument was here first, so adding a positional after it would
+    have made the environment optional-in-the-middle. `KEY=` unsets rather than
+    setting empty — C02 §3 distinguishes absent from empty, and the 256-colour
+    row needs the first.
+    """
+    overrides = dict(a.split("=", 1) for a in tail if "=" in a)
+    rest = [a for a in tail if "=" not in a]
+    return overrides, rest[0].encode() if rest else b""
+
+
+def schedule(command: bytes, keys: bytes) -> list[tuple[float, bytes]]:
+    """Type, submit, then one keypress per second — each its own write.
+
+    **Each its own write for the same reason the command is not a burst**: bytes
+    arriving together are a paste, and `n` twice in one write is text. Keys go
+    *after* the Enter because a pushed view's motions cannot be read from the
+    frame the command produced.
+    """
+    after = [(FIRST_KEY_AT + i, bytes([k])) for i, k in enumerate(keys)]
+    return [(TYPE_AT, command), (SUBMIT_AT, b"\r"), *after]
 
 
 if __name__ == "__main__":
@@ -199,9 +255,7 @@ if __name__ == "__main__":
     # apart by the `=`, because the keystroke argument was here first and adding
     # a positional after it would have made the environment optional-in-the-
     # middle. `KEY=` unsets rather than setting empty.
-    tail = sys.argv[6:]
-    overrides = dict(a.split("=", 1) for a in tail if "=" in a)
-    rest = [a for a in tail if "=" not in a]
+    overrides, keys = parse_tail(sys.argv[6:])
     # Typed, then Enter two seconds later — outside the paste window.
     #
     # **Keys after the Enter**, for a surface that is only interesting once it
@@ -209,6 +263,4 @@ if __name__ == "__main__":
     # command produced. Given as a sixth argument, one keypress per second, and
     # each one its own write for the same reason the command is not a burst —
     # bytes arriving together are a paste, and `n` twice in one write is text.
-    keys = rest[0].encode() if rest else b""
-    after = [(5.0 + i, bytes([k])) for i, k in enumerate(keys)]
-    run(cols, rows, [(1.5, command), (3.5, b"\r"), *after], out, hold, overrides)
+    run(cols, rows, schedule(command, keys), out, hold, overrides)

@@ -177,6 +177,32 @@ describe("C18 tier 3 — the edges", () => {
     expect(notMarked.command).toBe("/tty vim");
   });
 
+  it("T3.26 (I28, C05 I23): the app result carries the resolved contract, not the declaration", () => {
+    // The fixture's `edit` is interactive and `--background` carries the arm —
+    // the `docker run --detach` shape (F80).
+    const armed = parse("/edit -b config.yaml", ctx());
+    expect(armed.kind).toBe("app");
+    expect(armed.kind === "app" && armed.interactive, "the flag decides").toBe(false);
+
+    const plain = parse("/edit config.yaml", ctx());
+    expect(plain.kind === "app" && plain.interactive, "and the verb decides when it does not").toBe(
+      true,
+    );
+
+    // **Asserted on the result, not on the tool.** Reading the declaration back
+    // gives `true` in both rows — that is precisely the state this replaces, and
+    // a row asserting `result.tool.interactive` would pass against it.
+    expect(armed.kind === "app" && armed.tool.interactive, "the declaration is unchanged").toBe(
+      true,
+    );
+
+    // The local arm has no such member: C05 I19 refuses `interactive` with
+    // `local`, so a field there could only ever read `false`.
+    const local = parse("/guide", ctx());
+    expect(local.kind).toBe("local");
+    expect("interactive" in local, "a member that could only be false is absent").toBe(false);
+  });
+
   it("T3.25 (§5a): a verb named tty and the marker are two records of one name", () => {
     // C18 is the only component that can see both — it holds the manifest and
     // the policy — so it reports rather than picking. C05 cannot hold the rule:

@@ -278,6 +278,47 @@ describe("C05 validate", () => {
     if (spaced.ok && equals.ok) expect(spaced.args).toEqual(equals.args);
   });
 
+  it("T1.16b (I21, F148): a value that arrives as its own token is transmitted with its flag", () => {
+    // F148. `transmitted` was built by one push per loop iteration, and a valued
+    // flag spans two tokens — so the value was consumed by the walk's `i++` and
+    // never pushed. `/ps --limit 400` reached the far side as `ps --limit`, on
+    // every type and on both the long and the short form; only `--limit=400`
+    // survived, which is why nothing above C05 saw it for the whole build.
+    //
+    // T1.16 is the row this should have been: it compares the two forms on
+    // `args`, where they agree, and the field that disagreed was never read.
+    // So the equality is asserted here on `transmitted` as well — the two forms
+    // deliver the same invocation or one of them is lying about what will run.
+    const spaced = validateInvocation(ps(), ["--limit", "400"]);
+    const equals = validateInvocation(ps(), ["--limit=400"]);
+    expect(spaced.ok && equals.ok).toBe(true);
+    if (!spaced.ok || !equals.ok) return;
+
+    expect(spaced.transmitted, "the value is what makes the flag mean anything").toEqual([
+      "--limit",
+      "400",
+    ]);
+    expect(equals.transmitted).toEqual(["--limit=400"]);
+
+    // The short form is the second consumption site, and it is a different
+    // branch — `readShort` reports what it ate rather than advancing itself.
+    const short = validateInvocation(ps(), ["-n", "400"]);
+    expect(short.ok).toBe(true);
+    if (short.ok) expect(short.transmitted).toEqual(["-n", "400"]);
+
+    // Repeatable loses one value per occurrence, so it is the shape where the
+    // defect compounds rather than a second instance of it.
+    const repeated = validateInvocation(ps(), ["--label", "a", "--label", "b"]);
+    expect(repeated.ok).toBe(true);
+    if (repeated.ok) expect(repeated.transmitted).toEqual(["--label", "a", "--label", "b"]);
+
+    // And the strip still strips: the fix adds a push at the consumption sites
+    // and must not put a shell switch back on the wire (I21, F39).
+    const mixed = validateInvocation(ps(), ["--help", "--limit", "400"]);
+    expect(mixed.ok).toBe(true);
+    if (mixed.ok) expect(mixed.transmitted).toEqual(["--limit", "400"]);
+  });
+
   it("T1.17 (I16, §3): a value beginning with - is refused with the form that works", () => {
     // Both halves in one test. The message is only right if the thing it
     // recommends actually works, and split in two, each half passes while the
@@ -298,6 +339,85 @@ describe("C05 validate", () => {
     if (accepted.ok) expect(accepted.args["since"]).toBe("-1h");
   });
 
+  it("T1.19b (I23, I24): a flag arm decides, an arm equal to the default is refused, and I19/I20 read both homes", () => {
+    const findEdit = (source: Record<string, unknown>): Record<string, unknown> =>
+      (source["tools"] as Record<string, unknown>[]).find((t) => t["name"] === "edit")!;
+    const flagsOf = (source: Record<string, unknown>): Record<string, unknown>[] =>
+      findEdit(source)["flags"] as Record<string, unknown>[];
+
+    // **The arm that has to survive all of this**, first, so the refusals below
+    // are not satisfied by a rule that refuses everything. The fixture's `edit`
+    // is interactive and carries `--background` with `interactive: false` — the
+    // `docker run --detach` shape (F80).
+    const clean = parseManifest(raw());
+    expect(clean.ok, errorsOf(clean).join("\n")).toBe(true);
+    if (!clean.ok) return;
+    const tool = clean.value.tools.find((t) => t.name === "edit");
+    expect(tool?.interactive, "the verb's default").toBe(true);
+    // Asserted on the parsed value, not on the source: `takeOptionalBoolean` was
+    // added for this and an unread key is dropped silently under I3's leniency,
+    // which looks identical from outside.
+    expect(tool?.flags.find((f) => f.name === "background")?.interactive).toBe(false);
+
+    // I23 — an arm equal to the default decides nothing. **Both directions**,
+    // because a rule checking one leaves half the vacuous declarations
+    // expressible, and it is this refusal that makes the arms on a verb agree.
+    const sameAsDefault = raw();
+    flagsOf(sameAsDefault)[0]!["interactive"] = true;
+    expect(errorsOf(parseManifest(sameAsDefault))).toContain(
+      'tools[6].flags[0].interactive: --background declares interactive true and "edit" is ' +
+        "already interactive — the flag decides nothing. An arm is the opposite of the " +
+        "verb's default, or it is absent",
+    );
+
+    const falseOnPlain = raw();
+    const ps = (falseOnPlain["tools"] as Record<string, unknown>[])[0]!;
+    (ps["flags"] as Record<string, unknown>[])[0]!["interactive"] = false;
+    expect(errorsOf(parseManifest(falseOnPlain))).toContain(
+      'tools[0].flags[0].interactive: --status declares interactive false and "ps" is ' +
+        "already not interactive — the flag decides nothing. An arm is the opposite of the " +
+        "verb's default, or it is absent",
+    );
+
+    // I24 — I19 read through the flag. `ps` declares nothing, so an arm of
+    // `true` is the only way to write the impossible verb here, and a refusal
+    // reading the tool's field cannot see it.
+    const armWithStreams = raw();
+    const ps2 = (armWithStreams["tools"] as Record<string, unknown>[])[0]!;
+    ps2["streams"] = true;
+    (ps2["flags"] as Record<string, unknown>[])[0]!["interactive"] = true;
+    expect(
+      errorsOf(parseManifest(armWithStreams)).some((m) =>
+        m.includes("is interactive and declares streams"),
+      ),
+      "an arm re-creates exactly the verb I19 forbids",
+    ).toBe(true);
+
+    // The fixture's two local verbs carry no flags, so this row makes one: a
+    // local `ps` whose `--status` carries the arm. Built rather than borrowed,
+    // and the first attempt asserted `local` on a verb that is not — which the
+    // guard caught, and is why the guard is here.
+    const armWithLocal = raw();
+    const ps3 = (armWithLocal["tools"] as Record<string, unknown>[])[0]!;
+    ps3["local"] = true;
+    (ps3["flags"] as Record<string, unknown>[])[0]!["interactive"] = true;
+    expect(
+      errorsOf(parseManifest(armWithLocal)).some((m) => m.includes("is local and interactive")),
+      "and the local refusal likewise",
+    ).toBe(true);
+
+    // **The row that fails at HEAD before I24** (F118). I20 says `view` is
+    // declarable on a flag *and* that it is refused with `interactive`; both
+    // halves shipped and they did not meet, so the pair parsed when written this
+    // way and was refused when written the other.
+    const flagView = raw();
+    flagsOf(flagView)[0]!["view"] = true;
+    expect(
+      errorsOf(parseManifest(flagView)).some((m) => m.includes("declares both view and interactive")),
+      "a flag's view against the tool's interactive is the same pair I20 forbids",
+    ).toBe(true);
+  });
+
   it("T1.19 (I19): interactive is refused with streams and with local, and accepted alone", () => {
     // **The third half is the one that stops this being a blanket refusal.** A
     // rule that rejected `interactive` outright satisfies the first two
@@ -309,7 +429,7 @@ describe("C05 validate", () => {
     const withStreams = raw();
     findEdit(withStreams)["streams"] = true;
     expect(errorsOf(parseManifest(withStreams))).toContain(
-      'tools[6].interactive: "edit" declares both interactive and streams — a handoff gives ' +
+      'tools[6].interactive: "edit" is interactive and declares streams — a handoff gives ' +
         "the terminal to the child and a stream reads its stdout into the transcript; " +
         "drop whichever one the verb does not do",
     );
@@ -344,14 +464,19 @@ describe("C05 validate", () => {
     const withInteractive = raw();
     findEdit(withInteractive)["view"] = true;
     expect(errorsOf(parseManifest(withInteractive))).toContain(
-      'tools[6].view: "edit" declares both view and interactive — both hand input ' +
-        "ownership away, the view to the shell's own keymap and the handoff to a child; " +
-        "drop whichever one the verb does not do",
+      'tools[6].view: "edit" declares both view and interactive — on the tool or on a ' +
+        "flag, and either way both hand input ownership away, the view to the shell's own " +
+        "keymap and the handoff to a child; drop whichever one the verb does not do",
     );
 
+    // **`edit` carries an `interactive: false` arm on `--background` (I23), so
+    // dropping the tool's declaration orphans it.** An arm equal to the default
+    // decides nothing and is refused, which is the rule doing its job on a
+    // fixture edited to say something else — so these rows drop both.
     const withOneShot = raw();
     const e1 = findEdit(withOneShot);
     delete e1["interactive"];
+    e1["flags"] = [];
     e1["view"] = true;
     e1["oneShot"] = true;
     expect(errorsOf(parseManifest(withOneShot))).toContain(
@@ -363,6 +488,7 @@ describe("C05 validate", () => {
     const withStreams = raw();
     const e2 = findEdit(withStreams);
     delete e2["interactive"];
+    e2["flags"] = [];
     e2["view"] = true;
     e2["streams"] = true;
     const streamed = parseManifest(withStreams);
@@ -375,6 +501,7 @@ describe("C05 validate", () => {
     const viewTool = raw();
     const e3 = findEdit(viewTool);
     delete e3["interactive"];
+    e3["flags"] = [];
     e3["view"] = true;
     const parsed = parseManifest(viewTool);
     expect(parsed.ok, errorsOf(parsed).join("\n")).toBe(true);

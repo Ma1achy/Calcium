@@ -116,7 +116,7 @@ Alternate screen is the sole hard requirement (D28). A fullscreen application on
 - **I4** — A *valid* override wins over detection, unconditionally, including for `altScreen`. A value outside a field's domain is not an override — it is rejected, the detected value stands, and a warning is returned (T3.5).
 - **I5** — No component outside C02 reads `TERM`, `COLORTERM`, `TERM_PROGRAM`, `LANG`, `LC_ALL`, `LC_CTYPE` or `TMUX`. Lint-enforced.
 - **I6** — Every capability has a fallback owned by a named component (§4). A capability with no fallback cannot be added.
-- **I7** — `isUsable` depends on `altScreen` alone. No other capability can prevent the shell opening.
+- **I7** — `isUsable` depends on `altScreen` alone. No other capability can prevent the shell opening. **The predicate had no caller and the rule had two expressions** — C01 asks `!capabilities.altScreen` inline, which is the refusal that reaches the user, so A03 §9's MG25 allow-listed `isUsable` as *a rule expressed twice, the second unreachable*. C22's gate 3b is now that caller (→ C22 I61), which disposes of the duplicate by consuming it rather than by exempting it: C01's inline test stays, because C01 is a component with its own consumers and must refuse whoever hands it an unusable record.
 - **I8** — Warnings are returned, never emitted. C02 decides what is wrong, never when the user is told.
 
 ---

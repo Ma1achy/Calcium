@@ -18,7 +18,7 @@
  * `/history` and `/debug` an `int`.
  */
 
-import type { ToolDef } from "./types.js";
+import type { FlagDef, ToolDef } from "./types.js";
 
 /**
  * Appended after the app's tools, never prepended.
@@ -103,4 +103,34 @@ export const FRAMEWORK_TOOLS: readonly ToolDef[] = Object.freeze([
 /** The names, for the collision message and for tests that must not derive them. */
 export const FRAMEWORK_NAMES: readonly string[] = Object.freeze(
   FRAMEWORK_TOOLS.map((t) => t.name),
+);
+
+/**
+ * The flags Calcium reserves on **every** tool, appended as the six verbs above
+ * are appended to every manifest (C05 I22, F92).
+ *
+ * **Reserved rather than declared, and that is the whole argument.** `--help`
+ * asked per-app is a per-app discipline: one app forgetting it is a verb with no
+ * help, and the failure is silent because a missing flag looks exactly like a
+ * verb nobody asked about. `usageBlocks` generates from the manifest for the
+ * same reason its own comment gives — *a hardcoded usage string is wrong the
+ * first time a flag is added and nobody notices* — and a per-app `--help` puts
+ * that discipline back one level up.
+ *
+ * `shellOnly`, because the far side has its own `--help` and its own opinion
+ * about it, and F39 is what happens when a flag Calcium means reaches a binary
+ * that means something else by it.
+ */
+export const FRAMEWORK_FLAGS: readonly FlagDef[] = Object.freeze([
+  Object.freeze({
+    name: "help",
+    type: "bool" as const,
+    shellOnly: true,
+    summary: "what this verb takes",
+  }),
+] satisfies readonly FlagDef[]);
+
+/** The reserved flag names, for the collision message (I22). */
+export const RESERVED_FLAGS: readonly string[] = Object.freeze(
+  FRAMEWORK_FLAGS.map((f) => f.name),
 );

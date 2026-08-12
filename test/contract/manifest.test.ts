@@ -12,6 +12,7 @@ import {
   validateInvocation,
   type ArgType,
   type Manifest,
+  type ToolDef,
 } from "../../src/data/manifest/index.js";
 import { fixture, raw, toolNamed } from "../support/manifest.js";
 
@@ -159,6 +160,41 @@ describe("C05 contract", () => {
     expect(cases, "a thousand malformed inputs (C05 T2.3)").toBeGreaterThanOrEqual(1000);
   });
 
+  it("T2.10 (I23): the terminal contract is resolved from the flags actually given", () => {
+    const edit = toolNamed("edit");
+
+    // The default, with no arm present.
+    const plain = validateInvocation(edit, ["config.yaml"]);
+    expect(plain.ok && plain.interactive, "the verb's own declaration").toBe(true);
+
+    // The arm, long and short, and clustered — the three ways a switch arrives.
+    for (const argv of [["--background"], ["-b"], ["-b", "config.yaml"]]) {
+      const armed = validateInvocation(edit, argv);
+      expect(armed.ok && armed.interactive, `--background via ${argv.join(" ")}`).toBe(false);
+    }
+
+    // **The row that would need arbitration under any other shape.** `docker run
+    // -dit` is the real case: a detach flag and two attach-ish flags in one
+    // invocation. There is no precedence rule because `-i` and `-t` could only
+    // carry the tool's default, and C05 refuses that at parse — so the
+    // disagreement is unbuildable rather than resolved (F80).
+    const clustered = validateInvocation(edit, ["-b", "--", "-it"]);
+    expect(clustered.ok && clustered.interactive).toBe(false);
+
+    // The control, in the other direction: a tool declaring nothing whose flag
+    // carries `true`. Without it, a resolver that simply returned `false`
+    // whenever any arm was present would satisfy every row above.
+    const upward = toolNamed("ps");
+    const armedUp: ToolDef = {
+      ...upward,
+      flags: upward.flags.map((f) => (f.name === "watch" ? { ...f, interactive: true } : f)),
+    };
+    const bare = validateInvocation(armedUp, []);
+    expect(bare.ok && bare.interactive).toBe(false);
+    const watched = validateInvocation(armedUp, ["--watch"]);
+    expect(watched.ok && watched.interactive, "an arm raises it as well as lowers it").toBe(true);
+  });
+
   it("T2.4: every ArgType has a validator, and adding one without a validator fails the build", () => {
     // The compile-time half is `Record<ArgType, Check>` in validate.ts. This is
     // the runtime half: each type actually rejects something, so a table of
@@ -237,6 +273,57 @@ describe("C05 contract", () => {
     expect(round.ok).toBe(true);
     if (!round.ok) return;
     expect(round.value, "equal, framework rows and all").toEqual(first);
+  });
+
+  it("T2.7c (I22): --help is on every tool, and only in `tools`", () => {
+    // **Reserved, not asked for** — a per-app `--help` is a per-app discipline
+    // and one app forgetting it is a verb with no help, which reads exactly
+    // like a verb nobody asked about.
+    const m = fixture();
+    for (const t of m.tools) {
+      expect(t.flags.some((f) => f.name === "help"), `${t.name} has --help`).toBe(true);
+      expect(t.flags.find((f) => f.name === "help")?.shellOnly, "and it never travels").toBe(true);
+    }
+
+    // **Absent from `appTools`, which is what makes T2.7 hold.** The first
+    // version appended inside `parseTool`, so the flag went into both — and the
+    // round-trip then re-parsed a manifest already carrying it and hit the
+    // reserved-name check. T2.7 found it, one test below.
+    for (const t of m.appTools) {
+      expect(t.flags.some((f) => f.name === "help"), `${t.name} in appTools`).toBe(false);
+    }
+  });
+
+  it("T2.7d (I22): an app declaring --help fails at parse, as one declaring `clear` does", () => {
+    const src = raw();
+    const tools = src["tools"] as Record<string, unknown>[];
+    const first = tools[0] as Record<string, unknown>;
+    first["flags"] = [{ name: "help", type: "bool", summary: "mine" }];
+
+    const result = parseManifest(src);
+    expect(result.ok, "reserved, so it collides rather than shadowing").toBe(false);
+    if (result.ok) return;
+    expect(result.error.map((x) => x.message).join(" ")).toMatch(/reserves on every verb/u);
+  });
+
+  it("T2.7e (I21): shellOnly is refused on a valued flag and on a short form", () => {
+    // **The narrowness is the ruling.** A switch spans one token, so the strip
+    // is a comparison; a valued flag spans tokens the parser would have to
+    // re-derive, and a short clusters with others in one token.
+    const cases = [
+      [{ name: "fmt", type: "string", shellOnly: true, summary: "x" }, /switches only/u],
+      [{ name: "fmt", type: "bool", short: "f", shellOnly: true, summary: "x" }, /cannot have a short form/u],
+    ] as const;
+
+    for (const [over, pattern] of cases) {
+      const src = raw();
+      const tools = src["tools"] as Record<string, unknown>[];
+      (tools[0] as Record<string, unknown>)["flags"] = [over];
+      const result = parseManifest(src);
+      expect(result.ok, JSON.stringify(over)).toBe(false);
+      if (result.ok) continue;
+      expect(result.error.map((x) => x.message).join(" ")).toMatch(pattern);
+    }
   });
 
   it("T2.7b (§3): serialising `tools` rather than `appTools` is rejected, and says why", () => {

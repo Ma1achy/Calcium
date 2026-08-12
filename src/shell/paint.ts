@@ -33,7 +33,7 @@ import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { SGR_RESET } from "../terminal/escapes.js";
-import { PROMPT, PROMPT_GUTTER } from "./config.js";
+import { promptFor, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
 import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
@@ -43,6 +43,7 @@ import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import { spinnerFrames } from "../presentation/blocks/index.js";
 
 export type PaintDeps = Readonly<{
   registry: BlockRegistry;
@@ -90,8 +91,16 @@ export type PaintDeps = Readonly<{
   ghost: () => string | null;
 }>;
 
-/** The elision marker S01 §3 puts on a windowed prompt's edges. */
-const ELISION = "⋯";
+/**
+ * The elision marker S01 §3 puts on a windowed prompt's edges.
+ *
+ * **`collapseText` already owned this pair and this file declared a second copy
+ * of the unicode half** (F122). It is a whole row of its own, squared off by
+ * `exact`, so the ASCII form's three cells cost nothing — which is why this is a
+ * pair rather than a `Glyph`: C09 I5 requires 1:1 by cell count of the
+ * vocabulary, and `...` is not that.
+ */
+const ELISION: readonly [unicode: string, ascii: string] = Object.freeze(["⋯", "..."]);
 
 /**
  * The glyph C19 §7 draws while a completion is slow.
@@ -100,8 +109,16 @@ const ELISION = "⋯";
  * ticker, so a rotating spinner would need a timer this layer does not own and
  * must not grow. The claim C19 §7 makes is that the wait is *visible*, and one
  * glyph is that.
+ *
+ * **Taken from C09's own frames rather than written here** (C09 I22, F122).
+ * `spinnerFrames` has returned an ASCII set since it was built and this file
+ * hardcoded the unicode first frame two directories away — a mechanism that
+ * exists and is not called, which from the call site is indistinguishable from
+ * one that does not exist.
  */
-const SPINNER = "⠋";
+function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode">): string {
+  return spinnerFrames(caps)[0] ?? "";
+}
 
 export class FrameError extends Error {
   constructor(message: string) {
@@ -183,16 +200,33 @@ function region(
  * function is called from both the measurer and the composer, so a second wrap
  * here is the drift C14 I1 exists to prevent, one layer up.
  */
-export function commandRows(command: string, width: number): readonly string[] {
+export function commandRows(
+  command: string,
+  width: number,
+  // **The capability, because this function is also the measurer's** (C22
+  // I52). `construct.ts` calls it for `chromeRows`, so the prompt cannot be
+  // resolved at module scope and both forms must be `PROMPT_GUTTER.first`
+  // cells — otherwise the height C14 virtualises against and the row the
+  // composer draws disagree about the same entry.
+  caps: Pick<TerminalCapabilities, "unicode">,
+): readonly string[] {
   if (command === "") return [];
   const body = Math.max(1, width - PROMPT_GUTTER.first);
   const wrapped = hardWrapCells(command, body);
+  const prompt = promptFor(caps);
   return wrapped.map((row, i) =>
-    (i === 0 ? PROMPT : " ".repeat(PROMPT_GUTTER.cont)) + row,
+    (i === 0 ? prompt : " ".repeat(PROMPT_GUTTER.cont)) + row,
   );
 }
 
-function promptWindow(frame: Composed, rows: readonly string[]): PromptWindow {
+function promptWindow(
+  frame: Composed,
+  rows: readonly string[],
+  // The capability reaches here for the elision marker alone; `promptRegion`
+  // holds `deps` and passes it down rather than a second read (C09 I22).
+  caps: Pick<TerminalCapabilities, "unicode">,
+): PromptWindow {
+  const elision = caps.unicode === "ascii" ? ELISION[1] : ELISION[0];
   const cap = frame.promptRows;
 
   // **A cap of one shows the last row and no marker** (S01 §3, commitment 14).
@@ -209,7 +243,7 @@ function promptWindow(frame: Composed, rows: readonly string[]): PromptWindow {
   // edit, and showing the wrong window is worse than showing the last rows.
   // Named here so it is a known simplification rather than a silent one.
   const first = rows.length - (cap - 1);
-  return { rows: [ELISION, ...rows.slice(first)], first, offset: 1 };
+  return { rows: [elision, ...rows.slice(first)], first, offset: 1 };
 }
 
 /**
@@ -228,12 +262,12 @@ type PromptWindow = Readonly<{
 
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const cap = frame.promptRows;
-  const windowed = promptWindow(frame, deps.promptRows()).rows;
+  const windowed = promptWindow(frame, deps.promptRows(), deps.capabilities).rows;
 
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
     const body = windowed[i] ?? "";
-    const gutter = i === 0 ? PROMPT : " ".repeat(PROMPT_GUTTER.cont);
+    const gutter = i === 0 ? promptFor(deps.capabilities) : " ".repeat(PROMPT_GUTTER.cont);
     out.push(exact(gutter + body, width));
   }
 
@@ -248,7 +282,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   const row = out[last];
   if (row !== undefined && deps.spinning()) {
     const at = cells(row.trimEnd());
-    if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${SPINNER}`, width);
+    if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${spinnerGlyph(deps.capabilities)}`, width);
     return out;
   }
 
@@ -404,7 +438,7 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   }
 
   const cell = deps.promptCursor();
-  const window = promptWindow(frame, deps.promptRows());
+  const window = promptWindow(frame, deps.promptRows(), deps.capabilities);
   const within = cell.row - window.first + window.offset;
   if (within < 0 || within >= frame.promptRows) return null;
 

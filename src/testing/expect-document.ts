@@ -71,7 +71,11 @@ import { DEFAULT_WIDTHS, checkAsciiParity, checkMeasurement, formatReport } from
  * | `logs` | `level` is **printed**, padded to `LEVEL_WIDTH` — the word carries it |
  * | `steps` | `state` selects a **glyph**; the mark is structural, not colour |
  * | `plot` | C12 substitutes stacked strips at one bit (§5), which is D29 obeyed |
- * | `rule`, `events`, `progress`, `code`, `patch`, `tip`, `raw` | no meaning-bearing field at all |
+ * | `rule`, `progress`, `code`, `patch`, `tip`, `raw` | no meaning-bearing field at all |
+ *
+ * **`events` was in the last row and is now swept.** It gained a `tone` (F51)
+ * and the exemption did not notice, because the set was keyed by kind. That is
+ * F102, and the premise is now recorded per kind and checked.
  *
  * **`rule` is in the last row because it was measured twice.** The first pass
  * put it in the checkable column — a regex reading the type ran past
@@ -79,30 +83,71 @@ import { DEFAULT_WIDTHS, checkAsciiParity, checkMeasurement, formatReport } from
  * `{ kind, id, label }`; the compiler is what said so. Two of eleven kinds
  * carry a meaning-bearing field, not four.
  */
-const KINDS_WITH_NOTHING_TO_CHECK = new Set<BlockKind>([
-  "rule",
-  "logs",
-  "steps",
-  "plot",
-  "events",
-  "progress",
-  "code",
-  "patch",
-  "tip",
-  "raw",
+/**
+ * **Which premise an exemption rests on, because only one of them expires
+ * mechanically** (C04 I37, FINDINGS F102).
+ *
+ * The set this replaced was keyed by kind, so membership was earned once, by
+ * the fields a kind had on the day it was listed, and nothing re-read it when
+ * the fields changed. A new *kind* was a compile error; a new meaning-bearing
+ * *field* on an exempt kind was silence — and `events` gaining a `tone` (F51)
+ * is exactly that, verified by fabricated violation before this was written.
+ *
+ * `no-field` is checkable: the premise is *this kind carries no tone*, and a
+ * tone appearing anywhere in the block falsifies it, whatever it is called and
+ * however deeply it is nested. `by-rendering` is not, and says so — `plot`'s
+ * exemption is C12's stacked strips at one bit, which no walk of the document
+ * can see.
+ */
+type Exemption = Readonly<{ premise: "no-field" | "by-rendering"; why: string }>;
+
+const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
+  BlockKind,
+  Exemption
+>([
+  ["logs", { premise: "by-rendering", why: "`level` is printed, padded to LEVEL_WIDTH" }],
+  ["steps", { premise: "by-rendering", why: "`state` selects a glyph; the mark is structural" }],
+  ["plot", { premise: "by-rendering", why: "C12 substitutes stacked strips at one bit (C12 §5)" }],
+  ["rule", { premise: "no-field", why: "`{ kind, id, label, meta }` — measured, see below" }],
+  ["progress", { premise: "no-field", why: "a fraction and a label" }],
+  ["code", { premise: "no-field", why: "syntax is its own palette, not the tone one" }],
+  ["patch", { premise: "no-field", why: "the +/- marker carries the change axis (C04 I35)" }],
+  ["tip", { premise: "no-field", why: "text only" }],
+  ["raw", { premise: "no-field", why: "opaque by definition; the app owns what it renders" }],
 ]);
+
+/** Any `tone` anywhere in a block, at any depth. The premise, falsifiable. */
+function carriesATone(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(carriesATone);
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  if (typeof record["tone"] === "string") return true;
+  return Object.values(record).some(carriesATone);
+}
 
 /**
  * The compile-time half. A kind that is neither checked above nor listed as
  * having nothing to check makes this a type error, which is the whole point:
  * `default: break` accepted a new kind in silence, and silence in a compliance
  * checker is indistinguishable from compliance.
+ *
+ * **And the runtime half, which is the one the compiler cannot do**: an
+ * exemption claiming the kind has no tone-bearing field, on a block that has
+ * one. F102 — the guard against a new kind was blind to a new field.
  */
 function assertNothingToCheck(block: Block): void {
-  if (!KINDS_WITH_NOTHING_TO_CHECK.has(block.kind)) {
+  const exemption = KINDS_WITH_NOTHING_TO_CHECK.get(block.kind);
+  if (exemption === undefined) {
     throw new Error(
       `expectDocument: block kind "${block.kind}" is neither swept for colour-only meaning ` +
         `nor listed in KINDS_WITH_NOTHING_TO_CHECK with a reason (D29, A03 §2)`,
+    );
+  }
+  if (exemption.premise === "no-field" && carriesATone(block)) {
+    throw new Error(
+      `expectDocument: block kind "${block.kind}" is exempt from the D29 sweep on the premise ` +
+        `that it carries no meaning-bearing field (${exemption.why}), and this one carries a ` +
+        `tone — the premise has expired and the kind needs an arm, not an entry (C04 I37, F102)`,
     );
   }
 }
@@ -137,7 +182,7 @@ const ASCII: TerminalCapabilities = Object.freeze({ ...TRUECOLOUR, unicode: "asc
  * that fell back to `raw` would still produce rows, still measure, and quietly
  * assert nothing about the kind under test.
  */
-function fullRegistry(): BlockRegistry {
+export function fullRegistry(): BlockRegistry {
   const r = createBlockRegistry({});
   for (const definition of [tableDefinition, plotDefinition, patchDefinition]) {
     r.register(definition as unknown as BlockDefinition);
@@ -162,6 +207,13 @@ function plain(line: string): string {
     .join("");
 }
 
+export type RenderOpts = Readonly<{
+  /** Defaults to the truecolour, full-unicode record. */
+  capabilities?: TerminalCapabilities;
+  /** Keep SGR. Defaults to `false`, because a frame read by eye is a frame without escapes. */
+  colour?: boolean;
+}>;
+
 export interface DocumentAssertions {
   isValid(): this;
   measuresCorrectly(widths?: readonly number[]): this;
@@ -169,6 +221,29 @@ export interface DocumentAssertions {
   degradesToAscii(): this;
   degradesTo1Bit(): this;
   hasNoColourOnlyDistinction(): this;
+  /**
+   * The rows this document draws — **the frame, not a property of it** (C24 I23).
+   *
+   * Every other method here measures or asserts, and a property of a document is
+   * not a picture of one. The reference app documents its workaround as *"a row
+   * is a complete description of what will be drawn"*, which is true of a table
+   * and false of the change axis: the rows say `added` and only the frame says
+   * `+`. So the app asserted a value whose rendering it could not see, and this
+   * surface could not have caught the class that produced.
+   *
+   * **The production renderer, not a second one.** It returns what
+   * `renderSequenceToLines` produced instead of asserting about it — the same
+   * call `measuresCorrectly` and `degradesToAscii` already make, through the
+   * registry this object already holds. That is why it is publishable where the
+   * raw `renderToLines` was not: `BlockRegistry` stays unreachable (C24 §3), and
+   * a parallel renderer here would be the fifth instance of a suite building its
+   * own version of the thing under test.
+   *
+   * **Not `this`.** Every other method chains because it asserts; this one is
+   * the value, and returning `this` would make the frame unreachable from the
+   * one method whose whole point is to hand it over.
+   */
+  lines(width: number, opts?: RenderOpts): readonly string[];
 }
 
 export function expectDocument(doc: ViewDocument): DocumentAssertions {
@@ -313,6 +388,15 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
      * it means giving those two kinds a glyph field, which is a C04 spec change
      * and is recorded there as one.
      */
+    lines(width, opts = {}) {
+      const caps = opts.capabilities ?? TRUECOLOUR;
+      const drawn = renderSequenceToLines(registry, doc.blocks, width, {
+        theme: resolved,
+        capabilities: caps,
+      });
+      return opts.colour === true ? drawn : drawn.map(plain);
+    },
+
     hasNoColourOnlyDistinction() {
       const offences: string[] = [];
 
@@ -346,6 +430,22 @@ export function expectDocument(doc: ViewDocument): DocumentAssertions {
              * Closing it means a glyph on `ComparisonRow`, which is a C04 spec
              * change. FINDINGS F34.
              */
+            break;
+          case "events":
+            /**
+             * **Left the exemption when it gained a `tone`** (F51, F102). The
+             * `type` word is always printed, so a toned event with a word
+             * beside it is compliant — the same disposal `logs` gets, arrived
+             * at by the field rather than by the kind's name.
+             */
+            for (const e of block.events) {
+              if (bare(e.tone, undefined, e.type)) {
+                offences.push(
+                  `events "${block.id}" has an event toned ${String(e.tone)} with an empty type — ` +
+                    `an event has no glyph field, so the type word is the only other carrier`,
+                );
+              }
+            }
             break;
           case "keyValue":
             for (const r of block.rows) {

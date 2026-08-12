@@ -15,6 +15,7 @@
  */
 
 import type { Action, Block, Cell, ErrorLike, Glyph, Tone } from "../../data/viewmodel/index.js";
+import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
  * What every block-returning builder accepts, and the only declaration of it
@@ -96,8 +97,14 @@ export type StepInput = Readonly<{
 /** A log line, exactly as the block carries it (§4). */
 export type LogLine = Readonly<{ ts: string; level: string; message: string }>;
 
-/** An event line, exactly as the block carries it (§4). */
-export type EventLine = Readonly<{ ts: string; type: string; message: string }>;
+/**
+ * An event line, exactly as the block carries it (§4).
+ *
+ * **`tone` is here and absent from `LogLine`** — a fixed vocabulary the renderer
+ * knows needs no field, and an open one does (C04 I35, F51). `levelTone` maps a
+ * log level; nothing can map a container's actions.
+ */
+export type EventLine = Readonly<{ ts: string; type: string; message: string; tone?: Tone }>;
 
 /** A chip for `b.pills` (§4). */
 export type ChipInput = Readonly<{
@@ -107,22 +114,18 @@ export type ChipInput = Readonly<{
   active?: boolean;
 }>;
 
-/** A row for `b.comparison` (§4). */
+/** A row for `b.comparison` (§4). Two axes, never one (C04 I36). */
 export type ComparisonRow = Readonly<{
   field: string;
   a: string;
   b: string;
-  comparison?: "same" | "better" | "worse" | "changed";
+  change?: "unchanged" | "changed" | "added" | "removed";
+  verdict?: "better" | "worse";
 }>;
 
 /** Re-exported for the builders' own signatures; C04 owns them. */
 export type { Action, Block, Cell, Glyph, Tone };
-
-/**
- * C24 §5 — what `b.live` declares.
- *
- * Looser than what C23 drives, in the way every type here is looser than the
- * field it feeds: `every` and `staleAfter` are optional and the drivers
+export type { ProducerContext };
 
 /**
  * C24 §5 — what `b.live` declares.
@@ -140,9 +143,86 @@ export type LiveSpec = BlockOpts &
     title: string;
     /** Omitted -> one-shot: rendered once, never retried (A02 §7 rule 3). */
     every?: number;
-    fetch?: () => Promise<unknown>;
-    stream?: () => AsyncIterable<unknown>;
-    render: (data: unknown) => Block;
+    /**
+     * **Required, and `stream` is gone** (C24 I21, F78).
+     *
+     * `LiveSpec` offered two ways to feed a part and `b.live` threw twice to
+     * police the choice — once when neither was given, once when both were. One
+     * of the two did nothing: `partOf` built the driver's part with
+     * `fetch: spec.fetch ?? (() => Promise.resolve(null))` and **nothing
+     * anywhere read `spec.stream`**, so a part declared with it was registered,
+     * driven once with a fetch resolving null, and rendered `render(null)`.
+     *
+     * The failure direction is the worst available — a part that streams
+     * nothing looked exactly like a part that produced nothing. A plausible
+     * empty panel, not an error.
+     *
+     * **Two throws guarding a choice is the symptom; a declared option with no
+     * implementation is the disease**, and the remedy is to make the state
+     * unbuildable rather than reported. A required `fetch` is a compile error
+     * where the pair was a runtime throw, and both throws go with it. A
+     * streaming part is additive to re-add the day something drives one.
+     */
+    fetch: () => Promise<unknown>;
+    /**
+     * **The key that declares two parts read one source** (C24 I27, C23 §3c).
+     *
+     * A string and not a function, because functions cannot be compared and
+     * sharing needs a claim of sameness. Parts naming one key share the `fetch`
+     * *and* the derivation; only `render` is per instance — so two panels of one
+     * document cannot show two samples of one instant, which is what they did:
+     * `19` against `20`, read from a single composed frame, before this existed.
+     *
+     * Two parts naming one key with different `every` is **refused at
+     * construction**, naming both. Two naming one key with different `fetch`
+     * closures is **not checked and cannot be**: the key is the claim that they
+     * are the same and the framework takes it, which is the standing a string key
+     * has at all.
+     *
+     * Omitted, a part is its own source. That is not a second mode — every part
+     * has one, and this only says when two of them are the same.
+     */
+    source?: string;
+    /**
+     * **A fold over the source's versions**, run once per version and shared by
+     * key; its result reaches `render` in the fetched data's place (C23 I47).
+     *
+     * Not a convenience beside `source` but what makes it usable. A ring buffer
+     * maintained inside `fetch` is what the reference app did, and it is the
+     * shape this rule forbids:
+     *
+     * > Per-part state is view state only. Anything that accumulates belongs in
+     * > a derivation.
+     *
+     * That rule is also what makes the off-screen pause safe (C24 I28): a paused
+     * part holds nothing that could fall behind.
+     *
+     * `compute` throws like a `render` and not like a `fetch` — deterministic, so
+     * it does not retry, and the version is not consumed because a fold that
+     * threw has not advanced.
+     */
+    derive?: Readonly<{ key: string; compute: (data: unknown, prev: unknown) => unknown }>;
+    /**
+     * **The producer context arrives as a second parameter** (C07 §3, C24 §5).
+     *
+     * A live part is a producer: it renders repeatedly, and a part drawing
+     * non-ASCII text cannot ask what the terminal supports any more than an
+     * adapter could — the reference app's live panel draws `░` and `█`, which
+     * is F54's list arriving through F24's route.
+     *
+     * **It is not here so a part can size itself to the width.** F24 asked for
+     * that and C12 already does it: `curveRows` buckets N samples into the
+     * available dot columns and I5 keeps each column's vertical span, so a view
+     * opened at 120 and read at 80 is downsampled rather than doubled. The ring's
+     * length is retention, which the declarer owns and no terminal bounds.
+     *
+     * **Built per tick, never captured** (C07 §3a C), and `height` is `null` on
+     * this route even inside a view: the region belongs to the document and a
+     * refresh replaces one panel sharing it (C23 I34).
+     *
+     * Additive — an implementation ignoring it is unchanged.
+     */
+    render: (data: unknown, ctx: ProducerContext) => Block;
     renderError?: (err: ErrorLike, retryInMs: number | null) => Block;
     renderLoading?: () => Block;
     /** Default: twice `every`. Below it, construction throws (C24 T3.6). */

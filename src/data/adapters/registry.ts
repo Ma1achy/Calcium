@@ -148,7 +148,7 @@ export function createAdapterRegistry(
 ): AdapterRegistry {
   const registered = new Map<string, Adapter>();
   const fallback = createFallbackAdapter();
-  const patches = createPatchAdapter(fallback);
+  const patches = createPatchAdapter();
   let sealed = false;
 
   // I7 — every adapter supplied at construction is checked now, before a

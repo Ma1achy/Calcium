@@ -316,6 +316,73 @@ makes the framework unusable, invisible because every harness passes a real envi
 Two in a row is not a coincidence: **the defaults have never been exercised together**, and
 the thing that exercises them is a consumer that supplies only what it was told to.
 
+**Re-checked in the tier-4 pre-check and it stands, with one fact the entry did not have.**
+`env?` is still optional, the sentence is still in `src/shell/types.ts`, and `acquire()` still
+treats `!capabilities.altScreen` as fatal. Measured rather than read:
+
+```
+env {} → altScreen: false   colourDepth: 1   unicode: ascii
+warnings: []
+```
+
+**The sentence is true about two of the three consequences and silent about the one that
+matters** — colour and unicode *do* degrade, and `altScreen: false` ends the process. And
+`warnings` is **empty**, so C02's one channel to the author says nothing either. That half is
+new: the entry describes a false sentence, and the measurement shows the failure is also
+unreported, which is F15's class in a fourth place.
+
+**Closed** — C22 gate 3b (C22 I61, commitment 32), the sentence corrected in three places,
+`T3.20`–`T3.20e`, four mutations.
+
+**The where-is-this-written check found the sentence three times and the third made a claim of
+its own.** `C22 §117` answered its own silence with *"C02's warnings surface on the restored
+primary screen and an empty record is one of them"* — a mechanism that has **never existed**.
+C02 produces a warning for a rejected override (C02 I4, T3.5) and for nothing else, which is
+why `warnings` is empty and always was. That is the sixth blind spot pointed at the document
+that carried the remedy rather than at the one that carried the defect.
+
+**And the remedy was wrong twice, which is what decided the fix.** It routed the notice to §8
+step 3 — reached from `stop()`, which this path never calls, because `start()` rejects and the
+session never runs. Measured under a PTY. A warning there would have been **the same silence
+with more machinery**, so the ruling is a refusal at the point of exit rather than a warning.
+
+**What the refusal has that C01's did not: the cause.** C01 is entitled to the capability
+record alone, so *"alternate screen unsupported"* names the consequence and cannot name the
+reason — an author who omitted `env` was told about a capability they never mentioned. C22
+holds the record and the config and is the only layer that holds both. Measured, all four
+arms:
+
+```
+env: {}                          → `TuiConfig.env` is empty … pass the process environment as `env`
+env: { HOME }                    → `TERM` is not set in the `env` the app supplied
+env: { TERM: "dumb" }            → `TERM` is `dumb`, which declares no alternate screen
+env: {}, capabilities.altScreen  → the shell opens
+```
+
+**The fourth line is the gate's position, not a courtesy.** C02 I4 makes a valid override win
+unconditionally including for `altScreen`, and it resolves during construction — so a gate
+reading `config.env` ahead of step 3, which is where I36 would want it, refuses exactly the app
+that had said what to do. `T3.20b` is that row and it fails against every simpler tree.
+
+**Then the implementation falsified the ruling.** The gate was specified *after* the size gate,
+on the reasoning that both read the same terminal. Reading the diff showed a terminal both too
+small and unusable would defer — wait for a resize that cannot cure an absent `TERM`, then
+reach C01's fatal from inside `onResize`, which `resizeSubscribers` dispatches **unguarded**,
+so the throw leaves the SIGWINCH handler with `start()` long since resolved. The author's
+`catch` cannot see it and the gate never runs: **F8's silence, restored by the fix for F8.**
+It is gate 3b, ahead of gate 4 — the incurable condition answered before the curable one.
+
+**`isUsable` came off MG25's allow-list by being consumed.** A03 §9 had it as *a rule expressed
+twice, the second expression unreachable*; gate 3b is the caller. The list is compared by
+equality, so `make enforce` refused the commit until the entry went — the disposal MG25's own
+note asked for rather than a second exemption.
+
+**Not closed, and separated from the claim** (F140): the refusal leaves a constructed graph, so
+an author who **catches** the rejection and continues has a process that never exits. Measured
+on both trees — it is identical before this change, where C01's fatal throws from the same
+position — so the gate inherits it rather than introducing it. The realistic path is clean:
+uncaught, node prints the named message and exits 1.
+
 ---
 
 ## F9 — startup step 7 named the effect and had no mechanism ★★ · **closed**
@@ -590,7 +657,7 @@ context than an adapted one.
 
 ---
 
-## F15 — a rejected document produces no entry, no error, and no clue ★★
+## F15 — a rejected document produces no entry, no error, and no clue ★★ — **CLOSED**
 
 | | |
 |---|---|
@@ -640,6 +707,80 @@ next invalid document, which for a framework means waiting for its first app aut
 The fix is small and does not touch I1's exception: append a notice naming the validation
 error, or at minimum let it reach the fault handler. A silent no-op is the one outcome that
 teaches the author nothing.
+
+---
+
+### CLOSED — tier 3 row 3. Two channels, and the fix was already specified
+
+**The remedy was written down three times and built nowhere.** C23 §5's table, I1's second
+exception and §8a A5 all said the failure was *"logged as a defect"*; `grep` finds no sink in
+any component, and C13 and C14 each delegate diagnostics to C23 §5 by name. One unmeasured
+claim, restated until it read as a mechanism. **This is the *ask where a settled claim is
+written down* instrument pointed at a spec rather than at a plan**, and it is the fourth time
+it has changed what a row was going to build.
+
+**The moment was already chosen, twice.** C02 rules that a component decides what is wrong and
+never when the user is told, because C22 §8 restores the screen before printing; C20 §Warnings
+says that transfers whole. C23 is the third instance and takes the same shape — a readable
+collection, drained at C22 §8 step 3.
+
+So there are two channels and they fail independently, which §8e is what forced:
+
+| | |
+|---|---|
+| **an entry, at the moment** | the fault notice, `origin: "defect"`, carrying C13's own sentence |
+| **an accumulation, at exit** | `Pipeline.faults`, on the restored primary screen |
+
+**The reporting path is the path that failed**, so a single channel could not work: in the row
+where `transcript.append` throws, appending is precisely what cannot be relied on.
+
+### Measured, at the public entry
+
+`/dashboard`'s document — two blocks with the id `running` — submitted through `createTui`,
+the frame read rather than the collection:
+
+```
+prism  prism  22:13:20
+✗ appendAndCommit: TranscriptError: transcript.append: invalid document (C13 I10) — blocks: id
+  "running" appears 2 times (C04 I14) — ViewPatch addresses blocks by id, so a duplicate has no
+  correct target
+❯
+```
+
+Before, at the same size, the whole transcript was empty. The same sentence appears again
+after `⌃d`, on the restored primary screen, asserted to fall *after* the alternate-screen
+release rather than merely after `stop()` began — which the first version of the row did not
+distinguish, and the mutation pass said so.
+
+### What the finding got wrong, and what the count turned up
+
+- **"The fix is small"** — the *remedy* is, and the subject was not. Checking how many callers
+  reach the swallow turned up a **third** subject: `HistoryStore.warnings` is read by nothing
+  in `src/`, so a corrupt history file, a read-only home and a full disk have each been
+  detected, described and discarded for the life of the component. **T2.9 passed throughout**,
+  because what it asserts is that neither stream is written to — the silence it was written to
+  make safe is indistinguishable from the silence of a warning nobody collects. C22 §8 step 3
+  drained one of three collections and now drains three.
+- **"Waiting for the next invalid document, which for a framework means waiting for its first
+  app author"** — it was not waiting. **F138** was already in the tree: every notice composed
+  with `status: "error"` was invalid under C04 I3, so a handoff exiting non-zero produced no
+  entry. F15's own mechanism was hiding a second instance of F15's own class, and the thing
+  that found it was the fabricated row for this fix's ladder.
+
+### Also settled here
+
+**§8e, the walk** — a classification table over the five statements under one catch, indexed
+by which threw. §5's row is written as though only the first can. Four of five abandoned
+`resetFocus` between the append and the commit, which T4.7b asserts the position of because
+one frame with focus in a frozen block is the failure it prevents; abandoning it is that
+failure with no bound. The return value was `null` in four rows where the entry exists, and it
+is corrected without a row, because nothing can observe it without adding the consumer the row
+would be testing for.
+
+**Eleven mutations, all caught, with a control the harness verified live** — and two of the ten
+survived first time, both findings about the tests rather than the code: *"the reset was
+attempted"* was satisfied by the try's reset alone, and *"the reason appears after `stop()`"*
+was satisfied by both orderings of release and drain.
 
 ---
 
@@ -1106,6 +1247,13 @@ drops; a ceiling would render a busy container identically to a saturated one.
 left as an omission: `yFormat` is a trap in the shape a caller wants it (F31), `xLabels` is a
 fixed three-tuple that cannot hold S3's caption sentence, and `emptyMessage` has no consumer.
 
+> **Two of three now.** `yFormat` was exposed when F31 was fixed, and the reason recorded here
+> is why it took a separate row to see it: *a trap in the shape a caller wants it* is a reason
+> to fix the trap and it was written as a reason to withhold the field. The trap was the
+> **naming** — `percent` multiplied by 100 — and renaming that arm to `fraction` left nothing
+> to withhold (C04 I41). An omission with a recorded reason is a decision until something
+> presses on it, and nothing had.
+
 **And the shape of this finding is worth keeping.** C12 implemented all five fields, its
 tests were right, and every one of them passed — the mechanism was complete and *unreachable
 from the public surface*. A green suite over a mechanism nobody can invoke, which is MG25's
@@ -1113,7 +1261,7 @@ class arriving from the consumer's side rather than the producer's.
 
 ---
 
-## F28 — an app cannot reach the live parts it just declared
+## F28 — an app cannot reach the live parts it just declared — **CLOSED, and the record did not know**
 
 `b.live` records its `LiveSpec` in a `WeakMap` beside the document (`builders/live.ts:30`),
 and neither the map nor `liveDeclarations` is exported. So an app that builds a document
@@ -1129,6 +1277,18 @@ building a testing affordance the framework withheld.
 stretch survived a green suite because every row called a mechanism directly and nothing
 called the wiring. A framework that makes the mechanism unreachable pushes every consumer
 toward whole-stack tests or none.
+
+**CLOSED — the seam exists and cites this finding by name.** `src/testing/live-parts.ts`
+exports `liveParts(doc): readonly LivePart[]`, giving back the `block` and *exactly* the
+`LiveSpec` the declarer supplied, and `@fmx/calcium/testing` re-exports it. Its own header
+carries the argument this entry makes, including why it lands on the testing surface rather
+than the runtime one: *a production consumer reading back what it just declared holds a second
+record of the document, which is the class this repository removes; a test reading it is
+exercising the thing it declared.*
+
+Found by the tier-4 pre-check rather than by anything failing. **This is the population where
+that matters most**: a finding with no consumer has nothing pressing on it, so nothing corrects
+it either — and this one had been built against, closed, and left standing in three documents.
 
 ---
 
@@ -1195,6 +1355,51 @@ This is why `b.plot` exposes `yMin`/`yMax` and **not** `yFormat` (F27). The form
 for the loss curves C12 was written against and a trap in the shape a CLI-wrapping consumer
 reaches for. Fixing it means a second format or a documented sentence at the call site, and
 neither is a builder change.
+
+**Re-checked and it stands.** `plot/axes.ts` still returns `` `${Math.round(v * 100)}%` ``,
+`yFormat` is still on the public block type (`viewmodel/types.ts:360`), and `b.plot` still
+withholds it. Nothing has moved.
+
+**Closed** — C04 I41, `b.plot` carries the field, T1.12/T1.12b/T1.12c, T1.16b, T2.12c, a new
+golden, five mutations.
+
+**The arms are named for the unit that arrives, not the unit that renders.** Both draw a
+per-cent sign, so the rendered form could never separate them and naming them by it is what
+gave one member two plausible meanings:
+
+| arm | in | out |
+|---|---|---|
+| `fraction` | `0.84` | `84%` |
+| `percent` | `100.2` | `100%` |
+
+`fraction` **is the old `percent`, renamed** — the arithmetic never moved. Proof it did not:
+regenerating the goldens after migrating the existing fixture from `percent` to `fraction`
+produced **144 insertions and 0 deletions**. Every frame of that fixture is byte-identical;
+the insertions are the new arm's own case.
+
+**`percent`/`percentage` was the alternative and it is worse.** Two members one letter apart
+meaning opposite things is the two-meanings-one-word class this project has found the hard way
+three times already — `dismissable`, `origin`, `viewState`. Renaming a public enum member is
+breaking and the freeze is ahead, which is the argument for doing it now rather than against:
+two callers in the tree, both fixtures.
+
+**It is geometry, not appearance**, and that is the half a formatting change hides. C12 §3
+sizes the gutter with `labelWidth` over the *rendered* labels, so an arm that changes a
+label's width changes the plot area — which is why T1.12c asserts widths and why the new arm
+got a golden rather than a unit row.
+
+**And the arm is validated now, in both places.** It never was: an unknown string fell through
+to the numeric arm, so a typo rendered plain values in silence. The rename is exactly the
+event that produces one, because `percentage` is what a reader guesses. The check is in the
+constructor **and** the validator, on §3's standing reason — a document can arrive from a
+fixture without passing through a constructor, and a constructed block never reaches the
+validator, so a check in one covers half the ways a plot is built.
+
+**Two exemptions disposed of by their subjects being wired**, neither remembered by anyone:
+MG27's `BUILDER_OMISSIONS` entry for `plot.yFormat` and — in the row before this — MG25's for
+`isUsable`. Both lists are compared by equality, so `make enforce` refused each commit the
+moment the subject was consumed. That is the difference between an exemption that expires and
+one that outlives its reason unread.
 
 ---
 
@@ -1796,7 +2001,7 @@ Error: alternate screen unsupported — the shell cannot open
 
 ---
 
-## F53 — `exactOptionalPropertyTypes` makes an optional field unsupplyable
+## F53 — `exactOptionalPropertyTypes` makes an optional field unsupplyable — **DISPOSED**
 
 A consumer computing an optional config value cannot pass it. Neither form compiles:
 
@@ -1815,6 +2020,12 @@ nothing in `src/` or the test tree could ever have met it. Fifteen optional fiel
 `TuiConfig` have the shape; **one of them has been wanted conditionally**, and that one now
 carries `| undefined`. The rest are filed rather than changed, because a variance widened
 for no consumer is a guess about the next one.
+
+**DISPOSED, and the disposition is the sentence above.** `TuiConfig.capabilities` reads
+`Partial<TerminalCapabilities> | undefined` today (`src/shell/types.ts:432`), with *"fixed here
+because this is the field with a consumer"* beside it. The fourteen others are deliberately
+unwidened. **So there is no task here unless a second consumer appears** — this is a ruling
+already taken, and it was sitting in a plan as work.
 
 ---
 
@@ -1871,6 +2082,21 @@ the last thing left that cannot render.
 Filed, not fixed. C22 §6 owns the prompt and gives it no capability-dependent form, so this
 wants a ruling — a pair like C09's, or a `PROMPT` that takes the record — rather than a
 character swapped in place.
+
+### Amended when it was ruled on — two characters was one app's frame, not the class
+
+**The count is right about the dashboard and wrong about the framework.** *"Exactly one
+non-ASCII character"* was measured over the ASCII dashboard's own frame and holds there.
+Swept over `src/`, the framework draws **six** characters it does not substitute: the
+prompt and `loading…`, plus `⋯` and `⠋` in `paint.ts`, `… n more` in C19's menu, and `▸`
+marking the selected choice in `confirm.ts`. A frame is a sample of the class, and this
+finding measured the sample.
+
+**And *"wants a ruling"* is right about half of them.** Three bypass a function that
+already holds their ASCII form — `spinnerFrames(caps)`, `GLYPH_TABLE.expand`,
+`collapse.ts`'s pair. For those there is nothing to rule and there is a call that was
+not made. Ruled as C09 I22 and C22 I52, enforced by SS47, and the whole measurement is
+F122.
 
 ---
 
@@ -2232,9 +2458,10 @@ the reading instrument rather than at the capture.
 
 ## F64 — the app never built the block the surface was written for ★★
 
-S9's drawing shows a pushed logs view with a titled panel, a `following · 342 lines`
-header, key hints along the bottom, and `▐` tone on a `WARN` line. Its **Exercises**
-line claims *tone on individual lines (WARN/ERROR coloured)*.
+`DOCKER_TUI_SURFACES.md` **§9** — line 591, and the citation matters, see below — draws a
+pushed logs view with a titled panel, a `following · 342 lines` header, key hints along the
+bottom, and `▐` tone on a `WARN` line. Its **Exercises** line claimed *tone on individual lines
+(WARN/ERROR coloured)*.
 
 `src/logs.ts` builds `b.raw(text)`. One block per line, no timestamp, no level, no tone.
 
@@ -2259,6 +2486,31 @@ be wrong within a release*, and nginx, postgres and a shell script agree on noth
 
 **What it costs is a claim, not a feature.** The surfaces document says this app exercises
 tone on log lines. It does not, and until this entry nothing said so.
+
+**Re-checked, and this entry's own citation misdirected.** "S9" is section 9 of
+`DOCKER_TUI_SURFACES.md`, where the claim sat at line 591. It is **not**
+`docs/surfaces/S09_test.md`, which is a different surface entirely, and not `S12_logs_view.md`,
+which is the per-surface document for the logs view. A reader following the old citation finds
+a file without the sentence and concludes the finding is stale — which is what nearly happened
+here. Corrected in the heading of this section rather than only noted, because a note about a
+misleading citation and the misleading citation can sit in one document indefinitely.
+
+**Closed as an audit** — `DOCKER_TUI_SURFACES.md` §9's *Exercises* line no longer claims the
+tone, and the drawing is kept with the claim recorded beside it, because redrawing it would
+lose what was intended. `src/logs.ts:58` still builds `b.raw(text, …)`; the substance never
+changed and the fix was always going to be the sentence.
+
+**And the where-is-this-written check widened it.** This entry says `b.logs` has no consumer
+*in this application*. Measured across the whole tree, it has exactly **one caller anywhere**
+and it is a contract-test fixture (`test/contract/builders.test.ts:130`) — and Calcium's own
+logs surface composes the view from `raw` as well: `docs/surfaces/S12_logs_view.md` §Blocks
+lists *`panel` … wrapping `raw` (5 log lines)*. So the block is unreached by the reference app
+**and by the design that specified the view it was built for**.
+
+That is a different finding from this one and it is not closed by this row: F64 is about a
+claim, and *a published block kind whose own surface spec composes something else* is about
+the block. Filed as the residue rather than folded in — the test is whether landing this closes
+it, and it does not.
 
 ---
 
@@ -2372,7 +2624,7 @@ and the reason it is uninteresting is better than the reason given.
 
 ---
 
-## F67 — below a certain terminal size the shell draws nothing, says nothing, and stays alive ★★★
+## F67 — below a certain terminal size the shell draws nothing, says nothing, and stays alive ★★★ — **CLOSED**
 
 Found while shrinking a capture to make a compact README image. At **14 rows** the
 application produced an empty picture and the pipeline reported success.
@@ -2412,6 +2664,68 @@ Filed with what was measured.
 60 / 80 / 120 / 160 columns and a fixed height; the height axis has no equivalent sweep,
 and a document that renders to zero visible rows produces a frame that is *correct* — it
 is what was asked for. It took someone wanting a smaller picture.
+
+---
+
+### CLOSED — tier 3. The mechanism existed, was specified, and neither half ran
+
+**The gate was built and the record did not know.** `tooSmall()`, `drawFallback()`,
+`MIN_COLUMNS = 60`, `MIN_ROWS = 16`, wired as C22 gate 4, specified in C22 I8, I9 and I36,
+with unit rows — landed in `16ad934` on 2026-07-31, after this was filed. `CALCIUM_FIX_PLAN.md`
+still called it an open *ruling* and `TRIAGE.md` still called it open.
+
+**And measuring it reproduced the finding exactly.** Through a real PTY at F67's own table:
+
+| size | before | after |
+|---|---|---|
+| 100 x 12 | **0 bytes**, alive | `Terminal too small` / `100x12` / `Needs 60x16` |
+| 100 x 15 | **0 bytes**, alive | the same, with its own size |
+| 30 x 16 | **0 bytes**, alive | the same — the *columns* bound, which is why 30x16 was as blank as 100x12 |
+| 100 x 16 | opens | opens |
+| 100x12 → resize 100x30 | **0 further bytes**, no alternate screen | opens |
+
+### Two halves, one class, and it is the class that survives review
+
+**The fallback was drawn through `config.stdout`, which is not a route to the screen.** C01
+redirects `stdout.write` into its `debug` sink at **construction** (C01 I3, I9) — not at
+acquire — and `lifecycle.writer` is the only handle that still reaches the real stream.
+`constructGraph` has already run when gate 4 is read, so every byte went to a sink nobody
+reads. `fallback.ts`'s own doc explains the two-sink design and gets this one backwards:
+*"the terminal was never acquired and there is no alternate screen — this writes to the
+primary one, directly."* **Every clause is true.** It conflates *not acquired* with *not
+redirected*, and C01 separates them deliberately. The mid-session call site forty lines away
+has always used `writer`.
+
+**And the deferral deferred for ever.** C22 I8 registers an `onResize` to continue from step 5,
+and C01's `onWinch` began `if (state !== "acquired") return;` — while gate 4 deliberately does
+not acquire. T3.18's stated reason, *while suspended the dimensions belong to the child*, is
+true of `suspended` and of nothing else; `released` is terminal; `constructed` has neither
+property. **A guard covering three states with a reason that holds for one**, and C22 I8
+depended on a delivery C01 declined to make while C01 I12a recorded the asymmetry as though it
+were a decision. Ruled and fixed as C01 I12b.
+
+Both halves are **a correct sentence justifying a wider condition than it warrants** — MG24's
+class, twice in one defect, in two components.
+
+### Why no test could see either
+
+**A unit row hands `drawFallback` its own spy sink**, so a fallback written into C01's debug
+sink renders perfectly to it. **A fake lifecycle delivers a resize the real one dropped.** Each
+component was correct on its own side of the seam and the pair did nothing — which is why the
+rows that close this are tier 5, at F67's exact sizes, against a real PTY: **C22 T4.21** and
+**T4.21b**, plus **C01 T3.18c**, which is the pair T3.18 never had. Four mutations, all caught,
+with a control the harness verified.
+
+**The height axis still has no sweep**, and that half of the finding stands: golden frames run
+60/80/120/160 columns at one height. What exists now is three rows at three small sizes, not a
+sweep, and the difference is worth stating rather than letting the closure imply more.
+
+### One thing measured on the way
+
+`test/e2e/lifecycle.test.ts`'s pre-existing failure — C22 T5.6, *piping the shell to `cat`* —
+is **never saw `/❯/`**, and the cause is that this PTY carries no `LANG`, so C02 resolves the
+ASCII pair and the prompt is `>`. One of the 44 explained, and the reason the row here waits on
+the alternate-screen sequence rather than on a glyph.
 
 ---
 
@@ -2930,3 +3244,4101 @@ The fix is not obviously a per-flag `interactive` — that would let two flags
 disagree, and C05 already rejects that shape for `view`. More likely the
 declaration wants to be a predicate over the invocation, which is a larger change
 than it looks and is C05's to rule on. Filed with the consumer that needed it.
+
+### Amended when it was ruled on — three of its four claims were unmeasured
+
+Ruled as C05 I23. **Two premises and the severity argument were wrong**, and the
+finding survives because its subject was right: the type cannot describe `run`.
+Amended rather than restated, on F66's terms.
+
+**1 · "C05 already rejects that shape for `view`."** It does the opposite. C05 I20
+declares `view` on a `ToolDef` **and** on a `FlagDef`, and *an invocation is a view
+if either declares it* — a disjunction, under which two declarations cannot
+disagree. The objection was raised against the precedent that answers it.
+
+Where the claim came from is the useful part: I19 and I20 each refuse `view`
+**with** `interactive`, two *fields* on one tool. That is a refusal of a pair, read
+here as a refusal of *the same field declared twice*. Both readings are about
+"C05 refusing a combination", nothing in the prose forces a choice, and it went
+into a finding unchecked — the conflation F58 had, one document earlier.
+
+**2 · "The declaration wants to be a predicate."** It cannot be one. §1 of C05:
+the manifest is JSON the app ships, and T2.7 asserts `parseManifest` accepts its
+own serialised output. **A function does not survive that round trip**, so the
+shape this finding recommended is unimplementable in the transport it must cross.
+What works is a declaration per flag, resolved by the walk that knows which flags
+are present.
+
+**3 · The severity asymmetry, which chose the direction — measured, and inverted:**
+
+| | this finding said | measured |
+|---|---|---|
+| `/run -it alpine sh` not declared interactive | the session waits on a child nothing can answer | `docker run -it` with non-terminal stdin exits **1** at once — *cannot attach stdin to a TTY-enabled container*. An ordinary error document |
+| any REPL spawned without a handoff | the same hang | C21 spawns `stdio: ["ignore", "pipe", "pipe"]`. **stdin is `/dev/null`**, so a child reading it gets EOF and exits. The named mechanism does not exist |
+| `/run -d nginx` declared interactive | a flicker on a detached run | C23 §4 suspends, docker writes the container id to the **real** terminal, `resume()` and `invalidate()` repaint over it, and the transcript reads `run finished`. The invocation's only output is gone |
+
+So the direction called cosmetic is the one that discards the result, and the
+direction called catastrophic is a reported error. **Wrong in both directions**,
+and both halves were one line of C21 and one docker invocation away — twenty
+minutes, the figure that instrument keeps earning.
+
+**And the defect it concealed is the one nobody stated**: not that `run` is
+mis-declared, but that a handoff's document *cannot carry output at all*. Every
+correctly-declared interactive verb is fine with that, because a REPL's output
+belongs on the screen it owns. `run -d` is not a REPL. The old reason would be
+falsified by a docker release changing how `-it` fails; this one only by a
+handoff learning to capture.
+
+---
+
+## F81 — a cache hit is a kind and `Tone` is a grade, found a fourth time ★★★
+
+`docker build --progress=rawjson` reports `vertexes[].cached === true`. A step that
+was cached and a step that ran are **different kinds of thing**, and `Tone` is a
+goodness axis — `ok`, `warn`, `error`. Reaching for it would say a cache hit is
+*better* than work, which is not what a reader wants to know; they want to know
+which steps ran.
+
+So `renderBuild` carries the distinction in a **column, in words** (`HOW`:
+`cached` / `ran` / `…`), and leaves `Tone` alone.
+
+**This is F30/F49/F51's absent concept reached a fourth time, by a surface built in
+a different step for a different reason** — which is the threshold the triage ranks
+on. F30 wanted `added`/`removed` on a comparison, F49 wanted `+ - ~` to mean change
+kind, F51 wanted a lifecycle event to say which event is bad. None of the three
+knew about the others, and none of them is a build.
+
+**The surface found the axis boundary by hand, and the boundary is the useful
+part.** The same block *does* take a tone, on the same row, for the neighbouring
+column:
+
+```ts
+step: s.error !== undefined
+  ? { text: s.name, tone: "error", glyph: "error" }
+  : s.name,
+how:  s.cached ? "cached" : s.completed !== undefined ? "ran" : "…",
+```
+
+**Failure is a goodness axis and caching is not**, so one cell takes a tone and the
+one beside it cannot — in a single row, built by a single expression. That is the
+sharpest statement of the gap in the repository: not *this block needs a colour it
+does not have*, but *this row needs two axes and the model has one*, demonstrated
+by a cell of each sitting side by side. C04 I6 then required a glyph for the
+`error` tone, correctly, and there is no equivalent obligation available for the
+axis that has no home.
+
+### Why it is filed now and not in step 11
+
+**It was written down and it was written down in the wrong place.** The reasoning
+above existed the whole time as a comment at `src/progress.ts:31` and again at
+`:160`, and the first of them ends:
+
+> This is F30/F49/F51's fourth consumer, **filed rather than worked around**.
+
+It was not filed. The comment is a claim about a record, and there was no record —
+so the strongest group on the triage's list looked like three consumers rather than
+four for a whole step, and a reader of `FINDINGS.md` had no way to know otherwise.
+
+**That is the sixth blind spot in its cheapest form.** F58 was a claim restated
+across four documents that never held a measurement; F66 was one carried across four
+steps that was never written down at all. This is the inverse of both: the *content*
+was correct, complete, and measured — and it sat somewhere no mechanism reads. SP5
+checks that every citation resolves to a finding that exists. **Nothing checks the
+other direction: whether something that should have been a finding is one.**
+
+The generalisation is not "grep comments for findings", which would be noise. It is
+that **a comment is the natural place to explain a decision and the wrong place to
+record a gap**, because the two read identically at the point of writing. The
+decision — *use a column, not a tone* — belongs exactly where it is. The gap it was
+taken in response to belongs here, and only the author, at that moment, can tell
+which they have just written.
+
+---
+
+## F82 — the counter added because the rule shipped vacuous twice, shipped vacuous ★★★ — **fixed**
+
+SP5 returns `scanned` and `citations` beside its violations, and `findings.d.mts`
+says why in as many words:
+
+> A count is the only thing that tells "clean" from "did not run", so it is part
+> of the return rather than something a caller could forget to ask for.
+
+`citations` was incremented **inside the violation branch**, after the
+`if (known.has(id)) continue` that skips every citation which resolves. So it
+counted failures, which is what `violations.length` already counts, and the two
+were equal on every input SP5 has ever seen.
+
+Measured on the tree at F81:
+
+| | |
+|---|---|
+| `citations`, as reported | **0** |
+| resolving citations actually walked past | **412, across 66 files** |
+
+**Zero is what it reports on a clean tree, and zero is what it would report if the
+regex matched nothing, if `CITED_FROM` excluded every citing file, or if the walk
+returned an empty list.** Those are the exact two failures SP5 had already shipped,
+and the field existed to tell them apart. It could not: a clean run and a dead run
+were the same number, which is the property it was built to destroy.
+
+**Third time, inside the instrument built after the second.** The rule was vacuous
+once by scope (`walk("src")` holds none of the files that cite this ledger) and once
+by range (a guard that skipped every number past the maximum, on a gapless ledger).
+The counter was the response to both — and it was written in a way that could not
+report either.
+
+### The test agreed, in a way that is worth reading twice
+
+```ts
+expect(v).toHaveLength(0);
+expect(v.citations, "it looked at the citation and accepted it").toBe(0);
+```
+
+**The message states the intent and the number asserts the opposite.** If it looked
+at a citation and accepted it, `citations` is 1. Both halves were written in one
+sitting, from the same understanding, and neither was checked against the other —
+which is F65's shape, an artefact wrong about itself, arriving in a test rather than
+in a drawing. Nothing in a review distinguishes the two: a message and an assertion
+that disagree read exactly like a message and an assertion that agree.
+
+**And the corpus row asserted the wrong count.** It checked
+`scanned > 50` — *files opened* — which stays high when the regex matches nothing and
+when the scope holds the wrong files entirely. `scanned` proves the walk ran;
+**only `citations` proves the regex and the scope work together**, and that pair is
+what failed both earlier times.
+
+### How it was found, which is not by looking for it
+
+Verifying the F81 triage's own claim — *"`make enforce` resolves every `Fnn` cited
+above"* — by running the rule and reading its counters rather than its exit status.
+`enforce` was green, as it has been through all three vacuities. The number beside
+the green is what disagreed with the tree.
+
+**That is the frame-read applied to an enforcement rule**: the exit status is the
+assertion, and the counters are the frame. Three vacuities in one rule, none of them
+visible from a passing run, is the strongest case in this repository for the habit —
+and `citations: 0` is a fact a reader can check against a tree in one command, which
+is what makes it worth returning at all.
+
+Fixed: `citations` is incremented before the resolution check, so it counts every
+citation walked past. The corpus row now asserts `citations > 200` — a floor well
+under 412 so that filing findings does not move it — and the row above asserts `1`
+under its original message.
+
+**Mutation**, reverting the increment to the violation branch:
+
+| row | killed |
+|---|---|
+| the corpus row (`citations > 200`) | ✓ — *expected 0 to be greater than 200* |
+| a live number passes (`citations === 1`) | ✓ — *expected +0 to be 1* |
+| SP5 fires: past the end of the ledger | unaffected, correctly |
+| SP5 fires: a gap in the middle | unaffected, correctly |
+
+The two `fires` rows are untouched because they never depended on the counter, which
+is why four green rows and a broken field coexisted for as long as they did.
+
+### The second half, which the first half found within a minute
+
+**A working counter is a number you can check against a tree, and the first thing
+it said was that the scope was wrong again.** `415` looked low, so it was compared
+against what the repository actually holds:
+
+| | scanned | citations |
+|---|---|---|
+| the scope as written | `src`, `docs`, `examples/docker/src`, `examples/docker/test`, the ledger, `CLAUDE.md` | **415** |
+| what it was missing | **13 top-level documents under `examples/docker/`** | **250** |
+| `TRIAGE.md` alone | — | **175** |
+
+**The most-cited artefact after the ledger was outside the rule's scope**, and it is
+the one whose entire job is to cite. So were `VERIFYING.md`, `README.md`, and every
+`*_WALK.md` — the by-hand walks, which cite findings constantly because that is what
+a walk produces.
+
+**That is this rule's first vacuity repeating**, three instances of one class now: a
+scope naming the directories thought to matter rather than covering the directory and
+naming its exceptions. Fixed by walking `examples/docker` and letting `CITED_FROM`
+filter, which is the shape that stops it recurring — a new document is covered on the
+day it is written rather than on the day someone remembers the rule exists.
+
+**No violation was hidden.** All 250 resolve; the gap was in what could have been
+caught, not in what was. That is worth stating plainly rather than implying a near
+miss: the cost was a guarantee nobody had, not a defect nobody saw.
+
+**And the dedupe was caught by arithmetic, not by a test.** Widening the walk put the
+ledger in scope twice — once walked, once named — so it was scanned twice and its 116
+self-citations counted twice. `415 + 250 = 665` and the run reported **781**. The
+difference is exactly 116. A counter that can be checked against a sum is a counter
+that catches its own double-count, which is the second argument this finding makes for
+returning numbers rather than a boolean.
+
+Final: **306 files, 665 citations, 0 violations.**
+
+---
+
+## F83 — MG24 counts the implementing module as a consumer ★★★
+
+MG24 asks whether an `export interface` member is *"named somewhere else under
+`src/`"*. An interface declared in `types.ts` and implemented in `store.ts` is two
+files, so **every member of it has a consumer by construction** — the implementation.
+
+Measured over 280 interface members:
+
+| | |
+|---|---|
+| MG24 sees a consumer for | **265** |
+| ...of which **no** consumer outside the declaring component | **28** |
+
+Two of the 28 are real and neither is allow-listed:
+
+```
+HistoryStore.rerun     types.ts:65 declares it, store.ts:136 implements it, nothing calls it
+TransportRouter.busy   types.ts:74 declares it, router.ts:71 implements it, nothing reads it
+```
+
+**`busy` is the sharper one, because the tree says so out loud.** `router.ts:64`
+comments that a guard *"replaced `busy` and `shellChild`"*, and `construct.ts:1024`
+counts *"seventeen until `busy` and…"*. The member survived its own removal, and
+MG24 could not see it because `router.ts` implements the interface `types.ts`
+declares.
+
+**This is the class MG24 exists for, hiding inside MG24's own definition of a
+consumer.** A02 Seam 4 is about a component complete on its own side with nothing on
+the other — and the *implementation* is the same side. The file boundary was taken as
+a proxy for the seam, and within a component it is not one.
+
+The fix is a boundary rather than a rule: count a consumer only outside the declaring
+component. 28 candidates is a reviewable number, and the remainder disposes the same
+way `UNCONSUMED_MEMBERS` already does — an entry with a reason, and the equality arm
+that stops it outliving that reason.
+
+---
+
+## F84 — MG24 walks `export interface`; this codebase publishes with `export type` ★★★
+
+MG24's member walk is anchored on `export\s+interface`. Every object type published
+as `export type X = Readonly<{…}>` is outside it, and that is how most of this
+codebase declares a contract:
+
+| | members | inspected by any rule |
+|---|---|---|
+| `export interface` | 280 | **yes** — MG24 |
+| `export type` object types (163 of them) | **798** | **no** |
+
+`AdapterContext`, `LocalContext`, `RenderContext`, `ToolDef`, `Layer`, `ThemeTokens`
+and `GlyphSet` are all in the unwatched 798. **Nearly three times as many published
+members are unwatched as watched.**
+
+**The current yield is low, and saying so is the finding's other half.** Measured
+both ways:
+
+- **no use anywhere in `src/` at all: 0.** The literal version of the gap is empty.
+- **never named outside the declaring component: 67**, and they are dominated by
+  deferrals already recorded — `ToolDef.oneShot` has three paragraphs in C22 §4
+  explaining that it has no subject because `createTui` takes no argv, and
+  `ThemeTokens.palettes` is `ThemeStore.applyOverrides`' known gap seen from the
+  other side. **A documented deferral is the correct disposal and not a finding**,
+  which is C04's `status: "proposed"` model.
+
+**What is left after that filter is small and real:** `GlyphSet.teeLeft`,
+`GlyphSet.teeRight` and `GlyphSet.hollow` are declared glyph slots with **zero uses
+outside `glyphs.ts`** — three characters in a vocabulary with a degradation path and
+no drawer.
+
+So the scope hole is large and its present contents are not. **That is worth filing
+precisely because the two are usually confused**: a rule whose scope excludes 74% of
+its subject is a rule whose clean result means much less than it reads, whatever it
+happens to contain today. F82 is the same sentence about a counter.
+
+**And the measurement itself needed correcting mid-flight**, which is recorded because
+it is the same trap: the first version inherited MG24's *skip the declaring file* rule
+and reported `EngineOptions.onSourceError`, `FrameSchedulerOptions.windows` and
+`ViewRefresh.offsetMs` as dead. All three are used in the file that declares them.
+MG24's skip is right for interfaces, which live apart from their implementations, and
+wrong for `export type` objects, which are usually declared beside their use. **A
+filter carried from one shape to another produces confident false positives**, and
+the only thing that caught it was opening the three files.
+
+---
+
+## F85 — a context requires two fields whose supplier cannot supply them ★★★
+
+`RenderContext` has eight fields. Every construction site supplies all eight, so the
+partial-context pass reports it clean. Two of them are ceremonial, and the code says
+so:
+
+```ts
+// The registry replaces both of these with itself; they are here because
+// the type requires them, and a caller should not have to know that.
+measureChild: registry.measure,
+renderChild: () => {
+  throw new Error("renderChild is supplied by the registry");
+},
+```
+
+`render-lines.ts` builds a `RenderContext` at two sites and both write a `renderChild`
+that **throws if it is ever called**, because `BlockRegistry.render` overwrites it
+before any renderer sees it (`registry.ts:157`).
+
+**This is F58b's class, reached independently by a second component.** There, an
+adapter must compute ten `meta` fields and `authoritativeMeta` honours three. Here, a
+caller must supply eight context fields and the registry honours six. Both times the
+compiler demands a value, the consumer discards it, and the only way to satisfy the
+type is to write something untrue — a `?? 0` in one case, a throwing stub in the other.
+
+**A throwing stub is the more honest of the two and the more dangerous.** F58b's
+false value was silently discarded and nothing downstream ever showed it; this one
+is a live landmine that is correct only because the overwrite is unconditional. The
+comment is the whole of the guarantee.
+
+**The fix is the same shape and it is a narrower type**: the fields the registry owns
+do not belong in what a caller constructs. `Omit<RenderContext, "measureChild" |
+"renderChild">` at the construction boundary makes supplying them fail to compile
+rather than fail to matter — which is exactly F58b's disposition, and the second
+instance is what says it generalises beyond the adapter surface.
+
+Two independent consumers is this project's threshold for a shape being real.
+
+---
+
+## F86 — F79 named a mechanism it did not measure ★★
+
+F79 recorded that `tools/screen.py` mis-rendered a build step, quoting the raw bytes,
+and proposed a cause:
+
+> the `OSC` substitution runs first over the whole stream and an unterminated `\x1b]`
+> anywhere will consume an arbitrary span
+
+**Measured against the tool, which is unchanged since before F79 was filed:**
+
+| input | rendered |
+|---|---|
+| the exact quoted bytes, alone | **correctly** — `[3/3] RUN sleep 2 && echo two > /two` |
+| an unterminated `\x1b]0;docker-tui` earlier in the stream | the SGR line **still correct**; the OSC leaks as visible text |
+
+```python
+OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+```
+
+**The pattern is anchored to a terminator, so an unterminated OSC matches nothing and
+consumes nothing** — the opposite of the proposed mechanism. `[^\x07\x1b]*` cannot
+cross an ESC either, so the span it can eat is bounded by the next escape in any case.
+
+**Two results, and they point in different directions:**
+
+1. **F79's symptom is not reproducible at HEAD** from the bytes it recorded. It was
+   real — the bytes are quoted and the frame was read — but the cause is unestablished
+   and the reproducer in the finding does not reproduce it.
+2. **A different, real `screen.py` defect exists**: an unterminated OSC is printed as
+   text rather than consumed, so a title-set sequence appears in a frame as
+   `0;docker-tui`. That is a corruption of exactly the kind F79 argues about, arrived
+   at from the other end.
+
+**This is the sixth blind spot inside the finding that founded the instrument group.**
+F79's own text says *"when a frame shows something surprising, read the raw bytes
+before believing the render"* — and then names a mechanism without running it. A
+hypothesis in a finding reads exactly like a measurement in a finding, which is the
+whole of F58 and F66 restated.
+
+**It also prices the group's disposition.** *Every instrument gets a fixture it must
+reproduce* is not a tidying exercise: the two commands above are the entire cost, and
+they turn one unreproducible anecdote into one falsified mechanism and one reproducible
+defect. Neither was available while the tool had no fixture.
+
+**Closed, both halves** — `examples/docker/tools/screen_test.py`, 15 rows, and the leak
+repaired.
+
+**The repair, measured before and after.** The pattern required a terminator, so
+`\x1b]0;docker-tui` with no BEL matched nothing, the render loop skipped its two escape bytes
+as *an escape we do not model*, and the remainder was written into the grid as text:
+
+```
+before   0;docker-tui[3/3] RUN sleep 2
+after    [3/3] RUN sleep 2
+```
+
+A terminal abandons an OSC at the next ESC and discards it at end of input, so both are
+terminators now. The lookahead consumes the body **without** swallowing the escape that follows
+— a fix that ate the CSI too would repair the leak and lose the colour, and one row cannot see
+the difference, which is why four forms are asserted.
+
+**F79's row is kept even though it does not reproduce.** *Strips SGR without consuming the text
+around it* is what stops the symptom returning silently, and a finding whose cause was
+falsified still names a property worth holding.
+
+**The port is not a pure port, and the mutation pass is what said so.** The six rows came from
+`test/support/screen.ts`, which models what `composeFrame` writes — HOME, CUP at column 0,
+`\r\n`. Making CUP **ignore its column entirely** left all ten rows green, because not one of
+them addresses a column. This instrument replays a *real capture*, so its input domain is
+strictly larger: five rows were added for CUP's column, CUF, EL, ED and CUU, and each kills a
+mutation the ported six could not. **A port inherits the domain of the thing it was ported
+from**, and here the two domains differ by the whole of the far side's output.
+
+**And the fixture failed on its own arithmetic first**, which is the argument for running it:
+the F86 row used F79's full seventeen-cell line against a ten-column screen, so it wrapped and
+the row read `[3/3] RUN` against an expectation of the whole line. The tool was right and the
+expectation was not.
+
+**Group 9 does not close on this: 1 of 11.** Said in `CALCIUM_FIX_PLAN.md` rather than only
+here, because a disposition recorded in the finding it disposes of is how F53 sat in a plan as
+work for a tier.
+
+---
+
+## F87 — the triage's partition is claimed, and the count that checks it cannot see the claim ★★
+
+`TRIAGE.md` §*How this file was checked* states the property and the check in one
+breath:
+
+> The inventory is derived, not hand-copied. `grep '^## F' FINDINGS.md` yields 89 ids
+> and every one appears in **exactly one** group above — 10 + 12 + … = 89.
+
+**The sum is right and the property is false.** F30 is a bolded key in group 4 (a
+change axis) *and* in group 7 (an artefact wrong about the framework). Measured:
+
+| | |
+|---|---|
+| ids in the ledger | 89 |
+| distinct ids keyed in the triage's groups | **89** |
+| ids keyed in **two** groups | **1** — F30 |
+| ids group 7's rows name | **15** |
+| ids group 7's heading claims | **14** |
+
+**The two errors cancel exactly.** Group 7 declares 14 because it silently excludes
+the id already counted under group 4, so `10 + 12 + 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 +
+6 + 2 + 1 + 6` reaches 89 whether the partition holds or not.
+
+**The count is a proxy and it agrees with itself.** A sum over group sizes tests that
+the sizes add up; it cannot test that the groups are disjoint, because a duplicate
+placed once and counted once is arithmetically invisible. The check was built against
+the F55 version's failure — a heading reading *5 surfaces* over six rows — and it
+catches that shape and only that shape.
+
+**F30's placement is not the defect.** It genuinely is both: a verdict the union
+lacks, and a drawing that asserted one. **The sentence claiming a strict partition is
+the defect**, and the remedy is to state that groups may overlap and to mark the
+second appearance as a cross-reference — not to move the finding.
+
+This is F65 arriving in the document written to sort F65, and *assert the artefact,
+not a proxy* is the rule it fails: a disjointness claim wants a duplicate check, which
+is one `sort | uniq -d` and was never run.
+
+---
+
+## F88 — `CALCIUM_ROADMAP.md`'s own cross-references point at the wrong entries ★★
+
+The roadmap's body refers to Order entries by number — *"the same mechanism as
+selection's full-row background (#22)"*, *"see #16, which supersedes an earlier
+draft"*. Every such reference was resolved against the Order list:
+
+| | first count | **amended** |
+|---|---|---|
+| `#NN` references in the body | 31 | **32** |
+| resolving to the entry the sentence means | 17 | 17 |
+| **resolving to a different entry** | 12 | **13** |
+| ambiguous (a section, not an entry) | 2 | 2 |
+
+**The first count was one low, and how it was missed is the useful part.** Line 2152
+is `#31` *inside Order entry 25* — *"Design with as-you-type (#31)"* — and as-you-type
+is entry 40; 31 is completion ranking. The roadmap's own body says the right thing
+forty lines above it. Thirty references were resolved against the Order list and
+**that one was waved through as "inside the Order block"**, because its position made
+it look like bookkeeping rather than a claim.
+
+**A count that agrees with its own rows and is one short of the tree — in the finding
+written about a count that agreed with its own rows.** F87's shape, in the document
+about it, produced by the same move: a category exempted rather than resolved. **An
+exemption is where the next instance hides**, and this one exempted by position.
+
+Not near-misses. A sample, each checked by reading both the sentence and the entry it
+lands on:
+
+| written | means | lands on |
+|---|---|---|
+| `#20` — *"appears in `/theme --help` for free once #20 lands"* | 21, `--help` per verb | off-screen live parts |
+| `#16` — *"see #16, which supersedes an earlier draft"* | 18, shared pollers | one popup |
+| `#24` — *"With ranking (#24), 'best' becomes meaningful"* | 31, completion ranking | more default themes |
+| `#26` — *"it pairs with `b.row` (#26)"* | 38, horizontal composition | view trace in transcript |
+| `#25` — *"worth doing with the scroll-anchor rule (#25's neighbourhood)"* | 8, the scroll-anchor rule | ghost text |
+| `#32` — *"a theme declares the background it assumes (#32's ruling)"* | 39, theme background | prefix-out |
+
+**The cause is a renumbering that did not propagate**, and it is the edit-script
+discipline stated in `CLAUDE.md` — *an edit script asserts every replacement matched* —
+failing in the direction that leaves no trace: the Order list was reordered, every
+`#NN` in 2,000 lines of body kept its old target, and each one still resolves to a
+real entry. **A dangling reference would have been visible; a wrong one is not.**
+
+**Why it matters beyond tidiness.** Several of these are dependency statements — *do
+ranking before ghosting*, *build the wash with the background* — so a reader following
+them builds in the wrong order. `#20` and `#16` are the sharpest: both are read as
+prerequisites, and both name an unrelated entry.
+
+**The general form is worth more than the fix, and the disposition is *not* a rule.**
+A reference into a numbered list is checkable exactly as `Fnn` citations are, and the
+tempting fix is an SP-class rule resolving `#NN` against the Order list. **That would
+make a fragile scheme checkable rather than removing the fragility.**
+
+**Ruled: anchors, not numbers.** A `#NN` encodes a *position*; an anchor encodes the
+*thing*, and a renumber cannot invalidate it. That is *make the wrong state
+unbuildable rather than corrected* — the trade this project has now taken five times,
+after the TDZ `const`, `Exclude<ParseResult, {kind:"empty"}>`, glyphs-as-tokens and
+`origin` over `viewState`. **Enforcement is for classes that cannot be designed away,
+and this one can.**
+
+**The Order list keeps its numbers**, because a sequence is what they are good for.
+Numbers for the list, anchors for references — only the reference use was ever
+harmful. Inside the list's own code fence, where a link cannot render, a cross-entry
+reference becomes the entry's *name*.
+
+**Fixed at `80bd50b`+**: 32 references converted, 18 anchors added, and **each of the
+13 resolved by reading the sentence rather than retargeting the number** — a stale
+reference lands *somewhere*, so a mechanical retarget preserves the defect in a new
+form. Several were dependency statements, and a dependency pointing confidently at the
+wrong entry is worse than one pointing nowhere.
+
+---
+
+## F89 — an Order entry carries a claim its own document records as corrected ★★
+
+`CALCIUM_ROADMAP.md`'s Order list, entry 32:
+
+> `32 prefix-out / defaultRoute` — **CommandPolicy is exported and unreachable — a
+> config field.** And prefix-OUT (prose by default) is a separate ruling that
+> `agent-tui` needs
+
+The body of the same document, forty lines apart, says both things:
+
+| | |
+|---|---|
+| *"~~The command prefix is unreachable~~ — **CORRECTED: it is wired**"* | `TuiConfig` has `commandPolicy?`, threaded `config.ts:108 → construct.ts:673 → execution.ts:174 → parse` |
+| *"~~superseded~~"* (struck heading, live body) | *"`TuiConfig` has no policy field… there is no way to get one into a session — the eleventh instance of exported-and-unreachable"* |
+
+**Measured at HEAD, and the correction is the true one:**
+
+```
+src/shell/types.ts:318      commandPolicy?: CommandPolicy;     ← the field exists
+src/shell/config.ts:108     commandPolicy: config.commandPolicy ?? slashPolicy
+src/shell/construct.ts:699  commandPolicy: config.commandPolicy
+src/shell/execution.ts:174  policy: deps.commandPolicy
+src/interaction/parser/parse.ts:51   const policy = ctx.policy ?? slashPolicy
+```
+
+An app can supply its own prefix today. **The struck section's body was never amended
+and the Order list was drawn from it**, so the summary a reader acts on carries the
+falsified half while the correction sits above it in the same file.
+
+**The surviving half is real and different.** Prefix-*out* — prose by default, verbs
+by exception — is genuinely inexpressible: `prefixPolicy("")` makes every token a verb.
+That is a live gap with a named consumer, and it is not *"a config field"*; it is a
+ruling about whether the default route belongs inside `CommandPolicy` or beside it.
+
+**So the entry does not earn its stated place, and the reason is F66's shape one
+document out.** A claim was corrected in place and the correction did not reach the
+summary that cites it. Repetition inside a single document is not corroboration either:
+the strikethrough marks the *heading* as superseded and the body reads as current,
+which is exactly enough ambiguity for a summariser to take the wrong half.
+
+**What a triage cannot see, stated plainly**: this was not reachable from `FINDINGS.md`
+at all. It came from resolving the Order list's summary against its own body, which is
+*going to find where the claim was written down* pointed at a roadmap.
+
+---
+
+## F90 — the frame is recomputed and rewritten whole, and the four fixes are one chain ★★★
+
+**Filed as one finding because they are not independently actionable.** Each stage
+pays off only once the one before it lands, and landing them out of order converts
+continuous lag into a single long stall rather than fixing it. Four ids would invite
+exactly that.
+
+**Measured in the source, not profiled.** Two multiplicative costs on one keystroke:
+
+| | |
+|---|---|
+| `shell/session.ts:368` | `write(`${hide}${HOME}${lines.join("\r\n")}${cursor}`)` — **no comparison against the previous frame.** On 200×50 that is ~10,000 cells of styled output to change one character |
+| `shell/paint.ts:152` | `renderSequenceToLines(...)` per visible entry **per frame**, and nothing caches rendered lines. Only `measure` is cached — C14, on `(entryId, rev, width)` |
+
+**`region()` is the sharper statement**, and it is three lines below the call:
+
+```ts
+const lines = renderSequenceToLines(deps.registry, blocks, width, {...});
+const out: string[] = [];
+for (let i = 0; i < n; i += 1) out.push(exact(lines[i] ?? "", width));
+```
+
+**Every line past `n` is computed and discarded.** A 5,000-line patch renders 5,000
+lines, keeps thirty, and with highlighting `lowlight` tokenises all 5,000 first — per
+keystroke. The virtualisation is at *entry* granularity; C14 selects which entries are
+visible and the renderer then renders each one whole.
+
+### The chain, and the order is the finding
+
+| | stage | why it cannot move |
+|---|---|---|
+| **1** | **output diffing** — keep the last frame as rows, write only those that differ | Cuts every frame regardless of block size. Smallest, contained to one file, and **the invalidation story already exists**: `contaminated` forces a full repaint when the screen's contents are unknown |
+| **2** | **render caching** on `(entryId, rev, width)` | The frame *after* the first becomes free. **Alone it is not enough** — the first frame still renders 50,000 lines, so this converts continuous lag into one long stall |
+| **3** | **window the block** — reduce a block to a valid smaller block of the same kind | The one that actually fixes it. `windowPatch` proves the pattern at `shell/patch-view.ts:97`, but **only inside a pushed view** — the transcript has no equivalent. Per divisible kind: `patch` `table` `keyValue` `logs` `code`. The plot does not divide, and that is permanent (C12 I1) |
+| **4** | **cap with a visible marker** | Even windowed, `measure` walks the whole block once to know its height. `MAX_ROWS = 2_000` at `data/adapters/fallback.ts:39` is **the fallback adapter's own limit** and D40's cap bounds *blocks per document*, not rows within one — so an app adapter has no bound at all |
+
+**Stage 4's marker is what keeps it honest.** `fallback.ts:251` already writes
+*"Showing the first 2,000 rows; N more were not rendered"* for its own cap; a silent
+truncation is the empty-block class, and D40's eviction carries a marker for the same
+reason.
+
+**Anticipated in a comment and never built.** `terminal/frame-scheduler.ts:175` reasons
+about *"diffing against a screen whose contents nobody knows"* — a sentence that only
+means something if diffing is the normal case. **Specified in prose, absent in code**,
+which is this project's most-instantiated shape and the reason stage 1 is first.
+
+**Independent confirmation of the diagnosis, from the other side.** `code.ts:69` memoises
+tokenisation because *"a transcript re-renders on every frame; tokenising it on every
+frame…"* — **someone already knew rendering repeats and mitigated its most expensive
+part** rather than the repetition. The memo stays correct after stage 2 and stops being
+load-bearing.
+
+**Why it was never filed.** It is not a docker-tui finding: no surface *failed*, and the
+app's own documents are small. It was found by reading `session.ts` and `paint.ts`
+against each other, which is the instrument no triage contains.
+
+**The acceptance test is a frame-read, not a benchmark** — type into a 5,000-line diff
+and watch. A microbenchmark that improves while the frame still stutters has measured
+something other than what a reader experiences.
+
+---
+
+## F91 — every `b.live` part owns its own fetch, and two views of one source disagree ★★★
+
+> **CLOSED** — tier 3 row 2, `36e850d` `1c78ab6` `af90056` `b2f63c3` `372cff3`. Measured
+> before and after in `docs/notes/TUI_NOTE_shared_pollers_baseline.md`: two panels of one
+> document, read from **one composed frame**, went from `19` and `20` to `10` and `10`; the
+> poll rate halved; the reference app's drill-in went from 7 `docker container stats` in
+> fourteen seconds to 4; and a source polls nothing at all while nobody is looking.
+>
+> **Two of this finding's own claims were wrong and are corrected here.** `/stats` **does not
+> exist** — `manifest/read.ts:59` reserves the name deliberately, *"so that `/stats` stays
+> free"* — so the three sharers are two, and they are `container.ts`'s `cpu` and `io`, in one
+> document, running identical argv every 2 s. And the dashboard's `docker stats` (all
+> containers) is a *different* command from the drill-in's, so those two were never sharers.
+>
+> **What stayed owed**: staleness is still measured per part from its own `lastOk`, so two
+> parts on one `sourceVersion` can agree on the data and disagree in their titles (C23 §8d
+> D10). And **F137** — a fold runs on a version, so an attempt that failed at the transport is
+> no longer counted.
+
+**The optimisation is the weaker half.** The landing dashboard, `/stats` and a
+single-container panel each spawn `docker stats --no-stream` on their own interval —
+three subprocesses, one endpoint, no coordination.
+
+**The correctness half is the finding.** Two parts polling the same source at different
+moments **hold different data**: one plot and one sparkline each keep their own history
+and the two diverge on screen. Two renderings of one fact showing different numbers is a
+defect, not a cost — and it is the two-records-of-one-fact class, which this project has
+now found in a type, in a document and here in a clock.
+
+**The split that fixes it, and it is a design rather than a cache:**
+
+```
+SOURCE       fetch, shared, versioned            one poll per tick
+DERIVATION   pure, shared, memoised              the ring buffer · the parse · averages
+PART         view state + render, per instance   one expanded, one collapsed
+```
+
+> **Per-part state is view state only. Anything that accumulates belongs in a derivation.**
+
+That rule is what makes the rest safe. Expanded/collapsed and which-tab do not need
+updating while nobody is looking; a ring buffer does — so **a paused part cannot fall
+behind, because it holds nothing that could.**
+
+**`assignOffsets` and `backoffOf` are the existing seam** (`shell/refresh.ts:93,108`).
+They stagger *parts*; with shared sources there are far fewer things to stagger and parts
+sharing one are aligned by construction rather than by arithmetic. The stagger gets
+simpler and has less to do.
+
+**Its second consumer is already written down and depends on it.** `refresh.ts` holds
+**no visibility check of any kind** — its only `viewport/` import is `TranscriptStore`,
+and the two occurrences of *"visible"* in the file are comments about something else. So
+a part ticks whether or not its entry is on screen: scroll past a `/stats` entry and it
+**keeps spawning `docker stats` every two seconds for a panel nobody can see.** Unlike
+the render cost, this one spawns processes and hits the far side.
+
+**I9 is not violated by pausing, and the distinction is the ruling.** I9 protects a
+*frozen* entry — a newer entry appeared, the thing is still running, patches keep
+arriving. **Scrolled-off is a different state**: nobody is looking now, and the data must
+be fresh when they look. Pause and catch up on re-entry; with a shared source, one visible
+part keeps the source polling for everything sharing it, so returning is frequently free.
+
+**Where to stop: two levels, not a reactive graph.** `source → derivation → part` covers
+every case here. That is the same call as `b.row` being a container rather than a layout
+engine, and windowing being block-boundary rather than mid-row — **three rulings with one
+shape**, which is the evidence it is the right one.
+
+---
+
+## F92 — `usageBlocks` renders per-verb help and only an exit code can ask for it ★★
+
+**The claim this was filed from was wrong and the correction is the finding's shape.**
+`CALCIUM_ROADMAP.md` states *"`usageBlocks(tool, id)` is built, exported, and has no
+caller in `src/`"* and its Order entry compresses that to *"built, exported, and
+uncallable"*. **Measured:**
+
+```
+src/data/adapters/mapping.ts:159   export function usageBlocks(tool, id): readonly Block[]
+src/data/adapters/mapping.ts:237     ...usageBlocks(ctx.tool, id("usage-block"))   ← inside `if (raw.exitCode === 2)`
+```
+
+**It has a caller and it is not uncallable.** The roadmap's own body says as much two
+paragraphs later — *"it exists as the far side's usage-error path"* — so the summary
+overstates a body that is correct, which is F89's shape in a second entry of the same
+document.
+
+**The true gap is narrower and still real: the only thing that can ask for it is the far
+side exiting 2.** A reader who wants to know what a verb takes cannot get this document.
+`/ps --help` reaches the far side instead, because **every declared flag is transmitted**
+— which is F39, and `--help` is now its **second independent consumer**.
+
+**Its own comment argues for a trigger it does not have:**
+
+> *Exit 2 is an invocation problem, so the document says what a correct invocation looks
+> like — generated from the manifest, because a hardcoded usage string is wrong the first
+> time a flag is added and nobody notices until someone reads it.*
+
+**Two rulings when it is built.** Reserve `--help` framework-side rather than making apps
+declare it — C05 already appends the framework's six verbs to every parsed manifest, and a
+per-app discipline means one app forgetting it is a verb with no help. And it **shrinks**
+`/help`: verbs with summaries at the top level, detail behind `/verb --help`, so the
+fifty-verb wall becomes two levels and the second one is already written.
+
+**Blocked on F39.** Filing it separately is the point — F39 was one consumer and a shim
+absorbed it; it is now two, and the second is the framework's own.
+
+---
+
+## F93 — C09 §4a promises a registration path that was never built ★★★
+
+`src/presentation/blocks/kinds/code.ts:31` is `createLowlight({ json, yaml })`. Everything
+else renders flat: TypeScript, Python, a stack trace, a diff, SQL.
+
+**This is a regression against a stated design, not a scoping choice.** The file's own
+header commits to languages *arriving*:
+
+> *"measures identically whether or not its language is registered — a grammar shipping
+> tomorrow does not reflow yesterday's transcript"*
+>
+> *"An unregistered language renders as plain text, not an error"* — readable today and
+> **highlighted whenever someone registers it**
+>
+> *"The fallback is a fallback, not a filter."*
+
+**Every one of those sentences is pointless under a fixed two-language set.** `measure`
+ignores tokenisation *so that* adding a grammar later is safe; unregistered renders as text
+*so that* it is readable until someone registers it. Then the constructor shipped with **no
+registration path**, so *"whenever someone registers it"* has no someone. The spec's own
+promise is unreachable.
+
+**The recorded objection does not survive measurement.** Grammars import individually —
+`diff` 1.2 KB, `python` 9 KB, `typescript` 21 KB — and **24 mainstream grammars total
+180 KB**. The 9.3 MB figure is the whole package: 384 grammars, minified duplicates and CSS
+themes, none of which is pulled in. For a Node CLI that is noise, and a highlighter that
+flattens the language you actually use reads as broken rather than as economical.
+
+**Why nothing caught it, and this is the part worth keeping.** C09 was built when the only
+consumers were `docker inspect` (JSON) and an nginx config (YAML). **Two grammars satisfied
+every test, and nothing in the suite could distinguish *we ship two* from *we ship two for
+now*** — §4a's promises about future languages are prose, and no rule checks prose against
+behaviour. That is the standing gap named by both coverage audits and by the step-3a
+partition, arriving with a consumer.
+
+**Two changes, and the second is the one the spec obliges.** Ship the mainstream set, and
+**expose registration** — which matters more at 24 than at 2, because a mainstream set never
+covers a consumer's own domain. Exported block kinds with unexported grammars is the same
+asymmetry as a factory you can import and cannot install.
+
+**Amend the comment rather than deleting it.** Its principle holds — the full 384 *is* most
+of the weight and none of the value. What changed is that *"actually needed"* was measured
+against two consumers and now has more.
+
+### Amended when it was built — its own figures held and it named one change of three
+
+**Rare, and worth saying: every measurement in this entry re-measured true.** 384 grammars,
+9.2 MB for the package, and sixteen mainstream ones at 121 KB. The size objection survives
+and the scope of it was the thing that was wrong.
+
+**But two changes were missing, and both are the kind only the build finds.** F123 has them:
+`registerGrammar` without clearing the memo leaves §4a's sentence false, and shipping the
+set without extending `SLOTS` ships two grammars that highlight nothing.
+
+---
+
+## F94 — `export interface` does not mark a seam, and MG24's premise rests on it ★★★
+
+**One level past F83.** F83 said MG24's definition of a *consumer* was too weak.
+This says its definition of a *seam* is wrong, and it is the reason F83's fix could
+not be applied as written.
+
+MG24's header states the premise outright: *"A member of a published interface is
+the discriminator, and it is not a convenience: the interface **is** the seam."*
+Measured over 280 members with three definitions of consumed:
+
+| consumer is… | unconsumed |
+|---|---|
+| a bare name in another **file** — the rule before F83 | 15 |
+| a **call** in another file | 39 |
+| a **call** in another **component** — A02 Seam 4 read literally | **76** |
+
+**76 of 280 is 27% of the published surface**, and a rule whose violation describes a
+quarter of the tree is describing the architecture rather than a defect.
+
+**Re-measured after F95 removed the four phantom members: 73 of 276**, and the
+conclusion is unchanged. The figures above are recorded at the parser that produced
+them, because a table silently restated at a later measurement is how a document stops
+being checkable — and `componentSeamSignal` now prints the live number on every
+`make enforce`, so it is the summary line and not this paragraph that goes stale. Categorising
+the 38 that the component-scoped form produced says why:
+
+| | | |
+|---|---|---|
+| **2** | no call anywhere | the class MG24 exists for |
+| **24** | called inside their own component | an **internal contract**, not a seam |
+| **11** | called only by a test | a **diagnostic surface**, not a seam |
+| **1** | called by the reference app | an out-of-tree consumer (C24 I11's category) |
+
+**Three kinds of interface wear one keyword, and no textual rule separates them**,
+because `export` is per *module* and a component spans modules. An interface shared
+between two files of one component **must** be exported for TypeScript to permit it,
+so exporting is not evidence of anything.
+
+**A component barrel was tried as the discriminator and does not work either.** 21
+components have an `index.ts`; L4 has none, because nothing imports from the top —
+so every C22 and C23 interface would be exempted for the wrong reason.
+
+**Ruled: gate on the narrow half, report the wide half.** A consumer is a *call*
+outside the declaring file — which is F83's real defect, since the implementing file
+was counted as a consumer — and that produces **22 violations**, a list small enough
+to read, containing both of F83's own instances. The component-scoped measurement
+becomes a reported signal rather than a build gate, which is the line **C24 I11
+already draws** for the unused-export scan: *a reported signal rather than a build
+gate*. Reusing that disposal rather than inventing one is the point.
+
+**What this costs, stated rather than hidden:** the wide reading is the one A02 Seam
+4 actually describes, and it is not enforced. A member consumed only inside its own
+component still satisfies MG24. That is the same trade C24 I11 made and it should be
+re-read when a component's public surface becomes expressible.
+
+---
+
+## F95 — MG24 counted method parameters as interface members ★★
+
+`interfaceMembers` matched its member pattern against every line of an interface
+body, and a parameter inside a multi-line method signature is such a line:
+
+```ts
+take(
+  sourceId: string,        // ← matched as CompletionCache.sourceId
+  key: string,             // ← CompletionCache.key
+  ttlMs: number | undefined,
+  run: () => Promise<…>,
+): …
+```
+
+**Four of 280 in this tree, all from one signature, and two reached the violation
+list** — where they read exactly like an unwired seam, because no such member exists
+and therefore nothing can consume it. **A phantom is the worst shape a violation can
+take**: it cannot be fixed by wiring, it cannot be fixed by deleting, and the only
+resolution is an allow-list entry giving a reason for something that is not there.
+
+**Found by opening the file a violation named**, not by any assertion — the fix's own
+list was short enough to read, which is the argument for keeping it short.
+
+The fix is a nesting-depth counter: a member sits at depth 0 in the interface body.
+Four phantoms disappeared and the violation count went 24 → 22.
+
+**Its general form is the one to keep.** A line-oriented pattern over a nested
+structure is right about the line and wrong about the structure, and it fails
+*inward* — matching more than it should, never less — so it can only ever be found by
+reading what it produced. The same shape as the comment-stripping trap MG24's header
+records, and the third parsing defect in one rule.
+
+---
+
+## F96 — history persistence never creates its directory, and the member that would is uncalled ★★★
+
+**`FileSystem.mkdir` and `FileSystem.exists` are declared, implemented and never
+called.** Nothing anywhere in `src/` creates a directory:
+
+```
+src/shell/types.ts:100    mkdir(path: string): Promise<void>;     ← declared
+src/shell/session.ts:66   mkdir: async (path) => void (await mkdir(path, { recursive: true }))
+```
+
+That second line is the **implementation supplied into the seam**, and it is the only
+`mkdir` in the tree. There is no `mkdirSync`, no `recursive: true` anywhere else, and
+C20's writer uses exactly four members — `readFile`, `writeFile`, `appendFile`,
+`appendFileSync`.
+
+**So on any machine where the history directory does not already exist, history never
+persists.** `persist.ts:91` appends to `paths.commands`, the write fails ENOENT, and
+the catch at :94 does the right thing:
+
+```ts
+issued = from;                       // rewound, not dropped
+warn("history could not be written", err);
+```
+
+**It is not silent — it is permanent.** The rewind means the next append retries the
+same rows, and no code path ever creates the directory, so the retry fails identically
+forever. C20's error handling is correct and cannot help: it is built for a transient
+write failure, and this one never becomes transient.
+
+**Why no test catches it.** Every history test injects a fake `HistoryFs` whose writes
+succeed, which is right for testing the rewind and blind to the directory. **The fake
+supplies the behaviour** — the precondition the real filesystem imposes is exactly what
+a fake removes.
+
+**The fix is a call, not a feature**: ensure the directory before the first write. It
+belongs to **C22, not C20** — `HistoryFs` deliberately omits `mkdir`, and its own
+declaration says a wider type would let a later edit reach for something the component
+never needed. Widening it would trade this defect for F58b's and F85's shape. C22 owns
+`FileSystem` and owns `stateDir`.
+
+**It has a second consumer, and the fixture found it rather than the reasoning.** Once
+`fakeFs` modelled directories, removing the `mkdir` call turned **T4.5 — `/theme light`
+persists and survives a restart** — red, not a history row. Theme persistence writes to
+the same directory and was equally broken on a fresh machine; the test had passed since
+it was written because the double allowed it. **So the defect was never about history**:
+it was *nothing in the shell creates the directory every persisted thing writes into*,
+and history was simply where it was noticed.
+
+**`FileSystem.exists` was removed rather than wired.** It was declared, implemented over
+`fs.access`, supplied by both fakes and called by nothing, and there was nothing to wire
+it to — `mkdir` is `recursive: true`, so a prior existence check is a call whose answer
+changes nothing. MG24's disposition is *wire it or remove it*, and narrowing a public
+type is cheap now and a breaking change after the freeze.
+
+---
+
+## F97 — reverse search opens and cannot be typed into ★★★
+
+**`HistoryStore.searchType` and `searchBackspace` are declared, implemented,
+revert-tested, and never called from `src/`.**
+
+```
+src/interaction/history/types.ts:69   searchType(text: string): void;
+src/interaction/history/types.ts:70   searchBackspace(): void;
+src/interaction/history/store.ts:155  searchType(text) { … }        ← implemented
+test/revert/history.test.ts:107       store.searchType("ps");        ← the only callers
+```
+
+**The shell reaches ten of C20's members and not these two.** Measured over
+`src/shell/` and `src/interaction/router/`: `append` `drain` `entries` `next`
+`previous` `searchEnd` `searchLayer` `searchOlder` `searchOpen` `searchState`.
+
+And the overlay keymap has no printable-key row — `tab`, `down`, `up`, `enter`,
+`escape`, `⌃r`, and nothing else. **So `⌃r` opens a reverse search whose query can
+never become non-empty**, and `⌃r` again steps older through an unfiltered list.
+
+**This is MG24's founding class, arriving again.** C22 I38 was *C19 answered
+`spinning` and `src/shell` never read it*; this is the same shape with a keystroke on
+the end. And it is invisible in the way that class always is: **the producer is
+covered at revert tier**, which is the strongest protection this suite offers, so
+`searchType` is guarded against removal while nothing reaches it.
+
+**A revert test is the most misleading place for an unwired member to be covered.**
+Its whole promise is *removing this breaks a named test* — which is true, and says
+nothing about whether anything calls it. The protection reads as evidence of use.
+
+**Both defects together are the fixed rule's yield**, and it is worth stating as a
+number: MG24 over 276 real members produced **two user-visible defects**, F96 and
+this. Neither was reachable by any test in either suite.
+
+---
+
+## F98 — the suite leaves eleven sessions' process handlers attached ★★
+
+`npm test` prints, twice per worker:
+
+```
+MaxListenersExceededWarning: 11 uncaughtException listeners added to [process]
+MaxListenersExceededWarning: 11 unhandledRejection listeners added to [process]
+… and the same for SIGINT · SIGTERM · SIGHUP · SIGWINCH · SIGTSTP · SIGCONT
+```
+
+**Measured before assuming, and it inverted the guess.** The pairing in `src/` is
+correct and the asymmetry is *specified*:
+
+```
+lifecycle.ts:561   register()          ← at CONSTRUCTION, all eight events
+lifecycle.ts:374   disposeHandlers()   ← only inside release()
+```
+
+> **C01 I3** — handlers exist before `acquire()` is reachable. **Construction has side
+> effects deliberately**: a two-call API invites the ordering bug it exists to prevent.
+
+So this is not a lifecycle gap. **`buildGraph()` never calls `release()`**, and neither
+does any session test — so every constructed lifecycle leaves eight process-global
+handlers attached, and a vitest worker running many files accumulates them until Node
+complains at eleven.
+
+**The consequence is not the warning.** `SIGWINCH` on an abandoned session is latent,
+because the suite sends no real signals. **`uncaughtException` and `unhandledRejection`
+are not latent**: they fire on any unhandled error anywhere in the worker, so a single
+stray rejection in one test would be routed into eleven dead sessions' fatal paths, each
+running `fault()` against a fake stdout and an `onFatal` whose test finished. The failure
+would surface in whichever test was unlucky, attributed to it, with the cause eleven
+files away.
+
+**Node's warning is the whole of the detection**, and it is a warning about a count —
+the same shape as reading a green gate's counters. Nothing asserts it, so raising
+`MaxListeners` would silence the only signal there is.
+
+**What is unmeasured, stated rather than guessed:** whether the harness should call
+`release()` or dispose explicitly. `release()` does more than drop handlers — it unwinds
+the terminal, and a fake terminal's unwind may assert. That is the question a fix has to
+answer, and it is why this is filed rather than patched.
+
+**Filed because it was a real observation living in a report.** It surfaced while reading
+the F96 and F97 suite output, was set aside as harness noise, and *harness noise* is what
+F62 and F79 also looked like. **F81 is the measured cost of the alternative**: a finding
+that stayed a comment for a whole step, so the strongest group on the triage read as three
+consumers rather than four.
+
+---
+
+## F99 — eleven published members no rule could see, and six of them are one shape ★★★
+
+**F84's widening, landed and measured.** MG24 now walks `export type X = Readonly<{ … }>`
+as well as `export interface`: **276 members → 1055**. Of the 41 violations that
+produced, **eleven are named nowhere at all** — not in `src/`, not in `test/`, not in
+`tools/`, not in the reference app:
+
+| | |
+|---|---|
+| `GlyphSet.teeLeft` `teeRight` `hollow` `blocked` `warning` `bar` | **six declared glyph slots with no drawer** |
+| `VerbRatio.derived` `authored` `ratio` | C08 provenance — three of a five-field record; `recorded` and `flagged` are read |
+| `EngineOptions.cache` · `Grid.dots` · `Failure.actual` | one each |
+
+**The coverage audit predicted three of these** (`teeLeft`, `teeRight`, `hollow`) and
+stopped there, because it filtered by hand. The rule found six in the same record — and
+the three it added are the ones that matter more: `warning` and `blocked` are *semantic*
+slots, not box-drawing, so a theme declaring them gets nothing and the absence looks like
+a theme error rather than a missing renderer.
+
+**`VerbRatio` is the sharper instance.** Two of its five fields are read and three are
+not, in one record, computed together — so the arithmetic that produces `ratio` runs on
+every call and the answer is discarded. **A partially-consumed record is invisible to
+every rule that asks about a type**: the type is used, the file is imported, and the
+member is dead. That is the class F84 was filed for, and it needed the widening plus a
+consumer definition that fits how records are actually used.
+
+**The consumer test differs by keyword now, and that is F94 applied.** An `interface` is
+implemented and *called into*, so a property access is its consumer. A record is *built*,
+so `{ placed: …, popLayer: … }` names the member with no dot. **Measured: dot-access
+alone reported 82 over the widened walk**, mostly deps records supplied by object literal;
+using both tests everywhere made four allow-listed interface members read as consumed,
+which the equality arm caught in the same run. One test each, matched to the keyword.
+
+**The other thirty are the diagnostics category** — conformance reports and fixture-diff
+records whose consumer is a suite, which is what a reporting type looks like from inside
+the package that publishes it.
+
+**Disposition: wire or delete, and the glyphs are the ones to rule on first.** Six slots
+a theme can declare and nothing draws is the same shape as a spec promising registration
+with no registrar — the reader's evidence that the feature exists is the declaration.
+
+---
+
+## F100 — narrowing the adapter's return exposed three things the wide type hid ★★★
+
+**F58b landed**, and the interesting part is not the fix. `authoritativeMeta` honours
+`adapter`, `truncated` and `resultId` and overwrites the other seven on every route, so
+`AdapterMeta` now carries three keys and types the seven `never`.
+
+**Three defects surfaced that the wide type had been holding up.**
+
+### 1 · `Pick` alone does not narrow anything a helper returns
+
+The first version was `Partial<Pick<DocumentMeta, …>>`, and **the app compiled unchanged.**
+TypeScript's excess-property check fires only on a *fresh object literal*; a helper
+returning a full `DocumentMeta` is structurally assignable to a `Pick` of it. The app's
+`metaOf()` — **nine fields, duplicated verbatim in two files** — kept computing the
+discarded seven and kept type-checking.
+
+Typing the seven `never` is what forced it: `readonly string[]` is not assignable to
+`never` whether it arrives by literal or by helper. **A narrowing that only catches
+literals catches the easy half**, and the helper is where the duplication lives.
+
+### 2 · An app cannot obtain a document to test against
+
+`createAdapterRegistry` was not exported, so *"every document this app produces is valid"*
+— the app's own F35 closure — could only reach `adapter.adapt()`, which is no longer a
+document. **The suite failed the moment the narrowing landed**, which is C24 I19's
+`contextAt` argument arriving on the adapter surface: a producer the framework can test
+and a consumer cannot is one whose app-side tests assert against something the user never
+sees. Now exported.
+
+### 3 · A mechanical rewrite matched fourteen sites and seven were wrong
+
+The nine-field `meta:` block is uniform, so one regex rewrote every occurrence — and
+**half of them were not adapter returns**: `transcript/cap.ts`, four test-support
+fixtures, two app *local* handlers, and two far-side documents that arrive on stdout
+already complete. Every replacement matched. `tsc` stayed clean through the first pass and
+**166 tests failed at runtime**, because a document missing seven `meta` fields still
+satisfies a `Partial` type and fails validation.
+
+**Reverted by asking which files contain an `adapt`** — and the first version of that check
+was wrong too, grepping `adapt:` when the app uses method shorthand, so it reported *all
+seven real adapters as non-adapters*. Two bad filters in one repair.
+
+### And the fixture that had been lying
+
+`documents.test.ts` built its `AdapterContext` with `as never` and omitted `tool`, a
+**required** field. `usageBlocks` guards `tool === null`, `undefined !== null`, so routing
+through the registry reached the exit-2 branch and threw on `tool.args`. The rows had
+called adapters directly and never reached it. **`as never` is the mechanism**: a fixture
+narrower than the interface it stands for cannot fail on the difference, and the cast
+removes the compiler that would have said so.
+
+---
+
+## F101 — `stderr` and `exitCode` on a route with no far side ★★
+
+**Measured while fixing F13**, which asked which of the seven `meta` fields the
+framework can compute on the local route. Five are straightforward — `verb`, `argv`,
+`durationMs`, `transport`, `origin`. Two are not, and they fail differently.
+
+### `stderr` has no source, and the app used it as a second error channel
+
+A local handler spawns nothing, so there is no standard error stream to report. Three of
+the four helpers wrote `stderr: ""` — an invented constant. The fourth passed the failure
+message, and **the same string appears three times in one document**:
+
+```ts
+error: { message, stage: "local" },     // C04 I3 — required when status is "error"
+blocks: [b.notice.error(message)],
+meta: meta(argv, 1, message),           // ← and again, as stderr
+```
+
+**So nothing is lost by emptying it**, and something is gained: `meta.stderr` meant *what
+the far side printed* on one route and *what the handler decided to say* on the other,
+which makes it incomparable between entries in exactly the way F58 wrongly claimed
+`exitCode` was.
+
+**The residue, and it is a type question rather than a bug**: `stderr: ""` is still
+written, so the field is a constant on one of two routes. Removing it from
+`DocumentMeta` is not available — the spawn route needs it — so the honest options are a
+route-tagged union or leaving it empty and saying why. **Left empty with the reason
+recorded**, because a union here changes a public type for a field nothing currently
+misreads, and the freeze argument cuts the other way: making it a union later is additive.
+
+### `exitCode` is derivable, and carrying both is two records of one fact
+
+Every local document in the reference app pairs `status: "error"` with `exitCode: 1` and
+`status: "ok"` with `0` — **eight sites, no exceptions**, checked rather than assumed. So
+the handler was choosing a number that its own `status` already determined, and the two
+could disagree with nothing to notice.
+
+`runLocal` now derives it. **The disagreement was reachable**: a handler returning
+`status: "ok"` with `exitCode: 1` produced a document C13 accepts, and `$?`-style
+consumers would have read the two differently.
+
+**And the diff-read caught one thing the suite could not.** Removing the four helpers
+removed `adapter: "destructive"` with them, so every local verb's `meta.adapter` fell back
+to `completeLocal`'s `"local"` default — eight handlers that used to name themselves,
+anonymous. **Both suites stayed green**: `meta.adapter` is asserted three times and all
+three are on the adapter route, so nothing on the local route could see it.
+
+`adapter` is one of the three keys a producer owns, so each builder names itself again.
+The catch is the argument for the read: the last mechanical rewrite was caught by 166
+runtime failures, and this one had none to be caught by.
+
+---
+
+## F102 — D29's sweep exempts a *kind*, and the guard against that catches only a new kind ★★★
+
+`expectDocument().hasNoColourOnlyDistinction()` ends in a `default` arm that calls
+`assertNothingToCheck`, and its comment is the strongest self-description in the file:
+
+> `default: break` accepted a new kind in silence, and silence in a compliance checker is
+> indistinguishable from compliance. A03 §2's vacuity class in the checker.
+
+That repair is real and it closed the case it named. **It does not close the neighbouring
+one.** `KINDS_WITH_NOTHING_TO_CHECK` is a `Set<BlockKind>`, so membership is earned once,
+by the fields a kind had on the day it was listed, and nothing re-reads it when the fields
+change. A new *kind* is a compile error; a new meaning-bearing *field* on an exempted kind
+is silence.
+
+**Verified by fabricated violation**, because a claim about a hole is worth nothing
+asserted:
+
+```ts
+// `events` is exempt. F51's remedy is a tone on EventLine. Land it and sweep:
+{ kind: "events", id: "e", events: [{ ts: "12:00", type: "", message: "", tone: "error" }] }
+expect(() => expectDocument(d).hasNoColourOnlyDistinction()).not.toThrow();  // passes
+```
+
+A bare `error` tone with no glyph and no text — the exact shape the `notice`, `keyValue`,
+`pills` and `table` arms each throw on — passes, because the kind carrying it was exempted
+before it could carry one. **Four arms enforce the rule and the fifth kind is outside its
+subject**, and the difference is invisible from a green run.
+
+**The class, and it is why this is three stars rather than one.** A03 §2 says a rule with
+nothing to be wrong about passes like a rule that is satisfied. The repair above understood
+that and built a guard — and the guard has the same property one axis over. **An exemption
+is a claim about what the excluded set contains, and it is never re-checked, because the
+whole point of exempting was to stop looking.** That is the count-an-exemption rule arriving
+in a compliance checker rather than in a grep.
+
+**The fix is not a wider sweep.** Keying the set on the fields rather than the name — a
+kind is exempt while it declares no `tone`, no `glyph` and no other meaning-bearing slot —
+makes the exemption expire when its premise does. C04 I37.
+
+**And it did not fire on the change-axis ruling, which is the useful negative.** I35 forbids
+a producer supplying a colour for a categorical axis, so the case D29 would have to catch is
+unbuildable and the sweep needs no new arm. The hole is real and this ruling does not widen
+it; those are two findings and only one of them is a bug.
+
+---
+
+## F103 — three renderers implement one pattern and none of them names it ★★
+
+`patch`'s `TONES`/`MARKERS`/`SURFACES`, `structured.ts`'s `levelTone`, and the same file's
+`comparisonTone` are the same construction: a frozen map from a domain vocabulary to a
+palette slot, owned by the renderer, with the distinction carried in text or a marker so
+that losing the colour loses nothing.
+
+**Three instances in one layer, two of them in one file, and no shared name** — so when a
+fourth surface needed it, it was not found. F30, F49, F51 and F81 are four independent
+reports of *the model has one axis and needs two*, filed across four steps by surfaces that
+knew nothing of each other, and the answer was in `src/presentation/` the whole time.
+
+**What the absence cost is measurable and it is not code.** Each of the four solved it
+correctly by hand — the app's `+`/`-`/`~`, the `HOW` column, the exit code in the message —
+so nothing shipped wrong. What it cost was **four findings, one of which sat open for four
+steps as a ranked gap in the triage**, and a plan entry reading *a change axis distinct from
+`Tone`, 4 consumers, ⚠ C04 · C09 · C10* for work that turns out to be one type split and a
+sentence.
+
+**The pattern is now C04 I35 and the ruling is the deliverable**, but the finding is about
+how it stayed invisible: **a pattern with three implementations and no name reads as three
+local decisions**, and a fourth surface has nothing to search for. `levelTone` and
+`comparisonTone` sit forty lines apart.
+
+---
+
+## F104 — `block()` is transparent to excess properties, so every C04 narrowing lands unenforced ★★★
+
+C04 commitment 29: *"C04's constructors enforce the shape invariants and C24's `b` delegates
+to them. One enforcement point."* The signature is
+
+```ts
+export function block<B extends Block>(spec: B): B
+```
+
+and **`B` is inferred from the argument**, so the literal's own type *becomes* `B`. There is
+no fresh-literal check against `Block`, because nothing is ever checked against `Block` — the
+constraint is satisfied structurally by a type that already has the extra keys.
+
+**Verified by fabricated violation:**
+
+```ts
+block({ kind: "rule", id: "r", label: "x", utterGarbage: 42, anotherOne: { deeply: "wrong" } });
+// tsc --noEmit: zero errors
+```
+
+**How it was found, and it is the more useful half.** Splitting `Comparison`'s verdict union
+(F30) removed the field `comparison` from the type. `tsc` came back clean across `src`,
+`test` and `tools` — 175 files — with **eleven fixtures still supplying `comparison: "same"`**.
+A narrowing that removes a field from a public type should break every producer of it, and it
+broke none, because all eleven go through `block()`.
+
+**This is F85 and F58b's class arriving in the framework's own constructor**, and it is worse
+than either: those were single boundaries with a stub or an overwrite behind them, and this is
+the boundary *every* block passes through. Both suites were green either side, because a
+fixture carrying a dead key renders identically to one that does not.
+
+**The remedy has a precedent in the tree.** `ProducedMeta` makes forbidden keys unbuildable
+with `Partial<Record<Exclude<keyof T, K>, never>>`; the same idiom distributed over the union
+by `kind` would give `block()` the check its commitment claims. **Not attempted here** — the
+blast radius is every block literal in the tree and it is not this item's scope. Filed with
+the fabricated violation so the next narrowing does not repeat the measurement.
+
+**What this means for the three narrowings already landed, and it has to be said here.**
+F85, F58b and F13 all narrowed a type at a construction boundary, and every producer they
+constrain reaches that boundary through `block()` or through a builder that delegates to it.
+So **those three are correct by inspection and not by the compiler**: they were verified by
+reading each call site and by the suites, which is weaker than what the diff appears to
+promise. Nothing about them is known to be wrong — but a reader who assumes the type is now
+enforcing them is assuming something this finding says is false, and the next narrowing
+should not be planned as though the check exists.
+
+**The generalisation, which is the fourth instance of one rule.** *A type narrowing needs
+something to bite on* — and the thing that removes the bite has now been, in order: a stub
+that throws, an unconditional overwrite, `as never` in a fixture, and **a generic constructor
+that infers its constraint instead of checking against it.** The first three were call sites.
+This one is shipped framework code sitting under all of them.
+
+---
+
+## F105 — MG24 matches member names globally, and a frozen marker table flipped two unrelated members ★★
+
+`CHANGE_MARKERS` in C09 was added with the keys `unchanged`, `changed`, `added`, `removed`.
+MG24's record arm counts `(?:^|[{,(\s])name\s*:` as a consumer, so `CorpusDiff.changed` and
+`CorpusDiff.removed` — dead members of C08's corpus diff, two layers away — read as consumed,
+and the bidirectional equality arm failed the build.
+
+**The arm was right and the consumer test was wrong**, which is the good half: an exemption
+that stops being true is exactly what that arm exists to catch, and it caught one within
+minutes of an unrelated table being added.
+
+**The obvious remedy was measured and is worse.** Scoping the shorthand match to files that
+also name the owning type — a file building a `CorpusDiff` surely writes `CorpusDiff` — was
+implemented and produced **19 new violations**, and they share one shape:
+
+```
+ConstructDeps.repaint · KeyDeps.anchor · RefreshDeps.viewBlock · ActionDeps.pushView
+```
+
+A `*Deps` record is built inline at a call site whose type comes from the callee's signature
+and **is never written down**. That is the dominant legitimate use of the record arm, so the
+scoping trades one false consumer for nineteen false violations. Reverted, and the figure is
+recorded in the rule so the next person does not re-derive it.
+
+**What was done instead**: the two `CorpusDiff` entries left `UNCONSUMED_MEMBERS` with the
+reason in a comment. They are still genuinely unconsumed; if the collision ever goes, MG24
+fires again and they come back — the entry re-earning its place rather than outliving its
+reason.
+
+**The residue, stated rather than left implied.** MG24's subject is a *name*, not an
+`owner.name`, and no regex over stripped source can close that. F94 already says the rule is
+textual; this is the first measured instance of the collision, and it went in the direction
+nobody expected — a false *consumer*, silently weakening the rule, surfaced only because a
+second arm disagreed with the first.
+
+---
+
+## F37 confirmed at a cost — an app cannot read the frame of a block it just built
+
+Not a new finding; a measurement against an existing one. The change axis' first consumer is
+`/drift`, and reading its rendered block from the app took **four attempts, each blocked by a
+different unexported symbol**: `renderToLines`, `block`, `resolveTheme`, then the theme store's
+shape. Abandoned, and the marker column was read from the framework's own harness instead.
+
+`test/verbs.test.ts` already records the workaround as a decision — *"what a `Table` row
+carries is a complete description of what will be drawn"* — and for a table that is true. It
+is **not** true for the change axis, whose whole content is a marker the renderer derives: the
+rows say `added` and only the frame says `+`. So F37's cost has risen from ergonomic to
+evidential, and the app's own drift tests now assert a value whose rendering they cannot see.
+
+---
+
+## F106 — the block-expressiveness group is three findings and one visitor, and F34 was not half-answered ★★
+
+The triage ranked F33, F34, F18 and F50 as one item: *a block cannot express what the surface
+needs*, four consumers. Measured before ruling, as the change axis was:
+
+| | wants | is it expressiveness? |
+|---|---|---|
+| F33 | `Comparison` to label its columns | **yes** — no field exists |
+| F34 | a comparison's verdict to survive without colour | **yes** — nothing to derive a mark from |
+| F18 | a live panel to look live | **yes** — a slot exists and no field names it |
+| F50 | a non-flex column not to be truncated | **no** — its own text says *not a Calcium defect* |
+
+**F50 is a visitor.** `planColumns` does exactly what C11 says; the finding is that `flex` and
+`minWidth` are a shape a consumer gets wrong twice, and the block expresses the intent
+perfectly. It belongs with the group-7 artefact findings, not here. Three of four.
+
+**And F34 was not half-answered by the change axis, which is the correction worth recording.**
+The marker column carries `unchanged`/`changed`/`added`/`removed`. F34's own measured bound
+says `same` and `changed` were *already* recoverable — the two cells sit side by side — and
+that `better` and `worse` are not. So the marker closed the half that was never at risk.
+
+Frame-read, before the fix:
+
+```
+|field             a               b             |
+|p99               200ms           150ms         |     ← better
+|auprc             0.912           0.930         |     ← worse
+|loss              0.03            0.04          |     ← no verdict
+```
+
+**Three verdicts, one appearance, at every colour depth.** The split made it sharper rather
+than smaller: after I36, `verdict` is a standalone field whose only rendering is a tone —
+`ok` and `error` with no glyph, which is the shape C04 I6 forbids for `Cell` and `Notice` by
+name and cannot reach here because `ComparisonRow` is neither.
+
+**The ruling that came out of the measurement is narrower than the item.** Seven shapes carry
+a tone and **two carry a glyph slot**. The five without do not divide by "needs a field": for
+`ComparisonRow` the fact was already named and the renderer simply never used it, and for
+`KeyValue` rows, `Pills` chips, `Events` lines and `Series` there is genuinely nothing to
+derive from. So *where a shape names a categorical fact the renderer derives the mark; where
+it names only a tone a glyph slot is the remedy, and it waits for a surface.* C04 I38.
+
+**The four that wait are held back by an instrument, not a preference.** MG24 refuses a
+published member nothing consumes, so four speculative glyph slots arrive as four violations
+and four allow-list entries — the rule correctly declining to let a schema grow ahead of a
+surface. That is the second time in two items that MG24 has priced a design decision.
+
+## F107 — the wiring survived the mutation pass again, and the fixture is why
+
+`livePanel` is the one place in the tree that knows a region refreshes. Removing `live: true`
+from it — F18 unfixed, the whole point of the change — **failed nothing across unit, contract
+and integration.** `T1.4g` renders a panel with the flag and asserts the `▌`, so it tests the
+mechanism; nothing tested that the shell sets it.
+
+**The fixture is the sharp part.** `refresh.test.ts` builds its own `panel()` helper:
+
+```ts
+const panel = (id, title, child) => block({ kind: "panel", id, title, children: [child] });
+```
+
+— a panel **without** the flag, standing in for what the driver emits. So the suite that owns
+this seam holds a fixture that disagrees with the code it covers, and no assertion could have
+caught the regression by accident. *A fixture must be shown to respond to the thing under
+test*, and a stand-in written before the field existed cannot.
+
+Third instance of *a test that calls the mechanism verifies the mechanism, never the wiring*,
+and the second in two items — F51's tone reached the type, the builder and the D29 sweep with
+nothing asserting the paint. **Both were found by mutation and neither by review.**
+
+---
+
+## F108 — `FlagDef.view` has been usable on local verbs only, and its own comment says why ★★
+
+`FlagDef.view` declares that an invocation is a pushed view. Its comment records, correctly,
+that the example it was written for cannot be built:
+
+> **S3 was named here too, as `ps <uuid> --watch`, and cannot be built that way.** `docker ps`
+> takes no positional argument, `--watch` is not a docker flag, and **C06 I4 sends argv to the
+> far side verbatim** — so the declaration would have put a flag docker rejects on a verb that
+> rejects the id.
+
+**Two reasons are given and only one is about docker.** The positional argument is a fact
+about `docker ps`. *Argv goes over verbatim* is a fact about **Calcium**, and it applies to
+every `view` flag on every spawned verb, not to that example — so the arm has been usable only
+on `local: true` tools since it was written, and nothing anywhere says so. The comment ends
+*"no consumer outside a test fixture reaches this arm yet"*, which is true and reads as
+caution about an untested feature rather than as a bound on which verbs can use it.
+
+**This is F39 with the finding already written down beside the mechanism.** F39 was filed from
+`--raw` on `/inspect` and reads as one verb's problem; the same sentence sits in `types.ts`
+describing the same defect for a different field, and the two were never connected because one
+is a finding and the other is a comment.
+
+**Closed by the same change.** `shellOnly` gives a `view` flag on a spawned verb somewhere to
+go: declare both, and the flag decides the tier without reaching the binary. The arm is now as
+wide as its type — and the entry stays because *the reason a feature is narrow should be in
+the invariant, not in a parenthesis about the example that revealed it*.
+
+## F109 — a proxy that stopped measuring its property, caught by the property still being true
+
+C18's `T2.9 (I19): validateInvocation runs exactly once per parse` counts reads of
+`tool.flags` through a `Proxy`, with a control establishing reads-per-call first — *"a fixture
+must be shown to respond to the thing under test"*, which that test does better than most.
+
+The first version of this change derived the transmitted argv in C18 by reading `tool.flags`,
+and T2.9 failed: **4 reads against 3**. Validation still ran exactly once. The invariant held
+and the proxy for it did not.
+
+**The fix was the design, not the test.** A second reader of `tool.flags` in the parser was
+also a second copy of the flag grammar — where a value is inline or the next token, where `--`
+terminates — which is the drift a shared implementation prevents. Moving the split into
+`validateInvocation`, which already walks those tokens, made T2.9 pass **unchanged** and
+removed the duplication at the same time.
+
+**Worth an entry because the failure was informative in a way a stricter test would not have
+been.** A row asserting `perCall + 1` would have absorbed the change silently and kept the
+duplicate grammar. The proxy's fragility is what asked the question — and the answer was that
+the extra read should not exist, not that the count should be updated.
+
+---
+
+## F110 — `as never` in a fixture, fourth instance, and this time the count is exact ★★
+
+`inspect.test.ts` declared its adapter context as
+
+```ts
+const ctx = { command: "/inspect x", verb: "inspect", transport: "subprocess",
+              origin: "user", width: 120 } as never;
+```
+
+Five fields of an eight-field type, and `as never` satisfies every parameter, so the fixture
+had stopped tracking the type it stands for — `userRequestedJson` and `tool` were already
+missing and nothing said so.
+
+Adding `AdapterContext.flags` surfaced it as **three runtime failures instead of one compile
+error**, and the framework's own fixtures — which are typed — surfaced it as **nine compile
+errors that were fixed in one pass before a test ever ran.** Same change, same day, both sides
+of one repository: that is the cast's cost measured rather than argued.
+
+**Fourth instance of the class and the first with a control.** The earlier three were each a
+cast hiding a gap; this one had a typed cohort going through the identical narrowing at the
+same moment, so the comparison is not a judgement about how much the cast costs — it is nine
+against three, compile against runtime.
+
+Replaced with `ctxWith(flags)`, typed. The remaining two `as never` casts in that file are
+`registry`, which is a different question and already tsc-flagged (three pre-existing errors,
+unrelated).
+
+## F111 — a test named for a workaround outlives the workaround, and passes
+
+`shim.test.ts` carried `describe("F39: the shim strips a flag that selects a rendering")` with
+two rows asserting the strip. The strip was correct while F39 was open and is wrong now: C05
+I21 removes `--raw` before the transport is invoked, so a shim that strips it is **a second
+answer to a settled question**, and two mechanisms answering one question is how they drift.
+
+**The test would have kept the workaround alive.** Deleting the shim's `case inspect)` made
+`S4.1` fail — which is the suite working — but the obvious repair is to restore the strip,
+because the row's *name* says the strip is the feature. Nothing in the test says it is a
+workaround for a framework gap, even though its own file comment cites F39.
+
+Rewritten to assert the opposite and to name why: the shim passes `--raw` through untouched
+because it never arrives, and the declaration is what does the work. **A row asserting a
+workaround should name the finding it is waiting on in its title**, not only in a comment
+above it — the title is what a reader sees when it fails.
+
+Companion to F92's shape. There, a summary kept a body's claim and dropped its condition; here
+a test kept a mechanism and dropped the reason it existed.
+
+---
+
+## F112 — F21's four claims all held, and the fix was a tenth the size the report implied ★★
+
+Measured at HEAD before building, because the report's three compounding facts read as a
+design problem and two of them are not.
+
+| claim | at HEAD |
+|---|---|
+| `paint.ts` builds contexts without `onAction` | **holds** — `capabilities` and `theme` only |
+| `liveBlock` has three bindings and no `enter` | **holds** — `escape`, `down`, `up` |
+| `KeyAction` is a closed union with no `rowActivate` | **holds** |
+| `TuiConfig` has no keymap seam | **holds** — `createKeymap(defaultKeymap)`, nothing merged |
+
+**And then the thing the report did not say.** A focus model already exists and works:
+`focus.current.at === "liveBlock"`, `focus.rowId`, `focusRow`, and `liveRows()` walking the
+live entry's tables through C11's `focusableRowIds`. `TableRow.actions` exists. `actions.ts`
+exists. **Every piece of the route was built and one link was missing** — `enter` had no
+`KeyAction` to resolve to.
+
+So the fix is a union member, a binding, an effect, and a lookup beside the one that already
+answers *which rows are focusable*. **Not the navigation model, and not the render context.**
+The render-context half is the mouse route, which is a second path with its own question —
+cell→element resolution — and it stays open.
+
+**Why the report read bigger than it was.** Its three compounding facts are each true and
+they are not the same size: no `enter` binding is one line, no keymap seam is a feature, and
+`BlockKeymap` being dead is a third thing again. Listed together under one finding they read
+as one problem, and the smallest of them was the one blocking the other two consumers.
+*Compounding facts are not a difficulty estimate*, and the one that is load-bearing is worth
+separating from the ones that merely also hold.
+
+## F113 — a one-action fixture cannot falsify a first-action rule
+
+C23 I37 rules that `enter` fires a row's **first** action. The test drove real bytes through a
+real session and read the frame, which is the right shape — and the row it built had **one**
+action, so *first* and *last* are the same element and the mutation taking the wrong one
+survived the pass.
+
+Two of five mutations mattered here and this is the second: the other four died immediately
+because they break the route outright. This one is about a *choice inside* the route, and the
+fixture had made the choice unobservable.
+
+**Same class as the fifth-victim shapes and F73's ratio**: a setup where two readings agree is
+a setup that tests neither. Fixed by giving the row a second action and asserting the first
+fires *and the second does not* — the negative half is what has teeth, because a version that
+fired both would satisfy the positive one.
+
+**And the general form is worth stating, because the walk artefacts do not reach it.** A
+ruling of the form *the Nth of a collection* needs a fixture with at least two members and an
+assertion about the ones not chosen. Neither a sequence trace nor a classification table
+indexes that: it is not two rules meeting, it is one rule with a degenerate input.
+
+---
+
+## F114 — the builder-coverage rule already existed, correctly stated, with nothing reading it ★★★
+
+The audit was scoped as *four fields added one at a time closes four findings and leaves the
+fifth to be discovered*, and the rule was to be the deliverable. **The rule turned out to be
+already written, twice, and to have been true and unread for as long as it had existed.**
+
+C24 I18, in the tree before this pass:
+
+> A builder narrower than its block is **either a ruling with a reason written down or a
+> defect; there is no third state**, and the reason is what tells them apart.
+
+And commitment 16 says the same thing. Both correct, both general, both stating exactly the
+rule this item was asked to produce — and underneath them:
+
+| kind | field | disposition |
+|---|---|---|
+| `patch` | `collapsedAfter` | filed as F41 by a consumer who wanted it |
+| `patch` | `actions` | **absent and unnoticed** |
+| `table` | `sort` | **absent and unnoticed** |
+| `plot` | `yFormat`, `xLabels`, `emptyMessage` | deliberately not, reason recorded — the model working |
+
+**Two of six were the third column**, which is what an audit produces and four fixes cannot.
+Both had been walked past: `patch` was audited by hand when `collapsedAfter` was filed, and
+`table` is the most-used builder in the tree.
+
+**`table.sort` is the instructive one.** `ColumnDef.sortable` is reachable from `b.col`, so a
+surface can mark a column sortable and cannot say which one the data arrived sorted on. **The
+pair reads as covered because half of it is** — a reader checking *can this table express
+sorting* finds `sortable` and stops.
+
+**So the deliverable is the mechanism, and the finding is that the prose was never the gap.**
+MG27 compares every block type's fields against the builder that constructs it, with reasons
+in `BUILDER_OMISSIONS` keyed `Kind.field` and the bidirectional arm `UNCONSUMED_MEMBERS` has.
+It fired three violations on the run that created it.
+
+**This is C09 §4a's lesson arriving in the document that states the lesson.** A rule with
+nothing reading it passes exactly like a rule that is satisfied — A03 §2's vacuity class,
+applied not to a rule with no subject but to a *correct* rule with no reader. The instrument
+that finds the first kind is `make enforce`; the instrument that finds this one is asking
+**which mechanism reads this sentence**, and the answer had been *none* for twenty-four
+components.
+
+**Two parsing corrections before the rule was trustworthy**, both of which produced false rows
+on the first run and both worth recording because a rule that over-reports is not a rule
+anyone keeps. `Hunk.lines[].kind` is `"add" | "remove" | "context"`, so scanning for a
+`kind: "x"` literal invented three block kinds that do not exist — the `Block` union is the
+authority. And `export type Rule = Readonly<{ … }> & Gap;` is one line, which a body regex
+written for the multi-line form read straight past, attributing `Notice`'s fields to `Rule`.
+The first run reported 28 unreachable fields across 16 kinds; the true figure is **6 across 3**.
+
+---
+
+## F115 — the coverage rule was blind to its own findings regressing, and had documented why ★★★
+
+MG27's blind spots were written into A03 before the mutation pass ran, and the first of them
+reads:
+
+> It matches a field **name** in the builder's text, so a builder that mentions a field
+> without setting it counts as covering it.
+
+True, recorded, and its consequence not followed through. **A builder's text names a field
+three times** — in the spec parameter's type annotation, in the destructure, and in the
+constructed literal — and only the third sets anything. So deleting
+`...(sort === undefined ? {} : { sort })` left two mentions standing, and **MG27 stayed green
+on precisely the defect it had been written to find.**
+
+The rule would have reported its three gaps once, on the run that created it, and then gone
+blind to all three regressing. **A rule that fires once is indistinguishable from a rule that
+works**, and this one had a green run and three closed findings as its evidence.
+
+Fixed by scoping the search to the text from `finish<` onward — the annotation and the
+destructure are both above it, so the split needs no parser.
+
+**Recording a limit is not the same as following it through**, and that is the finding. The
+blind-spot list is written to satisfy *state a rule's blind spot*, and it did: the sentence is
+accurate. What it does not do is ask **what that limit means for the rule's own subject**, and
+here it meant the rule could not defend its own fixes. The instrument that asked was the
+mutation pass, and nothing else would have.
+
+## F116 — a mutation surviving located the guard, not a hole
+
+M20 and M21 — deleting `collapsedAfter` and `sort` from their builders — survived a `vitest`
+run and died under `make enforce`. Both readings were available and only one is right: the
+suite has no hole, MG27 is the guard, and **its only reader was a Makefile target.**
+
+That is worth a row rather than a shrug. `npm test` excludes tier 5 already, and a rule whose
+sole reader is `make enforce` is one a test-script refactor silences without failing anything.
+Every other MG rule with a real-tree arm has one in the suite — `MG19` in `process.test.ts`,
+`MG23` in `enforce-module-graph.test.ts` — and MG27 did not, because it was written straight
+into `checkModuleGraph` and inherited its wiring.
+
+Added, with the counters read rather than the exit status: the row asserts the violation list
+is empty **and** that both subject files are in the walked set, because a rule handed a file
+list missing `builders/index.ts` returns `[]` and passes.
+
+**The general form**: when a mutation survives, ask *which mechanism was supposed to catch
+this* before concluding the tests are thin. Three of this session's surviving mutations were
+missing assertions; this one was a correctly-guarded mechanism whose guard ran somewhere the
+mutation script did not look.
+
+## F117 — a blanket rename hit a rule id that was already taken, twice
+
+`MG26` was taken by the dev-only-entry-point rule and `C16 I24` by an existing invariant;
+both were chosen by writing *the next number after the one I had just read* rather than by
+reading the high-water mark. SP2 and A03's inventory caught both, which is those rules working.
+
+**The repair is where the finding is.** Renaming MG26 → MG27 with a blanket replace of
+`rule: "MG26"` also rewrote **the dev-entry rule's own emission**, so that rule started
+reporting itself as MG27 and its two fabricated violations failed with *"MG26 matched
+nothing — it would pass on a real violation"*. The rename fixing my rule broke a rule I had
+not touched.
+
+Same shape as this pass's own audit script, which invented three block kinds from a `kind:`
+literal before the `Block` union was made the authority: **a textual rewrite over a shared
+vocabulary hits every user of the token, and the ones you did not write are the ones you do
+not check.** The fabricated-violation rows are what found it, which is the third thing in this
+session that A03 commitment 14 has caught.
+
+---
+
+## F118 — a refusal covered one of the two ways to write the pair it forbids ★★★
+
+C05 I20 says `view` is declarable on a `ToolDef` **and** on a `FlagDef`, and that it
+is *refused with `interactive`*. Both halves are implemented. They do not meet:
+
+```js
+parseManifest({ …, tools: [{ name: "both", local: false, interactive: true,
+  flags: [{ name: "watch", type: "bool", view: true, summary: "s" }] }] })
+```
+
+| declared | result |
+|---|---|
+| `view` on the tool, `interactive` on the tool | **refused** |
+| `view` on a **flag**, `interactive` on the tool | **parses** |
+
+`parseTool`'s refusal reads the tool's own `view` — `if (view === true)` is the
+local `const`, not any flag's. So the invariant is enforced against the way its
+first consumer wrote it and open the other way, and I20's own sentence is what
+says the other way exists.
+
+**Found by checking a claim in F80, not by looking for it.** F80 asserted C05
+rejects a per-flag declaration disagreeing with a tool-level one; going to read
+I20 to confirm turned up the disjunction that makes disagreement impossible, and
+reading the code that implements it turned up a refusal that had never been
+extended past the tool. The probe above is a fabricated violation for a rule that
+did not fire.
+
+**The class is worth more than the instance.** A cross-field refusal is written
+when the first consumer declares the combination, and it is written against *that
+consumer's* way of declaring it. Every field with two homes has this shape
+available: I20's `view`, and now I23's `interactive`. Ruled as C05 I24 — a
+refusal reads every declaration of each field it names — with the deliberately
+conservative reading and its limit recorded, since an arm resolving `interactive`
+to `false` beside a `view` flag would in principle be legal and no app declares
+one.
+
+---
+
+## F119 — the pre-spawn gate was above the route, and the route was above the gate ★★★
+
+C23's `route` chose the `app` path on `result.tool.interactive` and handed the
+whole line to `runHandoff`. The `validation.ok` check lives **inside** `runApp`,
+which is the *other* arm of that same split. So a malformed invocation of an
+interactive verb was spawned without being validated at all:
+
+```
+/exec                 → docker exec, no container, no command
+```
+
+C05 §1's D17 is that a malformed invocation costs nothing rather than 300 ms of
+interpreter startup to be told the same thing, and C05 §6 is a gate built for it.
+Neither is reached on this route. **The verbs that stepped over the gate are the
+ones whose failure takes the screen** — a handoff suspends the alternate screen
+before the child starts, so the reader watches their session go away and come
+back to learn that they mistyped an argument.
+
+**Two guards, and neither is where it looks.** `runHandoff` has a guard: C21 I6
+refuses a handoff with stdin still in raw mode. That is a check on *this side's*
+state and it passes here, so the route reads as gated when nothing about the
+invocation has been examined.
+
+**And the `local` route has never had the check at all** — `runLocal` dispatches
+to its handler whatever validation said. Same shape, one case over. It is **not**
+fixed here and it is not F119: the app route's version was measured, and this one
+was noticed while reading for it. Repairing a second route on the strength of the
+first route's measurement is how a change stops being about its subject. Named so
+it is a known gap rather than something rediscovered.
+
+**Found by the ruling rather than by a test**, and it is the reason the ruling
+lands as an ordering as well as a field. Resolving `interactive` in the validator
+raises the question *what is the contract when validation failed*, and the honest
+answer is that the question should not arise: gate, then route. C23 I38. The
+fallback C18 I28 keeps for the failed arm has no reader, and saying so is what
+stops it becoming a policy someone later relies on.
+
+**Six mutations, six kills.** The resolver ignoring the arms, an arm equal to the
+default being accepted, I19 reading the tool only, I20 reading the tool only, the
+gate moved back below the split, and C23 reading the declaration — each dies, and
+the last two only after the type is loosened enough to express them. F120 is what
+the pass cost before it said anything true.
+
+**The repair holds by a type, not by discipline.** `runApp`'s parameter now demands
+`Extract<ValidationResult, { ok: true }>`, so the check cannot drift back inside it
+— a caller that has not gated does not compile. That matters more than usual here,
+because **two runtime guards of one condition are indistinguishable from one in
+every test**: each defeats the other's mutation. It is the argument `route`'s own
+`Exclude<…, { kind: "empty" }>` was written from, twenty lines up in the same
+function, and this is the second time that shape has come up in it.
+
+---
+
+## F120 — the mutation harness reported one pre-existing error six times ★★
+
+The pass for C05 I23 ran six mutations and returned the same verdict for all six:
+*did not compile (the type holds it)*. It read as a strong result — the ruling's
+shape making every defect unbuildable — and it was one stale error in a test file
+written ten minutes earlier, reported once per mutant.
+
+```py
+tsc = subprocess.run(["npx", "tsc", "--noEmit"], …)
+verdict = "did not compile" if tsc.returncode != 0 else run()
+```
+
+The harness judged mutants by a gate it had never run against the baseline. Its
+baseline line — `print("baseline after restore:", run())` — went through `run()`,
+which is **vitest only**, so the one gate that produced every verdict was the one
+gate nothing had checked. And it printed last, after all six verdicts were on the
+screen and had already been believed.
+
+**Both halves of the fix are in that sentence**: a harness runs the baseline
+through *every* gate it will judge by, and it runs it **first**. The second half
+is not decoration. A baseline printed at the end is a check on the restore, which
+is a different property, and it is the property the line's name claimed.
+
+**This is `read a green gate's counters` with the colours swapped.** That rule is
+about an exit status being one bit and the same bit for *clean* and for
+*did-not-run*. Here the bit was red, and red is the same bit for *the mutation was
+caught* and *nothing ran*. The instrument is symmetric and the habit was not:
+a green gate gets its counters read and a red one gets believed, because red
+looks like work being done.
+
+Corrected, the six killed six. **The uniform answer was the signal** — six
+mutations across four files, three of them one-line boolean flips, do not all
+fail the type-checker; a result too good in the same shape for every row is
+about the harness rather than about the code.
+
+---
+
+## F121 — six tier-5 rows were red at HEAD, and nothing said so ★★★
+
+Measured while checking whether C05 I23 had broken anything: stash, build, run the
+whole tier; pop, build, run it again. **The same six fail both ways.**
+
+| | |
+|---|---|
+| C06 T5.1 | a real binary emitting a large document |
+| C03 T5.4 | dragging the terminal edge continuously |
+| C04 T5.1 | a tall transcript pages top to bottom |
+| C04 T5.1b | `⌃Home` / `⌃End` reach the extremes |
+| C04 T5.2 | the same at four widths, resizing between |
+| C04 T5.3a | a live stream above a detached viewport |
+
+All six are frame waits timing out at ~30 s — the harness's `the frame never
+satisfied it`. The sessions start and render: the failing row's own dump shows
+`/ps --limit` drawn correctly, so this is a wait for a *particular* frame, not a
+broken build.
+
+**The finding is not the six. It is that measuring the baseline was not part of
+anything.** `npm test` excludes tier 5, `make enforce` does not run it, and every
+step in this programme has read a green framework suite and moved on. A tier
+nobody runs is a tier nobody notices going red, and the interval could be one
+commit or twenty — **the record cannot say, which is the second half of the
+defect.** A red gate with no baseline date is a red gate that will be inherited.
+
+**And a known-red tier is worse than a broken one, because it is stepped around.**
+The next person to run it reads six failures, matches them against six they were
+told about, and stops looking — so the seventh is invisible. That is not
+hypothetical here: a seventh row (`cols and rows: the child's window is the size
+asked for`) appeared once under full-tier load and passed three times in
+isolation. It was distinguishable from the six **only** because the six had just
+been enumerated against a stash. Without that list it would have read as *the
+usual tier-5 noise*.
+
+### What is not claimed
+
+**Not diagnosed.** These are timing-shaped and the environment has a load
+generator (`make fixtures` / `make load-down`), so *flaky under load* is the
+cheap reading and it is unverified — six rows failing together and repeatably is
+not what one-off contention usually looks like. Recorded as a measurement with
+its method, and the diagnosis is owed.
+
+**Not caused by C05 I23** — that is what the stash measured, and it is the only
+claim here that is settled.
+
+**The instrument is the same one as F120's, one level up.** That finding is about
+a harness judging mutants by a gate it never ran against the baseline. This is a
+programme judging changes by a suite that excludes a tier. Both are *the check you
+did not run on the state you started from*, and both were invisible while every
+gate that did run stayed green.
+
+---
+
+## F122 — the framework holds apps to a rule it exempts itself from ★★★
+
+C09 §4: **a glyph is a slot and never a character**, because substitution is 1:1 by
+column count and only the renderer knows the capability. It is a rule about *where the
+knowledge is*, and it was written about what a **block** carries. The framework's own
+authored text was never held to it.
+
+| | |
+|---|---|
+| string literals in `src/` with a non-ASCII character | 164 |
+| prose punctuation only — em dash, `§`, `·` | 106 |
+| **reported by SS47** | **58** |
+| the glyph table itself | 43 |
+| already carrying an ASCII form | 5 |
+| a developer's report, never a frame | 4 |
+| **drawn verbatim into a frame** | **6** |
+
+**Four correct sites are what make this a finding.** `text.ts` picks `"~"` at `ascii`,
+`patch/collapse.ts` carries a pair, `patch/definition.ts` its rule character,
+`plot/ramp.ts` an entire ASCII ramp. So the mechanism exists, is understood, and is
+**applied in four places and skipped in six** — which is a discipline failing rather
+than a gap, and a discipline failing four times in ten is what a scan is for.
+
+### Three of the six had nothing to rule
+
+| site | writes | while | |
+|---|---|---|---|
+| `shell/paint.ts:104` | `⠋` | `spinnerFrames(caps)` returns `["-","\\","|","/"]` at ascii | two files away |
+| `shell/confirm.ts:94` | `▸` | `GLYPH_TABLE.expand` is `["▸", ">"]` | the same character, with its pair |
+| `shell/paint.ts:94` | `⋯` | `collapse.ts` carries `["⋯", "..."]` | a second copy of one constant |
+
+**A mechanism that exists and is not called reads exactly like a mechanism that is
+missing**, from the site. That is why F55 filed the whole thing as wanting a ruling: at
+the point of use there is no difference between *no one has decided this* and *someone
+decided it in another file*. The instrument that tells them apart is the sweep, and it
+is the same instrument as the audit that produced MG27 — ask what the tree already
+does, not what this site does.
+
+### The three that are the ruling divide by where the text is authored
+
+- **Capability in hand** — the spinner sits inside a function holding `deps`.
+- **Shared with the measurer** — the prompt is drawn by `commandRows`, which
+  `construct.ts` also calls for `chromeRows`. Its two forms must be **1:1 by cell
+  count**, which is C09 I5's rule about the glyph vocabulary arriving at L4, in the one
+  place a *measurement* depends on a substitution. `❯ ` and `> ` are both two cells and
+  `PROMPT_GUTTER.first` is that number, so the equality is asserted rather than noted.
+- **Authored above the renderer** — `loading…`, `… n more`, `▸`. **Unsubstitutable by
+  construction**: the string is fixed at L3 or L4 and the capability is known at L1.
+  This is C09 §4's argument reaching the case it was never applied to, and the answer it
+  already gives is the slot.
+
+**`…` is refused a slot, and the refusal is the load-bearing part.** I5 wants 1:1 by
+cell count; the ASCII ellipsis is three cells. The pair that satisfies it is `["…","~"]`
+— which is right for truncation, where `text.ts` already uses it, and wrong as a general
+mark. So `loading…` becomes a notice carrying `pending`, the mark it actually wanted, and
+`… n more` becomes ASCII. **A vocabulary that admits every character its callers reach
+for stops being a vocabulary**, and this is the second time in three items that the
+right answer was to narrow rather than widen a type.
+
+### The scan's scope was measured before it was written
+
+Three candidate scopes, in order:
+
+| scope | reports | verdict |
+|---|---|---|
+| any non-ASCII in code | 183 | the em dashes in error messages swamp it |
+| a literal with no ASCII word — "a mark" | 53 | **misses the ruling**: `loading…` and `▸` sit in literals with words |
+| a literal whose non-ASCII is outside the prose set | 58, **6 unexcused** | the one that reports the defect and nothing else |
+
+The second is the instructive failure. It is the tighter, more elegant rule, it reports
+a smaller number, and **it excludes exactly the three sites the ruling is about** —
+because a mark embedded in a sentence is still a mark. A scan tuned until its output
+looks tidy is tuned away from the class.
+
+### The rule was wrong twice on its first new file, and the count is what said so
+
+**`rôle` in a reason string fired it.** A Latin letter with a diacritic is text, and the
+rule's subject is a *mark* — so the rule was wrong and the file was not. `\p{L}` passes.
+
+**Then `\p{L}` let `ℹ` through**, which is U+2139, in a letter category, and **C09's `info`
+glyph** — a mark sitting in the very table this rule polices. Caught by the count: 43
+glyph-table hits became 42, and *one fewer violation in the file the rule is about* is the
+shape to distrust. Excluded by range, since everything from U+2100 is a symbol classified as
+a letter and that is exactly where a mark would be drawn from.
+
+Neither would have been found by re-reading the rule. Both were found by **re-running the
+count after changing it** — the same instrument as F120's, one turn later: a verdict is not
+believed until its baseline has been through the same gate.
+
+**The reported figure is 54 with the exemptions removed, and it was 58 when this finding was
+written** — six of those were the defects, since fixed, and one was `ℹ` under the version of
+the rule that lasted an hour. Both numbers are kept because the first is what the finding was
+argued from.
+
+**The blind spot, with its number: 106 literals carry prose punctuation and SS47 passes
+all of them.** An em dash on a terminal reporting `unicode: ascii` is drawn as verbatim
+as `❯` is. That is a real and larger question — every error message in the tree — and it
+is not this rule's, which is about *marks*. Recorded rather than discovered, and the
+count is what makes it re-checkable.
+
+---
+
+## F123 — a promise needs three mechanisms and the finding that named it found one ★★★
+
+F93 read C09 §4a's promises — *readable today and highlighted whenever someone registers
+it* — against a constructor with a fixed pair and no registration path, and prescribed two
+changes: ship a mainstream set, expose registration. Both are right. Building them found
+that **neither makes the sentence true on its own**.
+
+### 1 · Registration without invalidation leaves the promise false
+
+`tokenise` memoises on `(language, text)` — and caches the **fallback**:
+
+```ts
+const tokens = lowlight.registered(language)
+  ? flatten(lowlight.highlight(language, text) as HastNode, null)
+  : [{ text, slot: null }];
+memo.set(key, tokens);
+```
+
+So a language registered after anything has been rendered keeps returning plain text until
+the 256-entry cap happens to clear the map. **Every assertion F93's change would suggest
+still passes**: the export exists, `lowlight.registered()` answers true, a *fresh* block
+highlights. The one that fails is the sentence's own case — the block that was on screen
+before the grammar arrived, which is the only reason the promise was worth making.
+
+**Two correct rules overlapping in a cell neither is about.** Memoise, because a transcript
+re-tokenising every frame makes scrolling cost more than producing the document. Fall back
+to text, because an unregistered language must be readable. Nothing in either says what
+happens when the second becomes false for a key the first is holding.
+
+### 2 · Shipping a grammar whose classes are unmapped ships nothing
+
+`SLOTS` maps thirteen `hljs-` classes and was written when the set was `json` and `yaml`.
+Tokenising a sample of each of the sixteen, counting **runs** rather than class names:
+
+| | runs | uncoloured |
+|---|---|---|
+| `json` | 13 | 0 |
+| `sql` | 16 | 6 |
+| `xml` | 11 | 8 |
+| `markdown` | 4 | **4 — nothing highlights** |
+| the sixteen | 152 | 59 |
+
+`markdown` emits `hljs-section`, `hljs-bullet`, `hljs-code`, and `SLOTS` carries none of
+them: registering it is **indistinguishable from not registering it**. `diff` colours its
+`@@` header and drops `hljs-addition` and `hljs-deletion`, which is worse than plain text —
+it highlights the one line nobody reads and leaves the ones they do.
+
+**Counting runs rather than class names is the whole of that measurement.** The class-name
+version says *fifteen classes unmapped across the set*, which sounds like a rounding error
+and hides that one grammar scores zero. `hljs-params` is unmapped and appears in five
+grammars and means nothing, because parameters are ordinary identifiers and are supposed to
+be plain. **The unit that carries the defect is the rendered run**, and the tidier count
+would have been reported and believed.
+
+### The three deliberate omissions, and one is a ruling already taken
+
+`hljs-params` is plain by design. `hljs-strong` and `hljs-emphasis` are **appearance**, and
+§4a maps rôles to slots. And `hljs-addition` / `hljs-deletion` get no slot because **C04's
+change-axis ruling says a change is a marker and never a tone** (F30, F49, F81) — colouring
+a `+` line green is exactly what that ruling refused, and a real diff is C25's, where the
+marker column is. So the gap `diff` has is not closed here and the reason is a decision made
+three items ago rather than a judgement made in this file.
+
+### Why nothing caught the original, which F93 got right
+
+C09 was built when the consumers were `docker inspect` and an nginx config. **Two grammars
+satisfied every test, and no test could distinguish *we ship two* from *we ship two for
+now*.** The promises were prose and no rule reads prose. What is added is not a rule for
+that — there isn't one — but T3.32, which asserts every grammar **in the set** colours
+something, with the three omissions in a list it reads. A grammar added later whose classes
+nobody checked fails on the commit that adds it.
+
+---
+
+## F124 — the app's capability sniff and C02 disagree on three of four locale shapes ★★★
+
+F54 was fixed app-side by threading a boolean called `unicodeText` through eight
+functions, computed in `main.ts` from `TERM`, `LC_ALL` and `LANG`. F43 records the cost as
+*duplicating `terminal/capabilities.ts` in the app*. **Duplication was the charitable
+reading.** Run against C02 at four locale shapes:
+
+| env | C02 `unicode` | the app | |
+|---|---|---|---|
+| `LC_ALL=C LANG=en_US.UTF-8` | `ascii` | **unicode** | disagree |
+| `LC_CTYPE=C LANG=en_US.UTF-8` | `ascii` | **unicode** | disagree |
+| `LC_CTYPE=en_US.UTF-8` | `full` | **ascii** | disagree |
+| `LANG=C` | `ascii` | ascii | — |
+
+**The mechanism is POSIX precedence against string concatenation.** C02 resolves
+`lcAll ?? lcCtype ?? lang` — *the first variable that is set wins and the others are not
+consulted* — and the app builds `` `${LC_ALL ?? ""}${LANG ?? ""}` `` and regex-tests the
+join. So `LC_ALL=C` beside a UTF-8 `LANG` is `ascii` to the framework and unicode to the
+app, and the app draws `▄ ▀ █` into a frame the renderer has already decided cannot show
+them.
+
+**That is F54's own defect, alive inside F54's fix**, and C02 names the case in a comment
+with a test number beside it (`capabilities.ts:113`, T3.8). The framework had the answer,
+covered, on the line the app was reimplementing.
+
+**It fails in both directions, which is what makes it a measurement rather than a
+complaint.** The third row degrades a terminal that could have drawn: `LC_CTYPE` alone is a
+locale the app has never heard of, so a reader with it set loses the banner, the bar and
+three captions for nothing.
+
+### The rejected mechanism, with the reason it fails
+
+*Let the app read the environment properly* is the obvious answer and it does not work.
+C02 reads **seven** variables — `TERM`, `TERM_PROGRAM`, `COLORTERM`, `LC_ALL`, `LC_CTYPE`,
+`LANG`, `TMUX` — and the app reads three. Closing the gap means porting `detectUnicode`,
+`detectColourDepth`, `detectSynchronisedUpdate`, `detectImageProtocol` and the `usable`
+gate into the app, which is the whole of C02 and is what C02 exists to not have twice.
+
+**And the port would still be wrong, because the app cannot see the overrides.**
+`detectCapabilities` takes a second argument, C22 I49 lets an application supply it, and
+this app supplies one — `DOCKER_TUI_DEPTH` (F52). An app deriving capabilities from the
+environment gets the *detected* record and never the *resolved* one, so the second consumer
+of its own override disagrees with the first.
+
+**One correction to a plausible version of this finding: C02 does not read `NO_COLOR`.**
+An app that read it would diverge from the framework rather than converge on it. It belongs
+in this section, as a cost of the rejected mechanism, and not in a list of things the
+workaround covers.
+
+### What it is evidence for
+
+Not that duplication is untidy. **That the duplicate is wrong today, in a shipped
+application, in the fix written for the finding that asked for the fact.** The workaround
+is three lines and it disagrees with the framework on three of the four shapes anyone
+tests.
+
+---
+
+## F125 — four of eight handler families declare their own context, and the surface says they cannot ★★★
+
+`src/index.ts:56` records why `LocalContext` became public:
+
+> **`TuiConfig.localHandlers` has been public since C22 and its context type was not**,
+> which was invisible while `LocalContext` held one field: an app wrote
+> `(argv, ctx: { command: string })` and structural typing agreed. `ctx.ask` makes that
+> impossible — a handler that asks cannot name the type of the thing it is asking through.
+
+Measured across the app's eight local-handler families:
+
+| names `LocalContext` | declares `ctx: { command: string }` |
+|---|---|
+| `mutation.ts:220` | `dashboard.ts:486` |
+| `destructive.ts:72, 123, 225` | `events.ts:276` |
+| `progress.ts:253` | `drift.ts:337, 396` |
+| `transfer.ts:116` | `config.ts:244` |
+
+**Four and four, and the split is exact: the four that name the type are the four that call
+`ask`.** So the sentence is true about the handlers it describes and constrains nothing
+about the other half — a parameter type may always be *wider* than what is passed, so
+declaring a context of one field remains assignable to `LocalHandler` and always will be.
+
+**`main.ts:205` is the sharpest instance.** It calls the dashboard handler directly for the
+greeting with `{ command: "" }` — an object literal that is not a `LocalContext`, has no
+`ask`, and compiles.
+
+### Why it matters to the ruling above it
+
+F14 asks that a local handler be handed the terminal's width. **Its own consumer is
+`dashboard.ts`, which is one of the four that would not see it.** A field added to
+`LocalContext` arrives at `mutation`, `destructive`, `progress` and `transfer` — the four
+that had no complaint — and does not arrive at the four that filed the findings.
+
+So the grant is not the whole of the change: **a context a consumer may decline to name is a
+context that cannot carry anything new.** What is owed is an obligation, and the shape of it
+is a decision this repository has taken before — make the wrong state unbuildable rather
+than corrected.
+
+### The class
+
+**A correct sentence justifying a scope it does not reach**, which is MG24's shape (F84)
+and the second instance. There the reasoning about type aliases was true and irrelevant to
+consuming a member; here the reasoning about `ask` is true and silent about handlers that
+do not ask. Both read as deliberate, both were written by someone who had the right
+distinction in hand, and neither is findable by asking whether the sentence is correct.
+
+The question that reaches it is the mutation pass's, asked of prose: **does this sentence
+constrain the decision it is attached to.**
+
+---
+
+## F126 — there is no seam because there is no unit ★★★
+
+F37's confirmation records four attempts at reading the app's own rendered frame, each
+blocked by a different unexported symbol — `renderToLines`, `block`, `resolveTheme`, then
+the theme store's shape — and reads as *four missing exports*. Measured, it is one thing
+missing, and it is not an export.
+
+**Nothing in the tree composes a frame as a named unit.** `session.ts:319` has `#render()`,
+a private method returning `void`, and the composition exists only inside it:
+
+```
+guard on acquired → #composed() → viewport.resize(width, region.height)
+  → paint(frame, #paintDeps(…))          ← FrameError falls back to drawFallback
+  → cursorFor(frame, #paintDeps(…)) → cursorSequence(null) → assemble → write
+```
+
+`lines` is a local. It is never returned, never yielded, never handed to anything. So the
+four attempts were not hunting a function someone forgot to export — **they were hunting a
+composition that has never existed as a value anywhere in the tree.**
+
+### The class, one level up from the audit's
+
+Every prior instance of *a complete mechanism unreachable from the other side of a seam*
+(TRIAGE group 2, five open and seven closed) is **a member nobody could call**. This is a
+**sequence nobody named**, and no rule that walks members can see it: MG24 counts consumers
+of exported members, MG25 and MG27 compare declared shapes against builders, and all three
+are satisfied by a tree in which every member is consumed and the only thing missing is the
+order they go in.
+
+**A private method is the perfect hiding place for it**, because the composition *is*
+consumed — sixty times a second — by the one caller that is inside the class.
+
+### What it costs, and the sharper half
+
+`test/verbs.test.ts` documents the app's workaround as *"a row is a complete description of
+what will be drawn"*, and for a table that is true. **The change axis falsified it**: rows
+say `added` and only the frame says `+` (F81). So the app asserts a value whose rendering it
+cannot see.
+
+**And the framework's own testing surface has the same blind spot, for the same reason.**
+`@fmx/calcium/testing` ships `expectDocument().isValid() · measuresCorrectly() ·
+rendersAt() · degradesToAscii() · degradesTo1Bit() · hasNoColourOnlyDistinction()`, plus
+two conformance suites. Every one of them **measures or asserts a property and none of them
+returns a frame**. `renderToLines` was there and was removed, correctly — `src/testing/index.ts`
+records why: it takes a `BlockRegistry`, which no consumer can construct, so it was an
+uncallable function on a public surface.
+
+That leaves the position measured: **the framework's own testing surface could not have
+caught the class the change axis produced.** It is the app's workaround's bound, one layer
+in, and it was invisible for the same reason — a property of a document is not a picture of
+one.
+
+### What is not claimed
+
+**Not that the composition is wrong.** `#render()`'s comments are the most careful in the
+file — the size read once by `compose`, the fallback rather than a short frame, the cursor
+sequence embedded in the single write. Extracting it must keep every one of those, and the
+only extraction worth making is one `session.ts` then calls, so that a consumer's frame is
+the production path rather than a second implementation of it. **A parallel renderer would
+be the fifth instance of a suite building its own version of the thing under test.**
+
+**And not measured: whether every step belongs to the unit.** The write is C01's writer and
+the fallback is a side effect; where the seam falls between *compose a frame* and *put it on
+a terminal* is the ruling's question and is not answered here.
+
+---
+
+## F127 — MG3 has never walked `import type`, and it is the rule the table calls hardest to undo ★★★
+
+A03 §3 names **MG3 and MG8** as the two whose violation is hardest to undo: L0's halves
+touching collapses the parallel-build property. MG3 has been green for the life of the
+table. It has also never been able to see half its subject.
+
+`importsOf(file, readFile, includeTypeOnly = false)` — and **every caller uses the
+default**. So a cross-half `import type` has never been an edge to MG3, and its clean record
+covers value imports only.
+
+Measured with a fabricated pair, because a clean run cannot tell a satisfied rule from an
+absent one:
+
+| fabricated edge in `src/data/adapters/types.ts` | `make enforce` |
+|---|---|
+| `import type { TerminalCapabilities } from "../../terminal/capabilities.js"` | **green** · 175 files · 6927 references · no violations |
+| `import { isUsable } from "../../terminal/capabilities.js"` | **MG3 fires** — *crosses L0's halves: data → terminal* |
+
+And the walk over `src/` as it stands finds **zero** cross-half edges of either kind. So the
+rule ships with a subject of one, which is the number to distrust rather than to report as
+coverage.
+
+**The table already holds both answers and neither row is wrong**, which is what made this
+survivable. MG21 records *"type-only imports are not edges"* for `presentation/` →
+`terminal/`; MG22 records *"type-only counts … a reference is a dependency whether or not it
+survives the build"*. The difference is what each row protects: MG21 is a **downward**
+direction the layer walk permits anyway, so erasure settles it, and MG22 is a **cycle** rule,
+where a reference is the dependency. MG3 is MG22's kind — what it protects is that `data/`
+type-checks with `terminal/` absent — so type-only is exactly the edge that breaks it.
+
+**Third instance of a correct rule scoped past most of its subject**, after MG24's
+`export interface` (F84) and F125's `ask` sentence. All three read as deliberate, all three
+were written by someone holding the right distinction, and none is findable by asking whether
+the sentence is true. The question that reaches them is *does this sentence constrain the
+decision it is attached to*.
+
+**And it was not merely unnoticed — the suite asserted it.** `test/unit/enforce-module-graph.test.ts`
+carried a row titled *"MG3: a type-only import across L0's halves is not an edge"*, with this
+justification:
+
+> C01 needs C02's `TerminalCapabilities` while genuinely not importing C02. **The same shape
+> across the halves is what this asserts is permitted.**
+
+The first sentence is true. The second generalises it to a case where the argument does not
+hold: C01 → C02 is `terminal/` → `terminal/`, where there is no independence claim to break
+and erasure settles it. Across the halves the claim is that each type-checks with the other
+absent, and a type-only edge is precisely what removes it.
+
+**So the blind spot had a green test pinning it**, which is why nobody found it by reading:
+the rule was silent, the suite agreed, and the reason given was correct about a different
+pair. *A true observation promoted to a general claim* — and the measurement that would have
+falsified it is the one nobody ran, because there was nothing that looked wrong.
+
+### What the arm sees, once it can see
+
+| relation | count |
+|---|---|
+| type-only imports into `terminal/` from above L0 | **22** — `presentation/` 11, `shell/` 9, `index.ts` 1, `testing/` 1 |
+| files above L0 naming **both** halves type-only | **13** — `presentation/` 8, `shell/` 4, `index.ts` 1 |
+| **MG3's actual subject** — an L0 half → the other | **0 runtime, 1 type-only** |
+
+**The arm forbids none of the twenty-two, and that is the answer rather than a gap.** L1 and
+L4 importing L0 is *downward*: MG1 permits it, and `presentation/` could not render C04's
+blocks onto a terminal without seeing both halves at once.
+
+**The rule's own name is what makes them look like violations.** MG3 forbids `data/` ↔
+`terminal/`; *"cross-half"* reads as forbidding any module that touches both. **Third instance
+in one pass of a rule whose *name* did work its *body* did not** — MG24's *"unconsumed
+member"* (F84), this, and MG27's *"coverage"*. The pattern is worth more than any of the
+three: a name that generalises correctly-scoped behaviour is read as the scope, and the
+reading survives review because the name is apt for what the rule *should* cover.
+
+**Zero violations from an arm that can see is a different result from zero from an arm that
+cannot**, and the figures are what distinguish them. Before this, the number was zero because
+nothing was walked.
+
+The arm is on, with the runtime edge still forbidden and `CROSS_HALF_TYPES` carrying exactly
+one entry — the sideways edge `ProducerContext` needs:
+the bidirectional arm refuses an exemption that excuses nothing, so the entry lands with the
+import it excuses rather than ahead of it. See A03 §3 and C07 I10.
+
+---
+
+## F128 — three specs disagreed with the code they specify, all in one direction
+
+Found by editing four component specs in one pass rather than by reading any of them. Each is
+a **later ruling that landed in code and never reached the document**, which is the state
+`CLAUDE.md` calls worse than either being wrong on its own.
+
+| spec | says | code | landed as |
+|---|---|---|---|
+| C07 §3 | `AdapterContext` has seven fields | it has eight — **`flags` is absent from the spec entirely** | row 5, `4721e28` (F39) |
+| C23 §2 | `LocalHandler` returns `ViewDocument` | `LocalDocument` | row 1, F13 |
+| C24 §3 | *"`parseManifest` is deliberately **still not exported**"* | it is exported | C24 I19, for `contextAt` |
+
+**The third is the one worth the finding.** The other two are a field and a type name — a
+reader hits the compiler. C24's is a **paragraph of live-sounding reasoning for a decision
+that had been reversed**, sitting above the export list that reverses it, and its argument
+(*"exporting it would make the working path 'call this first'"*) is still correct and still
+not the question. I19 exported it for a second consumer the paragraph does not mention: a
+`CompletionSource` needs a producer for the `Manifest` its own hook receives.
+
+**A correct sentence attached to a decision it no longer governs** — MG24's shape (F84) a
+fourth time, and the first instance where the sentence was right when written and was
+overtaken. That is the version review cannot catch at all: there is no moment at which it
+reads as wrong.
+
+All three corrected in the specs rather than footnoted, with the reversal recorded where the
+stale paragraph stood.
+
+---
+
+## F24 corrected — C12 already downsamples, and the direction inverts
+
+Not a new finding; a measurement against an existing one, taken while ruling on it.
+
+F24 reports that a plot's cap *"is taken from `AdapterContext.width` when the view opens and
+is wrong from the first resize afterwards: a view opened at 120 and read at 80 draws two
+samples per column."*
+
+**That is C12 working.** `curveRows` (`presentation/plot/curve.ts`) calls
+`columnsOf(samples, series.values.length, grid.dotWidth)` — N samples bucketed into the
+available dot columns — and C12 I5 keeps each column's whole vertical span, so the spike
+survives. The module's own header says why there is no branch to get wrong:
+
+> With at most one sample per column all four values coincide and the span is a single dot,
+> so this is plain Bresenham between points. **Fifty samples and fifty thousand take one
+> path**, and there is no density branch to get wrong at the boundary.
+
+So the finding's direction inverts. **Over-wide is handled**; **under-wide** — a ring of 120
+stretched across 200 columns — is a resolution loss rather than a wrong frame, and the ring's
+length is *retention*, which the producer already owns and which no terminal bounds.
+
+**What survives is the capability half, not the width half.** The reference app's live panel
+body draws `░` and `█` inside a `render`, which is F54's list arriving through F24's route —
+a live part cannot ask what the terminal supports any more than an adapter could. So
+`LiveSpec.render` takes the producer context, and it takes it for `capabilities`.
+
+Found by checking whether the mechanism a refusal was about to name actually existed. The
+mechanism proposed — a width fraction, *"which is `b.row`'s"* — does not: `b.row` is
+`row(id, cells)` at `builders/index.ts:279`, a table-row builder, and no width-fraction
+mechanism exists anywhere in the tree. **Both halves of that check paid**: the replacement
+was absent and the finding was wrong about why it needed one.
+
+---
+
+## F129 — a `view` verb that is also `local` appends an entry and opens nothing ★★★
+
+Found by C07 §3a's classification table, before a line of the producer grant was written,
+and it is the table doing the thing a trace cannot: two rules that are both true at rest.
+
+`isViewInvocation` has exactly one caller — `runApp`, at `execution.ts:668`, read before step 3
+because after step 3 it is too late (C22 I45). **`runLocal` has no such read.** And C18
+classifies on `tool.local` first (`parser/parse.ts:249`), so the two never meet:
+
+```
+local: true, view: true   →  kind: "local"  →  runLocal  →  appendAndCommit
+                                                          ↑ no asView branch exists
+```
+
+The verb runs, a document is produced, an ordinary transcript entry appears, and **no view
+opens, no refusal is raised, and nothing anywhere says so.** C05's parser permits the pair —
+it refuses `view` with `interactive` and with `oneShot`, and says nothing about `local`.
+
+**The sharp part is what the code already knew.** `manifest/types.ts` records, beside
+`shellOnly`:
+
+> `ps <uuid> --watch` *"cannot be built that way"* because argv goes over verbatim — so the
+> `view` arm **has been usable only on `local` tools** since it was written, and nothing said
+> so.
+
+That sentence is about the *flag-level* arm and it is correct. Its consequence is that the
+one route on which the arm is usable is the one route that ignores it. Two correct statements
+in two components, and the defect lives where they overlap — which is why no reader checking
+either one finds it.
+
+**Not fixed here.** It is C23 §2's route rather than the producer ruling's, and the fix is a
+decision: either `runLocal` gains the `asView` branch, or C05 refuses `view` with `local` and
+the arm's own comment stops being true. Recorded in C07 §3a cell B because the producer
+context's `height` is `null` on the local route **for this reason** — correct today, and
+correct by accident, so the cell moves when this does.
+
+**What it is evidence for.** The classification table earning its place a second time: C18's
+was the founding case for structural interactions, and this is one that no sequence trace
+reaches, because there is no event between *C18 classifies on `local` first* and *`runApp` is
+where the view decision lives*. They simply both hold.
+
+---
+
+## F130 — the grant's own tests could not see the grant, because the double was narrower
+
+The producer context landed with `make check` green, `make enforce` green and 2575 tests
+passing. Then the mutation pass:
+
+| mutation in `execution.ts` | before the rows below | after |
+|---|---|---|
+| `height` handed the region on **every** route — the defect C07 I18 forbids by name | **nothing failed** | T1.46 dies |
+| `capabilities` a hardcoded ASCII record rather than C22's resolved one — F124 reproduced inside the framework | **nothing failed** | T1.47 dies |
+| `measure` replaced by `() => 0` | **nothing failed** | T1.47 dies |
+
+**One cause for all three.** `test/unit/execution.test.ts`'s adapter double declared
+
+```ts
+adapt: (_raw: unknown, ctx: { command: string }) => …
+```
+
+so every field the grant added was erased at the one place a test could have observed it. The
+file's own comment, two lines below, records the same class from its last occurrence — *"this
+fake took no arguments at all, which is why nothing here could see that C23 passed a literal
+`seq: 0` — the parameter that was wrong was the one the double erased."*
+
+**It is F125 in a test double.** A parameter type may always be wider than what is passed, so
+the narrow declaration compiled, ran, and could never see a field. The obligation landed one
+commit earlier and covers `TuiConfig.localHandlers`; nothing covers a double inside the
+framework's own suite, and nothing sensibly could.
+
+**What it is evidence for.** Not that the tests were thin — they are 55 rows on this file
+alone. That **a grant nothing observes is a grant nothing can be wrong about**, and that the
+place to look is the double rather than the assertion. Three mutations, one narrowed
+parameter, and a green suite either way.
+
+---
+
+## F131 — `make all`'s golden gate had been red for four commits, and nobody read it ★★★
+
+Measured at `7241627`, before any of this row's work: `npm run golden` was **18 failed / 41
+passed**. It is one of the six targets `make all` runs, and `make enforce` and `npm test` —
+the two run by habit and by the pre-commit hook — were green throughout.
+
+**Two classes, both residue of earlier rows on this same branch.**
+
+| class | count | left by |
+|---|---|---|
+| stale snapshots: a comparison row gaining its derived mark, `✓` and `+` | **16** | row 4, `37d6d74` — C04 I38's ruling landing without regenerating |
+| `validateDocument` refusing seven `meta` fields on the fallback path | **2** | row 1, F13/F58b — `AdapterMeta` narrowing |
+
+**The second is the one worth the finding, because it looks like a defect and is not.** The
+two rows asserted C07 I5 — *every produced document passes C04's validator* — against
+`createFallbackAdapter().adapt(...)`. That value **stopped being a document** when
+`AdapterMeta` narrowed to the three keys an adapter owns: the seven the registry fills are
+absent by construction, so the validator was right and the assertion was aimed one call too
+early. Routed through an empty registry — which falls to the fallback by C07 I2's route 3 and
+fills `meta` — both pass unchanged.
+
+**A narrowing's blast radius is every test that asserted the old shape**, and the ones that
+fail are in whichever tier nobody runs. Row 1 landed in three commits, all green on `npm
+test`; the two rows it broke live in `test/golden/`, which `npm test` does not include.
+
+**The class is the one already recorded from the other direction.** *An exit code read through
+a pipe is the pipe's*, and *read a green gate's counters* — both about a gate whose result was
+not looked at. This is the third: a gate that was **read as absent**. Nothing reports `make
+all`'s status between commits, so a target that starts failing is indistinguishable from one
+nobody has run, and four commits went past.
+
+**Fixed rather than filed**, because it is this branch's own debt: the two assertions now go
+through the registry, and the sixteen snapshots were regenerated after reading the diff —
+every one is the single line `p99 120ms 98ms` becoming `p99 120ms ✓ 98ms` or `+ 98ms`, which
+is row 4's ruling working. `npm run golden` is 59 passed.
+
+---
+
+## F132 — the grant is untestable from the side that consumes it, and deleting the workaround is what showed it
+
+`ProducerContext.measure` is the frame's own measurer, which is the whole point of granting it
+— one arithmetic, or a split decided in a producer and the rows drawn on screen disagree. But
+`BlockRegistry` stays interior (C24 §3), so **a consumer whose adapter or handler takes a
+context has no way to call it outside a session.**
+
+**Invisible until `codeRows` was deleted, because the workaround was also the fixture.** The
+app's own suite measured with its reimplementation of the measurer; removing the
+reimplementation removed the only measurer the app had. The same for `LocalContext`: four
+handler families now name the type, and every test that calls one has to build a context with
+an `ask` in it.
+
+It is C24 I19's argument a second time — *a producer the framework can test and a consumer
+cannot is a producer whose app-side tests assert against something the user never sees* —
+which is why `createAdapterRegistry`, `completeLocal` and `contextAt` are exported. Closed the
+same way: `producerContext()` and `localContext()` on `@fmx/calcium/testing`, C24 I26.
+
+**`ask` defaults to declining**, and that is C23 I36's own semantics rather than a stub's: a
+question resolves with the choice marked `default` on `Esc`, so a handler tested without a
+scripted answer takes the route a user takes by pressing escape. A test meaning to exercise
+the other arm has to name the choice, which is the thing it should be saying out loud.
+
+**The class**: a grant lands complete on the producing side and incomplete on the consuming
+one, and the gap is hidden for exactly as long as the workaround it replaces is still there.
+
+---
+
+## F37 closed — the frame-read, and the numbers the split now produces
+
+`splitRaw` takes `ctx.measure` and `codeRows` is deleted. Read through
+`expectDocument().lines()` — the export this row added — against the 245-line inspect probe at
+width 120:
+
+| | |
+|---|---|
+| blocks after the split | **114** — the figure F37 recorded |
+| blocks over `SPLIT_FLOOR` (21) | **1**, at 24 rows |
+| rows, summed per block | 263 |
+| rows drawn | **377** |
+
+**The residue of one is walk B2's floor working** — a leaf with no children to divide by,
+which the ruling says is not zero and I47's indicator carries.
+
+**And 377 − 263 = 114 exactly**, which is the separator: a rendered sequence puts one row
+between blocks, so *n* blocks occupy *n* rows more than the sum of their heights. That is
+F40's lesson holding from the other side — the per-block measurer is the right one for
+*deciding a split*, and the frame adds the separators. Had the two disagreed by anything other
+than the block count, the deletion would have changed behaviour rather than only removing a
+duplicate.
+
+**What the deletion removed, measured both ways.** Comments stripped, per the rule that prose
+inflates a textual signal:
+
+| workaround | with prose | code only |
+|---|---|---|
+| `width()` — F14 | 44 | 6 |
+| `unicodeText()` — F43, F124 | 30 | 5 |
+| `codeRows()` — F37 | 27 | 8 |
+| `test/deep.ts` — F36, F37 | 43 | 11 |
+| four hand-declared contexts — F125 | 5 | 5 |
+| **total** | **149** | **35** |
+
+**The column fell, and the honest denominator is the smaller number.** Step 9 measured ~65
+lines in the *exists because Calcium is missing something* column; 35 lines of code — and 149
+lines of file — leave it here. The gap between the two figures is the point of the rule: four
+of these five carry more explanation than implementation, because **an unbuilt mechanism is
+documented more than a working one**, and a ratio computed on raw lines would have claimed
+more than the ruling did.
+
+### And the diff of the mechanical rewrite had one in it
+
+Thirty-five call sites gained `...producerContext()` or `...localContext()` by script. **One
+landed in the wrong argument**: `completeLocal(produced, { … })`'s second parameter is a
+*where* — command, verb, argv, durationMs — and the rewrite put four context fields into it.
+
+**It compiled.** A spread's extra keys are not an excess-property error, so the four went in
+silently and `npm test` was green either way. Nothing about the values was wrong; they were in
+a record that has no use for them, which is the version of this mistake that survives.
+
+Found by reading the diff rather than by a failure — the rule that assertions verify the
+*transformation* and not whether each site still means what it did. Two leftover
+`as unknown as LocalContext` casts came out with it: they satisfied the type by **erasure**,
+which is the double-narrower-than-its-interface class, and the published fixture makes the
+real record available so the cast has nothing left to hide.
+
+---
+
+## F133 — tier 5 was 44 failed at session start, and the prompt never draws
+
+The second half of F131's measurement, and the one that is **not** fixed here.
+
+`make e2e` at `7241627`, before this row's work: **44 failed / 50 passed / 7 todo, across 13
+of 16 files.** Measured again at `c4b2869` with the whole producer ruling landed:
+`harness.test.ts` is **5 failed / 10 passed** at both commits, unchanged, so the failures
+predate this row and none of them is the frame extraction.
+
+The failure is systemic rather than per-test:
+
+```
+Error: never saw /❯/ in:
+   <blank rows>
+```
+
+**The prompt never appears.** `❯` is `PROMPT` in `shell/config.ts` and it is on every frame
+the shell ever draws, so a capture without it is a shell that drew nothing — which is why
+`transport`, `harness`, `editor`, `completion`, `parser` and `manifest` all fail together.
+That is one cause with forty-four symptoms, not forty-four defects.
+
+**Filed rather than fixed**, and the boundary is deliberate: it is a tier-5 harness question
+with no bearing on row 2's ruling, and diagnosing it inside a row about producer context is
+how a row stops being reviewable. What it needs is its own step — reproduce one row by hand
+under `tools/capture.py`, and establish whether the shell fails to start or fails to paint.
+
+**What it changes about every green report on this branch.** `make all` has been red on two of
+its six targets throughout, and four commit messages quoted `enforce` and `npm test` as
+evidence. Both were true. Neither covers `golden` or `e2e`. See `VERIFYING.md` §0's fifth
+entry.
+
+---
+
+## F134 — CORRECTED TWICE. The drift is real and shipped, by a route neither reading found ★★★
+
+**The heading this replaces was *"a window is exact in height and wrong on screen for four
+kinds of five"*, and it describes a state that cannot currently occur.** Filed with a remedy —
+a new field on four public block types, therefore tier 2 before the freeze — and the premise
+was never checked against the registry.
+
+### The second correction, and it reverses the first
+
+**A patch *is* windowed today, and the drift is on screen.** `src/shell/patch-view.ts:97` calls
+`windowPatch(patch, region.width, offset, region.height)` and puts the result straight into
+`Layer.content` — the fullscreen patch viewer, reached by the `view` action on any patch. That
+window rebuilds a smaller `Patch`, and `numberWidth` was derived again from it.
+
+Measured on the shipped path: a patch numbered 1–9 at the top and 4000–4050 below renders a
+**4**-cell gutter whole and a **1**-cell gutter in the window at offset 0. Scrolling down grows
+the gutter and **moves every line of text three columns sideways** — F134's original symptom,
+exactly, and reachable by any reader who opens a large diff fullscreen.
+
+**So the first correction was wrong in the way it warned about.** It checked
+`BlockDefinition.window`, found four kinds declare none, and generalised to *no windowing
+happens*. C25 windows a patch by its own route (§3c), which is not that hook — **a correct
+observation about one mechanism promoted to a claim about all of them**, which is the class
+this session had already recorded twice before it produced a third instance in the finding
+written to correct the first.
+
+**C25 I21 had the argument and applied it to the neighbouring field.** *"`Hunk.header` is
+carried into a window verbatim, so its counts describe the whole hunk while the window shows
+part of it. Rewriting it to match the slice would make C25 compute from the one field it is
+defined not to read."* The gutter is that fact one field along. Pinned now as **I21a**, with
+`Patch.numberWidth` — the public field this row was going to spend on an optimisation and
+instead spends on a defect.
+
+**Neither conformance could see it.** C09 I26 checks rows; the generic window check never
+reaches a patch, because a patch declares no `BlockDefinition.window`. And `T3.20` sweeps
+**every valid offset** rather than asserting one, because the drift is a difference *between*
+windows: a single-offset row passes against the shipped behaviour, and a row comparing one
+window to a constant passes against a pin that is simply wrong. Dropping the pin gives
+`expected [ 1, 4 ] to deeply equal [ 4 ]`.
+
+### What the first correction got right, and it still stands
+
+**`logs` is the only kind that implements `window`.** One `window:` in all of
+`src/presentation/`. For a kind without one, `registry.ts` keeps the block whole:
+
+```ts
+if (windowable !== undefined && (localFrom > 0 || localTo < height)) { … }
+// otherwise: piece = block; dropped = localFrom;
+```
+
+So `patch`, `keyValue`, `table` and `code` render entire at every scroll position, and
+`numberWidth`, `widest` and `tokenise` are computed over the whole block every time —
+**identically, at every offset. Nothing moves sideways.** The gutter cannot narrow as the
+reader scrolls, because the gutter is never computed from a slice.
+
+**Recorded as the load-bearing fact rather than left implicit**, because it is what changes the
+day someone adds a second implementer — which is exactly what stage 3's remaining work is.
+
+### The invariant does not check the wrong axis; it has no subject
+
+The question asked of this row was *which axis does the invariant not check* — and
+`measure(w.block, width) − w.skipRows === to − from` checks **nothing** for these four.
+`measurement-conformance.ts` says so in its own words: the window hook is *"optional on the
+shape as it is on the definition… a kind that **declares** a window and gets it wrong is what
+this exists for."* Four of five declare none. **Not an invariant looking at the wrong axis — an
+invariant with no subject**, which is A03 §2's vacuity class arriving in a conformance suite.
+
+### And the `table` row was a correct conclusion on a wrong reason
+
+| kind | filed reason | measured |
+|---|---|---|
+| `patch` | `numberWidth` walks every line of every hunk | **true** — and it would need a pinned gutter *if* windowed |
+| `keyValue` | `widest(block.rows)` sets the key column | **true** — `render` maps every row's label |
+| `table` | `planColumns` reads every row | **false.** `planColumns(cols: readonly ColumnDef[], width)` reads the column *definitions* and the width; `minOf` reads `column.minWidth`. It never touches `block.rows` |
+| `code` | `tokenise` runs over the whole text | **true**, and the pin is lexer state at the boundary rather than a scalar |
+
+A table **is** hard to window, for a different mechanism: its height is
+`header + rows.length + Σ detailHeight(row) + actionBar`, so a boundary cuts *through* a
+variable-height row rather than between rows. Same verdict, different cause — and **the cause
+is the part a remedy would have been built on.**
+
+### What that does to the remedy
+
+*"A new field on four public block types and therefore tier 2, before the freeze"* is **not
+established**. At most three types; `code`'s is not a field; and none is needed until those
+kinds are windowed, which nothing currently is. **F134 is not freeze-relevant on this
+evidence.**
+
+### The hazard survives the claim, and is stated separately
+
+**A kind that implements `window` without pinning its layout derivation will drift** — the
+gutter narrows, the key column shifts, a construct spanning the cut highlights differently —
+and height conformance cannot see any of it. That is true, useful, and owed to whoever
+implements stage 3 for the remaining kinds. It is **not a defect today**.
+
+Separated from the claim rather than folded into it, which is F102's disposal: *an exemption
+records which premise it rests on, so it can be re-checked.* **The premise here is that `logs`
+is the only implementer.** The day a second appears, this hazard becomes a live requirement
+and this entry is where to look.
+
+### What remains, and it is cost rather than correctness
+
+F134's own last paragraph was the accurate part: stages 1, 2 and 4 apply to every kind, and
+what stage 3 leaves is *opening* a large diff and *resizing* while one is on screen.
+
+**Re-measured rather than cited**, because row 1's figures predate nothing that has landed
+since but were four rows old, and the honest possibility was that *the number justifying the
+work had already been spent by the work*. It has not. `tools/bench/frame.mjs`, 5,000 lines,
+200x50, 20 reps, both kinds in one session:
+
+| | `patch` — unwindowed | `logs` — windowed | ratio |
+|---|---|---|---|
+| first frame (start + greeting) | **3,679 ms** | 85.9 ms | **43x** |
+| drag step (`SIGWINCH` → frame) | **3,229 ms** | 8.4 ms | **384x** |
+| keystroke → frame | 13.2 ms | 1.6 ms | 8x |
+| `SIGWINCH`, same size | 11.1 ms | 1.1 ms | 10x |
+
+**Against row 1's recorded figures for the same unwindowed kind** — first frame 3,206 ms, drag
+step ~3,000 ms — this is +15% and +8%. **Nothing regressed**: the host carried a browser and
+two agents at roughly 1.5 of 11 cores, which is what that gap is, and the condition is recorded
+here rather than reported as clean (F69's disposition, and this session's own).
+
+**So the residue is real, large, and worst where a user is least able to tolerate it.** A drag
+is not one `SIGWINCH` but a stream of them, and each costs three and a quarter seconds with a
+max of 10.6 s — resizing a window with a big diff on screen is not slow, it is unusable.
+Opening one is 3.7 s. The keystroke and same-size cases, which the cache and stage 4 do serve,
+are 13.2 ms and 11.1 ms and are fine.
+
+**And the pin does not touch this.** `Patch.numberWidth` fixes the *fullscreen* window's
+correctness; the 43x and 384x are the *transcript* path, which is unwindowed until `patch`
+declares `BlockDefinition.window`.
+
+### CLOSED — `patch` declares a window, and the cut is exact
+
+| | before | after (two runs) | `logs` |
+|---|---|---|---|
+| first frame | 3,679 ms | **177–286 ms** | 85.9 |
+| drag step | 3,229 ms | **31.5–35.8 ms** | 8.4 |
+| keystroke | 13.2 ms | 12.4–19.2 ms | 1.6 |
+| `SIGWINCH`, same size | 11.1 ms | 10.8–16.9 ms | 1.1 |
+
+**13–21x on opening and 90–102x on a drag step**, landing within 2–4x of the windowed kind
+rather than 43–384x.
+
+**Ranges rather than figures, because the two runs disagree by 60% on the first frame and the
+*quieter* host produced the worse number** — the same shape F139 records, in the instrument
+this row is standing on. What survives that spread is the effect: two orders of magnitude is
+not something a busy laptop explains. A patch does more per row than a log line — a gutter, a marker, syntax slots —
+so parity was never the target; the *shape* was, and it is the same shape now. The bench's own
+liveness guard still reports 47 body rows on screen, so it is not fast by drawing nothing.
+
+**The premise checked before building, and it inverted a stated invariant.** I19 says a window
+cuts only at run boundaries because *cutting inside a run is not additive* — and its example is
+a cut of the **line array**: a run of one removed and two added lines is two rows whole and
+three cut between them. A cut by **rows** is a different operation: the first `min(k, removes)`
+removes beside the first `min(k, adds)` adds is exactly `k` rows and leaves exactly the
+remainder. **Measured across every run up to 4x4 at every cut point: additive everywhere.** So
+C09 I26's equality holds exactly, with no slack beyond the headers, and no snapping is needed
+on this route. I19 still governs the pushed view's offsets — its reason there is I20b, a caller
+and a window disagreeing about where one may begin, not additivity. Recorded as **I19a**.
+
+**Two functions, one row model, and that was the other thing checked rather than assumed.**
+`windowPatch` could not be parameterised into serving both: the pushed view owns its region, so
+its window is *a slice plus sticky headers* and the headers come out of the budget (I18) — ask
+for 20 rows, get fewer rows of diff. A transcript window cannot do that, because C14 measured
+the entry at full height and addresses rows inside it. `windowRows` pays for the same forced
+headers as `skipRows` instead. They share `rowsOf`, so they cannot disagree about what a row
+is; a single function would have had to lie to one caller about what its budget bought.
+
+**Verified by the sweep, not by a row I wrote.** Declaring `window` puts `patch` into C09's
+generic conformance, which walks **every** `(from, to)` pair of every fixture and checks
+`measure(w.block, w) − skipRows === to − from`. Two fabrications confirm it is live rather than
+vacuous: an off-by-one in the row slice and dropping the path header's slack each fail it, and
+each failed exactly one row.
+
+**One correction to this file's own record.** `structured.ts` named four derivations that
+disqualify a kind from windowing, and `planColumns` was in the list in error — it reads column
+definitions and the width, never the rows. `keyValue` and `code` are the two still open.
+
+### The gap this row created, closed in it
+
+**Nothing benched the fullscreen view**, and C25 I21a had just added a second O(n) walk to a
+function called once per frame. The whole tier is about claims with no measurement behind them,
+so leaving that one unmeasured was the state being complained about.
+
+`tools/bench/patch-window.mjs` times the window *build* — not the frame around it, which the
+file says rather than leaving a number that looks like a frame time to imply it. A control
+pair, **three runs each on a host settled below 33%**, 5,000 lines:
+
+| | runs | median |
+|---|---|---|
+| with the pin | 4.014, 3.420, 3.548 | **~3.5 ms** |
+| without | 2.084, 2.053, 1.958 | **~2.0 ms** |
+
+**+1.5 ms, or +75%** on the window build. **The loaded pair understated it** — it read +40–70%
+— which is worth recording as the direction that mistake goes: contention compressed a ratio
+rather than inflating it.
+
+**Worth it and not free.** A fullscreen view rebuilds its window per frame, so ~1.5 ms against
+a 16 ms budget, buying a gutter that no longer moves. **Avoidable and not avoided here**:
+`build()` already walks every line in `rowsOf`, so the width could fold into that pass. Named
+rather than taken, because it changes `rowsOf`'s contract for a saving nothing has asked for.
+
+**And the instrument guards the thing under test rather than a proxy.** Without the pin it
+prints `gutter: window 2, block 4  ← DRIFT`, so a run that measured a broken window could not
+be read as a clean one.
+
+**Measured, and the measurement is inconclusive by construction rather than by variance.** A
+control pair with and without the pin, back to back: start 3,545 against 6,002 ms, keystroke
+13.2 against 29.2, same-size `SIGWINCH` 29.4 against 16.1 — **the directions disagree**, and a
+host process was at 104% throughout. The structural reason is better than another run: the
+bench never pushes a view, so `windowPatch` is never called and the pin cannot execute on the
+path being timed. **A difference that cannot exist is noise however it is distributed**, and
+the pair is recorded rather than re-run to a number that would mean nothing either.
+
+What the pin *does* cost is one `numberWidth(patch)` walk per window build, on the fullscreen
+path — which already walks every line in `rowsOf`, so it is a second O(n) pass on a path that
+had one. **Nothing benches the fullscreen view**, which is stated here rather than left
+implicit: it is the path the correctness fix is for and the one with no timing instrument.
+
+## F135 — a malformed greeting is swallowed twice and the session shows nothing ★★
+
+C04's validator refuses the document, `appendAndCommit` (`execution.ts:216`)
+catches the throw, and `session.ts`'s greeting arm catches a rejection on top of
+it. The session starts, draws its header and its prompt, and **nothing appears,
+with nothing anywhere saying why**.
+
+Found by handing the bench a six-field `meta`. The symptom is not a crash and not
+an error entry — it is a working shell with an empty transcript, which is
+indistinguishable from an app that has no greeting.
+
+**F15's class through a second route, and with one more catch.** F15 is filed on a
+verb's document and its open question is whether a malformed document may be
+indistinguishable from a verb that did nothing. The greeting has two catches
+between the producer and the screen rather than one, so the tier-3 ruling F15 owes
+should be read as covering both.
+
+---
+
+## F136 — MG24 matches a record's members by name and not by owner, third instance ★
+
+A parameter written `cache: RenderCache` in `src/shell/` satisfied MG24's
+consumption test for `EngineOptions.cache` in `src/interaction/completion/`, two
+components away, and the equality arm then reported the exemption as one that had
+outlived its reason.
+
+**The rule already records the class as F105** — a frozen marker table gaining the
+keys `changed` and `removed` made two unrelated `CorpusDiff` members read as
+consumed — and records that the obvious fix, scoping the shorthand half to files
+that name the owner, trades one false consumer for nineteen false violations.
+
+**Filed as a third instance rather than as a repair**, because the measured
+remedy is worse and the equality arm caught it both times, which is that arm
+working. What a third instance buys is the record: the collision is with any
+identifier of the same name anywhere in `src/`, not only with a similar table.
+
+---
+
+## F137 — a fold runs on a version, so an attempt that failed is not counted ★★
+
+**A stated loss of the derivation layer, filed with the migration that produced
+it.** C23 I47's fold runs once per *source version*, and a version exists only
+when the fetch resolved. So a poll that failed at the transport reaches
+`renderError` and never reaches `compute` — and an app that counts attempts
+cannot count that one.
+
+`createCpuTick` counted them. It was the `fetch`, so `ring.began()` ran on the
+way past and its `catch` recorded the miss before rethrowing; `axisCaption` then
+says *N attempts, M readings*, and the divergence between the two is the app's
+report of a stall.
+
+**The two misses are not the same and only one is lost.** A container that has
+stopped still *resolves* — docker returns `--` for every measurement — so the
+fold runs and `took(null)` records it. That is the common case and it is
+unchanged. What is gone is `docker` itself failing, and there the driver renders
+the error arm and the panel title says `unavailable` outright, so the caption's
+divergence was the weaker of two signals for one event.
+
+**Why it is not fixed here.** The remedy is widening `derive` to run on the
+failure path too — `compute(data | error, prev)` — which makes every app's fold
+handle a second shape for a case most of them do not accumulate across. That is a
+C23 §3c ruling and taking it from inside a sharing change would be deciding I47
+to suit one consumer.
+
+**Filed rather than absorbed, because the app's own walk ruled the opposite.**
+S3_WALK A2 says *a rejection is still a tick, and a count taken only on success
+cannot see the stall it exists to report*. That sentence is still right and its
+mechanism has moved out from under it — the shape C23 §8a A4 records, where a
+ruling is correct about the interaction and assumes a mechanism the layer below
+does not have.
+
+---
+
+---
+
+## F138 — every notice composed as an error was an invalid document, and `vim` said nothing ★★★
+
+| | |
+|---|---|
+| **Surface** | the handoff's outcome notice — an interactive child that exited non-zero or died on a signal |
+| **Reached for** | nothing. It was found by the fabricated row for F15's own reporting ladder |
+| **Verdict** | **a real Calcium finding**, fixed — `documents.ts`, C23 T3.38, mutation `c23-faults` |
+
+`noticeDoc(command, text, tone, meta, status)` composed the document with the caller's
+`status` and **never with an `error` field**. C04 I3 requires the two together in both
+directions — *present iff the status is `"error"`* — so every call passing `"error"` produced
+a document `transcript.append` refuses:
+
+```
+transcript.append: invalid document (C13 I10) — error: required when status is "error" (C04 I3)
+```
+
+Two shipped call sites, both in the handoff's outcome:
+
+```ts
+noticeDoc(line, `${label} ended on ${exit.signal}`, "warn", { origin: "user" }, "error")
+noticeDoc(line, `${label} exited ${String(code)}`,  "warn", { origin: "user" }, "error")
+```
+
+**So `vim` exiting 1 produced no entry at all.** The throw landed in `appendAndCommit`'s bare
+catch, which is F15, and the transcript said the same thing it says when nothing happened.
+The successful arm — `${label} finished`, status `ok` — worked, which is why the route looked
+healthy: the failure path is the one that fails, and it is the one nobody runs twice.
+
+### How it was found, because that is the transferable part
+
+**Not by a test written to look for it.** It came out of the fabricated row for C23 §5a's
+reporting ladder — *if the fault notice itself throws, only the accumulation survives* — and
+the fault notice was written as `status: "error"`. The row was written to prove a claim about
+a construction path could be violated, and the first thing it proved was that the path was
+already broken. **A claim that a shape is safe is a claim, and this is the second time in this
+file that composing a document has been the thing that threw** (the glyph defect is the
+first).
+
+### The fix is the class
+
+Filled in `noticeDoc` rather than at the two call sites: the message is the notice's own text,
+and an `ErrorLike` carrying anything else would be paraphrasing it. Every future caller
+passing `"error"` is covered, which the two-site fix would not have been — and the two-site
+fix is what a reader of the stack trace would have written.
+
+**A03 §2's vacuity class, in a fifth place.** Nothing asserted the handoff's failure notice
+because the handoff's rows assert the *successful* exit, and a document that is never appended
+leaves a transcript indistinguishable from one where the verb was quiet.
+
+---
+
+## F139 — the rule was in the file header, and I filed a finding re-deriving it wrongly ★★★
+
+| | |
+|---|---|
+| **Surface** | tier 5's counters, and the record that says how to read them |
+| **Reached for** | a clean before/after on tier 5 for tier 3 row 3 |
+| **Verdict** | **a finding about the reader, not the suite** — and this entry is its second rewrite |
+
+Tier 5 came back **45** against a baseline of **44**. C03's `T5.6 — sixty seconds idle is
+zero writes and no measurable CPU` was the row that moved.
+
+**It is already documented, at the top of the file it lives in:**
+
+> **This file measures wall-clock and must not share the machine.** T5.2 is a p95
+> input-to-frame latency and T5.6 is sixty seconds of idle CPU; run alongside fifteen other
+> PTY files they measure the contention rather than the scheduler.
+
+And `VERIFYING.md`'s own preamble already carries the general form — *a rotating failure set
+is a diagnosis, not a mystery* — and §7 carries three measurements of a load generator
+perturbing exactly these rows. **Nothing here was unknown. What was missing was a reader.**
+
+### The diagnostic error, which is the transferable part
+
+The count moved. I attributed it to a mutation pass I had genuinely been running
+concurrently, removed that, re-measured, found the number **worse** — 0.0275 against 0.0121 —
+and concluded contention was ruled out.
+
+**It was ruled out as *my* contention.** An unrelated training job held the host across every
+run, on both sides of the change. The step that was wrong is the one that felt like rigour:
+eliminating a cause you control is not eliminating the cause, and **quieter yet worse is
+evidence of load you have not found, not evidence of no load.**
+
+Idle: **five for five green**, and the full suite **44 / 50 / 7 with a failing row set
+identical to the baseline's** — the same rows, not merely the same count.
+
+**And the tell was in the first run's own output.** `writes === 0` passed while
+`cpuFraction < 0.01` failed. **One of a pair failing while the other passes is a
+discriminator**: the behavioural half says the frame path is silent, so the resource half can
+only be measuring the host. It was there before any of the re-measuring.
+
+### A fourth instance of the rotating set, and it is uncaptured
+
+`make test` reported **7 failures** on one run and has been green on four since, two of them
+on an idle host. `npm test` is `vitest run --dir test` with **file parallelism** — `npm run
+e2e` passes `--no-file-parallelism` and this does not — so a rotating set under load is the
+documented phenomenon, of which VERIFYING already records 5, then 7, then 8.
+
+**I cannot confirm it, because I read that run through a `grep` and never captured the
+failing set** — §0's rule, arriving one indirection along: not an exit code through a pipe
+but a *failure list* through a filter, and the same loss. Filed unconfirmed rather than
+dismissed, because four green runs since is consistent with contention and also consistent
+with something intermittent that has not recurred.
+
+### Fixed: the CPU half is a difference, not a level
+
+The row now runs **two phases in one process** — thirty seconds with no scheduler, thirty
+with one — and asserts the *delta*. Whatever the host is doing lands in both, and the
+difference is C03's marginal cost, which is what *"there is no polling render loop"* actually
+claims. `frames === 0` and `writes === 0` are unchanged; they were always exact.
+
+**Shown to respond to the thing under test before being trusted.** A fabricated polling loop
+in the scheduler phase produced a delta of **+0.0488** against a 0.005 bound — *on a host
+whose control phase read `0.0154`*, which is to say a host where the old absolute bound of
+0.01 would have failed with no defect present. Load-tolerant in both directions: the clean row
+passes under two saturated cores, and the defective one is caught under the same load.
+
+**Two blind spots, recorded in the row.** The phase order biases toward passing — warm-up and
+early GC land in phase one, the control, measured at `0.0014` with the scheduler against
+`0.0042` without, a delta of **−0.0028**; a negative delta is that bias, not a discovery. And
+a host-wide idle burn is no longer caught at all, because both phases would burn: that claim
+is not C03's and nothing else currently makes it.
+
+**And the absolute number is not a function of load in any simple way** — the failures under
+a training job read 0.0121–0.0414, while two saturated cores produced 0.0014. Which is the
+argument for the delta restated as a measurement: an absolute bound was tracking something
+neither the test nor the reader controls.
+
+### A comparison taken under load is not automatically conservative
+
+Added after F134 measured it. The intuition is that contention inflates everything, so a
+*ratio* between two things measured under the same load is safe and if anything pessimistic.
+**Measured, it went the other way.** The pin's cost read **+40–70%** on a host carrying a
+training job and **+75%** on a settled one, three runs each side: load *compressed* the ratio.
+
+So the rule has two halves and only one was written down. Load makes an **absolute**
+untrustworthy — that is this entry's original subject — and it can make a **ratio** look
+better than it is, which is worse, because a ratio is the form everyone reaches for precisely
+to escape the first problem. Neither direction is guessable; both want the quiet re-run.
+
+### The failing set under load is not stable, which the protocol assumes it is
+
+Added after F8 and F31, where it cost two false diagnoses. *Compare the failing set, not the
+count* is the right rule and it has a premise nobody stated: that a contended run fails the
+**same** rows. Measured across three loaded runs on one afternoon, it does not.
+
+| run | load | failing set |
+|---|---|---|
+| F8, first | ~20 | `C17 T3.15` — a paste budget |
+| F8, second | ~20 | `C17 T3.15` again, worse |
+| F31 | 14.6 | `C10 T2.8`, `C10 T2.9`, `C01 T2.9`, `C21 T2.7` — four source scans |
+
+Every row is green when run alone and the whole suite is green when the host is quiet. The
+rows have nothing in common except a **deadline**: one is an explicit millisecond budget, four
+are vitest's 15 s timeout over a scan that takes 10–22 s under load. So the set is a sample of
+whichever deadline the machine missed this time, and a reader comparing two sets sees a
+different failure and concludes the change caused it.
+
+**What makes it dangerous rather than merely noisy** is that a *changed* set reads as evidence
+where an *identical* set would read as noise. F8's diagnosis went wrong exactly there: a
+plausible mechanism was in hand — F140, filed one paragraph earlier — and a set that had moved
+looked like confirmation. So the protocol needs the load beside the set, and a set that differs
+between two runs of the same tree is a measurement of the host, not of the change.
+
+### Two things that are genuinely new
+
+- **The counter-comparison protocol never stated its precondition.** *The six targets before
+  and after, counters compared* is a check only on an otherwise idle machine, and that clause
+  existed nowhere. It is `VERIFYING.md` §0's fifth entry now.
+- **`T5.6` names six different rows in tier 5** — C03's idle CPU, C06's standalone build,
+  C18's trailing `&`, C20's corrupt file, C22's piped shell, and history's. `VERIFYING.md`
+  cites `T5.6` bare in two places meaning two different rows. A bare id is ambiguous across
+  components in the one document whose job is to stop a result being misread.
+
+---
+
+## F140 — a refusal that leaves a constructed graph, so a caught rejection never exits ★
+
+| | |
+|---|---|
+| **Surface** | none — found by asking what F8's throw leaves behind |
+| **Reached for** | nothing; it fell out of ruling that gate 3b should throw |
+| **Verdict** | **framework-side**, pre-existing, and separated from F8's claim rather than folded into it |
+
+C22's gate 3b throws after `constructGraph` has run, so the graph — its history file, its
+stores, its transport — outlives the refusal. `stop()` is never called, because `start()`
+rejected. An author who **catches** the rejection and continues therefore has a process that
+does not exit.
+
+**Measured on both trees, which is the reason it is a separate entry.** Before gate 3b existed,
+C01's fatal threw from the same position with the same graph constructed, and the process hung
+identically. So the gate **inherits** this and does not introduce it, and folding it into F8
+would have made a pre-existing defect read as a regression the fix caused.
+
+**The realistic path is clean and the figure matters more than the finding.** Uncaught, node
+prints the named message and exits 1 — measured, twice. It bites only the author who catches
+`start()` and carries on, which is a narrow case and a real one.
+
+**A claim I made here was wrong, and it is left standing as the correction rather than
+deleted.** Four of F8's rows refuse, so each left a constructed graph alive in the vitest
+worker, and when C17 T3.15 — a wall-clock paste budget in another file — went from green to
+**2362 ms against a 2000 ms budget**, this entry said the leak was why and that stopping every
+session restored it. **The next run said 3684 ms with the sessions stopped.** The host's load
+average was **20.81**, against a baseline run taken when it was quiet.
+
+**The measurement that settles it**: with the whole change stashed, T3.15 run **alone** on the
+pre-change tree fails at **2099 ms**. On a settled host the whole suite is green — **2638
+passed / 2 todo**, the baseline's 2633 plus exactly the five rows this row added. It is contention, and it is independent of this row in
+both directions — the tree and the suite size.
+
+So the leak is real, the rows now stop their sessions because that is correct on its own
+terms, and **it is not what moved T3.15**. The sequence 2362 → 2612 → 3684 is monotonic in the
+wrong direction for a fixed cause and the remedy landed between the second and third. What
+made it look causal is that the leak was predicted by this very finding one paragraph above —
+a mechanism in hand is the most expensive kind of coincidence, because it supplies the
+explanation before the measurement does.
+
+**And the claim was written before the run that would have tested it**, which is the whole
+defect: *stopping every session restored it* was a prediction typed in the past tense. It is
+the sixth blind spot turned on my own paragraph, and the cheapest instrument for it was the
+one already scheduled — wait for the confirming run before writing the sentence that depends
+on it.
+
+**Why it is filed rather than fixed here.** The remedy is a teardown on the refusing path, and
+teardown is `stop()`'s — which drains diagnostics to stdout, sets `stopped`, and returns a
+code. Whether a gate may call it before throwing is a C22 §8 ruling about the five callers
+(I4), not a line inside a gate, and this row had already re-ruled its own ordering once.
+
+**Found by the throw question, and it is four for four now.** *When a ruling chooses to throw,
+ask what the throw leaves behind* — neither artefact shape indexes the rejection path, because
+both index the accepted one. C13's `settle(id, doc)` was the measured case; this is the same
+question asked of a decision taken in this row rather than of one already shipped.
+
+---
+
+## F141 — a block kind whose own surface spec composes something else ★★
+
+| | |
+|---|---|
+| **Surface** | S12, the logs view — the surface `Logs` was built for |
+| **Reached for** | nothing. Found by widening F64's citation check past the app |
+| **Verdict** | **framework-side** — a published shape with no consumer in the app *or* the design |
+
+F64 records that docker-tui builds `b.raw` where the drawing wanted toned log lines, and files
+it as a claim rather than a feature. Checking where that claim was written turned up a wider
+fact the entry did not have.
+
+**`b.logs` has exactly one caller in the whole tree, and it is a test fixture** —
+`test/contract/builders.test.ts:130`, the per-kind builder table. Nothing in `src/`, nothing in
+`examples/`.
+
+**And Calcium's own logs surface composes `raw`.** `docs/surfaces/S12_logs_view.md` §Blocks
+reads *`panel` with `title` … wrapping `raw` (5 log lines), `rule` … and `keyValue`*. So the
+surface that `Logs` exists to serve specifies a composition that does not use it. That is not
+the reference app failing to exercise a block; it is the **design** not reaching for it.
+
+**Why this is not F64 and not closed by it.** F64's subject is a sentence in a surfaces
+document that claimed something the app does not do, and correcting the sentence closes it. This
+one's subject is a published block kind. The test is *would landing that close this* — it does
+not, so it is the residue and it is named rather than folded in.
+
+**Nor is it MG24's.** `Logs` is consumed — by a test — so an import-graph rule sees a consumer
+and is satisfied. What has no consumer is the *shape's reason*: a kind whose surface spec
+composes a different kind is a producer no design reaches for, and no rule in the suite asks
+that question. It is F94's seam signal at the level of a block kind rather than a member.
+
+**Disposition owed before the freeze, not now.** Three readings and they want different work:
+S12 is wrong and should compose `logs`; `Logs` is speculative and should go the way
+`FileSystem.exists` went (F96 — narrowing a public type is cheap now and breaking after); or
+both are right and `raw` is the degraded path with `logs` the structured one, in which case
+**that sentence exists nowhere** and is the actual gap. Deciding it needs the S12 walk, which
+this row is not.
+
+### The walk, and it produced a fourth reading
+
+**The removal reading is out, and the figure is what settles it.** S12 draws three columns —
+`14:23:01.882`, a `WARN`, a message — which is `Logs`'s declared shape exactly:
+`lines: { ts, level, message }[]`. `raw` is one flat string per line, so the alignment would be
+baked into the text instead of computed at the width, and **`WARN` would draw in body colour**:
+`levelTone` maps error/fatal, warn, debug/trace and the rest, and only the `logs` renderer calls
+it. No other surface composes a `logs` block — every other mention across S02, S03, S04 and S05
+is the `--logs` *flag* or an action routing here — so this one figure decides it.
+
+**The deciding reason is not appearance.** `logs` is the only kind in the tree that implements
+`window`; `raw` has none. S12's own status line reads *1,284 lines* inside a panel showing five.
+**A surface built to scroll a long log specified the one kind that cannot be scrolled**, and the
+spec line is corrected rather than the block removed.
+
+**And the fourth reading, which none of the three anticipated.** `ViewPatch` carries `append` (a
+whole block), `replace`, `merge` (table *rows*), `status` and `expand`. **There is no operation
+that appends a line to a `logs` block.** Growing one means `replace` with a larger block every
+tick, re-sending every line each time.
+
+That is why the kind has no consumer, and it splits the situation rather than resolving it:
+
+| route | can use `logs` today | why |
+|---|---|---|
+| S12, a **bounded** view | **yes** | fetch, build the block once, window it — no patch involved |
+| the app's `/logs -f`, a **stream** | **no** | one line per tick, and the only growth op re-sends the block |
+
+So F64 — *docker-tui builds `b.raw` where the drawing wanted toned log lines* — is **right about
+the drawing and wrong to read as a defect in the app**. The streaming route has no operation to
+reach for. The incremental op is owed, is **additive** to a union apps produce rather than
+exhaustively consume, and therefore lands after publication.
+
+**Not freeze-relevant.** No public type is removed and none is narrowed — the walk ruled against
+the reading that would have done either, which is the whole reason it was run first.
+
+**Closed as a spec correction**: S12 §Blocks now composes `logs`, with the windowing argument
+and the missing patch operation recorded beside it.
+
+---
+
+## F142 — a derived count is derived once, and nothing re-derives it ★★
+
+| | |
+|---|---|
+| **Surface** | `TRIAGE.md` — the document whose own §*How this file was checked* is about a proxy agreeing with itself |
+| **Reached for** | nothing. Found by the tier-5 pre-check, before any of the three items was planned |
+| **Verdict** | **artefact-side**, and it is F87 one level up |
+
+`TRIAGE.md` §*How this file was checked* opens: *"The inventory is derived, not hand-copied.
+`grep '^## F' FINDINGS.md` yields **89** ids and every one is keyed in a group above — 10 + 12
++ 6 + 4 + 6 + 2 + 14 + 8 + 7 + 5 + 6 + 2 + 1 + 6 = 89."*
+
+Measured now, and **carefully, because the first pass at this entry did the thing the entry is
+about**: `grep -c '^## F'` gives **148** section headings, of which **145** are distinct
+findings — `## F24 corrected`, `## F37 confirmed at a cost` and `## F37 closed` are follow-up
+sections reusing an id, and a raw `grep -c` counts them as findings. Of those 145, **55 are
+keyed in no group**.
+
+I first reported this as *"147, fifty-eight outside"*, from a `grep -c` I had not looked at.
+Both numbers were wrong in the direction that makes the finding sound bigger, and the method
+was the one being criticised — a count quoted rather than derived. It is left here rather than
+silently replaced, because the entry's whole subject is a number nobody recomputes.
+
+**The check is correct and its subject moved.** *Derived, not hand-copied* is true about the
+moment it was written and says nothing about any moment since — and the sum still adds to 89,
+so the arithmetic it offers as evidence passes exactly as it did on the day. Fifty-eight
+findings are outside a partition that certifies itself complete.
+
+**This is F87's mechanism one level out.** F87 found that a sum over group sizes cannot see a
+duplicate placed twice and counted once — a proxy that agrees with itself. This is the same
+proxy failing to see **absence**: a total computed over the groups can only ever describe the
+groups, so nothing in the paragraph can notice ids that were never keyed anywhere. Both are
+*assert the artefact, not a proxy*, and F87 fixed the disjointness half while leaving the
+completeness half resting on a number nobody recomputes.
+
+**Second instance, inside group 9 itself.** Its heading reads **7 surfaces**, its table lists
+**seven** rows, and its prose opens *"**Six** findings about the measuring apparatus"*. F86 was
+added to the table and the sentence above it was not. That is exactly the F55-version failure
+the count check was *built to catch* — a heading reading *5 surfaces* over six rows — recurring
+in the group about instruments being wrong.
+
+**The remedy is not another number.** A count in prose is a snapshot with no mechanism, and the
+fix that lasts is either a derived count in the enforcement suite (`grep '^## F'` against the
+keyed ids, `sort | uniq -u` for the unkeyed) or no count at all. A03 already owns the shape:
+`BUILDER_OMISSIONS` and `UNCONSUMED_FUNCTIONS` are compared **by equality** precisely so an
+entry cannot outlive its reason unread, and this is the same requirement stated in prose where
+nothing can compare it.
+
+**And the pre-check is what found it**, which is the argument for the pre-check: the tier-5
+plan cites `TRIAGE.md`'s groups as its inventory, so every item below rested on a partition
+that had been stale for fifty-five findings.
+
+**Closed** — `SP6` in `tools/enforce/findings.mjs`, wired into `make enforce`, A03 §7a's table,
+and the 55 keyed.
+
+**The mechanism, not a recount.** SP6 takes the distinct ids from the ledger, takes the ids
+keyed in the group sections, and **compares the two sets by equality** — `BUILDER_OMISSIONS`'
+precedent, because a list checked as a subset lets an entry outlive its reason unread, which is
+exactly how this went stale. It returns `ids` and `keyed` as counters for the same reason SP5
+returns `scanned` and `citations`: an exit status cannot say whether the comparison happened.
+
+**Fabricated both ways**, because the two failures are different rules wearing one id — a
+finding filed and not keyed (the drift), and a key removed (the reverse, which also moves the
+total and so proves the sum check is live rather than inert behind the completeness check).
+Clean reads `145 ids, 145 keyed, 0 violations`.
+
+**The 55 are keyed by mechanism, and the distribution is the finding.** Two groups took more
+than half of them: **16 into group 11** (a gate that passes without checking) and **8 into
+group 9** (the instrument was wrong), with a further 9 into group 2. Everything filed since the
+inventory was last derived is dominated by the apparatus rather than by the framework — which
+inverts the ranking table's own story, where group 11 was sixth by size and is now first.
+
+**The duplicate prose counts were deleted rather than checked twice.** Group 9 read *7
+surfaces* in its heading and *"Six findings"* in the sentence beneath, because F86 was added to
+the table and not the sentence. A number stated twice can disagree with itself; the size is now
+in the ranking table only, where SP6 checks it.
+
+**Residue, named because a citation reads as coverage.** SP6 counts a bolded id anywhere in a
+group section, so it proves coverage and **not placement** — the triage keys in two forms and
+nothing distinguishes a key from a mention. Tightening the key form to table rows only would
+make placement checkable and is not done here. Until it is, the 55 placements above are
+one reader's judgement from each entry's heading, and they are marked as such in the document.
+
+---
+
+## F143 — a capture cut mid-character loses its whole recording ★★
+
+| | |
+|---|---|
+| **Surface** | `tools/capture.py` — `write_cast`'s final flush |
+| **Reached for** | nothing. Found by writing `capture_test.py`, group 9's fixture for the instrument |
+| **Verdict** | **instrument-side**, and it is a correct sentence justifying the wrong scope |
+
+The cast writer decodes incrementally, which is right and is why: `os.read` splits on bytes, so
+a 64 KiB read lands mid-sequence whenever the terminal is drawing box characters. Decoding each
+chunk independently with `errors="replace"` put U+FFFD in the middle of a panel border, the
+panel wrapped, and the recording was corrupt with the raw stream beside it perfectly intact.
+
+Its docstring then says `errors` is left strict **deliberately**: *"there is nothing left for it
+to paper over, and a failure here would be a real one."* Every clause of that is true, and it
+is the wrong scope. There *is* something left at the very end — a PTY read is not obliged to
+stop on a character boundary, so the final chunk of a capture can hold half of one, and
+`final=True` raises.
+
+**What the throw leaves behind is the finding.** It happens after the raw stream and the
+teardown have been written, so the session's `.cast` is missing, the summary line never prints,
+and the caller — `media.py`, `screencast.py` — sees a traceback from the tool rather than from
+the app. A capture that succeeded is reported as a crash, and the recording it was made for is
+gone. Losing the recording is a worse answer than one U+FFFD in the last cell.
+
+Fixed: the body stays strict — a partial sequence there is carried, and an *invalid* byte there
+still refuses — and only the trailing flush degrades to one replacement character. Both halves
+are rows, and they differ in one thing: whether the bad bytes are the last ones in the capture.
+Without the second, the first reads as *stop being strict*.
+
+**The class is MG24's**, which is why it is starred: a justification that is true, correctly
+stated, and not the one the decision needed. Review checks whether the sentence is true, and
+this one is.
+
+---
+
+## F144 — two of eleven instruments did not run at all ★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/gap-check.mjs`, `tools/measure-raw.mjs` |
+| **Reached for** | nothing. Found by running them, as the last step of giving them a fixture |
+| **Verdict** | **instrument-side**, and it is group 9's own subject arriving inside group 9 |
+
+Both probes call interfaces that have since moved. `splitRaw` takes the frame's own `measure`
+now (C07 I20) and `gap-check.mjs` still called the two-argument form; `createDocumentView` takes
+`measureSequence` as well as `measure` — a sequence can insert separation between blocks that no
+single measurement carries, which is `gap-check.mjs`'s whole question — and `measure-raw.mjs`
+still passed the old deps. Both die with a `TypeError` on their first call.
+
+**They are not silently wrong, and that is not much of a defence.** Nothing consulted them, so
+nothing noticed; an instrument nobody runs is indistinguishable from one that works, which is
+the fifth class in `VERIFYING.md` — a gate nobody reports — arriving in the instruments rather
+than in the targets. `make all` runs six targets and two of them were red for four commits for
+exactly the same reason.
+
+**And the second half is worth more than the first.** `measure-raw.mjs` builds a view in *two*
+places, and repairing one made it print three real lines before dying on the fourth. A probe
+that produces correct output and then fails is read as a probe that worked: the numbers are
+there, and a reader who saw them would not go looking for an exit code. The repair is only
+verified by running the whole thing and reading the last line, which is `read a green gate's
+counters` pointed at output rather than at a suite.
+
+Both repaired and both now run. The remedy that closes the class rather than the instance is
+the runner: `make tools-test` runs every instrument's fixture, and a probe that cannot start
+fails it.
+
+---
+
+## F145 — the guard that marked the output instead of failing ★
+
+| | |
+|---|---|
+| **Surface** | `tools/bench/patch-window.mjs` — the gutter check |
+| **Reached for** | nothing. Found while giving the file a fixture and asking what distinguishes a working run |
+| **Verdict** | **instrument-side**, and it is the bench's label defect one file over |
+
+`patch-window.mjs` exists because C25 I21a added a `numberWidth(patch)` walk to a path that
+already walked every line, and nothing measured it (F134). So the *pin* is the subject: a window
+whose gutter differs from its block's is not the path being timed, and the milliseconds
+underneath are a measurement of something else.
+
+It had three guards. Two — *the fixture is too small* and *the window is empty* — print and
+exit. The third appended `  ← DRIFT` to a line of output and carried on.
+
+**The drift is the most serious of the three and had the weakest response.** An empty window is
+obviously nothing; a drifted one produces a plausible number for the wrong path, which is the
+shape every finding in this group has. And a marker in the middle of a bench's output is read
+by whoever is looking for the number at the bottom.
+
+Fixed: `gutter()` in `tools/bench/liveness.mjs`, which exits, with the reason in the message —
+*the timing below is of something else*. BL8 covers it.
+
+**The class:** a diagnostic that names a real problem and does not stop anything is
+indistinguishable, at a glance, from a diagnostic that did not fire. It is `ask who sees the
+refusal` with the answer *nobody, and the run continued*.
+
+---
+
+## F146 — the rule was implemented, the list that connects it was not, and the suite was red for two commits ★★
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs` — `SPEC_RULES` |
+| **Reached for** | nothing. Found by running `make all` for group 9's row, two commits after the cause |
+| **Verdict** | **gate-side**, and it is A03 §2's own subject reaching the list that enforces A03 §2 |
+
+SP6 landed complete: the checker in `findings.mjs`, the row in A03's table, the fabrications in
+`enforce-commitments.test.ts`. **`SPEC_RULES` — the list commitment 14b reads to learn that a
+rule exists — was not touched.** So `make test` failed on *A03 inventories SP6 and nothing
+implements them* from the commit that added the rule, and stayed red through the next one.
+
+**`npm run enforce` was green the whole time, and correctly.** The rule was implemented and
+running; it fired twice that day on real violations. The gap was visible only to the suite, and
+the suite is not what a spec-and-rules commit runs — `enforce` is, because it is the pre-commit
+hook. Two green signals, both true, neither about the thing that was broken.
+
+**And the fabrication existed but could not be seen.** Commitment 14b requires a row per rule
+whose title says it *fires*; SP6's clean case and both its fabrications were one `it`, so the
+family check found no matching title and would have failed even once `SPEC_RULES` knew about
+it. **A bundled row can only be split** — three rows now, and the second fabrication is the one
+proving the sum check is live rather than inert behind the completeness check.
+
+**The class:** every instance in group 11 is a gate not checking the thing it is named after.
+This one is narrower and worse — the gate was checking, and the *registration* that tells the
+meta-gate it exists was missing. A rule can be fully built, fully tested, running in production
+and still invisible to the check that asks whether it was built.
+
+---
+
+## F147 — every interactive tier-5 row runs in a mode nobody chose ★★★
+
+| | |
+|---|---|
+| **Surface** | `test/support/pty.ts` — `interactivePty`'s default `env` |
+| **Reached for** | nothing. Found by running `make all` for group 9's row and reading the failing set |
+| **Verdict** | **harness-side.** Inherited: `src/`, `test/e2e/` and `test/support/` are byte-identical to the start of the session that found it |
+
+`make all` is red at **e2e: 44 rows, 13 of 16 files**, every one a 15-second timeout on
+`never saw /❯/`. Measured on an idle host — load 0.49 before and after, and one file alone
+fails the same five rows at the same budget — so it is **not** the contention class.
+
+**One cause, reproduced.** `interactivePty` builds the child's environment as
+`{ TERM, PATH, ...opts.env }`. There is no `LANG`, so C02 resolves the ASCII pair and the
+prompt renders `>`; the rows wait on `❯`. Driving the same fixture through `node-pty` with the
+full environment prints `❯` and with the harness's two variables prints `>` — 3251 bytes either
+way, the same frame, one glyph apart.
+
+**The mechanism was already written down**, in the third place: `test/e2e/lifecycle.test.ts:322`
+says *this PTY carries no `LANG`, so C02 resolves the ASCII pair and the prompt is `>`* and
+names one row's failure as pre-existing because of it. The finding here is the **scale** — it is
+not one row's control, it is every interactive row in the tier — and that the tier has therefore
+been asserting against a degraded rendering it never asked for. `DEGRADATION.md` is where ASCII
+is the subject; a completion row is not.
+
+**And my first reproduction was wrong, which is worth recording.** `script -qc` allocates a
+**0×0** PTY, so the app painted nothing and I nearly diagnosed a blank-screen defect from it.
+The fixture has to be shown to respond before it is asserted against — `test/support/README.md`,
+and this is the third instance.
+
+**Measured remedy, not landed.** Adding `LANG: "en_GB.UTF-8"` to that default takes
+`completion.test.ts` from **5 failures to 2**, and the two that remain are ordinary assertion
+failures rather than deadlines — *expected `'❯ /inv…'` to be `'❯ /invo'`*. So the change is
+right and it uncovers real work beneath, which is a ruling rather than a repair: what tier 5's
+default terminal *is* decides what a hundred rows are about. C02's own rows set `env`
+explicitly and spread last, so they keep winning either way.
+
+---
+
+## F148 — a valued flag reaches the far side without its value ★★★
+
+| | |
+|---|---|
+| **Surface** | the prompt-to-spawn path: C18 parse → C23 dispatch → C06 subprocess argv |
+| **Reached for** | nothing. Uncovered by F147's ruling — these rows previously died at the prompt wait and never got here |
+| **Verdict** | **framework-side**, and it is the first thing the degraded rendering was hiding |
+
+The row types `/ps --limit 400`. The buffer shows `❯ /ps --limit 400`. The far side prints its
+own argv, and it is:
+
+```
+far side pid=… cwd=/workspaces/tui-kit argv=ps --limit --json
+```
+
+**The value is gone.** `farside.mjs` then falls back to its default of 2 rows, so a row waiting
+for `0000399` waits for ever. Five occurrences in one serial tier-5 run, and the five are
+exactly the five rows that pass a value to `--limit`: `view-model` T5.1, T5.1b, T5.2, T5.3a and
+`transport` T5.1.
+
+**The manifest declares it valued** — `{"name":"limit","short":"n","type":"int"}` — so this is
+not a fixture disagreeing with a row. A flag typed with a value must arrive with it.
+
+**Two candidate causes ruled out by measurement rather than by reading:**
+
+- **Not the completion menu.** Escape before Enter, so the menu is dismissed, produces the same
+  argv. The value is not being replaced by an accepted candidate.
+- **Not the paste path.** `pty.type` writes the whole line in one call, which C16's heuristic
+  reads as a paste — but typing the same line one character at a time, outside the paste window
+  entirely, loses the value identically.
+
+So it is neither of the two mechanisms that would have been guessed.
+
+### The layer, pinned — and the scope is wider than this finding first said
+
+**`validateInvocation`, `src/data/manifest/validate.ts`. C05, one layer below both suspects.**
+Not the parser, not the transport. `transmitted` is built by the walk that owns the grammar
+(I21, F39) — and that walk pushes **one token per loop iteration**, while a valued flag whose
+value is its own token spans **two**. The value is consumed by the `i++` that steps past it and
+the top-of-loop push never sees it.
+
+Measured directly against the validator, which is where the finding's real scope came from:
+
+| argv | `transmitted` before | after |
+|---|---|---|
+| `--limit 400` | `["--limit"]` | `["--limit","400"]` |
+| `-n 400` | `["-n"]` | `["-n","400"]` |
+| `--search abc` | `["--search"]` | `["--search","abc"]` |
+| `--since 1h` | `["--since"]` | `["--since","1h"]` |
+| `--label a --label b` | `["--label","--label"]` | `["--label","a","--label","b"]` |
+| `--limit=400` | `["--limit=400"]` | unchanged |
+
+**It is not `int`, and it is not the long form.** Every type, both forms, and repeatable loses
+one value per occurrence. **Only the inline `=` form ever worked** — which is the whole answer
+to why nothing above C05 saw it for the length of the build.
+
+**A structural interaction, not an event-mediated one**, which is why no trace could reach it:
+*"the walk pushes once per iteration"* and *"a value may be its own token"* are both true at
+rest, with nothing happening between them. C18's classification-table shape is what indexes
+this, and the validator never had one. The comment above the site reasons about spans for the
+`shellOnly` skip — *"a switch spans exactly one token… which is why this is a skip rather than
+a span"* — and does not ask the same question of the branch twenty lines below that consumes a
+following token.
+
+**Why the tests agreed.** Every existing assertion about `transmitted` uses `--help`: a bool,
+one token, and the only flag shape the walk handles correctly. T1.16 compares the two flag-value
+forms and compares them on `args`, where they agree — the field that disagreed was never read.
+A suite indexed by the feature tested the rule against itself.
+
+**Closed.** Two pushes at the two consumption sites. T1.16b (unit), T2.9c (contract, the `argv`
+hop), T6.13 (fail-on-revert, asserted as the property across four flag shapes rather than one
+case). Reverting both sites turns exactly those three red and nothing else, out of 127.
+`transport` T5.1 now passes.
+
+**Why it was invisible.** Every one of these five rows waits on the prompt glyph first. Under
+the harness's `LANG`-less environment the prompt was `>`, the wait timed out at 15 seconds, and
+the row never reached the command it was written to test. **44 deadlines were hiding this.**
+That is the argument for F147's ruling in one line: a deadline says nothing, and an assertion
+says what the application did.
+
+## F149 — the harness reads a frame the shell stopped writing after the first one ★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/support/pty.ts`, `interactivePty.frame` — the getter every tier-5 row asserts through |
+| **Reached for** | nothing. Uncovered by fixing F148: the value arrived, the row still failed, and the frame in the failure message was the evidence |
+| **Verdict** | **instrument**, and it is the second class of §9 — a fabricated artefact, not a truncated one |
+
+`frame` reconstructs the current screen as **everything after the last `CSI H`**, and its comment
+states the shape it relies on:
+
+> *one write per frame, beginning with a hide and `CSI H` and ending with the cursor's position.
+> So the current frame is everything after the last `CSI H`* — citing S01 §3 and C22 §6.
+
+**Measured, on a live session at 100×24: `homes=1`.** The shell writes `CSI H` once, on its first
+paint, and never again. So `frame` returns the first paint **plus every frame since**, escapes
+stripped and rows run together.
+
+The failure that showed it — `view-model` T5.1, after F148 was fixed. The data is all there:
+
+```
+row 1..22   blank
+row 23      ❯
+row 24      ❯ /ps --limit 400   0000379 queued   0000380 queued  …  0000399 runni…
+```
+
+Twenty-two rows of a screen that has 400 rows of content on it, and the entire transcript
+concatenated onto one row. That is not a layout the shell can produce.
+
+### The app is right and the citation is wrong
+
+`src/shell/render-frame.ts:156`, C22 **I55 §6b**: the whole-frame form is the *fallback* —
+
+> *`HOME` plus every row joined is the whole-frame form and it is what every no-record case falls
+> back to: the first frame, a contaminated one, one whose predecessor was a different size, and
+> one following a refusal or a throw.*
+
+— and the ordinary frame is a **difference**, each changed row addressed with `cursorTo(i, 0)`.
+Measured on the same session: 32 CUP sequences in the tail and one home. `CSI_ANY` strips every
+one of those addresses, so rows written to line 4 and line 19 arrive adjacent in a string.
+
+**This is the sixth blind spot, pointed at a harness.** The claim carried a citation to two
+specs, and one of them says the opposite in a numbered invariant. A citation reads as
+authority, and nobody goes to look.
+
+### What it means for every row that has ever asserted on a frame
+
+The reconstruction is correct for exactly one frame — the first. After that:
+
+- **A "contains" assertion passes by accident.** The blob accumulates, so the text is in it
+  whether or not it is on the screen. This is why most rows are green.
+- **An absence assertion cannot pass honestly.** `not.toContain("first-text")` is asserting that
+  something never appeared, not that it is gone — the harness's own `frame` doc-comment warns
+  about exactly this hazard for `output` and the getter written to fix it has the same property.
+- **Anything positional or countable is simply wrong**: which row the prompt is on, how many
+  rows carry a marker, whether the last row is reachable.
+
+The failing shapes in the current tier-5 run are that list: `both rows are on the screen:
+expected 1 to be 2`, `expected 1 to be greater than 1`, `expected 23 not to be 23`, `gone from
+the screen: not to contain 'first-text'`, and *the last row is reachable* timing out against a
+screen that has it.
+
+### The remedy is a screen, not a slice — and it landed
+
+A frame cannot be recovered by slicing a stream that describes edits. `screen(bytes, rows)`
+**applies** what it receives, which is what the terminal on the other end is doing: CUP moves
+the write head, text overwrites the cells it lands on, `CSI H` resets to the origin, the
+alternate screen clears what was under it. It is the smallest emulator that makes the getter's
+own doc-comment true, and `frame` is now one call to it.
+
+**`cells()` is imported from `src/`, and the cost is stated rather than hidden.** The instrument
+now shares a measurer with the thing under test, which is the shape `test/support/README.md`
+forbids — a width defect would move the model and the app together and hide itself. The trade is
+taken because a second implementation would drift from the measurer the whole framework uses and
+disagree about exactly the characters that are hard. What makes it safe is that the coupling is
+**checked**: `overrun` reports any row painted wider than the screen, which is a row that
+wrapped, which is the one failure that corrupts state the application can no longer see.
+
+**Eleven rows, and seven mutations all caught by their named row** — including the first
+mutation, which is the harness's shipped state restored: slice from the last home, strip, split.
+That is the acceptance test for this finding, in the form the row asked for.
+
+### What the mutation pass found that the design did not
+
+The model was written as `head + text`, and the alternate-screen mutation **survived a run the
+alternate-screen row was written to catch**. The cause was the model rather than the test: that
+expression indexes a *cell* cursor into a *string*, so a write truncated everything to its right
+— and clearing the screen produced output identical to not clearing it.
+
+Two consequences, both the conflation `cells()` exists to prevent, and neither reachable by
+reading the code: a row's tail destroyed by any short write, and a column past a wide glyph off
+by one per glyph — invisible until C17's CJK rows run. A row is an array of cells now, with
+`null` for a cell nothing has written and `""` for the continuation half of a wide glyph.
+
+**A mutation that survives is a finding about the tests, or about the sentence they were written
+from. This one was about neither** — it was about the subject. That is a third disposition, and
+it is worth naming: the pass asks whether a test can see a defect, and the answer here was *the
+test is fine and the thing it is testing has a second defect standing in the way*.
+
+One divergence from a real terminal is recorded rather than fixed, and asserted so it cannot
+drift: writing onto the continuation half of a wide glyph takes that cell, where a terminal also
+blanks the orphaned lead half. The shell never produces it — `render-frame.ts` writes whole
+`exact()`-padded rows from column 0 — and the row that asserts it says where the model stops
+being the terminal.
+
+### Three copies of one false premise, in three files
+
+**The getter was never the finding.** *A frame begins with `CSI H`* was a belief in the repo,
+written independently three times:
+
+| where | what it does | what it got |
+|---|---|---|
+| `test/support/pty.ts` | slices `frame` from the last home | the first paint plus every edit since |
+| `test/e2e/theme.test.ts` T5.4 | `pty.output.split("\u001b[H").slice(1)` counts frames | 8 for fifty toggles, wanting >10 |
+| `test/e2e/capabilities.test.ts` T5.4b | slices from the last home, splits on newlines | 1 row where two are on the screen |
+
+None of the three cites the other; each was written from the same wrong idea. That is what makes
+this a finding about the record rather than about a function — and it is why fixing the getter
+closed only one of the three.
+
+**The premise entered through a real gap, which is why it was three files and not one.** T5.4b
+could not use `frame`, and its own comment says exactly why: C11 renders focus as a *tone* and
+nothing else (C11 I14), so the stripped text of a focused row is identical to an unfocused one,
+and asserting through `frame` would assert that focus is invisible — the defect the row exists
+to catch. Faced with a reader that could not express what it needed, the row built its own out
+of `lastIndexOf("\u001b[H")`. **A missing affordance is where a wrong idea gets copied**, and
+the copies then look like independent corroboration.
+
+Closed by supplying the affordance rather than by rewriting the assertion. `styledFrame` keeps
+the attributes each cell was written under, so the row filters the screen instead of deriving
+one.
+
+**An attribute record, not a rendering model — and the limit is asserted rather than
+described.** Cells written under the same sequences compare equal and cells written differently
+compare unequal, which is what *did the tone change* needs. It does not answer *what colour is
+this cell*: `\u001b[31m\u001b[32m` and `\u001b[32m` are the same green and a different pen
+here. PS15 asserts that inequality **on purpose**, so the accessor cannot later be read as
+resolving colour. Same discipline as the wide-glyph divergence, and for §9's reason: an
+instrument that looks like it resolves something and does not is the shape that manufactures
+evidence.
+
+### A resize clips; it does not re-flow and does not remember
+
+Found by reading C04 T5.2's frame, which F149's own fix is what made readable. Stale text sat in
+columns 80–119 of alternate rows: content from a 120-column pass surviving an 80-column one.
+
+The model answered a resize by rebuilding and replaying the whole stream at the new geometry.
+Every historical write then lands at the *current* width, so a narrow pass overwrites only the
+first 80 columns and the old tail stands. **Internally consistent, and every number it produced
+agreed with every other** — no arithmetic could have reached it, and no rule-interaction artefact
+indexes it either. `Painter.resize` clips both axes now; PS14 asserts that widening does not
+bring the cells back, and the re-flow is a mutation.
+
+The replay was also the expensive option. Clipping is correct *and* cheaper than the thing it
+replaced, which is worth recording because the first version was chosen for safety.
+
+### Why F148 had to be fixed first
+
+Both defects were on the same path and the outer one hid the inner. With the value dropped, the
+far side printed two rows, the frame's blob was short, and nothing about the run said *the rows
+are in the wrong place*. Fixing the flag put 400 rows on the screen, and a 400-row transcript
+collapsed onto one line is not a thing a reader can look at and not see. **A frame-read found
+it — the fourth time on this component that reading output found what no assertion did.**
+
+---
+
+## F150 — the published example did not parse, and the test that quotes it checked one direction ★★★★
+
+| | |
+|---|---|
+| **Surface** | `README.md`'s marked block · `examples/minimal/test/minimal.test.ts` · `examples/minimal/main.ts` |
+| **Reached for** | publication prep item 1, the outside-reader test — the mechanical half of R01 R4.4 |
+| **Verdict** | **three faults nested inside each other**, in the one example the reuse claim rests on |
+
+**Filed late, and that is the first thing to record about it.** The number was used in a commit
+message, in the `Makefile`, in `main.ts`, in the quoting test and in `R01` — five artefacts —
+and there was no entry here for any of them to refer to. `make enforce`'s SP5 is what found it,
+and only once the number reached a file under `docs/`. A finding referred to by five places and
+recorded in none is the sixth blind spot pointed at this session's own work.
+
+### 1. The block does not compile
+
+The README's marked block carried **27 of `main.ts`'s 64 meaningful lines**: no `rows` binding,
+no `return`, no `meta` object, and not one closing brace. Compiled, it is `TS1005: ',' expected`
+from line 18. The prose above it said it was *"quoted from that file line for line by a test."*
+
+### 2. Why it drifted — a subset check, one direction
+
+```ts
+for (const line of meaningful(fenced[1])) {
+  expect(meaningful(source)).toContain(line);
+}
+```
+
+Every README line must appear in `main.ts`; nothing requires the reverse. **Any omission
+passes.** The same shape as SP6's inventory one document over, and the same remedy: compare by
+equality. Verified by fabricated violation — truncating the block back to its shipped state
+turns the row red.
+
+### 3. Under that — the example had not typechecked since F58b landed
+
+`ProducedMeta` honours three `meta` keys and the example supplied ten. It declares a `check`
+script and the `Makefile` never ran it, so F58b's own narrowing never reached the example
+F58b is about. **F144's class arriving at the surface a stranger meets first.**
+
+`make check` now runs both examples' checks; reverting the example makes it exit 2.
+
+### What this is and is not evidence of
+
+It is the mechanical half of the outside-reader test: follow the README literally from a clean
+position and record where it stalls. That half finds what is **absent or broken**.
+
+It is **not** R4.4's actual claim, which is that *someone who is not its author* builds a
+working TUI from it. Nobody who has worked in this tree can run that, because the failure mode
+it exists to catch is a reader's own knowledge filling a gap without their noticing. Recorded
+as owed under R4.4 rather than closed.
+---
+
+## F151 — the likeliest thing a stranger types answers with two internal invariant numbers ★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/execution.ts:412`, `runShell` — C23 §2's `shell` route |
+| **Reached for** | publication prep item 2, *error messages as the first-run experience*. Found by the rig's own mistake |
+| **Verdict** | **correctness defect**, every consumer, on the path a first run is most likely to take |
+
+Type `list` where the shell wants `/list` and the screen says:
+
+```
+✗ appendAndCommit: TranscriptError: transcript.append: invalid document (C13 I10) — error: required
+  when status is "error" (C04 I3)
+```
+
+Nothing about `list`. Nothing about the slash. Two invariant numbers from two components the
+reader has never heard of, and no entry in the transcript at all.
+
+### How it was found is the part worth keeping
+
+**The rig typed the wrong thing.** The sweep was fourteen deliberate misconfigurations, and every
+one of them produced that message — which read as a spectacular finding until the *control* was
+run and failed identically. The control is the shipped example, whose own suite is green.
+
+The difference was one character. `examples/minimal/test/run-in-pty.py` types `/list`; the rig
+typed `list`. So the fourteen variants were measuring one accident fourteen times, and the
+accident was the finding: **a bare word is the single most likely thing a stranger types**, and it
+is the one input nothing had ever run.
+
+Two rules earned their place here and both are already written down. *A fixture must be shown to
+respond to the thing under test before it is asserted against* — the control is what separated
+fourteen findings from one. And *a defect proportional to a small count*: fourteen identical
+results should have been read as one cause immediately, not as corroboration.
+
+### The layer, pinned
+
+`runShell` composes the outcome directly:
+
+```ts
+status: exit.code === 0 ? "ok" : "error",
+blocks: [block({ kind: "raw", id: blockId("raw"), text: out })],
+```
+
+**No `error` field.** C04 I3 requires it present iff the status is `"error"`, so *every* failing
+shell command builds an invalid document, `transcript.append` refuses it (C13 I10), and what the
+user sees is F15's fault notice correctly reporting a framework defect.
+
+This is the **third instance of one class**, and `src/shell/documents.ts` already carries the
+other two in a comment above `noticeDoc`:
+
+> *every notice composed with that status was an invalid document, and `transcript.append` threw
+> on all of them. Two shipped call sites: a handoff killed by a signal and a handoff exiting
+> non-zero. **Neither produced an entry.***
+
+The fix was applied to `noticeDoc` — *"filling the field here rather than at the two call sites is
+the class rather than the instances"* — and `runShell` does not go through `noticeDoc`. **The
+class was closed at one composer and this is the other one.** Close the class, not the instance,
+and then check the class has one member.
+
+### The second half: the message exists and is thrown away
+
+`text: out` is stdout. `ChildHandle.stderr` is a separate `AsyncIterable<string>` (C21 I3) and
+`runShell` never reads it — so `sh: 1: list: not found`, the sentence that would have told the
+reader exactly what happened, is produced by the shell, delivered to the framework, and dropped.
+
+The raw block is therefore **empty** as well as unappendable. Fixing only the `error` field would
+have produced a valid document with nothing in it.
+
+**The verb route already does this correctly**, which is both the precedent and the proof it is
+reachable — W12 below shows `svc: permission denied` on screen from exit 13. One route reads
+stderr and one does not.
+
+### Measured
+
+| typed | before | after |
+|---|---|---|
+| `/list` | the table draws | unchanged |
+| `list` | `TranscriptError`, no entry | the exit code, the shell's own message, and what to type instead |
+
+---
+
+## F152 — the far side failed and the notice blames the app author's adapter ★★★
+
+| | |
+|---|---|
+| **Surface** | `src/data/adapters/registry.ts:265`, route 2 |
+| **Reached for** | the same sweep. Two of the fourteen variants |
+| **Verdict** | **misdirection** — accurate sentence, wrong subject |
+
+Point the binary at a path that does not exist and the screen says:
+
+```
+✗ The command did not start.
+spawn /nonexistent/svc ENOENT
+The adapter for "list" failed (Unexpected end of JSON input); showing the default rendering.
+```
+
+The first two lines are right. The third sends the reader to debug an adapter that did exactly
+what it should: there was no output, so there was no JSON. Same with exit 13:
+
+```
+✗ The command exited with code 13.
+svc: permission denied
+The adapter for "list" failed (Unexpected end of JSON input); showing the default rendering.
+```
+
+Route 2 computes `mapResult` **first**, so it already knows the result is a failure, and calls
+`adapter.adapt` anyway:
+
+```ts
+const outcome = mapResult(raw, ctx);
+const produced = adapter.adapt(raw, ctx);
+```
+
+The adapter throws on the empty payload, the catch appends the failure notice, and a correct
+diagnosis is followed by a false one. **The reader has already been told the truth and is then
+told to go and look somewhere else** — which is worse than silence, because the wrong file is
+the one they will open.
+
+It fires on four of the six variants where any far-side failure occurs. The narrow remedy is to
+suppress the notice when `outcome.status === "error"`: the payload is absent by construction, the
+user already has the real cause, and an adapter cannot be at fault for a command that never ran.
+
+---
+
+## F153 — a required field that is absent is reported as a field of the wrong type ★★
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/validate.ts:93` |
+| **Verdict** | **message quality**, and the ruling against it is already written in this repo |
+
+A notice built without a `tone` — which is required (`tone: Tone`, no `?`) — reports:
+
+```
+blocks[0] (notice): "tone" must be a string
+```
+
+`undefined` is indeed not a string, so the sentence is true. It is also the sentence that sends a
+reader to look at the value they wrote rather than at the key they omitted, and there is no value
+to look at.
+
+**`src/shell/config.ts:107` states the ruling, in the other direction, four files away:**
+
+> *`in` rather than a truthiness check: `name: ""` is a supplied field and a bad value, and
+> reporting it as missing sends the reader to the wrong line.*
+
+Absent and wrong are distinguished carefully in `createTui` and conflated in the validator every
+adapter's output passes through. The argument is symmetric and only half of it was applied.
+
+---
+
+## F154 — `make all` ran seven targets and CI ran six ★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/ci.yml`, and the `instruments` recipe's own comment |
+| **Reached for** | publication prep item 3, *wire CI from the tarball*. Found by diffing `make all`'s target list against the workflow's |
+| **Verdict** | **a gate that is not wired is not a gate** — F60's sentence, one job over |
+
+The Makefile's first line says *CI runs these targets, not equivalents*, and the `instruments`
+recipe carries group 9's whole remedy in a comment beside it:
+
+> ***`instruments` is in here rather than run by hand**, which is the whole of group 9's
+> remedy: eleven fixtures nobody runs is the fifth class in `examples/docker/VERIFYING.md` — a
+> gate nobody reports — arriving in the gate built to answer it.*
+
+`make all` is `check enforce audit instruments test golden e2e`. CI's jobs run `enforce`,
+`check`, `audit`, `test`, `golden`, `e2e`, `proof`. **`instruments` is in none of them.** So the
+remedy for *a gate nobody runs* landed in the gate a contributor runs by hand and not in the one
+that decides whether a branch merges — which is the failure it was written about, displaced by
+one level.
+
+Ten seconds, 17 instruments, 119 rows. Now in the `fast` job.
+
+**Found by diffing two lists, which is the only thing that finds it.** Both halves read as
+correct on their own: `make all` is complete, and every job in the workflow runs a real target.
+The defect is in neither list and only in the difference — the same shape as F144's two
+instruments that did not run, and the reason A03 compares its inventories by equality rather
+than by count.
+
+---
+
+## F155 — the measurement that disproved a true figure, and the instrument that reads as idle ★★★
+
+| | |
+|---|---|
+| **Surface** | `test/support/budget.ts`'s recorded 89 ms/pass, and `uptime` |
+| **Verdict** | **a false retraction, caught one command before it was written down** |
+
+Re-measuring the scan cost against the record gave **125, 230, 132 ms** where `budget.ts` says
+89 — a 2.4× ratio and a spread of nearly 2×, taken at a **load average of 0.02**. The
+conclusion wrote itself: the recorded number is a single optimistic sample and the honest figure
+is a range. That sentence was one command from landing in the file whose entire job is to be the
+record a later reader trusts.
+
+Re-run once the machine had actually settled: **70, 71, 71, 75, 78 ms.** The record reproduces
+and is conservative.
+
+**The instrument was the load average, and it was the one nearest to hand.** `0.02` is the
+*one-minute* figure; the five- and fifteen-minute figures were `1.04` and `1.39`. It was not an
+idle machine, it was a machine that had just stopped working — page cache and clock recovery
+still in progress, immediately after a full `make all`. A one-minute average is the wrong
+instrument for *is this quiet now* and it looks exactly like the right one.
+
+This is *a quiet machine is not less contention* pointed the other way: there, quieter-yet-worse
+meant the load was somewhere unlooked-at; here, a number that reads as quiet meant the load had
+merely just left. Both are the same lesson about believing a single reading of a host.
+
+What caught it was re-running after waiting — measuring the case that would falsify the
+falsification. **A retraction is a claim too**, and it gets the same treatment as the thing it
+retracts.
+
+### The reboot settles it, and the variance is the part worth keeping
+
+Re-measured on a rebooted host, settled to `0.01 / 0.01 / 0.00` with a discarded warm-up:
+**65, 65, 65, 66, 66 ms** — a spread of **1 ms** against the pre-reboot settled run's 70-78, and
+0.7× the recorded 89.
+
+**The mean moved a little and the spread collapsed from 11% to 1.5%.** A machine that looked
+settled by every instrument available was still carrying something no reading could name. So the
+lesson is not *the old figure was wrong* — it reproduces — but that **the quietest reading a
+long-lived host can give is noisier than a cold boot's**, which is the same sentence as F155's
+first half approached from the other end.
+
+Per the standing instruction, **no budget was lowered.** A threshold tightened to a rebooted
+developer machine fails on every other machine, and CI is the one that matters.
+
+**And the e2e drift closes.** 228 s → 371 s across one session was recorded as observed and
+unexplained; post-reboot it is **196.7 s**, faster than either, so it was the host and not the
+tree. Kept rather than deleted, because the next unexplained wall-clock growth on a long-lived
+host now has a precedent and a cheap first thing to try. `tools/scan-cost.mjs` now carries the method as code — discard the cold pass, median
+of five — because a figure without one cannot be reproduced or compared, in either direction.
+
+---
+
+## Two carried claims, checked against the record before acting on them
+
+Both were premises for item 3's work, and going to find where each was written down disposed of
+both. The habit's running total is now **five disproved and three produced**.
+
+**"`make proof` runs when someone remembers."** True until F60, and the workflow has carried a
+`proof` job since — conditioned on pull requests as well as `main`, for the reason the `full`
+job already carries, and in `publish`'s `needs` list. It packs the tarball, installs it into a
+tree that has never seen this repository, and runs **both** examples' suites against it. Nothing
+to wire; the claim describes the state the fix already changed.
+
+**"Record both numbers so the next person knows which regime a budget was set in."** Already
+done: `budget.ts` carries the 411 → 89 ms and 17.7 → 3.8 s table with the argument beside it.
+What was *not* there is the half that matters for a foreign runner — **the numbers were in a
+source comment and not in any run's output.** A figure nobody opens while a job is red is not
+available at the moment it is needed, which is what `make regime` fixes rather than the record.
+
+---
+
+## F156 — the gate wired in item 3 passed on every machine that had already run it ★★★
+
+| | |
+|---|---|
+| **Surface** | `Makefile`'s `install` and `check` recipes |
+| **Reached for** | nothing. **The first foreign CI run found it**, 19 seconds in |
+| **Verdict** | **a gate that passes without checking**, and the gate is one this session added |
+
+F150 wired both examples' own `check` scripts into `make check` — the fix for a `check`
+script the Makefile never ran. It did not wire their **install**. So the target passed on every
+machine that had ever run the examples, and failed on the first clean checkout:
+
+```
+main.ts(1,44): error TS2307: Cannot find module '@fmx/calcium' or its type declarations
+```
+
+**Two things were missing and only one is obvious.** `node_modules` in each example is the
+obvious half. The other is `dist/`: an example resolves the package through `file:../..`, and
+this package's `exports` name `dist/index.d.ts` — so `tsc --noEmit` inside an example needs a
+build that `tsc --noEmit` at the root never performs. **A04 §3 says install ends in *the one
+named build*, and the recipe did not build.** The prose was right and the recipe had drifted
+from it, which nothing compares.
+
+### Why local verification could not have caught it
+
+Every check run in this session was on a tree where `examples/minimal/node_modules` already
+existed, put there by earlier work on the example itself. The gate was reading state the
+developer's machine happened to hold. That is the same shape as the four scan rows that only
+failed under load and the e2e drift that only existed on a thirteen-day-old host: **a result
+that depends on the machine's history rather than on the tree.**
+
+It is also the exact thing publication prep item 3 said to do — *wire it, then read the first
+foreign run rather than assuming it carries* — paying out against the work of that same item.
+The instruction was written about budgets and the first foreign run answered about a gate.
+
+Fixed in `make install`, verified in a clean clone in the container: install 0, check 0. The
+failing case needs no fabrication — CI's `fast` job is the measurement.

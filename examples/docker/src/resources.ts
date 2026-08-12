@@ -22,28 +22,14 @@
  */
 
 import { b } from "@fmx/calcium";
-import type { AdapterContext, Block, ColumnDef, RawResult, ViewDocument } from "@fmx/calcium";
+import type { AdapterDocument, AdapterContext, Block, ColumnDef, RawResult, ViewDocument } from "@fmx/calcium";
 import { parseNdjson, str, type Row } from "./ndjson.ts";
 
 /** The nine `meta` fields, as F13 requires until `compose` is exported. */
-function metaOf(result: RawResult, ctx: AdapterContext, adapter: string): ViewDocument["meta"] {
-  return {
-    verb: ctx.verb,
-    adapter,
-    exitCode: result.exitCode ?? 0,
-    durationMs: result.durationMs,
-    truncated: false,
-    argv: result.argv,
-    stderr: result.stderr,
-    transport: ctx.transport,
-    origin: ctx.origin,
-  };
-}
-
 const failureOf = (result: RawResult): string =>
   result.stderr.trim() || `docker exited ${String(result.exitCode)}`;
 
-function failureDoc(result: RawResult, ctx: AdapterContext, adapter: string): ViewDocument {
+function failureDoc(result: RawResult, ctx: AdapterContext, adapter: string): AdapterDocument {
   const message = failureOf(result);
   return {
     schema: "tui.view/1",
@@ -53,7 +39,7 @@ function failureDoc(result: RawResult, ctx: AdapterContext, adapter: string): Vi
     // C13 throws, C23 discards, and the reader gets no entry at all (F35).
     error: { message, stage: "adapter" },
     blocks: [b.notice.error(message)],
-    meta: metaOf(result, ctx, adapter),
+    meta: { adapter },
   };
 }
 
@@ -62,12 +48,12 @@ const okDoc = (
   ctx: AdapterContext,
   adapter: string,
   blocks: readonly Block[],
-): ViewDocument => ({
+): AdapterDocument => ({
   schema: "tui.view/1",
   command: ctx.command,
   status: "ok",
   blocks,
-  meta: metaOf(result, ctx, adapter),
+  meta: { adapter },
 });
 
 // ── the six list verbs ──────────────────────────────────────────────────────
@@ -193,7 +179,7 @@ export function createListAdapter(verb: string) {
   const spec = LIST_SPECS[verb]!;
   return {
     schema: "tui.view/1" as const,
-    adapt(result: RawResult, ctx: AdapterContext): ViewDocument {
+    adapt(result: RawResult, ctx: AdapterContext): AdapterDocument {
       if (result.exitCode !== 0) return failureDoc(result, ctx, verb);
 
       const { rows, skipped } = parseNdjson(result.stdoutRaw);
@@ -235,7 +221,7 @@ export function createListAdapter(verb: string) {
 export function createResourceInspectAdapter(verb: string) {
   return {
     schema: "tui.view/1" as const,
-    adapt(result: RawResult, ctx: AdapterContext): ViewDocument {
+    adapt(result: RawResult, ctx: AdapterContext): AdapterDocument {
       if (result.exitCode !== 0) return failureDoc(result, ctx, verb);
 
       const text = result.stdoutRaw.trim();
