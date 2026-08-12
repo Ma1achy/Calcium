@@ -15,7 +15,6 @@
 
 import { appendFileSync } from "node:fs";
 import {
-  access,
   appendFile,
   mkdir,
   readdir,

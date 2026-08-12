@@ -32,7 +32,7 @@ import {
   checkBuilderCoverage,
   checkSeamConsumers,
 } from "../../tools/enforce/module-graph.mjs";
-import { checkMarks, checkSourceScans, MARK_EXEMPTIONS, SCANS } from "../../tools/enforce/source-scans.mjs";
+import { checkMarks, checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/dependencies.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";

@@ -278,7 +278,7 @@ it("T4.7 (C17 §2, C22 I13): the prompt's rendered height equals displayRows, on
   // elision marker with every arithmetic check passing.
   const stdin = fakeStdin();
   const COLUMNS = 60;
-  const { stdout, screen } = await buildSession(
+  const { screen } = await buildSession(
     { stdin: stdin as never },
     { columns: COLUMNS, rows: 24 },
   );

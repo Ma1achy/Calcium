@@ -13,7 +13,6 @@ import { PATCH_CORPUS, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
 import { FULL_CAPS, measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
-import type { Patch } from "../../src/data/viewmodel/index.js";
 
 const WIDTHS = [40, 60, 80, 100, 120, 160, 200] as const;
 const UNIFIED = [40, 60, 80] as const;

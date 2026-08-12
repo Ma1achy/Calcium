@@ -40,7 +40,7 @@ function raw(over: Partial<RawResult> = {}): RawResult {
 
 const marker: Adapter = {
   schema: "tui.view/1",
-  adapt: (r, ctx) => ({
+  adapt: (_r, ctx) => ({
     schema: "tui.view/1",
     command: ctx.command,
     status: "ok",

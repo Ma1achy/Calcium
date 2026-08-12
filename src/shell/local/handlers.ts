@@ -15,7 +15,7 @@
 import { visibleTools } from "../../data/manifest/index.js";
 import type { Manifest } from "../../data/manifest/index.js";
 import { block } from "../../data/viewmodel/index.js";
-import type { Block, LocalDocument, ViewDocument } from "../../data/viewmodel/index.js";
+import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { TranscriptStore } from "../../viewport/transcript/index.js";
 import type { HistoryEntry } from "../../interaction/history/types.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";

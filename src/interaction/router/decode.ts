@@ -18,7 +18,6 @@
  */
 
 import type {
-  DecodeCapabilities,
   Decoder,
   DecoderOptions,
   InputEvent,

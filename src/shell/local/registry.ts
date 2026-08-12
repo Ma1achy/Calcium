@@ -17,7 +17,7 @@
  */
 
 import type { Manifest } from "../../data/manifest/index.js";
-import type { Block, LocalDocument, ViewDocument } from "../../data/viewmodel/index.js";
+import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 export type Choice = Readonly<{ key: string; label: string; default?: true }>;

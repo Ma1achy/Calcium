@@ -228,7 +228,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     const called = new Set<string>();
     const real = graph.editor;
     const spy = new Proxy(real, {
-      get(target, prop, receiver) {
+      get(target, prop) {
         const value = Reflect.get(target, prop, target);
         if (typeof value !== "function") return value;
         return (...args: unknown[]) => {

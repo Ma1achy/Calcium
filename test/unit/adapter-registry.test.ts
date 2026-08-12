@@ -52,7 +52,7 @@ function raw(over: Partial<RawResult> = {}): RawResult {
 function markerAdapter(over: Partial<Adapter> = {}): Adapter {
   return {
     schema: "tui.view/1",
-    adapt: (r, ctx) => ({
+    adapt: (_r, ctx) => ({
       schema: "tui.view/1",
       command: ctx.command,
       status: "ok",

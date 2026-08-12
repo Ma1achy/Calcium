@@ -12,7 +12,7 @@
 
 import type { ConfirmHost } from "./confirm.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
-import type { Manifest, ManifestDocument, ManifestStore } from "../data/manifest/index.js";
+import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { ProcessRunner } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
 import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";

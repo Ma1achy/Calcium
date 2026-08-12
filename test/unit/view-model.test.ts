@@ -14,7 +14,6 @@ import {
   validateDocument,
   type MergeRow,
   type Table,
-  type TableRow,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";

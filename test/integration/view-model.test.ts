@@ -8,7 +8,7 @@
 // which is what `todo-expiry` is for: the note nobody would otherwise send to the
 // person who could act on it.
 import { describe, expect, it } from "vitest";
-import { createAdapterRegistry, createFallbackAdapter } from "../../src/data/adapters/index.js";
+import { createAdapterRegistry } from "../../src/data/adapters/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import {
   applyPatch,

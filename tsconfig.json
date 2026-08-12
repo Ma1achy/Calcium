@@ -12,6 +12,26 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
+
+    // **F141's row, and it earned its place on two findings rather than on
+    // tidiness.** `noUnusedLocals` found `CHROME_CELLS` — the constant feeding a
+    // width function that C19 deliberately removed when the menu became
+    // full-region, left behind with its doc comment reading as live. The
+    // example's `unicodeText` was the same shape: a dead computation kept alive
+    // by a careful justification whose premise had gone stale. And
+    // `noUnusedParameters` found `createPatchAdapter(fallback)`, a seam a direct
+    // import had superseded — F58b's class, a value computed at the call site
+    // and discarded.
+    //
+    // **Three of fifty-seven were findings; the rest was cruft**, and the split
+    // is the reason to turn it on rather than the count. A residue reads exactly
+    // like a live thing, and nothing else in the suite looks for one.
+    //
+    // `noUnusedParameters` needs the `_` prefix for a parameter that is
+    // positional and deliberately ignored, which this tree already used before
+    // the flag existed — `_dropped`, `_excess`, `_router`.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,

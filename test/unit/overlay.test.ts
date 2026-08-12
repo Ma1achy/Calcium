@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { OverlayChange } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, placeIn, registry, view } from "../support/overlay.js";
+import { REGION, centred, placeIn, registry, view } from "../support/overlay.js";
 
 const manager = () => createOverlayManager({ registry });
 

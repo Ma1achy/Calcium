@@ -34,7 +34,7 @@ import { producerContext } from "../support/producer-context.js";
  * so somebody above must, and this is the whole of what they do.
  */
 function submit(
-  router: TransportRouter,
+  _router: TransportRouter,
   manifest: ReturnType<typeof fixture>,
   inv: Invocation,
 ): "local" | "invoke" | "stream" {

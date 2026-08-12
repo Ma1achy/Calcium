@@ -6,7 +6,7 @@
 // A row about it written against `buildGraph` would measure the harness.
 import { describe, expect, it } from "vitest";
 
-import { MANIFEST, buildSession, fakeFs } from "../support/session.js";
+import { buildSession, fakeFs } from "../support/session.js";
 import type { TuiConfig } from "../../src/shell/types.js";
 import { createExecutionPipeline } from "../../src/shell/execution.js";
 import { fakeStdin } from "../support/fake-terminal.js";
@@ -150,7 +150,7 @@ describe("C22 integration — the frame's viewport", () => {
     // this was a red test rather than a green one measuring nothing**, which is
     // exactly what it was written for.
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 16 });
+    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 16 });
 
     const type = async (bytes: string): Promise<void> => {
       stdin.emit(bytes);
@@ -254,7 +254,7 @@ describe("C22 integration — the frame's viewport", () => {
     // invariant claims is that a frame carrying the spinner arrives **with no
     // further input**, and that is what fails for both mutations.
     const stdin = fakeStdin();
-    const { stdout, clock, screen } = await buildSession(
+    const { clock, screen } = await buildSession(
       { stdin: stdin as never, completionSources: [slow] } as never,
       // 20 rows, not 12: below C22 §8b's 60×16 gate the session draws
       // `Terminal too small` and every assertion here is about the fallback.
@@ -312,7 +312,7 @@ describe("C22 integration — the frame's viewport", () => {
     // because the thunk agreeing with the keymap is not the claim: the claim is
     // that the help a user reads contains them.
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
+    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
 
     // **`/help keys`, not `/help`.** The keymap moved behind an argument when
     // `/help` was measured at thirty verbs: it emitted every binding last, and
@@ -366,7 +366,7 @@ describe("C22 §7 — identity, from the app through C23", () => {
     // config field behind it, so no token could arrive to be nearly expired.
     // Either alone leaves the behaviour identical, which is why neither was
     // visible as a defect on its own.
-    const { stdout, screen } = await buildSession({
+    const { screen } = await buildSession({
       clock: () => NOW,
       identity: () => Promise.resolve(nearlyExpired()),
     });
@@ -384,7 +384,7 @@ describe("C22 §7 — identity, from the app through C23", () => {
     // The default is a *fetcher*, not an absent loop. Without this half, a
     // "default" that skipped construction entirely would pass T1.4e — and the
     // session would have no health transitions at all.
-    const { stdout, tui, screen } = await buildSession({ clock: () => NOW });
+    const { tui, screen } = await buildSession({ clock: () => NOW });
 
     await settle();
 
@@ -517,7 +517,7 @@ describe("C22 §4 step 7 — the greeting (I44)", () => {
     // action puts its command in the prompt (C04 I19's default kind), which is
     // visible without asserting on any internal.
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession(
+    const { screen } = await buildSession(
       {
         stdin: stdin as never,
         // **The verb is declared here, because C23 I27 refuses a handler with

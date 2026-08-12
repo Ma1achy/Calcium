@@ -20,17 +20,6 @@ import type { Candidate } from "./types.js";
 /** The id C15 knows the menu by; one layer for a whole completion (§6). */
 export const MENU_ID = "completion-menu";
 
-/** Padding either side of the widest entry, plus C15's border. */
-const CHROME_CELLS = 4;
-
-/**
- * How wide the menu wants to be (I8, C15 I16).
- *
- * **C19 declares this because nothing downstream can work it out.** A
- * `BlockRegistry` answers height at a width and never the reverse, so C15 knows
- * the region and this component knows the longest candidate, and neither can
- * supply the other's half.
- */
 /**
  * The selection glyph and its separator, which the value column must also hold.
  *

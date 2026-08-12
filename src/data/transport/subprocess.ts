@@ -22,7 +22,7 @@ import { withJson } from "./argv.js";
 import { escalate } from "./ladder.js";
 import { createNdjsonReader } from "./ndjson.js";
 import type { ChildHandle, Exit, ProcessRunner, SpawnOptions } from "../process/types.js";
-import type { Clock, Invocation, RawPatch, RawResult, VerbTransport } from "./types.js";
+import type { Clock, Invocation, RawPatch, VerbTransport } from "./types.js";
 
 type Termination = { cancelled: boolean; timedOut: boolean };
 

@@ -11,7 +11,7 @@
  */
 
 import { visibleTools, type Manifest, type ToolDef } from "./deps.js";
-import type { Candidate, CompletionContext, CompletionSource } from "./types.js";
+import type { Candidate, CompletionSource } from "./types.js";
 
 /**
  * What the filesystem sources are given (I17).
