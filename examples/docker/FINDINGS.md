@@ -6711,3 +6711,46 @@ failures rather than deadlines — *expected `'❯ /inv…'` to be `'❯ /invo'`
 right and it uncovers real work beneath, which is a ruling rather than a repair: what tier 5's
 default terminal *is* decides what a hundred rows are about. C02's own rows set `env`
 explicitly and spread last, so they keep winning either way.
+
+---
+
+## F148 — a valued flag reaches the far side without its value ★★★
+
+| | |
+|---|---|
+| **Surface** | the prompt-to-spawn path: C18 parse → C23 dispatch → C06 subprocess argv |
+| **Reached for** | nothing. Uncovered by F147's ruling — these rows previously died at the prompt wait and never got here |
+| **Verdict** | **framework-side**, and it is the first thing the degraded rendering was hiding |
+
+The row types `/ps --limit 400`. The buffer shows `❯ /ps --limit 400`. The far side prints its
+own argv, and it is:
+
+```
+far side pid=… cwd=/workspaces/tui-kit argv=ps --limit --json
+```
+
+**The value is gone.** `farside.mjs` then falls back to its default of 2 rows, so a row waiting
+for `0000399` waits for ever. Five occurrences in one serial tier-5 run, and the five are
+exactly the five rows that pass a value to `--limit`: `view-model` T5.1, T5.1b, T5.2, T5.3a and
+`transport` T5.1.
+
+**The manifest declares it valued** — `{"name":"limit","short":"n","type":"int"}` — so this is
+not a fixture disagreeing with a row. A flag typed with a value must arrive with it.
+
+**Two candidate causes ruled out by measurement rather than by reading:**
+
+- **Not the completion menu.** Escape before Enter, so the menu is dismissed, produces the same
+  argv. The value is not being replaced by an accepted candidate.
+- **Not the paste path.** `pty.type` writes the whole line in one call, which C16's heuristic
+  reads as a paste — but typing the same line one character at a time, outside the paste window
+  entirely, loses the value identically.
+
+So it is neither of the two mechanisms that would have been guessed, and the layer is not yet
+pinned. That is the next row's work; this one records the defect, its exact reproduction and
+what it is not.
+
+**Why it was invisible.** Every one of these five rows waits on the prompt glyph first. Under
+the harness's `LANG`-less environment the prompt was `>`, the wait timed out at 15 seconds, and
+the row never reached the command it was written to test. **44 deadlines were hiding this.**
+That is the argument for F147's ruling in one line: a deadline says nothing, and an assertion
+says what the application did.
