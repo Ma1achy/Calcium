@@ -6458,6 +6458,44 @@ both are right and `raw` is the degraded path with `logs` the structured one, in
 **that sentence exists nowhere** and is the actual gap. Deciding it needs the S12 walk, which
 this row is not.
 
+### The walk, and it produced a fourth reading
+
+**The removal reading is out, and the figure is what settles it.** S12 draws three columns —
+`14:23:01.882`, a `WARN`, a message — which is `Logs`'s declared shape exactly:
+`lines: { ts, level, message }[]`. `raw` is one flat string per line, so the alignment would be
+baked into the text instead of computed at the width, and **`WARN` would draw in body colour**:
+`levelTone` maps error/fatal, warn, debug/trace and the rest, and only the `logs` renderer calls
+it. No other surface composes a `logs` block — every other mention across S02, S03, S04 and S05
+is the `--logs` *flag* or an action routing here — so this one figure decides it.
+
+**The deciding reason is not appearance.** `logs` is the only kind in the tree that implements
+`window`; `raw` has none. S12's own status line reads *1,284 lines* inside a panel showing five.
+**A surface built to scroll a long log specified the one kind that cannot be scrolled**, and the
+spec line is corrected rather than the block removed.
+
+**And the fourth reading, which none of the three anticipated.** `ViewPatch` carries `append` (a
+whole block), `replace`, `merge` (table *rows*), `status` and `expand`. **There is no operation
+that appends a line to a `logs` block.** Growing one means `replace` with a larger block every
+tick, re-sending every line each time.
+
+That is why the kind has no consumer, and it splits the situation rather than resolving it:
+
+| route | can use `logs` today | why |
+|---|---|---|
+| S12, a **bounded** view | **yes** | fetch, build the block once, window it — no patch involved |
+| the app's `/logs -f`, a **stream** | **no** | one line per tick, and the only growth op re-sends the block |
+
+So F64 — *docker-tui builds `b.raw` where the drawing wanted toned log lines* — is **right about
+the drawing and wrong to read as a defect in the app**. The streaming route has no operation to
+reach for. The incremental op is owed, is **additive** to a union apps produce rather than
+exhaustively consume, and therefore lands after publication.
+
+**Not freeze-relevant.** No public type is removed and none is narrowed — the walk ruled against
+the reading that would have done either, which is the whole reason it was run first.
+
+**Closed as a spec correction**: S12 §Blocks now composes `logs`, with the windowing argument
+and the missing patch operation recorded beside it.
+
 ---
 
 ## F142 — a derived count is derived once, and nothing re-derives it ★★

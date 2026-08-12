@@ -45,7 +45,13 @@ The convention sentence is still correct where it belongs — S01 §2, and S13's
 
 Three regions: a title bar carrying the source and connection state, the lines, and a two-row footer — a status line and a keymap line. **The title bar is the panel's top border and the keymap is its `footer`**; the status line is an ordinary child.
 
-**Blocks, in order**: `panel` with `title` *logs · a3f9b21 · gpu-04.fmx.internal ─ ● following* and `footer` *esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow*, wrapping `raw` (5 log lines), `rule` with `gapBefore`, and `keyValue` (the status line). Five inner rows, one join, one rule, one status — eight children in ten rows with the border.
+**Blocks, in order**: `panel` with `title` *logs · a3f9b21 · gpu-04.fmx.internal ─ ● following* and `footer` *esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow*, wrapping `logs` (5 log lines), `rule` with `gapBefore`, and `keyValue` (the status line). Five inner rows, one join, one rule, one status — eight children in ten rows with the border.
+
+**This line said `raw` and the figure above says otherwise** (F141). The figure has three columns — `14:23:01.882`, a `WARN`, and a message — which is `Logs`'s shape exactly: `lines: { ts, level, message }[]`. `raw` is one flat string per line, so the alignment would be baked into the text rather than computed at the width, and **`WARN` would draw in body colour**: `levelTone` maps error/fatal, warn, debug/trace and the rest, and only the `logs` renderer calls it.
+
+**And the deciding reason is not appearance.** `logs` is the only kind in the tree that implements `window`. This surface's own status line says *1,284 lines* inside a panel showing five, so windowing is the whole mechanism — and `raw` has none. A surface built to scroll a long log specified the one kind that cannot be scrolled.
+
+**What this does not license, and it is why the block looked unused.** `ViewPatch` has `append` (a whole block), `replace`, `merge` (table rows), `status` and `expand` — **there is no operation that appends a line to a `logs` block.** A bounded view like this one is unaffected: it fetches, builds the block once, and windows it. A *streaming* view is not — growing a `logs` block means `replace` with a larger one every tick, re-sending every line each time, which is why the reference app's `/logs -f` emits one `raw` block per line (F64) and is right to. The incremental operation is owed and is additive; it is not this surface's blocker.
 
 **The status line answers "am I seeing everything?"** Active filter, level threshold, total lines received, and a warning count. A filtered view that looks empty is indistinguishable from a quiet process unless the filter is stated.
 
