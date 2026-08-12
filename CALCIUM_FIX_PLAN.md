@@ -327,7 +327,7 @@ leaves a constructed graph — measured identical on the pre-gate tree, so inher
 | item | fix | depends on |
 |---|---|---|
 | ~~**F79 · F86** `screen.py`'s OSC leak, and F79's mechanism unestablished~~ | — | **CLOSED** — the leak repaired and measured, 15 rows in `examples/docker/tools/screen_test.py`, five mutations. **Group 9 does not close: 1 of 11** |
-| **Group 9's other ten instruments** | **audit** | one fixture each, and a runner that runs them all |
+| **Group 9's other ten instruments** | **change** | one fixture each, and a runner that runs them all — planned below, and the pre-check moved two rows before a line was written |
 | ~~**Group 12** F69, F73 — time-based assertions under contention~~ | — | **NOT WORK** — ruled in this document, and `test/support/budget.ts` holds the measured half |
 | ~~**Group 7** 14 artefact findings~~ | — | **NOT WORK** — *habit, not a patch*, and the 14-vs-15 is measured and explained by F87 |
 | **Group 10** 5, all disproved | → `CLAUDE.md` | — |
@@ -389,6 +389,61 @@ from a mention. So the 55 placements are one reader's, made from each entry's he
 document says so where they sit. The *shape* of the finding is robust to a few misplacements;
 a precise ranking from it is not. Tightening the key form to table rows only is what would make
 it checkable, and it is filed rather than done.
+
+### Group 9's other ten — what each instrument claims, and the pre-check that moved two rows
+
+**Do not port.** The six rows carried over to `screen_test.py` inherited `composeFrame`'s
+domain and left *CUP ignores its column* green, because not one of them addresses a column.
+These ten replay, time, capture, measure and mutate — five domains, none of them `screen.py`'s.
+So the question per instrument is **what does this tool claim, and what input distinguishes a
+working one from a broken one**, and the answer is a fixture rather than a translation.
+
+**The pre-check ran first across all ten and moved two rows before a line was written.**
+
+- **The mutation runner already has a fixture.** `test/unit/mutate-harness.test.ts`, six rows,
+  and its fabrication is the real defect — the ANSI codes vitest puts between `Tests` and
+  `1 failed`, which made eight caught mutations report as survivors. It was found in the third
+  place, the file's own directory, and not in `docs/` or `test/support/`. So the row that was
+  named *goes first* is largely done, and what it is owed is one row: a `run` whose output never
+  reaches a summary at all, which is today's instance (a `grep -q` taking SIGPIPE under
+  `pipefail`, exit 141, every mutation reported a survivor).
+- **The waiter is not a file.** It was re-invented per invocation as a shell idiom, which is
+  exactly why it had no fixture and exactly how it fired on the load line and reported a run
+  complete that had not started. **A fixture cannot be written for something with no home**, so
+  the remedy is a file first: `tools/waitfor.mjs`, armed on a sentinel rather than on the file
+  being non-empty.
+
+That leaves the third of the three — the bench, whose liveness line said `patch lines` during a
+`logs` run — plus the eight untouched.
+
+| instrument | what it claims | what distinguishes a broken one |
+|---|---|---|
+| `tools/bench/frame.mjs` | the numbers below the line came from a screen with the document on it | a blank screen reported live; a label naming a kind the run did not use |
+| `tools/waitfor.mjs` *(new)* | the run it was waiting for has finished | any earlier write to the file satisfying it |
+| `tools/mutate/mutate.mjs` | a survivor is a finding about the test | a run whose output carries no summary at all |
+| `beats.py` | the cut lands on a settled screen | a cut at the asked-for timestamp, mid-redraw |
+| `screencast.py` | every command is typed, and Enter submits it | a gap shorter than C16's paste window, or a burst |
+| `capture.py` | the cast and the raw stream are one session | a multi-byte sequence split across two reads |
+| `s3_esc.py` | a tick surviving the pop has time to draw | a hold shorter than two intervals |
+| `media.py` | each image is evidence for the claim beside it | a frame below the floor at which the app draws nothing |
+| `gap-check.mjs` · `measure-raw.mjs` · `measure-s3.mjs` | measured through the application's own configuration | a registry missing a kind, so the block is measured by the fallback |
+| `tools/proof.sh` | the tarball installed, and where we said | npm reporting an override as accepted while publishing elsewhere |
+
+**Three of those columns are transcribed from the instrument's own header**, which is where the
+measured defect was already written down — `measure-s3.mjs` says a defaults-only registry
+answers 5 rows for a panel that draws 13, and `capture.py` says a chunk decoded independently
+puts U+FFFD inside a panel border. **A fixture that would have caught its own instance is the
+acceptance test for each**, and for those three the instance is already in the file.
+
+**The runner is the deliverable, not the fixtures.** Eleven fixtures with no runner is eleven
+things nobody runs — which is the fifth class in `VERIFYING.md`, a gate nobody reports, arriving
+in the gate built to answer it. One target, `make tools-test`, extended rather than joined by a
+second shape.
+
+**And the runner compares the inventory by equality**, on A03's precedent and SP6's: the set of
+instrument files against the set with a fixture, so a *new* instrument fails the gate on the day
+it lands. A runner over a hand-listed eleven closes eleven files; the equality closes the class.
+**Group 9 closes when all eleven have a fixture and one target runs them**, and not before.
 
 **Group 12 is a decision already taken**, and it is here so nobody retakes it: `make load-down`
 keeps its place on the asymmetry rather than the odds, and both measurements are recorded —
