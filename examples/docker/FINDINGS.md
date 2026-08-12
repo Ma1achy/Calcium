@@ -6745,12 +6745,131 @@ not a fixture disagreeing with a row. A flag typed with a value must arrive with
   reads as a paste — but typing the same line one character at a time, outside the paste window
   entirely, loses the value identically.
 
-So it is neither of the two mechanisms that would have been guessed, and the layer is not yet
-pinned. That is the next row's work; this one records the defect, its exact reproduction and
-what it is not.
+So it is neither of the two mechanisms that would have been guessed.
+
+### The layer, pinned — and the scope is wider than this finding first said
+
+**`validateInvocation`, `src/data/manifest/validate.ts`. C05, one layer below both suspects.**
+Not the parser, not the transport. `transmitted` is built by the walk that owns the grammar
+(I21, F39) — and that walk pushes **one token per loop iteration**, while a valued flag whose
+value is its own token spans **two**. The value is consumed by the `i++` that steps past it and
+the top-of-loop push never sees it.
+
+Measured directly against the validator, which is where the finding's real scope came from:
+
+| argv | `transmitted` before | after |
+|---|---|---|
+| `--limit 400` | `["--limit"]` | `["--limit","400"]` |
+| `-n 400` | `["-n"]` | `["-n","400"]` |
+| `--search abc` | `["--search"]` | `["--search","abc"]` |
+| `--since 1h` | `["--since"]` | `["--since","1h"]` |
+| `--label a --label b` | `["--label","--label"]` | `["--label","a","--label","b"]` |
+| `--limit=400` | `["--limit=400"]` | unchanged |
+
+**It is not `int`, and it is not the long form.** Every type, both forms, and repeatable loses
+one value per occurrence. **Only the inline `=` form ever worked** — which is the whole answer
+to why nothing above C05 saw it for the length of the build.
+
+**A structural interaction, not an event-mediated one**, which is why no trace could reach it:
+*"the walk pushes once per iteration"* and *"a value may be its own token"* are both true at
+rest, with nothing happening between them. C18's classification-table shape is what indexes
+this, and the validator never had one. The comment above the site reasons about spans for the
+`shellOnly` skip — *"a switch spans exactly one token… which is why this is a skip rather than
+a span"* — and does not ask the same question of the branch twenty lines below that consumes a
+following token.
+
+**Why the tests agreed.** Every existing assertion about `transmitted` uses `--help`: a bool,
+one token, and the only flag shape the walk handles correctly. T1.16 compares the two flag-value
+forms and compares them on `args`, where they agree — the field that disagreed was never read.
+A suite indexed by the feature tested the rule against itself.
+
+**Closed.** Two pushes at the two consumption sites. T1.16b (unit), T2.9c (contract, the `argv`
+hop), T6.13 (fail-on-revert, asserted as the property across four flag shapes rather than one
+case). Reverting both sites turns exactly those three red and nothing else, out of 127.
+`transport` T5.1 now passes.
 
 **Why it was invisible.** Every one of these five rows waits on the prompt glyph first. Under
 the harness's `LANG`-less environment the prompt was `>`, the wait timed out at 15 seconds, and
 the row never reached the command it was written to test. **44 deadlines were hiding this.**
 That is the argument for F147's ruling in one line: a deadline says nothing, and an assertion
 says what the application did.
+
+## F149 — the harness reads a frame the shell stopped writing after the first one ★★★★
+
+| | |
+|---|---|
+| **Surface** | `test/support/pty.ts`, `interactivePty.frame` — the getter every tier-5 row asserts through |
+| **Reached for** | nothing. Uncovered by fixing F148: the value arrived, the row still failed, and the frame in the failure message was the evidence |
+| **Verdict** | **instrument**, and it is the second class of §9 — a fabricated artefact, not a truncated one |
+
+`frame` reconstructs the current screen as **everything after the last `CSI H`**, and its comment
+states the shape it relies on:
+
+> *one write per frame, beginning with a hide and `CSI H` and ending with the cursor's position.
+> So the current frame is everything after the last `CSI H`* — citing S01 §3 and C22 §6.
+
+**Measured, on a live session at 100×24: `homes=1`.** The shell writes `CSI H` once, on its first
+paint, and never again. So `frame` returns the first paint **plus every frame since**, escapes
+stripped and rows run together.
+
+The failure that showed it — `view-model` T5.1, after F148 was fixed. The data is all there:
+
+```
+row 1..22   blank
+row 23      ❯
+row 24      ❯ /ps --limit 400   0000379 queued   0000380 queued  …  0000399 runni…
+```
+
+Twenty-two rows of a screen that has 400 rows of content on it, and the entire transcript
+concatenated onto one row. That is not a layout the shell can produce.
+
+### The app is right and the citation is wrong
+
+`src/shell/render-frame.ts:156`, C22 **I55 §6b**: the whole-frame form is the *fallback* —
+
+> *`HOME` plus every row joined is the whole-frame form and it is what every no-record case falls
+> back to: the first frame, a contaminated one, one whose predecessor was a different size, and
+> one following a refusal or a throw.*
+
+— and the ordinary frame is a **difference**, each changed row addressed with `cursorTo(i, 0)`.
+Measured on the same session: 32 CUP sequences in the tail and one home. `CSI_ANY` strips every
+one of those addresses, so rows written to line 4 and line 19 arrive adjacent in a string.
+
+**This is the sixth blind spot, pointed at a harness.** The claim carried a citation to two
+specs, and one of them says the opposite in a numbered invariant. A citation reads as
+authority, and nobody goes to look.
+
+### What it means for every row that has ever asserted on a frame
+
+The reconstruction is correct for exactly one frame — the first. After that:
+
+- **A "contains" assertion passes by accident.** The blob accumulates, so the text is in it
+  whether or not it is on the screen. This is why most rows are green.
+- **An absence assertion cannot pass honestly.** `not.toContain("first-text")` is asserting that
+  something never appeared, not that it is gone — the harness's own `frame` doc-comment warns
+  about exactly this hazard for `output` and the getter written to fix it has the same property.
+- **Anything positional or countable is simply wrong**: which row the prompt is on, how many
+  rows carry a marker, whether the last row is reachable.
+
+The failing shapes in the current tier-5 run are that list: `both rows are on the screen:
+expected 1 to be 2`, `expected 1 to be greater than 1`, `expected 23 not to be 23`, `gone from
+the screen: not to contain 'first-text'`, and *the last row is reachable* timing out against a
+screen that has it.
+
+### The remedy is a screen, not a slice
+
+A frame cannot be recovered by slicing a stream that describes edits. The harness needs a row
+buffer that **applies** what it receives — CUP moves the write head, text overwrites the row it
+lands on, `CSI H` resets to the origin — which is what the terminal on the other end is doing.
+It is the smallest emulator that makes the getter's own doc-comment true.
+
+Scoped, not built: this is the sole reader of `frame`, but it is read by sixteen tier-5 files
+and every green row asserting through it is currently unverified rather than known-good.
+
+### Why F148 had to be fixed first
+
+Both defects were on the same path and the outer one hid the inner. With the value dropped, the
+far side printed two rows, the frame's blob was short, and nothing about the run said *the rows
+are in the wrong place*. Fixing the flag put 400 rows on the screen, and a 400-row transcript
+collapsed onto one line is not a thing a reader can look at and not see. **A frame-read found
+it — the fourth time on this component that reading output found what no assertion did.**

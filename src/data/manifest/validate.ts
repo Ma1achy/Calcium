@@ -243,6 +243,12 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
     //
     // A switch spans exactly one token, which is why C05 refuses `shellOnly` on
     // anything else, and why this is a skip rather than a span.
+    //
+    // **The loop pushes one token per iteration; a valued flag spans two** (F148).
+    // `--limit 400` reached the far side as `--limit`, because the value was
+    // consumed by `i++` below and the top-of-loop push never saw it — silently,
+    // on every type and on both forms, with only `--limit=400` surviving. So
+    // each site that consumes a following token now transmits it there.
     if (!terminated && token.startsWith("--") && !token.includes("=")) {
       const f = byName.get(token.slice(2));
       if (f?.shellOnly === true) {
@@ -307,12 +313,15 @@ export function validateInvocation(tool: ToolDef, argv: readonly string[]): Vali
         continue;
       }
       occurrences.push({ flag, raw: next });
+      transmitted.push(next);
       i++;
       continue;
     }
 
     if (looksLikeFlag(token)) {
-      i += readShort(token, i);
+      const consumed = readShort(token, i);
+      if (consumed === 1) transmitted.push(argv[i + 1] ?? "");
+      i += consumed;
       continue;
     }
 

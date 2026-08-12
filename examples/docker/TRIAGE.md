@@ -37,7 +37,7 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
 | **8** | [Absence indistinguishable from failure](#8) | 10 | **3 open** (5 closed) | partly | real Calcium work · **5 of 8 fixed** |
-| **9** | [**The instrument was wrong**](#9) | 18 | **10** | — | **new at F80** · tooling, and it has no test |
+| **9** | [**The instrument was wrong**](#9) | 19 | **11** | — | **new at F80** · tooling, and it has no test |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
 | **11** | [A gate that passes without checking](#11) | 25 | **9** | — | 4 closed · **2 open, both about a rule's reach** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
@@ -384,6 +384,7 @@ against the bytes it was replaying.**
 | **F143** | `tools/capture.py`, again | F63's fix, scoped by a true sentence that was not the one the decision needed: the final flush stayed strict, so a capture ending mid-character **raised after the raw stream was written** and the session's `.cast` was lost. **Fixed** — strict body, one replacement at the very end |
 | **F144** | `tools/gap-check.mjs`, `tools/measure-raw.mjs` | **neither ran at all.** Both called interfaces that had moved (`splitRaw`'s measure, `createDocumentView`'s `measureSequence`) and died on their first call. Nothing consulted them, so nothing noticed. **Fixed**, and the runner is what closes the class |
 | **F145** | `tools/bench/patch-window.mjs` | the gutter guard **printed `← DRIFT` and carried on**, while the two guards beside it exit. A drifted window is a plausible number for a path that is not the one being timed. **Fixed** — it exits |
+| **F149** | `test/support/pty.ts` — **the framework's own harness, not the demo's tooling** | `frame` slices from the last `CSI H`, citing S01 §3 and C22 §6 for the shape. Measured on a live session: **one home, ever.** C22 I55 makes every later frame a *difference*, so the getter returns the first paint plus every edit since, addresses stripped and rows run together. A contains-assertion passes by accident; anything positional is wrong. Open — the remedy is a screen, not a slice |
 | **F86** | `tools/screen.py`, again | **F79's stated mechanism, measured and falsified.** An unterminated OSC consumes nothing — the regex is anchored to a terminator — and the quoted bytes render correctly in isolation. A *different* real defect: the OSC leaks as visible text. Open |
 
 **The disposition is not "fix the tools".** Five of six are already fixed and the sixth is a
@@ -485,7 +486,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F56** | `package.json`'s `bin` | a claim about an executable, accepted by install, pack, `publish --dry-run` and `make proof`. Three consumers existed and **all three reached around the entry point** |
 | **F60** | `make proof` | red on `main` for two merged PRs, because it is the one target CI does not run |
 | **F82** | **SP5's own `citations` counter** | itself — **the field added because the rule had shipped vacuous twice, shipped vacuous** |
-| **F148** | **the prompt-to-spawn path** | `/ps --limit 400` reaches the far side as `ps --limit` — the value dropped, five rows, and the manifest declares the flag `int`. Not the menu and not the paste path; both ruled out by measurement. **Open** |
+| **F148** | **`validateInvocation`, one layer below both suspects** | `transmitted` pushes one token per iteration and a valued flag spans two, so `/ps --limit 400` reached the far side as `ps --limit`. Every type, both forms, repeatable losing one value each; only `--limit=400` ever worked. **Fixed** — T1.16b, T2.9c, T6.13 |
 | **F147** | **tier 5's own terminal** | `interactivePty` passes `TERM` and `PATH` and no `LANG`, so C02 resolves ASCII and the prompt is `>` while 44 rows wait on `❯`. Every interactive row in the tier has been asserting against a degraded rendering. **Open** — the remedy is measured and is a ruling |
 | **F146** | **commitment 14b's own registration list** | SP6 was implemented, inventoried and fabricated, and `SPEC_RULES` never learned it existed — so `make test` was red for two commits while `npm run enforce` stayed green and correct. **Fixed**, and the bundled fabrication split into three rows |
 | **F83** | **MG24's definition of a consumer** | the implementing module counts as one, so an interface in `types.ts` implemented in `store.ts` gives every member a consumer by construction. **Open** |

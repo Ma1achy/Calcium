@@ -278,6 +278,47 @@ describe("C05 validate", () => {
     if (spaced.ok && equals.ok) expect(spaced.args).toEqual(equals.args);
   });
 
+  it("T1.16b (I21, F148): a value that arrives as its own token is transmitted with its flag", () => {
+    // F148. `transmitted` was built by one push per loop iteration, and a valued
+    // flag spans two tokens — so the value was consumed by the walk's `i++` and
+    // never pushed. `/ps --limit 400` reached the far side as `ps --limit`, on
+    // every type and on both the long and the short form; only `--limit=400`
+    // survived, which is why nothing above C05 saw it for the whole build.
+    //
+    // T1.16 is the row this should have been: it compares the two forms on
+    // `args`, where they agree, and the field that disagreed was never read.
+    // So the equality is asserted here on `transmitted` as well — the two forms
+    // deliver the same invocation or one of them is lying about what will run.
+    const spaced = validateInvocation(ps(), ["--limit", "400"]);
+    const equals = validateInvocation(ps(), ["--limit=400"]);
+    expect(spaced.ok && equals.ok).toBe(true);
+    if (!spaced.ok || !equals.ok) return;
+
+    expect(spaced.transmitted, "the value is what makes the flag mean anything").toEqual([
+      "--limit",
+      "400",
+    ]);
+    expect(equals.transmitted).toEqual(["--limit=400"]);
+
+    // The short form is the second consumption site, and it is a different
+    // branch — `readShort` reports what it ate rather than advancing itself.
+    const short = validateInvocation(ps(), ["-n", "400"]);
+    expect(short.ok).toBe(true);
+    if (short.ok) expect(short.transmitted).toEqual(["-n", "400"]);
+
+    // Repeatable loses one value per occurrence, so it is the shape where the
+    // defect compounds rather than a second instance of it.
+    const repeated = validateInvocation(ps(), ["--label", "a", "--label", "b"]);
+    expect(repeated.ok).toBe(true);
+    if (repeated.ok) expect(repeated.transmitted).toEqual(["--label", "a", "--label", "b"]);
+
+    // And the strip still strips: the fix adds a push at the consumption sites
+    // and must not put a shell switch back on the wire (I21, F39).
+    const mixed = validateInvocation(ps(), ["--help", "--limit", "400"]);
+    expect(mixed.ok).toBe(true);
+    if (mixed.ok) expect(mixed.transmitted).toEqual(["--limit", "400"]);
+  });
+
   it("T1.17 (I16, §3): a value beginning with - is refused with the form that works", () => {
     // Both halves in one test. The message is only right if the thing it
     // recommends actually works, and split in two, each half passes while the
