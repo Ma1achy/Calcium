@@ -399,20 +399,94 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
-  /** C23 §2's `shell` route — `spawnShell`, and a `raw` document (C18 §5). */
+  /**
+   * C23 §2's `shell` route — `spawnShell`, and a `raw` document (C18 §5).
+   *
+   * **I50, and the failure shape is the whole of it** (F151). This composed
+   * `status: "error"` with no `error` field, which C04 I3 forbids in both
+   * directions, so `transcript.append` refused every failing command (C13 I10)
+   * and the route produced **no entry at all** — the reader shown F15's fault
+   * notice citing two invariant numbers in place of the command they typed.
+   *
+   * Fourth instance of one class, and both earlier closures miss it by
+   * construction: `documents.ts` filled the field inside `noticeDoc` *"rather
+   * than at the two call sites"* and this route composes directly, while F35's
+   * app-side closure runs the documents the **app** produces and this one is
+   * the framework's. Closing a class means checking the class has one member.
+   *
+   * **`stderr` is read because it is where the sentence is.** `ChildHandle`
+   * delivers the two streams separately (C21 I3) and this read only `stdout`,
+   * so `sh: 1: list: not found` — the one line that names what went wrong —
+   * was produced, delivered and dropped, leaving a raw block that was empty as
+   * well as unappendable. Concurrently rather than in sequence: a child filling
+   * the pipe nobody is draining blocks, and reading stdout to exhaustion first
+   * is that deadlock.
+   *
+   * **The wording is C07 §4's, deliberately duplicated rather than imported.**
+   * `mapResult` takes a `RawResult` that a shell route has no way to build, and
+   * two spellings of *the command exited with code N* is a worse outcome than
+   * one sentence written twice; if that pair drifts, this comment is the link.
+   *
+   * **A remedy naming the prefix is a separate ruling and not taken here.** The
+   * likeliest cause is a verb typed without one, but `commandPolicy` is
+   * injected (C22) — `slashPolicy` is a default, not a guarantee — so a message
+   * saying *type `/list`* would be wrong for any app that supplied its own.
+   * What is here instead is true under every policy: the exit code, and the
+   * shell's own line naming the token it could not find.
+   */
   const runShell = async (line: string, command: string): Promise<void> => {
     guard.take("shell", headOf(command));
     try {
       const child = deps.runner.spawnShell(command, { cwd: () => deps.session().cwd });
-      let out = "";
-      for await (const chunk of child.stdout) out += chunk;
+      const drain = async (stream: AsyncIterable<string>): Promise<string> => {
+        let text = "";
+        for await (const chunk of stream) text += chunk;
+        return text;
+      };
+      const [out, err] = await Promise.all([drain(child.stdout), drain(child.stderr)]);
       const exit = await child.exited;
+
+      const failed = exit.code !== 0 || exit.signal !== null;
+      const message =
+        exit.signal !== null
+          ? `Killed by ${exit.signal}.`
+          : `The command exited with code ${String(exit.code ?? 1)}.`;
 
       appendAndCommit(
         compose({
           command: line,
-          status: exit.code === 0 ? "ok" : "error",
-          blocks: [block({ kind: "raw", id: blockId("raw"), text: out })],
+          status: failed ? "error" : "ok",
+          // **The success path is byte-identical to what it was**: one raw
+          // block, emitted whether or not the command said anything. Eliding
+          // an empty one there would change every silent command's entry from
+          // one block to none, which is a rendering change this row has no
+          // reason to make and no test covering it.
+          //
+          // The failure path is new, so it chooses: the notice carries the
+          // sentence, and a raw block appears only when it has content — an
+          // empty one is a blank row the reader has to account for, and on
+          // this route both streams are routinely empty.
+          blocks: failed
+            ? [
+                block({
+                  kind: "notice",
+                  id: blockId("shell-failed"),
+                  tone: "error",
+                  glyph: "error",
+                  text: message,
+                }),
+                ...(out === "" ? [] : [block({ kind: "raw", id: blockId("raw"), text: out })]),
+                ...(err === "" ? [] : [block({ kind: "raw", id: blockId("raw-err"), text: err })]),
+              ]
+            : [block({ kind: "raw", id: blockId("raw"), text: out })],
+          ...(failed
+            ? {
+                error: {
+                  message,
+                  code: exit.signal !== null ? "KILLED_BY_SIGNAL" : "UNEXPECTED_EXIT",
+                },
+              }
+            : {}),
           meta: {
             origin: "user",
             exitCode: exit.code ?? 1,

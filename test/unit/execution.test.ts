@@ -54,7 +54,18 @@ type Scripted = Readonly<{
   /** A live part returned by the `/guide` local handler — T1.38's control arm. */
   localLive?: () => Block;
 
-  spawnShell?: () => { stdout: AsyncIterable<string>; exited: Promise<{ code: number | null }>; overflowed: boolean };
+  /**
+   * **`stderr` is here because `ChildHandle` has it** (C21 I3, F151). The fake
+   * carried `stdout` alone for as long as the route read `stdout` alone, so the
+   * two agreed about a field neither of them used — and the route's failure
+   * path, which needs it, was the half nothing could construct.
+   */
+  spawnShell?: () => {
+    stdout: AsyncIterable<string>;
+    stderr: AsyncIterable<string>;
+    exited: Promise<{ code: number | null; signal?: string | null }>;
+    overflowed: boolean;
+  };
 
   /**
    * Make `resetFocus` throw — §8e's fourth row, and the only statement after the
@@ -222,7 +233,8 @@ function harness(script: Scripted = {}) {
         calls.push("spawnShell");
         return (script.spawnShell ?? (() => ({
           stdout: (async function* () { yield "out"; })(),
-          exited: Promise.resolve({ code: 0 }),
+          stderr: (async function* () { /* a successful command says nothing */ })(),
+          exited: Promise.resolve({ code: 0, signal: null }),
           overflowed: false,
         })))();
       },
@@ -982,6 +994,93 @@ describe("C23 tier 3 — edges", () => {
     await settled();
   });
 
+  it("T3.17 (I50, F151): a failing shell command produces an entry rather than a refusal", async () => {
+    // **The row is `toHaveLength(1)`, and that is the whole finding.** This
+    // composed `status: "error"` with no `error` field, C04 I3 forbids that in
+    // both directions, and `transcript.append` refused it — so the route
+    // produced *no entry at all* and the reader saw a fault notice citing two
+    // invariant numbers in place of the command they typed.
+    //
+    // Reached by typing a bare word where the shell wants a prefixed verb,
+    // which is the likeliest thing an unfamiliar reader does and the one input
+    // nothing had ever run.
+    const h = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { /* a command that was not found says nothing here */ })(),
+        stderr: (async function* () { yield "sh: 1: list: not found\n"; })(),
+        exited: Promise.resolve({ code: 127, signal: null }),
+        overflowed: false,
+      }),
+    });
+
+    h.pipeline.submit("list");
+    await settled();
+
+    expect(h.transcript.entries, "the failing command produced no entry").toHaveLength(1);
+    const doc = h.transcript.entries[0]?.doc;
+    expect(doc?.status).toBe("error");
+    // C04 I3's other direction — present *because* the status is `"error"`.
+    expect(doc?.error?.message, "the error field C13 refused the document for").toBe(
+      "The command exited with code 127.",
+    );
+
+    // **And the sentence that names what happened.** `ChildHandle` delivers the
+    // two streams separately (C21 I3) and the route read only `stdout`, so the
+    // one line identifying the token was produced, delivered and dropped —
+    // leaving a raw block that was empty as well as unappendable.
+    const text = JSON.stringify(doc?.blocks);
+    expect(text, "the shell's own line never reached the document").toContain("list: not found");
+    // The empty stdout is not drawn as a blank row beside the notice.
+    expect(doc?.blocks, "an empty stream became a block").toHaveLength(2);
+  });
+
+  it("T3.18 (I50, F151): a signal is named, and a success is unchanged", async () => {
+    const killed = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { /* nothing */ })(),
+        stderr: (async function* () { /* nothing */ })(),
+        exited: Promise.resolve({ code: null, signal: "SIGTERM" }),
+        overflowed: false,
+      }),
+    });
+    killed.pipeline.submit("sleep 99");
+    await settled();
+    expect(killed.transcript.entries[0]?.doc.error?.message).toBe("Killed by SIGTERM.");
+
+    // **The control, and it is what stops this row from being satisfied by a
+    // route that calls everything an error.** The success path is asserted to
+    // be exactly what it was: one raw block, no notice, no `error`.
+    const ok = harness();
+    ok.pipeline.submit("echo hi");
+    await settled();
+    const doc = ok.transcript.entries[0]?.doc;
+    expect(doc?.status).toBe("ok");
+    expect(doc?.error).toBeUndefined();
+    expect(doc?.blocks).toHaveLength(1);
+    expect(doc?.blocks[0]?.kind).toBe("raw");
+
+    // **A command that succeeds and says nothing, which is the arm the
+    // mutation pass found missing.** "The success path is unchanged" was
+    // asserted only where there was output to see, so eliding an empty raw
+    // block survived — a real change (one block becomes none for every silent
+    // `true`, `cd`, `touch`) that no row could observe, because the fake always
+    // yielded text. The fixture agreed with the claim on the only input it had.
+    const silent = harness({
+      spawnShell: () => ({
+        stdout: (async function* () { /* nothing */ })(),
+        stderr: (async function* () { /* nothing */ })(),
+        exited: Promise.resolve({ code: 0, signal: null }),
+        overflowed: false,
+      }),
+    });
+    silent.pipeline.submit("true");
+    await settled();
+    const quiet = silent.transcript.entries[0]?.doc;
+    expect(quiet?.status).toBe("ok");
+    expect(quiet?.blocks, "a silent success lost its block").toHaveLength(1);
+    expect(quiet?.blocks[0]).toMatchObject({ kind: "raw", text: "" });
+  });
+
   it("T3.16 (I5): a shell route holds the guard exactly as an app verb does", async () => {
     // `sleep 30` delegated to the shell is a foreground command, and no shell
     // lets you type another over it. Scoping the guard to app verbs is the
@@ -990,7 +1089,8 @@ describe("C23 tier 3 — edges", () => {
     const h = harness({
       spawnShell: () => ({
         stdout: (async function* () { yield "x"; })(),
-        exited: new Promise((r) => { finish = () => r({ code: 0 }); }),
+        stderr: (async function* () { /* nothing */ })(),
+        exited: new Promise((r) => { finish = () => r({ code: 0, signal: null }); }),
         overflowed: false,
       }),
     });
