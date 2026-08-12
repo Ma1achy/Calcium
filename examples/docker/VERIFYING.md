@@ -370,6 +370,29 @@ removing the fixture made `make all` green. **Not flakiness discovered — load 
 Worth writing down because the natural reading of a timing failure during a frame-read
 session is that the change under test caused it.
 
+### The gate is its own load generator, and tier 5 runs last
+
+Measured today, three serial runs of the identical command — `make e2e` *is* `npm run e2e`, so
+the target is not the variable:
+
+| run | conditions | result |
+|---|---|---|
+| alone, idle host | load 1.7 | **16/16 files · 98 passed · exit 0** |
+| inside `make all`, after six targets | warm | 2 failed — `transport` T5.6 timed out at 75 s, `view-model` T5.3a asserted `3 to be greater than 6` |
+| alone again, idle host | load 0.77 → 2.92 | **16/16 · 98 passed · exit 0**, T5.6 at **3.16 s** |
+
+**The failing set changed**, which is the tell: an identical set across loaded runs reads as
+evidence, a different one reads as noise. And T5.6's 75 s is the same row and the same number as
+a real quadratic found earlier the same day — so *contention* was the comfortable answer and had
+already been the wrong one once. It was re-measured rather than assumed, and 3.16 s is the
+answer.
+
+**The general form: a gate that runs seven targets in sequence hands its last one a warm host.**
+`check`, `test` and `golden` are CPU-bound and finish moments before tier 5 spawns 16 PTYs with
+timing assertions in them. That is the same sentence as the busy-loop container above, with the
+gate itself in the fixture's place — so *"`make all` per target on an idle host"* is not
+fastidiousness, it is what makes the tier-5 leg mean anything.
+
 **Re-measured in step 8, and it did not reproduce.** `make fixtures` brings up `dtui-load`
 — the same shape of busy loop — and tier 5 ran green with it up: 94 passed, 7 todo,
 `E2E_WITH_LOAD_EXIT=0` read from a redirect. Both measurements are real, and neither
