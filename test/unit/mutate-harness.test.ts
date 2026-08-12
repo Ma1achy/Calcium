@@ -83,6 +83,126 @@ describe("mutation harness", () => {
     ).toThrow(/already fails/);
   });
 
+  it("MH4b: a run that never reaches a summary is blindness, not a survivor", () => {
+    // **Today's instance, and it is the same class as MH4 arriving from the
+    // channel rather than from the regex.** The suite was piped into `grep -q`
+    // under `pipefail`; grep exited on its first match, the writer took SIGPIPE,
+    // and the pipeline returned 141 with a truncated buffer. No summary line
+    // reached `killed`, so every mutation came back a survivor — nine findings
+    // about weak tests, and the tests were never run to completion.
+    //
+    // The control pair is what catches it, and this row is what says so: a
+    // `run` that returns nothing at all must refuse rather than report.
+    const files = new Map([["a.ts", "const x = 1;"]]);
+
+    expect(() =>
+      runPass({
+        mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
+        control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
+        read: (f) => files.get(f) as string,
+        write: (f, s) => void files.set(f, s),
+        run: () => "",
+      }),
+    ).toThrow(BlindHarnessError);
+
+    // And a truncated one, which is what the buffer actually held: real output,
+    // cut before the summary. It reads far more like a real run than `""` does.
+    expect(() =>
+      runPass({
+        mutations: [{ name: "m", file: "a.ts", from: "1", to: "2", expect: "T1.1" }],
+        control: { file: "a.ts", from: "const x", to: "const BROKEN", why: "renames the export" },
+        read: (f) => files.get(f) as string,
+        write: (f, s) => void files.set(f, s),
+        run: () => " RUN  v4.1.10 /workspaces/tui-kit\n\n ✓ test/unit/a.test.ts (6 tests)",
+      }),
+    ).toThrow(/not live/);
+  });
+
+  it("MH4c: a harness that goes blind MID-pass is not nine findings", () => {
+    // **The residue MH4b leaves, and the one that actually bit.** The control
+    // pair is checked once, before the first mutation — so a `run` that stops
+    // producing output *after* it passes is invisible to it, and every row from
+    // there on reads as a survivor. That is nine findings about weak tests, from
+    // a suite that never ran.
+    //
+    // `ran` is the distinction `killed` cannot make: a run that did not finish
+    // and a run that finished green are the same `false` and mean opposite
+    // things.
+    const files = new Map([["a.ts", "const x = 1;\nconst y = 2;\n"]]);
+    let calls = 0;
+    const run = (): string => {
+      calls += 1;
+      // clean, control, then the pipe breaks
+      if (calls === 1) return PASSED;
+      if (calls === 2) return `${FAILED}\n  × T1.1 asserts x`;
+      return " RUN  v4.1.10\n\n ✓ test/unit/a.test.ts (6 tests)";
+    };
+
+    const results = runPass({
+      mutations: [
+        { name: "first", file: "a.ts", from: "const x = 1;", to: "const x = 9;", expect: "T1.1" },
+        { name: "second", file: "a.ts", from: "const y = 2;", to: "const y = 9;", expect: "T1.2" },
+      ],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T1.1 asserts x" },
+      read: (f) => files.get(f) as string,
+      write: (f, s) => void files.set(f, s),
+      run,
+    });
+
+    expect(results.map((r) => r.noSummary ?? false)).toEqual([true, true]);
+
+    const text = report(results);
+    expect(text).toContain("NO SUMMARY");
+    expect(text, "and it does not read as a finding about the tests").not.toMatch(/\d+ survived/);
+    expect(text).toContain("went blind mid-pass");
+  });
+
+  it("MH7: two files — each row runs against a tree holding only its own mutation", () => {
+    // **Found by mutation, and it is a finding about these tests rather than
+    // about the harness.** Deleting the `finally { restore() }` between rows
+    // survived every row above, because all of them mutate one file and each
+    // write is `originals + this mutation` — so the previous row is overwritten
+    // anyway. The moment two files are in play it is a real defect: row 1's
+    // mutation to `a.ts` is still on disk while row 2 runs against `b.ts`, and
+    // the two kills cannot be told apart.
+    //
+    // The same shape as `screen_test.py`'s ported six, which addressed column 0
+    // and left *CUP ignores its column* alive: a suite indexed by the case in
+    // hand tests each rule against itself and agrees.
+    const files = new Map([
+      ["a.ts", "const x = 1;"],
+      ["b.ts", "const y = 2;"],
+    ]);
+    // What `a.ts` held at each run: clean, control, row a, row b. The fourth is
+    // the assertion — row b must run against an `a.ts` nobody has touched.
+    const aDuring: string[] = [];
+    const run = (): string => {
+      aDuring.push(files.get("a.ts") as string);
+      // The control is the second call and must be seen killed, or the pass
+      // refuses to report at all.
+      return aDuring.length === 2 ? `${FAILED}\n  × T1.1 asserts x` : PASSED;
+    };
+
+    runPass({
+      mutations: [
+        { name: "a", file: "a.ts", from: "const x", to: "const X", expect: "T1.1" },
+        { name: "b", file: "b.ts", from: "const y", to: "const Y", expect: "T1.2" },
+      ],
+      control: { file: "a.ts", from: "const x = 1;", to: "const x = 0;", why: "T1.1 asserts x" },
+      read: (f) => files.get(f) as string,
+      write: (f, s) => void files.set(f, s),
+      run,
+    });
+
+    expect(aDuring.length, "clean, control, row a, row b").toBe(4);
+    expect(aDuring[2], "row a's own mutation is applied").toBe("const X = 1;");
+    expect(aDuring[3], "and row b runs against an untouched a.ts").toBe("const x = 1;");
+    expect([files.get("a.ts"), files.get("b.ts")], "restored at the end").toEqual([
+      "const x = 1;",
+      "const y = 2;",
+    ]);
+  });
+
   it("MH6: a live harness reports kills and survivors apart", () => {
     const files = new Map([["a.ts", "const x = 1;\nconst y = 2;\n"]]);
     // Killed only when `x` is touched: `y` is the line no test covers. The
