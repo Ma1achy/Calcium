@@ -6998,6 +6998,58 @@ it — the fourth time on this component that reading output found what no asser
 
 ---
 
+## F150 — the published example did not parse, and the test that quotes it checked one direction ★★★★
+
+| | |
+|---|---|
+| **Surface** | `README.md`'s marked block · `examples/minimal/test/minimal.test.ts` · `examples/minimal/main.ts` |
+| **Reached for** | publication prep item 1, the outside-reader test — the mechanical half of R01 R4.4 |
+| **Verdict** | **three faults nested inside each other**, in the one example the reuse claim rests on |
+
+**Filed late, and that is the first thing to record about it.** The number was used in a commit
+message, in the `Makefile`, in `main.ts`, in the quoting test and in `R01` — five artefacts —
+and there was no entry here for any of them to refer to. `make enforce`'s SP5 is what found it,
+and only once the number reached a file under `docs/`. A finding referred to by five places and
+recorded in none is the sixth blind spot pointed at this session's own work.
+
+### 1. The block does not compile
+
+The README's marked block carried **27 of `main.ts`'s 64 meaningful lines**: no `rows` binding,
+no `return`, no `meta` object, and not one closing brace. Compiled, it is `TS1005: ',' expected`
+from line 18. The prose above it said it was *"quoted from that file line for line by a test."*
+
+### 2. Why it drifted — a subset check, one direction
+
+```ts
+for (const line of meaningful(fenced[1])) {
+  expect(meaningful(source)).toContain(line);
+}
+```
+
+Every README line must appear in `main.ts`; nothing requires the reverse. **Any omission
+passes.** The same shape as SP6's inventory one document over, and the same remedy: compare by
+equality. Verified by fabricated violation — truncating the block back to its shipped state
+turns the row red.
+
+### 3. Under that — the example had not typechecked since F58b landed
+
+`ProducedMeta` honours three `meta` keys and the example supplied ten. It declares a `check`
+script and the `Makefile` never ran it, so F58b's own narrowing never reached the example
+F58b is about. **F144's class arriving at the surface a stranger meets first.**
+
+`make check` now runs both examples' checks; reverting the example makes it exit 2.
+
+### What this is and is not evidence of
+
+It is the mechanical half of the outside-reader test: follow the README literally from a clean
+position and record where it stalls. That half finds what is **absent or broken**.
+
+It is **not** R4.4's actual claim, which is that *someone who is not its author* builds a
+working TUI from it. Nobody who has worked in this tree can run that, because the failure mode
+it exists to catch is a reader's own knowledge filling a gap without their noticing. Recorded
+as owed under R4.4 rather than closed.
+---
+
 ## F151 — the likeliest thing a stranger types answers with two internal invariant numbers ★★★★
 
 | | |
@@ -7147,3 +7199,86 @@ to look at.
 
 Absent and wrong are distinguished carefully in `createTui` and conflated in the validator every
 adapter's output passes through. The argument is symmetric and only half of it was applied.
+
+---
+
+## F154 — `make all` ran seven targets and CI ran six ★★★
+
+| | |
+|---|---|
+| **Surface** | `.github/workflows/ci.yml`, and the `instruments` recipe's own comment |
+| **Reached for** | publication prep item 3, *wire CI from the tarball*. Found by diffing `make all`'s target list against the workflow's |
+| **Verdict** | **a gate that is not wired is not a gate** — F60's sentence, one job over |
+
+The Makefile's first line says *CI runs these targets, not equivalents*, and the `instruments`
+recipe carries group 9's whole remedy in a comment beside it:
+
+> ***`instruments` is in here rather than run by hand**, which is the whole of group 9's
+> remedy: eleven fixtures nobody runs is the fifth class in `examples/docker/VERIFYING.md` — a
+> gate nobody reports — arriving in the gate built to answer it.*
+
+`make all` is `check enforce audit instruments test golden e2e`. CI's jobs run `enforce`,
+`check`, `audit`, `test`, `golden`, `e2e`, `proof`. **`instruments` is in none of them.** So the
+remedy for *a gate nobody runs* landed in the gate a contributor runs by hand and not in the one
+that decides whether a branch merges — which is the failure it was written about, displaced by
+one level.
+
+Ten seconds, 17 instruments, 119 rows. Now in the `fast` job.
+
+**Found by diffing two lists, which is the only thing that finds it.** Both halves read as
+correct on their own: `make all` is complete, and every job in the workflow runs a real target.
+The defect is in neither list and only in the difference — the same shape as F144's two
+instruments that did not run, and the reason A03 compares its inventories by equality rather
+than by count.
+
+---
+
+## F155 — the measurement that disproved a true figure, and the instrument that reads as idle ★★★
+
+| | |
+|---|---|
+| **Surface** | `test/support/budget.ts`'s recorded 89 ms/pass, and `uptime` |
+| **Verdict** | **a false retraction, caught one command before it was written down** |
+
+Re-measuring the scan cost against the record gave **125, 230, 132 ms** where `budget.ts` says
+89 — a 2.4× ratio and a spread of nearly 2×, taken at a **load average of 0.02**. The
+conclusion wrote itself: the recorded number is a single optimistic sample and the honest figure
+is a range. That sentence was one command from landing in the file whose entire job is to be the
+record a later reader trusts.
+
+Re-run once the machine had actually settled: **70, 71, 71, 75, 78 ms.** The record reproduces
+and is conservative.
+
+**The instrument was the load average, and it was the one nearest to hand.** `0.02` is the
+*one-minute* figure; the five- and fifteen-minute figures were `1.04` and `1.39`. It was not an
+idle machine, it was a machine that had just stopped working — page cache and clock recovery
+still in progress, immediately after a full `make all`. A one-minute average is the wrong
+instrument for *is this quiet now* and it looks exactly like the right one.
+
+This is *a quiet machine is not less contention* pointed the other way: there, quieter-yet-worse
+meant the load was somewhere unlooked-at; here, a number that reads as quiet meant the load had
+merely just left. Both are the same lesson about believing a single reading of a host.
+
+What caught it was re-running after waiting — measuring the case that would falsify the
+falsification. **A retraction is a claim too**, and it gets the same treatment as the thing it
+retracts. `tools/scan-cost.mjs` now carries the method as code — discard the cold pass, median
+of five — because a figure without one cannot be reproduced or compared, in either direction.
+
+---
+
+## Two carried claims, checked against the record before acting on them
+
+Both were premises for item 3's work, and going to find where each was written down disposed of
+both. The habit's running total is now **five disproved and three produced**.
+
+**"`make proof` runs when someone remembers."** True until F60, and the workflow has carried a
+`proof` job since — conditioned on pull requests as well as `main`, for the reason the `full`
+job already carries, and in `publish`'s `needs` list. It packs the tarball, installs it into a
+tree that has never seen this repository, and runs **both** examples' suites against it. Nothing
+to wire; the claim describes the state the fix already changed.
+
+**"Record both numbers so the next person knows which regime a budget was set in."** Already
+done: `budget.ts` carries the 411 → 89 ms and 17.7 → 3.8 s table with the argument beside it.
+What was *not* there is the half that matters for a foreign runner — **the numbers were in a
+source comment and not in any run's output.** A figure nobody opens while a job is red is not
+available at the moment it is needed, which is what `make regime` fixes rather than the record.

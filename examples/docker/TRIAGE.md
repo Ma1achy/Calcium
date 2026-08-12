@@ -37,9 +37,9 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
-| **9** | [**The instrument was wrong**](#9) | 19 | **11** | — | **new at F80** · tooling, and it has no test |
+| **9** | [**The instrument was wrong**](#9) | 20 | **11** | — | **new at F80** · tooling — and F155 is the first where the instrument is not ours |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 25 | **9** | — | 4 closed · **2 open, both about a rule's reach** |
+| **11** | [A gate that passes without checking](#11) | 27 | **9** | — | 6 closed · **2 open, both about a rule's reach** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -378,6 +378,7 @@ against the bytes it was replaying.**
 |---|---|---|
 | **F79** | `tools/screen.py` | rendered `\x1b[38;5;188m[3/3] RUN …` as `38;5; RUN …` — an SGR fragment exactly where a six-cell step number belonged. **The app was correct.** Open |
 | **F63** | `tools/capture.py` | decoded each 64 KiB read independently, so every read landing mid-UTF-8 put U+FFFD inside a panel border. **Fixed** — incremental decoder, zero replacements against one per beat |
+| **F155** | **`uptime`'s load average** | a one-minute figure of 0.02 read as an idle host while the five-minute was 1.04 — a machine that had just stopped working, giving 125-230 ms where a settled one gives 70-78. One command from a **false retraction** of a true figure being written into `budget.ts`. **Fixed** — `tools/scan-cost.mjs` carries the method as code |
 | **F76** | `tools/beats.py` | hand-written timestamps went stale the first time a beat was shortened, so the report named the wrong moments. **Fixed** — beats derived from `screencast.BEATS` |
 | **F62** | `make fixtures` | `while :; do :; done` produced a **flat line at 100%** in the headline plot of a demo about plots. Correct, honest, the least interesting figure C12 can draw. **Fixed** — bursts |
 | **F74** | `demo.cast` | the completion beat had never worked: beat 3 moved focus into a live block and every character of beat 4 was correctly dropped. **Fixed** |
@@ -486,6 +487,8 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F2** | a CI job | Calcium was not a publishable package, and the job proved nothing |
 | **F56** | `package.json`'s `bin` | a claim about an executable, accepted by install, pack, `publish --dry-run` and `make proof`. Three consumers existed and **all three reached around the entry point** |
 | **F60** | `make proof` | red on `main` for two merged PRs, because it is the one target CI does not run |
+| **F150** | **the README's quoting test** | a subset check in one direction, so the published block could omit anything and stay green. It did: 27 lines of 64, and **the example did not parse**. Under it, `examples/minimal` had not typechecked since F58b — a `check` script the `Makefile` never ran. **Fixed** — equality both ways, and `make check` runs both examples |
+| **F154** | **`make instruments`** | `make all` runs seven targets and the workflow ran six. Group 9's remedy — *in the gate rather than run by hand* — landed in the gate a contributor runs by hand and not in the one that gates a merge. Found by diffing two lists, both correct on their own. **Fixed** — in the `fast` job |
 | **F82** | **SP5's own `citations` counter** | itself — **the field added because the rule had shipped vacuous twice, shipped vacuous** |
 | **F148** | **`validateInvocation`, one layer below both suspects** | `transmitted` pushes one token per iteration and a valued flag spans two, so `/ps --limit 400` reached the far side as `ps --limit`. Every type, both forms, repeatable losing one value each; only `--limit=400` ever worked. **Fixed** — T1.16b, T2.9c, T6.13 |
 | **F147** | **tier 5's own terminal** | `interactivePty` passes `TERM` and `PATH` and no `LANG`, so C02 resolves ASCII and the prompt is `>` while 44 rows wait on `❯`. Every interactive row in the tier has been asserting against a degraded rendering. **Open** — the remedy is measured and is a ruling |

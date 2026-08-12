@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks check enforce instruments test golden e2e audit proof all clean
+.PHONY: install hooks check enforce instruments regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -37,6 +37,13 @@ enforce:            ## A03 — module graph, source scans, supply chain
 
 instruments:        ## every instrument's own fixture, and the inventory by equality (group 9)
 	node tools/instruments.mjs
+
+regime:             ## what a source-scan pass costs *here*, beside the recorded figures
+	@# **Reports, never fails.** A budget is a claim about a regime and a runner
+	@# is not the regime it was measured in — so the number a foreign run needs
+	@# is its own, printed next to ours. A gate that went red on a busy machine
+	@# would teach people to re-run gates, which is the opposite of the point.
+	node tools/scan-cost.mjs
 
 test:               ## tiers 1-4
 	npm run test

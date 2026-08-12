@@ -62,6 +62,37 @@
  * per-file figures have not been re-taken; the pass figure has, and it is the
  * one that moved.
  *
+ * ---
+ *
+ * **Re-measured with a stated method, and 89 ms reproduces.** Discard the cold
+ * pass, take the median of five: **70, 71, 71, 75, 78 ms** on a settled host.
+ * The recorded figure stands and is if anything conservative.
+ *
+ * **It did not reproduce on the first attempt, and why is the finding.** Three
+ * runs immediately after a full gate gave **125, 230, 132 ms** — a spread of
+ * nearly 2× and a ratio of 2.4× — at a load average whose *one-minute* figure
+ * was 0.02. That reads as an idle host and the host was not idle: the five- and
+ * fifteen-minute figures were 1.04 and 1.39, so it was a machine that had just
+ * stopped working, with its page cache and clocks still recovering.
+ *
+ * **A one-minute load average is the wrong instrument for *is this quiet now*,
+ * and it is the instrument nearest to hand.** The correction was one command
+ * from being written into this file as *the honest figure is a range* — a false
+ * retraction of a true number, in the document whose whole job is to be the
+ * record a later reader trusts. What caught it was re-running after the machine
+ * settled, which is the case that would falsify the falsification.
+ *
+ * So the method is part of the figure and not a footnote: a number here without
+ * one cannot be reproduced, and *the figures above are what a later reader
+ * needs to tell a regression from growth* is a claim a single unlabelled sample
+ * cannot support in either direction.
+ *
+ * ** is the method, executable.** It prints this machine's
+ * figure beside both recorded ones and their ratio, and CI runs it — because a
+ * budget is a claim about a regime, and a runner is not this regime. It does
+ * not fail: a slow machine is information, and a gate that goes red on a busy
+ * one teaches people to re-run gates.
+ *
  * **Do not raise these without knowing what they measure.** A scan that has
  * started taking twice as long is telling you the tree doubled or a rule became
  * quadratic, and both are worth knowing. Re-measure instead — the figures above

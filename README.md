@@ -469,6 +469,13 @@ that has drifted is worse than none: it fails on your machine and not on ours.
 `make proof` runs it from the packed tarball rather than from this workspace, so
 what is verified is the published package.
 
+**This is 0.x, deliberately.** The example above is the surface most likely to
+stay put; the rest of the API will break between minor versions, and it will
+break without a deprecation cycle. Twenty-five specs and their invariants are
+the contract that is stable — the names in front of them are not yet, and saying
+so is the difference between a breaking change and a broken promise. Pin an
+exact version.
+
 ---
 
 ## The parts you do not write

@@ -44,6 +44,11 @@ const COVERED = [
   ["tools/bench/patch-window.mjs", null], // same fixture — `gutter`
   ["tools/bench/liveness.mjs", null], // the guard itself, covered by its own rows
   ["tools/waitfor.mjs", ["npx", "vitest", "run", "test/unit/waitfor.test.ts"]],
+  // **This target caught it on the day it landed**, which is the claim the
+  // equality comparison above makes and this is the first time it has been paid
+  // out: `scan-cost.mjs` was added, `make instruments` went from 16/16 to
+  // 17 found, 16 with a fixture, and named the file.
+  ["tools/scan-cost.mjs", ["npx", "vitest", "run", "test/unit/scan-cost.test.ts"]],
   ["tools/mutate/mutate.mjs", ["npx", "vitest", "run", "test/unit/mutate-harness.test.ts"]],
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
   ["examples/docker/tools/screen.py", ["python3", "examples/docker/tools/screen_test.py"]],

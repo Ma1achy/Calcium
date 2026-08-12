@@ -21,8 +21,31 @@ jobs:
           cache: npm
       - run: make install
       - run: make enforce      # A03 · ~5s · fails first, deliberately
-      - run: make check
+      - run: make check        # includes both examples' own `check` scripts (F150)
+
+      # **`instruments` was in `make all` and in no CI job** (F154). The
+      # Makefile's own header says *CI runs these targets, not equivalents*, and
+      # the `instruments` recipe carries group 9's whole remedy in a comment —
+      # *in here rather than run by hand* — which was true of the local gate and
+      # not of the enforced one. Same shape as F60 one job down: a gate that is
+      # not wired is not a gate. 16 instruments, 113 rows, about ten seconds.
+      - run: make instruments
+
       - run: make audit
+
+      # **Before `make test`, because it is what a red scan row wants read
+      # first.** Prints this runner's cost per source-scan pass beside the
+      # figures `budget.ts` records and their ratio. Never fails.
+      #
+      # The recorded numbers are from an idle developer machine, and this repo
+      # measured on the same day that the gate is its own load: two C12/C14 fuzz
+      # rows timed out at 5 s under concurrent PTYs and passed in 7.5 s alone. A
+      # budget measured on a quiet machine is the one that fails first
+      # elsewhere, so the ratio is the sentence someone reading a foreign
+      # failure needs — and it has to be in the run's own output, not in a
+      # source comment they will not open while a job is red.
+      - run: make regime
+
       - run: make test
 
   # Heavy stages: main and tags only. Private repos have a monthly budget and
