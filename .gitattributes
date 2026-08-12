@@ -1,0 +1,21 @@
+# **A source file with a NUL in it is invisible to a diff read** — and one of
+# ours has one on purpose.
+#
+# `test/contract/parser.test.ts` carries a hostile-input corpus for the
+# tokeniser: a quote, a backslash, a pipe, `&&`, a tab, **a literal NUL**, a CJK
+# glyph, a ZWJ emoji. The NUL is the point of the row and it is not going away.
+#
+# Git's binary heuristic sees that byte and renders every change to the file as
+# `Bin 15383 -> 16498 bytes`. The file still diffs under `--text`, and it still
+# merges, so nothing is broken — but *reading the diff* is a scheduled step here
+# and it produced 1 of 11 findings in one step. An instrument that silently
+# shows nothing for one file is the shape `VERIFYING.md` §9 is about: there is
+# no marker distinguishing *nothing changed* from *I am not showing you this*.
+#
+# Found by reading this session's own diff, which is also where a stray probe
+# file turned up committed. Both are that step earning its place.
+*.ts   diff
+*.mts  diff
+*.mjs  diff
+*.json diff
+*.md   diff
