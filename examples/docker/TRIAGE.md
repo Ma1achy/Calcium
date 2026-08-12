@@ -37,7 +37,7 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
-| **9** | [**The instrument was wrong**](#9) | 20 | **11** | — | **new at F80** · tooling — and F155 is the first where the instrument is not ours |
+| **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
 | **11** | [A gate that passes without checking](#11) | 28 | **9** | — | 7 closed · **2 open, both about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
@@ -378,6 +378,8 @@ against the bytes it was replaying.**
 |---|---|---|
 | **F79** | `tools/screen.py` | rendered `\x1b[38;5;188m[3/3] RUN …` as `38;5; RUN …` — an SGR fragment exactly where a six-cell step number belonged. **The app was correct.** Open |
 | **F63** | `tools/capture.py` | decoded each 64 KiB read independently, so every read landing mid-UTF-8 put U+FFFD inside a panel border. **Fixed** — incremental decoder, zero replacements against one per beat |
+| **F157** | **the capture harness, and Python itself** | the shot asks for LANG=C, the child also gets LC_CTYPE=C.UTF-8 that nobody set — PEP 538 coercion, inherited through pty.fork, outranking LANG. The ASCII degradation shot has never shown ASCII: 6,833 box-drawing dashes in the picture whose job is the fallback. **Fixed**, three fixture rows |
+| **F158** | **a fixed 1.5 s against an async opening** | /drift typed before the greeting landed, so the banner appended under the comparison — later content above earlier, header scrolled off. 20 frames, right size, exit 0. **Partly fixed** — TYPE_AT is a weaker fix and says so |
 | **F155** | **`uptime`'s load average** | a one-minute figure of 0.02 read as an idle host while the five-minute was 1.04 — a machine that had just stopped working, giving 125-230 ms where a settled one gives 70-78. One command from a **false retraction** of a true figure being written into `budget.ts`. **Fixed** — `tools/scan-cost.mjs` carries the method as code |
 | **F76** | `tools/beats.py` | hand-written timestamps went stale the first time a beat was shortened, so the report named the wrong moments. **Fixed** — beats derived from `screencast.BEATS` |
 | **F62** | `make fixtures` | `while :; do :; done` produced a **flat line at 100%** in the headline plot of a demo about plots. Correct, honest, the least interesting figure C12 can draw. **Fixed** — bursts |

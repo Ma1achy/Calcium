@@ -41,6 +41,15 @@ from capture import run  # noqa: E402
 UTF8 = {"LANG": "en_GB.UTF-8"}
 TRUE = {**UTF8, "COLORTERM": "truecolor"}
 
+# **When each shot starts typing**, for the ones whose opening frame is slow to
+# settle. Default 1.5 s; see the note at the call site (F158).
+TYPE_AT: dict[str, float] = {
+    # The comparison runs two `docker inspect`s and the greeting is still
+    # landing at 1.5 s on a loaded host — measured, as a banner appended
+    # underneath the table it was supposed to precede.
+    "drift": 4.0,
+}
+
 # name, cols, rows, command, hold, env, still-at (None = animate)
 SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = [
     # 1 — the headline. Animated, and it has to run long enough for the plot to
@@ -209,10 +218,28 @@ if __name__ == "__main__":
         print(f"{name} ({cols}x{rows})")
         raw = os.path.join(out, name)
         pre = PRE.get(name)
+        # **The opening frame is async, so a fixed delay races it** (F158).
+        #
+        # The greeting asks docker for its version and the dashboard fetches
+        # before either can be drawn, so *when the banner lands* is a property of
+        # the daemon and the host, not of this script. At 1.5 s `drift` typed
+        # into a session whose greeting had not arrived: the comparison appended
+        # first and the banner appended **under** it, so the shot showed the
+        # tail of a table with its `field / a / b` header scrolled off, beneath
+        # nothing, above a welcome. An impossible-looking transcript, and the
+        # numbers were all fine — 20 cast frames, right size, no error.
+        #
+        # `TYPE_AT` buys the slow openers more room. It is a delay rather than a
+        # settle-detector because the capture is one-way: it writes on a clock
+        # and reads afterwards, and teaching it to wait on content is a bigger
+        # change than this row. **Recorded as the weaker fix it is** — a shot
+        # whose opening is slower than its delay will drift the same way, and
+        # the frame is what says so, which is why every shot is read.
+        at = TYPE_AT.get(name, 1.5)
         script = (
-            [(1.5, pre), (3.0, b"\r"), (5.0, command), (6.5, b"\r")]
+            [(at, pre), (at + 1.5, b"\r"), (at + 3.5, command), (at + 5.0, b"\r")]
             if pre is not None
-            else [(1.5, command), (3.5, b"\r")]
+            else [(at, command), (at + 2.0, b"\r")]
         )
         # **Completion needs no key at all now.** The menu opens on two or more
         # static candidates as the verb is typed (C19 I19), so the command *is*

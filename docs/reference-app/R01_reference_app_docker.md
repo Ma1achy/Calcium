@@ -318,13 +318,20 @@ Each row is a claim the framework makes and this app tests.
 ## 13. The scorecard — what the app proved, and what it did not
 
 Written after the application was finished, because a commitment nobody scores is
-indistinguishable from a commitment satisfied. Twelve rows, and **four of them do not
+indistinguishable from a commitment satisfied. Twelve rows, and **five of them do not
 hold.** Each figure below is measured rather than recalled.
+
+**Re-measured after steps 9-13, and two rows moved.** Row 1 went 663 to 2,676 with
+comments stripped — nine times the commitment rather than twice. Row 2 stopped holding
+outright: the app gained lifecycle, destructive, registry, exec and resource verbs, so
+*nothing mutating* is false and `R2.5`, which scanned emitted commands against a denylist,
+no longer exists in `test/`. **A scorecard written once is a snapshot**, which is the same
+thing this document says about a commitment nobody scores, applied to the scoring.
 
 | | commitment | verdict |
 |---|---|---|
-| 1 | under 300 lines of app code | **exceeded — 663** |
-| 2 | five read-only verbs, nothing mutating | held, and widened |
+| 1 | under 300 lines of app code | **exceeded — 663, now 2,676** |
+| 2 | five read-only verbs, nothing mutating | **no longer held** — five mutating families, every one gated by a confirm |
 | 3 | no custom theme, block kind, policy or emulator | **held** |
 | 4 | the glyph derives from `State`, never the prose `Status` | held |
 | 5 | `Ports` and `Status` render verbatim | held, and it took a correction |

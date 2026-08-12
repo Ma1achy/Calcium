@@ -61,6 +61,31 @@ def run(
         os.environ["TERM"] = "xterm-256color"
         os.environ["COLUMNS"] = str(cols)
         os.environ["LINES"] = str(rows)
+
+        # **A shot that names a locale gets that locale and no blend** (F157).
+        #
+        # `depth-ascii` asks for `LANG=C` and got a Unicode frame for the life of
+        # the shot: 1,233 box-drawing dashes in the one picture whose entire job
+        # is to show the ASCII fallback. The app was right, C02 was right and
+        # POSIX was right — the child's environment held **`LC_CTYPE=C.UTF-8`,
+        # which nobody in this repository set.**
+        #
+        # It is Python's own. PEP 538 locale coercion sees a C/POSIX locale at
+        # interpreter start and exports `LC_CTYPE=C.UTF-8` into *this* process,
+        # `pty.fork()` hands it to the child, and `LC_CTYPE` outranks `LANG` — so
+        # the harness overrode the shot by being written in Python. A node-pty
+        # probe of the same app with the same `LANG=C` degrades correctly, which
+        # is what pinned it to the instrument rather than the application.
+        #
+        # So the three are cleared together and only what the shot names is put
+        # back. Clearing rather than setting `LC_ALL`: absent and empty are
+        # different inputs to C02's rules, and a shot asking for one variable
+        # must not silently acquire a second.
+        LOCALE = ("LANG", "LC_ALL", "LC_CTYPE")
+        if any(k in (env or {}) for k in LOCALE):
+            for key in LOCALE:
+                os.environ.pop(key, None)
+
         for key, value in (env or {}).items():
             if value == "":
                 os.environ.pop(key, None)

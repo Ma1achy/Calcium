@@ -107,9 +107,16 @@ inspect` on whatever the first one reports, and pairs the fields by hand — the
 objects do not have the same shape, so no structural diff reaches it. The rows
 that match collapse into a count rather than filling the screen.
 
-The verdicts are visibly untoned, and that is F30 and F34 in the picture: a
-`Comparison`'s verdict is carried by colour and nothing else, and its union mixes
-a *change* axis with a *judgement* axis. It is `docs/ROADMAP.md` entry 4.
+**This picture is the argument for a change that has since landed**, and it is
+kept for that. A `Comparison`'s verdict used to be carried by colour and nothing
+else, and one union named two axes at once — which is why `added` and `removed`
+had nowhere to go. F30 and F34.
+
+The type is now split: `change` is neutral and drawn in a marker column
+(`~ + -`, blank for unchanged), `verdict` is the judgement half and the only one
+that takes a colour. The renderer had already made the split — `comparisonTone`
+coloured `better`/`worse` and left the rest alone — so the type was the last
+place still conflating them.
 
 ### The theme, on the terminal it is for
 
@@ -180,7 +187,9 @@ found three defects, F70 to F72.
 | `/drift <c>` | the container against the image it came from, verdict-toned |
 | `/config <c> <path>` | a real unified diff with hunks, context and syntax |
 | `/logs <c>` | streaming into a pushed view; `⌃c` leaves it |
-| `/inspect` `/diff` `/images` `/top` `/port` `/events` `/compare` | the rest |
+| `/inspect` `/diff` `/images` `/top` `/port` `/events` `/compare` | the rest of the read side |
+| `/rm <c>` | **the confirm** — a question carrying what it will destroy, and a refusal passed through with a `fill` |
+| `/system prune` | the same, where the list of what goes has to be fetched because no `--dry-run` exists |
 
 `/help` lists them with their flags, because the manifest is the only place any
 of that is written down.
@@ -193,10 +202,11 @@ This directory is mostly evidence. In the order that makes sense:
 
 | | |
 |---|---|
-| [`FINDINGS.md`](FINDINGS.md) | sixty-nine entries, logged in the order they were hit |
+| [`FINDINGS.md`](FINDINGS.md) | every finding, logged in the order it was hit. **No count here** — it said *sixty-nine* while the ledger held 159, and a number in prose is a snapshot with no mechanism (F87, F142). `make enforce`'s SP6 is what counts them, by equality against `TRIAGE.md` |
 | [`TRIAGE.md`](TRIAGE.md) | the same, grouped by shape and ranked by consumer count |
 | [`../../docs/ROADMAP.md`](../../docs/ROADMAP.md) | **the deliverable** — four pieces of framework work, each with a real surface behind it |
 | [`DEGRADATION.md`](DEGRADATION.md) | the same view at five colour depths, as frames |
+| [`CORRECTIONS.md`](CORRECTIONS.md) | **every drawing that turned out wrong**, derived by `tools/corrections.mjs` rather than hand-listed. F11's ruling was *keep the drawings, add an appendix* — the corrections were made in place at every site and the index was never written, so the most-instantiated class in the project had no count. The number is a **floor**, and the tool says why |
 | [`VERIFYING.md`](VERIFYING.md) | how to read a result here without being lied to |
 | `*_WALK.md` | each surface walked by hand before it was built |
 
@@ -208,10 +218,33 @@ looking for problems.
 
 ---
 
-## What it does not do
+## What it does, and what it will ask you first
 
-Nothing that mutates. No `stop`, no `rm`, no `run`. Every verb reads, which is
-R01's second commitment and keeps a demo you can hand to someone safe to drive.
+**It mutates now, and this section said it did not.** For most of the project the
+answer was *nothing that mutates — no `stop`, no `rm`, no `run`* — R01's second
+commitment, and true when it was written. Steps 9 to 13 added five families and
+all three of the verbs that sentence names:
+
+| family | verbs |
+|---|---|
+| lifecycle | `stop` `start` `restart` `kill` `pause` `unpause` `rename` `update` |
+| destructive | `rm` `rmi` `prune` `volume prune` `network prune` `system prune` |
+| registry | `pull` `push` `build` |
+| exec | `cp` `commit` `export` `save` `load` `import` `run` `exec` `attach` `create` |
+| resources | `network ls` `volume ls` `context ls` `builder ls` `system df` · three `inspect`s · `image history` |
+
+**Every one of them asks first**, through C23's confirm host, and the question
+carries what it will destroy rather than a yes/no box. There is no `--dry-run`
+on any `prune`, so each prune verb is two calls — the second is the list docker
+itself walks, because with no dry-run that is the only honest source.
+
+The refusals are passed through verbatim: `docker rm` on a running container
+says *stop the container before removing or force remove*, which is better than
+anything this app would write, and a `tip` carries a `fill` action so `--force`
+is a decision taken at a prompt you can still edit rather than a button.
+
+**It is still safe to hand to someone, and for a different reason than before.**
+It was safe because it could not; it is safe because it asks.
 
 **Two block behaviours it was expected to demonstrate and does not**, in both
 cases because the far side is not the shape the block assumes:
