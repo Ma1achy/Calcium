@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { block, cell } from "../../data/viewmodel/index.js";
+import { cell, rebuild } from "../../data/viewmodel/index.js";
 import type {
   Action,
   Block,
@@ -109,7 +109,7 @@ function finish<B extends Block>(spec: B, opts: BlockOpts | undefined, gapDefaul
   // unequal. T4.6's pairing assertion found exactly that.
   const withGap = gap ? { ...spec, gapBefore: true } : spec;
 
-  const built = block(withGap as B);
+  const built = rebuild(withGap as B);
   if (explicit === undefined) defaulted(built);
   return built;
 }

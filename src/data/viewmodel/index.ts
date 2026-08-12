@@ -56,7 +56,7 @@ export type {
 
 export { ACTION_KINDS, GLYPH_REQUIRED_TONES, SCHEMA } from "./types.js";
 
-export { BlockShapeError, block, cell, deepFreeze, descendants, document } from "./construct.js";
+export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild } from "./construct.js";
 
 export { validateBlock, validateDocument, type Validity } from "./validate.js";
 

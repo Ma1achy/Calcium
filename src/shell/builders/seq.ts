@@ -25,7 +25,7 @@
  * can disagree.
  */
 
-import { block } from "../../data/viewmodel/index.js";
+import { rebuild } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 
 /**
@@ -89,5 +89,5 @@ export function seq(blocks: readonly Block[]): readonly Block[] {
 /** A copy of `blk` with no leading gap, rebuilt through C04's constructor. */
 function withoutGap<B extends Block>(blk: B): B {
   const { gapBefore: _dropped, ...rest } = blk;
-  return block(rest as B);
+  return rebuild(rest as B);
 }
