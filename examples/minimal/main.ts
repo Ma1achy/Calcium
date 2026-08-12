@@ -43,21 +43,13 @@ const list: Adapter = {
         }),
         b.notice("muted", `${String(rows.length)} services`),
       ],
-      meta: {
-        verb: ctx.verb,
-        adapter: "list",
-        // `?? 0` because `RawResult.exitCode` is `number | null` and
-        // `DocumentMeta.exitCode` is `number`. See FINDINGS F58 — every adapter
-        // in this repository writes this line, and it says a signalled process
-        // exited cleanly.
-        exitCode: raw.exitCode ?? 0,
-        durationMs: raw.durationMs,
-        truncated: false,
-        argv: raw.argv,
-        stderr: raw.stderr,
-        transport: ctx.transport,
-        origin: ctx.origin,
-      },
+      // **Three keys, not ten** (F58b, F150). An adapter owns `adapter`,
+      // `truncated` and `resultId`; the registry supplies the rest and
+      // overwrites anything written here, so the other seven were computed and
+      // thrown away. `ProducedMeta` marks them `never` now — and this example,
+      // the one R01 R4.4 rests on and the README quotes, is where that
+      // narrowing had not arrived. It had not typechecked since.
+      meta: { adapter: "list" },
     };
   },
 };

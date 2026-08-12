@@ -21,8 +21,16 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 hooks:              ## point git at .githooks — pre-commit runs `make enforce` (A04 §5)
 	git config core.hooksPath .githooks
 
-check:              ## type-check and lint
+check:              ## type-check and lint, including the examples
 	npm run check
+	@# **The examples have `check` scripts and nothing ran them** (F150). The
+	@# minimal example did not typecheck for as long as F58b's narrowing had
+	@# been landed: `ProducedMeta` honours three `meta` keys and it supplied ten.
+	@# It is the example R01 R4.4's reuse claim rests on and the one the README
+	@# quotes, so a check it declares and nobody invokes is F144's class arriving
+	@# at the surface a stranger meets first.
+	cd examples/minimal && npm run check
+	cd examples/docker && npm run check
 
 enforce:            ## A03 — module graph, source scans, supply chain
 	npm run enforce
