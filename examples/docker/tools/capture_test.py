@@ -25,12 +25,16 @@ decides *what the capture contains*, which is where both defects were.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _fixture import case, main  # noqa: E402
+
+# The module itself, not only its names — the locale row swaps `APP`.
+import capture  # noqa: E402
 from capture import FIRST_KEY_AT, SUBMIT_AT, TYPE_AT, parse_tail, schedule, write_cast  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "_capture_fixture.cast"
@@ -158,6 +162,36 @@ case(
     ({"OPTS": "a=b"}, b""),
 )
 case("no tail at all is no overrides and no keys", parse_tail([]), ({}, b""))
+
+# 9 — **A shot that names a locale gets that locale and nothing else** (F157).
+#
+# This is an end-to-end row rather than a parse row, because the defect it pins
+# was invisible to every parse: the override reached the child exactly as
+# written, and the child *also* held `LC_CTYPE=C.UTF-8` that nobody in this
+# repository set. Python's PEP 538 locale coercion exports it at interpreter
+# start, `pty.fork()` hands it on, and `LC_CTYPE` outranks `LANG` — so
+# `depth-ascii` drew 1,233 box-drawing dashes in the one picture whose whole job
+# is the ASCII fallback, for the life of the shot.
+#
+# What it asserts is the child's own report, from `env`, not our bookkeeping.
+_saved_app = capture.APP
+try:
+    capture.APP = ["/usr/bin/env"]
+    capture.run(80, 24, [(0.1, b"")], "/tmp/_capture_locale_row", 1.2, {"LANG": "C"})
+    with open("/tmp/_capture_locale_row", "rb") as fh:
+        seen = fh.read().decode("utf8", "replace")
+    reported = {
+        line.split("=", 1)[0]: line.split("=", 1)[1].strip()
+        for line in seen.split("\n")
+        if "=" in line and line.split("=", 1)[0] in ("LANG", "LC_ALL", "LC_CTYPE")
+    }
+    case("a locale shot gets the locale it named", reported.get("LANG"), "C")
+    case("and no LC_CTYPE the harness coerced", "LC_CTYPE" in reported, False)
+    case("and no LC_ALL it did not ask for", "LC_ALL" in reported, False)
+finally:
+    capture.APP = _saved_app
+    os.remove("/tmp/_capture_locale_row")
+
 
 if __name__ == "__main__":
     sys.exit(main("capture.py"))
