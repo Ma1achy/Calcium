@@ -76,6 +76,15 @@ Terminals send no key-up events and repeat held keys as fresh presses, so there 
 
 ## 3. Derived focus
 
+> **C26 is this section's successor, and nothing here is retracted.** The flat union is what
+> a navigation model replaces — see `C26_navigation.md`. Two things in it constrain that
+> design rather than being replaced by it: **`FOCUS_ORDER` is the single priority artefact**,
+> so C26's interaction mode is a focus target and not a flag consulted first (C26 I2), and
+> **I2's `resetFocus()` is a call rather than a subscription**, which C26 inherits for element
+> resolution (C26 I11). The measured counts this component actually carries — `pushedView` 9,
+> `liveBlock` 4, `copyMode` 0 — are in C26 §1, because the roadmap's table had two of them
+> wrong.
+
 ```typescript
 type FocusTarget =
   | "overlay" | "copyMode" | "pushedView" | "prompt" | "liveBlock" | "global";

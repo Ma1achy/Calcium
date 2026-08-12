@@ -1,0 +1,428 @@
+# C26 — Navigation
+
+| Field | Value |
+|---|---|
+| **Type** | Component |
+| **Package** | `@fmx/calcium` |
+| **Layer** | L3 interaction |
+| **Depends on** | C09 (`BlockDefinition.elements`, `measure`) · C13 (the entry a scope names) · C14 (the visible range, and `#restoreFromAnchor`'s shape) · C11 (`focusableRowIds`, which this generalises) |
+| **Consumed by** | C16 router · L4 |
+| **Source** | `CALCIUM_ROADMAP.md` Order 7 · A02 §2 focus priority · principia-ii `SMART_NAV_IMPLEMENTATION.md` |
+| **Status** | Draft — **design only.** No `src/interaction/navigation/`, no bindings, no keymap rows. |
+
+---
+
+## 1. Purpose
+
+**Navigating the transcript as a structure does not exist.** Row movement inside the live
+block works; block to block, column to column, cell to cell does not, and neither does
+anything a pointer lands on.
+
+The reason is not that nobody wrote the bindings. It is that there is nowhere for them to
+live: `FocusTarget` is a flat priority list of six, so every key a block might want competes
+with the prompt in one namespace. `pushedView` has nine bindings and they are a flat list —
+`up` and `down` are bound to `viewPageUp` and `viewPageDown`, which is what a namespace looks
+like when it has run out of room rather than when it has been designed.
+
+C26 replaces the flat target with **a scope stack plus a mode**, and makes what a block
+offers a **declaration** rather than a set of keys.
+
+**It subsumes rather than sits beside.** Block-to-block movement, column and cell movement,
+the focusable-block concept, clickable rows and links, `copyMode`'s missing producer,
+semantic copy and the question/menu primitive all fall out of this. Every one of them built
+first is built twice — §11 lists them.
+
+### What this is designed against, measured rather than remembered
+
+`CALCIUM_ROADMAP.md`'s navigation table was wrong in two of five rows when this was written,
+and one of them was the headline argument for the component. Counted from `defaultKeymap`
+on 2026-08-13:
+
+| target | bindings | shape |
+|---|---|---|
+| `prompt` | 28 | full readline |
+| `pushedView` | 9 | a flat list with no scope, no mode, no edge semantics |
+| `overlay` | 6 | — |
+| `liveBlock` | 4 | `escape` · `up` · `down` · `enter` → `rowActivate` |
+| `global` | 4 | — |
+| `copyMode` | **0** | a focus target with no keys |
+
+**The premise survives on different evidence.** *Zero bindings* was false; *nowhere for a
+richer set to live* is not.
+
+---
+
+## 2. The split — navigation and interaction
+
+**Navigation mode** moves focus between things. **Interaction mode** sends keys *to* the
+thing focused.
+
+This solves key collision **structurally** rather than key by key: a block in interaction
+owns its keys and the prompt does not compete for them. It is the same trade as the `⌃Home`
+ruling, made once instead of per binding.
+
+`⏎` enters interaction on the focused element. `Esc` leaves it. **Two-level escape** — the
+first exits interaction, the second leaves the scope — is what makes drilling in
+non-frustrating: the reader is never one keypress from losing their position.
+
+### The mode is a focus target, and that is a constraint rather than a convenience
+
+**C16 §5's Ctrl-C ladder has no order of its own.** Its rungs 3–7 are handlers registered on
+focus targets, so their order *is* `FOCUS_ORDER`'s, and the two cannot disagree. C16's own
+spec pass found the defect that arises when the ladder exists as a second artefact — copy
+mode above both overlay rungs, against A02 §2 — and `FOCUS_ORDER` is the single artefact that
+prevents it.
+
+So **interaction mode must be expressible as a focus target**, not as a flag consulted inside
+dispatch. A mode that sat beside `FOCUS_ORDER` and had to be checked first would be a second
+priority list, and the ladder would acquire an order of its own again. This is the strongest
+constraint on the shape of §3's state, and it came out of the walk (§8a, trace 5).
+
+---
+
+## 3. Scopes
+
+A scope stack, and it is **shallow by construction** — a terminal transcript is not an
+arbitrary tree:
+
+```
+entry → block → row → cell
+```
+
+Four levels, not an unbounded descent, so the drill gesture has a small learnable set.
+
+**A level exists only where §5's declaration reports elements at it.** A kind that reports
+none is atomic at that level, and the stack cannot descend into it. That is what makes
+"scopes are shallow" a property of the data rather than a promise in prose.
+
+### Focus memory is closer to required than optional
+
+principia-ii lists it as a future enhancement. In a terminal it is not: there is no click to
+jump back with, so re-entering a table at row 1 every time is punishing.
+
+**And restoring is a re-resolution, not a restoration.** The element the reader was on may
+not exist when they return — C13 evicts, `putBlock` replaces a block whole, and §5's element
+list is a function of width. The operation is **resolve by id, fall forward to the nearest
+survivor**, which is C14 I6's shape for the scroll anchor and is reused rather than invented.
+
+---
+
+## 4. Policies
+
+Declarative per-kind metadata, taken from principia-ii, answering *what does `↓` do at the
+edge of this thing* with no conditional in any handler:
+
+```
+ArrowPolicy   navigate · escape-vertical · escape-horizontal · escape-all · custom
+EscapePolicy  auto (two-level) · bubble · modal · custom
+```
+
+Resolved **global → kind → per-node override**, which is the shape C10's theme resolution and
+C05's manifest merge already have — familiar machinery rather than a new one.
+
+### The vocabulary is checked against three kinds before it is adopted
+
+**Two instances fitting a rule is not evidence for the rule — it is the minimum for noticing
+one.** `table` and `logs` will both fit, and they are the two anyone would reach for. The
+third is `patch` in a pushed view, whose nine bindings today have no edge semantics at all
+and whose scope levels are hunks rather than rows. If the vocabulary does not fit it, the
+axis is wrong rather than the vocabulary incomplete — which is what C13's patch gate cost
+when the third case was not sought.
+
+**Recorded as owed rather than assumed**, and it is the first thing the implementation does.
+
+---
+
+## 5. Element resolution — one declaration, keyboard and pointer
+
+```typescript
+elements?: (block: B, width: number) => readonly NavElement[];
+```
+
+on `BlockDefinition`, beside `window?`.
+
+```typescript
+type NavElement = Readonly<{
+  id: string;
+  level: "block" | "row" | "cell";
+  rows: Readonly<{ from: number; to: number }>;    // [from, to), block-local
+  cols: Readonly<{ from: number; to: number }>;    // [from, to)
+  arrow?: ArrowPolicy;
+  escape?: EscapePolicy;
+  activate?: Action;
+}>;
+```
+
+**Optional, and a kind that is atomic omits it — and the argument is C09's own**, at
+`presentation/blocks/types.ts:94–104` on `window?`: *an absent member cannot be deleted by a
+later edit while a branch returning the block unchanged can.* The same sentence covers a
+branch returning `[]`. Cited rather than restated, so the two seams read as one decision
+rather than as two that happen to agree.
+
+**Pure in `(block, width)`, and never in focus.** That is what makes it legal under C11 I14 —
+focus is rendered and never owned — and it is a stronger guarantee than a rule, because focus
+is not a parameter and the purity is therefore unrepresentable as a violation. It is also
+what makes it cacheable on the key `shell/render-cache.ts` already uses.
+
+**The keyboard walks the list; the pointer searches it. One source, so they cannot disagree**
+— which is the roadmap's constraint on the mouse work, satisfied structurally rather than by
+two mechanisms agreeing.
+
+`focusableRowIds` (`presentation/table/definition.ts:230`) is this, at one level for one kind.
+**C26 generalises it and does not sit beside it.** A second parallel mechanism is the defect
+to avoid, and it is named here so the implementation cannot reach for one quietly.
+
+### What generic invariant does this earn, and it is weaker than `window`'s
+
+`window?` earned an equality: `measure(w.block, width) − w.skipRows === to − from`. One
+number against one number, total over every kind that declares it, and it is what made an
+app's wrong implementation catchable by a sweep rather than by review. **The question is what
+the equivalent is here, and it has to be asked before the seam ships** — an invariant with no
+subject is A03 §2's vacuity class, and C11 I17 is the measured instance of it.
+
+**There is no single equality. There are four predicates, and each catches a class:**
+
+1. **Containment.** Every element's `rows` lies within `[0, measure(block, width))` and its
+   `cols` within `[0, width)`. Catches an implementation whose positions are derived from
+   something other than the block it was handed — F134's drift class in the navigation axis.
+2. **Reading order.** The list is non-decreasing by `(rows.from, cols.from)`. Needed because
+   the keyboard *walks* it: "next" has to mean "next on screen" or `↓` is arbitrary.
+3. **Disjointness per level.** Two elements at the same `level` share no cell. This is what
+   makes pointer resolution single-valued. **Per level and not globally**, because a cell
+   nests inside its row by design — a global disjointness would forbid the structure
+   (§8a, table row d).
+4. **Stability.** `elements(b, w)` twice is deeply equal. Catches an implementation reading a
+   clock or a counter, which the signature does not forbid.
+
+**And the strongest property is the one that will be vacuous at landing, which is said here
+rather than discovered.** A kind declaring **both** `window` and `elements` owes their
+agreement:
+
+```
+elements(window(b, w, from, to).block, w)
+  ≡  { e shifted by (from − skipRows) : e ∈ elements(b, w), e.rows ⊆ [from, to) }
+```
+
+That is F134's gutter defect one field along — a derivation computed over the whole block
+while the window shows a slice — and it is the check that would catch it generically. Today
+`window` has exactly two implementers (`logs`, `patch`) and `elements` will have `table`
+first, so **the intersection is empty and the invariant has no subject on the day it lands.**
+
+**The premise is recorded so it can be re-checked** (F102's disposal, and F134's own hazard
+note): *this is vacuous while no kind declares both.* The day one does — `patch` is the
+likely first, since a hunk is a natural scope — it becomes a live requirement, and this
+paragraph is where to look.
+
+### Resolution is a pull, not a subscription
+
+C16 reads C13, C14 and C15 **at the moment it needs them** and registers no callback on any
+change stream — *"every one is a pull, and that is the audit"* (`router.ts`). The reason
+generalises: C13 emits `append` then `evict` for one `append()`, so a consumer reading deltas
+as current state sees a half-applied store, which cost C14 a blank screen that every assertion
+passed.
+
+**So the element list is recomputed on dispatch, not maintained under a subscription.** C26
+inherits the property rather than being the component that breaks it.
+
+---
+
+## 6. Pointer
+
+**The plumbing is built.** SGR decoding (`decode.ts:393`), a `mouse` capability that is off
+under tmux, and a routing table that hit-tests layers by `Placed` and falls through to the
+viewport (`router.ts:254`). Wheel scrolling works. What is missing is **cell → element
+resolution**, which is §5's declaration and nothing else.
+
+The constitution it ships with is the constraint: *"every mouse affordance has a keyboard
+equivalent, so nothing is lost — only convenience"* (`capabilities.ts:67`). Clicking is *jump
+directly to this scope*; the keyboard is *walk there*. Same target set, two routes.
+
+**Deepest level wins**, which is what makes click-to-focus and click-to-activate one rule
+rather than a per-block decision: a click resolves to the innermost element containing the
+cell, and an element carrying `activate` is invoked while one without it takes focus.
+
+**One translation, used by both rungs** — C16 I20 already records what it costs to
+have two: a layer's box and C14's entry map are both region-relative, and comparing a
+terminal row to one of them directly resolved clicks to the row above.
+
+---
+
+## 7. Focus is rendered, never owned
+
+**C11 I14 and C11 I17 are the hard edge of this component.** Focus changes tone and nothing else:
+no marker, no extra row, no width. A height that varied with focus would move without `rev`
+moving, so C14's cache could not invalidate it — and `measure` never receives focus at all
+(C09 I8), so it is invisible to measurement. C11 T1.18's three-way equality and T6.16 are the
+rows that hold it.
+
+**C11 I17 is the pattern to copy and not only the rule to obey.** The action bar's *presence*
+follows the data and its *content* follows focus. Every C26 affordance resolves the same way:
+the space a focus ring would occupy is reserved by the data or it does not exist.
+
+Background and reverse video are free. Anything that changes size is not.
+
+**The chrome says the mode, the block says the focus** — `NAV` / `EDIT`, the way vim shows
+`-- INSERT --`. **This spec does not decide the chrome row.** Chrome is one row each by
+design and four features already want it (`CALCIUM_ROADMAP.md` Order 29). C26 states a
+requirement — *the mode must be visible somewhere that is not the block* — and defers the
+placement. **The operation does not exist yet, and saying so is the point**: a ruling that
+names a mechanism the layer below does not have is C23 §8a A4's class, and it is cheaper to
+notice here.
+
+---
+
+## 8. Invariants
+
+- **I1** — The scope stack is at most four deep, and a level exists only where §5's
+  declaration reports an element at it.
+- **I2** — Interaction mode is a focus target, so C16 §5's ladder derives from `FOCUS_ORDER`
+  and holds no order of its own (§2).
+- **I3** — `elements` is pure in `(block, width)`. Focus is not a parameter, so a
+  focus-dependent geometry is unrepresentable rather than forbidden.
+- **I4** — Every element's rows lie within `[0, measure(block, width))` and its columns within
+  `[0, width)`.
+- **I5** — The element list is in reading order, non-decreasing by `(rows.from, cols.from)`.
+- **I6** — Two elements at the same `level` share no cell. Nesting across levels is the
+  structure and is not a violation.
+- **I7** — A kind declaring both `window` and `elements` owes their agreement (§5). **Vacuous
+  while the intersection is empty**, and the premise is recorded so it can be re-checked.
+- **I8** — The keyboard and the pointer resolve against the same declaration. There is no
+  second source.
+- **I9** — Focus is rendered by the block and owned here (C11 I14). C26 holds a location; it
+  draws nothing and commits no frame.
+- **I10** — Restoring focus is a re-resolution by id with a fall-forward to the nearest
+  survivor, never an index (C14 I6's shape).
+- **I11** — Element resolution is a pull, recomputed on dispatch. C26 subscribes to no change
+  stream.
+- **I12** — A refused or throwing `elements` makes the block atomic for that dispatch and
+  focus falls to the block level. It is not a throw the caller sees.
+- **I13** — Leaving a scope and a command running are **different transitions**. Both reach
+  the prompt today and only one may keep a focus memory (§8a, table row a).
+- **I14** — Two-level escape: the first `Esc` exits interaction, the second leaves the
+  scope. Neither is C16 §5's Ctrl-C rung and neither is `viewPop` (→ C16 I24) — the
+  collision between the second and `viewPop` is trace 6 and is owed a ruling.
+- **I15** — Policies resolve global → kind → per-node override, and **an override naming a
+  level the kind reports no element at is a construction error**, the way a duplicate
+  binding is (→ C16 I10). An override for an absent level is unreachable and reads as
+  configured, which is A03 §2's vacuity class arriving in a config value.
+
+---
+
+## 8a. The walk
+
+**Both artefact shapes, because this component has state *and* structure.** C19 is the
+measured case for taking only the trace: its `--flag=value` defect was structural, no number
+of event rows could reach it, and the table that would have caught it was already in the repo.
+
+Eleven rows below; **six carried a finding**, and each is a cell where two correct statements
+overlap.
+
+### Classification table — structural, at rest
+
+| # | the two rules that meet | ruling |
+|---|---|---|
+| **a** | *`Esc` returns to the prompt* (C16 I24, `liveBlock`) meets *focus memory remembers the row* | **FINDING.** `FocusStore.toPrompt()` and `reset()` both assign `AT_PROMPT`, which has no `rowId` — so returning to the prompt destroys the location today. Focus memory needs them to diverge: `reset()` is *a command ran* (C16 I2) and `toPrompt()` is *the reader stepped out*. One state transition, two meanings, nothing distinguishing them. → **I13** |
+| **b** | *an override wins over the kind* meets *a level exists only where elements report one* | **FINDING.** An override naming a `cell` policy on a kind reporting no cell elements is unreachable and reads as configured — A03 §2's vacuity class arriving in a config value. Ruling: an override for an absent level is a **construction error**, the way C16 I10 makes a duplicate binding one. |
+| **c** | *deepest level wins* meets *disjointness makes resolution single-valued* | **FINDING.** Global disjointness forbids the nesting the model is built on. Disjointness is **per level** → **I6**, and it is the reason §5 lists four predicates rather than three. |
+| **d** | *`escape-all` leaves the scope* meets *there is no scope above `entry`* | Falls to the prompt by row **a**'s transition, and therefore inherits its ruling rather than adding one. |
+| **e** | *the arrow policy governs the edge* meets *`↓` at the prompt is `historyNext` **and** enters the live block* (C16 I22) | Not a collision: C16 I22's second effect is entry and this governs exit. But the pair means there are two ways back to the prompt (`Esc` and the bottom edge) and **they must agree about row a's transition.** Named so the implementation does not give them separate paths. |
+
+### Sequence trace — event-mediated
+
+| # | what happens in between | ruling |
+|---|---|---|
+| **1** | an entry is **evicted** while focus is inside it | **FINDING.** C13's cap sweep exempts live and streaming entries, so focus inside the live block cannot be evicted today. **C26 makes eviction reachable under focus for the first time**, because block-to-block movement leaves the live entry. → **I10** |
+| **2** | `resetFocus()` (C16 I2, L4 calls it on submit) arrives **while in interaction mode** | Row **a**. The mode must be left, not only the location reset. |
+| **3** | a **resize** while in interaction | `elements` is width-dependent, so the focused element may not exist at the new width. Same remedy as 1, and the operation exists: C14 `#restoreFromAnchor`. |
+| **4** | a **refresh** replaces the block under a focused element | `putBlock` is total and never throws (`document-view.ts:107`), so the element vanishes with no signal. Same remedy — and it is why **I11** is a pull: there is nothing to subscribe to that would say *your element went*. |
+| **5** | **`⌃c` in interaction mode** | **FINDING, and it constrains the type.** If the mode were a flag consulted before dispatch, the ladder would gain a rung with an order of its own — exactly the artefact C16's `FOCUS_ORDER` comment exists to prevent. The mode must be a focus target. → **I2**, §2 |
+| **6** | **`Esc` inside a pushed view in interaction mode** | **FINDING.** `escape` on `pushedView` is `viewPop` (C16 I24), and two-level escape wants the first `Esc` to exit interaction. C16 I24 argued that `viewPop` is *not* the Ctrl-C rung under another name; the same argument now has to be made about `Esc`, and it does not obviously survive — the view's dismissal and the mode's exit are both *"undo the last thing I entered"*. Ruling owed at implementation, with the two-level rule taking the inner one. |
+
+### The two checks that neither artefact indexes
+
+**Does the ruling name an operation that exists?** (C23 §8a A4.)
+
+- *Focus memory restores the row* — needs the row to survive. It does not; the operation is
+  re-resolve and fall forward, and it exists as C14 `#restoreFromAnchor`. **Survives, remedy
+  changed.**
+- *The chrome shows the mode* — needs a chrome row. Order 29 owns one row and four features
+  want it. **The operation does not exist**, so §7 states a requirement and defers.
+- *An element is re-resolved after a patch* — needs a change signal. C16 subscribes to none by
+  ruling. **Recompute on dispatch** → I11.
+
+**What does a refusal leave behind?** A throwing `elements` would abandon a focus location
+pointing at something unresolvable, two components from the throw. So it is not a throw:
+the block is atomic for that dispatch and focus falls to the block level → **I12**.
+
+---
+
+## 9. Commitments
+
+1. The scope stack is `entry → block → row → cell`, at most four deep (I1).
+2. Navigation and interaction are modes, and interaction is a focus target (I2).
+3. `⏎` enters interaction; `Esc` leaves it, then leaves the scope (I14).
+4. `ArrowPolicy` and `EscapePolicy` resolve global → kind → per-node override, and an override for a level the kind does not report is a construction error (I15).
+5. `BlockDefinition.elements` is optional, pure in `(block, width)`, and is the single source for both keyboard and pointer (I3, I8).
+6. Element lists satisfy containment, reading order, per-level disjointness and stability (I4, I5, I6) — checked generically by a conformance sweep, as `window`'s equality is.
+7. A kind declaring both `window` and `elements` satisfies their agreement (I7), and the invariant's emptiness is recorded rather than left to be found.
+8. Focus changes tone and nothing else (I9, → C11 I14).
+9. Restoration is by id with a fall-forward (I10).
+10. Element resolution is a pull (I11).
+11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
+
+**The three-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
+is a § detail rather than a commitment* — it is a step the implementation takes, and no
+invariant can hold a promise about the order in which something was checked. It stays in §4
+where it is owed, rather than being given an invariant it would make vacuous.
+
+---
+
+## 10. Tests
+
+Named against the invariants; the tiers are the six.
+
+- **T1.x** (I4, I5, I6) — the four predicates, per kind, as a **generic conformance sweep**
+  over every kind declaring `elements`. The shape is C09's window conformance: it walks every
+  fixture rather than asserting one, because a single-element row passes against a wrong
+  implementation. **Two fabrications confirm it is live**, as F134's did.
+- **T2.x** (I2) — the ladder still derives from `FOCUS_ORDER` with the mode present:
+  exhaustive over the target union, not over a hand-written list.
+- **T2.x** (I8) — a click and the equivalent walk reach the **same element object**, asserted
+  by identity rather than equality. The keymap's `/help` traversal is the precedent: identity
+  is what makes "one source" checkable.
+- **T3.x** (I10, I12) — evict, resize and `putBlock` under a live focus; and a kind whose
+  `elements` throws.
+- **T3.x** (I13) — `reset()` and `toPrompt()` produce different locations.
+- **T6.x** (I6) — making disjointness global → the nesting fixtures fail.
+- **T6.x** (I11) — turning the pull into a subscription → the half-applied-store row fails.
+- **T6.x** (I2) — moving the mode out of `FOCUS_ORDER` into a pre-dispatch flag → the ladder
+  ordering row fails.
+
+**The mutation pass is scheduled, not optional.** Every module mutated on landing; a mutation
+that fails nothing indicts the tests or the prose, and §5's vacuity note is the sentence most
+likely to be the second kind.
+
+---
+
+## 11. Subsumed — within this model, not built here
+
+Each is a `CALCIUM_ROADMAP.md` entry that lands inside C26 rather than beside it, and each is
+listed so the Order list can point here instead of carrying a duplicate:
+
+- **10** question / menu primitive — `ctx.ask` exists with `choices`
+  (`shell/local/registry.ts:59`); the in-transcript menu block is an interactive element.
+- **15** text selection, copy and semantic copy — `copyMode` is a focus target with **zero**
+  bindings and no producer (`enterCopyMode` is defined nowhere in `src/`). Semantic copy is
+  *copy the focused element*, which needs §5 and nothing else.
+- **16** one popup — the confirm and the completion menu are two mechanisms today; whichever
+  survives is an interaction-mode consumer.
+- block-to-block movement · column and cell movement · the focusable-block concept · clickable
+  rows and links — §3 and §5.
+- `pushedView`'s nine flat bindings — §2 and trace 6.
+
+## 12. Out of scope
+
+- **The chrome row.** Order 29, and §7 says why.
+- **Rebindable keys** (Order 42). A precedence ladder over bindings is orthogonal to what a
+  binding may address.
+- **The scroll anchor.** Already built — C14 I4/I5/I6.

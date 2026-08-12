@@ -46,6 +46,8 @@ An earlier draft placed `ColumnDef` here on the reasoning that it "describes pla
 
 `focusableRowIds` is here rather than in §5 because C16 imports it: focus is rendered by C11 and owned by C16 (I14), so the router needs the ordered list of rows it may move between, and that list is a function of the block alone.
 
+**It is the one instance of what C26 generalises, and C26 replaces it rather than joining it.** `elements(block, width)` is the same edge — a block declaring what it offers to whatever owns focus — at four scope levels for every kind instead of one level for this one, and returning positions so a pointer can resolve against the same declaration the keyboard walks. Two parallel mechanisms would be the defect: the roadmap's constraint on the mouse work is *one source, or they will disagree*, and a `focusableRowIds` left standing beside `elements` is exactly the second source. Named here because this file is where someone adding the second one would be working. `docs/components/C26_navigation.md` §5, C26 commitment 11.
+
 `planColumns` is **pure and not memoised**. It is called on every render and on every resize, and it must be cheap — which is an argument for it being cheap, not for it holding a cache.
 
 Three reasons, and the first two are structural. C11 owns no state (I11), and T2.6 scans `table/` for mutable module state — a memo table is the state that scan exists to find. Measured heights are already cached one layer up, on `(entryId, rev, width)` (C14 I3), which is where the repeated work actually accumulates. And there is no measurement behind the optimisation: T3.16 asserts sub-millisecond planning at 10,000 rows, and a cache added to satisfy a budget that is already met is complexity bought with nothing.
