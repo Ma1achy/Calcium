@@ -372,9 +372,18 @@ renders keybindings from the keymap and verbs from the manifest, the sentence de
 half of it — which is F11's class arriving in the framework's own front door.
 
 <a id="output-diffing"></a>
-### ★★ The frame is written whole, every time — no output diffing
+### ~~★★ The frame is written whole, every time~~ — BUILT, Order 12
 
-**The larger of the two performance defects, and the one to fix first.**
+**Corrected 2026-08-13.** `shell/render-frame.ts` `body()` holds the previous frame,
+addresses each changed row with `cursorTo(i, 0)` and writes only that row. Every row is
+already `exact()`-padded to the frame's width, so a rewrite covers the row it replaces
+cell for cell and no erase is needed; `SGR_RESET` leads each row (I57). The whole-frame
+form survives as the no-record case — the first frame, a contaminated one, and one whose
+predecessor was a different size — which is `previous() === null`, one expression rather
+than a second reading of C03's flag.
+
+**The diagnosis below is left standing because it is what the measurement was taken
+against.**
 
 `session.ts:367` writes `HOME` followed by every row joined, on every frame. **There is no
 comparison against the previously written frame.** On a 200×50 terminal that is ~10,000
@@ -408,7 +417,13 @@ invalidation mechanism exists, and it cuts the per-frame cost for *every* frame 
 only for large blocks.
 
 <a id="cells-fast-path"></a>
-### `cells()` has no ASCII fast path — the hottest function in the tree
+### ~~`cells()` has no ASCII fast path~~ — BUILT, Order 14
+
+**Corrected 2026-08-13.** `presentation/text.ts:89–108`, and it is **an equality rather
+than an approximation**: the path is taken only when every code unit is printable ASCII,
+where `text.length` is provably the same answer as the walk below. That is what makes it
+safe against the rule that `cells()` is the one measurer — a fast path that were merely
+usually right would put the drift inside the function written to prevent it.
 
 **Read, not guessed.** `cells()` is:
 
@@ -470,7 +485,14 @@ and watch"* is what a user experiences; a microbenchmark that improves while the
 stutters has measured the wrong thing.
 
 <a id="render-caching"></a>
-### ★ Rendering is not cached, and a large block makes the app unusable
+### ~~★ Rendering is not cached~~ — BUILT, Order 13
+
+**Corrected 2026-08-13.** `shell/render-cache.ts`, and it carries two axes the naive key
+would have dropped. **Focus**, because `visibleRows` passes `focusFor(...)` into the
+render and C11 draws the focused row in another tone (C11 I14) — moving a selection down
+a table changes no `rev` and no width. **The theme's identity**, via `ResolvedTheme.name`,
+which already moves on a variant switch and on an override — so the fact travels with the
+value and cannot be left out of an `invalidate` call at a fourth site.
 
 **A performance defect, measured in the code rather than guessed at.** `paint.ts:137` calls
 `renderSequenceToLines(registry, blocks, width, …)` on every visible entry **every frame**,
@@ -1129,7 +1151,17 @@ still stutters has measured something other than what a user experiences — and
 findings above were all found by reading code and frames, not by profiling.
 
 <a id="shared-pollers"></a>
-### ★★ Shared pollers — a correctness fix that happens to be an optimisation
+### ~~★★ Shared pollers~~ — BUILT, Order 18
+
+**Corrected 2026-08-13.** `shell/refresh.ts` holds a `Source` per declared source, and
+**every part refers to one** — a part with no declared `source` is still a source, which
+is what keeps one code path rather than two. The derivation layer is `folds`, one entry
+per derivation key holding the version it was computed at (I47); **the stagger is over
+sources rather than parts**, so parts sharing a source are aligned by construction rather
+than by two spreads agreeing. Backoff is the source's and rendering is the part's
+(§8d D6).
+
+**The correctness half is the reason it was worth doing, and it is what landed first.**
 
 **Every `b.live` part owns its own `fetch`.** The landing dashboard, `/stats`, and a
 single-container panel each spawn `docker stats --no-stream` on their own interval. Three
@@ -1242,7 +1274,13 @@ the whole thing is moot, and the honest answer is a recorded negative.
 - **Entries scrolled off are not rendered.** C14 selects visible rows before `paint` sees
   them; the off-screen problem is *inside* a visible block, not between entries.
 
-### ★ Off-screen work — three layers, and only one is handled
+### ~~★ Off-screen work~~ — BUILT, Order 20
+
+**Corrected 2026-08-13.** `refresh.ts:212` takes `visible: (host: RefreshHost) => boolean`
+and `construct.ts:760` answers it from `stores.viewport.visible()`. The ruling it carries
+is worth keeping in view: **a `view` host is visible while it is declared**, and *entries*
+are what the viewport reports, so a part inside a partly-visible entry counts as visible.
+Per-block offsets do not exist, and inventing them here would have been a second geometry.
 
 *"Do not redraw what is not on screen"* is three separate questions with three different
 answers.
@@ -1731,14 +1769,28 @@ arm and `onAction` has no route from a keystroke, so none from a click either.
 
 **Keyboard is thinner than it looks:**
 
-| | |
-|---|---|
-| `prompt` | 28 bindings — full readline |
-| `overlay` | 6 · `global` 4 |
-| `liveBlock` | **3 only** — `escape`, `up`, `down`. Row movement within one block |
-| `pushedView` | **zero.** A focus target with no keys — docker-tui's S3 hit this |
-| between blocks | no mechanism at all |
-| horizontal | nothing — no column or cell movement |
+| | roadmap, as written | counted from `defaultKeymap`, 2026-08-13 |
+|---|---|---|
+| `prompt` | 28 bindings — full readline | **28** |
+| `overlay` | 6 | **6** |
+| `global` | 4 | **4** |
+| `liveBlock` | **3 only** — `escape`, `up`, `down` | **4** — and the fourth is `enter` → `rowActivate`, F21's close |
+| `pushedView` | **zero.** A focus target with no keys | **9** — `n p g G pageup pagedown up down escape` (C16 I24) |
+| `copyMode` | not in the table | **0**, and it is the one that actually has none |
+| between blocks | no mechanism at all | unchanged |
+| horizontal | nothing — no column or cell movement | unchanged |
+
+**Corrected in place rather than rewritten, because two of five rows were wrong and one was
+wrong by nine.** *Zero bindings* was the headline argument for the whole model — *"there is
+nowhere for a richer set to live"* — and it had been nine bindings out of date since C16 I24
+landed. **Wrong in both directions**, which is the shape to watch for: `copyMode` is the
+target with no keys and it was not in the table at all.
+
+**The premise survives on different evidence, which is why this is a correction and not a
+retraction.** Nine `pushedView` keys are a flat list with no scope, no mode and no edge
+semantics — `up` and `down` are bound to `viewPageUp` and `viewPageDown`, which is a list
+that ran out of room rather than a navigation model — and `liveBlock` still cannot leave its
+own rows. The design is written against the counted table, not this paragraph.
 
 Row navigation inside the current live block works. **Navigating the transcript as a
 structure — block to block, cell to cell — does not exist.**
@@ -1819,14 +1871,27 @@ block — todo checkboxes, the question/menu primitive — gets a coherent home 
 inventing its own keys.
 
 <a id="scroll-anchor"></a>
-### The scroll-anchor rule — do this regardless, and first
+### ~~The scroll-anchor rule — do this regardless, and first~~ — BUILT, Order 8
 
 **If the user is scrolled up, a new entry must not move their viewport. If they are at the
 bottom, it follows.** An anchor-preservation rule in C14, and the difference between a
 transcript usable during streaming and one that is not.
 
-The floating jump-to-bottom button with a new-entry indicator is chrome on top of it.
-Optional. **The rule underneath is not**, and it is small enough to do before the model.
+**Corrected 2026-08-13, and it is C14 I4, I5 and I6.** `viewport.ts:347 #afterContent()`
+runs after **every** C13 change — `append` included, not only `resize` — and while
+detached it recomputes `topRow` from `(anchorId, rowOffset)` rather than keeping it.
+`followTail` is derived from where the viewport ended up and never from which way the
+reader scrolled (I5), and the anchor is an entry id plus an offset so eviction cannot
+shift it (I6). `T5.3` is the row: *a live `--logs` tail at 1,000 lines/s while scrolled up
+reading → the view does not move.*
+
+**Found by reading rather than by grepping, and the symbol would have answered the wrong
+question.** `#anchor` is captured before a resize *and* restored after an append; those
+are two mechanisms sharing a field name, and only the second is this rule. A grep for the
+field finds the first and says nothing about the second.
+
+The floating jump-to-bottom button with a new-entry indicator is chrome on top of it, and
+**it is what remains** — which puts it behind Order 29's chrome row rather than here.
 
 ---
 
@@ -2109,119 +2174,179 @@ an ML platform's TUI.
 ## Order
 
 ```
-0  step 8                    docker-tui packaged — README, play environment, screencast, CI
-1  PHASE 1                   producer context · change axis · builder audit · the prompt
-                             ↑ serves both destinations, must precede the freeze
-2  prism-tui's first         experiment table · training curve · one live job
-   surfaces                  ↑ the second consumer, and b.live's stream arm's first
-3  the ML package            tensors, heatmaps — built with prism-tui as the consumer
-4  what 2 and 3 found        phase 1's equivalent, second round
-5  publication prep          error messages · the outside-reader test · 0.x · CI from the
-                             tarball
-—  PUBLISH 0.x               with two real consumers behind it
-6  phase 2                   the empty-block convention · rendering flags
-7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
-                             the small navigation items rather than sitting beside them
-8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
-9  mermaid (text path)       cheap once the dependency is vetted, distinctive
-10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
-11 markdown                  translates to existing blocks
-12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
-                             to change one. Anticipated in a comment, never built.
-                             Smallest fix, biggest effect, invalidation already exists
-13 RENDER CACHING          ★ a large diff renders 5,000 lines to show 30. Multiplicative
-                             with the above, which is why it is "unusable" not "slow"
-                             (highlighting is already memoised — that memo exists BECAUSE
-                              rendering repeats, which confirms the diagnosis)
-14 cells() ASCII fast path  the hottest function walks Intl.Segmenter over ASCII. Cheap,
-                             but measure after the render cache — most calls vanish with it
-15 text selection + copy    copyMode exists with no producer; OSC 52; and semantic copy,
-                             which pairs with the navigation model
-16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
-                             two parameters. C19's menu already has the flip, the selection
-                             and `… N more`; the confirm reimplements or lacks all of it
-17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
-                             MAX_ROWS is the fallback adapter's alone. diffing → caching → window
-                             the block → cap with a marker. A CHAIN, in that order
-18 SHARED POLLERS ★★       source → derivation → part. One fetch AND one computation per
-                             source; only the render is per instance. A CORRECTNESS fix
-                             first. Render memoised on (sourceVersion, viewState, width),
-                             one batch per source, and the stagger gets less to do
-19 resize coalescing        never delayed by C03 I2, and every SIGWINCH rebuilds the Fenwick
-                             index. A drag is N rebuilds + N renders + N writes
-20 off-screen live parts ★  b.live keeps ticking when scrolled off — no visibility check
-                             exists. Throttle, not pause (I9 protects a scrolled-away
-                             --watch), and fetch on re-entry. Spawns processes for nobody
-21 --help per verb ★        usageBlocks() is built, exported, and uncallable. Reserve
-                             --help framework-side, and it makes /help's fifty-verb wall
-                             a two-level problem instead. Needs F39's render-selecting flag
-22 b.art — banners          sparse variants, fallback ends at styled text, and VALIDATION
-                             PER VARIANT (no tabs, uniform width, measured cells) — ~30
-                             lines that would have caught every banner defect
-23 selection styling        a full-row BACKGROUND WASH — free, since it changes no size
-                             (the patch renderer already does it). Reverse video at 1-bit,
-                             gutter glyph as the fallback. Selection as a `meaning` palette
-                             so C10's contrast floor checks the fg/bg pair
-24 more default themes      two ship and `light` is dark-on-dark. ThemeSet is a two-field
-                             record, so more is a PUBLIC TYPE change — freeze-relevant
-25 ghost text ★            drawn since PR #27. What remains: it ghosts only a SOLE
-                             candidate, which is when the hint is least needed, and it
-                             is static-only. Design with as-you-type — one hint, two levels
-26 view trace in transcript a full-screen view leaves no record. Append on push, PATCH on
-                             pop — sidesteps B03's no-trace-on-pop ruling, one entry, D7
-                             intact. And ⏎ to re-enter is nearly free
-27 syntax highlighting ★    a REGRESSION against C09 §4a, not a scoping choice — the spec
-                             promises "highlighted whenever someone registers it" and there
-                             is no someone. 24 mainstream = 180 KB, measured. Phase-1-shaped
-28 prompt cursor-following  the window exists and is tail-anchored; the fix is threading
-                             cursorCell, which the code already names
-29 chrome row budget        one row each by design, and four features now want it. Rule
-                             once — chrome-as-blocks pairs with b.row
-30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
-                             a string, so the transcript renders what it actually is
-31 completion ranking       prefix-matched and unranked today. Recency-first is nearly
-                             free (C20 has it) and is the most-felt. RANK BEFORE
-                             as-you-type, or the menu is worse for opening itself
-32 prefix-out / defaultRoute      prefix-IN is expressible and CommandPolicy is reachable
-                             (retracted — F89). Prefix-OUT is not: prose by default, verbs
-                             by exception. A RULING on defaultRoute, not a config field
-33 QUEUEING ★              submit while something runs — a stated must. Small queue,
-                             real rulings, and Ctrl-C is ambiguous the way step 9's was
-34 UX polish set            animation (decoration never information) · change highlighting ·
-                             finish notifications · structured export · error remedies as
-                             fill actions · empty states that teach
-35 progress feedback        the spinner is static by a ruling whose premise expired — the
-                             refresh driver IS the ticker now. Motion, then elapsed time,
-                             then what it is doing
-36 scrollbar + edge markers the terminal cannot provide one (alt screen has no scrollback)
-                             and C14 already has the numbers. The edge marker is the cheap
-                             half and may matter more than the bar
-37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
-                             bracketed with them. C10's no-background choice means a drawn
-                             line is the only tool available       the frame marks none of its four boundaries — and C10's
-                             no-background choice means a drawn line is the only tool left
-38 horizontal composition   b.row — the banner already paid for its absence by hand
-                             (width fractions ship with it; height fill is separate and
-                              waits on phase 1.1's producer-context contract)
-39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
-                             overrides with `/theme <theme> --no-bg` (a FlagDef, free in
-                             --help, per-invocation not sticky; warn and comply). Painting
-                             makes
-                             C10's contrast floor provable rather than assumed against a
-                             guess; inheriting preserves transparency. The light theme
-                             paints, because it cannot work otherwise. Shares row-padding
-                             with selection's wash. Plus: /help's verb list came
-                             back empty — both found by looking
-40 as-you-type completion    the trigger, not the engine — and it makes the manifest
-                             claim visible. Largely subsumes the next line
-41 typo detection            trivial, delightful — smaller once 40 lands
-42 rebindable keys          precedence ladder (framework < app < user), not a refusal —
-                             a user override IS a collision. Unbind is `action: null`, a
-                             VALUE not an absence, and it falls through to the next rung
-43 images (kitty)            designed already; unlocks mermaid HD + ML samples
-44 session resume            tractable half of the persistence story
-—  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
+BUILT 0  step 8                    docker-tui packaged — README, play environment, screencast, CI
+PART  1  PHASE 1                   producer context · change axis · builder audit · the prompt
+                                   ↑ serves both destinations, must precede the freeze
+      2  prism-tui's first         experiment table · training curve · one live job
+         surfaces                  ↑ the second consumer, and b.live's stream arm's first
+      3  the ML package            tensors, heatmaps — built with prism-tui as the consumer
+      4  what 2 and 3 found        phase 1's equivalent, second round
+PART  5  publication prep          error messages · the outside-reader test · 0.x · CI from the
+                                   tarball
+      —  PUBLISH 0.x               with two real consumers behind it
+      6  phase 2                   the empty-block convention · rendering flags
+      7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
+                                   the small navigation items rather than sitting beside them
+BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
+      9  mermaid (text path)       cheap once the dependency is vetted, distinctive
+PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
+      11 markdown                  translates to existing blocks
+BUILT 12 OUTPUT DIFFING          ★★ the whole frame is written every keystroke — ~10,000 cells
+                                   to change one. Anticipated in a comment, never built.
+                                   Smallest fix, biggest effect, invalidation already exists
+BUILT 13 RENDER CACHING          ★ a large diff renders 5,000 lines to show 30. Multiplicative
+                                   with the above, which is why it is "unusable" not "slow"
+                                   (highlighting is already memoised — that memo exists BECAUSE
+                                    rendering repeats, which confirms the diagnosis)
+BUILT 14 cells() ASCII fast path  the hottest function walks Intl.Segmenter over ASCII. Cheap,
+                                   but measure after the render cache — most calls vanish with it
+      15 text selection + copy    copyMode exists with no producer; OSC 52; and semantic copy,
+                                   which pairs with the navigation model
+      16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
+                                   two parameters. C19's menu already has the flip, the selection
+                                   and `… N more`; the confirm reimplements or lacks all of it
+PART  17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
+                                   MAX_ROWS is the fallback adapter's alone. diffing → caching → window
+                                   the block → cap with a marker. A CHAIN, in that order
+BUILT 18 SHARED POLLERS ★★       source → derivation → part. One fetch AND one computation per
+                                   source; only the render is per instance. A CORRECTNESS fix
+                                   first. Render memoised on (sourceVersion, viewState, width),
+                                   one batch per source, and the stagger gets less to do
+      19 resize coalescing        never delayed by C03 I2, and every SIGWINCH rebuilds the Fenwick
+                                   index. A drag is N rebuilds + N renders + N writes
+BUILT 20 off-screen live parts ★  b.live keeps ticking when scrolled off — no visibility check
+                                   exists. Throttle, not pause (I9 protects a scrolled-away
+                                   --watch), and fetch on re-entry. Spawns processes for nobody
+PART  21 --help per verb ★        usageBlocks() is built, exported, and uncallable. Reserve
+                                   --help framework-side, and it makes /help's fifty-verb wall
+                                   a two-level problem instead. Needs F39's render-selecting flag
+      22 b.art — banners          sparse variants, fallback ends at styled text, and VALIDATION
+                                   PER VARIANT (no tabs, uniform width, measured cells) — ~30
+                                   lines that would have caught every banner defect
+      23 selection styling        a full-row BACKGROUND WASH — free, since it changes no size
+                                   (the patch renderer already does it). Reverse video at 1-bit,
+                                   gutter glyph as the fallback. Selection as a `meaning` palette
+                                   so C10's contrast floor checks the fg/bg pair
+      24 more default themes      two ship and `light` is dark-on-dark. ThemeSet is a two-field
+                                   record, so more is a PUBLIC TYPE change — freeze-relevant
+PART  25 ghost text ★            drawn since PR #27. What remains: it ghosts only a SOLE
+                                   candidate, which is when the hint is least needed, and it
+                                   is static-only. Design with as-you-type — one hint, two levels
+      26 view trace in transcript a full-screen view leaves no record. Append on push, PATCH on
+                                   pop — sidesteps B03's no-trace-on-pop ruling, one entry, D7
+                                   intact. And ⏎ to re-enter is nearly free
+PART  27 syntax highlighting ★    a REGRESSION against C09 §4a, not a scoping choice — the spec
+                                   promises "highlighted whenever someone registers it" and there
+                                   is no someone. 24 mainstream = 180 KB, measured. Phase-1-shaped
+      28 prompt cursor-following  the window exists and is tail-anchored; the fix is threading
+                                   cursorCell, which the code already names
+      29 chrome row budget        one row each by design, and four features now want it. Rule
+                                   once — chrome-as-blocks pairs with b.row
+      30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
+                                   a string, so the transcript renders what it actually is
+      31 completion ranking       prefix-matched and unranked today. Recency-first is nearly
+                                   free (C20 has it) and is the most-felt. RANK BEFORE
+                                   as-you-type, or the menu is worse for opening itself
+      32 prefix-out / defaultRoute      prefix-IN is expressible and CommandPolicy is reachable
+                                   (retracted — F89). Prefix-OUT is not: prose by default, verbs
+                                   by exception. A RULING on defaultRoute, not a config field
+      33 QUEUEING ★              submit while something runs — a stated must. Small queue,
+                                   real rulings, and Ctrl-C is ambiguous the way step 9's was
+PART  34 UX polish set            animation (decoration never information) · change highlighting ·
+                                   finish notifications · structured export · error remedies as
+                                   fill actions · empty states that teach
+      35 progress feedback        the spinner is static by a ruling whose premise expired — the
+                                   refresh driver IS the ticker now. Motion, then elapsed time,
+                                   then what it is doing
+      36 scrollbar + edge markers the terminal cannot provide one (alt screen has no scrollback)
+                                   and C14 already has the numbers. The edge marker is the cheap
+                                   half and may matter more than the bar
+      37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
+                                   bracketed with them. C10's no-background choice means a drawn
+                                   line is the only tool available
+PART  38 horizontal composition   b.row — the banner already paid for its absence by hand
+                                   (width fractions ship with it; height fill is separate and
+                                    waits on phase 1.1's producer-context contract)
+RULED 39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
+                                   overrides with `/theme <theme> --no-bg` (a FlagDef, free in
+                                   --help, per-invocation not sticky; warn and comply). Painting
+                                   makes
+                                   C10's contrast floor provable rather than assumed against a
+                                   guess; inheriting preserves transparency. The light theme
+                                   paints, because it cannot work otherwise. Shares row-padding
+                                   with selection's wash. Plus: /help's verb list came
+                                   back empty — both found by looking
+      40 as-you-type completion    the trigger, not the engine — and it makes the manifest
+                                   claim visible. Largely subsumes the next line
+      41 typo detection            trivial, delightful — smaller once 40 lands
+      42 rebindable keys          precedence ladder (framework < app < user), not a refusal —
+                                   a user override IS a collision. Unbind is `action: null`, a
+                                   VALUE not an absence, and it falls through to the next rung
+PART  43 images (kitty)            designed already; unlocks mermaid HD + ML samples
+      44 session resume            tractable half of the persistence story
+      —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
+
+### How to read the status column — checked 2026-08-13
+
+**A count in prose is a snapshot with no mechanism** (F142), and this list has been
+renumbered repeatedly. So the column is not a memory: every non-OPEN row names the symbol
+that would have to exist, and the check is re-running that grep rather than reading this
+table. A row whose evidence does not reproduce is the row to fix.
+
+**Written, then re-run — and the re-run found one.** 35 claims, and the first pass reported
+34: the row for 17 cited `logs` in `blocks/kinds/simple.ts`, where its definition is not.
+`logs` declares its window in `structured.ts` and `patch` in `presentation/patch/definition.ts`,
+which is a correction to this table and not to the status. **The point is that reading the
+table would not have found it.** A row can name a real mechanism and the wrong file, and that
+is indistinguishable from a correct row until something resolves the reference — which is
+SP5's argument, arriving in the document SP5 does not scan.
+
+This is not wired into `make instruments`, and that is a decision rather than an oversight:
+it would need a fixture of its own, since the inventory is compared by equality. Worth doing
+if the column outlives one session.
+
+**Four values, and PART is the load-bearing one.** *A citation reads as coverage* — marking
+17 BUILT because `patch` landed would drop `keyValue` and `code` out of the remainder
+silently. The test is never *did something land here*; it is **would this entry be closed by
+what landed**.
+
+| # | status | evidence in the tree | residue |
+|---|---|---|---|
+| 0 | BUILT | `examples/docker/README.md` (F157), the media (F158), `.github/workflows/ci.yml` `fast`/`proof` (F150, F154, F156) | — |
+| 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `data/viewmodel/types.ts:440` | 1.1, 1.3, 1.4 not checked in this pass |
+| 5 | PART | **CI from the tarball** built: `ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
+| 8 | BUILT | **C14 I4/I5/I6.** `viewport.ts:347 #afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
+| 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `shell/local/registry.ts:59`, reached as `ctx.ask` at `execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
+| 12 | BUILT | `shell/render-frame.ts` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
+| 13 | BUILT | `shell/render-cache.ts`, keyed on entry · `rev` · width · **focus** · theme name | — |
+| 14 | BUILT | `presentation/text.ts:89–108` — an equality, not an approximation | — |
+| 17 | PART | `logs` — `blocks/kinds/structured.ts:123` — **and** `patch` — `presentation/patch/definition.ts:211` — declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step) | **two implementers, not four.** `keyValue` and `code` declare none and render whole at every offset |
+| 18 | BUILT | `shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
+| 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `refresh.ts:212`, wired at `construct.ts:760` | — |
+| 21 | PART | `usageBlocks` **has a caller** — `shell/documents.ts:215`, on `raw.exitCode === 2` | `--help` per verb, which needs 6's render-selecting flag |
+| 25 | PART | drawn: `paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static |
+| 27 | PART | **16 languages** registered in `presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
+| 34 | PART | animation exists as `RenderContext.tick` (C09 I8 — appearance only) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
+| 38 | PART | `Group` ships with `direction: "row" \| "column"` — `viewmodel/types.ts:556`, `b.group`, `containers.ts:236` | **the width fractions this entry says ship with it do not.** `childWidths` gives every child the same width — `viewmodel/measure.ts:118–124` |
+| 39 | RULED | the ruling is in the entry; `Style.background` exists at `theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
+| 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `terminal/capabilities.ts:19,148` | no renderer |
+
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it: **6** —
+`FlagDef` has no presentation-selecting field (`data/manifest/types.ts:42–56`), and F15 being
+CLOSED does not close 2.1's convention · **15** — `enterCopyMode` is defined nowhere in
+`src/`, and there is no OSC 52 · **26**, **32**, **40** — the symbols the entries name are
+absent · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
+until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **35** —
+`paint.ts:110–120` returns frame 0 and writes out the ticker argument this entry says has
+expired; the `steps` block already animates off `ctx.tick` (`structured.ts:403`) · **44** —
+`interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
+which is worth saying because it reads as coverage.
+
+**Not checked in this pass, and named rather than left to look checked:** 2, 3, 4, 7, 9, 11,
+16, 19, 22, 23, 24, 29, 30, 31, 33, 36, 37, 41, 42. Nineteen of forty-five. Their rows are
+unmarked, which is what an unmarked row has always meant, and that is the point of saying so
+here — an OPEN nobody verified reads exactly like one somebody did.
 
 **Step 8 stays at the top** because the README and the play environment are prerequisites
 for the outside-reader test, and because CI running examples from the tarball is the
