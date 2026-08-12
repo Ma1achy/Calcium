@@ -2348,6 +2348,13 @@ which is worth saying because it reads as coverage.
 unmarked, which is what an unmarked row has always meant, and that is the point of saying so
 here — an OPEN nobody verified reads exactly like one somebody did.
 
+**Entry 7 is now specified, and four rows below it are inside it rather than beside it.**
+`docs/components/C26_navigation.md` — design only, nothing built. **10** (the question / menu
+primitive), **15** (selection, copy, semantic copy), **16** (one popup) and the unnumbered
+block-to-block, column and cell movement are subsumed, and C26 §11 lists them with the
+evidence. They keep their rows: *would landing this close it* is answered **no** for all four
+until C26 is built, and a row deleted on the strength of a design is a row nobody is owed.
+
 **Step 8 stays at the top** because the README and the play environment are prerequisites
 for the outside-reader test, and because CI running examples from the tarball is the
 mechanism that keeps the docs true — which matters more than usual, since eight drawings in
