@@ -213,6 +213,43 @@ describe("PS · the harness's screen", () => {
     expect(tall.rows()[3]).toBe(" ".repeat(10));
   });
 
+  it("PS15 (F149, C11 I14): the screen keeps the attributes each cell was written under", () => {
+    // **The one thing stripped rows cannot express.** C11 renders focus as a
+    // tone and nothing else — no marker, no extra row, no width — so a focused
+    // row and an unfocused one have identical text. C02's T5.4b is the row that
+    // needs the difference, and it reached into the raw stream because this did
+    // not exist; that reach was the third independent copy of the `CSI H`
+    // premise and it counted one row where two were on the screen.
+    const plain = painter(10, 1);
+    plain.apply(`${HOME}${SGR}row`);
+    const toned = painter(10, 1);
+    toned.apply(`${HOME}${ESC}[38;5;188mrow`);
+
+    expect(plain.rows(), "the text is identical, which is the whole problem").toEqual(
+      toned.rows(),
+    );
+    expect(toned.styled(), "and the tone is not").not.toEqual(plain.styled());
+    expect(toned.styled()[0]).toContain("38;5;188");
+
+    // A reset returns the pen, so a row painted after one compares equal to a
+    // row painted with no styling at all.
+    const reset = painter(10, 1);
+    reset.apply(`${HOME}${ESC}[38;5;188m${ESC}[0mrow`);
+    expect(reset.styled()).toEqual(plain.styled());
+
+    // **A stated limit.** This records the sequences a cell was written under;
+    // it does not resolve them. Two sequences naming the same final colour are
+    // a different pen here, which is why it answers *did the tone change* and
+    // must not be asked *what colour is this*.
+    const twice = painter(10, 1);
+    twice.apply(`${HOME}${ESC}[31m${ESC}[32mrow`);
+    const once = painter(10, 1);
+    once.apply(`${HOME}${ESC}[32mrow`);
+    expect(twice.styled(), "an attribute record, not a rendering model").not.toEqual(
+      once.styled(),
+    );
+  });
+
   it("PS9 (F149): overrun reports a row wider than the screen and is empty otherwise", () => {
     // The check that makes importing `cells()` from `src/` honest. The model
     // shares a measurer with the thing under test, so it cannot detect a width

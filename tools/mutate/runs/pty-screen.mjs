@@ -31,8 +31,8 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: "    col = line === undefined ? col + cells(text) : place(line, col, text);",
-    to: "    col = line === undefined ? col + cells(text) : place(line, col, \"\");",
+    from: "        : place(line, ink, col, text);",
+    to: "        : place(line, ink, col, \"\");",
     why: "a screen that writes no text can satisfy nothing here — every row states content, so a pass where this survives is a pass that saw no kill",
   },
   mutations: [
@@ -89,7 +89,7 @@ const results = runPass({
       // screen is empty is reading somebody else's output.
       name: "entering the alternate screen keeps what was underneath",
       file: FILE,
-      from: "      grid = blank();\n      if (alt !== undefined) {",
+      from: "      grid = blank();\n      pens = blank();\n      if (alt !== undefined) {",
       to: "      if (alt !== undefined) {",
       // PS6 — the prompt painted before the switch is still on the screen.
       expect: "PS6",
@@ -117,6 +117,27 @@ const results = runPass({
       to: "      for (const line of grid) line.length = Math.max(line.length, cols);",
       // PS14 - narrowing does not lose the cells beyond the new width.
       expect: "PS14",
+    },
+    {
+      // The pen, without which a focused row and an unfocused one are the same
+      // string — which is what sent C02's T5.4b into the raw stream in the
+      // first place, and that reach was the third copy of the CSI H premise.
+      name: "the pen is never recorded, so every cell is unstyled",
+      file: FILE,
+      from: "      ink[x] = pen;",
+      to: "      ink[x] = null;",
+      // PS15 - a toned row and a plain one compare equal.
+      expect: "PS15",
+    },
+    {
+      // A pen that never resets bleeds the first tone down every cell after it,
+      // so a row painted after a reset compares unequal to an unstyled one.
+      name: "SGR 0 accumulates rather than resetting the pen",
+      file: FILE,
+      from: '      pen = sgr === "" || sgr === "0" ? "" : pen + `\\u001b[${sgr}m`;',
+      to: '      pen = pen + `\\u001b[${sgr}m`;',
+      // PS15 - a reset no longer returns the pen.
+      expect: "PS15",
     },
     {
       // The incremental path's own hazard. Everything ready means an address

@@ -108,6 +108,14 @@ export type Painter = Readonly<{
    * exactly the frame it produced.
    */
   resize: (cols: number, rows: number) => void;
+  /**
+   * The rows with the attributes each cell was written under (C11 I14).
+   *
+   * For the one thing stripped rows cannot express: focus is a *tone*, so a
+   * focused row and an unfocused one have identical text. An attribute record
+   * rather than a rendering model — see the pen's note in the walk.
+   */
+  styled: () => string[];
 }>;
 
 /**
@@ -142,16 +150,20 @@ export function painter(initialCols: number, initialRows: number): Painter {
    */
   const blank = (): (string | null)[][] => Array.from({ length: rows }, () => []);
   let grid = blank();
+  let pens = blank();
+  let pen = "";
   let row = 0;
   let col = 0;
 
   /** Overwrite `text` into `line` from cell `at`, and answer where the head is. */
-  function place(line: (string | null)[], at: number, text: string): number {
+  function place(line: (string | null)[], ink: (string | null)[], at: number, text: string): number {
     let x = at;
     for (const ch of text) {
       const w = cells(ch);
       while (line.length < x) line.push(null);
+      while (ink.length < x) ink.push(null);
       line[x] = ch;
+      ink[x] = pen;
       // The continuation cells of a wide glyph. Written explicitly rather than
       // left as holes: a later narrow write landing on the second half must
       // replace it, and a hole would render as a space beside a glyph that is
@@ -166,11 +178,33 @@ export function painter(initialCols: number, initialRows: number): Painter {
   // escape — SGR, DECSET, the synchronised-update window — and moves no write
   // head, so it is skipped rather than rendered.
   const token =
-    /\u001b\[(\d*)(?:;(\d*))?([Hf])|\u001b\[(\d*)J|\u001b\[\?1049([hl])|\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])|(\r)|(\n)|([^\r\n\u001b]+)/g;
+    /\u001b\[(\d*)(?:;(\d*))?([Hf])|\u001b\[(\d*)J|\u001b\[\?1049([hl])|\u001b\[([0-9;]*)m|\u001b(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[()][0-9A-Za-z]|[0-9A-Za-z])|(\r)|(\n)|([^\r\n\u001b]+)/g;
 
   function apply(chunk: string): void {
   for (const m of chunk.matchAll(token)) {
-    const [, r, c, cup, erase, alt, cr, lf, text] = m;
+    const [, r, c, cup, erase, alt, sgr, cr, lf, text] = m;
+
+    // **The pen, and what it is and is not** (F149, C11 I14).
+    //
+    // C11 renders focus as a *tone and nothing else*, so the stripped text of a
+    // focused row is identical to an unfocused one — C02's T5.4b reached for
+    // raw output precisely because asserting through the rows would assert that
+    // focus is invisible, which is the defect it exists to catch. So the screen
+    // keeps what was in effect when each cell was written.
+    //
+    // **This is an attribute record, not a rendering model.** It accumulates
+    // the SGR sequences since the last reset rather than resolving them into
+    // foreground, background and flags: two cells written under the same
+    // sequences compare equal and two written differently compare unequal,
+    // which is what a row comparing focused against unfocused needs. It would
+    // *not* answer "what colour is this cell" — `\u001b[31m\u001b[32m` and
+    // `\u001b[32m` are the same green and different pens here. The limit is
+    // stated because an instrument that looks like it resolves colour and does
+    // not is the shape §9 is about.
+    if (sgr !== undefined) {
+      pen = sgr === "" || sgr === "0" ? "" : pen + `\u001b[${sgr}m`;
+      continue;
+    }
 
     if (cup !== undefined) {
       // **CUP is 1-based on the wire and 0-based here**, which is `cursorTo`'s
@@ -190,6 +224,7 @@ export function painter(initialCols: number, initialRows: number): Painter {
     // show them underneath the application for the life of the session.
     if (erase !== undefined || alt !== undefined) {
       grid = blank();
+      pens = blank();
       if (alt !== undefined) {
         row = 0;
         col = 0;
@@ -212,7 +247,11 @@ export function painter(initialCols: number, initialRows: number): Painter {
     // and a model that only advanced on rows it kept would put the next write
     // in the wrong column.
     const line = row >= 0 && row < rows ? grid[row] : undefined;
-    col = line === undefined ? col + cells(text) : place(line, col, text);
+    const ink = row >= 0 && row < rows ? pens[row] : undefined;
+    col =
+      line === undefined || ink === undefined
+        ? col + cells(text)
+        : place(line, ink, col, text);
   }
   }
 
@@ -230,8 +269,11 @@ export function painter(initialCols: number, initialRows: number): Painter {
       // Clip rather than re-flow: a terminal drops what no longer fits, and the
       // shell repaints whole after a resize anyway (C22 I55).
       for (const line of grid) line.length = Math.min(line.length, cols);
+      for (const line of pens) line.length = Math.min(line.length, cols);
       grid.length = Math.min(grid.length, nextRows);
+      pens.length = Math.min(pens.length, nextRows);
       while (grid.length < nextRows) grid.push([]);
+      while (pens.length < nextRows) pens.push([]);
       rows = nextRows;
       if (row >= rows) row = rows - 1;
       if (col > cols) col = cols;
@@ -241,6 +283,20 @@ export function painter(initialCols: number, initialRows: number): Painter {
         const text = line.map((cell) => cell ?? " ").join("");
         const width = cells(text);
         return width >= cols ? text : text + " ".repeat(cols - width);
+      }),
+    styled: () =>
+      grid.map((line, y) => {
+        let out = "";
+        let held: string | null = null;
+        for (let x = 0; x < line.length; x += 1) {
+          const ink = pens[y]?.[x] ?? "";
+          if (ink !== held) {
+            out += ink === "" ? "\u001b[0m" : ink;
+            held = ink;
+          }
+          out += line[x] ?? " ";
+        }
+        return out;
       }),
   };
 }
@@ -557,6 +613,20 @@ export type InteractivePty = {
    * mean what it says.
    */
   readonly frame: readonly string[];
+  /**
+   * The frame with the attributes each cell was written under (C11 I14, F149).
+   *
+   * **`frame` cannot express a tone.** C11 renders focus as colour and nothing
+   * else — no marker, no extra row, no width — so a focused row and an
+   * unfocused one have identical stripped text, and a row asserting through
+   * `frame` would be asserting that focus is invisible. C02's T5.4b is that
+   * row, and it reached into `output` for raw bytes because this did not exist.
+   *
+   * An attribute *record*, not a rendering model: cells written under the same
+   * sequences compare equal and cells written differently compare unequal. It
+   * does not answer what colour a cell is.
+   */
+  readonly styledFrame: readonly string[];
   /** Resolve once `pattern` appears, or reject after `ms`. */
   waitFor(pattern: RegExp, ms?: number): Promise<RegExpExecArray>;
   /**
@@ -701,6 +771,9 @@ export function interactivePty(
     get frame() {
       // Applied as it arrived, not re-derived — see `paint` and F149.
       return paint.rows();
+    },
+    get styledFrame() {
+      return paint.styled();
     },
     waitForFrame(ok, ms = 15_000) {
       // Polled rather than driven by the data event: the frame is a derived

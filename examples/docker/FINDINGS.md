@@ -6914,11 +6914,26 @@ None of the three cites the other; each was written from the same wrong idea. Th
 this a finding about the record rather than about a function — and it is why fixing the getter
 closed only one of the three.
 
-**T5.4b cannot simply switch to `frame`, and its own comment says why**: C11 renders focus as a
-*tone* and nothing else (C11 I14), so the stripped text of a focused row is identical to an
-unfocused one. Asserting against `frame` would assert that focus is invisible, which is the
-defect the row exists to catch. It needs rows carrying their attributes — a decision about what
-the screen model keeps, not a repair. **Left open and named rather than quietly rewritten.**
+**The premise entered through a real gap, which is why it was three files and not one.** T5.4b
+could not use `frame`, and its own comment says exactly why: C11 renders focus as a *tone* and
+nothing else (C11 I14), so the stripped text of a focused row is identical to an unfocused one,
+and asserting through `frame` would assert that focus is invisible — the defect the row exists
+to catch. Faced with a reader that could not express what it needed, the row built its own out
+of `lastIndexOf("\u001b[H")`. **A missing affordance is where a wrong idea gets copied**, and
+the copies then look like independent corroboration.
+
+Closed by supplying the affordance rather than by rewriting the assertion. `styledFrame` keeps
+the attributes each cell was written under, so the row filters the screen instead of deriving
+one.
+
+**An attribute record, not a rendering model — and the limit is asserted rather than
+described.** Cells written under the same sequences compare equal and cells written differently
+compare unequal, which is what *did the tone change* needs. It does not answer *what colour is
+this cell*: `\u001b[31m\u001b[32m` and `\u001b[32m` are the same green and a different pen
+here. PS15 asserts that inequality **on purpose**, so the accessor cannot later be read as
+resolving colour. Same discipline as the wide-glyph divergence, and for §9's reason: an
+instrument that looks like it resolves something and does not is the shape that manufactures
+evidence.
 
 ### A resize clips; it does not re-flow and does not remember
 
