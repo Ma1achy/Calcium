@@ -252,8 +252,11 @@ against. **So must a fake**, and the inert class has migrated there.
 rows, the shell was driven under `script -qc`, painted nothing and stayed alive — F67's
 signature, and a blank-screen defect was one step from being filed. `script -qc` allocates a
 **0×0** PTY: no columns, no rows, nothing to draw on. The same fixture through `node-pty` at
-100×30 printed 3251 bytes. `examples/docker/VERIFYING.md` §9 carries it beside the three
-truncated-frame diagnoses, which are the same shape applied to a cut rather than to a size.
+100×30 printed 3251 bytes. `examples/docker/VERIFYING.md` §9 carries it as a **second class** beside the three
+truncated-frame diagnoses: a cut *corrupts* evidence and a misconfigured instrument
+*manufactures* it. The tells differ — a truncation you find by re-reading, and re-reading a
+fabricated blank produces a blank however carefully it is done. Only the instrument's own
+configuration says which world the artefact came from.
 
 Twice in one file: `test/unit/execution.test.ts` stubbed `editor: {} as never`
 and an action test failed with `setText is not a function` — a finding about the
