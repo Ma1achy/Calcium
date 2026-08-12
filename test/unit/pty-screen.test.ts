@@ -8,7 +8,7 @@
 // ever, and a 400-row transcript came back as a single line.
 import { describe, expect, it } from "vitest";
 
-import { atEscapeBoundary, overrun, screen } from "../support/pty.js";
+import { atEscapeBoundary, overrun, painter, screen } from "../support/pty.js";
 
 const ESC = "\u001b";
 const HOME = `${ESC}[H`;
@@ -179,6 +179,38 @@ describe("PS · the harness's screen", () => {
       const b = atEscapeBoundary(a.partial + whole.slice(cut));
       expect(a.ready + b.ready, `cut at ${String(cut)}`).toBe(whole);
     }
+  });
+
+  it("PS14 (F149): a resize clips what no longer fits and does not remember it", () => {
+    // **The frame-read found this and no arithmetic could have.** The model
+    // first answered a resize by rebuilding and replaying the whole stream at
+    // the new geometry, which is internally consistent and wrong: every
+    // historical write lands at the *current* width, so content painted at 120
+    // columns survives an 80-column pass that overwrites only the first 80. The
+    // leftover sat in columns 80–119 of C04's T5.2 and read as a rendering
+    // defect in the application.
+    //
+    // A terminal does not re-flow and does not remember. Narrowing loses the
+    // cells beyond the new width, and widening again does not bring them back.
+    const paint = painter(20, 3);
+    paint.apply(`${HOME}${"x".repeat(20)}`);
+    expect(paint.rows()[0]).toBe("x".repeat(20));
+
+    paint.resize(10, 3);
+    expect(paint.rows()[0], "the cells beyond the width are gone").toBe("x".repeat(10));
+
+    paint.resize(20, 3);
+    expect(paint.rows()[0], "and widening does not recover them").toBe(`${"x".repeat(10)}${" ".repeat(10)}`);
+
+    // Height clips the same way, and a row below the new bottom does not
+    // reappear when the screen grows again.
+    const tall = painter(10, 4);
+    tall.apply(`${at(3)}bottom`);
+    expect(tall.rows()[3]).toBe("bottom    ");
+    tall.resize(10, 2);
+    expect(tall.rows()).toHaveLength(2);
+    tall.resize(10, 4);
+    expect(tall.rows()[3]).toBe(" ".repeat(10));
   });
 
   it("PS9 (F149): overrun reports a row wider than the screen and is empty otherwise", () => {

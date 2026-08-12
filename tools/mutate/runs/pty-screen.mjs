@@ -107,6 +107,18 @@ const results = runPass({
       expect: "PS9",
     },
     {
+      // **The frame-read's finding, as a mutation.** Rebuilding and replaying at
+      // the new geometry is internally consistent and puts every historical
+      // write at the current width — 120-column content surviving an 80-column
+      // pass, sitting in columns 80-119, reading as an application defect.
+      name: "a resize re-flows instead of clipping",
+      file: FILE,
+      from: "      for (const line of grid) line.length = Math.min(line.length, cols);",
+      to: "      for (const line of grid) line.length = Math.max(line.length, cols);",
+      // PS14 - narrowing does not lose the cells beyond the new width.
+      expect: "PS14",
+    },
+    {
       // The incremental path's own hazard. Everything ready means an address
       // split across two reads is dropped and its tail painted as text — a
       // plausible screen, wrong, and nothing about it looks partial.

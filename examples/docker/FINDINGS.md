@@ -6899,6 +6899,42 @@ blanks the orphaned lead half. The shell never produces it — `render-frame.ts`
 `exact()`-padded rows from column 0 — and the row that asserts it says where the model stops
 being the terminal.
 
+### Three copies of one false premise, in three files
+
+**The getter was never the finding.** *A frame begins with `CSI H`* was a belief in the repo,
+written independently three times:
+
+| where | what it does | what it got |
+|---|---|---|
+| `test/support/pty.ts` | slices `frame` from the last home | the first paint plus every edit since |
+| `test/e2e/theme.test.ts` T5.4 | `pty.output.split("\u001b[H").slice(1)` counts frames | 8 for fifty toggles, wanting >10 |
+| `test/e2e/capabilities.test.ts` T5.4b | slices from the last home, splits on newlines | 1 row where two are on the screen |
+
+None of the three cites the other; each was written from the same wrong idea. That is what makes
+this a finding about the record rather than about a function — and it is why fixing the getter
+closed only one of the three.
+
+**T5.4b cannot simply switch to `frame`, and its own comment says why**: C11 renders focus as a
+*tone* and nothing else (C11 I14), so the stripped text of a focused row is identical to an
+unfocused one. Asserting against `frame` would assert that focus is invisible, which is the
+defect the row exists to catch. It needs rows carrying their attributes — a decision about what
+the screen model keeps, not a repair. **Left open and named rather than quietly rewritten.**
+
+### A resize clips; it does not re-flow and does not remember
+
+Found by reading C04 T5.2's frame, which F149's own fix is what made readable. Stale text sat in
+columns 80–119 of alternate rows: content from a 120-column pass surviving an 80-column one.
+
+The model answered a resize by rebuilding and replaying the whole stream at the new geometry.
+Every historical write then lands at the *current* width, so a narrow pass overwrites only the
+first 80 columns and the old tail stands. **Internally consistent, and every number it produced
+agreed with every other** — no arithmetic could have reached it, and no rule-interaction artefact
+indexes it either. `Painter.resize` clips both axes now; PS14 asserts that widening does not
+bring the cells back, and the re-flow is a mutation.
+
+The replay was also the expensive option. Clipping is correct *and* cheaper than the thing it
+replaced, which is worth recording because the first version was chosen for safety.
+
 ### Why F148 had to be fixed first
 
 Both defects were on the same path and the outer one hid the inner. With the value dropped, the

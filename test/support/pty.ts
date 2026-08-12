@@ -94,6 +94,20 @@ export type Painter = Readonly<{
   apply: (chunk: string) => void;
   /** The rows a user would see, padded to the screen's width. */
   rows: () => string[];
+  /**
+   * Change the screen's shape, **clipping** what no longer fits.
+   *
+   * A terminal does not re-flow and does not remember: cells beyond the new
+   * width are gone, and so are rows beyond the new height. This existed first
+   * as a rebuild — throw the screen away and replay the whole stream at the new
+   * geometry — which is wrong in a way that only a frame-read shows. Replaying
+   * places every historical write at the *current* width, so content painted at
+   * 120 columns survives an 80-column pass that overwrites only the first 80,
+   * and the leftover sits in columns 80–119 looking like a rendering defect in
+   * the application. C04's T5.2 resizes between four widths, and that is
+   * exactly the frame it produced.
+   */
+  resize: (cols: number, rows: number) => void;
 }>;
 
 /**
@@ -108,7 +122,9 @@ export type Painter = Readonly<{
  * frame reader changed under it. The terminal on the other end does not replay
  * either; it applies what arrives and keeps the screen.
  */
-function painter(cols: number, rows: number): Painter {
+export function painter(initialCols: number, initialRows: number): Painter {
+  let cols = initialCols;
+  let rows = initialRows;
   /**
    * **A row is cells, not a string** — and this is the second thing the
    * mutation pass found rather than the first thing written.
@@ -209,6 +225,17 @@ function painter(cols: number, rows: number): Painter {
   // painted, exactly as the slice it replaces did.
   return {
     apply,
+    resize: (nextCols, nextRows) => {
+      cols = nextCols;
+      // Clip rather than re-flow: a terminal drops what no longer fits, and the
+      // shell repaints whole after a resize anyway (C22 I55).
+      for (const line of grid) line.length = Math.min(line.length, cols);
+      grid.length = Math.min(grid.length, nextRows);
+      while (grid.length < nextRows) grid.push([]);
+      rows = nextRows;
+      if (row >= rows) row = rows - 1;
+      if (col > cols) col = cols;
+    },
     rows: () =>
       grid.map((line) => {
         const text = line.map((cell) => cell ?? " ").join("");
@@ -603,7 +630,7 @@ export function interactivePty(
    * to be. The same class as the split multi-byte character two fields down, one
    * layer up: a boundary is not a delimiter.
    */
-  let paint = painter(width, height);
+  const paint = painter(width, height);
   let held = "";
   /**
    * **A multi-byte character split across two reads is one character, not two
@@ -660,14 +687,12 @@ export function interactivePty(
     resize: (cols, rows) => {
       width = cols;
       height = rows;
-      // **Rebuilt, not resized.** A screen of a different shape is a different
-      // screen, and the shell agrees: C22 I55 sends a frame whose predecessor
-      // was a different size down the whole-frame path. Replaying once is
-      // bounded and rare, and it keeps the model's answer identical to the
-      // one-shot `screen()` the fixture asserts against.
-      paint = painter(width, height);
-      held = "";
-      paint.apply(output);
+      // **Clipped, not replayed** — see `Painter.resize`. Replaying the stream
+      // at the new geometry puts historical writes at the current width, and
+      // C04's T5.2 is the row that shows it: content from a 120-column pass
+      // surviving an 80-column one, in columns 80–119, reading as a rendering
+      // defect in the application.
+      paint.resize(width, height);
       term.resize(cols, rows);
     },
     get output() {
