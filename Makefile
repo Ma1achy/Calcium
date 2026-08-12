@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks check enforce test golden e2e audit proof all clean
+.PHONY: install hooks check enforce instruments test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -27,6 +27,9 @@ check:              ## type-check and lint
 enforce:            ## A03 — module graph, source scans, supply chain
 	npm run enforce
 
+instruments:        ## every instrument's own fixture, and the inventory by equality (group 9)
+	node tools/instruments.mjs
+
 test:               ## tiers 1-4
 	npm run test
 
@@ -43,7 +46,11 @@ audit:              ## npm audit + dependency manifest
 proof:              ## pack, install the tarball clean, run the example against it (R01)
 	bash tools/proof.sh
 
-all: check enforce audit test golden e2e
+# **`instruments` is in here rather than run by hand**, which is the whole of
+# group 9's remedy: eleven fixtures nobody runs is the fifth class in
+# `examples/docker/VERIFYING.md` — a gate nobody reports — arriving in the gate
+# built to answer it. It costs about ten seconds.
+all: check enforce audit instruments test golden e2e
 
 clean:
 	rm -rf dist node_modules

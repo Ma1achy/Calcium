@@ -136,7 +136,11 @@ fixtures-status:    ## what is up
 	  --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 
 tools-test:         ## the instruments' own fixtures — known bytes in, stated frame out
-	@python3 tools/screen_test.py
+	@# **The repository's runner, not this directory's own list.** Six of the
+	@# instruments are the app's and ten are the framework's, and two lists is
+	@# how one of them stops being run. `make instruments` at the root is the
+	@# same target; this is the door from here.
+	@cd ../.. && node tools/instruments.mjs
 
 help:
 	@grep -E '^[a-z-]+:.*?##' $(MAKEFILE_LIST) \

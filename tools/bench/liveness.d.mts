@@ -10,3 +10,8 @@ export declare function samplesLive(
   ticks: number,
   expected?: number,
 ): Readonly<{ samples: readonly string[]; dead: boolean; line: string }>;
+
+export declare function gutter(
+  pinned: number,
+  whole: number,
+): Readonly<{ drift: boolean; line: string }>;

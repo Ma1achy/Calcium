@@ -6611,3 +6611,33 @@ counters` pointed at output rather than at a suite.
 Both repaired and both now run. The remedy that closes the class rather than the instance is
 the runner: `make tools-test` runs every instrument's fixture, and a probe that cannot start
 fails it.
+
+---
+
+## F145 — the guard that marked the output instead of failing ★
+
+| | |
+|---|---|
+| **Surface** | `tools/bench/patch-window.mjs` — the gutter check |
+| **Reached for** | nothing. Found while giving the file a fixture and asking what distinguishes a working run |
+| **Verdict** | **instrument-side**, and it is the bench's label defect one file over |
+
+`patch-window.mjs` exists because C25 I21a added a `numberWidth(patch)` walk to a path that
+already walked every line, and nothing measured it (F134). So the *pin* is the subject: a window
+whose gutter differs from its block's is not the path being timed, and the milliseconds
+underneath are a measurement of something else.
+
+It had three guards. Two — *the fixture is too small* and *the window is empty* — print and
+exit. The third appended `  ← DRIFT` to a line of output and carried on.
+
+**The drift is the most serious of the three and had the weakest response.** An empty window is
+obviously nothing; a drifted one produces a plausible number for the wrong path, which is the
+shape every finding in this group has. And a marker in the middle of a bench's output is read
+by whoever is looking for the number at the bottom.
+
+Fixed: `gutter()` in `tools/bench/liveness.mjs`, which exits, with the reason in the message —
+*the timing below is of something else*. BL8 covers it.
+
+**The class:** a diagnostic that names a real problem and does not stop anything is
+indistinguishable, at a glance, from a diagnostic that did not fire. It is `ask who sees the
+refusal` with the answer *nobody, and the run continued*.

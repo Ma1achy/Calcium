@@ -327,7 +327,7 @@ leaves a constructed graph — measured identical on the pre-gate tree, so inher
 | item | fix | depends on |
 |---|---|---|
 | ~~**F79 · F86** `screen.py`'s OSC leak, and F79's mechanism unestablished~~ | — | **CLOSED** — the leak repaired and measured, 15 rows in `examples/docker/tools/screen_test.py`, five mutations. **Group 9 does not close: 1 of 11** |
-| **Group 9's other ten instruments** | **change** | one fixture each, and a runner that runs them all — planned below, and the pre-check moved two rows before a line was written |
+| ~~**Group 9's other ten instruments**~~ | — | **CLOSED** — `make instruments`: **16** instruments, every one with a fixture, 113 rows, the inventory compared by equality. The ten were sixteen (`tools/bench` was not in the hand-list and the waiter had no file), and three findings came out of it — F143, F144, F145 |
 | ~~**Group 12** F69, F73 — time-based assertions under contention~~ | — | **NOT WORK** — ruled in this document, and `test/support/budget.ts` holds the measured half |
 | ~~**Group 7** 14 artefact findings~~ | — | **NOT WORK** — *habit, not a patch*, and the 14-vs-15 is measured and explained by F87 |
 | **Group 10** 5, all disproved | → `CLAUDE.md` | — |
@@ -444,6 +444,32 @@ second shape.
 instrument files against the set with a fixture, so a *new* instrument fails the gate on the day
 it lands. A runner over a hand-listed eleven closes eleven files; the equality closes the class.
 **Group 9 closes when all eleven have a fixture and one target runs them**, and not before.
+
+#### What it came to, measured
+
+**Sixteen instruments, not eleven.** The hand-list in `CALCIUM_COVERAGE_AUDIT_2` named nine
+tools plus `tools/mutate` and `tools/proof.sh`; the three files under `tools/bench` were never
+in it, and the waiter did not exist as a file. **That is the argument for deriving the inventory
+rather than for counting it more carefully**, and it is why the runner walks the directories and
+compares by equality instead of iterating a list. An instrument added tomorrow fails
+`make instruments` on the day it lands — fabricated and confirmed, along with a fixture rigged
+to report zero rows.
+
+**Three findings, and not one came from a row written to look for it** — the same distribution
+as docker-tui's step 8:
+
+| how it was found | finding |
+|---|---|
+| running the instrument | **F144** — `gap-check.mjs` and `measure-raw.mjs` did not run at all |
+| writing the fixture | **F143** — a capture cut mid-character loses its whole cast |
+| asking what a broken one looks like | **F145** — the gutter guard printed `← DRIFT` and carried on |
+
+**And the pre-check moved two of the three that were named to go first.** The mutation runner
+already had a fixture, found in the third place — the file's own directory — and the waiter had
+nowhere to put one. Two of five in tier 4, two of three in tier 5, two of three here.
+
+**`make all` gained a seventh target.** Ten seconds, and it is the whole of the remedy: eleven
+fixtures nobody runs is `VERIFYING.md`'s fifth class inside the gate built to answer it.
 
 **Group 12 is a decision already taken**, and it is here so nobody retakes it: `make load-down`
 keeps its place on the asymmetry rather than the odds, and both measurements are recorded —

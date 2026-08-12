@@ -44,6 +44,32 @@ export function liveness(rows, { marker, kind, min = MIN_ROWS }) {
 }
 
 /**
+ * The window bench's guard: is the gutter the *pinned* one.
+ *
+ * **C25 I21a's pin is the whole reason `patch-window.mjs` exists** (F134) — a
+ * `numberWidth(patch)` walk added to a path that already walked every line. So a
+ * window whose gutter differs from the block's is not the path being timed, and
+ * the number underneath it is a measurement of something else.
+ *
+ * It printed `← DRIFT` and carried on. Two of that file's three guards exit; this
+ * one marked the output and left it to a reader, which is the bench's other
+ * defect — a diagnostic nobody reads — in the file next door.
+ *
+ * @param {number} pinned  the window's gutter
+ * @param {number} whole   the block's
+ */
+export function gutter(pinned, whole) {
+  const drift = pinned !== whole;
+  return {
+    drift,
+    line: drift
+      ? `GUTTER DRIFT: window ${String(pinned)}, block ${String(whole)}.\n` +
+        "The window is not the pinned path (C25 I21a), so the timing below is of something else."
+      : `gutter: window ${String(pinned)}, block ${String(whole)}`,
+  };
+}
+
+/**
  * The pollers bench asks a different question of the same screen: did the parts
  * *tick*. A part that never ticked prints its loading `-`, and two dead panels
  * agree perfectly — which is the reading the guard exists to refuse.

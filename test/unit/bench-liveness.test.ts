@@ -7,7 +7,7 @@
 // broke.
 import { describe, expect, it } from "vitest";
 
-import { liveness, MIN_ROWS, samplesLive } from "../../tools/bench/liveness.mjs";
+import { gutter, liveness, MIN_ROWS, samplesLive } from "../../tools/bench/liveness.mjs";
 
 /** A screen with a document on it: `value` is the kind-agnostic body marker. */
 const live = (n: number): string[] => [
@@ -101,5 +101,26 @@ describe("bench liveness", () => {
 
     expect(agreeing.dead).toBe(false);
     expect(agreeing.samples).toEqual(["12.5", "12.5"]);
+  });
+
+  it("BL8: a drifted gutter fails rather than marking the output", () => {
+    // **The window bench's third guard, and it used to only print.** Two of that
+    // file's three exit; this one appended `← DRIFT` to a line and left it to a
+    // reader. It is the more serious of the three: an empty window is obviously
+    // nothing, and a drifted one is a plausible number for a path that is not
+    // the one under test — C25 I21a's pin is the whole reason the bench exists.
+    const bad = gutter(3, 4);
+
+    expect(bad.drift).toBe(true);
+    expect(bad.line).toContain("GUTTER DRIFT");
+    expect(bad.line, "and it says why the number below is not the answer").toContain(
+      "timing below is of something else",
+    );
+
+    const ok = gutter(4, 4);
+    expect(ok.drift).toBe(false);
+    expect(ok.line, "the quiet form still reports both widths").toBe(
+      "gutter: window 4, block 4",
+    );
   });
 });

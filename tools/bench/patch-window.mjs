@@ -20,6 +20,7 @@
 //
 import { windowPatch, totalRows, clampOffset } from "../../dist/presentation/patch/window.js";
 import { numberWidth } from "../../dist/presentation/patch/layout.js";
+import { gutter } from "./liveness.mjs";
 
 const LINES = Number(process.argv[2] ?? 5_000);
 const REPS = Number(process.argv[3] ?? 200);
@@ -72,13 +73,17 @@ for (let r = 0; r < REPS; r += 1) {
   // fastest possible and would mean nothing — and the pin is the thing under
   // test, so it is checked rather than assumed present.
   if (r === 0) {
-    const pinned = numberWidth(w);
-    const whole = numberWidth(patch);
-    console.log(`gutter: window ${String(pinned)}, block ${String(whole)}${pinned === whole ? "" : "  ← DRIFT"}`);
     if (w.hunks.length === 0) {
       console.error("WINDOW EMPTY: nothing below would mean anything.");
       process.exit(1);
     }
+    // **This exits now; it used to print `← DRIFT` and carry on.** The two
+    // guards above it exit, and a drift is the more serious of the three: an
+    // empty window is obviously nothing, and a drifted one is a plausible number
+    // for a path that is not the one under test. See `test/unit/bench-liveness.test.ts`.
+    const { drift, line } = gutter(numberWidth(w), numberWidth(patch));
+    console.log(line);
+    if (drift) process.exit(1);
   }
 }
 
