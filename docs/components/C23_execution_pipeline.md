@@ -72,6 +72,17 @@ type AskOptions = Readonly<{
   choices: readonly Readonly<{ key: string; label: string; default?: true }>[];
 }>;
 
+interface LocalContext {
+  readonly command: string;          // as typed, for `doc.command`
+  ask(opts: AskOptions): Promise<string>;
+}
+
+type AskOptions = Readonly<{
+  question: string;
+  detail?: Block;                    // what the answer will affect
+  choices: readonly Readonly<{ key: string; label: string; default?: true }>[];
+}>;
+
 interface LocalRegistry {
   register(verb: string, handler: LocalHandler): void;
   seal(): void;
@@ -831,6 +842,7 @@ Per submission.
 25. Composition inserts no spacing of its own, so a document's height is knowable from the document (I24, §2).
 26. `seal()` reconciles the local registry against the manifest, both directions, and fails construction on a mismatch (I27).
 27. C23 counts stream patches and supplies `seq`; C07 spends it as an id namespace and a reset, so a constant breaks both (I30, C07 I15).
+28. A `view` action resolves its target within the source entry and refuses two things — an unresolvable target, and a view raised onto a non-empty stack — rather than ignoring the first or letting C15's throw cross a renderer's callback (I31).
 29. A refresh names its part and is registered against its host, so one `release(host)` is every teardown path (I32).
 30. A refresh stops on settle, pop, evict, clear and `stopping`, and keeps running through a freeze (I33, I9).
 31. A refresh patches one `panel` in one op, and past `staleAfter` that panel's title carries its age rather than the screen going quietly wrong (I34, I35).
