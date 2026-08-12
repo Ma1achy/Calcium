@@ -37,7 +37,7 @@ type change.
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
 | **8** | [Absence indistinguishable from failure](#8) | 10 | **3 open** (5 closed) | partly | real Calcium work · **5 of 8 fixed** |
-| **9** | [**The instrument was wrong**](#9) | 15 | **7** | — | **new at F80** · tooling, and it has no test |
+| **9** | [**The instrument was wrong**](#9) | 17 | **9** | — | **new at F80** · tooling, and it has no test |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
 | **11** | [A gate that passes without checking](#11) | 22 | **6** | — | 4 closed · **2 open, both about a rule's reach** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
@@ -381,6 +381,8 @@ against the bytes it was replaying.**
 | **F62** | `make fixtures` | `while :; do :; done` produced a **flat line at 100%** in the headline plot of a demo about plots. Correct, honest, the least interesting figure C12 can draw. **Fixed** — bursts |
 | **F74** | `demo.cast` | the completion beat had never worked: beat 3 moved focus into a live block and every character of beat 4 was correctly dropped. **Fixed** |
 | **F75** | `demo.cast` | three `view: true` verbs append nothing, so the recording went transcript → fullscreen → *the same transcript*, three times. **Fixed** |
+| **F143** | `tools/capture.py`, again | F63's fix, scoped by a true sentence that was not the one the decision needed: the final flush stayed strict, so a capture ending mid-character **raised after the raw stream was written** and the session's `.cast` was lost. **Fixed** — strict body, one replacement at the very end |
+| **F144** | `tools/gap-check.mjs`, `tools/measure-raw.mjs` | **neither ran at all.** Both called interfaces that had moved (`splitRaw`'s measure, `createDocumentView`'s `measureSequence`) and died on their first call. Nothing consulted them, so nothing noticed. **Fixed**, and the runner is what closes the class |
 | **F86** | `tools/screen.py`, again | **F79's stated mechanism, measured and falsified.** An unterminated OSC consumes nothing — the regex is anchored to a terminator — and the quoted bytes render correctly in isolation. A *different* real defect: the OSC leaks as visible text. Open |
 
 **The disposition is not "fix the tools".** Five of six are already fixed and the sixth is a

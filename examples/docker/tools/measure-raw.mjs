@@ -6,18 +6,12 @@
  * reimplemented, because the ceiling is a property of `project` and `lastOffset`
  * together and a reimplementation would agree with whichever one I read.
  */
-import { createBlockRegistry } from "../../../dist/presentation/blocks/index.js";
-import { tableDefinition } from "../../../dist/presentation/table/index.js";
-import { plotDefinition } from "../../../dist/presentation/plot/index.js";
-import { patchDefinition } from "../../../dist/presentation/patch/index.js";
+import { appRegistry } from "./registry.mjs";
 import { createDocumentView } from "../../../dist/shell/document-view.js";
 import { b } from "../../../dist/shell/builders/index.js";
 import { readFileSync } from "node:fs";
 
-const registry = createBlockRegistry({ defaults: true });
-registry.register(tableDefinition);
-registry.register(plotDefinition);
-registry.register(patchDefinition);
+const registry = appRegistry();
 
 const doc = JSON.parse(
   readFileSync(new URL("../test/corpus/inspect-raw-probe.json", import.meta.url), "utf8"),
@@ -34,7 +28,13 @@ const overlays = { layers: new Map(), top: null,
 
 const drive = (label, blocks) => {
   const view = createDocumentView({
-    overlays, measure: (bl, w) => registry.measure(bl, w),
+    overlays,
+    measure: (bl, w) => registry.measure(bl, w),
+    // **Added because the probe had stopped running.** `createDocumentView`
+    // takes `measureSequence` as well — a sequence can insert separation between
+    // blocks that no single measurement carries, which is `gap-check.mjs`'s
+    // whole question — and this file still passed the old deps. FINDINGS F144.
+    measureSequence: (bls, w) => registry.measureSequence(bls, w),
     region: () => REGION, redraw: () => {},
   });
   view.open("/inspect x");
@@ -98,8 +98,14 @@ drive("two levels where it overflows", split);
  * blocks*.
  */
 const pageProbe = (label, blocks) => {
+  // Two constructions in this file and only one had been repaired — which is
+  // the second half of F144: a probe that runs its first three lines and dies on
+  // the fourth reports three real numbers before it fails, and a reader who saw
+  // output would not go looking.
   const view = createDocumentView({
-    overlays, measure: (bl, w) => registry.measure(bl, w),
+    overlays,
+    measure: (bl, w) => registry.measure(bl, w),
+    measureSequence: (bls, w) => registry.measureSequence(bls, w),
     region: () => REGION, redraw: () => {},
   });
   view.open("/inspect x");

@@ -6542,3 +6542,72 @@ group section, so it proves coverage and **not placement** — the triage keys i
 nothing distinguishes a key from a mention. Tightening the key form to table rows only would
 make placement checkable and is not done here. Until it is, the 55 placements above are
 one reader's judgement from each entry's heading, and they are marked as such in the document.
+
+---
+
+## F143 — a capture cut mid-character loses its whole recording ★★
+
+| | |
+|---|---|
+| **Surface** | `tools/capture.py` — `write_cast`'s final flush |
+| **Reached for** | nothing. Found by writing `capture_test.py`, group 9's fixture for the instrument |
+| **Verdict** | **instrument-side**, and it is a correct sentence justifying the wrong scope |
+
+The cast writer decodes incrementally, which is right and is why: `os.read` splits on bytes, so
+a 64 KiB read lands mid-sequence whenever the terminal is drawing box characters. Decoding each
+chunk independently with `errors="replace"` put U+FFFD in the middle of a panel border, the
+panel wrapped, and the recording was corrupt with the raw stream beside it perfectly intact.
+
+Its docstring then says `errors` is left strict **deliberately**: *"there is nothing left for it
+to paper over, and a failure here would be a real one."* Every clause of that is true, and it
+is the wrong scope. There *is* something left at the very end — a PTY read is not obliged to
+stop on a character boundary, so the final chunk of a capture can hold half of one, and
+`final=True` raises.
+
+**What the throw leaves behind is the finding.** It happens after the raw stream and the
+teardown have been written, so the session's `.cast` is missing, the summary line never prints,
+and the caller — `media.py`, `screencast.py` — sees a traceback from the tool rather than from
+the app. A capture that succeeded is reported as a crash, and the recording it was made for is
+gone. Losing the recording is a worse answer than one U+FFFD in the last cell.
+
+Fixed: the body stays strict — a partial sequence there is carried, and an *invalid* byte there
+still refuses — and only the trailing flush degrades to one replacement character. Both halves
+are rows, and they differ in one thing: whether the bad bytes are the last ones in the capture.
+Without the second, the first reads as *stop being strict*.
+
+**The class is MG24's**, which is why it is starred: a justification that is true, correctly
+stated, and not the one the decision needed. Review checks whether the sentence is true, and
+this one is.
+
+---
+
+## F144 — two of eleven instruments did not run at all ★★★
+
+| | |
+|---|---|
+| **Surface** | `tools/gap-check.mjs`, `tools/measure-raw.mjs` |
+| **Reached for** | nothing. Found by running them, as the last step of giving them a fixture |
+| **Verdict** | **instrument-side**, and it is group 9's own subject arriving inside group 9 |
+
+Both probes call interfaces that have since moved. `splitRaw` takes the frame's own `measure`
+now (C07 I20) and `gap-check.mjs` still called the two-argument form; `createDocumentView` takes
+`measureSequence` as well as `measure` — a sequence can insert separation between blocks that no
+single measurement carries, which is `gap-check.mjs`'s whole question — and `measure-raw.mjs`
+still passed the old deps. Both die with a `TypeError` on their first call.
+
+**They are not silently wrong, and that is not much of a defence.** Nothing consulted them, so
+nothing noticed; an instrument nobody runs is indistinguishable from one that works, which is
+the fifth class in `VERIFYING.md` — a gate nobody reports — arriving in the instruments rather
+than in the targets. `make all` runs six targets and two of them were red for four commits for
+exactly the same reason.
+
+**And the second half is worth more than the first.** `measure-raw.mjs` builds a view in *two*
+places, and repairing one made it print three real lines before dying on the fourth. A probe
+that produces correct output and then fails is read as a probe that worked: the numbers are
+there, and a reader who saw them would not go looking for an exit code. The repair is only
+verified by running the whole thing and reading the last line, which is `read a green gate's
+counters` pointed at output rather than at a suite.
+
+Both repaired and both now run. The remedy that closes the class rather than the instance is
+the runner: `make tools-test` runs every instrument's fixture, and a probe that cannot start
+fails it.
