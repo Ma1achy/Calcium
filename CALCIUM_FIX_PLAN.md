@@ -32,12 +32,14 @@ it**, **⚠ if it changes a public type**, and **what it depends on landing firs
 |---|---|---|---|---|
 | **F83** MG24 counts a consumer outside the **component**, not the file | change | — | — | — |
 | **F84** MG24 walks `export type` as well as `export interface` — 798 against 280 | change | — | — | F83 (same rule) |
-| **Group 9** a fixture per instrument: known bytes in, stated frame out | **audit** | 7 | — | — · `screen.py` first |
+| ~~**Group 9** a fixture per instrument: known bytes in, stated frame out~~ | — | 10 | — | **CLOSED** — 16 of 16, `make instruments` |
 
 **Why first with no consumers behind it.** A02 Seam 4 is about a component complete on its own
 side; the implementation is the *same* side, so an interface in `types.ts` implemented in
 `store.ts` gives every member a consumer by construction. **A rule with a perfect record of
-not firing is indistinguishable from a rule that works.** 11 instruments, 1 covered.
+not firing is indistinguishable from a rule that works.** Group 9 is closed at **16 of 16** —
+and the eleven was a hand-list short by five, which is the reason the runner derives the
+inventory and compares it by equality rather than iterating a table.
 
 ---
 

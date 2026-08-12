@@ -6641,3 +6641,34 @@ Fixed: `gutter()` in `tools/bench/liveness.mjs`, which exits, with the reason in
 **The class:** a diagnostic that names a real problem and does not stop anything is
 indistinguishable, at a glance, from a diagnostic that did not fire. It is `ask who sees the
 refusal` with the answer *nobody, and the run continued*.
+
+---
+
+## F146 — the rule was implemented, the list that connects it was not, and the suite was red for two commits ★★
+
+| | |
+|---|---|
+| **Surface** | `tools/enforce/commitments.mjs` — `SPEC_RULES` |
+| **Reached for** | nothing. Found by running `make all` for group 9's row, two commits after the cause |
+| **Verdict** | **gate-side**, and it is A03 §2's own subject reaching the list that enforces A03 §2 |
+
+SP6 landed complete: the checker in `findings.mjs`, the row in A03's table, the fabrications in
+`enforce-commitments.test.ts`. **`SPEC_RULES` — the list commitment 14b reads to learn that a
+rule exists — was not touched.** So `make test` failed on *A03 inventories SP6 and nothing
+implements them* from the commit that added the rule, and stayed red through the next one.
+
+**`npm run enforce` was green the whole time, and correctly.** The rule was implemented and
+running; it fired twice that day on real violations. The gap was visible only to the suite, and
+the suite is not what a spec-and-rules commit runs — `enforce` is, because it is the pre-commit
+hook. Two green signals, both true, neither about the thing that was broken.
+
+**And the fabrication existed but could not be seen.** Commitment 14b requires a row per rule
+whose title says it *fires*; SP6's clean case and both its fabrications were one `it`, so the
+family check found no matching title and would have failed even once `SPEC_RULES` knew about
+it. **A bundled row can only be split** — three rows now, and the second fabrication is the one
+proving the sum check is live rather than inert behind the completeness check.
+
+**The class:** every instance in group 11 is a gate not checking the thing it is named after.
+This one is narrower and worse — the gate was checking, and the *registration* that tells the
+meta-gate it exists was missing. A rule can be fully built, fully tested, running in production
+and still invisible to the check that asks whether it was built.

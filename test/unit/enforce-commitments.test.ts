@@ -634,7 +634,7 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
   // when the regex matches nothing and when the scope holds the wrong files. The
   // pair that failed both earlier times is regex-and-scope *together*, and only
   // `citations` can show it. F82.
-  it("SP6: the inventory is complete, and both directions can fail", () => {
+  it("SP6: the real tree is clean, and the rule actually read it", () => {
     // **The rule this test exists for was green while 55 of 145 findings were
     // keyed nowhere** — because the evidence it offered was a sum over the
     // groups, and a total computed over the groups can only describe the
@@ -643,24 +643,42 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     expect(clean.ids, "findings read").toBeGreaterThan(100);
     expect(clean.keyed, "and every one is keyed").toBe(clean.ids);
     expect(clean.map((x) => x.message), "SP6").toEqual([]);
+  });
 
-    // **Fabricated both ways, because the two failures are different rules
-    // wearing one id.** A finding filed and not keyed is the drift this exists
-    // to catch; a key removed is the reverse, and it also moves the total, so
-    // the second fabrication proves the sum check is live rather than inert
-    // behind the completeness check.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
-    const triage = readFileSync("examples/docker/TRIAGE.md", "utf8");
-    const io = (l: string, t: string) => ({
-      read: (f: string) => (f.endsWith("TRIAGE.md") ? t : l),
-    });
+  /** The ledger and the triage as they are, for the two fabrications below. */
+  const inventoryIo = (): { ledger: string; triage: string } => ({
+    ledger: readFileSync("examples/docker/FINDINGS.md", "utf8"),
+    triage: readFileSync("examples/docker/TRIAGE.md", "utf8"),
+  });
+  const io = (l: string, t: string) => ({
+    read: (f: string) => (f.endsWith("TRIAGE.md") ? t : l),
+  });
 
+  it("SP6 fires: a finding filed and keyed nowhere", () => {
+    // The drift the rule exists to catch, and the direction that actually
+    // happened: 55 of them.
+    const { ledger, triage } = inventoryIo();
     const filed = checkTriageInventory(
       io(`${ledger}\n\n## F999 — a fabricated finding\n\nbody.\n`, triage),
     );
-    expect(filed.map((x) => x.message).join(" "), "an unkeyed finding fails").toContain("F999");
 
+    expect(filed.map((x) => x.message).join(" "), "an unkeyed finding fails").toContain("F999");
+  });
+
+  it("SP6 fires: a key removed, which also moves the sum", () => {
+    // **The reverse, and it is a different rule wearing one id.** Removing a key
+    // fails completeness *and* the total, so this fabrication is what proves the
+    // sum check is live rather than inert behind the completeness check —
+    // two violations, not one.
+    //
+    // **Split from the row above on the day `SPEC_RULES` learned about SP6.**
+    // Commitment 14b requires a row per rule whose title says it *fires*, and
+    // all three of these were one `it` — so the family check could not see any
+    // of them, and SP6 sat in A03's table with the fabrication written and
+    // invisible. A bundled row can only be split.
+    const { ledger, triage } = inventoryIo();
     const unkeyed = checkTriageInventory(io(ledger, triage.replace("**F142**", "F142")));
+
     expect(unkeyed.length, "a removed key fails completeness and the sum").toBe(2);
   });
 
