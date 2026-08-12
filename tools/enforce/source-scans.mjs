@@ -930,13 +930,37 @@ function scopesOf(scan) {
 
 export function checkSourceScans(files, readFile = (f) => readFileSync(f, "utf8")) {
   const violations = [];
+
+  // **Each file was read once per rule, and there are 34 of them.**
+  //
+  // The read sat inside the rule loop, so a pass over 179 files did 6,086 reads
+  // to see 179 distinct files, and the suite makes 43 passes — 261,698 reads of
+  // an immutable tree. Measured on an idle machine: 411 ms a pass, 17.7 s of CPU
+  // across the suite, which is why four scan rows timed out at 15 s inside a
+  // loaded run and passed in 2.8 s alone.
+  //
+  // **Read once, and the loops below are otherwise untouched** — deliberately.
+  // Inverting them to file-major would reorder every violation list, and the
+  // rows that assert on those lists would have to move with it; a reordering
+  // that happens to keep the suite green is a change nobody can check. So this
+  // is a cache in front of the same walk, and `readFile` stays injected because
+  // the fabricated-violation rows supply their own.
+  const seen = new Map();
+  const read = (f) => {
+    const hit = seen.get(f);
+    if (hit !== undefined) return hit;
+    const src = readFile(f);
+    seen.set(f, src);
+    return src;
+  };
+
   for (const scan of SCANS) {
     const scopes = scopesOf(scan);
     for (const file of files) {
       const f = file.replaceAll("\\", "/");
       if (!scopes.some((s) => f.startsWith(s))) continue;
       if (scan.allow.some((a) => f === a || f.startsWith(a))) continue;
-      const src = readFile(file);
+      const src = read(file);
       src.split("\n").forEach((line, i) => {
         // Comments are prose about the rule, not violations of it. A line
         // comment was already skipped; a block comment's continuation was not,

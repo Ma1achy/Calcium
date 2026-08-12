@@ -34,6 +34,34 @@
  * C12 T2.1 is the same class and the precedent for the remedy: an explicit
  * budget, sized from a measurement, with the reason beside it.
  *
+ * ---
+ *
+ * **Re-measured after four rows timed out in one day, and the budget was not the
+ * problem.** T2.8 twice, T2.9 and T2.19 each hit 15 s inside a loaded run and
+ * passed in ~2.8 s alone. The three candidates were *the budget is wrong*, *the
+ * parallelism is wrong*, and *scan rows need their own lane*. It was none of
+ * them.
+ *
+ * `checkSourceScans` read each file **once per rule**, and there are 34 — the
+ * read sat inside the rule loop. So one pass over 179 files did **6,086 reads to
+ * see 179 distinct files**, and the suite makes **43 passes**: 261,698 reads of a
+ * tree that does not change while it is being read.
+ *
+ * | | before | after |
+ * |---|---|---|
+ * | one pass, idle | 411 ms | **89 ms** |
+ * | the suite's 43 passes | 17.7 s of CPU | **3.8 s** |
+ * | worst row in a loaded run | 15 s, timed out | 11 s |
+ *
+ * Read once per pass, with the loops otherwise untouched so no violation list
+ * reorders. **This is why the numbers above stand rather than being raised** —
+ * the instruction at the foot of this comment said re-measure instead of
+ * raising, and re-measuring found work rather than a number.
+ *
+ * The tree has grown 162 → 179 files since the table above was taken, and the
+ * per-file figures have not been re-taken; the pass figure has, and it is the
+ * one that moved.
+ *
  * **Do not raise these without knowing what they measure.** A scan that has
  * started taking twice as long is telling you the tree doubled or a rule became
  * quadratic, and both are worth knowing. Re-measure instead — the figures above

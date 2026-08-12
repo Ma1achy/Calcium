@@ -52,35 +52,36 @@ const run = promisify(execFile);
 const width = (): number => process.stdout.columns || 80;
 
 /**
- * Whether the terminal can draw anything outside ASCII.
+ * **`unicodeText` was here and is gone** (F54, F124, F43).
  *
- * **It was called `blockElements` and the name was already too narrow.** It was
- * written for the banner's `▄ ▀ █`; the second consumer is S3's `█`/`░` bar and
- * the third is a `·` in a caption, which is not a block element at all. The
- * predicate never was about block elements — it is C02's `unicode` axis, which
- * the app has to compute for itself because no consumer is handed the record
- * (F43).
+ * It computed C02's `unicode` axis from three environment variables joined into
+ * one string, and disagreed with the framework on **three of the four locale
+ * shapes anyone tests** — in both directions. `LC_ALL=C` beside a UTF-8 `LANG`
+ * drew block elements into a frame the renderer had already decided could not
+ * show them; `LC_CTYPE` alone degraded a terminal that could have drawn, and
+ * cost a reader the banner for nothing. C02 resolves `lcAll ?? lcCtype ?? lang`
+ * — POSIX precedence, first variable set wins — against a concatenation.
  *
- * **Decided by the app, and that is a finding rather than a design** (F43).
- * `detectCapabilities` is not exported and a local handler is handed no
- * capabilities at all, so the one route an app writes entirely itself cannot
- * ask the framework what the terminal supports — the third instance of a fact
- * the consumer needs and is not offered (F14, F36).
+ * **Two things had to be true to delete it, and the second is why this note
+ * exists rather than a smaller one.** The adapter half went when
+ * `ProducerContext` grew `capabilities`, C02's *resolved* record with the app's
+ * own overrides applied — so `container.ts` asks instead of being told. That
+ * left this function with **no caller at all**, which nothing reported: neither
+ * tsconfig sets `noUnusedLocals`, and the example typechecks clean under
+ * `strict` with a dead function in it.
  *
- * It matters because **capability substitution covers glyphs the framework
- * picks, not text an adapter supplies** — step 1's em-dash finding, eight rows
- * high. `▄▀█` in a `raw` block pass through untouched and draw as garbage on a
- * terminal that cannot show them, so choosing is unavoidably the app's job and
- * carrying an ASCII variant is the correct app-side answer.
+ * And its justification had gone stale in place. The comment argued that *a
+ * local handler is handed no capabilities at all, so the one route an app writes
+ * entirely itself cannot ask the framework what the terminal supports* —
+ * `LocalContext` is `ProducerContext & …`, and has carried the resolved record
+ * since C23 I39 landed. A correct-sounding reason for keeping something,
+ * outliving the fact it rested on, is what kept this readable and dead.
  *
- * The test is deliberately crude: a UTF-8 locale and a terminal that is not
- * `dumb`. Getting it wrong costs a wordmark, not correctness.
+ * The half that was never wrong and is worth keeping: **capability substitution
+ * covers glyphs the framework picks, not text an adapter supplies.** `▄▀█` in a
+ * `raw` block passes through untouched. Choosing an ASCII variant is the app's
+ * job — it just asks `ctx.capabilities.unicode` now instead of guessing.
  */
-const unicodeText = (): boolean => {
-  const term = process.env["TERM"] ?? "";
-  const locale = `${process.env["LC_ALL"] ?? ""}${process.env["LANG"] ?? ""}`;
-  return term !== "" && term !== "dumb" && /utf-?8/iu.test(locale);
-};
 
 /**
  * S12's depth, resolved by the app because that is where an environment variable
