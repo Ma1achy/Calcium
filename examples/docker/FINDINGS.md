@@ -7342,3 +7342,92 @@ The instruction was written about budgets and the first foreign run answered abo
 
 Fixed in `make install`, verified in a clean clone in the container: install 0, check 0. The
 failing case needs no fabrication — CI's `fast` job is the measurement.
+
+---
+
+## F157 — the ASCII degradation shot has never shown ASCII, and the cause is the harness's own interpreter ★★★★
+
+| | |
+|---|---|
+| **Surface** | `examples/docker/tools/capture.py`, and `docs/media/depth-ascii.gif` |
+| **Reached for** | *check the five-depth strip specifically — if 1-bit and ASCII are indistinguishable at README scale, the picture argues against the point it makes* |
+| **Verdict** | **the instrument was wrong**, third instance, and the first where the cause is the language it is written in |
+
+The degradation strip's whole argument is that the same surface survives five renderings. Read at
+the size GitHub shows it, **1-bit and ASCII were indistinguishable** — the same braille plot, the
+same `┌─│` panel borders, the same `·` separators, the same `❯`.
+
+They were indistinguishable because **the ASCII shot was not ASCII**. Counted in the committed
+cast: **6,833 `─`, 566 `│`, 32 `┌`**, in the one picture whose entire job is the fallback.
+
+### The app is right, and so is everything else
+
+The shot asks for `LANG=C` and `capture.py` sets it. Measured through the same surface with a
+node-pty probe at `LANG=C`: **zero box-drawing characters**, `+ - |` borders, an `@#*+=-.`
+density ramp for the plot, `........` for the memory bar, `>` for the prompt. The application
+degrades correctly and always did.
+
+Asking what the child actually received — from `env`, its own report, rather than our
+bookkeeping:
+
+```
+LANG=C
+TERM=xterm-256color
+LC_CTYPE=C.UTF-8      ← nobody in this repository set this
+DOCKER_TUI_DEPTH=1
+```
+
+**It is Python's.** PEP 538 locale coercion sees a C/POSIX locale at interpreter start and
+exports `LC_CTYPE=C.UTF-8` into the harness's own environment; `pty.fork()` hands it to the
+child; and `LC_CTYPE` outranks `LANG` under POSIX. C02 reads the three in that order — its
+comment even says *"`LC_ALL=C` suppresses a UTF-8 `LANG`"* — and correctly resolved full
+Unicode. Every layer behaved, and the frame was still wrong.
+
+**The harness overrode the shot by being written in Python.** That is why the node-pty probe
+disagreed: Node performs no such coercion, so the same request produced the right answer through
+a different instrument. Two instruments, one input, two frames — which is what pinned it to the
+capture rather than to the app.
+
+### The remedy, and what it does not cover
+
+A shot naming any of `LANG`, `LC_ALL`, `LC_CTYPE` now has all three cleared before its own are
+applied, so it gets the locale it asked for and no blend. Three fixture rows assert the child's
+own `env` report, and removing the fix turns *"and no `LC_CTYPE` the harness coerced"* red.
+
+**F147's class, third instance** — after tier 5's PTY passing no `LANG` at all, and the
+`interactivePty` default terminal. Each time the instrument's environment reached the frame and
+each time the numbers were fine: 27 cast frames, right dimensions, no error, a picture that
+looked like a terminal.
+
+---
+
+## F158 — a fixed delay against an asynchronous opening, and the frame is the only thing that says so ★★★
+
+| | |
+|---|---|
+| **Surface** | `examples/docker/tools/media.py`'s shot script |
+| **Reached for** | reading the regenerated shots at README scale, as F157's row required |
+| **Verdict** | **the instrument was wrong**, and it produced an impossible transcript that every count accepted |
+
+Every shot types its command at a fixed 1.5 s. The opening frame is **not** fixed: the greeting
+asks docker for its version and the dashboard fetches before either can draw, so when the banner
+lands is a property of the daemon and the host.
+
+Regenerated on a busier host, `/drift` was typed into a session whose greeting had not arrived.
+The comparison appended first and **the banner appended underneath it** — a transcript showing
+later content above earlier content, with the table's own `field / a / b` header scrolled off
+the top.
+
+**Nothing but the picture could say so.** 20 cast frames, the right dimensions, exit 0, a
+correctly rendered gif of a state the application cannot be in.
+
+`TYPE_AT` gives the slow openers more room, and it is **recorded as the weaker fix it is**: the
+capture writes on a clock and reads afterwards, so a shot whose opening is slower than its delay
+drifts the same way. Teaching it to wait on content is a larger change than this row. What
+catches the next one is the same thing that caught this one — reading every shot at the size it
+is published.
+
+**And one shot cannot be regenerated at all.** `menu-over-diff.gif` is F68's evidence and has no
+entry in `SHOTS`, so the README's claim that these images *"regenerate when the app changes
+rather than rotting"* holds for fourteen of fifteen. Filed rather than fixed: restoring its shot
+means reconstructing the menu-over-diff state, which is a row of its own.

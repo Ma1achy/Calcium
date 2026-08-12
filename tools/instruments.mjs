@@ -58,6 +58,11 @@ const COVERED = [
   ["examples/docker/tools/media.py", ["python3", "examples/docker/tools/media_test.py"]],
   ["examples/docker/tools/s3_esc.py", ["python3", "examples/docker/tools/s3_esc_test.py"]],
   ["examples/docker/tools/gap-check.mjs", ["node", "examples/docker/tools/probes_test.mjs"]],
+  // F11's corrections index. Its `--root` flag exists because CX6 — *a
+  // fabricated correction in a new document is found* — could not otherwise be
+  // written, and without that row the other six pass on a tool printing a
+  // hard-coded list, which is the failure a derived index removes.
+  ["examples/docker/tools/corrections.mjs", ["node", "examples/docker/tools/corrections_test.mjs"]],
   ["examples/docker/tools/measure-raw.mjs", null], // same fixture — the shared registry
   ["examples/docker/tools/measure-s3.mjs", null], // same fixture
 ];

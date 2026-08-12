@@ -393,6 +393,16 @@ timing assertions in them. That is the same sentence as the busy-loop container 
 gate itself in the fixture's place — so *"`make all` per target on an idle host"* is not
 fastidiousness, it is what makes the tier-5 leg mean anything.
 
+**Measured a third time, and this time it did.** Regenerating the media needs `make fixtures`,
+so `dtui-load` was up for the whole of a `make e2e`: **`transport` T5.6 timed out at 75 s.**
+`make load-down`, same tree, same command, no other change — **16/16, 98 passed, 196.8 s.**
+
+So the guard now rests on a reproduction rather than only on the asymmetry. All three
+measurements stand and none cancels the others: it failed in step 4, it did not reproduce in
+step 8, and it failed again here. **A flaky trigger is still a trigger** — what the guard costs
+is one second, and what its absence cost, twice now, is a timeout read as a deadlock in code
+that has none. The row below keeps both earlier figures for the same reason.
+
 **Re-measured in step 8, and it did not reproduce.** `make fixtures` brings up `dtui-load`
 — the same shape of busy loop — and tier 5 ran green with it up: 94 passed, 7 todo,
 `E2E_WITH_LOAD_EXIT=0` read from a redirect. Both measurements are real, and neither
