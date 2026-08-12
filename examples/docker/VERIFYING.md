@@ -434,6 +434,31 @@ The third is the sharpest, because the byte stream *contained* the text — `gre
 reads as **drawn and then overwritten**, which is a real and serious defect class, and two
 minutes went into it before the cause turned out to be the `[:16]`.
 
+### And a fourth, where the instrument's *size* produced the blank rather than its cut
+
+Diagnosing 44 red tier-5 rows, the shell was driven under `script -qc` to see what it painted.
+It painted **nothing**, and stayed alive — which is F67's signature exactly, and a blank-screen
+defect was one step from being written down.
+
+`script -qc` allocates a **0×0** PTY. `process.stdout.columns` and `.rows` are both `0`, the
+shell has no region to draw, and the silence was the instrument's. Driven through `node-pty` at
+100×30 the same fixture printed 3251 bytes and a prompt.
+
+**The three rows above are a cut applied to real output; this is output that never existed**,
+and it is the worse of the two because there is nothing to notice. A truncated frame at least
+came from a run. The rule is `test/support/README.md`'s, one level out: **a fixture must be
+shown to respond to the thing under test before it is asserted against** — and an *instrument*
+is a fixture when it is what you are reading through.
+
+The same rule caught the in-memory filesystem in `test/support/session.ts`, which answered `""`
+for a file that was never written and accepted a write into a directory that did not exist:
+correct about the interface, silent about the world. Same shape, different world — a double
+that cannot fail is a double that agrees.
+
+**What actually found the real cause** was reading the harness's spawn rather than the app's
+output: `interactivePty` builds `{ TERM, PATH }` and no `LANG`, so C02 resolves ASCII and the
+prompt is `>`. F147.
+
 **So: print every row, always.** A frame at 40 rows is 40 lines of output; there is no
 budget being saved. If the output genuinely needs narrowing, narrow the *columns* — the
 frame's height is the thing being read and the thing a cut destroys.

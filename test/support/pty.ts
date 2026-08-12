@@ -186,7 +186,18 @@ export function runInPty(
       name: opts.env?.["TERM"] ?? "xterm-256color",
       cols: 80,
       rows: 24,
-      env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
+      // **`LANG` is part of the default because the default is a capable
+      // terminal** (F147). It was absent — not as a decision that tier 5 tests a
+      // degraded one, but because an environment built by listing two variables
+      // has whatever you did not list. C02 then resolved the ASCII pair, the
+      // prompt rendered `>`, and 44 rows across 13 files waited fifteen seconds
+      // each for a `❯` the app was right not to draw.
+      //
+      // Tier 5's job is the whole stack as a user meets it, and a user has a
+      // `LANG`. A degraded terminal is what a row **asks** for — `opts.env`
+      // spreads last, so `capabilities.test.ts` setting `LANG: "C"` still wins,
+      // which is how the one file that is about degradation keeps its subject.
+      env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8", PATH: process.env["PATH"] ?? "", ...opts.env },
     });
 
     let output = "";
@@ -337,7 +348,11 @@ export function interactivePty(
     name: opts.env?.["TERM"] ?? "xterm-256color",
     cols: opts.cols ?? 80,
     rows: opts.rows ?? 24,
-    env: { TERM: "xterm-256color", PATH: process.env["PATH"] ?? "", ...opts.env },
+    // The same default, and for the same reason (F147). Both spawners, because
+    // the defect was in what an unlisted variable does rather than in either
+    // function — fixing the one that surfaced it would leave the other live,
+    // which is the mistake the `name`-wins-over-`env` note above records twice.
+    env: { TERM: "xterm-256color", LANG: "en_GB.UTF-8", PATH: process.env["PATH"] ?? "", ...opts.env },
     // Raw bytes rather than per-chunk strings — see `bytes` below.
     encoding: null,
   });

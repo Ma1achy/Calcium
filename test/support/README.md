@@ -248,6 +248,13 @@ wants this one, for the same reason.
 A fixture must be shown to respond to the thing under test before it is asserted
 against. **So must a fake**, and the inert class has migrated there.
 
+**And so must an instrument you are reading a result through.** Diagnosing 44 red tier-5
+rows, the shell was driven under `script -qc`, painted nothing and stayed alive — F67's
+signature, and a blank-screen defect was one step from being filed. `script -qc` allocates a
+**0×0** PTY: no columns, no rows, nothing to draw on. The same fixture through `node-pty` at
+100×30 printed 3251 bytes. `examples/docker/VERIFYING.md` §9 carries it beside the three
+truncated-frame diagnoses, which are the same shape applied to a cut rather than to a size.
+
 Twice in one file: `test/unit/execution.test.ts` stubbed `editor: {} as never`
 and an action test failed with `setText is not a function` — a finding about the
 harness wearing the shape of a finding about actions. The same file's table
