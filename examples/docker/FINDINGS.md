@@ -6856,15 +6856,48 @@ expected 1 to be 2`, `expected 1 to be greater than 1`, `expected 23 not to be 2
 the screen: not to contain 'first-text'`, and *the last row is reachable* timing out against a
 screen that has it.
 
-### The remedy is a screen, not a slice
+### The remedy is a screen, not a slice — and it landed
 
-A frame cannot be recovered by slicing a stream that describes edits. The harness needs a row
-buffer that **applies** what it receives — CUP moves the write head, text overwrites the row it
-lands on, `CSI H` resets to the origin — which is what the terminal on the other end is doing.
-It is the smallest emulator that makes the getter's own doc-comment true.
+A frame cannot be recovered by slicing a stream that describes edits. `screen(bytes, rows)`
+**applies** what it receives, which is what the terminal on the other end is doing: CUP moves
+the write head, text overwrites the cells it lands on, `CSI H` resets to the origin, the
+alternate screen clears what was under it. It is the smallest emulator that makes the getter's
+own doc-comment true, and `frame` is now one call to it.
 
-Scoped, not built: this is the sole reader of `frame`, but it is read by sixteen tier-5 files
-and every green row asserting through it is currently unverified rather than known-good.
+**`cells()` is imported from `src/`, and the cost is stated rather than hidden.** The instrument
+now shares a measurer with the thing under test, which is the shape `test/support/README.md`
+forbids — a width defect would move the model and the app together and hide itself. The trade is
+taken because a second implementation would drift from the measurer the whole framework uses and
+disagree about exactly the characters that are hard. What makes it safe is that the coupling is
+**checked**: `overrun` reports any row painted wider than the screen, which is a row that
+wrapped, which is the one failure that corrupts state the application can no longer see.
+
+**Eleven rows, and seven mutations all caught by their named row** — including the first
+mutation, which is the harness's shipped state restored: slice from the last home, strip, split.
+That is the acceptance test for this finding, in the form the row asked for.
+
+### What the mutation pass found that the design did not
+
+The model was written as `head + text`, and the alternate-screen mutation **survived a run the
+alternate-screen row was written to catch**. The cause was the model rather than the test: that
+expression indexes a *cell* cursor into a *string*, so a write truncated everything to its right
+— and clearing the screen produced output identical to not clearing it.
+
+Two consequences, both the conflation `cells()` exists to prevent, and neither reachable by
+reading the code: a row's tail destroyed by any short write, and a column past a wide glyph off
+by one per glyph — invisible until C17's CJK rows run. A row is an array of cells now, with
+`null` for a cell nothing has written and `""` for the continuation half of a wide glyph.
+
+**A mutation that survives is a finding about the tests, or about the sentence they were written
+from. This one was about neither** — it was about the subject. That is a third disposition, and
+it is worth naming: the pass asks whether a test can see a defect, and the answer here was *the
+test is fine and the thing it is testing has a second defect standing in the way*.
+
+One divergence from a real terminal is recorded rather than fixed, and asserted so it cannot
+drift: writing onto the continuation half of a wide glyph takes that cell, where a terminal also
+blanks the orphaned lead half. The shell never produces it — `render-frame.ts` writes whole
+`exact()`-padded rows from column 0 — and the row that asserts it says where the model stops
+being the terminal.
 
 ### Why F148 had to be fixed first
 

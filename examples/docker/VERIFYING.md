@@ -476,6 +476,41 @@ that cannot fail is a double that agrees.
 output: `interactivePty` builds `{ TERM, PATH }` and no `LANG`, so C02 resolves ASCII and the
 prompt is `>`. F147.
 
+### A third shape: real bytes, reassembled by a wrong model
+
+F149, and it belongs here because the family is the same and the tell is different again.
+
+The framework's own tier-5 harness reconstructs a frame as **everything after the last
+`CSI H`**, on a shape its comment states and cites: *one write per frame, beginning with a hide
+and `CSI H`*, referred to S01 §3 and C22 §6. Measured on a live session: **one home, ever.**
+C22 **I55 §6b** says the opposite in a numbered invariant — the whole-frame form is the
+*fallback*, and every ordinary frame is a **difference** with each changed row addressed by
+`cursorTo(i, 0)`. Stripping escapes throws those addresses away, so rows written to line 4 and
+line 19 arrive adjacent. A 400-row transcript came back as one line.
+
+| | the cut | the 0×0 PTY | this |
+|---|---|---|---|
+| the bytes | real, truncated | none | **real, complete** |
+| what you are looking at | a frame with its edge cut off | a frame that never existed | a frame assembled wrongly |
+| the tell | re-read and the rows are there | check the instrument's configuration | **check the model against what the subject actually emits** |
+
+**Neither of the first two tells reaches it.** Re-reading gives the same wrong screen, and the
+instrument is configured perfectly — 100 columns, 24 rows, the right terminal, the right `LANG`.
+Nothing about it is missing. It is *applying the wrong rule to correct input*, and the only
+thing that finds that is going to the source and asking what the subject emits.
+
+**And a citation is what stopped anyone going.** The claim carried two spec references, so it
+read as settled — which is the sixth blind spot pointed at a harness rather than at a plan. The
+question that reaches it is the same one: *which file holds this, and does it say so?* Twenty
+minutes. One of the two cited sections contradicts it in a numbered invariant.
+
+**Why it survived so long is the part worth carrying.** A "contains" assertion over the blob
+passes whenever the text was *ever* painted, so most rows stayed green and looked like coverage.
+Only the assertions that are about a screen rather than about a string — a row's position, a
+count, something being *gone* — could fail, and there were few of them. **An instrument can be
+wrong in a way that only the minority of assertions can see, and the majority then reads as
+corroboration.**
+
 **So: print every row, always.** A frame at 40 rows is 40 lines of output; there is no
 budget being saved. If the output genuinely needs narrowing, narrow the *columns* — the
 frame's height is the thing being read and the thing a cut destroys.
