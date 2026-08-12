@@ -6995,3 +6995,155 @@ far side printed two rows, the frame's blob was short, and nothing about the run
 are in the wrong place*. Fixing the flag put 400 rows on the screen, and a 400-row transcript
 collapsed onto one line is not a thing a reader can look at and not see. **A frame-read found
 it — the fourth time on this component that reading output found what no assertion did.**
+
+---
+
+## F151 — the likeliest thing a stranger types answers with two internal invariant numbers ★★★★
+
+| | |
+|---|---|
+| **Surface** | `src/shell/execution.ts:412`, `runShell` — C23 §2's `shell` route |
+| **Reached for** | publication prep item 2, *error messages as the first-run experience*. Found by the rig's own mistake |
+| **Verdict** | **correctness defect**, every consumer, on the path a first run is most likely to take |
+
+Type `list` where the shell wants `/list` and the screen says:
+
+```
+✗ appendAndCommit: TranscriptError: transcript.append: invalid document (C13 I10) — error: required
+  when status is "error" (C04 I3)
+```
+
+Nothing about `list`. Nothing about the slash. Two invariant numbers from two components the
+reader has never heard of, and no entry in the transcript at all.
+
+### How it was found is the part worth keeping
+
+**The rig typed the wrong thing.** The sweep was fourteen deliberate misconfigurations, and every
+one of them produced that message — which read as a spectacular finding until the *control* was
+run and failed identically. The control is the shipped example, whose own suite is green.
+
+The difference was one character. `examples/minimal/test/run-in-pty.py` types `/list`; the rig
+typed `list`. So the fourteen variants were measuring one accident fourteen times, and the
+accident was the finding: **a bare word is the single most likely thing a stranger types**, and it
+is the one input nothing had ever run.
+
+Two rules earned their place here and both are already written down. *A fixture must be shown to
+respond to the thing under test before it is asserted against* — the control is what separated
+fourteen findings from one. And *a defect proportional to a small count*: fourteen identical
+results should have been read as one cause immediately, not as corroboration.
+
+### The layer, pinned
+
+`runShell` composes the outcome directly:
+
+```ts
+status: exit.code === 0 ? "ok" : "error",
+blocks: [block({ kind: "raw", id: blockId("raw"), text: out })],
+```
+
+**No `error` field.** C04 I3 requires it present iff the status is `"error"`, so *every* failing
+shell command builds an invalid document, `transcript.append` refuses it (C13 I10), and what the
+user sees is F15's fault notice correctly reporting a framework defect.
+
+This is the **third instance of one class**, and `src/shell/documents.ts` already carries the
+other two in a comment above `noticeDoc`:
+
+> *every notice composed with that status was an invalid document, and `transcript.append` threw
+> on all of them. Two shipped call sites: a handoff killed by a signal and a handoff exiting
+> non-zero. **Neither produced an entry.***
+
+The fix was applied to `noticeDoc` — *"filling the field here rather than at the two call sites is
+the class rather than the instances"* — and `runShell` does not go through `noticeDoc`. **The
+class was closed at one composer and this is the other one.** Close the class, not the instance,
+and then check the class has one member.
+
+### The second half: the message exists and is thrown away
+
+`text: out` is stdout. `ChildHandle.stderr` is a separate `AsyncIterable<string>` (C21 I3) and
+`runShell` never reads it — so `sh: 1: list: not found`, the sentence that would have told the
+reader exactly what happened, is produced by the shell, delivered to the framework, and dropped.
+
+The raw block is therefore **empty** as well as unappendable. Fixing only the `error` field would
+have produced a valid document with nothing in it.
+
+**The verb route already does this correctly**, which is both the precedent and the proof it is
+reachable — W12 below shows `svc: permission denied` on screen from exit 13. One route reads
+stderr and one does not.
+
+### Measured
+
+| typed | before | after |
+|---|---|---|
+| `/list` | the table draws | unchanged |
+| `list` | `TranscriptError`, no entry | the exit code, the shell's own message, and what to type instead |
+
+---
+
+## F152 — the far side failed and the notice blames the app author's adapter ★★★
+
+| | |
+|---|---|
+| **Surface** | `src/data/adapters/registry.ts:265`, route 2 |
+| **Reached for** | the same sweep. Two of the fourteen variants |
+| **Verdict** | **misdirection** — accurate sentence, wrong subject |
+
+Point the binary at a path that does not exist and the screen says:
+
+```
+✗ The command did not start.
+spawn /nonexistent/svc ENOENT
+The adapter for "list" failed (Unexpected end of JSON input); showing the default rendering.
+```
+
+The first two lines are right. The third sends the reader to debug an adapter that did exactly
+what it should: there was no output, so there was no JSON. Same with exit 13:
+
+```
+✗ The command exited with code 13.
+svc: permission denied
+The adapter for "list" failed (Unexpected end of JSON input); showing the default rendering.
+```
+
+Route 2 computes `mapResult` **first**, so it already knows the result is a failure, and calls
+`adapter.adapt` anyway:
+
+```ts
+const outcome = mapResult(raw, ctx);
+const produced = adapter.adapt(raw, ctx);
+```
+
+The adapter throws on the empty payload, the catch appends the failure notice, and a correct
+diagnosis is followed by a false one. **The reader has already been told the truth and is then
+told to go and look somewhere else** — which is worse than silence, because the wrong file is
+the one they will open.
+
+It fires on four of the six variants where any far-side failure occurs. The narrow remedy is to
+suppress the notice when `outcome.status === "error"`: the payload is absent by construction, the
+user already has the real cause, and an adapter cannot be at fault for a command that never ran.
+
+---
+
+## F153 — a required field that is absent is reported as a field of the wrong type ★★
+
+| | |
+|---|---|
+| **Surface** | `src/data/viewmodel/validate.ts:93` |
+| **Verdict** | **message quality**, and the ruling against it is already written in this repo |
+
+A notice built without a `tone` — which is required (`tone: Tone`, no `?`) — reports:
+
+```
+blocks[0] (notice): "tone" must be a string
+```
+
+`undefined` is indeed not a string, so the sentence is true. It is also the sentence that sends a
+reader to look at the value they wrote rather than at the key they omitted, and there is no value
+to look at.
+
+**`src/shell/config.ts:107` states the ruling, in the other direction, four files away:**
+
+> *`in` rather than a truthiness check: `name: ""` is a supplied field and a bad value, and
+> reporting it as missing sends the reader to the wrong line.*
+
+Absent and wrong are distinguished carefully in `createTui` and conflated in the validator every
+adapter's output passes through. The argument is symmetric and only half of it was applied.

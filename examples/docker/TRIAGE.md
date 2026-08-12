@@ -36,12 +36,12 @@ type change.
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
 | **6** | [Rendered from data that has since moved](#6) | 2 | **2 open** | ⚠ C04 | real Calcium work |
 | **7** | [An artefact describes the world rather than being checked against it](#7) | 17 | **14** | — | artefact discipline — **no code** |
-| **8** | [Absence indistinguishable from failure](#8) | 10 | **3 open** (5 closed) | partly | real Calcium work · **5 of 8 fixed** |
+| **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
 | **9** | [**The instrument was wrong**](#9) | 19 | **11** | — | **new at F80** · tooling, and it has no test |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
 | **11** | [A gate that passes without checking](#11) | 25 | **9** | — | 4 closed · **2 open, both about a rule's reach** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
-| **13** | [Text the framework emits and does not substitute](#13) | 1 | 1, *and every consumer has it* | — | real Calcium work · needs a ruling |
+| **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
 
 **Four groups are new since F55** — 9, 10, 12, and F81's arrival in 4. Group 9 is the one
@@ -311,13 +311,14 @@ answer is a frame-read that cannot be wrong. **Read the ladder before choosing t
 | **F128** | three specs disagreed with the code they specify, all in one direction |
 
 
-## 8 · Absence indistinguishable from failure — **3 open, 5 closed**
+## 8 · Absence indistinguishable from failure — **3 open, 6 closed**
 
 Every instance is invisible by construction: a green suite, a plausible frame, no diagnostic.
 
 | | what vanished | state |
 |---|---|---|
 | **F35** | three app documents setting `status: "error"` and omitting `error` | **closed as a class** — `documents.test.ts` runs every document this app can produce through the validator |
+| **F151** | **the framework's own `shell` route, same class, fourth instance** | `runShell` composed `status: "error"` with no `error`, so every failing bare word was refused by `transcript.append` and produced **no entry** — the reader shown two invariant numbers instead of their command. **F35's closure cannot see it**: `documents.test.ts` runs the documents *this app* produces, and this one is produced by the framework. `noticeDoc`'s closure cannot either — the route does not go through it. **Fixed** (C23 I50) |
 | **F29** | the framework's own default `renderError` threw, mid-stall | **fixed** |
 | **F40** | a view's window, measured a block at a time — C15 cut the excess silently | **fixed** |
 | **F47** | a pushed view did not follow its own stream | **fixed** |
@@ -604,7 +605,7 @@ that fails under contention will fail eventually whether or not anyone introduce
 ---
 
 <a id="13"></a>
-## 13 · Text the framework emits and does not substitute — **1**
+## 13 · Text the framework emits — **3**
 
 **F55.** `PROMPT = "❯ "` and `b.live`'s default `loading…` are constants concatenated into a
 frame with nothing between them and the terminal. C09 §4 argues at length that a glyph is a
@@ -625,6 +626,8 @@ already made — folding it in is cheaper than making a second one.
 | | why this group |
 |---|---|
 | **F55** | the framework draws two characters it does not substitute — this group's subject |
+| **F152** | the framework emits a sentence about the wrong subject — the far side failed and the notice names the app author's adapter |
+| **F153** | the framework emits a sentence about the wrong fault — an absent required field reported as a value of the wrong type |
 
 
 ## Singles — one consumer each

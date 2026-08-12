@@ -32,7 +32,7 @@ C18 classifies; C23 routes. Seven kinds, seven paths.
 | `builtinThenShell` | Apply, **then** delegate the remainder (C18 §4 rule 2b) |
 | `local` | Run an in-process handler, append its document |
 | `app` | Transport → adapt → append (§3) |
-| `shell` | `spawnShell` → `raw` document (C18 §5) |
+| `shell` | `spawnShell` → `raw` document (C18 §5); **on a non-zero exit, an error document carrying the shell's own stderr** (I50) |
 
 ### Composition inserts no spacing of its own
 
@@ -797,6 +797,8 @@ Per submission.
 - **I48** — **A swallowed failure is recorded and reported on two channels, and C23 chooses neither moment for the second** (§5a). Every bare `catch` in the pipeline records the reason in `faults`, deduplicated by message; C22 §8 step 3 drains it onto the restored primary screen beside C02's capability warnings and C20's history warnings. This is C02's ruling taken a third time — *the component decides what is wrong, never when the user is told* — and it is why `faults` is a readable collection rather than a callback: a callback chooses the moment, and the moment is after the terminal is released. The other channel is the fault notice, which speaks at the time and cannot be relied on, because in §8e's first row appending is what failed. **The prose it replaces claimed a defect log that no component had.**
 - **I49** — **The catch finishes what the try did not.** `resetFocus` and the commit run on every path out of `appendAndCommit`, and the entry id is returned whenever the entry exists. §8e's table is the argument: four of five rows leave the append done and the sequence after it abandoned, and the reset is the one whose absence is permanent — T4.7b asserts its position because a frame painted with focus in a frozen block is the failure it prevents. The same reasoning §8a A5 applied to the guard, applied to the four statements that ruling did not look at.
 
+
+- **I50** — **The `shell` route's failure is a document like any other: `error` filled, and the shell's own stderr in it.** A non-zero exit composed `status: "error"` with no `error` field, which C04 I3 forbids in both directions, so `transcript.append` refused every one of them (C13 I10) and the route produced **no entry at all** — the user seeing F15's fault notice cite two invariant numbers instead of the command they typed. This is the **third instance of the class `documents.ts` closed at `noticeDoc`**, and the argument recorded there — *filling the field here rather than at the two call sites is the class rather than the instances* — is why it recurred: the class was closed at one composer, and this route does not go through it. **Closing a class means checking the class has one member.** The second half is `stderr`: `ChildHandle` delivers it separately (C21 I3) and the route read only `stdout`, so a failing command's one explanatory sentence was produced, delivered and dropped — leaving a raw block that was empty as well as unappendable. §3's verb route already reads it, which is both the precedent and the proof it was reachable. **A bare word is the likeliest thing an unfamiliar reader types**, and it is the input this route exists for.
 ---
 
 ## 8. Commitments
