@@ -18,6 +18,7 @@
 //     node tools/bench/frame.mjs [lines] [reps]
 //
 import { createTui, b, defaultTheme } from "../../dist/index.js";
+import { liveness } from "./liveness.mjs";
 
 const LINES = Number(process.argv[2] ?? 5_000);
 const REPS = Number(process.argv[3] ?? 20);
@@ -273,30 +274,23 @@ if (LINES > 0) {
   // fixture against a perfectly live one. The same defect the three test files
   // had, arriving in the instrument that found them.
   const seen = screenRows(stdout.chunks, size);
-  const content = seen.filter((r) => r.trim() !== "").length;
   // **A body line, not the path header.** The viewport follows the tail, so what
   // is on screen is the *bottom* of the patch and the path row is thousands of
   // rows above it. Asserting on `module.ts` failed against a perfectly live
   // fixture — the assertion was wrong, not the document, and reading the frame
   // is what said which.
   // `value` appears in both fixtures' line text, so one marker serves both.
-  // **Two earlier edits to this line matched nothing and reported success**,
-  // because they were written against a version without the trailing `.length`
-  // and `str.replace` is silent about a miss. That is the edit-script rule in
-  // CLAUDE.md arriving in the tool that checks the fixture — ask whether the
-  // change fired, not whether the run is still green.
-  const body = seen.filter((r) => r.includes("value")).length;
-  if (body < 5 || content < 5) {
-    console.error(
-      `\nFIXTURE DEAD: ${String(content)} non-blank rows, ${String(body)} patch lines on screen.\n` +
-        "The document did not reach the transcript. Nothing below would mean anything.",
-    );
+  //
+  // **The guard itself now has a fixture** — `test/unit/bench-liveness.test.ts`,
+  // group 9. It lived here as four inline lines, and the label said `patch
+  // lines` during a `logs` run: a defect in the one line whose job is to say the
+  // fixture responded, unreachable by anything short of running the bench.
+  const { dead, line } = liveness(seen, { marker: "value", kind: KIND });
+  if (dead) {
+    console.error(`\n${line}`);
     process.exit(1);
   }
-  // `KIND`, not the word "patch": the marker is deliberately kind-agnostic
-  // (see above), and the label said `patch lines` in a `logs` run — the one
-  // line whose whole job is to tell the reader the fixture responded.
-  console.log(`fixture live: ${String(content)} non-blank rows, ${String(body)} of them ${KIND} lines`);
+  console.log(line);
 }
 
 // 1 — a keystroke. C03 gives `input` a zero window, so the whole frame happens

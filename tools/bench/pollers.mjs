@@ -26,6 +26,7 @@
 //     node tools/bench/pollers.mjs [windowMs] [everyMs]
 //
 import { createTui, b, defaultTheme } from "../../dist/index.js";
+import { samplesLive } from "./liveness.mjs";
 
 const WINDOW_MS = Number(process.argv[2] ?? 1_000);
 const EVERY_MS = Number(process.argv[3] ?? 100);
@@ -259,21 +260,18 @@ await sleep(WINDOW_MS);
 // that never ticked prints its loading `-` and would report a perfect agreement
 // between two panels that are both dead.
 const seen = screenRows(stdout.chunks, size);
-const samples = seen.flatMap((r) => {
-  const m = /sample\s+(\S+)/.exec(r);
-  return m === null ? [] : [m[1]];
-});
-if (ticks === 0 || samples.length !== 2 || samples.includes("-")) {
-  console.error(
-    `\nFIXTURE DEAD: ${String(ticks)} fetches, samples ${JSON.stringify(samples)}.\n` +
-      "The parts did not tick. Nothing below would mean anything.",
-  );
+// The guard has its own fixture — `test/unit/bench-liveness.test.ts`, group 9.
+// Two dead panels agree exactly, which is a stronger-looking result than the
+// live one, so the reading it refuses is the one that would have been believed.
+const { samples, dead, line } = samplesLive(seen, ticks);
+if (dead) {
+  console.error(`\n${line}`);
   console.error(seen.filter((r) => r.trim() !== "").join("\n"));
   process.exit(1);
 }
 
 // b — the divergence, read from ONE frame.
-console.log(`\nfixture live: ${String(ticks)} fetches in the window`);
+console.log(`\n${line}`);
 console.log(`  ALPHA and BETA, from one frame: ${samples.join("  vs  ")}`);
 console.log(
   samples[0] === samples[1]
