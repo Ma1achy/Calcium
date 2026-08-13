@@ -4011,7 +4011,7 @@ shape**, which is the evidence it is the right one.
 
 ---
 
-## F92 — `usageBlocks` renders per-verb help and only an exit code can ask for it ★★
+## F92 — `usageBlocks` renders per-verb help and only an exit code can ask for it ★★ — **CLOSED**
 
 **The claim this was filed from was wrong and the correction is the finding's shape.**
 `CALCIUM_ROADMAP.md` states *"`usageBlocks(tool, id)` is built, exported, and has no
@@ -4047,6 +4047,29 @@ fifty-verb wall becomes two levels and the second one is already written.
 
 **Blocked on F39.** Filing it separately is the point — F39 was one consumer and a shim
 absorbed it; it is now two, and the second is the framework's own.
+
+### CLOSED — both rulings built, and the roadmap kept the pre-build wording for both
+
+**The trigger exists.** `src/shell/execution.ts:1300` routes `--help` on the `app` and `local`
+paths before any spawn, gated on `validation.ok` — *a malformed invocation should say what is
+wrong rather than what is possible*, so `/ps --nonsense --help` reports the misspelling.
+`usageDoc` (`src/shell/documents.ts:211`) composes from the manifest with `status: "ok"`,
+because asking what a verb takes is not an error. T4.8 asserts both halves: the document, **and
+that nothing spawned** — a test checking only the blocks would pass while the child still ran.
+
+**Both rulings this finding named are built, and the second had gone unread.**
+
+| ruling | at HEAD |
+|---|---|
+| reserve `--help` framework-side | `FRAMEWORK_FLAGS`, `src/data/manifest/framework.ts:126`, `shellOnly: true`, appended to every tool (C05 I22) |
+| `/help` shrinks to two levels | `src/shell/local/handlers.ts:110` groups by C05 §3's partition, with `/help keys` as a second question |
+
+**And *blocked on F39* resolved the other way round.** F39 was closed by C05 I21 — `--help` is
+`shellOnly`, so it never travels, which is the mechanism this finding was waiting for and it
+arrived under the other finding's name. The roadmap's entry 21 still read *"built, exported, and
+uncallable"* through all of it: this finding corrected that summary once, the correction was
+right, and **the row it corrected was never updated and then went stale a second way.** A
+finding can fix a claim and leave the document holding it.
 
 ---
 

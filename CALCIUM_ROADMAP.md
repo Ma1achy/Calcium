@@ -2389,10 +2389,15 @@ RULED 6  phase 2                   the empty-block convention · rendering flags
                                    transmitted, so all three wants work and F39 is CLOSED —
                                    its sentence named RENDERING and the axis it needed was
                                    TRANSMISSION. RULED: the field arrives with the resolution
-                                   that reads it, which is 21's --help per verb, on C26 §5's
-                                   arrow/escape precedent. That dissolves the value question:
-                                   the set is whatever --help must say. FlagDef is unchanged,
-                                   so the freeze is unaffected. C05 §8b, C22 §13b
+                                   that reads it, which is 21's --help — AND 21 WAS ALREADY
+                                   BUILT, so the question is answered rather than deferred.
+                                   --help REPLACES the result rather than selecting among
+                                   renderings of one, and usageBlocks lists every flag flat, so
+                                   no reader needs the distinction. 6.2 CLOSES WITH NO FIELD:
+                                   FlagDef is unchanged permanently, not pending, and §2's
+                                   closed-set test is answered because there are NO MEMBERS —
+                                   the framework understands exactly one presentation-selecting
+                                   flag and does it by RESERVING THE NAME. C05 §8b, C22 §13b
 PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
                                    the small navigation items rather than sitting beside them.
                                    SPECIFIED as C26; stages 1–3 built (interaction is a focus
@@ -2455,15 +2460,19 @@ PART  19 resize coalescing        never delayed by C03 I2, and every SIGWINCH re
 BUILT 20 off-screen live parts ★  b.live keeps ticking when scrolled off — no visibility check
                                    exists. Throttle, not pause (I9 protects a scrolled-away
                                    --watch), and fetch on re-entry. Spawns processes for nobody
-PART  21 --help per verb ★        usageBlocks() is built, exported, and uncallable. Reserve
-                                   --help framework-side, and it makes /help's fifty-verb wall
-                                   a two-level problem instead. THE DEPENDENCY ON 6 IS INVERTED,
-                                   not removed: this said "needs F39's render-selecting flag",
-                                   and 6's walk found that field has no instance and no consumer
-                                   until THIS renders per-verb usage. So 21 does not wait on 6;
-                                   6.2 waits on 21, and the field's value set is whatever --help
-                                   must be able to say (C05 §8b.6). --help itself is already
-                                   reserved on every tool by C05 I22
+BUILT 21 --help per verb ★        BUILT, and the row described the state before it. --help is
+                                   reserved framework-side (C05 I22, shellOnly), routed on both
+                                   the app and local paths at execution.ts:1300 gated on
+                                   validation.ok, answered by usageDoc from the manifest with
+                                   nothing spawned, and T4.8 asserts BOTH halves. /help is
+                                   already two-level: grouped by C05 §3's partition, with
+                                   /help keys as a second question. THE DEPENDENCY ON 6 WAS
+                                   INVERTED AND BOTH ROWS WERE STALE — this said it needs 6's
+                                   flag, then 6.2 was found to need this, and this was already
+                                   built. So 6.2 is answered rather than blocked: --help
+                                   REPLACES the result rather than selecting among renderings,
+                                   and usageBlocks lists every flag flat, so nothing needs the
+                                   distinction. C05 §8b.7
       22 b.art — banners          sparse variants, fallback ends at styled text, and VALIDATION
                                    PER VARIANT (no tabs, uniform width, measured cells) — ~30
                                    lines that would have caught every banner defect
@@ -2627,7 +2636,7 @@ what landed**.
 | 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:440` | 1.1, 1.3, 1.4 not checked in this pass |
 | 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
 | 7 | PART | **specified as C26, and three stages built.** `ElementAddress` — `interaction/router/types.ts:84` — and one shared resolver, `resolveFocus` — `interaction/router/focus.ts:122` — so focus holds an address and render and keys answer from the same place. Stage 1 made `interaction` a focus target, stage 2 gave blocks `elements`, stage 3 the address; the ⏎ ruling followed. `docs/components/C26_navigation.md` | **§4's policy resolution and the modes.** `ArrowPolicy` and `EscapePolicy` are absent from `src/` — withdrawn under MG24 because `NavElement.arrow` and `.escape` had no reader, **re-checked against the widened rule (F159) and the withdrawal holds**, so §4 is still a design question. The scroller is the fourth kind that check runs against (46) |
-| 6 | RULED | **the ruling is in the entry, and the walk is in two specs.** `docs/components/C05_tool_manifest.md` §8b and `docs/components/C22_composition_root.md` §13b. 2.2's first half is built and the prose had not caught up: `shellOnly` — `data/manifest/types.ts:88` — is absent from `argv` via `validateInvocation`, `data/manifest/validate.ts:254`, and `examples/docker/bin/docker-json` records the shim's strip being deleted rather than commented | **no code, and 2.2's half is now a deferral rather than a design.** 2.1's convention is unwritten and its residue is an empty block whose emptiness is a *failure to compute*, which C22 cannot tell from a success. 2.2's field is **blocked on 21** — it would have no consumer until `--help` renders per verb, which is C26 §5's `arrow`/`escape` ruling applied unchanged |
+| 6 | RULED | **the ruling is in the entry, and the walk is in two specs.** `docs/components/C05_tool_manifest.md` §8b and `docs/components/C22_composition_root.md` §13b. 2.2's first half is built and the prose had not caught up: `shellOnly` — `data/manifest/types.ts:88` — is absent from `argv` via `validateInvocation`, `data/manifest/validate.ts:254`, and `examples/docker/bin/docker-json` records the shim's strip being deleted rather than commented | **2.2 is closed with no field; 2.1's convention is what remains.** The convention is unwritten and its residue is an empty block whose emptiness is a *failure to compute*, which C22 cannot tell from a success. 2.2 needs nothing: `--help` replaces the result rather than selecting among renderings, and `usageBlocks` — `src/data/adapters/mapping.ts:169` — lists every flag flat |
 | 8 | BUILT | **C14 I4/I5/I6.** `src/viewport/viewport/viewport.ts:347` — `#afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
 | 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `src/shell/local/registry.ts:59`, reached as `ctx.ask` at `src/shell/execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
 | 12 | BUILT | `src/shell/render-frame.ts:153` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
@@ -2637,7 +2646,7 @@ what landed**.
 | 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
 | 19 | PART | **the first claim holds and the second does not.** `resize` is an immediate commit reason, never coalesced (C03 §, I2). But *every SIGWINCH rebuilds the Fenwick index* is false: `src/viewport/viewport/viewport.ts:197` rebuilds **only when the width changed** — C14 I8, *a height change invalidates none, and doing both would make dragging a terminal's bottom edge cost a full remeasure per frame* — and step 0 refuses a resize to the size already held (C14 I21) | a **horizontal** drag is still N rebuilds + N renders + N writes, which is the half that survives |
 | 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `src/shell/refresh.ts:212`, wired at `src/shell/construct.ts:760` | — |
-| 21 | PART | `usageBlocks` **has a caller** — `src/shell/documents.ts:215`, on `raw.exitCode === 2` | `--help` per verb. **Not blocked on 6 — the reverse**: 6.2's field has no consumer until this renders per-verb usage, so 21 leads and 6.2 follows (C05 §8b.6) |
+| 21 | BUILT | **the user-invokable path exists and is tested.** `src/shell/execution.ts:1300` routes `--help` on both paths before any spawn; `usageDoc` — `src/shell/documents.ts:211` — composes from the manifest with `status: "ok"`; `--help` is reserved by `FRAMEWORK_FLAGS`, `src/data/manifest/framework.ts:126`, `shellOnly`; `/help` is two-level at `src/shell/local/handlers.ts:110`. T4.8 asserts the document **and** that nothing spawned | — |
 | 25 | PART | drawn: `src/shell/paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static |
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
@@ -2699,6 +2708,30 @@ body section**, and a body section is where a claim goes stale most quietly, bec
 above it is still open and reads as coverage. Twelve stale claims across four sweeps — eleven
 of forty-four entries, 25%, plus this one, which is not an entry. The rate has risen at every
 sweep, which is what says the column is being verified rather than maintained.
+
+**The fifth sweep found the largest one yet, and two kinds no resolver reaches.**
+
+**Entry 21 was PART and is BUILT** — every claim in it, including the second one nobody had
+re-read: `/help`'s flat wall is already two-level, grouped by C05 §3's partition with
+`/help keys` beside it. Its evidence cited `documents.ts:215` *"on `raw.exitCode === 2`"*, and
+215 is inside `usageDoc`, whose own comment says the exit-2 framing is the state it replaced.
+**A citation can resolve, point at real code, and describe the thing that code was written to
+end.** That is a fifteenth stale claim and the biggest so far — a whole entry, not a sentence.
+
+**The two new kinds, because neither is a stale claim and neither is checkable.**
+
+- **An inverted dependency.** 21 said it needs 6's flag; 6.2 was then found to need 21. Both
+  sentences were true when written and the arrow between them was backwards. A citation
+  resolver checks citations; **a dependency is a claim about two entries and neither one is
+  wrong.** Only building one of them settles it.
+- **A deferral chain.** 6.2's value set was deferred three times — to C09/C22, then to entry
+  21, then answered by finding 21 built. Each link was correct and each read as coverage.
+  **Would landing this close it applies to a deferral as much as to a fix**, and nothing in
+  either instrument asks it of one.
+
+Fifteen stale claims across five sweeps — twelve of forty-four entries, **27%**, plus the body
+section and these two. The rate has risen at every sweep, which is what says the column is
+verified rather than maintained.
 
 **Entry 7's four subsumed rows stand.** `docs/components/C26_navigation.md` — specified, and
 stages 1–3 built. **10** (the question / menu
