@@ -365,6 +365,48 @@ for (const entry of [...all].sort((a, b) => Number(a) - Number(b))) {
   );
 }
 
+// --- 4. how much of the confirmed-OPEN population a grep sweep can reach ----
+//
+// **Reported, never gated — and it is the sixth sweep's finding made countable.**
+// Every sweep before it claimed *"the symbols these entries name are absent from
+// `src/`"*, which is exact when an entry names one. Entries 40 and 41 name none —
+// *"the trigger, not the engine"*, *"typo detection — trivial, delightful"* — so
+// the sweep passed over them and recorded a confirmation it had not made. Both
+// were built. **An entry with no symbol reads exactly like one whose symbol is
+// absent**, which is A03 §2's vacuity class arriving in the instrument rather than
+// in the list.
+//
+// So the number that matters is not how many entries are OPEN but **how many of
+// them a grep could have checked at all**. It cannot be a gate: an entry is
+// allowed to name no symbol, and demanding one would push rows into inventing a
+// citation that means nothing — the same trap the `path:line` rule avoids by
+// making the line optional. What it is good for is knowing how much of a clean
+// sweep was a measurement.
+//
+// **Measured against the sweep's own evidence paragraph, not the Order row**, and
+// the difference is not a detail. The Order row is a title and a rationale; the
+// paragraph is where a sweep records what it checked. Measuring the row said 4 of
+// 19, and it was wrong in both directions — 9 and 11 carry no backticks and their
+// *titles* (`mermaid`, `markdown`) are perfectly greppable, while an entry can have
+// a symbol in its rationale that the sweep never looked for. **The question is what
+// the sweep wrote down**, so the text to read is its own sentence: an entry with its
+// own clause naming a symbol was checked, and a bare `**N**` under a blanket *"the
+// symbols these entries name are absent"* was asserted.
+const openEntries = [...(confirmedOpen ?? [])];
+const openParagraph = (() => {
+  const i = text.indexOf("**Checked and confirmed OPEN**");
+  return i === -1 ? "" : text.slice(i, text.indexOf("\n\n", i));
+})();
+/** The clause discussing each entry: from its own `**N**` to the next one. */
+const clauseOf = (entry) => {
+  const marks = [...openParagraph.matchAll(/\*\*(\d+)\*\*/gu)];
+  const at = marks.find((m) => m[1] === entry);
+  if (at === undefined) return "";
+  const next = marks.find((m) => m.index > at.index);
+  return openParagraph.slice(at.index, next?.index ?? openParagraph.length);
+};
+const greppable = openEntries.filter((e) => /`[^`]+`/u.test(clauseOf(e)));
+
 // --- report -----------------------------------------------------------------
 // **The counter, not the status.** Scanning zero rows is very fast and exits 0,
 // and `45 of 45 resolve` over an empty set reads as a pass — the trap
@@ -379,6 +421,13 @@ console.log(
   `roadmap-status — ${String(n)} entries · ${String(marked.size)} marked, ` +
     `${String(resolved)} resolving · ${String(confirmedOpen?.size ?? 0)} confirmed OPEN · ` +
     `${String(unchecked?.size ?? 0)} unchecked`,
+);
+console.log(
+  `  grep reach · ${String(greppable.length)}/${String(openEntries.length)} confirmed-OPEN ` +
+    `entries carry their own symbol; the rest rest on a blanket claim` +
+    (greppable.length === openEntries.length
+      ? ""
+      : ` — ${openEntries.filter((e) => !greppable.includes(e)).sort((x, y) => Number(x) - Number(y)).join(", ")}`),
 );
 for (const f of fail) console.error(`  ${f}`);
 if (fail.length > 0) {
