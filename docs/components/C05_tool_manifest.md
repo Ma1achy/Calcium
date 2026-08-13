@@ -694,6 +694,65 @@ respectively. `elementId` was named for exactly this reason in C26 and the argum
 and guaranteed nothing (F159); here the argument is correct and the *other* half — the name —
 is the half that still works. A firing is trustworthy; only a silence is suspect.
 
+### 8b.5 — the code step falsified the walk, and the field has no instance
+
+**§8b.1 divided F39 into a closed half and an open half. Going to write the open half showed
+it has no instance.** The walk is right that no field declares a presentation. It was wrong
+that anything needs one, and the three examples the roadmap names are the measurement:
+
+| the want | how it works at HEAD | field needed? |
+|---|---|---|
+| `--raw` | declared `shellOnly`, read at `examples/docker/src/inspect.ts:192` as `ctx.flags["raw"]`, and the adapter returns `splitRaw(…)` instead of `structuredBlocks(…)` | **no** |
+| `--json` | transmitted, because the far side understands it — the case §8b.2 uses to prove the axes differ | **no** |
+| `--wide` | `--raw`'s shape exactly: a `shellOnly` switch the adapter reads | **no** |
+
+The consumer's own comment is the ruling written before the walk asked: *"`ctx.flags`, not
+`result.argv`: a shellOnly flag is absent from argv by construction, **which is the whole of
+what F39 asked for** (C05 I21)."*
+
+**So F39 is CLOSED, and marking it PARTIAL an hour earlier was the same error one level up.**
+§8b.1 read F39's second sentence — *there is no way to declare a flag that selects a rendering*
+— as an open defect without asking whether any app still hits one. That is *a citation reads as
+coverage* inverted: a sentence read as a **gap** because it is literally true, with no check
+that anything is missing. The test is the same in both directions — **would landing this close
+it** — and here the thing that landed was I21, and it closed it.
+
+**F39's sentence named the wrong axis, which is why this was findable only from the code.** It
+said *rendering rather than invocation* and the axis it actually needed was **transmission**.
+I21 gave it transmission and the want evaporated, because rendering was never the framework's
+decision — the adapter composes the document, and which blocks it puts in is the adapter's
+business by construction (A02 Seam 2). C13's patch gate is the precedent: two instances looked
+like one axis and the third showed the axis was wrong rather than the classification incomplete.
+
+### 8b.6 — the ruling: the field arrives with the resolution that reads it
+
+**A presentation-selecting field would be a published member with no consumer**, which is
+MG24's founding class and F21's shape — *a field that existed, so nothing looked*.
+
+**This repo has already ruled this exact question, three weeks ago, on this exact kind of
+field.** C26 §5 draws `arrow` and `escape` on `NavElement`; `presentation/blocks/types.ts:134`
+records why they are not there: *"landing them before C26 §4's resolution exists would publish
+two fields with no reader… They arrive with the resolution that reads them, in the commit that
+gives them a consumer."* That withdrawal was re-measured against the widened MG24 (F159) and
+holds. The same ruling applies here and is inherited rather than re-derived.
+
+**Its consumer is named and it is entry 21.** `--help` per verb is the one party that needs to
+know *this flag changes what you see* as distinct from *this flag changes what runs*, because
+that is a grouping in rendered usage. `usageBlocks` exists (`src/shell/documents.ts:215`), and
+until it renders per-verb help nothing reads the distinction.
+
+**And that answers the value question §8b.4 left open, by dissolving it.** The value set is
+whatever `--help` must be able to say, so it cannot be chosen before the consumer exists —
+choosing it now would be picking a vocabulary for a reader that has not been written, which is
+how `view` acquired two declarations and F118. §2's `ARG_TYPES` rule says a closed set is right
+when the framework must understand every member; **whether the framework must understand this
+one is a question only entry 21 can answer**, and it is the freeze-relevant part.
+
+**What the freeze needs from this section, since that was the reason for spec-first.** Nothing
+is added to `FlagDef`. The public type is unchanged, and a field added later with its consumer
+is additive — which is what entry 6.2 always claimed to be, and is now true of the deferral
+rather than of the field.
+
 ## 9. Out of scope
 
 | Not here | Where |
