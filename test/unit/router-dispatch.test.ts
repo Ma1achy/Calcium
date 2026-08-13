@@ -493,3 +493,73 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
     expect(calls, "no pop under the confirm, no prompt cleared").toEqual([]);
   });
 });
+
+describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that says so", () => {
+  /**
+   * **The premise the ⏎ ruling rests on, asserted rather than described.**
+   *
+   * §8b.8 rules that `⏎` does not enter interaction, because the mode has
+   * nothing in it: no block declares keys, and the target carries one binding.
+   * Both halves are facts about the tree today, and a premise recorded in prose
+   * and checked by nothing is a premise that goes quiet — F102's disposal, and
+   * T2.17's shape for the `window` × `elements` agreement.
+   *
+   * **This row fails the day either fact changes**, which is exactly when `⏎`'s
+   * second effect and I14's first level go live and it should be inverted.
+   */
+  it("T2.6a (C26 §8b.8): nothing merges a block keymap, so the mode has no bindings", () => {
+    // `mergeBlock` is the only route a `BlockKeymap` reaches the router by, and
+    // `src/index.ts` §3 records it as interior and dropped — "not public, not
+    // finished". Counted over `src/` and not over the tree, because a test
+    // calling it is not a producer.
+    const callers = ["keymap.ts", "router.ts", "construct.ts", "session.ts", "keys.ts"]
+      .map((f) => {
+        for (const dir of ["src/interaction/router/", "src/shell/"]) {
+          try {
+            return readFileSync(`${dir}${f}`, "utf8");
+          } catch {
+            /* the file lives in the other directory */
+          }
+        }
+        return "";
+      })
+      .join("\n")
+      // The declaration itself is not a call. Dropping the interface line is
+      // what makes this a producer count rather than a mention count.
+      .split("\n")
+      .filter((l) => l.includes("mergeBlock(") && !l.includes("mergeBlock(blockKeymap"))
+      .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"));
+
+    expect(
+      callers,
+      "a block now declares keys — C26 §8b.8's premise is gone, ⏎'s second effect is owed, and this row should be inverted",
+    ).toEqual([]);
+  });
+
+  it("T2.6b (C26 §8b.8, I14): the interaction target binds ⌃c and nothing else", () => {
+    // The other half. A mode reachable with one binding takes every key from the
+    // prompt and is left only by cancellation — which is why the ruling refuses
+    // to enter it, rather than the reader discovering it.
+    const { router, focus } = harness();
+    focus.enterLiveBlock(addr("r1"));
+    focus.setMode("interact");
+
+    expect(router.dispatch(ctrlC), "⌃c leaves interaction").toBe(true);
+    expect(focus.current, "and stays on the row, per the two-level shape").toEqual({
+      at: "liveBlock",
+      element: addr("r1"),
+      mode: "navigate",
+    });
+
+    // Every other key falls through: there is nothing on the target to take it.
+    focus.setMode("interact");
+    for (const k of [key("s"), key("escape"), key("enter"), key("a")]) {
+      expect(router.dispatch(k), `\`${k.kind === "key" ? k.key.name : "?"}\` is unbound here`).toBe(
+        false,
+      );
+    }
+    expect(focus.current.at === "liveBlock" && focus.current.mode, "still in the mode").toBe(
+      "interact",
+    );
+  });
+});
