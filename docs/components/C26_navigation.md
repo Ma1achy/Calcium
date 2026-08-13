@@ -120,7 +120,7 @@ EscapePolicy  auto (two-level) · bubble · modal · custom
 Resolved **global → kind → per-node override**, which is the shape C10's theme resolution and
 C05's manifest merge already have — familiar machinery rather than a new one.
 
-### The vocabulary is checked against three kinds before it is adopted
+### The vocabulary is checked against four kinds before it is adopted
 
 **Two instances fitting a rule is not evidence for the rule — it is the minimum for noticing
 one.** `table` and `logs` will both fit, and they are the two anyone would reach for. The
@@ -129,7 +129,30 @@ and whose scope levels are hunks rather than rows. If the vocabulary does not fi
 axis is wrong rather than the vocabulary incomplete — which is what C13's patch gate cost
 when the third case was not sought.
 
+**The fourth is a scrollable container, and it is the one most likely to break the
+vocabulary.** `CALCIUM_ROADMAP.md` entry 46 is where the container lives; the check belongs
+here, because it is a step in adopting `ArrowPolicy` rather than a feature of its own.
+
+**Every kind above resolves `↓` at an *edge*. A scroller has an edge *and* an interior that
+is not an element.** `↓` inside one is ambiguous in a way no policy value addresses: *move to
+the next element* and *scroll the container* are both correct readings, and the vocabulary
+has no room to say which — so either scrolling requires interact mode, which makes a table
+you cannot scroll without entering, or navigate scrolls and interact has to mean something
+else.
+
+**Run it before adopting `ArrowPolicy`, not after.** A vocabulary needing a value it has no
+room for is exactly the finding the multi-kind rule exists to surface, and finding it after
+adoption means every kind that already declared a policy is re-declared.
+
+**Record the outcome either way**, and this is why the check is not a formality: *fits four
+kinds* is a much stronger claim than *fits two*, and *does not fit a scroller* is worth
+knowing before C26 ships the vocabulary rather than after an app has written against it.
+A check whose negative result is not written down is a check nobody can tell was run.
+
 **Recorded as owed rather than assumed**, and it is the first thing the implementation does.
+The fields are not in the tree yet — MG24 caught `NavElement.arrow` and `.escape` shipping
+with no reader and they were withdrawn (§8b) — so the check has no cost to run late and
+every cost to skip.
 
 ---
 
@@ -637,7 +660,7 @@ is the shape a spec commit should have.
 10. Element resolution is a pull (I11).
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
 
-**The three-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
+**The four-kind validation of §4 is not here, and SP1 is why.** *If it is none of those, it
 is a § detail rather than a commitment* — it is a step the implementation takes, and no
 invariant can hold a promise about the order in which something was checked. It stays in §4
 where it is owed, rather than being given an invariant it would make vacuous.

@@ -2417,7 +2417,7 @@ PART  27 syntax highlighting ★    a REGRESSION against C09 §4a, not a scoping
 PART  34 UX polish set            animation (decoration never information) · change highlighting ·
                                    finish notifications · structured export · error remedies as
                                    fill actions · empty states that teach
-      35 progress feedback        the spinner is static by a ruling whose premise expired — the
+RULED 35 progress feedback        the spinner is static by a ruling whose premise expired — the
                                    refresh driver IS the ticker now. Motion, then elapsed time,
                                    then what it is doing. AND THE PENDING ENTRY IS BLANK: the
                                    row is appended at once with blocks: [] (execution.ts step
@@ -2427,9 +2427,23 @@ PART  34 UX polish set            animation (decoration never information) · ch
                                    mechanism is there and nothing puts content in before it.
                                    Elapsed time is the useful tier — a number separates slow
                                    from stuck where a rotating glyph only proves the process is
-                                   alive. OPEN QUESTION: does the pending notice belong to the
-                                   framework or the adapter? Composing one the app did not ask
-                                   for is F123's class
+                                   alive. RULED: THE FRAMEWORK COMPOSES IT, AN ADAPTER THAT
+                                   KNOWS MORE REPLACES IT. The framework knows both things a
+                                   blank entry is missing — the verb and how long it has been
+                                   running — and only the adapter can say PULLING LAYER 3 OF 7,
+                                   because the far side is the only place that fact exists.
+                                   NOT F123's class, and that distinction IS the ruling: F123
+                                   was the framework TRUNCATING AN APP'S DOCUMENT, deciding
+                                   something the app had already decided. This fills a blank
+                                   the app has never had a way to fill — the pending entry is
+                                   composed at append, before the adapter has returned
+                                   anything, so there is nothing to override until there is.
+                                   And no default means every app reimplements the same
+                                   notice, which is the producer-context family's whole
+                                   finding: five surfaces duplicating a Calcium module because
+                                   the framework withheld a fact it held. The elapsed tick
+                                   comes from the refresh driver, never a setInterval in
+                                   paint.ts
       36 scrollbar + edge markers the terminal cannot provide one (alt screen has no scrollback)
                                    and C14 already has the numbers. The edge marker is the cheap
                                    half and may matter more than the bar. AT CONTAINER SCOPE
@@ -2540,6 +2554,7 @@ what landed**.
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
 | 38 | PART | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` | **the width fractions this entry says ship with it do not.** `childWidths` gives every child the same width — `src/data/viewmodel/measure.ts:122` |
+| 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
 | 39 | RULED | the ruling is in the entry; `Style.background` exists at `src/presentation/theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
@@ -2548,9 +2563,7 @@ what landed**.
 CLOSED does not close 2.1's convention · **15** — `enterCopyMode` is defined nowhere in
 `src/`, and there is no OSC 52 · **26**, **32**, **40** — the symbols the entries name are
 absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **46** — `window?` and `elements?` are both built, and **nothing holds an offset**: no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`, so the third of the three pieces is the missing one · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
-until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **35** —
-`paint.ts:110–120` returns frame 0 and writes out the ticker argument this entry says has
-expired; the `steps` block already animates off `ctx.tick` (`structured.ts:403`) · **44** —
+until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **44** —
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
 which is worth saying because it reads as coverage.
 
