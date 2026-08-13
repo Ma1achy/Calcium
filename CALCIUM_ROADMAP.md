@@ -592,9 +592,17 @@ streamed code, prism's long training logs.
 ### Text selection, copy and paste — and `copyMode` already exists with no producer
 
 **`copyMode` is a focus target that nothing can enter.** It is in `FocusTarget`, ordered in
-the ladder, `register("copyMode", …)` is wired at `router.ts:192` — and `session.ts:409`
-supplies `copyMode: () => false`, unconditionally. Routed, ordered, unreachable: the
-eighteen-structural-gaps shape one more time, and this one was *anticipated by name*.
+the ladder at `focus.ts:42`, `register("copyMode", …)` is wired at `router.ts:215` — and
+`session.ts:547` supplies `copyMode: () => false`, unconditionally. Routed, ordered,
+unreachable: the eighteen-structural-gaps shape one more time, and this one was *anticipated
+by name*.
+
+**Two stubs, not one — and the second is worse.** `session.ts:548` supplies
+`exitCopyMode: () => undefined`. So a producer alone would give the reader a mode that can be
+entered and not left: the `⌃c` rung consumes the key and does nothing, which is a hang rather
+than a gap. **The producer and the exit are one piece of state or neither ships** (C16 §5b
+B1). Measured 2026-08-13; line numbers above were `router.ts:192` and `session.ts:409` when
+this entry was written and had drifted.
 
 **The problem it exists for is real.** In the alternate screen with mouse tracking on, the
 terminal's native selection is disabled — mouse events go to the app — so a reader cannot
@@ -603,9 +611,17 @@ drag-select and copy the way they can in any other terminal program.
 **Three mechanisms, and they are complementary rather than alternatives:**
 
 - **`copyMode`** — a mode that turns mouse tracking *off*, so the terminal's own selection
-  works normally. The target exists; it needs a producer, a binding to enter it, and a
-  visible indicator (the mode belongs in the chrome, exactly as the navigation model's
+  works normally. The target exists; it needs a producer, an exit, a binding to enter it, and
+  a visible indicator (the mode belongs in the chrome, exactly as the navigation model's
   `NAV`/`EDIT` does).
+
+  **And it needs the toggle, which does not exist.** `MOUSE` is a single mode string
+  (`escapes.ts:37`) with no way to leave tracking off and come back, and `router.ts:271` gates
+  mouse routing on `mouseEnabled()`, which reads **capabilities, not copy mode**. So *"turns
+  tracking off"* describes a mechanism this entry would **add**, with its own reason — it is
+  not a behaviour of the tree that copy mode would inherit. Measured 2026-08-13. The argument
+  for the mode is unaffected: it rests on what a terminal's native selection does in the
+  alternate screen with tracking on, which is true whether or not a toggle exists yet.
 - **OSC 52** — the terminal clipboard escape, so the app can copy *programmatically*.
   Works over ssh and through tmux, which drag-select often does not.
 - **Shift-click passthrough** — most terminals bypass mouse tracking while Shift is held.
@@ -909,11 +925,16 @@ attention, and says so when it is not showing everything* — and each consumer 
 - **Does copy take the selected text or the selected elements?** Semantic copy is the
   advantage, and a selection spanning the boundary has to be a character range or an element
   range — which give different answers.
-- **`copyMode` turns mouse tracking off** so the terminal's own selection works, and the
+- **`copyMode` would turn mouse tracking off** so the terminal's own selection works, and the
   terminal **selects what is painted**. A container's hidden rows are not painted, so
   terminal-native selection cannot see an inner offset at all — and turning tracking off
   kills the wheel with it. **Terminal-native selection and inner scroll are in direct
   tension, and semantic copy is the way out rather than a nicety.**
+
+  **Conditional, because the toggle does not exist yet** (entry 15, measured 2026-08-13):
+  `MOUSE` is one mode string and `mouseEnabled()` reads capabilities. The tension is real and
+  is a property of terminals rather than of this tree, so the conclusion stands — but stated
+  as a prediction about a mechanism entry 15 would add, not as a defect in one that runs.
 
 Build the container and the selection model together, or the second is retrofitted against
 the first — they are one concept at two scopes, exactly as entry 15's three are.
@@ -1634,7 +1655,7 @@ hand-drawn case is the one that needs the API to be good.
 anchor, no mark, no region in C17. So there is nothing to select *into* — the binding is the
 small half.
 
-#### `⌃a` keeps line-start; select-all takes `⌃⇧a`
+#### `⌃a` keeps line-start; select-all takes `⌥a` — checked, and `⌃⇧a` lost
 
 **`⌃a` is line-start in bash, zsh, fish, every readline app, tmux's prefix, screen and
 Emacs.** Changing it makes Calcium the one shell where it does something else, and the cost
@@ -1649,9 +1670,28 @@ either consistent choice.**
 to honour and the field is open. `⌃⇧a` reads as "the bigger `⌃a`", which is what it is, and
 it is the same family as `⌃z`/`⌥z`.
 
-**Check it against the decoder first**, per T2.13: `⌃⇧a` and `⌃a` are frequently **the same
-byte** (`0x01`) — exactly the collision that ruled out `⌃_` for undo. If they are, `⌥a` is
-the fallback, on the ESC-prefixed path `⌥b`/`⌥d`/`⌥f` already use.
+**Checked against the decoder, 2026-08-13, and the answer is no** — per T2.13, the check that
+already cost `⌃_`.
+
+- `decode.ts:262` maps every byte 1–26 to `key(letter, …, {ctrl: true})`, and `key()` at
+  `:118` defaults `shift` to `false`. **No shift information survives the legacy path**, so
+  `⌃⇧a` and `⌃a` are one event.
+- The two paths that *do* carry shift — CSI-u (`decode.ts:346`) and xterm's `modifyOtherKeys`
+  (`:352`) — are parsed but never **requested**: nothing in `escapes.ts` or `lifecycle.ts`
+  enables either protocol. They fire only where a terminal volunteers them, which is not a
+  base a default binding can stand on.
+- And `keymap.ts:193` already binds `{name: "a", ctrl: true}` → `home` on the prompt.
+
+**So it is not merely a collision — the byte has a meaning.** A `⌃⇧a` row would resolve
+against the same event as line-start and one of the two would silently never run.
+
+**`⌥a` takes it, not as a fallback but as the binding.** The meta path exists
+(`decode.ts:305`), and the meta bindings are `enter`, `backspace`, `d`, `b`, `f`, `z` — `a` is
+free. It is the same family as `⌥b`/`⌥d`/`⌥f`, which is where the prompt's word motions
+already live.
+
+**Second binding lost to this check**, after `⌃_`, and both were found before anything was
+built. That is the check working rather than a cost.
 
 **And [rebindable keys](#rebindable-keys) is the real answer to "which default is right."** The keymap is
 declarative data and this is one row either way — ship a default, let people change it.
@@ -1670,7 +1710,7 @@ alone means shipping an anchor and a region for one binding and then generalisin
 ⇧← ⇧→          extend by character
 ⌥⇧← ⌥⇧→        extend by word            — pairs with ⌥b/⌥f, which exist
 ⇧⌃a ⇧⌃e        extend to line start/end  — pairs with ⌃a/⌃e, which exist
-⌃⇧a            select all
+⌥a             select all              — ⌃⇧a is 0x01, which is ⌃a, which is bound
 ```
 
 **Every one of these has its unshifted motion already bound**, so the keys are not the work
@@ -1680,11 +1720,18 @@ extend the region from the anchor*, and typing replaces the region. That is the 
 **Check every shifted form against the decoder before binding it**, per T2.13 — `⇧←` is
 `CSI 1;2D` and `⌥⇧←` is `CSI 1;10D` or an ESC-prefixed form depending on the terminal.
 **A binding the decoder cannot produce is the fifteen-unexecuted-bindings class**, which has
-already cost `⌃_` once and is the reason `⌃⇧a` needs the same check above.
+already cost `⌃_` once and has now cost `⌃⇧a` — the check above, run.
 
 **That is the same concept the copy story needs at two other scopes**: a selection in the
 editor, a selection in the transcript ([`copyMode`](#text-selection)), and semantic copy of a focused
-block. **One mechanism, three scopes — do not build it as a one-off for `⌃⇧a`.**
+block. **One mechanism, three scopes — do not build it as a one-off for one binding.**
+
+**Corrected by C16 §5a: it is two selection scopes and one mode that deliberately has none.**
+The classification table put all three at rest against `⌥a` and nothing survives as a
+*region* — the prompt's is a character range, the transcript's is a set of elements, and copy
+mode is the app **not** reading a selection at all, because the terminal owns it. What
+survives all three is where the text lands, which is the kill buffer (C17 §5a). **One
+clipboard is the shared mechanism; one selection type is not.**
 
 **And be precise about what is actually missing.** *Deleting* everything already works:
 `⌃u` kills to start, `⌃a ⌃k` kills the line. What does not exist is **selecting** it — to
@@ -1696,7 +1743,11 @@ copy, or to replace by typing. If the want is "clear the prompt fast", that ship
 **Correction to an earlier version of this entry**, which read C11 I14 too widely and ruled
 out more than it forbids.
 
-**I14 and I17 forbid anything that changes *size*:**
+**I17 with I9 forbid anything that changes *size* — and I14 is not one of them.** Corrected
+2026-08-13, a second pass over the same citation. I14 is about **ownership**: focus is drawn
+by C11 and owned by C16, which is what keeps I11 true. It says nothing about geometry, so
+pairing it with I17 here read as two invariants agreeing when only one was on the subject.
+The rule is I17's, and it rests on I9:
 
 > *"A height that varied with focus would move without `rev` moving, so C14's cache could not
 > invalidate it — I9 broken in the one way measurement cannot catch, since **`measure` never
@@ -1746,7 +1797,9 @@ changes. Same trick as the scrollbar's column.
 **Whether the wash spans the full row width or only the text.** Full-width reads as
 *selected*; text-width reads as *highlighted* — and for a table row you almost certainly want
 the former. That means **padding the row to the region width before styling**, which is a
-rendering decision rather than a measurement one, so it stays inside I14.
+rendering decision rather than a measurement one, so it stays inside I17 — the row is padded
+to a width the layout already chose, and no cell count changes. (This line said "inside I14",
+which is the ownership invariant and forbids nothing here.)
 
 **And it pairs with the [navigation model](#navigation-model)**, where *selected* becomes a
 state worth showing strongly because the reader is moving through things deliberately.
@@ -2444,7 +2497,15 @@ BUILT 14 cells() ASCII fast path  the hottest function walks Intl.Segmenter over
                                    navigate and interact — stage 1's argument for interaction
                                    (a flag read before dispatch gives C16 §5's ladder an order
                                    of its own) applies unchanged, and two mode concepts in one
-                                   model is the cost of getting it wrong
+                                   model is the cost of getting it wrong.
+                                   WALKED 2026-08-13, both artefacts: C16 §5a (classification
+                                   table, the three scopes at rest) and §5b (sequence trace).
+                                   FOUR RULINGS — one clipboard, copy writes the kill buffer
+                                   (C17 §5a); TWO selection scopes, not three, since copy mode
+                                   is the app having none; ⌥a, not ⌃⇧a, which is 0x01 = ⌃a and
+                                   bound to home; the mouse toggle is a mechanism this entry
+                                   ADDS, not one it inherits. exitCopyMode is a second stub,
+                                   so producer and exit ship together or neither does
       16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
                                    two parameters. C19's menu already has the flip, the selection
                                    and `… N more`; the confirm reimplements or lacks all of it

@@ -115,6 +115,37 @@ A single kill buffer, not a ring — a ring's value depends on `Alt-Y` cycling, 
 
 `yank` inserts at the cursor as one atomic edit.
 
+## 5a. Copy writes to the kill buffer — one clipboard, not two
+
+**Ruled here rather than in the copy feature, because the buffer is C17's.**
+
+Selection copy — `y` on a focused element, select-all in the prompt, whatever the
+transcript's selection eventually offers — writes the **kill buffer**. There is not
+a second store beside it.
+
+**The argument is that §5 already calls this a clipboard and rules on it as one.**
+*"It is a clipboard: a paste target that silently rewound when the user undid
+something else would be a worse surprise than the one it prevents."* A second
+clipboard would need that ruling restated, and would leave the reader unable to say
+which store `⌃y` yanks from — two paste targets and one paste key. So `⌃k` then `y`
+then `⌃y` yanks what `y` copied, which is the least surprising sequence and needs no
+new rule.
+
+**Copy is not a kill, so it does not join a kill run.** §5's consecutive-kill append
+is about a run of deletions building one entry; a copy replaces the buffer outright
+and ends any run in progress, exactly as any non-kill operation does. Two copies in
+a row leave the second, not both.
+
+**Copy is not an undo unit either**, and for §5's reason inverted: a copy changes no
+text, so there is nothing for undo to restore, and the buffer is not undo state in
+either direction.
+
+**The system clipboard is a different axis and is not ruled here.** Whether a copy
+*also* emits OSC 52 is a question about the terminal, answered per capability, and
+it does not change where the text lands inside the process. Naming it as separate is
+the point: folding it in would make "one clipboard" a claim about two things, one of
+which C17 cannot see.
+
 ---
 
 ## 6. Undo

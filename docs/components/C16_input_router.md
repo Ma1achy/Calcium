@@ -317,9 +317,10 @@ constructible case.
 | 4 | Non-dismissable overlay | a confirm on top — **over anything**, including copy mode and a view | T1.12, T1.12b |
 | 5 | Copy mode | `copyMode` true, no layer on the stack | T4.3 |
 | 6 | Pushed view | a view on the stack, no overlay above it | T5.3 |
-| 7 | Focus in the live block | `StoredFocus.at === "liveBlock"`, no layer, not copy mode | T1.14 |
-| 8 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
-| 9 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
+| 7 | Interaction on a block | `StoredFocus.at === "liveBlock"`, `mode === "interact"`, a live entry, no layer, not copy mode | T2.6b |
+| 8 | Focus in the live block | as above with `mode === "navigate"` | T1.14 |
+| 9 | Prompt with text | `StoredFocus.at === "prompt"`, buffer non-empty | T5.3 |
+| 10 | Prompt empty | as above, buffer empty | T1.9, T1.10 |
 
 Three rows earned their place by being hard to fill, and each was a different
 defect.
@@ -338,6 +339,77 @@ gap in the table; it is a wrong answer given confidently**, because a ladder alw
 returns something. That is why re-running this table after adding a rung is part of
 the rule rather than a courtesy: rung 7's arrival renumbered two rows, and a row
 whose number moved is a citation somewhere that did not.
+
+**And rung 7 arrived a second time, by exactly that route.** C26 added `interaction`
+to `FOCUS_ORDER` and registered its `⌃c` handler (`router.ts:234`), and this table
+was not re-run — so for the length of that stage the ladder had eight rungs in code
+and seven here, with the copy-mode row's neighbours misdescribed. Found while
+reading the ladder for copy mode's own work, not by any check. The rule above says
+re-running the table is part of adding a rung; the instance that proves it is the
+one that ignored it.
+
+---
+
+## 5a. Copy mode's classification table — the three scopes at rest
+
+**Structural, not event-mediated, and it is the artefact this component tends not to
+get.** Copy mode looks like a state machine, so the trace in §5b is the obvious
+thing to write; the rows that decide the design are the ones where two rules both
+hold at rest with no event between them. Indexed by rule interaction, not by input
+coverage — a row governed by one rule restates that rule and finds nothing.
+
+The subject is one key, `⌥a`, against the four places focus can be. Two of those
+already have owners.
+
+| # | Focus at rest | What already claims the key | What select-all would claim | Ruling |
+|---|---|---|---|---|
+| A1 | Prompt, buffer has text | C17's keymap: `⌥a` is unbound; `⌥b`/`⌥d`/`⌥f` are bound on the same path | select the whole buffer | **`⌥a` binds here.** The one cell where nothing else claims it |
+| A2 | Prompt, buffer empty | as A1 | select nothing | **A no-op, not a refusal.** Selecting an empty buffer produces the empty region, which is the state the reader is already in |
+| A3 | Live block, `mode: "navigate"` | C26: arrows move between elements; `⌥a` unbound | select every row of the block? every element? | **Unbound.** See the ruling below — this is the cell that decides whether selection is a C17 concept or a system-wide one |
+| A4 | Live block, `mode: "interact"` | the block's own declared keys — **an open set** (C26 I14) | select within the block | **Unbound, and it must stay so.** A framework key inside interaction is the shadowing question C26 already ruled: keys belong to the block |
+| A5 | Copy mode | the terminal's native selection, which the app does not see | nothing the app can do | **Unbound, and the cell is why copy mode is a target.** In copy mode the app is not reading the selection at all |
+| A6 | An overlay or a pushed view on top | the layer's own answer callback (§4) | — | **Unreachable.** `activeTarget` never answers `prompt` or `liveBlock` with a layer up, so the key never arrives |
+
+### What it found
+
+**The three scopes do not want one selection type — they want one *clipboard*.** A1
+and A2 are a character range in a buffer; A3 is a set of elements; A5 is a range of
+painted cells the app cannot address. Nothing survives all three as a *region*.
+What does survive is where the copied text lands, which is §5b's first ruling and a
+C17 one.
+
+**A4 is the row that would have been got wrong.** Binding `⌥a` globally is the
+natural implementation and it silently shadows a key a block may declare — the same
+defect C26 ruled against for every other framework binding, arriving through a
+feature that has nothing to do with blocks. No sequence produces this; it is two
+correct statements overlapping at rest.
+
+**A5 says copy mode is not a scope of the selection model at all.** It is the
+absence of one: the reader is using the terminal's selection because the app's does
+not reach painted history. So "three scopes, one mechanism" is right about the
+mechanism and wrong about the count — there are **two** selection scopes and one
+mode in which the app deliberately has none.
+
+## 5b. Copy mode's sequence trace — what an event leaves behind
+
+**Event-mediated, and the first row is a defect that exists in the tree today.**
+
+| # | Sequence | What happens now | Ruling |
+|---|---|---|---|
+| B1 | Enter copy mode, press `⌃c` | `activeTarget` answers `copyMode`; the rung calls `deps.exitCopyMode()`, which is `() => undefined` (`session.ts:548`). The key is **consumed** and the mode does not end | **The producer and the exit are one piece of state or neither ships.** A mode reachable and not leavable is worse than one that is unreachable, and the tree currently has the second stub as well as the first |
+| B2 | Enter copy mode while a verb is in flight | rungs 1–2 dominate: `⌃c` cancels the verb and copy mode stays | **Correct and kept.** Cancelling the work outranks leaving a viewing mode; the reader presses `⌃c` twice, which is the ladder's shape |
+| B3 | A confirm is raised while in copy mode | rung 4 dominates copy mode (T1.12b) — the confirm takes the key | **Correct and kept**, and it is the interaction the original ladder pass got wrong in the other direction |
+| B4 | Output arrives while in copy mode | C13 appends, C14 scrolls, the terminal's selection now covers different text | **The mode must suspend the scroll or say it did not.** A selection that silently comes to mean other text is the failure this feature exists to avoid, and it has no owner yet — the open question this trace leaves |
+| B5 | `y` on a focused element, then `⌃y` at the prompt | `⌃y` yanks the kill buffer (C17 §5) — which `y` did not write | **One clipboard.** See C17 §5a |
+| B6 | `⌃k` fills the kill buffer, then `y` copies an element, then `⌃y` | under one clipboard, `⌃y` yanks the element | **Intended.** Copy is another way to fill the same buffer, and it inherits C17 §5's no-rewind ruling rather than needing a second one |
+| B7 | Entering copy mode with a selection open in the prompt | the prompt's region is still stored; the terminal now owns the screen selection | **Two selections visible, one live.** The prompt's must be dropped on entry, or the reader sees a highlight that no key acts on |
+
+### What it found
+
+B1 is the tree's state and not a hypothetical. B4 has no owner in any component and
+is the question this trace exists to raise. B7 is the interaction between the two
+surviving scopes and it only appears because A1 and A5 were written down as
+separate rows first.
 
 ---
 
