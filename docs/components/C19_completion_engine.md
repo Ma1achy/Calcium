@@ -136,6 +136,50 @@ So **a dynamic source answers for the slot and the engine filters by prefix.** T
 
 ---
 
+## 3a. Ordering — recency first, source order under it
+
+**Nothing sorted, and that was never ruled.** `matching()` filters on `startsWith` and the
+dedup loop preserves insertion order, so the order the reader sees is the order the sources
+were registered in: a verb run a minute ago and one never used rank identically. That was
+tolerable while the menu was a `Tab` affordance and stopped being so when §6a landed —
+**the menu now opens on every keystroke, so an unranked list is in front of the reader
+continuously rather than on request.**
+
+**Ordering is a ruling this spec did not have.** Source order is a consequence of the
+registration loop, not a decision, and a consequence that nobody wrote down is the shape A03
+§2 is about: it cannot be violated, because there is nothing to violate.
+
+### Recency is the half that needs nothing built
+
+C20 already holds `HistoryEntry = { command, ts, exitCode }` and a `list(filter?)` reader
+(`src/interaction/history/types.ts:17`). So recency is a **lookup**, with no new state, no
+persistence and no decay curve — the entry's *"nearly free"* is exact rather than optimistic.
+
+**Injected as `recency: (value) => number | null`, not as a store handle**, and the reason is
+the layer. C19 and C20 are both L3; an import between them is a sideways edge, legal only while
+it stays acyclic, and a handle is an invitation to reach for `list()`, `search` or the
+navigation cursor later. A function of one argument cannot grow into one — the same argument
+`FocusInputs` makes for taking C15's layer and C13's entry structurally.
+
+**`null` sorts last and stably**, so the rule refines source order rather than replacing it.
+On a fresh session every candidate is `null` and the menu is exactly what it is today, which is
+what makes this safe to land without a second ruling about ties.
+
+### What is deliberately not built
+
+**Subsequence matching is not in this round and the entry says why.** `cstats` → `container
+stats` is what `fzf` trains people to expect, and without a *match-quality* score it makes the
+list worse rather than better: every candidate containing those letters in order arrives, and
+recency cannot rank a set whose members the reader has mostly never run. A scorer is the
+prerequisite and it is a separate ruling.
+
+**And substring matching is refused for a reason that is not cost — see I27.** The premise
+*prefix matching cannot see a word in the middle of a name* is true of `matching()` and
+irrelevant to it: the verb source emits **one word at a time**, so the buried word never
+reaches the filter. Changing `matching()` would change nothing, and the honest change is to
+the source's model, which is I14's one-level-at-a-time shape and a larger question than this
+entry.
+
 ## 4. Requesting
 
 ```typescript
@@ -597,6 +641,9 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 - **I24** — A dynamic source's cache key carries the arguments typed *before* the current token as well as the slot's identity, because a source's answer may depend on them — a path inside a named container is the ordinary case. Only the token being typed is excluded, so the narrowing keystrokes after a `Tab` still share one entry.
 - **I25** — A dynamic source may declare `cacheKey(ctx)`, naming what its answer depends on beyond the slot's identity and the earlier arguments. A path source returns the directory it is about to list: its answer is a function of part of the prefix, which the engine may not interpret and no generic rule can extract.
 
+- **I26** — Candidates are ordered **most-recently-run first**, and everything else keeps its source order. The engine ranks after deduplication and before the menu, over C20's history read through an injected `recency: (value) => number | null` rather than a store handle — C19 and C20 are both L3, so an import is a sideways edge that must stay acyclic (A02 §1), and a function of one argument cannot grow into one. `null` is *never run*, and every `null` sorts after every timestamp while preserving the order it arrived in, so a stable sort makes the rule a **refinement** of source order rather than a replacement for it: a source's own ordering still decides among candidates the reader has never used, which is every candidate on a fresh session. **Ranking is the engine's and never a source's** — a source that sorted would be ranking the fraction of the set it produced, and the menu shows the union.
+- **I27** — The verb source offers **the next word** of each tool name, so a prefix that matches no first word matches nothing, and that is the level rather than a miss. `stats` does not complete `container stats`; `container` does, and then `stats`. Any widening to substring or subsequence matching is a change to **this** rule and not to the filter — the filter never sees the buried word, because the source never emits the whole name (§3, C05 §2's sub-verbs). Recorded because *prefix matching cannot see a word in the middle of a name* reads as a one-line fix to `matching()` and would change nothing.
+
 ---
 
 ## 10. Commitments
@@ -622,6 +669,8 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 19. The menu has edges top and bottom, because it spans the region and its neighbours in both directions are text of the same shape: a `rule` first and last. The remainder beside them counts rows and not blocks (I23).
 20. A dynamic source may depend on an argument already typed, so the cache key carries them (I24). The token being typed is still excluded, which is what the cache was for.
 21. A source whose answer depends on part of what is typed says so through `cacheKey` (I25). The framework's own path source is the case, and a whole-prefix key would be the defect the cache exists to prevent.
+22. **The menu is ordered most-recently-run first**, over C20's history read through an injected function, with source order kept underneath (I26). Stated as a commitment because ordering was never ruled at all: it was the registration loop's order, which is a consequence rather than a decision and so had nothing to violate. §6a is what made it cost — the menu now opens on every keystroke, so an unranked list is continuously in front of the reader rather than shown on request.
+23. **A buried word is the source's model and not the filter's** (I27). The verb source emits one word of a name at a time, so widening `matching()` to substring would change nothing — the whole name never reaches it.
 
 ---
 
@@ -651,6 +700,10 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T1.14**: `Esc` with the menu open → dismissed, buffer unchanged.
 - **T1.15**: `Tab` twice on an **ambiguous** match → the first inserts the common prefix with no delimiter, the second opens the menu. The reachable form of `j22` R17; the single-match form it used to assert cannot occur, because rule 3's delimiter moves the cursor into the next slot.
 - **T1.15b**: `Tab` on a single match → the candidate and its delimiter, and the slot after the cursor is the next one. A directory candidate ends `/`, a value-taking flag ends `=`, a bool flag ends with a space.
+- **T1.16** (I26): three candidates, two of them run — the more recent first, the older second, the never-run third. The row that a stable sort alone would pass is the fourth: **two never-run candidates keep their source order**, which is what makes the rule a refinement rather than a replacement.
+- **T1.16b** (I26): every candidate never run → the order is exactly the source order, unchanged. The fresh-session case, and the one that says landing this needs no second ruling about ties.
+- **T1.16c** (I26): ranking happens **after** deduplication, so a value produced by two sources is ranked once and keeps the first source's position among equals.
+- **T1.17** (I27): `stats` at the verb slot completes nothing and `container` completes `container`; after `container `, `stats` completes. The row is written against the claim that this is a *defect*, and it asserts the level instead — a widened `matching()` leaves it identical, because the source never emits `container stats`.
 
 ### Tier 2 — contract / interface
 
