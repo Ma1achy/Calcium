@@ -51,6 +51,23 @@ export type Surfaces = Readonly<{
    */
   diffAdd: string;
   diffRemove: string;
+  /**
+   * The selection wash (C17 §5b, roadmap entry 23).
+   *
+   * **A surface rather than a palette entry, and the entry said otherwise.**
+   * Roadmap 23 ruled *selection as a `carries: "meaning"` palette so C10 checks
+   * the pair* — and `resolveBackground` refuses any ref that is not
+   * `surface.*`, because a tone painted as a background is a tone nothing
+   * measured a floor for in that role (I21). So the ruling named an operation
+   * this layer does not have, which is C23 §8a A4's shape: an artefact correct
+   * about the interaction it found and wrong about a mechanism it assumed.
+   *
+   * The guarantee it wanted is delivered by the mechanism that does exist —
+   * `diffAdd`/`diffRemove`'s pairing (§4a), which checks a foreground slot
+   * against a background surface at that slot's own floor. One entry in
+   * `SELECTION_SLOTS`, and the same argument for its narrowness.
+   */
+  selection: string;
 }>;
 
 export type ThemeTokens = Readonly<{

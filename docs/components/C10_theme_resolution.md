@@ -245,6 +245,23 @@ Recorded because the prediction and the outcome are worth having side by side. T
 
 ---
 
+
+## 4b. The selection wash — a surface, and the ruling that named the wrong one
+
+**Roadmap entry 23 ruled *selection as a `carries: "meaning"` palette entry, so C10 checks the foreground/background pair against the contrast floor*. The guarantee is right and the mechanism is not.** `resolveBackground` refuses any ref that is not `surface.*` (I21), because a tone painted as a background is a tone nothing measured a floor for in that role — so a palette entry cannot be a wash at all.
+
+That is C23 §8a A4's shape: **an artefact correct about the interaction it found and wrong about a mechanism it assumed existed.** The guarantee it wanted is delivered by the mechanism that does exist, which is §4a's — a foreground slot paired with a background surface, checked at that slot's own floor.
+
+So `surfaces.selection` is a text-bearing surface and `SELECTION_SLOTS` is its pairing. **One slot: `tone.default`.** The prompt's text is `default`; ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is adjacent to a selection and never inside one.
+
+**The measured figures, because they are what would tempt a widening.** On the light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and the fix would look like weakening the check. §4's argument for excluding `bgDeep`, in the mirror: do not validate a slot against a surface that slot never lands on.
+
+Shipped values, measured against `tone.default`'s 4.5 floor: dark `#264057` at **7.25**, light `#c9ddf5` at **8.18**.
+
+**Reverse video is the 1-bit rung and it is the painter's, not the theme's.** `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash alone would fall from a background straight to nothing. `inverse` needs no colour at all and is supported essentially universally, which is what stops the ladder having a hole in the middle. C22 T4.16 is that rung.
+
+---
+
 ## 5. Switching
 
 `/theme` switches variant. The change is **atomic**: the store swaps a resolved theme in one assignment, so no frame is ever half-themed.

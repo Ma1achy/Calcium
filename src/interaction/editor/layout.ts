@@ -136,3 +136,57 @@ export function cursorCell(text: string, cursor: number, width: number, gutter: 
   const i = Math.min(Math.max(0, cursor), cells.length - 1); // graphemes-ok
   return cells[i] ?? { row: 0, col: gutterAt(0, gutter) };
 }
+
+/**
+ * A run of cells on one display row, `[from, to)` (roadmap entry 23).
+ *
+ * Half-open, like every other range in this component, so an empty run is
+ * `from === to` and cannot be spelled two ways.
+ */
+export type CellSpan = Readonly<{ row: number; from: number; to: number }>;
+
+/**
+ * Which cells a buffer region covers, per display row (C17 I21, I18).
+ *
+ * **The same walk `layout` and `cursorCell` use**, which is what makes this a
+ * consequence of I18 rather than a second measurement beside it. A span
+ * computed by re-wrapping the text here would part company with the drawn rows
+ * at exactly the boundaries this component exists for.
+ *
+ * **A row the region passes *through* is washed to the full width**, and that is
+ * the rule rather than an aesthetic. A wash stopping at the last cluster of an
+ * intermediate row reads as *highlighted*; one running through the padding
+ * reads as *selected*, and the newline or wrap it covers is genuinely part of
+ * the region. Only the last row stops at the head. No assertion about which
+ * characters are in the region distinguishes the two — a frame-read does.
+ *
+ * Geometry is untouched (I17 with C11 I9): this returns cells to style, never
+ * cells to add, so `displayRows` is the same number with a selection and
+ * without one.
+ */
+export function selectionSpans(
+  text: string,
+  from: number,
+  to: number,
+  width: number,
+  gutter: Gutter,
+): readonly CellSpan[] {
+  const lo = Math.min(from, to); // graphemes-ok: two buffer positions, ordered
+  const hi = Math.max(from, to); // graphemes-ok: the same
+  if (lo === hi) return Object.freeze([]);
+
+  const { cells } = walk(text, width, gutter);
+  const start = cells[Math.min(lo, cells.length - 1)]; // graphemes-ok: a cell index
+  const end = cells[Math.min(hi, cells.length - 1)]; // graphemes-ok: a cell index
+  if (start === undefined || end === undefined) return Object.freeze([]);
+
+  const out: CellSpan[] = [];
+  for (let row = start.row; row <= end.row; row += 1) {
+    const first = row === start.row ? start.col : gutterAt(row, gutter);
+    // **`width`, not the row's last cluster.** The region continues past this
+    // row, so the wash does too — through the padding and the wrap.
+    const last = row === end.row ? end.col : width;
+    if (last > first) out.push(Object.freeze({ row, from: first, to: last }));
+  }
+  return Object.freeze(out);
+}

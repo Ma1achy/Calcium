@@ -2555,10 +2555,20 @@ BUILT 21 --help per verb ★        BUILT, and the row described the state befor
       22 b.art — banners          sparse variants, fallback ends at styled text, and VALIDATION
                                    PER VARIANT (no tabs, uniform width, measured cells) — ~30
                                    lines that would have caught every banner defect
-      23 selection styling        a full-row BACKGROUND WASH — free, since it changes no size
+BUILT 23 selection styling ★      BUILT 2026-08-13 — `surfaces.selection` with a
+                                   `selectionPairs` sibling in `contrast.ts`, `selectionSpans`
+                                   in `editor/layout.ts`, and the wash applied in
+                                   `shell/paint.ts` after the row is squared off.
+                                   a full-row BACKGROUND WASH — free, since it changes no size
                                    (the patch renderer already does it). Reverse video at 1-bit,
                                    gutter glyph as the fallback. Selection as a `meaning` palette
-                                   so C10's contrast floor checks the fg/bg pair
+                                   so C10's contrast floor checks the fg/bg pair.
+                                   BUILT 2026-08-13 with one ruling CORRECTED: a `meaning`
+                                   PALETTE cannot be a wash — resolveBackground refuses any
+                                   ref that is not surface.*, so the entry named a mechanism
+                                   C10 does not have. `surfaces.selection` plus a
+                                   `selectionPairs` sibling delivers the guarantee it wanted
+                                   (C10 §4b). dark #264057 at 7.25 : 1, light #c9ddf5 at 8.18
       24 more default themes      two ship and `light` is dark-on-dark. ThemeSet is a two-field
                                    record, so more is a PUBLIC TYPE change — freeze-relevant
 PART  25 ghost text ★            drawn since PR #27. What remains: it ghosts only a SOLE
@@ -2739,9 +2749,10 @@ what landed**.
 | 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |
 | 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:185` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
 | 41 | BUILT | **both populations, one suggester.** `suggestName` — `src/data/manifest/validate.ts:147` — is the single distance-2 cutoff (C05 I18), read for unknown flags at `src/data/manifest/validate.ts:284` and unknown verbs at `src/interaction/parser/parse.ts:183`, sharing the tie-break so a second implementation cannot diverge. `test/unit/parser.test.ts` asserts distance 3 outside and 2 inside | — |
+| 23 | BUILT | **a surface with its own pairing, and the ruling it corrected.** `surfaces.selection` — `src/presentation/theme/tokens-dark.ts:36`, `#264057` at 7.25 : 1 against `tone.default` — is checked by `selectionPairs`, `src/presentation/theme/contrast.ts:158`, a **sibling** of `diffPairs` rather than an entry in it. The cells come from `selectionSpans` — `src/interaction/editor/layout.ts:167` — off the same walk `layout` uses, and `washed` in `src/shell/paint.ts:291` applies them after `exact` squares the row, which is where full-row rather than text-width comes from. `inverse` is the 1-bit rung. T4.13–T4.17 and T1.37–T1.41 | a `carries: "meaning"` **palette** cannot be a wash — `resolveBackground` refuses any ref that is not `surface.*`, so the entry named a mechanism C10 does not have (C10 §4b) |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. First sweep: **15** — `enterCopyMode` is defined nowhere in
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. First sweep: **15** — `enterCopyMode` is defined nowhere in
 `src/`, and there is no OSC 52 · **26**, **32** — the symbols the entries name are
 absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
 until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **44** —

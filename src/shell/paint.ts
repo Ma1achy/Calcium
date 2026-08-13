@@ -31,14 +31,14 @@
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
-import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
+import { background, paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { SGR_RESET } from "../terminal/escapes.js";
 import { promptFor, PROMPT_GUTTER } from "./config.js";
 import { composite } from "./composite.js";
 import { gutterMatchesPrompt, heightsSum, type Composed } from "./frame.js";
 import type { Block } from "../data/viewmodel/index.js";
 import type { Placed } from "../viewport/overlay/index.js";
-import type { Cell } from "../interaction/editor/index.js";
+import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
@@ -64,6 +64,19 @@ export type PaintDeps = Readonly<{
   overlays: () => readonly Placed[];
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
+  /**
+   * The selection's cells, in the prompt's own layout (entry 23, C17 I21).
+   *
+   * **Cells to style, never cells to add** — I17 with C11 I9. The wash is a
+   * style over the same grid, exactly as the patch renderer's added and removed
+   * lines already are, so `measure` never sees it and `promptRows` is the same
+   * number with a region and without one. **A row of chrome — a marker line, a
+   * bracket, a status row — is forbidden by the same invariant**, and that is
+   * the constraint at every step rather than a note about this one.
+   *
+   * Empty when there is no region, so the common case costs one array.
+   */
+  promptSelection: () => readonly CellSpan[];
   /** Whether the prompt is where keys are going — C16's derived focus. */
   promptFocused: () => boolean;
   /**
@@ -260,15 +273,55 @@ type PromptWindow = Readonly<{
   offset: number;
 }>;
 
+/**
+ * The selection wash, applied to a squared-off row (entry 23).
+ *
+ * **After `exact`, and that is where the full-row half comes from.** The row is
+ * already padded to `width`, so a span running to `width` washes the padding
+ * too — *selected* rather than *highlighted*. Applying this before the pad would
+ * stop at the last cluster, pass every assertion about which characters are in
+ * the region, and only be visible in a frame-read.
+ *
+ * **Reverse video is the 1-bit rung and it is here rather than in the theme.**
+ * `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash
+ * alone would fall straight from a background to nothing. `inverse` needs no
+ * colour at all and is supported essentially everywhere, which is what stops the
+ * ladder having a hole in the middle.
+ */
+function washed(row: string, span: CellSpan, deps: PaintDeps): string {
+  const style = selectionStyle(deps);
+  const before = sliceCells(row, 0, span.from);
+  const inside = sliceCells(row, span.from, span.to);
+  const after = sliceCells(row, span.to, cells(row));
+  return `${before}${paintSpans([{ text: inside, style }])}${after}`;
+}
+
+/** The wash, or reverse video where there is no colour to wash with (§4b). */
+function selectionStyle(deps: PaintDeps): Style {
+  const bg = background("surface.selection", deps.theme, deps.capabilities);
+  return bg.background === undefined ? { inverse: true } : bg;
+}
+
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const cap = frame.promptRows;
-  const windowed = promptWindow(frame, deps.promptRows(), deps.capabilities).rows;
+  const window = promptWindow(frame, deps.promptRows(), deps.capabilities);
+  const windowed = window.rows;
+  // **Mapped through the window, not assumed aligned with it.** The prompt is
+  // windowed around its end when it exceeds its cap (S01 §3), so an editor row
+  // and a painted row are different numbers whenever the elision marker is up.
+  const spans = new Map<number, CellSpan>();
+  for (const span of deps.promptSelection()) {
+    const at = span.row - window.first + window.offset;
+    if (at >= 0 && at < cap) spans.set(at, span);
+  }
 
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
     const body = windowed[i] ?? "";
     const gutter = i === 0 ? promptFor(deps.capabilities) : " ".repeat(PROMPT_GUTTER.cont);
-    out.push(exact(gutter + body, width));
+    const squared = exact(gutter + body, width);
+    const span = spans.get(i);
+    out.push(span === undefined ? squared : washed(squared, span, deps));
   }
 
   // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on

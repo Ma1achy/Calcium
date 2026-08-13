@@ -28,6 +28,15 @@ export const LIGHT: ThemeTokens = Object.freeze({
     // rather than before it, and A01 A.1 records all 48 measured ratios.
     diffAdd: "#d2ffd2",
     diffRemove: "#fff0f0",
+
+    // §4b — the selection wash. `tone.default` measures 8.18 : 1 against it,
+    // over its 4.5 floor. `tone.muted` is NOT paired with it and the figures are
+    // why someone might think it should be: on light it measures 2.14–2.42
+    // against every candidate, under muted's own 2.5 floor. Ghost text is muted
+    // and is drawn *after* the buffer's last cluster, so it is adjacent to a
+    // selection and never inside one — the scope of a floor is where the text
+    // goes (C10 §4a's own argument).
+    selection: "#c9ddf5",
   }),
 
   palettes: Object.freeze({

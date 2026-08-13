@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createEditor } from "../../src/interaction/editor/index.js";
+import { selectionSpans } from "../../src/interaction/editor/index.js";
 import { UNDO_LIMIT } from "../../src/interaction/editor/undo.js";
 
 const G = { first: 2, cont: 2 } as const;
@@ -669,5 +670,71 @@ describe("C17 §5b — extend obeys the kill-run rule (I16)", () => {
     // `"one two "` is what a still-open run produces: the second cut prepended
     // to the copied text, one buffer describing a deletion and a copy at once.
     expect(e.killBuffer, "a fresh entry, not a continuation of the run").toBe("one ");
+  });
+});
+
+
+describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
+  const G = { first: 2, cont: 2 } as const;
+
+  it("T1.37 (I18, entry 23): a row the region passes through runs to the FULL width", () => {
+    // **The rule, and it is a rule rather than an aesthetic.** A wash stopping
+    // at an intermediate row's last cluster reads as *highlighted*; one running
+    // through the padding reads as *selected*, and the wrap it covers is
+    // genuinely part of the region.
+    //
+    // The buffer wraps at 10 cells with a 2-cell gutter, so `"abcdefghijkl"` is
+    // two display rows of 8 and 4.
+    const spans = selectionSpans("abcdefghijkl", 0, 12, 10, G);
+
+    expect(spans).toEqual([
+      { row: 0, from: 2, to: 10 },
+      { row: 1, from: 2, to: 6 },
+    ]);
+  });
+
+  it("T1.38 (entry 23): the last row stops at the head, not at the edge", () => {
+    // The control for the row above, and the reason it cannot be folded into
+    // it: "every row to the edge" satisfies T1.37 exactly and is a different
+    // defect — one that looks correct on any single-row selection.
+    const spans = selectionSpans("abcdefghijkl", 0, 10, 10, G);
+
+    expect(spans[spans.length - 1], "row 1 stops two cells in").toEqual({
+      row: 1,
+      from: 2,
+      to: 4,
+    });
+  });
+
+  it("T1.39 (entry 23): a region inside one row is that row's cells alone", () => {
+    const spans = selectionSpans("abcdef", 1, 4, 20, G);
+    expect(spans).toEqual([{ row: 0, from: 3, to: 6 }]);
+  });
+
+  it("T1.40 (entry 23): an empty region has no spans, and the ends may arrive either way round", () => {
+    // **Both orders**, because the head can be behind the anchor and a caller
+    // that sorted them once would still pass a row asserting only the forward
+    // case.
+    expect(selectionSpans("abcdef", 3, 3, 20, G)).toEqual([]);
+    expect(selectionSpans("abcdef", 4, 1, 20, G)).toEqual(
+      selectionSpans("abcdef", 1, 4, 20, G),
+    );
+  });
+
+  it("T1.41 (I18): the spans come from the same walk `layout` returns rows from", () => {
+    // **Not a second measurement.** A span computed by re-wrapping here would
+    // part company with the drawn rows at exactly the boundary this asserts —
+    // a line that exactly fills its row, which is I19's trailing position.
+    const text = "abcdefgh";
+    const e = createEditor({ text, cursor: 0 });
+    const rows = e.layout(10, G);
+    const spans = selectionSpans(text, 0, 8, 10, G);
+
+    expect(rows.length, "one full row plus the position after it").toBe(2);
+    expect(spans[0], "the wash covers the full row it fills").toEqual({
+      row: 0,
+      from: 2,
+      to: 10,
+    });
   });
 });

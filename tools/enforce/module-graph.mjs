@@ -1101,51 +1101,21 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "diagnostics, and already an explicit exception in C16 T2.14's non-editing list",
   "IdentityLoop.warned": "diagnostics; its own declaration says so and C22 T3.12 reads it",
 
-  // **The region, published before the thing that reads it** (C17 I21).
-  // Published now rather than later because I21 cannot be *stated* without it:
-  // "an extending motion never moves the anchor" is a claim about a value, and
-  // a model whose only observable is `cursor` cannot distinguish the defect the
-  // whole shape was built against.
+  // **`LineEditor.selection` was here and is gone**, taken out by the equality
+  // arm the moment roadmap entry 23's wash read it from `shell/session.ts`.
+  // Recorded because the entry's own predictions were wrong twice: it first
+  // named entry 15 step 3 as the consumer, and step 3 landed with MG24 silent,
+  // because `copy()` reads the member *inside the declaring file*. The rule is
+  // right; the predictions were not, and only the arm settled it.
   //
-  // **Its predicted expiry was wrong, and checking is what found that.** The
-  // entry was written naming two consumers — entry 15 step 3 (copy) and entry
-  // 23 (the wash). Step 3 landed and MG24 stayed silent, because `copy()` reads
-  // `this.selection` *inside the declaring file* and MG24 counts mentions
-  // outside it. The rule is right; the prediction was not, and it is F83's
-  // shape from the other side — there, an implementing module was miscounted as
-  // a consumer, and here a same-file reader is correctly not counted by someone
-  // who expected it to be. **Verified by removing this entry and watching MG24
-  // fire**, rather than by reading the rule.
-  //
-  // So one consumer remains and it is roadmap entry 23: the wash reads the
-  // region from `shell/paint.ts`, which is another file. The equality arm
-  // removes this the day that lands.
-  //
-  // **Its sibling `LineEditor.selected` is NOT here, and that is a finding
-  // rather than an inconsistency.** MG24 matches by name, and
-  // `KeyEffects.selected` — C19's menu row — carries the same one, so the rule
-  // reads it as consumed and says nothing. Measured the day both landed:
-  // F105/F160's blind spot as a live false negative in new code.
-  "LineEditor.selection":
-    "C17 I21 — the region, read by roadmap entry 23's wash from `shell/paint.ts`; " +
-    "published now because I21 is unstateable without it, and the equality arm removes " +
-    "this entry the day that consumer lands",
+  // **And it sat here as a duplicate key for one commit.** Step 3's edit
+  // inserted a corrected block without removing the original, so the object
+  // literal carried two `"LineEditor.selection"` entries and `Object.freeze`
+  // silently kept the last. `make enforce` was green throughout — a duplicate
+  // key violates nothing this file checks — and it surfaced only when the arm
+  // went to remove *the* entry and found two. **An edit script that asserts its
+  // anchor matched still has to assert the old text is gone.**
 
-  // **The region, published before the two things that read it** (C17 I21).
-  // Entry 15 step 3 — copy writing the kill buffer — and roadmap entry 23 —
-  // the wash — are its consumers, and neither exists. Published now rather
-  // than later because I21 cannot be *stated* without it: "an extending motion
-  // never moves the anchor" is a claim about a value, and a model whose only
-  // observable is `cursor` cannot distinguish the defect the whole shape was
-  // built against.
-  //
-  // **Its sibling `LineEditor.selected` is NOT here, and that is a finding
-  // rather than an inconsistency.** MG24 matches by name, and `KeyEffects.selected`
-  // — C19's menu row — carries the same one, so the rule reads it as consumed
-  // and says nothing. Measured the day both landed: F105/F160's blind spot as a
-  // live false negative in new code, not a hypothetical. The list is compared by
-  // equality, so adding it here would fire MG24's own bidirectional arm.
-  
   // **Four more, and comments were the only thing hiding them.** MG24 counted a
   // name inside a comment as a consumer until the day it stopped; these four
   // fired on the first run that stripped prose, in shipped code, alongside the
@@ -1358,8 +1328,12 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "Identity.user": "C22 — the identity record's fields, asserted by the identity tests. `SessionSnapshot` carries it and no component destructures it",
   "Identity.email": "C22 — as `user`",
   "Identity.groups": "C22 — as `user`",
-  "SgrStyle.inverse": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
-  "SgrStyle.underline": "C01 — as `inverse`",
+  // `SgrStyle.inverse` was beside this one until entry 23 wired it: the
+  // selection wash falls back to reverse video where there is no colour, so
+  // `shell/paint.ts` names it and the equality arm took the entry out. **Two
+  // exemptions expired by one change and only one was predicted** — which is
+  // the arm doing the job the prediction could not.
+  "SgrStyle.underline": "C01 — a style slot C10 does not yet emit; T-rows assert the escape it produces",
   "FrameSchedulerOptions.windows": "C03 — per-reason coalescing windows, injected by six test files to drive the scheduler deterministically",
   "Finding.subject": "C09 §7 — boundary-conformance report field, asserted by the suite it exists for",
   "Finding.assertion": "C09 §7 — as `subject`",

@@ -33,6 +33,7 @@ import { focusKey } from "./render-cache.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
+import { selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { resolveFocus } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
@@ -133,6 +134,9 @@ export function createTui<C extends TuiConfig>(
   // cannot await.
   return new Session(resolveConfig(config, ambient()));
 }
+
+/** One frozen empty array rather than a new one per paint (entry 23). */
+const EMPTY_SPANS: readonly CellSpan[] = Object.freeze([]);
 
 class Session implements TuiInstance {
   #state: SessionState = "created";
@@ -514,6 +518,19 @@ class Session implements TuiInstance {
       transcriptRows: () => visibleRows(graph, width),
       promptRows: () => graph.editor.layout(width, PROMPT_GUTTER),
       promptCursor: () => graph.editor.cursorCell(width, PROMPT_GUTTER),
+      // **The wash, mapped through the same walk the rows came from** (C17 I18,
+      // roadmap entry 23). `selection` is read here rather than a
+      // `selectionSpans` method being added to `LineEditor`, because the guard
+      // and the mapping both belong to whoever knows the width — and a method
+      // whose only caller is the painter is a member the editor does not need.
+      //
+      // Empty when there is no region, which is the common case and costs one
+      // frozen array.
+      promptSelection: () => {
+        const sel = graph.editor.selection;
+        if (sel === null) return EMPTY_SPANS;
+        return selectionSpans(graph.editor.text, sel.anchor, sel.head, width, PROMPT_GUTTER);
+      },
       // C16's derived focus, read rather than stored — the cursor belongs to
       // whatever holds the keys, and a second record of that would drift from
       // the display exactly as a stored focus does (C16 §3, C15 I19).

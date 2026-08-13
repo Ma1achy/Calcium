@@ -7,6 +7,7 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 import {
   defaultTheme,
   diffPairs,
+  selectionPairs,
   floorFor,
   ratio,
   resolve,
@@ -294,7 +295,7 @@ describe("C10 contract", () => {
     expect([...new Set(pairs.map(([, , surface]) => surface))].sort()).toEqual(["diffAdd", "diffRemove"]);
   });
 
-  it("T2.14c (I22, §4a): seven surfaces, and the withdrawn strong pair is absent", () => {
+  it("T2.14c (I22, §4a, §4b): eight surfaces, and the withdrawn strong pair is absent", () => {
     // The pair that was specified, measured and removed. Asserted absent rather
     // than merely unmentioned: a spec that measured something out and a token
     // file that quietly kept it is exactly the drift this suite exists to stop,
@@ -309,7 +310,30 @@ describe("C10 contract", () => {
         "borderStrong",
         "diffAdd",
         "diffRemove",
+        // §4b — the selection wash. A text-bearing surface with a pairing of
+        // its own (`selectionPairs`), not an eighth entry in the diff one.
+        "selection",
       ]);
+    }
+  });
+
+  it("T2.14d (§4b): the selection pairing is `tone.default` alone, and is not the diff one", () => {
+    // **Written because widening `diffPairs` was the first attempt and four
+    // rows refused it** — T2.14b above states outright that `tone.default`
+    // must not be in the diff pairing, and it was right: a function whose name
+    // says one thing and whose contents say two stops being readable. The
+    // sibling is asserted here so the split cannot quietly become a merge.
+    for (const variant of VARIANTS) {
+      const pairs = selectionPairs(defaultTheme[variant]);
+      expect(pairs.map(([palette, slot]) => palette + "." + slot), variant).toEqual([
+        "tone.default",
+      ]);
+      expect([...new Set(pairs.map(([, , surface]) => surface))]).toEqual(["selection"]);
+      // `muted` is deliberately not paired, and C10 §4b carries the measured
+      // reason: on light it sits under its own floor against every candidate
+      // wash. Ghost text is muted and is drawn after the buffer's last
+      // cluster, so it is adjacent to a selection and never inside one.
+      expect(pairs.map(([, slot]) => slot), variant).not.toContain("muted");
     }
   });
 

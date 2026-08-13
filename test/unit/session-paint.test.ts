@@ -42,6 +42,7 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     ghost: () => null,
     overlays: () => [],
     promptCursor: () => ({ row: 0, col: 2 }),
+    promptSelection: () => [],
     promptFocused: () => true,
     ...over,
   };
@@ -358,5 +359,128 @@ describe("C22 T4.7 (I50) — ghost text is composited, and is appearance not geo
       deps({ promptRows: () => ["/co"], ghost: () => "ntainer", spinning: () => true }),
     );
     expect(plainOf(promptRow(painted))).not.toContain("ntainer");
+  });
+});
+
+describe("C22 — the selection wash (roadmap entry 23)", () => {
+  /**
+   * The cells whose appearance changed, as a frame-read asks it.
+   *
+   * Not *which characters were in the region* — every assertion about
+   * `selectionSpans` already answers that, and answers it identically for the
+   * defect this file is written against.
+   */
+  const washedCells = (row: string): string => {
+    const m = new RegExp("\u001b\\[[0-9;]*m(.*?)\u001b\\[0m", "u").exec(row);
+    return m?.[1] ?? "";
+  };
+
+  /** The painted index of prompt row `i`: header + viewport, then the prompt. */
+  const promptAt = (f: Composed, i: number): number => f.region.height + 1 + i;
+
+  it("T4.13 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
+    // **The invariant at every step, not a note about this one.** A row of
+    // chrome — a marker line, a bracket, a status row — is forbidden by the
+    // same rule that makes the wash free.
+    const f = frameAt(20, 10, 2);
+    const rows = () => ["one", "two"];
+    const plain = paint(f, deps({ promptRows: rows }));
+    const selected = paint(
+      f,
+      deps({ promptRows: rows, promptSelection: () => [{ row: 0, from: 2, to: 20 }] }),
+    );
+
+    expect(selected.length, "the same number of rows").toBe(plain.length);
+    for (let i = 0; i < plain.length; i += 1) {
+      expect(displayCells(selected[i] ?? ""), `row ${String(i)} is the same width`).toBe(
+        displayCells(plain[i] ?? ""),
+      );
+    }
+  });
+
+  it("T4.14 (entry 23): a row the region passes THROUGH is washed to the full width", () => {
+    // **The mutation this row was written for**, and a frame-read is the only
+    // instrument that reaches it: a wash stopping at the last cluster reads as
+    // *highlighted* rather than *selected*, and it passes every assertion about
+    // which characters are in the region — because they are all still in it.
+    const f = frameAt(20, 10, 2);
+    const rows = paint(
+      f,
+      deps({
+        promptRows: () => ["abc", "de"],
+        // From row 0's first cell into the middle of row 1, so row 0 is passed
+        // through and row 1 is where the head is.
+        promptSelection: () => [
+          { row: 0, from: 2, to: 20 },
+          { row: 1, from: 2, to: 4 },
+        ],
+      }),
+    );
+
+    const through = washedCells(rows[promptAt(f, 0)] ?? "");
+    expect(displayCells(through), "through the padding, not to the last cluster").toBe(18);
+    expect(through.startsWith("abc"), "and it still covers the text").toBe(true);
+  });
+
+  it("T4.15 (entry 23): the LAST row of a region stops at the head", () => {
+    // The control for the row above. Without it, "full width" is satisfied by
+    // washing every row of the region to the edge — a different defect, and one
+    // that looks correct on any single-row selection.
+    const f = frameAt(20, 10, 2);
+    const rows = paint(
+      f,
+      deps({
+        promptRows: () => ["abc", "de"],
+        promptSelection: () => [
+          { row: 0, from: 2, to: 20 },
+          { row: 1, from: 2, to: 4 },
+        ],
+      }),
+    );
+
+    expect(displayCells(washedCells(rows[promptAt(f, 1)] ?? "")), "two cells").toBe(2);
+  });
+
+  it("T4.17 (entry 23, S01 §3): the span is mapped through the prompt's window", () => {
+    // **The row the mutation pass demanded.** An editor row and a painted row
+    // are the same number until the prompt exceeds its cap and windows around
+    // its end — and every other row here has an unwindowed prompt, so dropping
+    // the mapping failed nothing. Four editor rows into a cap of two puts the
+    // elision marker up and shifts everything by one.
+    // Four wanted rows in a five-row terminal: the cap is `floor(rows / 2)`,
+    // which is two, so the prompt windows and the marker takes one of them.
+    const f = frameAt(20, 5, 4);
+    const rows = paint(
+      f,
+      deps({
+        promptRows: () => ["aa", "bb", "cc", "dd"],
+        // The last editor row, which is the only content row the window shows.
+        promptSelection: () => [{ row: 3, from: 2, to: 4 }],
+      }),
+    );
+
+    expect(washedCells(rows[promptAt(f, 0)] ?? ""), "the marker row is untouched").toBe("");
+    expect(washedCells(rows[promptAt(f, 1)] ?? ""), "the wash lands on the shown row").toBe(
+      "dd",
+    );
+  });
+
+  it("T4.16 (entry 23, C10 §4b): at 1-bit the wash is reverse video, not nothing", () => {
+    // **The rung that stops the ladder falling from a background straight to a
+    // glyph.** `resolveBackground` answers nothing where there is no colour, so
+    // a wash alone would vanish; `inverse` needs no colour at all.
+    const f = frameAt(20, 10, 1);
+    const rows = paint(
+      f,
+      deps({
+        capabilities: { ...FULL_CAPS, colourDepth: 1 },
+        promptRows: () => ["abc"],
+        promptSelection: () => [{ row: 0, from: 2, to: 5 }],
+      }),
+    );
+
+    const row = rows[promptAt(f, 0)] ?? "";
+    expect(row, "SGR 7 — reverse video").toContain("[7m");
+    expect(washedCells(row)).toBe("abc");
   });
 });

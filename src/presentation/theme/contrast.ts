@@ -108,6 +108,25 @@ const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   tone: Object.freeze(["ok", "error", "muted"]),
 });
 
+/**
+ * §4b — the selection wash, and exactly one slot lands on it.
+ *
+ * **`tone.default` alone, and the narrowness is the same decision `DIFF_SLOTS`
+ * makes rather than a smaller version of it.** The prompt's text is `default`;
+ * ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is
+ * adjacent to a selection and never inside one.
+ *
+ * **The measured figures, because they are what would tempt a widening.** On the
+ * light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own
+ * 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and
+ * the fix would look like weakening the check. That is C10 §4's argument for
+ * excluding `bgDeep`, in the mirror: do not validate a slot against a surface that
+ * slot never lands on.
+ */
+const SELECTION_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  tone: Object.freeze(["default"]),
+});
+
 /** The pairing, exposed so the suite can assert its shape rather than its results. */
 export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, string, string, string])[] {
   const out: (readonly [string, string, string, string])[] = [];
@@ -125,10 +144,38 @@ export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, stri
   return Object.freeze(out);
 }
 
+/**
+ * §4b's pairing, and it is a **sibling** of `diffPairs` rather than two more
+ * entries in it.
+ *
+ * Widening `diffPairs` was the first attempt and four rows refused it — one
+ * asserting its size, one its slot list, and one stating outright that
+ * `tone.default` must not be in the diff pairing. They were right: `diffPairs`
+ * means *the diff surfaces' pairing*, and a function whose name says one thing
+ * and whose contents say two is how a check stops being readable. The same
+ * argument `DIFF_SLOTS` already makes about `textSurfaces`, one level down.
+ */
+export function selectionPairs(
+  tokens: ThemeTokens,
+): readonly (readonly [string, string, string, string])[] {
+  const hex = tokens.surfaces.selection;
+  if (!isHex(hex)) return Object.freeze([]);
+
+  const out: (readonly [string, string, string, string])[] = [];
+  for (const [palette, slots] of Object.entries(SELECTION_SLOTS)) {
+    for (const slot of slots) {
+      const value = tokens.palettes[palette]?.slots[slot];
+      if (value === undefined || !isHex(value)) continue;
+      out.push([palette, slot, "selection", hex]);
+    }
+  }
+  return Object.freeze(out);
+}
+
 function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
   const errors: ThemeError[] = [];
 
-  for (const [palette, slot, surface, hex] of diffPairs(tokens)) {
+  for (const [palette, slot, surface, hex] of [...diffPairs(tokens), ...selectionPairs(tokens)]) {
     const value = tokens.palettes[palette]?.slots[slot];
     if (value === undefined) continue;
 
@@ -140,7 +187,7 @@ function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
       path: `palettes.${palette}.${slot}`,
       message:
         `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${hex}), ` +
-        `below its floor of ${floor} : 1 — a diff background is a surface text ` +
+        `below its floor of ${floor} : 1 — a background is a surface text ` +
         `lands on, so the background moves rather than the slot`,
     });
   }
