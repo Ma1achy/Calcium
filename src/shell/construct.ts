@@ -332,6 +332,63 @@ export async function constructGraph(
   // **Manifest before completion sources**, within the step: the default
   // sources are manifest-derived (§2), so built first they would answer over an
   // empty tool list and never refill.
+  // **Recency ranking, and the shell owns the mapping** (C19 I26, §3a).
+  //
+  // The engine takes `(value) => number | null` and never a history handle:
+  // C19 and C20 are both L3, so the edge is sideways and must stay a
+  // function. What *run* means is this layer's to answer — a candidate's
+  // value at the verb slot is `ps` and a history line is `/ps --mine`, so
+  // the mapping needs the prefix convention and the sub-verb depth, which
+  // neither component below holds.
+  //
+  // **Rebuilt per submission, not per keystroke.** The cap is 10,000 and the
+  // menu opens on every keystroke, so scanning would put 200,000 comparisons
+  // on the input path — I2's *completion never blocks input* failing exactly
+  // where §6a made it continuous. `entries` only grows on `append`, so its
+  // **length is a version**: rebuild when it moves, answer from the map
+  // otherwise.
+  //
+  // Declared before the store it reads because construction is ordered and
+  // this is the earlier half of it. The closure is called on a keystroke,
+  // long after `history` is assigned, and answers `null` until then — which
+  // is the unranked order the engine already had.
+  //
+  // **`recency: recencyOf` and not `{ recency }`, and that is a finding rather
+  // than a style.** MG24's record arm counts a member as consumed when it sees
+  // `name:` or `.name`, and object shorthand is neither — so `{ recency }`
+  // supplied the member and the rule fired anyway. Widening the arm to accept
+  // a bare `name` before `,` or `}` was measured and is refused: 8 of the 75
+  // members it would newly call consumed, and most are not consumers at all —
+  // `VerbRatio.ratio` matched a `ratio` in `theme/index.ts`, and two
+  // `HistoryStore` members matched their own barrel's `export { … }`. **An arm
+  // that reads a re-export as a consumer is F83's class from a third
+  // direction.** The local carries a different name from the member, which
+  // costs nothing and leaves the rule able to see the seam.
+  let historyStore: Awaited<ReturnType<typeof openHistory>> | null = null;
+  let recencyAt = -1;
+  let recencyIndex = new Map<string, number>();
+  const recencyOf = (value: string): number | null => {
+    const entries = historyStore?.entries ?? null;
+    if (entries === null) return null;
+    if (entries.length !== recencyAt) {
+      recencyIndex = new Map<string, number>();
+      for (const e of entries) {
+        // **The first token as typed, prefix included** — because a verb
+        // candidate's `value` is `/ps` and not `ps` (`sources.ts:61` builds
+        // it as `/${head}`). The ruling was written the other way round and
+        // the implementation falsified it: an index keyed on the bare head
+        // would have matched nothing and ranked nothing, with every row still
+        // green — a stable sort over keys that are all `null` IS the source
+        // order the rows assert. A later entry overwrites an earlier one, so
+        // the map holds the most recent run of each verb.
+        const head = e.command.trimStart().split(/\s+/u)[0] ?? "";
+        if (head !== "") recencyIndex.set(head, e.ts);
+      }
+      recencyAt = entries.length;
+    }
+    return recencyIndex.get(value) ?? null;
+  };
+
   const built = await (async () => {
     const blocks = createBlockRegistry({ defaults: true });
     // **The three the framework itself produces** (C09 §1, I13). `defaults`
@@ -377,7 +434,7 @@ export async function constructGraph(
 
     manifest.load(parsed.value);
 
-    const completion = createEngine({ now: config.clock });
+    const completion = createEngine({ now: config.clock, recency: recencyOf });
     // **The framework's six first, then the app's** (I3b). §2 called
     // manifest-derived completion a working default and nothing built it, so
     // `Tab` produced no candidates in any real session while every C19 tier
@@ -502,6 +559,8 @@ export async function constructGraph(
       clock: config.clock,
       stateDir: config.stateDir,
     });
+    // The later half of C19 I26's seam — see `recency` above.
+    historyStore = history;
     const editor = createEditor();
     const themed = loadTheme(config.theme);
     if (!themed.ok) throw new ConstructionError("stores", themed.error);

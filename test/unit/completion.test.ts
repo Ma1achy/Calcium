@@ -24,6 +24,110 @@ const engineWith = (...sources: Parameters<ReturnType<typeof createEngine>["regi
   return { engine, clock };
 };
 
+/**
+ * A static source offering exactly these values, in this order (C19 I26's rows).
+ *
+ * The order is the fixture's whole point: I26 refines source order rather than
+ * replacing it, so a row about ranking has to be able to say what the order was
+ * before ranking, and a source that sorted its own output could not.
+ */
+const listSource = (id: string, values: readonly string[]) => ({
+  id,
+  slots: ["verb"] as const,
+  dynamic: false as const,
+  complete: () => values.map((value) => ({ value })),
+});
+
+const rankedWith = (
+  recency: (value: string) => number | null,
+  ...sources: Parameters<ReturnType<typeof createEngine>["register"]>[0][]
+) => {
+  const engine = createEngine({ now: fakeClock().now, recency });
+  for (const s of sources) engine.register(s);
+  return engine;
+};
+
+const valuesAt = (engine: ReturnType<typeof createEngine>, text: string): readonly string[] =>
+  engine.suggest(at(text)).map((c) => c.value);
+
+describe("C19 §3a — ordering", () => {
+  it("T1.16 (I26): most-recently-run first, and never-run keeps source order", () => {
+    // **The fourth candidate is the row that matters.** Two ranked and one
+    // unranked passes under a comparator that merely sorts; what says the rule
+    // is a *refinement* is that two never-run values stay in the order the
+    // source gave them, which a comparator answering anything but 0 for the
+    // null-null pair would scramble.
+    const engine = rankedWith(
+      (v) => ({ "/zebra": 100, "/alpha": 900 })[v] ?? null,
+      listSource("s", ["/zebra", "/alpha", "/middle", "/omega"]),
+    );
+    expect(valuesAt(engine, "/‸"), "run values by recency, then source order").toEqual([
+      "/alpha",
+      "/zebra",
+      "/middle",
+      "/omega",
+    ]);
+  });
+
+  it("T1.16b (I26): every candidate never run → exactly the source order", () => {
+    // The fresh-session case, and the reason this landed without a second
+    // ruling about ties: on day one the menu is what it was before I26.
+    const values = ["/delta", "/alpha", "/charlie"];
+    const ranked = rankedWith(() => null, listSource("s", values));
+    const unranked = engineWith(listSource("s", values)).engine;
+    expect(valuesAt(ranked, "/‸")).toEqual(values);
+    expect(valuesAt(ranked, "/‸"), "and identical to an engine with no recency at all").toEqual(
+      valuesAt(unranked, "/‸"),
+    );
+  });
+
+  it("T1.17 (I27): a buried word is the source's model, not the filter's", () => {
+    // **Written against the claim that this is a defect, and it asserts the
+    // level instead.** Roadmap 31 reads *`stats` cannot find `container stats`,
+    // because prefix matching cannot see a word in the middle of a name* — true
+    // of `matching()` and irrelevant to it. The verb source emits ONE WORD at a
+    // time (I14, C05 §2's sub-verbs), so `serving scale` is offered as
+    // `/serving` and the whole name never reaches the filter. A widened
+    // `matching()` would leave every line here identical.
+    const { engine } = engineWith(verbSource(manifest));
+
+    expect(valuesAt(engine, "/scale‸"), "not a first word, so not a candidate").toEqual([]);
+    expect(valuesAt(engine, "/serv‸"), "the head is").toEqual(["/serving"]);
+
+    // **And the second level is NOT reachable, which this row found by trying.**
+    // `verbSource`'s own comment says *`serving scale` completes as `serving`
+    // and then `scale`* — and the slot after a verb is never `verb`:
+    // `context.ts:224` returns one only while `command` is true, which is the
+    // first token alone. After `/serving ` the slot is `none`, because
+    // `serving` resolves as a tool and has no positionals, so no source is
+    // applicable and the sub-verb is uncompletable.
+    //
+    // Asserted as it stands rather than skipped, so **the row fails the day it
+    // is fixed** and the sentence above has to be rewritten with it — a
+    // deferral that expires by itself instead of an `it.todo` nobody revisits.
+    // C19 §3a records it; it is not entry 31's, because widening `matching()`
+    // or ranking the results changes nothing here.
+    expect(at("/serving sc‸").slot.kind, "the defect, asserted so a fix breaks it").toBe("none");
+    expect(valuesAt(engine, "/serving sc‸"), "so nothing completes it").toEqual([]);
+  });
+
+  it("T1.16c (I26): ranking runs after dedupe, so a shared value is ranked once", () => {
+    // T3.18 gives a duplicated value to the **first** source that offered it.
+    // Ranking before dedupe would sort the two copies against each other and
+    // let the later source's win the position — T3.18 reversed by a step that
+    // has nothing to do with it. Asserted through the count, because a wrong
+    // order here is invisible while a duplicate is not.
+    const engine = rankedWith(
+      (v) => (v === "/shared" ? 500 : null),
+      listSource("first", ["/solo", "/shared"]),
+      listSource("second", ["/shared", "/other"]),
+    );
+    const out = valuesAt(engine, "/‸");
+    expect(out.filter((v) => v === "/shared"), "one copy, not two").toHaveLength(1);
+    expect(out[0], "and it ranks ahead of the never-run values").toBe("/shared");
+  });
+});
+
 describe("C19 §2 — the slot the cursor is in", () => {
   it("T1.2 (I14): `/` completes the manifest and bare text the filesystem", () => {
     expect(at("/p‸").slot.kind).toBe("verb");
