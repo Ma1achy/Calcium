@@ -131,12 +131,33 @@ reading `Placed.truncated`.
 **The confirm currently reimplements or lacks all of it**, and the peek and the question would
 each reimplement it again. **One mechanism, four callers.**
 
-### Two parameters, and they are the whole difference
+**Read against the tree, 2026-08-13, and the disjunction hides which is which — which is the
+half that decides the size.** `src/shell/confirm.ts` **reimplements** the selection: its own
+`selected` index, its own modular arrow cycling, its own marker glyph in `render`. It
+**lacks** the flip and `… N more` entirely. So the shared mechanism is already written twice
+and the two missing pieces are additions, not merges.
+
+### Three parameters, and the third was missing from this list
 
 ```
 onSelect       insert | resolve(key) | resolve(text) | none
 dismissable    true for advisory layers, FALSE where an owner awaits an answer
+placement      anchored (with a prefer) | centred
 ```
+
+**`placement` was not here and the two consumers differ on it**, which is what a read of the
+tree found rather than a re-reading of this page. `confirm.ts:148` pushes
+`{ kind: "centred" }` with a declared `CONFIRM_WIDTH`; the completion menu and reverse
+search push `{ kind: "anchored", prefer: "above" }`. A unification described by two
+parameters cannot express the difference its own two consumers actually have.
+
+**And §1 above draws the confirm *anchored to the prompt*, which is not what ships.** The
+figure and the parameter list disagreed with the code in opposite directions, and neither
+disagreed with the other — so reading this page against itself would not have found it.
+**Read the abstract against the section, and the section against the code.**
+
+C15 already models both kinds (`src/viewport/overlay/types.ts:27`), so this is a parameter
+the layer type has and this design did not name.
 
 ### And two things the unification must not lose
 

@@ -2526,8 +2526,19 @@ BUILT 15 text selection + copy ★  BUILT 2026-08-13 in four steps plus a step 0
                                    C23 I46's pause reaches polled parts and not a live stream,
                                    which is the case a reader most wants to copy from
       16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
-                                   two parameters. C19's menu already has the flip, the selection
-                                   and `… N more`; the confirm reimplements or lacks all of it
+                                   THREE parameters. C19's menu already has the flip, the
+                                   selection and `… N more`; the confirm reimplements or lacks
+                                   all of it. READ 2026-08-13 and it survives, with two
+                                   corrections: the confirm REIMPLEMENTS the selection
+                                   (`selected`, arrow cycling, its own marker) and LACKS the
+                                   flip and `… N more`, so one half is a merge and the other
+                                   two are additions. And the design's parameter list said
+                                   TWO — onSelect, dismissable — while the two consumers
+                                   differ on a third, PLACEMENT: the confirm is
+                                   `{kind: "centred"}` at `src/shell/confirm.ts:148` and the
+                                   menu is anchored. The design's own §1 draws it anchored,
+                                   so the figure and the list disagreed with the code in
+                                   opposite directions and not with each other
 PART  17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
                                    MAX_ROWS is the fallback adapter's alone. diffing → caching → window
                                    the block → cap with a marker. A CHAIN, in that order
@@ -2696,6 +2707,21 @@ PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    view's inner blocks — and the render cache key is wrong
                                    the day one scrolls (13). Selection across a scrolled
                                    boundary is the part that needs ruling, with 15
+      48 MG24 IS BLIND ON THE       the freeze protects the surface `src/index.ts` names, and
+         PUBLIC SURFACE ★           MG24 matches members BY NAME — so a published field with
+                                   no reader passes the moment any type anywhere declares
+                                   that name. THREE MEASURED INSTANCES, the third on
+                                   `NavElement.copy`, which is block vocabulary an app
+                                   declares. FOUR TIGHTENINGS MEASURED AND REFUSED, the
+                                   fourth here: gating on public types alone is 31.6% exact
+                                   against 32.6% for everything — no better, and 151 of the
+                                   219 collisions are public-vs-public. The axis is wrong
+                                   rather than the threshold: a coherent API reuses its
+                                   vocabulary across types DELIBERATELY, so this population
+                                   selects FOR name reuse. What could work is not a rule
+                                   change — a SECOND CONSUMER written from the public
+                                   surface names every field it uses, and the residue is the
+                                   candidates, by USE rather than by name. F160
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
@@ -2754,7 +2780,10 @@ what landed**.
 | 15 | BUILT | **four steps and a step 0, and the mode is a target throughout.** Copy mode: `#setCopyMode` holds the state at `src/shell/session.ts:586`, C03 gains `suspend`/`resume` at `src/terminal/frame-scheduler.ts:263` (§4a), C01 gains `setMouseTracking` at `src/terminal/lifecycle.ts:348` because nowhere else writes an escape. The prompt: an anchor plus the cursor, with `⌥a`/`⇧←`/`⇧Home` bound after `modifiersOf` — `src/interaction/router/decode.ts:113` — learned xterm's fourth bit. One clipboard: `copyText`, `src/interaction/editor/editor.ts:377`, written by `⌥w` and by the transcript's `copyElement`, `src/shell/keys.ts:778`, over a range held by `extendRow`, `src/interaction/router/focus.ts:246`, copying `rowCopyText`'s source text, `src/presentation/table/definition.ts:290`. The wash is entry 23 | OSC 52 is a separate axis and is not built: whether a copy **also** reaches the system clipboard is a capability question about the terminal, and it changes nothing about where the text lands in-process |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. · **26**, **32** — the symbols the entries name are
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. **48** joins them measured rather than
+grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
+public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
+is open with its first candidate already refused. · **26**, **32** — the symbols the entries name are
 absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
 until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **44** —
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,

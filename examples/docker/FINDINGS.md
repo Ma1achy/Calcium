@@ -7657,9 +7657,44 @@ false negatives observed in code written the same day, which is now two of two n
 members that happened to collide. The collision is not rare; it is created by whichever
 name a developer reaches for.
 
-Still not a reopening: the three tightenings below were measured and rejected, and none
-of them would have caught this one either — `(owner, name)` needs a receiver's type,
-which no regex over source has.
+### The fourth tightening, measured 2026-08-13 — and refused with a better reason
+
+**The three below all move the *consumer* side. This one moves the *subject* side**: gate
+only on members of types `src/index.ts` names, which is the freeze-relevant population and
+the only one that cannot be fixed after publication. Smaller, and possibly exact enough to
+key by name safely.
+
+| population | members | exact | rate |
+|---|---|---|---|
+| all of `src/` | 1171 | 382 | **32.6%** |
+| public types only | 320 | 101 | **31.6%** |
+
+**The public surface is no better. It is marginally worse.** And the follow-up settles the
+narrower variant too: of the 219 colliding public members, **151 collide with another
+*public* type** — so a rule scoped public-against-public removes 68 and leaves 151.
+
+**The reason is the axis, not the threshold, and that is what makes this worth recording
+rather than retrying.** The collisions are dominated by vocabulary — `name`, `type`,
+`width`, `height`, `schema`, `argv`, `signal`, `verb` — and **a coherent public API reuses
+its vocabulary across types deliberately.** `FlagDef.name`, `ArgDef.name` and `ToolDef.name`
+are the same word because they are the same idea, and a manifest whose three declaration
+types called it three things would be worse. So narrowing to the public surface selects
+*for* the population where name reuse is a design goal.
+
+Four tightenings measured, four refused. The rule keys by name because nothing available to
+a regex over source distinguishes two types that share one.
+
+### What survives, and it is not a tightening
+
+**MG24 is blind on exactly the surface the freeze protects, and no consumer-side or
+subject-side scoping fixes it.** That is a residue rather than a bug, and it belongs where
+work is tracked rather than in a closed finding — roadmap entry 48. The shape that could
+work is not a change to MG24 at all: a **consumer written from the public surface**, which
+is the instrument that has already found variance no producer could (`a-consumer-finds-
+variance-a-producer-cannot`). A second app declaring blocks would name every field it
+actually uses, and the ones it never names are the candidates — by *use*, not by name.
+
+Still not a reopening: the tightenings are refused and the class is understood.
 
 ### The remedy F160 proposed does not key uniquely either
 
