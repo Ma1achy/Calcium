@@ -142,6 +142,45 @@ describe("roadmap-status — the Order column's verifier", () => {
     expect(r.out).toMatch(/reads exactly like one somebody did/u);
   });
 
+  it("RS8: an OPEN row that says something is built fails — the vacuity arm", () => {
+    // **The hole the other checks leave, and entry 7 is the measured case.** RS2
+    // resolves a *marked* row's evidence; RS4 asks that no entry falls out of the
+    // partition. Both watch rows that make a claim, and **a blank row makes none**
+    // — so it resolves trivially and reads exactly like a row somebody verified.
+    // Entry 7 stayed OPEN through three landed stages with its own description
+    // reading *"stages 1–3 built"*, and its confirmed-OPEN evidence — *"has no
+    // `src/interaction/navigation/`"* — was **true**, because the work landed in
+    // `router/` and `shell/`. A citation that resolves while the sentence it
+    // carries is false is the shape no resolution check reaches.
+    //
+    // The arm needs nothing outside the document, which is why it is cheap enough
+    // to be exact: a row that claims something is built is PART at least.
+    const staled = mutate(
+      "PART  46 SCROLLABLE CONTAINERS",
+      "      46 SCROLLABLE CONTAINERS",
+    );
+    const r = run(staled);
+    expect(r.ok, "an OPEN row asserting `elements` is built").toBe(false);
+    expect(r.out).toContain("entry 46 is OPEN and its own description says");
+  });
+
+  it("RS8b: a built-word exemption that no longer matches its row fails", () => {
+    // **The equality arm, which is what keeps the two exemptions honest.** The
+    // pattern fired on four rows and two were real; 3 and 15 use a built-word
+    // without asserting anything exists — *built with prism-tui as the consumer*
+    // and *is built three times*. Narrowing the regex to exclude them would also
+    // stop it seeing the next phrasing, so they are named exemptions quoting the
+    // sentence. An exemption checked by membership alone is one that outlives its
+    // reason, which is the failure every over-permissive list in this repo has had.
+    const reworded = mutate(
+      "tensors, heatmaps — built with prism-tui as the consumer",
+      "tensors, heatmaps — made together with prism-tui as the consumer",
+    );
+    const r = run(reworded);
+    expect(r.ok, "the quoted sentence is gone").toBe(false);
+    expect(r.out).toContain("re-earn the exemption or drop it");
+  });
+
   it("RS5: an entry in two of the three sets fails", () => {
     // 13 is BUILT. Naming it in the unchecked list as well makes the document say
     // two things, and a partition that only checked coverage would pass.

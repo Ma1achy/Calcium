@@ -9,6 +9,7 @@ import {
   checkOneStorePerComponent,
   checkSeamConsumers,
   componentSeamSignal,
+  nameExactnessSignal,
 } from "./module-graph.mjs";
 import { checkSourceScans, checkMarks } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
@@ -75,6 +76,11 @@ const RED = "\x1b[31m", DIM = "\x1b[2m", GREEN = "\x1b[32m", RESET = "\x1b[0m";
 // Computed only for the summary line — it gates nothing, and computing it beside
 // the violations would invite someone to push it into the list. F94.
 const seam = componentSeamSignal(files);
+// F105/F160 as one class. MG24 matches a member by name and not by owner, so a
+// member whose name several types declare is one the rule cannot be exact about.
+// Printed for F142's reason: a number in prose is a snapshot, and this one has to
+// move when the tree does or it goes quiet the way the blind spot did.
+const exactness = nameExactnessSignal(files);
 
 if (violations.length === 0) {
   console.log(
@@ -85,7 +91,10 @@ if (violations.length === 0) {
       // the number is visible rather than buried in F94. It is a count and not a
       // verdict — most of it is legitimate — so what it is good for is movement.
       `  ${DIM}seam signal · ${seam.withinComponent.length}/${seam.members} published members ` +
-      `never called outside their own component (F94, reported not gated)${RESET}`,
+      `never called outside their own component (F94, reported not gated)${RESET}\n` +
+      `  ${DIM}name exactness · MG24 is exact for ${exactness.exact}/${exactness.members} ` +
+      `members; the rest share a name with another owner — ${exactness.shared.join(", ")} ` +
+      `(F105/F160, reported not gated)${RESET}`,
   );
   process.exit(0);
 }
