@@ -307,6 +307,10 @@ notice here.
 - **I14** — Two-level escape: the first `Esc` exits interaction, the second leaves the
   scope. Neither is C16 §5's Ctrl-C rung and neither is `viewPop` (→ C16 I24) — the
   collision between the second and `viewPop` is trace 6 and is owed a ruling.
+  **Vacuous while nothing can enter interaction** (§8b.8), and the premise is recorded rather
+  than left to be found: `⌃c` is the only binding on the target today, so the first level has
+  no subject and the second is `liveBlock`'s existing exit. The day a block declares keys,
+  both levels are first tested for real.
 - **I15** — Policies resolve global → kind → per-node override, and **an override naming a
   level the kind reports no element at is a construction error**, the way a duplicate
   binding is (→ C16 I10). An override for an absent level is unreachable and reads as
@@ -331,6 +335,8 @@ overlap.
 | **b** | *an override wins over the kind* meets *a level exists only where elements report one* | **FINDING.** An override naming a `cell` policy on a kind reporting no cell elements is unreachable and reads as configured — A03 §2's vacuity class arriving in a config value. Ruling: an override for an absent level is a **construction error**, the way C16 I10 makes a duplicate binding one. |
 | **c** | *deepest level wins* meets *disjointness makes resolution single-valued* | **FINDING.** Global disjointness forbids the nesting the model is built on. Disjointness is **per level** → **I6**, and it is the reason §5 lists four predicates rather than three. |
 | **d** | *`escape-all` leaves the scope* meets *there is no scope above `entry`* | Falls to the prompt by row **a**'s transition, and therefore inherits its ruling rather than adding one. |
+| **f** | *`⏎` enters interaction on the focused element* (§2) meets *`⏎` activates the focused row* (C16 I22, F21) | **FINDING, and it needs two absences distinguished.** *The block declares no keys* and *the element declares no `activate`* are different facts about different things, and only one of them is a reason to refuse the mode. Ruling in §8b.8: activate if the element declares one; **do not enter interaction**, because the second absence is currently structural. |
+| **g** | *entering interaction hands the block every key* (§2) meets *`interaction` has one binding, and no block declares any* | **FINDING.** A mode with nothing in it is reachable, takes every key from the prompt, and is left only by `⌃c` — A03 §2's vacuity class as a *reachable state* rather than as an unfalsifiable rule. Measured, not assumed: `Keymap.mergeBlock` has no caller in `src/` and `register("interaction", …)` binds `⌃c` alone. → §8b.8 |
 | **e** | *the arrow policy governs the edge* meets *`↓` at the prompt is `historyNext` **and** enters the live block* (C16 I22) | Not a collision: C16 I22's second effect is entry and this governs exit. But the pair means there are two ways back to the prompt (`Esc` and the bottom edge) and **they must agree about row a's transition.** Named so the implementation does not give them separate paths. |
 
 ### Sequence trace — event-mediated
@@ -565,11 +571,63 @@ property of the signature*. One decision applied twice, not a second one that ag
 
 ---
 
+### 8. `⏎`'s second effect names a mechanism with no producer, so it does not ship
+
+Entry 1 ruled that `⏎` cannot simply *be* the interaction key, because `rowActivate` already
+holds `(liveBlock, enter)` and two bindings on one pair is a construction error (→ C16 I10).
+The remedy was one binding with two effects in order, on C16 I22's precedent. **Deciding the
+order required asking what "the block declares no keys" means, and there are two absences
+behind that phrase.**
+
+| | the absence | what it is a fact about | observable today? |
+|---|---|---|---|
+| **A** | the block declares no **keymap** | the block — whether the mode has anything in it | **no.** Nothing reports it |
+| **B** | the element declares no **`activate`** | the element — whether `⏎` has an action | **yes.** `NavElement.activate` is optional |
+
+**They do not resolve the same way, and collapsing them is how the trap would have shipped.**
+B is a per-element silence and is already right: pressing `⏎` on a row that does nothing is a
+question, not a mistake, and a refusal per keystroke on a table where most rows have none is
+noise the reader cannot act on. **A is structural**, and it is currently true of every block:
+
+- `Keymap.mergeBlock` — the seam an adapter attaches a `BlockKeymap` through — **has no caller
+  in `src/`.** `src/index.ts` §3 records it as one of three members ruled interior and dropped,
+  *"not public, not finished"*.
+- `register("interaction", …)` binds **`⌃c` and nothing else**. `Esc` is not on the target;
+  I14's two-level escape is unimplemented.
+
+So entering interaction today produces a mode with **zero bindings**, which takes every key
+away from the prompt and is left only by `⌃c`. That is row **g**: A03 §2's vacuity class
+arriving as a *reachable state* rather than as a rule nothing can violate.
+
+#### The ruling, and why it is narrower than §2 said
+
+**`⏎` dispatches the focused element's `activate`, and does nothing otherwise. It does not
+enter interaction, and the second effect returns with the mechanism that makes the mode
+inhabitable** — in the commit that gives `mergeBlock` a producer.
+
+**Not a deferral of convenience: the arm cannot be written.** *Enter interaction when the
+block declares keys* names a question nothing in the tree can answer — no element, no
+definition and no registry reports whether a block has a keymap, because the only thing that
+would attach one has no producer. **When a ruling names an operation, check the operation
+exists** (C23 §8a A4), and this is that check run on the ruling the walk had already made.
+Shipping the arm would mean inventing a mechanism to report an absence that is currently
+total, in order to guard a mode nothing can act in.
+
+The finding survives and only the remedy changes, which is A4's disposition exactly. What
+would have shipped without the check is worse than a missing feature: `⏎` on any row without
+an action would have entered a keyless mode and the prompt would have stopped responding.
+
+**Stage 3's code already implements the ruling** — `rowActivate` resolves the address and
+dispatches the element's own `activate` — so this entry changes a commitment and no code, which
+is the shape a spec commit should have.
+
+---
+
 ## 9. Commitments
 
 1. The scope stack is `entry → block → row → cell`, at most four deep (I1).
 2. Navigation and interaction are modes, and interaction is a focus target (I2).
-3. `⏎` enters interaction; `Esc` leaves it, then leaves the scope (I14).
+3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, because the mode has no bindings and the seam that would supply them has no producer (§8b.8). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
 4. `ArrowPolicy` and `EscapePolicy` resolve global → kind → per-node override, and an override for a level the kind does not report is a construction error (I15).
 5. `BlockDefinition.elements` is optional, pure in `(block, width)`, and is the single source for both keyboard and pointer (I3, I8).
 6. Element lists satisfy containment, reading order, per-level disjointness and stability (I4, I5, I6) — checked generically by a conformance sweep, as `window`'s equality is.
@@ -613,6 +671,12 @@ Named against the invariants; the tiers are the six.
   fall-forward taking the first element rather than the nearest forward → the `putBlock` row
   fails.
 - **T3.x** (I13) — `reset()` and `toPrompt()` produce different locations.
+- **T2.x** (§8b.8, I14) — **the vacuity of interaction mode, asserted rather than described.**
+  `Keymap.mergeBlock` has no caller in `src/` and `interaction` carries one binding, so the
+  mode has nothing in it and `⏎`'s second effect is not committed. The row asserts both facts,
+  and it **fails the day either changes** — which is when the second effect and I14's first
+  level go live and this row is inverted. A premise recorded and unchecked is a premise that
+  goes quiet (F102's disposal, and T2.17's shape for the `window` × `elements` agreement).
 - **T6.x** (I6) — making disjointness global → the nesting fixtures fail.
 - **T6.x** (I11) — turning the pull into a subscription → the half-applied-store row fails.
 - **T6.x** (I2) — moving the mode out of `FOCUS_ORDER` into a pre-dispatch flag → the ladder
