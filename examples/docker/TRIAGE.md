@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 29 | **9** | — | 7 closed · **3 open, all three about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
+| **11** | [A gate that passes without checking](#11) | 30 | **9** | — | 7 closed · **4 open, all four about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -482,7 +482,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **10: 5 closed, 5 open**
+## 11 · A gate that passes without checking — **11: 5 closed, 6 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
@@ -499,6 +499,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F83** | **MG24's definition of a consumer** | the implementing module counts as one, so an interface in `types.ts` implemented in `store.ts` gives every member a consumer by construction. **Open** |
 | **F84** | **MG24's scope** | it walks `export interface` only. **798 members published as `export type` are outside every rule in the suite** — nearly three times the 280 it watches. **Open** |
 | **F159** | **MG24's member walk** | it reads members off their own lines, so a type declared on a *single* line presents none and is watched by nothing. Neither the keyword nor the name is the discriminator — the **line shape** is, and **40 published object types under `src/` are single-line**. F84's sibling: a rule widened along the axis one finding named can stay narrow along one it did not, and the earlier fix is what makes the clean result read as coverage. **Instance fixed** — both C26 types reformatted, with the reason recorded at each declaration; **class open** |
+| **F160** | **MG24's member matching** | it compares members **by name**, so `ElementReport.kindsCovered` reported a *different* type's exemption stale. The harmless direction; the same looseness means **a genuinely unconsumed member is satisfied the moment any unrelated type anywhere declares a field with that name** — and `id`, `kind`, `width`, `rows` are exactly the names a new type carries. Nothing in a clean run tells the two apart. **Instance renamed**, blind spot recorded at the declaration; **class open** — the fix is keying by `(owner, name)` |
 
 **F82 was found producing this file** and it is the group's sharpest instance, because the
 gate that failed is the one verifying the sentence three sections down. `citations` was
@@ -531,7 +532,7 @@ failure modes; only `citations` shows that the regex and the scope work **togeth
 Fixed, and mutated: reverting the increment kills both new rows and neither `fires` row —
 which is why four green rows and a dead field coexisted for as long as they did.
 
-### The three open ones are about a rule's *reach*, and they fail in different directions
+### The four open ones are about a rule's *reach*, and they fail in different directions
 
 **F83 is a definition too weak inside its scope.** A02 Seam 4 is about a component complete on
 its own side with nothing on the other — and the implementation is the *same* side. The file

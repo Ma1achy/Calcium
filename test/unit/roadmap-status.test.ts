@@ -50,19 +50,25 @@ function mutate(from: string, to: string): string {
 }
 
 describe("roadmap-status — the Order column's verifier", () => {
-  it("RS1: the roadmap as it stands resolves, and over 45 entries", () => {
+  it("RS1: the roadmap as it stands resolves, over every entry it has", () => {
     const r = run();
-    expect(r.out, "the real roadmap").toContain("45/45 entries accounted for");
     expect(r.ok).toBe(true);
     // **The counter, not only the status** — a run over 3 entries also exits 0.
-    // The corpus size is pinned because it is structural; the marked count is
-    // asserted as a relation rather than a figure, because a number that churns
-    // on every status change is a number people update without reading. What has
-    // to hold is that something was marked and that every marked row resolved.
-    const m = /45 entries · (\d+) marked, (\d+) resolving/u.exec(r.out);
+    //
+    // **Every figure here is a relation, and the pinned one was wrong within a
+    // day.** This row read `45/45` as a literal and the list grew to 47 when the
+    // nits were distributed — so a test whose whole subject is *a count in prose
+    // is a snapshot with no mechanism* carried one. The corpus size is asserted
+    // as a floor, and the identities are asserted against the run's own numbers.
+    const m = /(\d+) entries · (\d+) marked, (\d+) resolving/u.exec(r.out);
     expect(m, "the counter line").not.toBeNull();
-    expect(Number(m?.[1]), "marked rows").toBeGreaterThan(0);
-    expect(Number(m?.[2]), "every marked row resolves").toBe(Number(m?.[1]));
+    const entries = Number(m?.[1]);
+    expect(entries, "a real corpus, not three rows").toBeGreaterThan(40);
+    expect(r.out, "every entry accounted for").toContain(
+      `${String(entries)}/${String(entries)} entries accounted for`,
+    );
+    expect(Number(m?.[2]), "marked rows").toBeGreaterThan(0);
+    expect(Number(m?.[3]), "every marked row resolves").toBe(Number(m?.[2]));
   });
 
   it("RS2: a claim naming the wrong file fails, and names the identifier", () => {
