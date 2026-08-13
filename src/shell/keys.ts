@@ -77,6 +77,16 @@ export type KeyDeps = Readonly<{
   /** C16's stored focus — the one piece of it in the system (C16 §3). */
   focus: FocusStore;
   /**
+   * Enter copy mode (C16 §5b, C03 §4a).
+   *
+   * **The entry half only, and the exit is deliberately not here.** Leaving is
+   * `⌃c` on the ladder's copy-mode rung, which already calls `exitCopyMode` —
+   * so a matching effect in this table would be a second exit with an order of
+   * its own. The pair still ships together; they just do not ship *here*
+   * together.
+   */
+  enterCopyMode: () => void;
+  /**
    * The fullscreen patch view (C25 §3b, C22 I41).
    *
    * Named here rather than reached through `overlays`, because the motions are
@@ -701,6 +711,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.history.searchOlder();
       refreshSearchLayer();
     },
+
+    // --- copy mode (C16 §5b) -----------------------------------------------
+    //
+    // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
+    // this table's — a second way out here would give copy mode an order of its
+    // own, which is exactly what makes it a target rather than a mode.
+    enterCopyMode: () => void deps.enterCopyMode(),
   });
 
   /**

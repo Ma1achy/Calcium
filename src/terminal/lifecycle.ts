@@ -61,6 +61,24 @@ export interface TerminalLifecycle {
    * viewport's dimensions at construction step 5, before anything is acquired.
    */
   size(): TerminalSize;
+  /**
+   * Mouse tracking on or off, while acquired (C22's copy mode).
+   *
+   * **Here because nowhere else may write an escape sequence.** `MOUSE` is a
+   * mode this component takes at `acquire()` and restores at `release()`, and a
+   * second writer of it is precisely the class C01 exists to prevent — the
+   * cursor's sequence takes the same shape for the same reason.
+   *
+   * **A no-op without the capability**, so a caller never has to ask twice: the
+   * mode was never taken, so there is nothing to toggle and `held` stays
+   * truthful. Idempotent, and a no-op while suspended — a child owns the
+   * terminal there, and its modes are not ours to change.
+   *
+   * `mouseEnabled()` in the router is a *capability* question and gains no arm
+   * from this. A capability and a mode are different questions, and one
+   * predicate answering both is how they come to disagree.
+   */
+  setMouseTracking(on: boolean): void;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -317,6 +335,26 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
   function take(key: Exclude<HeldKey, "stdout">): void {
     ACQUIRE[key]();
     held.add(key);
+  }
+
+  /**
+   * Mouse tracking toggled while the shell holds the terminal.
+   *
+   * **`held` is the record and it stays truthful**, which is what makes the
+   * unwind in `release()` correct without a second flag: tracking off means the
+   * mode is not held, so release does not emit a `leave` for something already
+   * left, and re-enabling goes through `take` exactly as acquisition does.
+   */
+  function setMouseTracking(on: boolean): void {
+    if (!capabilities.mouse) return; // I10 — never taken; nothing to toggle.
+    if (state !== "acquired") return; // suspended or released: not ours to change.
+    if (on === held.has("mouse")) return; // idempotent (T3.x, the second call).
+    if (on) {
+      take("mouse");
+      return;
+    }
+    emit(MOUSE.leave);
+    held.delete("mouse");
   }
 
   // --- the transition guard -------------------------------------------------
@@ -585,6 +623,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     // any acquire. There is nothing to be wrong about — reading the size of a
     // terminal nobody has entered is still the size of the terminal.
     size: snapshotSize,
+    setMouseTracking,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).

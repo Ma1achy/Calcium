@@ -24,6 +24,28 @@ export interface FrameScheduler {
   commit(reason: CommitReason): void;
   flush(): void;
   invalidate(): void;
+  /**
+   * Hold the screen still on purpose (§4a, I13, I14).
+   *
+   * **Suspension is about staleness the reader asked for; contamination is
+   * about a screen whose contents nobody knows.** That one distinction settles
+   * both questions this pair raises: an ordinary frame waits, a contaminated
+   * one is written, and `resize` — which implies contamination (I7) — is
+   * therefore never deferred. A wrapped line scrolls the alternate screen,
+   * which is the one failure the application can no longer see.
+   *
+   * `resume()` writes an ordinary diffed frame rather than a repaint, because
+   * suspension writes nothing: the terminal still holds the last frame written
+   * and the diff's model of it is still true. **That property is the whole
+   * argument for this pair existing** rather than L4 passing a `render`
+   * callback that returns without composing — a no-op render clears `pending`
+   * and `contaminated` on a frame that was never written, so C03's own state
+   * would stop describing the terminal.
+   *
+   * Freeze-relevant: new members on a published L0 interface (commitment 15).
+   */
+  suspend(): void;
+  resume(): void;
   readonly pending: boolean;
   readonly contaminated: boolean;
 }
@@ -78,6 +100,8 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
   /** The window the outstanding timer was armed with — the ceiling in force. */
   let armed: number | null = null;
   let contaminated = false;
+  /** §4a — the screen held still on purpose (I13, I14). */
+  let suspended = false;
   let deferred: CommitReason | null = null;
 
   /**
@@ -164,6 +188,16 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
       return;
     }
 
+    // **The gate is here and nowhere else** (I13). One place to reason about,
+    // and it falls on the branch below rather than beside it: suspension holds
+    // the `render` arm and never the `repaint` one. A suspended scheduler still
+    // arms and fires timers, which costs a wasted callback per window and keeps
+    // `commit`'s state machine one machine rather than two.
+    if (suspended && !contaminated) {
+      state = "idle";
+      return;
+    }
+
     state = "writing";
     const sync = capabilities.synchronisedUpdate;
     if (sync) write(SYNC_UPDATE.enter);
@@ -226,6 +260,23 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     runWrite();
   }
 
+  function suspend(): void {
+    // Idempotent, and during a write it applies to the *next* frame — the same
+    // rule `invalidate()` follows, and for the same reason: `writeFrame` read
+    // its flags before calling out.
+    suspended = true;
+  }
+
+  function resume(): void {
+    if (!suspended) return;
+    suspended = false;
+    // **An ordinary commit, not `invalidate()`** (I14). Nothing was written
+    // while suspended, so the terminal holds the last frame this component put
+    // there and the diff has a true model of it. A repaint here would be a
+    // larger burst bought with no correctness at all.
+    commit("input");
+  }
+
   function invalidate(): void {
     // Idempotent (T3.2). During a write it applies to the *next* frame rather
     // than the one in progress, because `writeFrame` read the flag before
@@ -237,6 +288,8 @@ export function createFrameScheduler(opts: FrameSchedulerOptions): FrameSchedule
     commit,
     flush,
     invalidate,
+    suspend,
+    resume,
     // Getters, not stored booleans — `pending` is a fact about the state
     // machine, and storing it alongside admits the combination where a timer is
     // outstanding and `pending` is false (T2.1, T2.4).

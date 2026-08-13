@@ -23,7 +23,7 @@ describe("C03 contract", () => {
   it("T2.1: every member of FrameScheduler is present; the flags are getters", () => {
     const { scheduler } = harness();
 
-    for (const member of ["commit", "flush", "invalidate"]) {
+    for (const member of ["commit", "flush", "invalidate", "suspend", "resume"]) {
       expect(typeof (scheduler as unknown as Record<string, unknown>)[member], member).toBe(
         "function",
       );
@@ -45,13 +45,15 @@ describe("C03 contract", () => {
     // The whole surface, exactly. A frame buffer, a content parameter or a
     // `getFrame` would all show up here first (T6.8).
     expect(new Set(Object.keys(scheduler))).toEqual(
-      new Set(["commit", "flush", "invalidate", "pending", "contaminated"]),
+      new Set(["commit", "flush", "invalidate", "suspend", "resume", "pending", "contaminated"]),
     );
 
     // Arity: `commit` takes a reason and nothing else; the rest take nothing.
     expect(scheduler.commit.length).toBe(1);
     expect(scheduler.flush.length).toBe(0);
     expect(scheduler.invalidate.length).toBe(0);
+    expect(scheduler.suspend.length).toBe(0);
+    expect(scheduler.resume.length).toBe(0);
 
     // And nothing is handed back to a caller that could carry a frame.
     expect(scheduler.commit("input")).toBeUndefined();

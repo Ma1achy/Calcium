@@ -151,6 +151,16 @@ class Session implements TuiInstance {
    * it is the only place C03's flag needs an expression here.
    */
   #lastFrame: readonly string[] | null = null;
+  /**
+   * Copy mode: the reader has asked the app to step back (C16 §5b, C03 §4a).
+   *
+   * **Real state owned here, beside the other frame queries**, because the two
+   * things it drives are both this file's: the scheduler it suspends and the
+   * mouse tracking it turns off. `FocusInputs.copyMode` reads it and
+   * `activeTarget` does the rest — it is a *target*, not a third mode beside
+   * navigate and interact (roadmap 15's ruling, C26 I2's argument unchanged).
+   */
+  #copyMode = false;
 
   constructor(private readonly config: ResolvedConfig) {}
 
@@ -542,10 +552,46 @@ class Session implements TuiInstance {
     };
   }
 
+  /**
+   * Both halves of copy mode, in one place because they are one transition.
+   *
+   * **Three effects and the order is not arbitrary.** The flag moves first, so
+   * anything that reads it during the rest of this sees the new value. Then the
+   * screen: entering *suspends after* one last frame is drawn showing the
+   * indicator — otherwise the reader is told nothing and simply finds the mouse
+   * dead — and leaving *resumes*, which writes the catching-up frame itself
+   * (C03 I14).
+   *
+   * Mouse tracking last, and off only after the frame that says so is up: the
+   * terminal's own selection is what the reader is about to use, and it should
+   * not become available before the screen has stopped moving.
+   */
+  #setCopyMode(on: boolean): void {
+    const graph = this.#graph;
+    if (graph === null || this.#copyMode === on) return;
+    this.#copyMode = on;
+
+    if (on) {
+      // The indicator's frame, then the hold. `flush` rather than a bare commit
+      // so the frame is on the screen before `suspend()` can gate one.
+      graph.scheduler.commit("input");
+      graph.scheduler.flush();
+      graph.scheduler.suspend();
+      graph.lifecycle.setMouseTracking(false);
+      return;
+    }
+
+    // Tracking back first: the reader has finished selecting, and the app takes
+    // the mouse again before it takes the screen.
+    graph.lifecycle.setMouseTracking(true);
+    graph.scheduler.resume();
+  }
+
   #frameQueries(): FrameQueries {
     return {
-      copyMode: () => false,
-      exitCopyMode: () => undefined,
+      copyMode: () => this.#copyMode,
+      enterCopyMode: () => this.#setCopyMode(true),
+      exitCopyMode: () => this.#setCopyMode(false),
       entryAtRow: () => null,
       region: () => this.#composed().region,
       overlayRegion: () => this.#composed().overlayRegion,
@@ -606,6 +652,7 @@ class Session implements TuiInstance {
     return compose({
       chrome: this.config.chrome,
       session: () => graph?.session.snapshot ?? emptySnapshot(this.config),
+      copyMode: () => this.#copyMode,
       now: this.config.clock,
       size: () => graph?.lifecycle.size() ?? { columns: 80, rows: 24 },
       // **The same number the paint path reads** (S01 §3, commitment 4 and 13).

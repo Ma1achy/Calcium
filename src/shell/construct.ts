@@ -161,7 +161,17 @@ export type Step = (typeof STEPS)[number];
  */
 export type FrameQueries = Readonly<{
   copyMode: () => boolean;
+  /**
+   * Leave copy mode (C16 §5b B1).
+   *
+   * **Ships with `copyMode` and with `enterCopyMode`, never after them.** The
+   * `⌃c` rung already calls this, so a producer landing alone gives a mode that
+   * consumes the key and does nothing — entered and not leavable, which is
+   * worse than unreachable. Both stubs were in the tree for the length of C26.
+   */
   exitCopyMode: () => void;
+  /** Enter it. The other half of B1's pair (C16 §5b). */
+  enterCopyMode: () => void;
   entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
    * Where the transcript sits, for mouse routing (C16 `RouterDeps.region`).
@@ -923,6 +933,8 @@ export async function constructGraph(
     documentView,
     releaseView: () => void pipeline.releaseView(),
     focus,
+    // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
+    enterCopyMode: deps.frame.enterCopyMode,
     // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
     // directly and tested `block.kind === "table"`, which was one of *three*
     // such walks — the two below and `focusFor` in `session.ts`. Each was a

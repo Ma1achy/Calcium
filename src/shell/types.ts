@@ -81,6 +81,18 @@ export type ChromeContext = Readonly<{
   session: SessionSnapshot;
   now: number;
   columns: number;
+  /**
+   * Copy mode is up (C16 §5b).
+   *
+   * **Handed down rather than left to the default header**, because an app that
+   * supplies its own chrome supplies all of it — and copy mode is the one mode
+   * whose entire effect is that things stop responding. A reader whose mouse
+   * has gone dead with nothing on screen saying why has been given a bug.
+   *
+   * Not on `SessionSnapshot`: that is what a *command* runs against, and this is
+   * a property of the frame, like `columns`.
+   */
+  copyMode: boolean;
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];

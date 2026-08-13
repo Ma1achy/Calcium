@@ -236,6 +236,11 @@ Fake `schedule`, spy `render`/`repaint`, fabricated capabilities.
 - **T1.12** (I6): with `synchronisedUpdate: true`, a write emits `2026 h` before and `2026 l` after the render callback.
 - **T1.13** (I6): with `synchronisedUpdate: false`, no `2026` byte is emitted.
 - **T1.14**: custom `windows: { stream: 16 }` → the stream timer is scheduled at 16 ms.
+- **T1.15** (I13): `suspend()` then `commit("input")` → neither callback is called. Then `resume()` → `render()` once. The pair is the assertion: a suspension that never lifts is indistinguishable from a scheduler that stopped working.
+- **T1.16** (I13): `suspend()` then `commit("resize")` → `repaint()` is called **while suspended**. Contamination overrides, because suspension may make the screen stale and may not leave it unknown — and a resize is the case where deferring costs the state the application can no longer see.
+- **T1.17** (I13): `suspend()`, `invalidate()`, `commit("input")` → `repaint()`. The same rule reached without a resize, so the row is about contamination rather than about `resize` in particular.
+- **T1.18** (I14): `commit("spinner")` then `suspend()` then `flush()` → nothing is written, and no work is held: `resume()` produces exactly **one** `render()`. A queue would produce two.
+- **T1.19** (I14): `resume()` calls `render()` and not `repaint()`, with `contaminated` false throughout. The diff's model of the screen survives suspension because suspension writes nothing — which is the property that made this the right seam rather than a `render` callback that returns early.
 
 ### Tier 2 — contract / interface
 

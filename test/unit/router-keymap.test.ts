@@ -302,6 +302,14 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt c+z": ["\u001a"],
       "prompt m+z": ["\u001bz"],
 
+      // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
+      // provisional — which key enters copy mode is the rebindable-keys row's
+      // question — and its *wire form* is not: this check fired on the binding
+      // the moment it was added, before the mode had a producer, which is what
+      // it is for.
+      "prompt m+v": ["\u001bv"],
+      "liveBlock m+v": ["\u001bv"],
+
       // The pushed view (I24). **The plain letters are the interesting rows**,
       // and they are only bindable at this target: a prompt takes `n` and `p`
       // as text, and §6 rejected `g`/`G` for the transcript for exactly that

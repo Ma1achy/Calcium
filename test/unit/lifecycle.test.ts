@@ -301,3 +301,86 @@ describe("C01 raw input delivery", () => {
     expect(stdin.rawModeCalls.at(-1), "raw mode off, as C21 I6 requires").toBe(false);
   });
 });
+
+describe("C01 mouse tracking, toggled (copy mode)", () => {
+  it("T1.20 (I6): setMouseTracking(false) emits the leave pair; (true) emits it back", () => {
+    // **Here because nowhere else may write an escape sequence.** The mode is
+    // C01's from `acquire()` to `release()`, and a second writer of it is the
+    // class this component exists to prevent.
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+    const before = stdout.output;
+
+    lifecycle.setMouseTracking(false);
+    const off = stdout.output.slice(before.length);
+    expect(off, "1006l then 1002l — the leave pair, in order").toContain(MODES.mouseSgrOff);
+    expect(off).toContain(MODES.mouseOff);
+    expect(off.indexOf(MODES.mouseSgrOff)).toBeLessThan(off.indexOf(MODES.mouseOff));
+
+    const mid = stdout.output;
+    lifecycle.setMouseTracking(true);
+    const on = stdout.output.slice(mid.length);
+    expect(on).toContain(MODES.mouseOn);
+    expect(on).toContain(MODES.mouseSgrOn);
+  });
+
+  it("T1.21: the toggle is idempotent, so a caller never has to ask twice", () => {
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+
+    lifecycle.setMouseTracking(false);
+    const after = stdout.output;
+    lifecycle.setMouseTracking(false);
+
+    expect(stdout.output, "the second call emits nothing").toBe(after);
+  });
+
+  it("T1.22 (I10): without the capability the mode was never taken, so nothing toggles", () => {
+    // A no-op rather than an emission, and `held` stays truthful — which is
+    // what keeps the release unwind correct with no second flag beside it.
+    const { lifecycle, stdout } = harness({ mouse: false });
+    lifecycle.acquire();
+    const before = stdout.output;
+
+    lifecycle.setMouseTracking(false);
+    lifecycle.setMouseTracking(true);
+
+    expect(stdout.output).toBe(before);
+  });
+
+  it("T1.23: tracking left off is not left off at release — `held` is the record", () => {
+    // The control for the line above. If `held` were not updated, release would
+    // emit a second leave for a mode already left; if a separate flag tracked
+    // it, the two could disagree. One record, and this row is what says so.
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+    lifecycle.setMouseTracking(false);
+    const before = stdout.output;
+
+    lifecycle.release();
+    const out = stdout.output.slice(before.length);
+
+    expect(out, "release does not re-leave a mode already left").not.toContain(MODES.mouseOff);
+    expect(out, "and the alternate screen still goes back").toContain(MODES.altScreenOff);
+  });
+
+  it("T1.24: a no-op while suspended — a child owns the terminal's modes there", () => {
+    // **`true`, not `false`, and the mutation pass is what found that.** The
+    // first version of this row turned tracking *off* while suspended and
+    // passed with the state guard removed — because `suspend()` has already
+    // unwound every held mode, so `held.has("mouse")` is false and the
+    // idempotence check returns first. The row proved nothing, and it read
+    // exactly like one that proved the guard.
+    //
+    // Turning it *on* is the arm the guard is actually load-bearing for: with
+    // the guard gone it emits `1002h` into a terminal a child owns.
+    const { lifecycle, stdout } = harness();
+    lifecycle.acquire();
+    lifecycle.suspend();
+    const before = stdout.output;
+
+    lifecycle.setMouseTracking(true);
+
+    expect(stdout.output, "nothing is written into a child's terminal").toBe(before);
+  });
+});

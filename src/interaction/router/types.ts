@@ -222,7 +222,18 @@ export type KeyAction =
   | "viewBottom"
   | "viewPageUp"
   | "viewPageDown"
-  | "viewPop";
+  | "viewPop"
+  // --- copy mode (C16 §5b) -------------------------------------------------
+  //
+  // **Entry only. The exit is §5's rung and not an action**, because leaving is
+  // `⌃c` and `⌃c` resolves on the ladder rather than in this table — the same
+  // split every other target has. An `exitCopyMode` row here would be a second
+  // way out with an order of its own, which is what makes copy mode a target
+  // rather than a mode in the first place.
+  //
+  // A mode with entry and no exit is B1; a mode with an exit and no entry is
+  // the same defect inverted, and just as testable.
+  | "enterCopyMode";
 
 export type Binding = Readonly<{
   target: FocusTarget;

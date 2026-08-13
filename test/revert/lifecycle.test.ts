@@ -172,6 +172,7 @@ describe("C01 fail-on-revert", () => {
         "onResize",
         "onResume",
         "onInput",
+        "setMouseTracking",
         "size",
         "writer",
         "acquired",

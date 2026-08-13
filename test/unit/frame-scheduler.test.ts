@@ -190,3 +190,113 @@ describe("C03 acquisition and synchronised update", () => {
     expect(written).toEqual([]);
   });
 });
+
+describe("C03 §4a — suspension", () => {
+  it("T1.15 (I13): a suspended scheduler writes nothing, and resume writes once", () => {
+    // **The pair is the assertion.** A suspension that never lifts is
+    // indistinguishable from a scheduler that stopped working, so asserting the
+    // silence alone would pass for a component that had simply broken.
+    const { scheduler, render, repaint } = build();
+
+    scheduler.suspend();
+    scheduler.commit("input");
+    scheduler.commit("completion");
+
+    expect(render, "nothing is written while suspended").not.toHaveBeenCalled();
+    expect(repaint).not.toHaveBeenCalled();
+
+    scheduler.resume();
+
+    expect(render).toHaveBeenCalledTimes(1);
+    expect(repaint, "resume diffs; it does not repaint").not.toHaveBeenCalled();
+  });
+
+  it("T1.16 (I13): a resize is written while suspended — contamination overrides", () => {
+    // Suspension may make the screen *stale*, which is what the reader asked
+    // for. It may not make the screen *unknown*. Width is the axis that wraps
+    // and a wrapped line scrolls the alternate screen, which is the one failure
+    // the application can no longer see — so deferring here protects nothing
+    // and costs the state.
+    const { scheduler, render, repaint } = build();
+
+    scheduler.suspend();
+    scheduler.commit("resize");
+
+    expect(repaint, "a resize reaches the terminal while suspended").toHaveBeenCalledTimes(1);
+    expect(render).not.toHaveBeenCalled();
+
+    // And the suspension is still in force afterwards: the resize was written
+    // because it was contaminated, not because it lifted the hold.
+    scheduler.commit("input");
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("T1.17 (I13): the rule is contamination, not resize in particular", () => {
+    // The same behaviour reached through `invalidate()`, so the row cannot pass
+    // for an implementation that special-cased one commit reason.
+    const { scheduler, render, repaint } = build();
+
+    scheduler.suspend();
+    scheduler.invalidate();
+    scheduler.commit("input");
+
+    expect(repaint).toHaveBeenCalledTimes(1);
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("T1.18 (I14): flush forces nothing while suspended, and holds no queue", () => {
+    // **Both obvious answers were wrong**, and this row separates them. If
+    // `flush()` composed, suspension would be advisory — the first assertion.
+    // If suspension queued, `resume()` would produce more than one frame — the
+    // last. There is no queue because `commit` already collapses to one state
+    // and one deferred reason, which was true long before suspension existed.
+    const { scheduler, render, clock } = build();
+
+    scheduler.commit("spinner");
+    scheduler.suspend();
+    scheduler.flush();
+
+    expect(render, "flush does not compose while suspended").not.toHaveBeenCalled();
+
+    // The armed timer still fires and still writes nothing.
+    clock.advance(100);
+    expect(render).not.toHaveBeenCalled();
+
+    scheduler.resume();
+    expect(render, "one frame on resume, not one per held commit").toHaveBeenCalledTimes(1);
+  });
+
+  it("T1.19 (I14): resume diffs, because suspension wrote nothing to diverge from", () => {
+    // **The property that chose this seam over a no-op `render` callback.**
+    // Nothing was written, so the terminal still holds the last frame this
+    // component put there and the diff's model of it is still true. A repaint
+    // here would be a larger burst bought with no correctness at all — and a
+    // no-op render would have cleared these two flags on a frame that never
+    // reached the screen.
+    const { scheduler, render, repaint } = build();
+
+    scheduler.commit("input"); // a real frame, so there is a screen to diff against
+    expect(render).toHaveBeenCalledTimes(1);
+
+    scheduler.suspend();
+    scheduler.commit("stream");
+    scheduler.resume();
+
+    expect(repaint).not.toHaveBeenCalled();
+    expect(render).toHaveBeenCalledTimes(2);
+    expect(scheduler.contaminated, "suspension never contaminates").toBe(false);
+  });
+
+  it("T1.19b (I13): suspend and resume are idempotent", () => {
+    const { scheduler, render } = build();
+
+    scheduler.suspend();
+    scheduler.suspend();
+    scheduler.commit("input");
+    expect(render).not.toHaveBeenCalled();
+
+    scheduler.resume();
+    scheduler.resume();
+    expect(render, "the second resume commits nothing").toHaveBeenCalledTimes(1);
+  });
+});

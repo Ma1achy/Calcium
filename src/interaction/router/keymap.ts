@@ -270,6 +270,25 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "pushedView", key: { name: "down" }, action: "viewPageDown" },
   { target: "pushedView", key: { name: "escape" }, action: "viewPop" },
 
+  // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
+  //
+  // **`⌥v` is PROVISIONAL and the word is load-bearing.** Which key enters copy
+  // mode is a question for the rebindable-keys row and is deliberately still
+  // open; shipping the mode with no way in is B1's failure inverted — a mode
+  // that can be left and never entered — so a default is picked and labelled
+  // rather than deferred. `v` for *visual*, on the meta path `⌥b`/`⌥d`/`⌥f`
+  // already use, and free in this table.
+  //
+  // **Checked through the real decoder before being written down** (T2.13,
+  // T2.14): `ESC v` decodes as `{name: "v", meta: true}`.
+  //
+  // **Two targets, not `global`.** `activeTarget` answers `global` only with no
+  // live entry and focus away from the prompt, so a `global` row would resolve
+  // almost nowhere. Not `interaction`: a block's declared keys are an open set
+  // (C26 I14) and a framework binding there shadows one — C16 §5a row A4.
+  { target: "prompt", key: { name: "v", meta: true }, action: "enterCopyMode" },
+  { target: "liveBlock", key: { name: "v", meta: true }, action: "enterCopyMode" },
+
   { target: "global", key: { name: "pageup" }, action: "scrollPageUp" },
   { target: "global", key: { name: "pagedown" }, action: "scrollPageDown" },
   { target: "global", key: { name: "home", ctrl: true }, action: "scrollTop" },

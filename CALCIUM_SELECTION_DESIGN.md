@@ -75,7 +75,7 @@ running it against keys that did not exist yet.
 
 ---
 
-## 3. Step 1 — copy mode reachable and leavable
+## 3. Step 1 — copy mode reachable and leavable · **LANDED 2026-08-13**
 
 **One commit, and B1 is why the parts cannot be split.** `session.ts:547–548`
 holds two stubs. A producer without an exit gives the reader a mode that consumes
@@ -87,8 +87,13 @@ Four pieces, together:
 - **The producer.** Real state behind `copyMode: () => boolean`, owned by L4
   beside the other frame queries.
 - **The exit.** `exitCopyMode` clears it. The `⌃c` rung needs no change.
-- **A binding to enter.** Not designed here — it wants the rebindable-keys row
-  and one free key, and it is the smallest open piece.
+- **A binding to enter — `⌥v`, and it is PROVISIONAL.** Which key enters copy
+  mode is still the rebindable-keys row's question; shipping the mode with no
+  way in is B1's failure inverted, so a default is picked and labelled rather
+  than deferred. Bound at `prompt` and `liveBlock`, **not** `global` (which
+  `activeTarget` almost never answers) and **not** `interaction` (C16 §5a A4 —
+  a block's declared keys are an open set). T2.13 fired on the row the moment it
+  was added, before the mode had a producer, which is what that check is for.
 - **The chrome indicator.** The mode belongs on screen exactly as `NAV`/`EDIT`
   does. A mode with no indicator is a reader wondering why the mouse stopped
   working.

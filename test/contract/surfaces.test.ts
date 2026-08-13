@@ -158,6 +158,7 @@ describe("the S-series' illustrated heights", () => {
     const frame = compose({
       chrome: { header: () => [], footer: () => [] },
       session: () => S01_SESSION,
+      copyMode: () => false,
       now: () => 1_700_000_000_000,
       size: () => ({ columns: width, rows }),
       promptRows: () => 1,

@@ -118,7 +118,7 @@ describe("C03 fail-on-revert", () => {
 
     expect(scheduler.commit.length, "commit takes a reason and nothing else").toBe(1);
     expect(new Set(Object.keys(scheduler))).toEqual(
-      new Set(["commit", "flush", "invalidate", "pending", "contaminated"]),
+      new Set(["commit", "flush", "invalidate", "suspend", "resume", "pending", "contaminated"]),
     );
   });
 

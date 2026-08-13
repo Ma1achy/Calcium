@@ -51,6 +51,7 @@ function frameAt(columns: number, rows: number, promptRows = 1): Composed {
   return compose({
     chrome: { header: () => [], footer: () => [] },
     session: () => SESSION,
+    copyMode: () => false,
     now: () => 1_700_000_000_000,
     size: () => ({ columns, rows }),
     promptRows: () => promptRows,
@@ -157,6 +158,7 @@ describe("C22 §6 — the paint", () => {
     const f = compose({
       chrome: { header: () => [], footer: () => [] },
       session: () => SESSION,
+      copyMode: () => false,
       now: () => 1_700_000_000_000,
       size: shrinking,
       promptRows: () => 1,

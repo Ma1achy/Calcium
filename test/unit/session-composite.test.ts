@@ -38,6 +38,7 @@ function frameAt(columns = 40, rows = 12): Composed {
   return compose({
     chrome: { header: () => [], footer: () => [] },
     session: () => SESSION,
+    copyMode: () => false,
     now: () => 1_700_000_000_000,
     size: () => ({ columns, rows }),
     promptRows: () => 1,

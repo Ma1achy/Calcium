@@ -716,3 +716,87 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
   });
 });
+
+describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
+  it("T4.30 (C16 §5b B1): ⌥v enters, the header says COPY, mouse tracking goes off", async () => {
+    // **B1 is the row this file owes.** `copyMode` and `exitCopyMode` were both
+    // stubs for the length of C26 — routed, ordered, unreachable — and the
+    // producer landing alone would have given a mode the ⌃c rung consumes and
+    // does not end. The pair is asserted as a pair for that reason.
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    // The control: the indicator is not there before the key, so the assertion
+    // below is about the key rather than about the header always saying COPY.
+    expect(screen().rows[0], "no indicator before entry").not.toContain("COPY");
+
+    const before = stdout.output;
+    await type("\u001bv");
+
+    expect(screen().rows[0], "the mode is on screen, in the row always drawn").toContain("COPY");
+    expect(
+      stdout.output.slice(before.length),
+      "tracking off, so the terminal's own selection works",
+    ).toContain("[?1002l");
+
+    // **The indicator's frame is up before the hold takes effect** — otherwise
+    // the reader is told nothing and simply finds the mouse dead.
+    expect(screen().rows[0]).toContain("COPY");
+  });
+
+  it("T4.31 (C16 §5b B1): ⌃c leaves it, and the screen comes back", async () => {
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    await type("\u001bv");
+    expect(screen().rows[0]).toContain("COPY");
+
+    const before = stdout.output;
+    await type("\u0003");
+
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+    expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
+  });
+
+  it("T4.32 (C03 I13): while copy mode is up, output does not move the screen", async () => {
+    // The whole point of the suspension, at the level where it is visible:
+    // a selection the reader is taking must not come to mean other text.
+    const stdin = fakeStdin();
+    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+
+    // A control first: typing moves the screen when copy mode is NOT up, so the
+    // assertion after it is about the mode and not about typing being invisible.
+    const base = screen().rows.join("\n");
+    await type("abc");
+    expect(screen().rows.join("\n"), "typing normally repaints").not.toBe(base);
+
+    await type("\u001bv");
+    const held = stdout.output;
+
+    await type("def");
+    expect(stdout.output, "nothing reaches the terminal while suspended").toBe(held);
+
+    await type("\u0003");
+    expect(stdout.output.length, "and resume writes the catching-up frame").toBeGreaterThan(
+      held.length,
+    );
+  });
+});

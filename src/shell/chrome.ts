@@ -39,6 +39,15 @@ const header =
       chips: [
         { label: name },
         { label: binary, tone: "muted" },
+        // **Not optional, and not a footer hint.** Copy mode is the one mode
+        // whose whole effect is that things stop responding — the mouse goes
+        // dead and the screen stops moving — so a reader with nothing on screen
+        // saying why has been handed a bug rather than a feature. It sits in
+        // the header because the header is the row that is always drawn.
+        //
+        // Ahead of the clock, so it does not move when the clock narrows at
+        // 80 columns (§4's two formats).
+        ...(ctx.copyMode ? [{ label: "COPY", tone: "warn" as const }] : []),
         { label: formatClock(ctx.now, ctx.columns), tone: "muted" },
       ],
     }),
