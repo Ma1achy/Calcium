@@ -52,6 +52,18 @@ export declare function checkOrdering(
   readFile?: (file: string) => string,
 ): Violation[];
 
+/** SP7 — every test row id a spec declares, in document order, `x` rows excluded. */
+export declare function testRowsOf(
+  file: string,
+  readFile?: (file: string) => string,
+): string[];
+
+/** SP7 — a test row's number is unique within its spec. */
+export declare function checkTestRowIds(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+): Violation[];
+
 export declare const OWNERS: readonly Readonly<{ path: string; spec: string }>[];
 export declare const TOPICS: Readonly<Record<string, string>>;
 export declare const REFERENCE_EXCEPTIONS: Readonly<Record<string, string>>;

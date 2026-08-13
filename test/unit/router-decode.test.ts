@@ -41,7 +41,7 @@ const names = (events: readonly InputEvent[]): string[] =>
   events.map((e) => (e.kind === "key" ? e.key.name : e.kind));
 
 describe("C16 §2 — key decoding", () => {
-  it("T1.3b (I17): `\\r` is enter and `\\n` is Ctrl-J — asserted as a pair", () => {
+  it("T1.3h (I17): `\\r` is enter and `\\n` is Ctrl-J — asserted as a pair", () => {
     // They were the same event, and only `\r` was ever asserted. A binding on
     // Ctrl-J — one of the two terminal-independent newline bindings C17 I12
     // requires — resolved against something nothing could produce, and the
@@ -60,7 +60,7 @@ describe("C16 §2 — key decoding", () => {
     ]);
   });
 
-  it("T1.3d (I17): Shift-Enter decodes, in both forms a terminal sends it", () => {
+  it("T1.3j (I17): Shift-Enter decodes, in both forms a terminal sends it", () => {
     // The third instance, and the one the mechanical check found rather than a
     // person. `u` is not in the letter table and `27` is not in the tilde
     // table, so both sequences were discarded as well-formed-but-unknown —
@@ -139,7 +139,7 @@ describe("C16 §2 — key decoding", () => {
     ]);
   });
 
-  it("T1.3c (I17): a modified key carries the unmodified key's name", () => {
+  it("T1.3i (I17): a modified key carries the unmodified key's name", () => {
     // `Alt-Enter` arrived as {name: "\r", meta: true} — the byte, not the name
     // the keymap uses — so C17 I12's other terminal-independent newline binding
     // also resolved against an event nothing produced. Both halves of I12 were

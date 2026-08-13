@@ -62,7 +62,7 @@ const MUTATIONS = [
     file: PAINT,
     from: "    const squared = exact(gutter + body, width);\n    const span = spans.get(i);\n    out.push(span === undefined ? squared : washed(squared, span, deps));",
     to: "    const span = spans.get(i);\n    const inner = gutter + body;\n    out.push(exact(span === undefined ? inner : washed(inner, span, deps), width));",
-    expect: "T4.14",
+    expect: "T4.23",
   },
   {
     // **The window ignored.** An editor row and a painted row are different
@@ -73,7 +73,7 @@ const MUTATIONS = [
     file: PAINT,
     from: "    const at = span.row - window.first + window.offset;",
     to: "    const at = span.row;",
-    expect: "T4.17",
+    expect: "T4.26",
   },
   {
     // **Geometry.** Appending rather than styling in place is what a row of
@@ -84,7 +84,7 @@ const MUTATIONS = [
     file: PAINT,
     from: "  return `${before}${paintSpans([{ text: inside, style }])}${after}`;",
     to: "  return `${before}${paintSpans([{ text: inside, style }])}${after} `;",
-    expect: "T4.13",
+    expect: "T4.22",
   },
   {
     // **The 1-bit rung removed.** At one bit `resolveBackground` answers
@@ -94,7 +94,7 @@ const MUTATIONS = [
     file: PAINT,
     from: "  return bg.background === undefined ? { inverse: true } : bg;",
     to: "  return bg;",
-    expect: "T4.16",
+    expect: "T4.25",
   },
 ];
 

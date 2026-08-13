@@ -258,7 +258,7 @@ So `surfaces.selection` is a text-bearing surface and `SELECTION_SLOTS` is its p
 
 Shipped values, measured against `tone.default`'s 4.5 floor: dark `#264057` at **7.25**, light `#c9ddf5` at **8.18**.
 
-**Reverse video is the 1-bit rung and it is the painter's, not the theme's.** `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash alone would fall from a background straight to nothing. `inverse` needs no colour at all and is supported essentially universally, which is what stops the ladder having a hole in the middle. C22 T4.16 is that rung.
+**Reverse video is the 1-bit rung and it is the painter's, not the theme's.** `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash alone would fall from a background straight to nothing. `inverse` needs no colour at all and is supported essentially universally, which is what stops the ladder having a hole in the middle. C22 T4.25 is that rung.
 
 ---
 

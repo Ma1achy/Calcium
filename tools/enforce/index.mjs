@@ -16,6 +16,7 @@ import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import {
   checkCommitments,
   checkOrdering,
+  checkTestRowIds,
   checkReferences,
   checkSeamFour,
   referenceFiles,
@@ -59,6 +60,7 @@ const violations = [
   // SP2 — the numbers locate what they name. SP3 — and everything that cites
   // one of them resolves, which for eleven hundred references nothing did.
   ...checkOrdering(specs),
+  ...checkTestRowIds(specs),
   // SP4 — Seam 4 and its owners agree, both directions. The only artefact
   // several components write to and none owns, wrong at every one that touched
   // it, because every row exists twice and nothing compared the copies.

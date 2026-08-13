@@ -387,7 +387,7 @@ Fake heights, no rendering.
 - **T6.11** (I11): shelling out to a clipboard binary → T2.4 fails.
 - **T6.13** (§4): restoring `settle` to "invalidates nothing" → T4.10 fails, and the app route's entry has zero height for the rest of the session: appended with no blocks, measured at zero, settled with the real document, never remeasured. The screen is blank with the entry in the store, and every assertion about anchors, clamping and the cache passes.
 - **T6.12** (I12): C14 calling `commit` directly → T4.8's spy fails, and L2 gains a dependency on L0-terminal.
-- **T6.13** (I13): special-casing the eviction marker → T4.3's cache-delta assertions fail on the marker entry.
+- **T6.20** (I13): special-casing the eviction marker → T4.3's cache-delta assertions fail on the marker entry.
 - **T6.14** (I3): reading `(entryId, rev, width)` as a composite map key → T2.3b fails, and a `--watch` at a thousand lines a second accumulates a slot per tick. T2.3 still passes, which is why T2.3b exists.
 - **T6.15** (I9): keeping the front offset and never rebuilding → T2.8 fails on a session that evicts without resizing, and the index outgrows the transcript it indexes.
 - **T6.19** (§5 step 6): removing the `followTail` branch from `resize` → T3.12c fails and the tail drifts off the bottom of the screen. `#afterContent` has the same two-branch shape ten lines away, which is what makes the omission read as a completed step.

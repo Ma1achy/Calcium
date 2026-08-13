@@ -686,9 +686,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.16** (I18): each of the three pending states, reset and then continued — a lone `Esc` mid-window, a paste between its markers, a run inside the heuristic's window. *Then* the bytes that would have completed each sequence decode as themselves, and `reset()` itself emitted nothing. Three cases rather than one, because a reset that cleared only the escape window passes any single-state test and still emits a child's keystrokes inside the next paste.
 - **T1.3c** (I3): a click at a transcript row resolves to that row's block, not to the focused target.
 - **T1.3d** (I3): a click inside an overlay's placed region resolves to the overlay even when focus is elsewhere.
-- **T1.3b** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
-- **T1.3c** (I17): `ESC \r` decodes to `{name: "enter", meta: true}` — the name the keymap uses, not the byte.
-- **T1.3d** (I17): `CSI 13;2u` and `CSI 27;2;13~` both decode to `{name: "enter", shift: true}`. Both forms, because a terminal sends one or the other and a rule satisfied by either is satisfied on half the terminals.
+- **T1.3h** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
+- **T1.3i** (I17): `ESC \r` decodes to `{name: "enter", meta: true}` — the name the keymap uses, not the byte.
+- **T1.3j** (I17): `CSI 13;2u` and `CSI 27;2;13~` both decode to `{name: "enter", shift: true}`. Both forms, because a terminal sends one or the other and a rule satisfied by either is satisfied on half the terminals.
 - **T1.3e** (I17, §2): xterm's Meta bit is read. `CSI 1;10D` and `CSI 1;2D` decode to **different** keys, and `CSI 1;10D` and `CSI 1;4D` to the **same** one — the two wire forms of `⌥⇧←`. The pair is the assertion: either form alone passes with bit 8 unread, which `CSI 1;16D` shows by being correct in the broken state. Fabricated rather than found, because the defect produces a well-formed key and nothing above the decoder can see it.
 - **T1.4**: `CSI 200~` enters buffering.
 - **T1.5** (I12): bytes during buffering emit no key events.

@@ -433,7 +433,7 @@ describe("C22 §3 — construction order", () => {
     expect(withOwn.pipeline).toBe(injected);
   });
 
-  it("T1.4e (I23, I23a): an author's own document constructs, and gains the six", async () => {
+  it("T1.4p (I23, I23a): an author's own document constructs, and gains the six", async () => {
     // **Inverted.** This row used to assert the opposite — that a hand-built
     // manifest is *refused*, naming the verbs it lacks. The refusal was right
     // about the danger and left no accepted input: an author cannot produce a

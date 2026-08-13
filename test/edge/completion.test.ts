@@ -284,7 +284,7 @@ describe("C19 §6 — the menu", () => {
     expect(glyphs(second)).toEqual([undefined, "bullet"]);
   });
 
-  it("T3.19 (I18): a candidate with a detail renders its label and its hint, at every width", () => {
+  it("T3.29 (I18): a candidate with a detail renders its label and its hint, at every width", () => {
     // **Asserted on the rendered rows rather than on the block**, because the
     // block was correct throughout. C11 hands residual width only to columns
     // declaring `flex: true` (plan.ts step 8), the menu's table declared

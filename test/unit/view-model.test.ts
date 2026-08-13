@@ -197,7 +197,7 @@ describe("C04 validation", () => {
     expect(r.ok === false && r.error.join(" ")).not.toContain("cyclic");
   });
 
-  it("T1.16 (§3): a line plot without a height is a construction error", () => {
+  it("T1.19 (§3): a line plot without a height is a construction error", () => {
     expect(() =>
       block({ kind: "plot", id: "p", form: "line", series: [{ values: [1, 2] }] }),
     ).toThrow(BlockShapeError);

@@ -599,7 +599,7 @@ Six tiers. No state machine, so no transition table (A02 §7).
 - **T6.3** (I6): making `patch` a privileged built-in → T2.3 fails.
 - **T6.4** (I4): rendering the add/remove distinction with tone alone → T4.2 fails at `colourDepth: 1`.
 - **T6.5** (I3): tokenising inside `measure` → T2.5 fails.
-- **T6.8** (I21a): dropping the pin, so a window derives its own gutter → T3.20 fails. **This is the shipped behaviour**, and its symptom is not a crash or a wrong height: it is every line of a large diff moving three columns sideways as the reader scrolls the fullscreen view, which reads as the terminal misbehaving.
+- **T6.25** (I21a): dropping the pin, so a window derives its own gutter → T3.20 fails. **This is the shipped behaviour**, and its symptom is not a crash or a wrong height: it is every line of a large diff moving three columns sideways as the reader scrolls the fullscreen view, which reads as the terminal misbehaving.
 - **T6.6** (§3): flipping the layout threshold so split is the narrow form → T1.5 fails, and every line truncates at 60 columns.
 - **T6.7** (C04 commitment 20): merging `patch` into `diff` behind a mode flag → T2.1 fails, because height then depends on the mode rather than the block.
 

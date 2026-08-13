@@ -529,8 +529,36 @@ The suite governs the source. **SP1 governs the documents the source is written 
 | SP4 | A02 Seam 4 and each owner's orchestration table hold the same rows, **both directions** | A02 Seam 4 · C22 §3c · C23 §4 | A02 §Seam 4 |
 | SP5 | Every `Fnn` citation resolves against a finding that exists | FINDINGS · CLAUDE.md §Ask where a settled claim is written down | A03 §7a |
 | SP6 | Every finding is keyed in `TRIAGE.md`, and its declared total is compared by equality | FINDINGS F142 · F87 | A03 §7a |
+| SP7 | A test row's number is unique within its spec; `Tn.x` placeholders exempt | `docs/components/` | A03 §2 · A03 §7a |
 
 They run in `make enforce` and their fire-tests are `test/unit/enforce-commitments.test.ts`.
+
+**SP7 is SP2's argument applied to the numbers tests actually cite, and it was missing for the
+whole build.** SP2 makes invariant ids unique because *"C13 I17 is the cap"* locates something
+only if the numbers do. A test row is cited by more readers than an invariant is — every test name in
+this repository opens with one, and every fail-on-revert row names the row it breaks — and
+nothing checked them.
+
+**Twenty-four duplicated numbers across twelve specs on its first run**, and the way they were
+found is the argument for the rule. Five of them were created in one session, by appending a
+group of rows to a tier whose numbering had moved on, and they were noticed only because a
+sixth row was about to be added by hand. C01 declares `T3.18c` twice, about two different
+states; C04 declares `T1.16` twice, once about row-id uniqueness and once about a plot's
+height; C23 held five. **Every one of them read as backed**: nothing is missing and nothing
+dangles, so SP1 and SP3 stay green while the number has stopped locating anything — A03 §2's
+failure arriving at the *citation* rather than at the rule.
+
+**The remedy keeps the letter's meaning, which SP2 already had to learn.** A lettered row is a
+variant of its base, so a duplicated `T1.3b` becomes the next free letter of `T1.3` rather than
+the next free number of tier 1: a positional renumber invents a relationship that does not
+exist. And the new letter goes *after* the highest, never into a gap, so the letters ascend with
+the document.
+
+**Its blind spot is the placeholder, and it is stated because an unrecorded limit reads as
+strength.** A spec under construction writes `T3.x` for a row whose number is not yet decided —
+C26 §8b carries seven — and a placeholder is not a claim about a row, so `x` rows are excluded
+before the comparison. The cost is real: two rows that both stay `T3.x` are two this rule will
+never separate, and only their landing numbers close that.
 
 **SP2 is a check that existed as a habit rather than a mechanism**, which is the same class as SS3 (§2) approached from the other side: not a rule written down and never built, but a rule performed reliably and never written down. Ordering was verified by ad-hoc script while the specs were written and caught every time. When the habit stopped, the drift resumed — twenty of twenty-five specs, C04 declaring `…17, 22, 23, 24, 25, 26, 27, 28, 19, 29, 18, 20, 20a, 33, 32, 31, 30, 21` — and nothing went red, because nothing was missing and no citation dangled. The list had simply stopped locating anything.
 

@@ -598,7 +598,7 @@ describe("C22 §3 step 11 — the effect table", () => {
 });
 
 describe("C22 §3 step 12 — the read loop", () => {
-  it("T1.4f (C22 I24): a byte reaches the router only once the terminal is acquired", async () => {
+  it("T1.4q (C22 I24): a byte reaches the router only once the terminal is acquired", async () => {
     const { graph, stdin } = await buildGraph();
 
     stdin.emit("a");

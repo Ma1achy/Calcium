@@ -378,7 +378,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
   /** The painted index of prompt row `i`: header + viewport, then the prompt. */
   const promptAt = (f: Composed, i: number): number => f.region.height + 1 + i;
 
-  it("T4.13 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
+  it("T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
     // **The invariant at every step, not a note about this one.** A row of
     // chrome — a marker line, a bracket, a status row — is forbidden by the
     // same rule that makes the wash free.
@@ -398,7 +398,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
     }
   });
 
-  it("T4.14 (entry 23): a row the region passes THROUGH is washed to the full width", () => {
+  it("T4.23 (entry 23): a row the region passes THROUGH is washed to the full width", () => {
     // **The mutation this row was written for**, and a frame-read is the only
     // instrument that reaches it: a wash stopping at the last cluster reads as
     // *highlighted* rather than *selected*, and it passes every assertion about
@@ -422,7 +422,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
     expect(through.startsWith("abc"), "and it still covers the text").toBe(true);
   });
 
-  it("T4.15 (entry 23): the LAST row of a region stops at the head", () => {
+  it("T4.24 (entry 23): the LAST row of a region stops at the head", () => {
     // The control for the row above. Without it, "full width" is satisfied by
     // washing every row of the region to the edge — a different defect, and one
     // that looks correct on any single-row selection.
@@ -441,7 +441,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
     expect(displayCells(washedCells(rows[promptAt(f, 1)] ?? "")), "two cells").toBe(2);
   });
 
-  it("T4.17 (entry 23, S01 §3): the span is mapped through the prompt's window", () => {
+  it("T4.26 (entry 23, S01 §3): the span is mapped through the prompt's window", () => {
     // **The row the mutation pass demanded.** An editor row and a painted row
     // are the same number until the prompt exceeds its cap and windows around
     // its end — and every other row here has an unwindowed prompt, so dropping
@@ -465,7 +465,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
     );
   });
 
-  it("T4.16 (entry 23, C10 §4b): at 1-bit the wash is reverse video, not nothing", () => {
+  it("T4.25 (entry 23, C10 §4b): at 1-bit the wash is reverse video, not nothing", () => {
     // **The rung that stops the ladder falling from a background straight to a
     // glyph.** `resolveBackground` answers nothing where there is no colour, so
     // a wash alone would vanish; `inverse` needs no colour at all.

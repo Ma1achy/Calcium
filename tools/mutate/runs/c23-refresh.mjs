@@ -95,7 +95,7 @@ const results = runPass({
       file: "src/shell/refresh.ts",
       from: "        if (part.done || part.inFlight) continue;",
       to: "        if (part.done) continue;",
-      expect: "T3.32",
+      expect: "T3.40",
     },
     // --- the teardown set (C23 I33) ----------------------------------------------
     {
