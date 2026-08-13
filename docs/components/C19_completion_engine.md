@@ -165,6 +165,39 @@ navigation cursor later. A function of one argument cannot grow into one — the
 On a fresh session every candidate is `null` and the menu is exactly what it is today, which is
 what makes this safe to land without a second ruling about ties.
 
+### Two things writing it settled that the ruling did not
+
+**Amended rather than chosen silently**, because both are visible only from the implementation
+and both change what the injected function may do.
+
+**The index is rebuilt per submission, never per keystroke.** The cap is 10,000
+(`DEFAULT_CAP`, C20 I10), the menu opens on every keystroke and a set of twenty candidates
+scanned against ten thousand entries is two hundred thousand comparisons on the input path —
+which is I2, *completion never blocks input*, failing in the one place §6a made continuous.
+`HistoryStore.entries` only grows on `append`, so its **length is a version**: the shell
+rebuilds a `Map` when the length changes and answers from it otherwise, O(1) per candidate.
+The engine sees a plain function either way, which is what the seam is for.
+
+**What is matched is the command's first token, and the implementation falsified the first
+wording of this paragraph.** It said a verb candidate's value is `ps` against a history line
+`/ps --mine`, and asked the shell to strip the prefix. **The value is `/ps`** —
+`src/interaction/completion/sources.ts:61` builds it as `` `/${head}` `` — so an index keyed on
+the bare head would have matched nothing, ranked nothing, and left every row green, because a
+stable sort over keys that are all `null` *is* the source order the rows assert. **A ruling
+that is wrong about a value's shape fails silently in exactly the direction the tests cannot
+see.**
+
+Corrected: the key is the history line's first token as typed, which is already the candidate's
+value, and the mapping is an identity rather than a transformation. The **shell** still owns it
+— it knows commands are stored with the prefix, and C19 may not reach for that — but the reason
+is narrower than *the prefix convention and the sub-verb depth*, and the narrower reason is the
+true one.
+
+**A candidate no history line maps to is `null`, and that is the ordinary case.** A path, a
+flag, a container id: none has ever been "run", so all of them keep source order. The rule
+therefore changes the verb menu and leaves every other slot alone — a narrower effect than
+*rank the candidates* suggests, and the one worth stating so nobody looks for it elsewhere.
+
 ### What is deliberately not built
 
 **Subsequence matching is not in this round and the entry says why.** `cstats` → `container
@@ -172,6 +205,26 @@ stats` is what `fzf` trains people to expect, and without a *match-quality* scor
 list worse rather than better: every candidate containing those letters in order arrives, and
 recency cannot rank a set whose members the reader has mostly never run. A scorer is the
 prerequisite and it is a separate ruling.
+
+### The defect writing I27's row found, and it is not entry 31's
+
+**`verbSource`'s own comment describes two-level completion that does not happen.** It reads
+*"offers the next word of each tool name rather than the whole name, so `serving scale`
+completes as `serving` and then `scale`"* — and **the slot after a verb is never `verb`**.
+`context.ts:224` returns one only while `command` is true, which is the first token alone;
+after `/serving ` the tool resolves, it has no positionals, and the slot is `none`. No source
+is applicable, so a sub-verb is uncompletable at the level the comment promises.
+
+**Found by writing a row for I27 that asserted the second level and watching it fail** — the
+first two assertions of T1.17 passed, which is the shape worth naming: a row can confirm the
+rule it was written for and falsify the sentence beside it.
+
+**Recorded here and not fixed, because it is a different component's question.** The slot is
+C19's derivation over C18's tokens, and *"is the second word of a sub-verb a verb"* is a
+classification rule, not a source or a filter. **It is emphatically not entry 31's**: widening
+`matching()` changes nothing here, and neither does ranking — the candidate set is empty
+because nothing is asked. T1.17 asserts the current behaviour so **the row fails the day it is
+fixed** and this section has to be rewritten with it.
 
 **And substring matching is refused for a reason that is not cost — see I27.** The premise
 *prefix matching cannot see a word in the middle of a name* is true of `matching()` and
@@ -641,7 +694,7 @@ Structural: no event mediates these, and a trace indexed by keystrokes reaches n
 - **I24** — A dynamic source's cache key carries the arguments typed *before* the current token as well as the slot's identity, because a source's answer may depend on them — a path inside a named container is the ordinary case. Only the token being typed is excluded, so the narrowing keystrokes after a `Tab` still share one entry.
 - **I25** — A dynamic source may declare `cacheKey(ctx)`, naming what its answer depends on beyond the slot's identity and the earlier arguments. A path source returns the directory it is about to list: its answer is a function of part of the prefix, which the engine may not interpret and no generic rule can extract.
 
-- **I26** — Candidates are ordered **most-recently-run first**, and everything else keeps its source order. The engine ranks after deduplication and before the menu, over C20's history read through an injected `recency: (value) => number | null` rather than a store handle — C19 and C20 are both L3, so an import is a sideways edge that must stay acyclic (A02 §1), and a function of one argument cannot grow into one. `null` is *never run*, and every `null` sorts after every timestamp while preserving the order it arrived in, so a stable sort makes the rule a **refinement** of source order rather than a replacement for it: a source's own ordering still decides among candidates the reader has never used, which is every candidate on a fresh session. **Ranking is the engine's and never a source's** — a source that sorted would be ranking the fraction of the set it produced, and the menu shows the union.
+- **I26** — Candidates are ordered **most-recently-run first**, and everything else keeps its source order. What *run* means is the shell's to answer and never C19's: the mapping from a candidate to a history line needs the prefix convention and the manifest's sub-verb depth, so the engine takes a value and returns a stamp (§3a). The engine ranks after deduplication and before the menu, over C20's history read through an injected `recency: (value) => number | null` rather than a store handle — C19 and C20 are both L3, so an import is a sideways edge that must stay acyclic (A02 §1), and a function of one argument cannot grow into one. `null` is *never run*, and every `null` sorts after every timestamp while preserving the order it arrived in, so a stable sort makes the rule a **refinement** of source order rather than a replacement for it: a source's own ordering still decides among candidates the reader has never used, which is every candidate on a fresh session. **Ranking is the engine's and never a source's** — a source that sorted would be ranking the fraction of the set it produced, and the menu shows the union.
 - **I27** — The verb source offers **the next word** of each tool name, so a prefix that matches no first word matches nothing, and that is the level rather than a miss. `stats` does not complete `container stats`; `container` does, and then `stats`. Any widening to substring or subsequence matching is a change to **this** rule and not to the filter — the filter never sees the buried word, because the source never emits the whole name (§3, C05 §2's sub-verbs). Recorded because *prefix matching cannot see a word in the middle of a name* reads as a one-line fix to `matching()` and would change nothing.
 
 ---
@@ -702,7 +755,7 @@ Six tiers. Every cell of the §8 table and every row of §8a is covered.
 - **T1.15b**: `Tab` on a single match → the candidate and its delimiter, and the slot after the cursor is the next one. A directory candidate ends `/`, a value-taking flag ends `=`, a bool flag ends with a space.
 - **T1.16** (I26): three candidates, two of them run — the more recent first, the older second, the never-run third. The row that a stable sort alone would pass is the fourth: **two never-run candidates keep their source order**, which is what makes the rule a refinement rather than a replacement.
 - **T1.16b** (I26): every candidate never run → the order is exactly the source order, unchanged. The fresh-session case, and the one that says landing this needs no second ruling about ties.
-- **T1.16c** (I26): ranking happens **after** deduplication, so a value produced by two sources is ranked once and keeps the first source's position among equals.
+- **T1.16c** (I26): a value produced by two sources is ranked **once** — one copy in the menu, ahead of the never-run ones. **It does not assert the order of the two steps, and the mutation pass is why.** The row was written for *ranking after deduplication*, and swapping them is behaviourally equivalent: `recency` is a function of the value, so two copies carry identical keys and a stable sort leaves the first where it was. The mutation survives and is an `EXPECTED_SURVIVOR` with that reason. **The sentence that justified the order was not a constraint**, which review cannot tell from one that is.
 - **T1.17** (I27): `stats` at the verb slot completes nothing and `container` completes `container`; after `container `, `stats` completes. The row is written against the claim that this is a *defect*, and it asserts the level instead — a widened `matching()` leaves it identical, because the source never emits `container stats`.
 
 ### Tier 2 — contract / interface
