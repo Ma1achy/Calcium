@@ -296,8 +296,10 @@ notice here.
   stream.
 - **I12** — A refused or throwing `elements` makes the block atomic for that dispatch and
   focus falls to the block level. It is not a throw the caller sees.
-- **I13** — Leaving a scope and a command running are **different transitions**. Both reach
-  the prompt today and only one may keep a focus memory (§8a, table row a).
+- **I13** — Leaving a scope and a command running are **different transitions**, and only
+  one may keep a focus memory. **`FocusStore` already has both functions** — `toPrompt()` is
+  the reader stepping out and `reset()` is C16 I2's append — and the call sites use the wrong
+  one (§8b.2). The invariant is that each exit calls the transition that names it.
 - **I14** — Two-level escape: the first `Esc` exits interaction, the second leaves the
   scope. Neither is C16 §5's Ctrl-C rung and neither is `viewPop` (→ C16 I24) — the
   collision between the second and `viewPop` is trace 6 and is owed a ruling.
@@ -353,6 +355,57 @@ overlap.
 **What does a refusal leave behind?** A throwing `elements` would abandon a focus location
 pointing at something unresolvable, two components from the throw. So it is not a throw:
 the block is atomic for that dispatch and focus falls to the block level → **I12**.
+
+---
+
+## 8b. What the implementation falsified
+
+**The walk rules the shape; code is the first thing that can disprove it.** Both entries
+below were found by reading the call sites before writing a line, and both make a §8a ruling
+*sharper* rather than wrong — which is the disposition worth having a heading for, because a
+walk that is only ever confirmed is a walk nobody checked.
+
+### 1. `⏎` is already bound on `liveBlock`, so §2 cannot have it
+
+§2 says *`⏎` enters interaction on the focused element*. `defaultKeymap` already binds
+`{ target: "liveBlock", key: { name: "enter" }, action: "rowActivate" }` — F21's close, and
+the route from a keystroke to `actions.ts` that did not exist for four components.
+
+**Two bindings on one `(target, key)` is a construction error** (→ C16 I10), so this is not a
+choice between them. **The ruling: one binding, two effects, in order** — `rowActivate` enters
+interaction when the focused element declares one and dispatches the row's action otherwise.
+
+**The precedent is in the same component and was reached the same way.** C16 I22 is `↓`:
+*one binding with two effects, in order*, because the prompt's `↓` is `historyNext` and §3's
+sentence also said it enters the live block. Two claims on one keystroke, and the resolution
+was ordering rather than a second key. Nothing in §8a's table reached this, because the table
+indexes *policy* interactions and this is a collision with a binding that already exists —
+**a rule interaction with the keymap, which is a table neither artefact was indexed over.**
+
+### 2. I13 is smaller as a remedy and larger as a defect
+
+§8a row a said `toPrompt()` and `reset()` both assign `AT_PROMPT`, so one transition carries
+two meanings and focus memory needs them to diverge. **They already diverge. The call sites
+are wired to the wrong one.**
+
+| exit | calls | should call |
+|---|---|---|
+| `⌃c` from the live block — `router.ts:227` | `toPrompt()` | `toPrompt()` ✓ |
+| `Esc` — `focusPrompt`, `keys.ts:530` | **`reset()`** | `toPrompt()` |
+| `↑` past the first row — `keys.ts:570` | **`reset()`** | `toPrompt()` |
+
+`toPrompt()` has **exactly one caller in the tree**, and it is the emphatic exit. The two
+ordinary ones call C16 I2's *a command ran*.
+
+**Invisible today because both produce `AT_PROMPT`**, and backwards the moment focus memory
+exists: `Esc` and `↑` would wipe the memory while `⌃c` kept it. So the remedy is two call
+sites rather than a new transition, and the defect is that the distinction the API already
+draws has never been honoured.
+
+**This is the shape §8a's own preamble warns about one level up.** A ruling can be correct
+about the interaction and wrong about the mechanism it assumed — C23 §8a A4's class. Here it
+assumed a mechanism was *missing* that is present and unused, which is the same error with
+the sign flipped, and it is cheaper to find at the call site than at the cache.
 
 ---
 
