@@ -2313,7 +2313,7 @@ PART  5  publication prep          error messages · the outside-reader test · 
                                    tarball
       —  PUBLISH 0.x               with two real consumers behind it
       6  phase 2                   the empty-block convention · rendering flags
-      7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
+PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
                                    the small navigation items rather than sitting beside them.
                                    SPECIFIED as C26; stages 1–3 built (interaction is a focus
                                    target, blocks report elements, focus holds an address).
@@ -2497,7 +2497,7 @@ PART  43 images (kitty)            designed already; unlocks mermaid HD + ML sam
                                    global. Placed.cursor is per layer (C15 I19), so a bar in
                                    the prompt and a block in a pushed view is legitimate and
                                    one global setting forecloses it
-      46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and its content can
+PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and its content can
                                    exceed its declared height — so scroll follows focus, and
                                    row/panel/group are excluded (no declared height, nothing
                                    to focus). window? and elements? are both built; what is
@@ -2540,6 +2540,7 @@ what landed**.
 | 0 | BUILT | `examples/docker/README.md` (F157), the media (F158), `.github/workflows/ci.yml` `fast`/`proof` (F150, F154, F156) | — |
 | 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:440` | 1.1, 1.3, 1.4 not checked in this pass |
 | 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
+| 7 | PART | **specified as C26, and three stages built.** `ElementAddress` — `interaction/router/types.ts:84` — and one shared resolver, `resolveFocus` — `interaction/router/focus.ts:122` — so focus holds an address and render and keys answer from the same place. Stage 1 made `interaction` a focus target, stage 2 gave blocks `elements`, stage 3 the address; the ⏎ ruling followed. `docs/components/C26_navigation.md` | **§4's policy resolution and the modes.** `ArrowPolicy` and `EscapePolicy` are absent from `src/` — withdrawn under MG24 because `NavElement.arrow` and `.escape` had no reader, **re-checked against the widened rule (F159) and the withdrawal holds**, so §4 is still a design question. The scroller is the fourth kind that check runs against (46) |
 | 8 | BUILT | **C14 I4/I5/I6.** `src/viewport/viewport/viewport.ts:347` — `#afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
 | 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `src/shell/local/registry.ts:59`, reached as `ctx.ask` at `src/shell/execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
 | 12 | BUILT | `src/shell/render-frame.ts:153` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
@@ -2556,13 +2557,14 @@ what landed**.
 | 38 | PART | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` | **the width fractions this entry says ship with it do not.** `childWidths` gives every child the same width — `src/data/viewmodel/measure.ts:122` |
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
 | 39 | RULED | the ruling is in the entry; `Style.background` exists at `src/presentation/theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
+| 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **31** · **33** · **36** · **37** · **41** · **42** · and **7**, which is now specified as C26 and has no `src/interaction/navigation/`. First sweep: **6** —
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **31** · **33** · **36** · **37** · **41** · **42**. First sweep: **6** —
 `FlagDef` has no presentation-selecting field (`data/manifest/types.ts:42–56`), and F15 being
 CLOSED does not close 2.1's convention · **15** — `enterCopyMode` is defined nowhere in
 `src/`, and there is no OSC 52 · **26**, **32**, **40** — the symbols the entries name are
-absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **46** — `window?` and `elements?` are both built, and **nothing holds an offset**: no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`, so the third of the three pieces is the missing one · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
+absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
 until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **44** —
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
 which is worth saying because it reads as coverage.
@@ -2577,8 +2579,30 @@ one somebody did, and so does one nobody could.
 *every SIGWINCH rebuilds the Fenwick index* has been false since C14 I8 landed. Nine of
 forty-two checked — 21% — and the rate did not fall between sweeps.
 
-**Entry 7 is now specified, and four rows below it are inside it rather than beside it.**
-`docs/components/C26_navigation.md` — design only, nothing built. **10** (the question / menu
+**The third sweep, 2026-08-13, found two more — and it was a check rather than a reading.**
+7 and 46 were both blank while their own descriptions said something was built: 7's
+*"stages 1–3 built"*, 46's *"`window?` and `elements?` are both built"*. Both are now PART
+with evidence rows. **Eleven of forty-four checked — 25% — and the rate has now risen
+across three sweeps**, which is worth saying plainly rather than reporting the two finds as
+diligence.
+
+**What made 7 invisible is the hole this list was built with.** Its confirmed-OPEN evidence
+was *"has no `src/interaction/navigation/`"*, and that grep still resolves — the work landed
+in `router/` and `shell/`, because that is where focus lives. **The citation was true and the
+sentence it carried was false**, which no resolution check reaches: check 1 resolves a
+*marked* row's evidence and check 2 only asks that no entry falls out of the partition, so
+both watch rows that make a claim. **A blank row makes none and resolves trivially** — A03
+§2's vacuity class arriving inside the instrument written to catch stale rows.
+
+`tools/roadmap-status.mjs` now carries the arm that closes it, and it needs nothing outside
+this document: **a row that says something is built is not OPEN.** Its first run fired on
+four rows, two real and two using a built-word without asserting anything exists — 3's
+*built with prism-tui as the consumer* and 15's *is built three times*. The pattern is not
+narrowed to fit them; they are named exemptions quoting the sentence, with an equality arm,
+so a row that changes its wording has to re-earn the exemption.
+
+**Entry 7's four subsumed rows stand.** `docs/components/C26_navigation.md` — specified, and
+stages 1–3 built. **10** (the question / menu
 primitive), **15** (selection, copy, semantic copy), **16** (one popup) and the unnumbered
 block-to-block, column and cell movement are subsumed, and C26 §11 lists them with the
 evidence. They keep their rows: *would landing this close it* is answered **no** for all four

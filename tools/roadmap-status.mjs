@@ -78,14 +78,27 @@ function parse(text) {
   /** number -> status. An unmarked row is OPEN, which is what it has always meant. */
   const marked = new Map();
   const all = new Set();
+  /** number -> the row's own description, continuation lines included. */
+  const described = new Map();
+  let current = null;
   for (const line of block.split("\n")) {
     // Six wide, because that is the field the status pass writes. Matching
     // `BUILT|PART|RULED` as alternatives silently missed every marked row —
     // "BUILT" is five characters and the field is six.
     const m = /^(.{6})(\d+|—) /.exec(line);
-    if (m === null) continue;
-    if (m[2] === "—") continue;
+    if (m === null) {
+      // A continuation line of the row above — the descriptions wrap, and the
+      // claim that matters is as likely to be on the fourth line as the first.
+      if (current !== null) described.set(current, `${described.get(current) ?? ""}\n${line}`);
+      continue;
+    }
+    if (m[2] === "—") {
+      current = null;
+      continue;
+    }
     all.add(m[2]);
+    current = m[2];
+    described.set(m[2], line.slice(m[0].length));
     const status = m[1].trim();
     if (status !== "") marked.set(m[2], status);
   }
@@ -120,6 +133,7 @@ function parse(text) {
   return {
     all,
     marked,
+    described,
     evidence,
     confirmedOpen: listed("**Checked and confirmed OPEN**"),
     unchecked: listed("**Not checked, and named"),
@@ -209,7 +223,7 @@ function resolve(cell) {
 // `--file` takes an absolute path from the fixture and a relative one from the
 // Makefile, so it is resolved rather than always joined.
 const text = readFileSync(isAbsolute(ROADMAP) ? ROADMAP : join(ROOT, ROADMAP), "utf8");
-const { all, marked, evidence, confirmedOpen, unchecked } = parse(text);
+const { all, marked, described, evidence, confirmedOpen, unchecked } = parse(text);
 
 const fail = [];
 
@@ -247,6 +261,75 @@ if (confirmedOpen !== null && unchecked !== null) {
   }
   if (spurious.length > 0) fail.push(`accounted for and not in the list: ${sorted(spurious)}`);
   if (twice.length > 0) fail.push(`in two of the three sets: ${sorted(twice)}`);
+}
+
+// --- 3. an OPEN row may not claim, in its own words, that something is built -
+//
+// **A marked row owes a symbol; a blank row owed nothing, and that was the hole.**
+// Check 1 resolves every marked row's evidence, and check 2 makes sure no entry
+// falls out of the partition — so both instruments watch rows that *make a claim*.
+// An OPEN row makes none, which is the vacuity class arriving inside the tool
+// written to catch stale rows: it resolves trivially and reads exactly like a row
+// somebody verified.
+//
+// **Entry 7 is the measured case.** Its status column was blank while its own
+// description read *"SPECIFIED as C26; stages 1–3 built"*, and its confirmed-OPEN
+// evidence — *"has no `src/interaction/navigation/`"* — was true, because the work
+// landed in `router/` and `shell/`. The citation resolved and the sentence it
+// carried was false, which is the shape no resolution check reaches.
+//
+// So the arm is **self-consistency within the row**, needing nothing outside the
+// document: a row that says something is built is not OPEN. It is cheap and it is
+// exact, where an arm that tried to resolve an OPEN row's evidence is neither —
+// a confirmed-OPEN sentence legitimately cites symbols that **do** exist, as
+// counter-evidence (24's `defaultTheme`, 28's `cursorCell`, 29's `chromeRows`,
+// each named precisely because it *reads as coverage and is not*).
+// **The pattern is not narrowed to fit; the exceptions are named.** Its first run
+// fired on four rows and two were real — 7 and 46, both genuinely PART. The other
+// two use a built-word without asserting anything exists, and narrowing the regex
+// to exclude them would also stop it seeing whatever phrasing arrives next. An
+// allow-list covering the population and naming its exceptions is the shape this
+// repo has settled on everywhere it has had this choice.
+//
+// The equality arm is what stops an entry outliving its reason: an exemption whose
+// sentence has changed, or whose entry is no longer OPEN, is itself a failure.
+const OPEN_BUILT_WORDS = Object.freeze({
+  "3": {
+    phrase: "built with prism-tui as the consumer",
+    why: "instrumental, not an assertion — it says what 3 will be built WITH, and prism-tui does not exist in this tree at all (3 is one of the three unchecked entries)",
+  },
+  "15": {
+    phrase: "is built three times",
+    why: "the consequence of a hypothetical — *build one scope alone and the model is built three times* — which is the entry's argument for doing all three at once, not a claim that any of them exists",
+  },
+});
+const BUILT_CLAIM = /\b(built|shipped|landed|already exists|is wired)\b/i;
+for (const entry of [...all].sort((a, b) => Number(a) - Number(b))) {
+  const exempt = OPEN_BUILT_WORDS[entry];
+  const body = described.get(entry) ?? "";
+  const flat = body.replace(/\s+/gu, " ");
+  if (exempt !== undefined) {
+    if (marked.has(entry)) {
+      fail.push(
+        `entry ${entry} is exempt from the built-claim check and is no longer OPEN — ` +
+          `remove the exemption, an entry that outlives its reason is how the list stops being read`,
+      );
+    } else if (!flat.includes(exempt.phrase)) {
+      fail.push(
+        `entry ${entry}'s built-claim exemption quotes "${exempt.phrase}", which the row ` +
+          `no longer says — re-read the row and re-earn the exemption or drop it`,
+      );
+    }
+    continue;
+  }
+  if (marked.has(entry)) continue;
+  const m = BUILT_CLAIM.exec(body);
+  if (m === null) continue;
+  fail.push(
+    `entry ${entry} is OPEN and its own description says "${m[1]}" — a row that claims ` +
+      `something is built is PART at least. A blank row makes no claim and so resolves ` +
+      `trivially, which is how entry 7 stayed OPEN through three landed stages`,
+  );
 }
 
 // --- report -----------------------------------------------------------------
