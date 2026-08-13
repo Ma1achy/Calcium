@@ -1662,6 +1662,101 @@ export function componentSeamSignal(files, readFile = (f) => readFileSync(f, "ut
   return { members: members.length, withinComponent };
 }
 
+/**
+ * **How much of MG24's subject the rule is exact about — F105 and F160 as one class.**
+ *
+ * MG24 matches a member by **name**, not by `owner.name`, and that looseness runs
+ * both ways. F105 measured the false-positive direction: a frozen marker table
+ * gained the keys `changed` and `removed`, two unrelated `CorpusDiff` members read
+ * as consumed, and the equality arm caught it. F160 is the same matching producing
+ * the direction that does **not** announce itself:
+ *
+ *   a genuinely unconsumed member is satisfied the moment any unrelated type,
+ *   anywhere in `src/`, declares a field with the same name and something reads it.
+ *
+ * **Two measured instances of one mechanism, so this closes the class rather than
+ * the second instance.** What closes it is not a tightening — three were measured
+ * and all three are rejected, with the figures, so nobody re-derives them:
+ *
+ *   scope the shorthand arm to files naming the owner   19 false violations (F105)
+ *   key by (owner, name) exactly                        needs a receiver's TYPE;
+ *                                                       no regex over source has it
+ *                                                       — **and it would not key
+ *                                                       uniquely if it did.** Three
+ *                                                       owner names are declared
+ *                                                       twice in `src/`: `Placed`
+ *                                                       (`viewport/overlay/types.ts`
+ *                                                       and `interaction/router/
+ *                                                       router.ts`), `Token`, and
+ *                                                       `ConformanceReport`. Seven
+ *                                                       `owner.name` pairs collide,
+ *                                                       which is exactly the gap
+ *                                                       between the seam signal's
+ *                                                       1157 and this function's
+ *                                                       1150 — the two numbers print
+ *                                                       on adjacent lines and this is
+ *                                                       why they differ. F160 named
+ *                                                       the looseness correctly and
+ *                                                       its remedy assumed a
+ *                                                       uniqueness the tree does not
+ *                                                       have (C23 §8a A4's shape)
+ *   restrict a consumer to import-reachable files       93 flagged, dominated by
+ *                                                       the deps-injection pattern
+ *                                                       that IS this architecture —
+ *                                                       `keys.ts:658` calls
+ *                                                       `deps.viewport.scrollToTop()`
+ *                                                       and imports no viewport at
+ *                                                       all. That member is C16 I23,
+ *                                                       one of MG24's four founding
+ *                                                       instances, so the arm's first
+ *                                                       false positive is the rule's
+ *                                                       own reason for existing
+ *
+ * So the closure is a **measurement, reported every run** — the treatment C24 I11
+ * gives a signal too broad to gate on, and the treatment the seam signal above
+ * already gets. This is exact and needs no type analysis: **a member name declared
+ * by one owner is matched unambiguously, and the rule is exact about it.** A name
+ * several owners declare is where a consumed verdict may belong to a sibling, and
+ * that set is the blind spot's reach, computed rather than estimated.
+ *
+ * **The figure at the time of writing is 376 of 1150 — the rule is exact about 33%
+ * of its subject**, and the shared names are the ones a new type is most likely to
+ * carry: `id` (30 owners), `kind` (23), `text` (15), `capabilities` (13), `width`
+ * (10). An unrecorded limit reads as strength, and this one was invisible for the
+ * same reason F159's was: a clean run looks identical either way.
+ *
+ * **Why printed rather than filed.** F159 and F160 both came out of a claim written
+ * in a comment that was still a belief. A number in prose is a snapshot with no
+ * mechanism (F142); a number recomputed on every run moves when the tree does, and
+ * a fall in exactness is a component having grown a surface named like everything
+ * else — which is worth a look rather than a failure.
+ */
+export function nameExactnessSignal(files, readFile = (f) => readFileSync(f, "utf8")) {
+  const sources = new Map(files.map((f) => [f, readFile(f)]));
+  const members = interfaceMembers(files, (f) => sources.get(f) ?? "");
+  const owners = new Map();
+  for (const { owner, name } of members) {
+    if (!owners.has(name)) owners.set(name, new Set());
+    owners.get(name)?.add(owner);
+  }
+  const seen = new Set();
+  let exact = 0;
+  for (const { owner, name } of members) {
+    const key = `${owner}.${name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (owners.get(name)?.size === 1) exact += 1;
+  }
+  // The names most owners share, since *which* names collide is the actionable
+  // half — a member called `id` is where the blind spot is certain to apply.
+  const shared = [...owners]
+    .filter(([, o]) => o.size > 1)
+    .sort((a, b) => b[1].size - a[1].size)
+    .slice(0, 5)
+    .map(([name, o]) => `${name} (${String(o.size)})`);
+  return { members: seen.size, exact, shared };
+}
+
 // --- MG25 — a free function with no consumer --------------------------------
 //
 // **MG24's blind spot, and MG24's own header is where it was written down.**
