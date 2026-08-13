@@ -24,6 +24,22 @@ export type FocusTarget =
   | "overlay"
   | "copyMode"
   | "pushedView"
+  /**
+   * C26 I2 — interaction mode, and it is **a target rather than a flag**.
+   *
+   * The block owns its keys while the reader is inside it, and the prompt does
+   * not compete: key collision solved structurally rather than per key.
+   *
+   * **It is here, in the union, because of what the alternative does to the
+   * ladder.** C16 §5's rungs 3–7 are handlers registered on these targets, so
+   * their order *is* `FOCUS_ORDER`'s and the two cannot disagree. A mode
+   * consulted *before* dispatch would be a second priority list, and the ladder
+   * would acquire an order of its own again — which is the artefact whose
+   * existence produced the copy-mode-above-overlay contradiction against
+   * A02 §2. C26 §8a trace 5 is where that was found, and it is the strongest
+   * constraint the walk placed on this component's shape.
+   */
+  | "interaction"
   | "prompt"
   | "liveBlock"
   | "global";
@@ -36,7 +52,20 @@ export type FocusTarget =
  */
 export type StoredFocus =
   | Readonly<{ at: "prompt" }>
-  | Readonly<{ at: "liveBlock"; rowId: string | null }>;
+  /**
+   * `mode` rides on the location rather than beside it (C26 I2).
+   *
+   * A second field would be a second thing to keep in step, and the two cannot
+   * disagree if there is only one value: *which row, and whether its keys are
+   * ours or the block's* is one fact, exactly as *which row* was already part
+   * of *where focus is* rather than a separate owner.
+   *
+   * **`"navigate"` is the only mode reachable until a kind declares
+   * `elements`** (C26 §5), and that is said here rather than left implicit: an
+   * invariant about interaction mode holds trivially while nothing can enter
+   * it, and the day something can is the day it is first tested for real.
+   */
+  | Readonly<{ at: "liveBlock"; rowId: string | null; mode: "navigate" | "interact" }>;
 
 export type InputEvent =
   | Readonly<{ kind: "key"; key: Key }>

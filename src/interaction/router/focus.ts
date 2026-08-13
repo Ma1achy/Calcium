@@ -43,6 +43,14 @@ export const FOCUS_ORDER = Object.freeze([
   "overlay",
   "copyMode",
   "pushedView",
+  // **Above `prompt` and below every layer** (C26 I2). A block being interacted
+  // with outranks the prompt, which is the whole of the navigation/interaction
+  // split; it does not outrank an overlay that must be answered, copy mode,
+  // which takes every key, or a view, which covers the region.
+  //
+  // Its position needs no argument of its own beyond that, and that is the
+  // point: adding a rung to C16 §5's ladder is this line and nothing else.
+  "interaction",
   "prompt",
   "liveBlock",
   "global",
@@ -62,6 +70,14 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
   if (deps.overlayTop?.kind === "overlay") return "overlay";
   if (deps.copyMode) return "copyMode";
   if (deps.overlayTop?.kind === "view") return "pushedView";
+  // **Before the `prompt` row, and gated on the live entry** (C26 I2). The mode
+  // is stored, so it can outlive the entry that was being interacted with —
+  // freezing is a mode exit nobody signals (C26 §8a trace, the live-block
+  // freeze), and answering `interaction` for an entry that is no longer live
+  // would hand every key to a block the reader cannot act on.
+  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact" && deps.liveEntry !== null) {
+    return "interaction";
+  }
   if (deps.stored.at === "prompt") return "prompt";
   if (deps.liveEntry !== null) return "liveBlock";
   return "global";
@@ -85,10 +101,31 @@ export interface FocusStore {
   reset(): void;
   /** `↓` from the prompt. `null` row means "the block, no row yet". */
   enterLiveBlock(rowId: string | null): void;
-  /** `Esc` from the live block, and Ctrl-C's live-block rung. */
+  /**
+   * **The reader stepped out**, and it is not `reset()` (C26 I13).
+   *
+   * `Esc`, `↑` past the first row, and Ctrl-C's live-block rung. All three are
+   * the reader leaving; `reset()` is C16 I2's *a command ran*, which is L4's and
+   * arrives from the submit row.
+   *
+   * **Both produce `{at: "prompt"}` today, so the distinction is currently
+   * invisible — and it was already wrong.** `toPrompt()` had exactly one caller
+   * in the tree, the Ctrl-C rung, while `Esc` and `↑` called `reset()`. Focus
+   * memory hangs off this pair, and with the call sites as they were the
+   * emphatic exit would have kept the memory and the two ordinary ones wiped it.
+   * C26 §8b.2.
+   */
   toPrompt(): void;
   /** Row navigation within the live block; a no-op at the prompt. */
   focusRow(rowId: string | null): void;
+  /**
+   * Enter or leave interaction mode on the focused row (C26 I2, I14).
+   *
+   * A no-op at the prompt for `focusRow`'s reason: entering the live block is
+   * one call's decision, and a mode change arriving from a stale handler would
+   * hand the block every key without a keystroke.
+   */
+  setMode(mode: "navigate" | "interact"): void;
 }
 
 const AT_PROMPT: StoredFocus = Object.freeze({ at: "prompt" });
@@ -104,7 +141,9 @@ export function createFocusStore(): FocusStore {
       stored = AT_PROMPT;
     },
     enterLiveBlock(rowId) {
-      stored = Object.freeze({ at: "liveBlock", rowId });
+      // Entry is always into navigation. Landing in interaction would give the
+      // block every key before the reader has seen where focus went.
+      stored = Object.freeze({ at: "liveBlock", rowId, mode: "navigate" });
     },
     toPrompt() {
       stored = AT_PROMPT;
@@ -114,7 +153,15 @@ export function createFocusStore(): FocusStore {
       // live block is `↓`'s decision and belongs to one call, or a row focus
       // arriving from a stale handler would move focus without a keystroke.
       if (stored.at !== "liveBlock") return;
-      stored = Object.freeze({ at: "liveBlock", rowId });
+      // **Moving between rows leaves interaction**, which is the two-level
+      // escape read from the other end: a mode belongs to the element it was
+      // entered on, and carrying it to the next row would make `↓` mean
+      // something different depending on how the reader arrived.
+      stored = Object.freeze({ at: "liveBlock", rowId, mode: "navigate" });
+    },
+    setMode(mode) {
+      if (stored.at !== "liveBlock") return;
+      stored = Object.freeze({ at: "liveBlock", rowId: stored.rowId, mode });
     },
   };
 }

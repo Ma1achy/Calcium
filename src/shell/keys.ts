@@ -527,7 +527,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // Entry with no exit is a session whose prompt cannot be reached, so both
     // routes are bindings rather than one: `Esc`, which S01's footer already
     // prints as `esc prompt`, and `↑` from the first row, mirroring the entry.
-    focusPrompt: () => void deps.focus.reset(),
+    // **`toPrompt()`, not `reset()`** (C26 I13, §8b.2). Both produce
+    // `{at: "prompt"}` today, so this line changes no behaviour — and it was
+    // wrong, in the direction that matters: `reset()` is C16 I2's *a command
+    // ran*, arriving from C23's submit row, and this is the reader stepping out.
+    // `toPrompt()` existed for exactly this and had one caller in the tree, the
+    // Ctrl-C rung. Focus memory hangs off the pair, so with these two call sites
+    // as they were the emphatic exit would have kept the memory and the two
+    // ordinary ones wiped it.
+    focusPrompt: () => void deps.focus.toPrompt(),
     rowDown: () => {
       const rows = deps.liveRows();
       const current = deps.focus.current;
@@ -566,8 +574,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       if (current.at !== "liveBlock") return;
       const i = rows.indexOf(current.rowId ?? "");
       // At the first row — or at a row the block no longer has — `↑` leaves.
+      // `toPrompt()` for `focusPrompt`'s reason above: this is the reader
+      // stepping out, and it is the second of the two call sites C26 §8b.2 found
+      // wired to C16 I2's append transition.
       if (i <= 0) {
-        deps.focus.reset();
+        deps.focus.toPrompt();
         return;
       }
       deps.focus.focusRow(rows[i - 1] ?? null);

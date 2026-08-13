@@ -222,6 +222,21 @@ export function createRouter(
       deps.popLayer();
       return true;
     });
+    // **The new rung is this registration and nothing else** (C26 I2). Its
+    // position in the ladder is `FOCUS_ORDER`'s, so there was no order to
+    // choose and no second artefact to keep in step — which is the whole
+    // argument for interaction being a target rather than a flag consulted
+    // before dispatch (C26 §8a trace 5).
+    //
+    // ⌃c leaves interaction and stays on the row, rather than going to the
+    // prompt. The ladder's shape is *undo the innermost thing you entered*, and
+    // the rung below is what takes the reader out of the block — two presses,
+    // matching the two-level escape (C26 I14) rather than shortcutting it.
+    register("interaction", (e) => {
+      if (!isCtrlC(e)) return false;
+      focus.setMode("navigate");
+      return true;
+    });
     register("liveBlock", (e) => {
       if (!isCtrlC(e)) return false;
       focus.toPrompt();
