@@ -7479,3 +7479,42 @@ written down, in a comment I had just written, and it was still a belief. Twenty
 of fabricated violations, and the rule's blind spot is now stated rather than assumed
 absent. A justification that is true about the mechanism it names and silent about whether
 the mechanism runs reads exactly like one that holds.
+
+---
+
+## F160 — MG24 matches published members by name, so any file can create a false negative ★★★
+
+**Found in C26 stage 2, and it is the other direction from F159.** F159 is about which
+declarations MG24 *reads*; this is about how it *compares* what it read.
+
+`ElementReport.kindsCovered` was added in `src/testing/navigation-conformance.ts` and read in
+a second file. MG24 then reported that `ConformanceReport.kindsCovered`'s exemption was
+**stale** — a different type, in a different component, whose member nothing had started
+consuming. The rule had matched the two members **by name**.
+
+**The false positive is the harmless direction and it is not the finding.** The same
+looseness runs the other way:
+
+> **A genuinely unconsumed member is satisfied the moment any unrelated type, anywhere in
+> `src/`, declares a field with the same name and something reads it.**
+
+`id`, `kind`, `width`, `rows`, `blockId`, `label`, `text`, `command` — the common names are
+exactly the ones a new type is most likely to carry, so the failure arrives by accident and
+never announces itself. **Nothing in a clean run distinguishes *this member has a consumer*
+from *some other member with this name does*.**
+
+**The reach matters because of what MG24 is used for.** It is not one rule among twenty: it
+is the instrument several dispositions have been checked with, and this session used it twice
+as evidence — to withdraw `NavElement.arrow` and `.escape` rather than exempt them, and to
+argue that `ElementAddress.elementId` was watched. **The second of those was wrong for a
+different reason (F159), which is what prompted looking at this one properly.**
+
+The instance is renamed — `ElementReport.kinds` — and the blind spot is recorded at the
+declaration so the next reader of that field meets it. **The rule is still loose**, and the
+fix is to key members by `(owner, name)` rather than by name, which is a change to the
+population of a gate and therefore a step of its own, exactly as F159's is.
+
+**Both findings are about the same twelve lines and neither would be found by reading them.**
+F159 came from fabricating a violation; this came from a rule firing on something that was
+not its subject. **A rule that reports the wrong instance is showing you its matching, and
+that is the only view of it you get from outside.**

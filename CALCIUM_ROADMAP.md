@@ -785,6 +785,114 @@ of the screen, and every row taken from the transcript is a row of content. So:
 budget](#chrome-row-budget) — all three are about what the frame's chrome may contain, and deciding them
 separately is how four features end up fighting over one row.
 
+<a id="scrollable-containers"></a>
+### Scrollable containers — and the criterion is focus, not "is it a container"
+
+**A correction to an earlier ruling here, and half of it still stands.** What was argued
+against was **mid-row slicing and an independent viewport inside a block**, because
+`measure(block, width) → height` is total and pure and every cache, the compositor and C14's
+virtualisation rest on it. **That constraint is real** — it is what `windowPatch` and
+`BlockDefinition.window` were designed around.
+
+**What was wrong was reading it as "no inner scroll".** A scrollable container is three
+things and two of the three are now built:
+
+| piece | state |
+|---|---|
+| `window?` — reduces a block to a **valid smaller block of the same kind** | **built** (F134) |
+| `elements?` — navigable positions with a row range | **built** (C26 stage 2) |
+| a **view offset**, per container, owned by the focus model | **missing** — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/` |
+
+Nothing about the third breaks the measurement invariant, because **the container measures at
+its declared height and windows its child** — the move `patch` and `logs` already make. The
+expensive thing that was refused is not the thing being asked for.
+
+#### Where it stops
+
+> **A container scrolls if it is focusable and its content can exceed its declared height.**
+
+**Scroll follows focus**, because a keystroke has to land somewhere the reader can see and a
+container with an offset and no focus is a scroll nobody can aim. That criterion **admits**
+the live block, a pushed view's inner blocks, the completion menu, a paste chip's peek and
+the prompt; it **excludes** `row`, `panel` and `group`, which have no declared height of
+their own and nothing to focus. A panel with its own offset wrapping a scrollable table is
+two offsets where a reader expects one.
+
+It needs **a declared height** — `b.row`'s `height: "fill"` question, and the same ruling:
+*the block declares intent, the owner resolves it, and `measure` never sees the unresolved
+form*. And the offset is **view state, not accumulated state**, per C23's rule from the
+shared pollers work, which is what makes it droppable — the argument entry 44 now rests on.
+
+#### The consumers, and one is nearly built
+
+| consumer | today |
+|---|---|
+| **the prompt**, when the buffer outgrows `promptRows` | the window exists and is tail-anchored — **entry 28**, and the fix is threading `cursorCell` |
+| the completion menu | `… N more` and no way to reach them — **the count exists and the motion does not** |
+| a paste chip's peek | designed, unbuilt (entry 30) |
+| **a live block** whose content outgrows its region | `logs`' whole purpose, and the case `window` was built for |
+| a pushed view's inner blocks | nine flat bindings scroll **the document**, so `n` moves whole blocks past a table the reader is inside |
+
+**The live block is the strongest, and it is the only one where the content moves under the
+reader** — at the bottom, follow; scrolled up, hold. That is the scroll-anchor rule inside a
+container rather than in the transcript, and **C14's `#anchor` already makes exactly that
+distinction (entry 8, BUILT)**, so the rule exists and needs generalising rather than
+inventing.
+
+**One offset concept, five owners.** Build the rule once — *the window follows the reader's
+attention, and says so when it is not showing everything* — and each consumer is wiring.
+
+#### Selection across a scrolled boundary is the part that does not fall out
+
+- **Does a selection extend past the visible window?** Dragging to an inner container's
+  bottom edge either stops or auto-scrolls. Both defensible; **stopping silently is the one a
+  reader reads as a bug.**
+- **Does copy take the selected text or the selected elements?** Semantic copy is the
+  advantage, and a selection spanning the boundary has to be a character range or an element
+  range — which give different answers.
+- **`copyMode` turns mouse tracking off** so the terminal's own selection works, and the
+  terminal **selects what is painted**. A container's hidden rows are not painted, so
+  terminal-native selection cannot see an inner offset at all — and turning tracking off
+  kills the wheel with it. **Terminal-native selection and inner scroll are in direct
+  tension, and semantic copy is the way out rather than a nicety.**
+
+Build the container and the selection model together, or the second is retrofitted against
+the first — they are one concept at two scopes, exactly as entry 15's three are.
+
+#### Degraded, four affordances collapse onto one cell
+
+ASCII draws the bar as `|` and `#` (entry 36's ruling). **At 1-bit the wash is gone, so the
+filled bar cell is the only focus signal left** — more weight than reserve-and-fill was
+carrying at truecolour. So **the focused container's border changes character**: a different
+box-drawing weight, or `+`/`#` at ASCII. It survives every depth, it is one character rather
+than a colour, and it is **F34's rule applied to a container** — a distinction must not be
+carried by colour alone. Optional at truecolour, **not optional at 1-bit**, because nothing
+else is left.
+
+---
+
+<a id="configurable-cursor"></a>
+### A configurable cursor — two axes, and only one is trivial
+
+**The glyph is really the shape, and the terminal draws it.** `cursorSequence` is C01's and
+positions the cursor; *which character* is `DECSCUSR` — block, underline or bar, each steady
+or blinking. **A capability-gated escape rather than something Calcium paints**, and it
+degrades by being ignored. Cheap.
+
+**The blink default is a state machine, not a terminal setting.** *Blinks when idle, steady
+while typing* is the behaviour worth having and no terminal offers it: emit the steady
+variant on a keystroke, emit the blinking variant after N ms of no input. **The refresh
+driver already owns the clock** — the argument that closed the spinner's *this layer must not
+grow a timer* premise — so this is a consumer of an existing mechanism rather than a new
+timer in `paint.ts`. The constraint survives even though its premise did not.
+
+**RULED: per focus target, not global.** The cursor is placed by whatever holds focus —
+`Placed.cursor`, relative to the layer's own origin, absent means hidden (C15 I19). So shape
+and blink are per target: **a bar in the prompt and a block in a pushed view is a legitimate
+thing to want, and deciding it as one global setting forecloses it.**
+
+---
+
 <a id="horizontal-composition"></a>
 ### Horizontal composition — every block is full width, and the banner paid for it
 
@@ -1495,6 +1603,26 @@ C17 would need a **selection range**, every motion a shifted variant that extend
 to replace it, and the renderer to show it — which is the [full-row background](#selection-wash), at
 character granularity.
 
+**The shifted motions belong with select-all, or the model gets built twice.** Select-all is
+the *degenerate case* of a selection model — the whole buffer as one region — so shipping it
+alone means shipping an anchor and a region for one binding and then generalising them:
+
+```
+⇧← ⇧→          extend by character
+⌥⇧← ⌥⇧→        extend by word            — pairs with ⌥b/⌥f, which exist
+⇧⌃a ⇧⌃e        extend to line start/end  — pairs with ⌃a/⌃e, which exist
+⌃⇧a            select all
+```
+
+**Every one of these has its unshifted motion already bound**, so the keys are not the work
+and the list is short for the same reason select-all is: each shifted form is *move, and
+extend the region from the anchor*, and typing replaces the region. That is the entire model.
+
+**Check every shifted form against the decoder before binding it**, per T2.13 — `⇧←` is
+`CSI 1;2D` and `⌥⇧←` is `CSI 1;10D` or an ESC-prefixed form depending on the terminal.
+**A binding the decoder cannot produce is the fifteen-unexecuted-bindings class**, which has
+already cost `⌃_` once and is the reason `⌃⇧a` needs the same check above.
+
 **That is the same concept the copy story needs at two other scopes**: a selection in the
 editor, a selection in the transcript ([`copyMode`](#text-selection)), and semantic copy of a focused
 block. **One mechanism, three scopes — do not build it as a one-off for `⌃⇧a`.**
@@ -2186,7 +2314,27 @@ PART  5  publication prep          error messages · the outside-reader test · 
       —  PUBLISH 0.x               with two real consumers behind it
       6  phase 2                   the empty-block convention · rendering flags
       7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
-                                   the small navigation items rather than sitting beside them
+                                   the small navigation items rather than sitting beside them.
+                                   SPECIFIED as C26; stages 1–3 built (interaction is a focus
+                                   target, blocks report elements, focus holds an address).
+                                   THREE QUESTIONS A SCROLLABLE CONTAINER (46) OPENS AND C26
+                                   DOES NOT ANSWER: (a) what ↓ means in navigate mode on a
+                                   scroller — every other kind resolves ↓ at an EDGE by
+                                   ArrowPolicy, and a scroller has an edge AND an interior
+                                   that is not an element, so either scrolling needs interact
+                                   mode or navigate scrolls and interact means something else.
+                                   The policy vocabulary was designed before scrollers existed
+                                   and may have no value here, which is a CHECK before
+                                   adopting it. (b) a pushed view binds n p g G pageup pagedown
+                                   and interact on a table inside it should give those to the
+                                   TABLE — the first case where the outer scope's bindings and
+                                   the inner one's are the SAME keys rather than different
+                                   ones; esc reverting them may be the whole story and that is
+                                   worth checking, since a key meaning two things in two modes
+                                   is fine and in one mode is not. (c) I10 restores focus by
+                                   address and says nothing about which MODE you return in —
+                                   probably navigate, since re-entering a mode you left is
+                                   surprising, but it is unruled and cheap to rule now
 BUILT 8  the scroll-anchor rule    small, real usability — or earlier, it is cheap
       9  mermaid (text path)       cheap once the dependency is vetted, distinctive
 PART  10 question / menu primitive biggest unlock for agent UIs — lands inside the navigation model
@@ -2201,7 +2349,17 @@ BUILT 13 RENDER CACHING          ★ a large diff renders 5,000 lines to show 30
 BUILT 14 cells() ASCII fast path  the hottest function walks Intl.Segmenter over ASCII. Cheap,
                                    but measure after the render cache — most calls vanish with it
       15 text selection + copy    copyMode exists with no producer; OSC 52; and semantic copy,
-                                   which pairs with the navigation model
+                                   which pairs with the navigation model. THREE SCOPES, ONE
+                                   MECHANISM — the editor's region, the transcript's, and copy
+                                   as a verb on a focused thing; build one alone and the model
+                                   is built three times. C17 has NO selection concept at all:
+                                   no anchor, no mark, no region, so select-all is the
+                                   degenerate case of a model that does not exist. RULED:
+                                   copyMode stays a TARGET and is not a third mode beside
+                                   navigate and interact — stage 1's argument for interaction
+                                   (a flag read before dispatch gives C16 §5's ladder an order
+                                   of its own) applies unchanged, and two mode concepts in one
+                                   model is the cost of getting it wrong
       16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
                                    two parameters. C19's menu already has the flip, the selection
                                    and `… N more`; the confirm reimplements or lacks all of it
@@ -2240,8 +2398,12 @@ PART  27 syntax highlighting ★    a REGRESSION against C09 §4a, not a scoping
                                    is no someone. 24 mainstream = 180 KB, measured. Phase-1-shaped
       28 prompt cursor-following  the window exists and is tail-anchored; the fix is threading
                                    cursorCell, which the code already names
-      29 chrome row budget        one row each by design, and four features now want it. Rule
-                                   once — chrome-as-blocks pairs with b.row
+      29 chrome row budget        one row each by design, and FIVE features now want it: the
+                                   mode indicator, elapsed time, the queued count, region
+                                   separators (37) and now WHERE IN THIS CONTAINER AM I (46),
+                                   which is the scrollbar at container scope rather than
+                                   transcript scope. Rule once — chrome-as-blocks pairs with
+                                   b.row
       30 paste as a chip          Claude Code's idea; Calcium can reference a BLOCK rather than
                                    a string, so the transcript renders what it actually is
       31 completion ranking       prefix-matched and unranked today. Recency-first is nearly
@@ -2257,10 +2419,32 @@ PART  34 UX polish set            animation (decoration never information) · ch
                                    fill actions · empty states that teach
       35 progress feedback        the spinner is static by a ruling whose premise expired — the
                                    refresh driver IS the ticker now. Motion, then elapsed time,
-                                   then what it is doing
+                                   then what it is doing. AND THE PENDING ENTRY IS BLANK: the
+                                   row is appended at once with blocks: [] (execution.ts step
+                                   3), so a five-second tool shows an empty entry under a live
+                                   prompt and reads as NOTHING HAPPENED rather than as waiting.
+                                   settle(id, doc) already replaces the whole document, so the
+                                   mechanism is there and nothing puts content in before it.
+                                   Elapsed time is the useful tier — a number separates slow
+                                   from stuck where a rotating glyph only proves the process is
+                                   alive. OPEN QUESTION: does the pending notice belong to the
+                                   framework or the adapter? Composing one the app did not ask
+                                   for is F123's class
       36 scrollbar + edge markers the terminal cannot provide one (alt screen has no scrollback)
                                    and C14 already has the numbers. The edge marker is the cheap
-                                   half and may matter more than the bar
+                                   half and may matter more than the bar. AT CONTAINER SCOPE
+                                   (46) it is one cell of the container's own width, not a
+                                   second bar in the frame's reserved column, and ONLY THE
+                                   FOCUSED CONTAINER FILLS IT — reserve always, fill on focus,
+                                   which is the focus gutter's trick and keeps width constant
+                                   so the cache stays safe. Mouse: click-to-seek and drag are
+                                   plumbing that exists (Placed hit-testing + elements' row
+                                   ranges) with no affordance; the WHEEL is the new one and it
+                                   resolves BY POSITION where focus resolves BY FOCUS, so the
+                                   two devices can legitimately disagree about which container
+                                   a gesture addresses. And copyMode turns tracking off, which
+                                   kills the wheel — another argument that terminal-native
+                                   selection and inner scroll are in tension
       37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
                                    bracketed with them. C10's no-background choice means a drawn
                                    line is the only tool available
@@ -2283,7 +2467,33 @@ RULED 39 theme background ★      RULED: theme declares `background: "terminal"
                                    a user override IS a collision. Unbind is `action: null`, a
                                    VALUE not an absence, and it falls through to the next rung
 PART  43 images (kitty)            designed already; unlocks mermaid HD + ML samples
-      44 session resume            tractable half of the persistence story
+      44 session resume            tractable half of the persistence story. RULED: a resumed
+                                   session opens at the BOTTOM and restores no scroll offset,
+                                   no container offset and no focus. C23's rule from the shared
+                                   pollers work — per-part state is view state only, anything
+                                   that accumulates belongs in a derivation — and an offset
+                                   accumulates nothing, so it is dropped freely and the reader
+                                   gets the newest thing. Stated so it is not re-decided and
+                                   nobody builds persistence for it
+      45 configurable cursor       shape is DECSCUSR and the TERMINAL draws it, so it is a
+                                   capability-gated escape that degrades by being ignored.
+                                   Blink is a state machine no terminal offers — steady on a
+                                   keystroke, blinking after N ms — and the refresh driver
+                                   already owns the clock. RULED: per focus target, not
+                                   global. Placed.cursor is per layer (C15 I19), so a bar in
+                                   the prompt and a block in a pushed view is legitimate and
+                                   one global setting forecloses it
+      46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and its content can
+                                   exceed its declared height — so scroll follows focus, and
+                                   row/panel/group are excluded (no declared height, nothing
+                                   to focus). window? and elements? are both built; what is
+                                   missing is a per-container offset as VIEW STATE. Blocked
+                                   on 7: scroll follows focus, so it cannot be designed until
+                                   focus is. Five consumers — the prompt (28), the completion
+                                   menu, a paste chip's peek (30), a live block, a pushed
+                                   view's inner blocks — and the render cache key is wrong
+                                   the day one scrolls (13). Selection across a scrolled
+                                   boundary is the part that needs ruling, with 15
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
@@ -2337,7 +2547,7 @@ what landed**.
 `FlagDef` has no presentation-selecting field (`data/manifest/types.ts:42–56`), and F15 being
 CLOSED does not close 2.1's convention · **15** — `enterCopyMode` is defined nowhere in
 `src/`, and there is no OSC 52 · **26**, **32**, **40** — the symbols the entries name are
-absent · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
+absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **46** — `window?` and `elements?` are both built, and **nothing holds an offset**: no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`, so the third of the three pieces is the missing one · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
 until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **35** —
 `paint.ts:110–120` returns frame 0 and writes out the ticker argument this entry says has
 expired; the `steps` block already animates off `ctx.tick` (`structured.ts:403`) · **44** —
