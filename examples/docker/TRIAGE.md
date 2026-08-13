@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 11 | **5** | — | **new at F80** · method — and all five disproved |
-| **11** | [A gate that passes without checking](#11) | 28 | **9** | — | 7 closed · **2 open, both about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
+| **11** | [A gate that passes without checking](#11) | 29 | **9** | — | 7 closed · **3 open, all three about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -482,7 +482,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **9: 5 closed, 4 open**
+## 11 · A gate that passes without checking — **10: 5 closed, 5 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
@@ -498,6 +498,7 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F146** | **commitment 14b's own registration list** | SP6 was implemented, inventoried and fabricated, and `SPEC_RULES` never learned it existed — so `make test` was red for two commits while `npm run enforce` stayed green and correct. **Fixed**, and the bundled fabrication split into three rows |
 | **F83** | **MG24's definition of a consumer** | the implementing module counts as one, so an interface in `types.ts` implemented in `store.ts` gives every member a consumer by construction. **Open** |
 | **F84** | **MG24's scope** | it walks `export interface` only. **798 members published as `export type` are outside every rule in the suite** — nearly three times the 280 it watches. **Open** |
+| **F159** | **MG24's member walk** | it reads members off their own lines, so a type declared on a *single* line presents none and is watched by nothing. Neither the keyword nor the name is the discriminator — the **line shape** is, and **40 published object types under `src/` are single-line**. F84's sibling: a rule widened along the axis one finding named can stay narrow along one it did not, and the earlier fix is what makes the clean result read as coverage. **Instance fixed** — both C26 types reformatted, with the reason recorded at each declaration; **class open** |
 
 **F82 was found producing this file** and it is the group's sharpest instance, because the
 gate that failed is the one verifying the sentence three sections down. `citations` was
@@ -530,7 +531,7 @@ failure modes; only `citations` shows that the regex and the scope work **togeth
 Fixed, and mutated: reverting the increment kills both new rows and neither `fires` row —
 which is why four green rows and a dead field coexisted for as long as they did.
 
-### The two open ones are about a rule's *reach*, and they fail in opposite directions
+### The three open ones are about a rule's *reach*, and they fail in different directions
 
 **F83 is a definition too weak inside its scope.** A02 Seam 4 is about a component complete on
 its own side with nothing on the other — and the implementation is the *same* side. The file
@@ -548,7 +549,15 @@ survive: `GlyphSet.teeLeft`, `teeRight` and `hollow`, declared glyph slots with 
 
 **Filed anyway, and this is the group's argument in one line: a rule whose scope excludes
 three-quarters of its subject is a rule whose clean result means much less than it reads,
-whatever it happens to contain today.** That is F82's sentence about a counter, applied to a
+whatever it happens to contain today.**
+
+**F159 is the third, and it is the one that could only be found after F84 was fixed.** MG24
+now walks type aliases — which is what closes F84's axis and what makes its result read as
+covered. It still reads members off their own lines, so a declaration written on one line
+presents none: forty published object types under `src/` are outside the rule by their
+formatting alone, and nothing chose that. **A rule widened along the axis a finding named
+can stay narrow along one it did not, and the earlier fix is precisely what hides the
+remainder.** That is F82's sentence about a counter, applied to a
 scope — and it is why this group's disposition is never "fix the instance".
 
 **F60 is three findings stacked and only the third is new.** F36 and F37 are why the deep

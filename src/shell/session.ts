@@ -31,9 +31,9 @@ import { commandRows, type PaintDeps } from "./paint.js";
 import { composeFrame } from "./render-frame.js";
 import { focusKey } from "./render-cache.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
-import { focusableRowIds } from "../presentation/table/index.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
+import { resolveFocus } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
 import {
@@ -720,16 +720,26 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   const entry = graph.transcript.entries.find((e) => e.id === entryId);
   if (entry === undefined) return null;
 
-  for (const block of entry.doc.blocks) {
-    if (block.kind !== "table") continue;
-    if (
-      stored.rowId === null ||
-      focusableRowIds(block).includes(stored.rowId)
-    ) {
-      return Object.freeze({ blockId: block.id, rowId: stored.rowId });
-    }
-  }
-  return null;
+  // **The third of the three walks, and the one in another component** (C26
+  // §8b.4). This tested `block.kind === "table"` and asked C11 directly, exactly
+  // as `liveRows` and `liveRowAction` did — and `liveRowAction`'s own comment
+  // warned that a second walk elsewhere would be a second answer to *what is
+  // here*, while sitting beside the second and blind to this one.
+  //
+  // It also stopped at the top level, so a table inside a `panel` was never told
+  // it held focus and drew no highlight for a row the reader had moved to.
+  //
+  // **And it manufactured the block half of the address by searching for the
+  // first element whose id matched** (C26 §8b.7), so with two tables each
+  // carrying `r1` the highlight drew on the first while focus was on the second.
+  // `resolveFocus` is the same function the key effects use, which is what makes
+  // *what is highlighted* and *where the next arrow goes* one answer rather than
+  // two that agree — and it writes nothing, because this runs per frame.
+  const elements = graph.liveElements();
+  const i = resolveFocus(stored.element, elements);
+  const found = i === null ? undefined : elements[i];
+  if (found === undefined) return null;
+  return Object.freeze({ blockId: found.blockId, rowId: found.element.id });
 }
 
 /** What `session` reads before the graph exists — §9's `created` state. */

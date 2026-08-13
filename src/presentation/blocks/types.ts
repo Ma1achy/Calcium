@@ -87,6 +87,64 @@ export type Windowed = Readonly<{
   skipRows: number;
 }>;
 
+/**
+ * What `↓` does at the edge of a thing, and what `Esc` does inside it (C26 §4).
+ *
+ * A closed vocabulary rather than a callback, so a policy can be resolved
+ * global → kind → per-element without a conditional in any handler — the shape
+ * C10's theme resolution and C05's manifest merge already have.
+ *
+ * **Declared here rather than in C26, and the reason is the layer.** `elements`
+ * hangs off `BlockDefinition`, which is L1; C26 is L3. A block declaring its
+ * policy cannot import the component that reads it, so the vocabulary lives with
+ * the declaration and C26 reads down. Same direction as `focusableRowIds`, which
+ * C16 already imports from C11 for exactly this reason (C11 I14).
+ */
+/**
+ * One thing focus can be on, and the **single** declaration both keyboard and
+ * pointer read (C26 §5, I8).
+ *
+ * The keyboard walks the list; the pointer searches it. Two mechanisms agreeing
+ * is not the same as one mechanism, and the roadmap's constraint on the mouse
+ * work is *one source, or they will disagree*.
+ *
+ * `rows` and `cols` are **block-local and half-open**, `[from, to)`, so a caller
+ * that knows where the block starts knows where the element is without the block
+ * knowing where it was placed.
+ */
+export type NavElement = Readonly<{
+  /**
+   * Unique within the block's own declaration (C26 I6).
+   *
+   * **Not a row id, and that is the point.** `liveRows` concatenated row ids
+   * across every table in an entry and `focusFor` resolved to the first block
+   * holding one, so two tables each carrying `r1` drew the highlight on the
+   * wrong one. An element is addressed inside a declaration that knows which
+   * block produced it, so there is no flat namespace to collide in (C26 §8b.6).
+   */
+  id: string;
+  level: "block" | "row" | "cell";
+  /** Block-local row range, `[from, to)`. */
+  rows: Readonly<{ from: number; to: number }>;
+  /** Column range, `[from, to)`. */
+  cols: Readonly<{ from: number; to: number }>;
+  /**
+   * What `⏎` does here, when the element is more than a place to stand.
+   *
+   * **`arrow` and `escape` are not here yet, and MG24 is why.** C26 §5 draws
+   * them on `NavElement`, and landing them before C26 §4's resolution exists
+   * would publish two fields with no reader — which is F21's shape exactly:
+   * `TableRow.actions` existed, the spec said C11 "surfaces its actions", and
+   * no code read the field. *The fifth of specified, agreed and structurally
+   * absent, and the worst hidden — the other four were missing values or missing
+   * verbs, and this one was a field that existed, so nothing looked.*
+   *
+   * They arrive with the resolution that reads them (C26 I15), in the commit
+   * that gives them a consumer.
+   */
+  activate?: Action;
+}>;
+
 export interface BlockDefinition<B extends Block = Block> {
   kind: string;
   measure: Measure<B>;
@@ -102,6 +160,27 @@ export interface BlockDefinition<B extends Block = Block> {
    * `measure(result.block, width) − result.skipRows === to − from`.
    */
   window?: (block: B, width: number, from: number, to: number) => Windowed;
+  /**
+   * What this block offers to keyboard and pointer (C26 §5, I3).
+   *
+   * **Optional on `window?`'s argument above, and it is the same decision rather
+   * than a second one that agrees**: an absent member cannot be deleted by a
+   * later edit while a branch returning `[]` can. A kind that is a single
+   * indivisible thing omits it and is atomic, exactly as `plot` is unwindowable.
+   *
+   * **`measureChild`, because the positions are not a function of `(block,
+   * width)` alone** (C26 §8b.3). A table row's offset is
+   * `header + Σ(1 + detailHeight(row))` and `detailHeight` measures the expanded
+   * detail — so without the seam an implementation would guess, and a guessed
+   * position is a pointer landing on the wrong row. Same seam `measure` takes
+   * (A02 Seam 1), supplied by the registry so a kind cannot reach for its own.
+   *
+   * **Never receives focus, and that is a guarantee rather than a rule.** C11
+   * I14 puts focus in C16; a geometry that varied with it would move without
+   * `rev` moving and C14's cache could not invalidate it. Focus is not a
+   * parameter here, so the violation is unrepresentable rather than forbidden.
+   */
+  elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
 }
 
 export interface BlockRegistry {
@@ -112,6 +191,22 @@ export interface BlockRegistry {
   render(block: Block, ctx: RenderContextInput): ReactElement;
   /** A run of blocks laid out down the screen, `gapBefore` included (C04 §3a). */
   measureSequence(blocks: readonly Block[], width: number): number;
+  /**
+   * What one block offers to keyboard and pointer; `[]` for an atomic kind
+   * (C26 §5). `measureChild` is supplied here, never by the caller.
+   */
+  elementsOf(block: Block, width: number): readonly NavElement[];
+  /**
+   * Every element in a sequence, with block-local rows lifted into
+   * sequence-local ones and **children walked** (C26 §5, §8b.5).
+   *
+   * The pairing with `blockId` is what C09 I14's renderer needs and what stops
+   * two blocks' element ids sharing one namespace.
+   */
+  elementsIn(
+    blocks: readonly Block[],
+    width: number,
+  ): readonly Readonly<{ blockId: string; element: NavElement }>[];
   /**
    * Rows `[from, to)` of a *sequence*, as a smaller sequence plus an offset
    * (C09 §2a, I25).

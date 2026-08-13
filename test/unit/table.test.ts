@@ -5,7 +5,18 @@
 // holds the comparison against what the spec *states*; this file holds the
 // properties that must hold whatever a surface declares.
 import { describe, expect, it } from "vitest";
-import { COLUMN_GAP, focusableRowIds, planColumns, tableDefinition } from "../../src/presentation/table/index.js";
+import { COLUMN_GAP, planColumns, tableDefinition, tableElements } from "../../src/presentation/table/index.js";
+
+/**
+ * The drawn order of a table's rows (C26 §5).
+ *
+ * **`focusableRowIds` was this, and it is gone.** C26 commitment 11: the
+ * declaration a pointer and a keyboard both read replaces it rather than
+ * standing beside it, because two mechanisms agreeing is not one mechanism.
+ * The rows below assert *order*, which is what they always asserted.
+ */
+const drawnOrder = (block: Table, width = 160): readonly string[] =>
+  tableElements(block, width, registry.measure).map((e) => e.id);
 import { psColumns, psTable } from "../support/blocks.js";
 import { measurable, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
@@ -149,7 +160,7 @@ describe("C11 tier 1 — planColumns", () => {
         rows,
         sort: { key: "family", direction: round % 2 === 0 ? "asc" : "desc" },
       };
-      expect(focusableRowIds(block)).toEqual(rows.map((r) => r.id));
+      expect(drawnOrder(block)).toEqual(rows.map((r) => r.id));
     }
   });
 
@@ -183,7 +194,7 @@ describe("C11 tier 1 — planColumns", () => {
     expect(planColumns(psColumns(), 160).dropped).toEqual([]);
     const lines = registry.renderToLines(block, 160).slice(1);
 
-    const order = focusableRowIds(block);
+    const order = drawnOrder(block);
     expect(order).toEqual(["r2", "r4", "r5", "r3", "r1"]);
 
     for (const id of order) {
@@ -219,7 +230,7 @@ describe("C11 tier 1 — planColumns", () => {
       ],
       sort: { key: "metric", direction: "asc" },
     };
-    expect(focusableRowIds(block)).toEqual(["r2", "r3", "r1"]);
+    expect(drawnOrder(block)).toEqual(["r2", "r3", "r1"]);
   });
 
   it("T1.15: a duration column orders 45s, 12m, 2h, 3d by magnitude", () => {
@@ -238,7 +249,7 @@ describe("C11 tier 1 — planColumns", () => {
       ],
       sort: { key: "age", direction: "asc" },
     };
-    expect(focusableRowIds(block)).toEqual(["s", "m", "hm", "h", "d"]);
+    expect(drawnOrder(block)).toEqual(["s", "m", "hm", "h", "d"]);
   });
 
   it("T1.16 (I13): missing values sort last ascending and descending", () => {
@@ -251,10 +262,10 @@ describe("C11 tier 1 — planColumns", () => {
     const asc: Table = { kind: "table", id: "t", columns: psColumns(), rows, sort: { key: "metric", direction: "asc" } };
     const desc: Table = { ...asc, sort: { key: "metric", direction: "desc" } };
 
-    expect(focusableRowIds(asc)).toEqual(["low", "high", "empty", "absent"]);
+    expect(drawnOrder(asc)).toEqual(["low", "high", "empty", "absent"]);
     // Last either way — a null is an absence of rank, not the bottom of one. The
     // missing rows also keep their relative order, which is I8 over I13.
-    expect(focusableRowIds(desc)).toEqual(["high", "low", "empty", "absent"]);
+    expect(drawnOrder(desc)).toEqual(["high", "low", "empty", "absent"]);
   });
 
   it("T1.17 (I15): the expand marker fills a role column, and only a role column", () => {

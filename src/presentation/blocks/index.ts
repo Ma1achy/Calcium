@@ -36,6 +36,7 @@ export type {
   BlockDefinition,
   BlockRegistry,
   FocusState,
+  NavElement,
   RenderContext,
   RenderContextInput,
 } from "./types.js";

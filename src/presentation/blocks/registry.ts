@@ -9,11 +9,26 @@
  */
 import { Box, Text } from "ink";
 import { createElement, type ReactElement } from "react";
-import { normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
+import { childWidths, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block } from "../../data/viewmodel/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { paint, rows, tone } from "./paint.js";
-import type { BlockDefinition, BlockRegistry, RenderContext, RenderContextInput } from "./types.js";
+import type {
+  BlockDefinition,
+  BlockRegistry,
+  NavElement,
+  RenderContext,
+  RenderContextInput,
+} from "./types.js";
+
+/**
+ * One frozen empty list, shared.
+ *
+ * A fresh `[]` per call would be a new identity every time, and C26 I11 makes
+ * this a **pull** recomputed on dispatch — so an atomic block would allocate on
+ * every keystroke for a value that is always the same nothing.
+ */
+const EMPTY_ELEMENTS: readonly NavElement[] = Object.freeze([]);
 
 /**
  * The definition of last resort: a registry with no `raw` at all, which is
@@ -131,6 +146,86 @@ class Registry implements BlockRegistry {
    */
   measureSequence = (blocks: readonly Block[], width: number): number =>
     sequenceHeight(blocks, normaliseWidth(width), this.measure);
+
+  /**
+   * What one block offers to keyboard and pointer, `measureChild` supplied
+   * (C26 §5, I8).
+   *
+   * **A kind with no `elements` is atomic and answers `[]`** — the same shape
+   * `window`'s absence takes, and the reason `elements?` is optional rather
+   * than a member every kind must implement with an empty body.
+   *
+   * Contained for `measure`'s reason (I11): an implementation that throws makes
+   * its block atomic for this call rather than taking the caller with it. C26
+   * I12 rules that explicitly — the alternative leaves focus pointing at
+   * something unresolvable two components from the throw.
+   */
+  elementsOf = (block: Block, width: number): readonly NavElement[] => {
+    const w = normaliseWidth(width);
+    try {
+      const resolved = this.#resolve(block);
+      const declared = resolved.definition.elements;
+      if (declared === undefined) return EMPTY_ELEMENTS;
+      return declared(resolved.block, w, this.measure);
+    } catch {
+      return EMPTY_ELEMENTS;
+    }
+  };
+
+  /**
+   * Every element in a **sequence**, block-local rows lifted into
+   * sequence-local ones (C26 §5).
+   *
+   * **The recursion is the point, and its absence was a defect** (C26 §8b.5).
+   * The three walks this replaces each iterated a document's top level and
+   * stopped, so a `table` inside a `panel` could not be focused, moved through
+   * or activated. `panel` and `group` hold arbitrary children, and the offsets
+   * are exactly the ones `measureSequence` already computes — so recursing here
+   * costs a line and inventing a second geometry to avoid it would have cost a
+   * drift.
+   *
+   * `gapBefore` is counted here and never inside a block, for `windowSequence`'s
+   * reason: the gap belongs to the run.
+   */
+  elementsIn = (
+    blocks: readonly Block[],
+    width: number,
+  ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
+    const w = normaliseWidth(width);
+    const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
+    let row = 0; // cells-ok — a row cursor, not a width
+
+    const walk = (seq: readonly Block[], atWidth: number): void => {
+      for (const block of seq) {
+        if (block.gapBefore === true) row += 1;
+        const top = row;
+        for (const element of this.elementsOf(block, atWidth)) {
+          out.push({
+            blockId: block.id,
+            element: Object.freeze({
+              ...element,
+              rows: Object.freeze({ from: top + element.rows.from, to: top + element.rows.to }),
+            }),
+          });
+        }
+        // A container declares no elements of its own today; its children's are
+        // reached here. The child widths are C04's, never invented — the same
+        // `childWidths` the measurer and both renderers take (C04 §3).
+        if (block.kind === "panel" || block.kind === "group") {
+          const widths = childWidths(block, atWidth);
+          const before = row;
+          block.children.forEach((child, i) => {
+            row = before;
+            walk([child], widths[i] ?? 1);
+          });
+        }
+        row = top + this.measure(block, atWidth);
+      }
+    };
+
+    walk(blocks, w);
+    return Object.freeze(out);
+  };
 
   /**
    * Rows `[from, to)` of a sequence, as a smaller sequence plus an offset (I25).

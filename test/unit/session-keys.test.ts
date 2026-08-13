@@ -18,6 +18,8 @@ import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
 import { producerContext } from "../support/producer-context.js";
+import { navElement } from "../support/focus.js";
+import type { Action } from "../../src/data/viewmodel/index.js";
 const key = (k: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }): Key => ({
   name: k.name,
   ctrl: k.ctrl ?? false,
@@ -275,12 +277,16 @@ describe("C22 §3 step 11 — the effect table", () => {
       overlayRegion: () => ({ width: 80, height: 24 }),
       redraw: () => undefined,
       focus: createFocusStore(),
-      liveRows: () => ["row-0", "row-1"],
       // A stand-in, and it must not supply the behaviour: this suite drives the
       // editing bindings, and whether `enter` on a row reaches C23's dispatcher
       // is a wiring question a file that builds its own deps cannot answer.
-      // T4.x in session.test.ts is where that is asserted.
-      liveRowAction: () => null,
+      // T4.x in session.test.ts is where that is asserted. So the elements
+      // declare no `activate` — an absent member, not an `undefined` one.
+      liveElements: () => [
+        { blockId: "b1", element: navElement("row-0", 0) },
+        { blockId: "b1", element: navElement("row-1", 1) },
+      ],
+      liveEntryId: () => null,
       onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
@@ -661,8 +667,8 @@ describe("C22 §3 step 12 — the read loop", () => {
       overlayRegion: () => ({ width: 80, height: 24 }),
       redraw: () => undefined,
       focus: createFocusStore(),
-      liveRows: () => [],
-      liveRowAction: () => null,
+      liveElements: () => [],
+      liveEntryId: () => null,
       onAction: () => undefined,
       schedule: (fn: () => void) => {
         fn();
@@ -739,5 +745,114 @@ describe("C22 §3 step 12 — the read loop", () => {
     // verb rather than a menu over a set of one.
     expect(graph.editor.text, "the unique match, inserted whole").toBe("/help ");
     expect(graph.overlays.top, "and no menu over a set of one").toBeNull();
+  });
+});
+
+describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", () => {
+  /**
+   * Two blocks whose element ids collide, which is the state the defect needed.
+   *
+   * **The ids collide by construction rather than by choice**: `tableOf` numbers
+   * its rows `r1..rn`, so any document holding two tables has them. A fixture
+   * that invented distinct ids would agree with the defect and with the fix.
+   */
+  const collidingEffects = () => {
+    const focus = createFocusStore();
+    const fired: Action[] = [];
+    const effects = createKeyEffects({
+      editor: {},
+      completion: {},
+      overlays: {},
+      history: { entries: [], append: () => undefined, next: () => null },
+      patchView: { open: () => null, move: () => false, pop: () => false },
+      documentView: {
+        open: () => null,
+        fill: () => false,
+        putBlock: () => false,
+        blockAt: () => null,
+        move: () => false,
+        pop: () => false,
+        openFor: null,
+      },
+      releaseView: () => undefined,
+      visibilityChanged: () => undefined,
+      manifest: null,
+      viewport: recordingViewport().viewport,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+      focus,
+      liveElements: () => [
+        // **Both `r1`s carry an action, and they differ.** With only the second
+        // one armed, *the focused element's action* and *the first action in the
+        // list* are the same object and the assertion cannot tell them apart —
+        // the mutation firing the first survived against exactly that fixture.
+        { blockId: "a", element: navElement("r1", 0, { kind: "fill", label: "a/r1", command: "a/r1" }) },
+        { blockId: "a", element: navElement("r2", 1) },
+        { blockId: "b", element: navElement("r1", 2, { kind: "fill", label: "b/r1", command: "b/r1" }) },
+        { blockId: "b", element: navElement("r2", 3) },
+      ],
+      liveEntryId: () => "e1",
+      onAction: (action: Action) => void fired.push(action),
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
+    } as unknown as Parameters<typeof createKeyEffects>[0]);
+    return { effects, focus, fired };
+  };
+
+  it("T1.15 (C26 I10): ↓ walks past a colliding id instead of restarting at it", () => {
+    const { effects, focus } = collidingEffects();
+
+    // Down from the prompt enters at the first element, then walks.
+    effects.table["historyNext"]?.();
+    effects.table["rowDown"]?.();
+    effects.table["rowDown"]?.();
+    expect(focus.current, "the third element, in the second block").toEqual({
+      at: "liveBlock",
+      element: { blockId: "b", elementId: "r1" },
+      mode: "navigate",
+    });
+
+    // **The step the flat namespace could not take.** `rows.indexOf("r1")`
+    // answered 0 here — the *first* block's `r1` — so the next `↓` went back to
+    // the second element and the reader could never reach the second table.
+    effects.table["rowDown"]?.();
+    expect(focus.current, "forward, not back to the first block").toEqual({
+      at: "liveBlock",
+      element: { blockId: "b", elementId: "r2" },
+      mode: "navigate",
+    });
+  });
+
+  it("T1.16 (C26 I10): ⏎ fires the focused element's action, not the first id match", () => {
+    const { effects, focus, fired } = collidingEffects();
+    focus.enterLiveBlock({ blockId: "b", elementId: "r1" });
+
+    effects.table["rowActivate"]?.();
+    expect(fired, "the second block's action, which is the focused one").toEqual([
+      { kind: "fill", label: "b/r1", command: "b/r1" },
+    ]);
+  });
+
+  it("T1.17 (C26 I10): ↑ leaves only from a real first element, never from a stale one", () => {
+    // The two dispositions that used to differ: `indexOf` answered −1 both for
+    // "the first row" and for "a row the block no longer has", so `↑` left to
+    // the prompt in a case where `↓` restarted at the top. Resolution falls
+    // forward before the edge is tested, so the two agree.
+    const { effects, focus } = collidingEffects();
+
+    focus.enterLiveBlock({ blockId: "b", elementId: "gone" });
+    effects.table["rowUp"]?.();
+    expect(focus.current, "fell forward into block b, then stepped up").toEqual({
+      at: "liveBlock",
+      element: { blockId: "a", elementId: "r2" },
+      mode: "navigate",
+    });
+
+    focus.enterLiveBlock({ blockId: "a", elementId: "r1" });
+    effects.table["rowUp"]?.();
+    expect(focus.current, "and a real first element does leave").toEqual({ at: "prompt" });
   });
 });

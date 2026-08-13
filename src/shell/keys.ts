@@ -36,8 +36,10 @@ import type {
 } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/index.js";
-import type { KeyAction } from "../interaction/router/types.js";
+import type { ElementAddress, KeyAction } from "../interaction/router/types.js";
+import { resolveFocus } from "../interaction/router/focus.js";
 import type { Action } from "../data/viewmodel/index.js";
+import type { NavElement } from "../presentation/blocks/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
@@ -91,33 +93,31 @@ export type KeyDeps = Readonly<{
   /** C22 I46 — the pop releases the view's parts, rather than a later fetch doing it. */
   releaseView: () => void;
   /**
-   * The live entry's focusable rows, or empty (C16 I22).
+   * Every navigable element in the live entry, addressed and in reading order,
+   * or empty (C16 I22, C26 §5).
    *
-   * C16 takes row ids as data and holds no opinion about what a row is, so
-   * whether a block is navigable is answered from the block (C11 I14). Empty is
-   * what makes `↓` a no-op over a notice rather than focus landing somewhere
-   * with nothing in it.
+   * C16 holds no opinion about what a row is, so whether a block is navigable is
+   * answered from the block (C11 I14). Empty is what makes `↓` a no-op over a
+   * notice rather than focus landing somewhere with nothing in it.
+   *
+   * **One function where there were two, and the second one's reason was already
+   * false** (C26 §8b.7). `liveRowAction` was separate *"because `liveRows` is
+   * asked on every arrow keystroke and this only on `enter`"* — while its body
+   * called the same full registry walk, and had done since the three walks
+   * collapsed into one. Both had to become address-shaped anyway, and one pull
+   * answering both questions is what stops a second answer to *what is here*
+   * existing at all.
+   *
+   * The element carries its own `activate` (C26 §5), so the *first action* rule
+   * this used to apply lives in the kind that declares the element rather than
+   * here: C04 I19 makes `fill` the default kind, so a well-formed row's first
+   * action is the one `enter` should do, and `tableElements` is where that is
+   * now decided. Most elements have none — navigating to read is worth doing on
+   * its own.
    */
-  liveRows: () => readonly string[];
-  /**
-   * The action a focused row fires, and the entry it fires from (C23 I37, F21).
-   *
-   * **Answered from the block, exactly as `liveRows` is**, and for the same
-   * reason: C16 takes row ids as data and holds no opinion about what a row is,
-   * so the one place that knows a live entry's blocks answers both. Two
-   * functions rather than one returning pairs, because `liveRows` is asked on
-   * every arrow keystroke and this only on `enter`.
-   *
-   * **The first action, and C04 I19 is why that is safe.** A row lists its
-   * actions in order and `fill` is the default kind — populating the prompt
-   * rather than running — so the first action of a well-formed row is the one a
-   * reader would expect `enter` to do. A row declaring `exec` first has declared
-   * a reversible operation, which is what I19 reserves that kind for.
-   *
-   * `null` for a row with no actions, which is most of them: `focusableRowIds`
-   * returns every row, because navigating to read is worth doing on its own.
-   */
-  liveRowAction: (rowId: string) => Readonly<{ action: Action; from: EntryId }> | null;
+  liveElements: () => readonly PlacedNavElement[];
+  /** The entry those elements belong to, for an action's origin (C23 I37). */
+  liveEntryId: () => EntryId | null;
   /**
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
@@ -143,6 +143,24 @@ export type KeyDeps = Readonly<{
    */
   schedule: (fn: () => void, ms: number) => Disposable;
 }>;
+
+/**
+ * An element and the block that declared it — C09's `elementsIn` pairing (C26 §5).
+ *
+ * The pair is the address: `blockId` from here and `element.id` from the element
+ * are exactly what `StoredFocus` stores, so nothing has to be joined by a search.
+ */
+export type PlacedNavElement = Readonly<{
+  // Broken across lines deliberately: MG24's member walk does not see a
+  // single-line declaration, so the line shape decides whether these two members
+  // are watched at all (FINDINGS F159).
+  blockId: string;
+  element: NavElement;
+}>;
+
+/** The address of a placed element. One expression, so no call site spells it. */
+const addressOf = (p: PlacedNavElement): ElementAddress =>
+  Object.freeze({ blockId: p.blockId, elementId: p.element.id });
 
 /** What a bound key does. Returns nothing: the loop commits (C22 I27). */
 export type KeyEffect = () => void;
@@ -514,12 +532,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         deps.editor.setText(entry);
         return;
       }
-      const rows = deps.liveRows();
+      const elements = deps.liveElements();
       // A block with nothing focusable is not entered: `activeTarget` would say
       // `liveBlock`, every key would resolve against a target with no bindings,
       // and they would all be dropped.
-      if (rows.length === 0) return;
-      deps.focus.enterLiveBlock(rows[0] ?? null);
+      const first = elements[0];
+      if (first === undefined) return;
+      deps.focus.enterLiveBlock(addressOf(first));
     },
 
     // --- the way back, and between rows (C16 I22) ------------------------
@@ -527,14 +546,30 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // Entry with no exit is a session whose prompt cannot be reached, so both
     // routes are bindings rather than one: `Esc`, which S01's footer already
     // prints as `esc prompt`, and `↑` from the first row, mirroring the entry.
-    focusPrompt: () => void deps.focus.reset(),
+    // **`toPrompt()`, not `reset()`** (C26 I13, §8b.2). Both produce
+    // `{at: "prompt"}` today, so this line changes no behaviour — and it was
+    // wrong, in the direction that matters: `reset()` is C16 I2's *a command
+    // ran*, arriving from C23's submit row, and this is the reader stepping out.
+    // `toPrompt()` existed for exactly this and had one caller in the tree, the
+    // Ctrl-C rung. Focus memory hangs off the pair, so with these two call sites
+    // as they were the emphatic exit would have kept the memory and the two
+    // ordinary ones wiped it.
+    focusPrompt: () => void deps.focus.toPrompt(),
     rowDown: () => {
-      const rows = deps.liveRows();
+      const elements = deps.liveElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
-      const i = rows.indexOf(current.rowId ?? "");
-      const next = rows[i + 1];
-      if (next !== undefined) deps.focus.focusRow(next);
+      // **`resolveFocus`, not `indexOf`** (C26 I10, §8b.7). The old line was
+      // `rows.indexOf(current.rowId ?? "")` over a flat list of row ids, which
+      // found the *first* block carrying the id and counted from there — so with
+      // two tables each holding `r1` the next `↓` continued from the wrong one.
+      // It also answered −1 for a row the block no longer has, which quietly
+      // meant "start again from the top" while `rowUp` read the same −1 as
+      // "leave to the prompt".
+      const i = resolveFocus(current.element, elements);
+      if (i === null) return;
+      const next = elements[i + 1];
+      if (next !== undefined) deps.focus.focusRow(addressOf(next));
     },
     /**
      * **F21's whole subject: the route from a keystroke to `actions.ts`.**
@@ -554,23 +589,40 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     rowActivate: () => {
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
-      const rowId = current.rowId;
-      if (rowId === null || rowId === undefined) return;
-      const found = deps.liveRowAction(rowId);
-      if (found === null) return;
-      deps.onAction(found.action, found.from);
+      // Resolved rather than looked up by id (C26 I10). The old form took the
+      // bare row id into a second walk that matched the *first* block carrying
+      // it, so `⏎` on the second table's `r1` fired the first table's action.
+      const elements = deps.liveElements();
+      const i = resolveFocus(current.element, elements);
+      if (i === null) return;
+      // `activate` is the element's own, declared by the kind (C26 §5), rather
+      // than a row shape this layer would otherwise have to know.
+      const action = elements[i]?.element.activate;
+      const from = deps.liveEntryId();
+      if (action === undefined || from === null) return;
+      deps.onAction(action, from);
     },
     rowUp: () => {
-      const rows = deps.liveRows();
+      const elements = deps.liveElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
-      const i = rows.indexOf(current.rowId ?? "");
-      // At the first row — or at a row the block no longer has — `↑` leaves.
-      if (i <= 0) {
-        deps.focus.reset();
+      const i = resolveFocus(current.element, elements);
+      // At the first element `↑` leaves. **A stale address no longer arrives
+      // here as one** (C26 I10): it used to reach this as `indexOf`'s −1 and
+      // exit to the prompt, while `rowDown` read the same −1 as "go to the top"
+      // and `focusFor` drew no highlight at all — three call sites, three
+      // answers, none of them the invariant's. Resolution falls forward before
+      // the edge is tested, so only a real first element leaves.
+      //
+      // `toPrompt()` for `focusPrompt`'s reason above: this is the reader
+      // stepping out, and it is the second of the two call sites C26 §8b.2 found
+      // wired to C16 I2's append transition.
+      if (i === null || i === 0) {
+        deps.focus.toPrompt();
         return;
       }
-      deps.focus.focusRow(rows[i - 1] ?? null);
+      const previous = elements[i - 1];
+      deps.focus.focusRow(previous === undefined ? null : addressOf(previous));
     },
     // --- C17 -----------------------------------------------------------
     //

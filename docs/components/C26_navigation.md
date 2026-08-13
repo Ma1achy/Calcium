@@ -136,7 +136,7 @@ when the third case was not sought.
 ## 5. Element resolution — one declaration, keyboard and pointer
 
 ```typescript
-elements?: (block: B, width: number) => readonly NavElement[];
+elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
 ```
 
 on `BlockDefinition`, beside `window?`.
@@ -290,17 +290,27 @@ notice here.
   second source.
 - **I9** — Focus is rendered by the block and owned here (C11 I14). C26 holds a location; it
   draws nothing and commits no frame.
-- **I10** — Restoring focus is a re-resolution by id with a fall-forward to the nearest
-  survivor, never an index (C14 I6's shape).
+- **I10** — Focus is stored as an **address**, `(blockId, elementId)`, and restoring it is a
+  re-resolution by that address with a fall-forward to the nearest survivor **forward in
+  reading order**, never an index (C14 I6's shape). **One resolver answers for both the render
+  side and the key side**, so what is highlighted and where the next arrow goes cannot
+  disagree; it writes nothing, and the store is repaired by the next focus-moving keystroke
+  (§8b.7).
 - **I11** — Element resolution is a pull, recomputed on dispatch. C26 subscribes to no change
   stream.
 - **I12** — A refused or throwing `elements` makes the block atomic for that dispatch and
   focus falls to the block level. It is not a throw the caller sees.
-- **I13** — Leaving a scope and a command running are **different transitions**. Both reach
-  the prompt today and only one may keep a focus memory (§8a, table row a).
+- **I13** — Leaving a scope and a command running are **different transitions**, and only
+  one may keep a focus memory. **`FocusStore` already has both functions** — `toPrompt()` is
+  the reader stepping out and `reset()` is C16 I2's append — and the call sites use the wrong
+  one (§8b.2). The invariant is that each exit calls the transition that names it.
 - **I14** — Two-level escape: the first `Esc` exits interaction, the second leaves the
   scope. Neither is C16 §5's Ctrl-C rung and neither is `viewPop` (→ C16 I24) — the
   collision between the second and `viewPop` is trace 6 and is owed a ruling.
+  **Vacuous while nothing can enter interaction** (§8b.8), and the premise is recorded rather
+  than left to be found: `⌃c` is the only binding on the target today, so the first level has
+  no subject and the second is `liveBlock`'s existing exit. The day a block declares keys,
+  both levels are first tested for real.
 - **I15** — Policies resolve global → kind → per-node override, and **an override naming a
   level the kind reports no element at is a construction error**, the way a duplicate
   binding is (→ C16 I10). An override for an absent level is unreachable and reads as
@@ -325,6 +335,8 @@ overlap.
 | **b** | *an override wins over the kind* meets *a level exists only where elements report one* | **FINDING.** An override naming a `cell` policy on a kind reporting no cell elements is unreachable and reads as configured — A03 §2's vacuity class arriving in a config value. Ruling: an override for an absent level is a **construction error**, the way C16 I10 makes a duplicate binding one. |
 | **c** | *deepest level wins* meets *disjointness makes resolution single-valued* | **FINDING.** Global disjointness forbids the nesting the model is built on. Disjointness is **per level** → **I6**, and it is the reason §5 lists four predicates rather than three. |
 | **d** | *`escape-all` leaves the scope* meets *there is no scope above `entry`* | Falls to the prompt by row **a**'s transition, and therefore inherits its ruling rather than adding one. |
+| **f** | *`⏎` enters interaction on the focused element* (§2) meets *`⏎` activates the focused row* (C16 I22, F21) | **FINDING, and it needs two absences distinguished.** *The block declares no keys* and *the element declares no `activate`* are different facts about different things, and only one of them is a reason to refuse the mode. Ruling in §8b.8: activate if the element declares one; **do not enter interaction**, because the second absence is currently structural. |
+| **g** | *entering interaction hands the block every key* (§2) meets *`interaction` has one binding, and no block declares any* | **FINDING.** A mode with nothing in it is reachable, takes every key from the prompt, and is left only by `⌃c` — A03 §2's vacuity class as a *reachable state* rather than as an unfalsifiable rule. Measured, not assumed: `Keymap.mergeBlock` has no caller in `src/` and `register("interaction", …)` binds `⌃c` alone. → §8b.8 |
 | **e** | *the arrow policy governs the edge* meets *`↓` at the prompt is `historyNext` **and** enters the live block* (C16 I22) | Not a collision: C16 I22's second effect is entry and this governs exit. But the pair means there are two ways back to the prompt (`Esc` and the bottom edge) and **they must agree about row a's transition.** Named so the implementation does not give them separate paths. |
 
 ### Sequence trace — event-mediated
@@ -356,17 +368,272 @@ the block is atomic for that dispatch and focus falls to the block level → **I
 
 ---
 
+## 8b. What the implementation falsified
+
+**The walk rules the shape; code is the first thing that can disprove it.** Every entry below
+was found by reading the call sites before writing a line, and most make a §8a ruling
+*sharper* rather than wrong — which is the disposition worth having a heading for, because a
+walk that is only ever confirmed is a walk nobody checked.
+
+**This heading said "Both entries below" over six of them**, and it is F142's lesson arriving
+in the smallest possible form: *a count in prose is a snapshot with no mechanism.* It was
+written when there were two and was never a claim anyone re-read. Corrected to a quantifier,
+which cannot go stale.
+
+### 1. `⏎` is already bound on `liveBlock`, so §2 cannot have it
+
+§2 says *`⏎` enters interaction on the focused element*. `defaultKeymap` already binds
+`{ target: "liveBlock", key: { name: "enter" }, action: "rowActivate" }` — F21's close, and
+the route from a keystroke to `actions.ts` that did not exist for four components.
+
+**Two bindings on one `(target, key)` is a construction error** (→ C16 I10), so this is not a
+choice between them. **The ruling: one binding, two effects, in order** — `rowActivate` enters
+interaction when the focused element declares one and dispatches the row's action otherwise.
+
+**The precedent is in the same component and was reached the same way.** C16 I22 is `↓`:
+*one binding with two effects, in order*, because the prompt's `↓` is `historyNext` and §3's
+sentence also said it enters the live block. Two claims on one keystroke, and the resolution
+was ordering rather than a second key. Nothing in §8a's table reached this, because the table
+indexes *policy* interactions and this is a collision with a binding that already exists —
+**a rule interaction with the keymap, which is a table neither artefact was indexed over.**
+
+### 2. I13 is smaller as a remedy and larger as a defect
+
+§8a row a said `toPrompt()` and `reset()` both assign `AT_PROMPT`, so one transition carries
+two meanings and focus memory needs them to diverge. **They already diverge. The call sites
+are wired to the wrong one.**
+
+| exit | calls | should call |
+|---|---|---|
+| `⌃c` from the live block — `router.ts:227` | `toPrompt()` | `toPrompt()` ✓ |
+| `Esc` — `focusPrompt`, `keys.ts:530` | **`reset()`** | `toPrompt()` |
+| `↑` past the first row — `keys.ts:570` | **`reset()`** | `toPrompt()` |
+
+`toPrompt()` has **exactly one caller in the tree**, and it is the emphatic exit. The two
+ordinary ones call C16 I2's *a command ran*.
+
+**Invisible today because both produce `AT_PROMPT`**, and backwards the moment focus memory
+exists: `Esc` and `↑` would wipe the memory while `⌃c` kept it. So the remedy is two call
+sites rather than a new transition, and the defect is that the distinction the API already
+draws has never been honoured.
+
+**This is the shape §8a's own preamble warns about one level up.** A ruling can be correct
+about the interaction and wrong about the mechanism it assumed — C23 §8a A4's class. Here it
+assumed a mechanism was *missing* that is present and unused, which is the same error with
+the sign flipped, and it is cheaper to find at the call site than at the cache.
+
+### 3. `elements` cannot compute its own positions — the signature is wrong
+
+§5 declares `elements?(block, width)`. **A table's row offsets are not a function of those
+two.** `measure` is `(block, width, measureChild)` and a row's offset is
+`header + Σ(1 + detailHeight(row))`, where `detailHeight` calls `sequenceHeight(...,
+measureChild)` for every expanded row (`table/definition.ts:88`). Without it the positions
+would have to be guessed, and a guessed position is a pointer landing on the wrong row —
+the drift class, arriving through the seam built to prevent it.
+
+**The signature is `Measure<B>`'s, and that is the argument rather than a convenience.**
+A02 Seam 1 injects measurement precisely so a container composes children whose kind it does
+not know; `elements` has the same problem and takes the same seam. The registry supplies it,
+as it already does for `measure` — which also means an implementation cannot reach for its
+own measurer.
+
+```typescript
+elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
+```
+
+### 4. There are three parallel walks, and the code predicted it
+
+§5 says a second mechanism beside `focusableRowIds` is the defect to avoid. **There are
+already three, each with `block.kind === "table"` written into it:**
+
+| walk | file | answers |
+|---|---|---|
+| `liveRows` | `shell/construct.ts:838` | the ordered row ids |
+| `liveRowAction` | `shell/construct.ts:856` | the focused row's action |
+| `focusFor` | `shell/session.ts:715` | which block owns the focused row |
+
+`liveRowAction`'s own comment names the hazard — *"a second walk elsewhere would be a second
+answer to what is here, and the two would disagree the first time a block kind became
+navigable"* — and it is written **beside** the walk it was warning about, while the third sat
+in another component. Two instances read as a pair; the third is in a different file, which is
+why the comment did not find it.
+
+### 5. All three walk the top level only, so a nested table is unreachable
+
+Each iterates `entry.doc.blocks` and stops. `panel` and `group` hold `children: readonly
+Block[]` (`viewmodel/types.ts:553,560`), so **a table inside a panel cannot be focused, moved
+through, or activated** — by keyboard or, once it exists, by pointer.
+
+C04 exports `descendants` and C13's cap uses it *by name*, with a comment saying a second copy
+would miss things. None of the three focus walks call it. Registry-side `elements` resolution
+inherits the recursion for free, because the registry already walks children for `measure` and
+`render`.
+
+### 6. Row ids collide across blocks, and focus resolves to the wrong one
+
+Row ids are unique within a block at best — C11 T3.15 records that even *that* is unchecked
+and is C04's to add. `liveRows` **concatenates** ids across every table in the entry, `rowUp`
+and `rowDown` use `rows.indexOf(...)`, and `focusFor` returns the **first** block containing
+the id.
+
+So two tables in one document each carrying a row `r1` give: `↓` onto the second table's `r1`,
+highlight drawn on the *first* table's, and the next `↓` continuing from the first table's
+position. Every step is individually correct.
+
+**`elements` closes it by construction rather than by adding a uniqueness rule**: an element
+is addressed by its own id within a declaration that knows which block produced it, so there
+is no flat namespace for two rows to collide in.
+
+**Half of that landed in stage 2 and half did not, which entry 7 below is about.**
+`elementsIn` pairs every element with its block, so the *declaration* side has no flat
+namespace. `StoredFocus.rowId` stayed a bare string, so the *stored* side still had one, and
+the defect above survived a change whose whole subject it was.
+
+---
+
+### 7. The address type already exists one layer down, and `focusFor` manufactures the other half
+
+Reading every reader of `rowId` before choosing the type — the same pass that falsified §5's
+signature in entry 3 — moves two decisions and confirms three.
+
+**`FocusState` is already the address.** `presentation/blocks/types.ts:17` is
+`{blockId, rowId: string | null}`, because C09 needs a pair to tell one block it holds focus
+(C11 I14). The store held half of it and `session.ts` re-derived the other half by taking the
+**first** element whose id matched.
+
+So entry 6's diagnosis was true and named the wrong subject. It is not that row ids collide —
+C04 I31 makes them unique *within* a table and says nothing across blocks, so a collision
+between two tables is well-formed and always was. **It is that one type is the address and
+the other is half of it, and the join between them is a first-match search.** The remedy is
+not a uniqueness rule anywhere; it is that the stored form stops being narrower than the form
+it is rendered as.
+
+**I10 is ruled and unimplemented, and its four readers improvise four different answers.**
+Against an id the block no longer has:
+
+| reader | today |
+|---|---|
+| `keys.ts` `rowUp` | `indexOf` → −1, `i <= 0` → leaves to the prompt |
+| `keys.ts` `rowDown` | `indexOf` → −1, `rows[0]` → jumps to the first row |
+| `session.ts` `focusFor` | no match → `null` → no highlight drawn |
+| `keys.ts` `rowActivate` | `null` → silent |
+
+None is I10's fall-forward. So *what does a stale address do* is not a question the new type
+raises — it is a ruling that exists, that nothing implements, and that four call sites answer
+four ways. **A spread of dispositions with no shared source is what an unimplemented invariant
+looks like from the code**, and it is invisible to a reader checking any one of them.
+
+**The address is well-founded on invariants that already exist.** C04 **I14** makes block ids
+unique within the document, *nested children included* (`src/data/viewmodel/validate.ts:439`);
+**I6** above makes element ids unique within a block's declaration. `(blockId, elementId)` is
+therefore unique with no new rule, and entry 6's *closes it by construction* becomes checkable
+rather than asserted.
+
+**`liveRowAction`'s reason for being a second function is already false in the code.** Its
+comment argues two functions rather than one returning pairs *because `liveRows` is asked on
+every arrow keystroke and this only on `enter`* — while its body calls `liveElements()`, the
+same full registry walk. The cheap/expensive split does not exist and has not since stage 2
+rewired it. Both signatures have to change for the address anyway, so they collapse to one
+pull. **A justification that was true when written and was falsified by a later change reads
+exactly like one that still holds** — the sibling of §7's mutation lesson, one artefact over.
+
+**Eviction and resize are not the reachable staleness; patch is.** §8a listed three, and
+against the tree:
+
+- **Eviction** (trace 1) — C13's sweep exempts live and streaming entries, and both `focusFor`
+  and `activeTarget` gate on the live entry. Unreachable until block-to-block movement exists,
+  which §11 defers.
+- **Resize** (trace 3) — element ids are row ids and are width-independent; only positions
+  move. The trace's premise is true *generically* and **vacuous for `table`**, which yields an
+  element per row at every width. It cannot be tested with a real kind, so a fabricated one is
+  owed — a check whose only subject is the kind that cannot violate it passes exactly like one
+  that is satisfied (A03 §2).
+- **Patch** (trace 4) — `putBlock` is total and never throws, so the element vanishes with no
+  signal. **The only case reachable today**, and the one the disposition is written for.
+
+#### The ruling I10 was owed
+
+Resolution is **exact match on `(blockId, elementId)` first; on no match, the nearest survivor
+forward in the list**. The list is in reading order by I5, so *nearest* is the list's own order
+and not a second notion of distance that could disagree with it.
+
+**One resolver, shared by the render side and the key side**, and the reason is that the
+obvious placement is wrong. `focusFor` is a render query and must write nothing, so a
+fall-forward computed there would leave the store holding a dead address and the next `↓`
+computing from it — the original defect one layer over. A fall-forward that *did* write would
+put a mutation in a per-frame read. So neither side owns it: both call the same pure function,
+display and the next keystroke agree by construction, and the store is repaired by the next
+focus-moving keystroke. Same argument as `elements` itself — one source, or they disagree.
+
+It takes its element list **structurally rather than by import**, on the argument `focus.ts`
+already makes for `FocusInputs`: taking C15's and C13's shapes by structure *keeps purity a
+property of the signature*. One decision applied twice, not a second one that agrees.
+
+---
+
+### 8. `⏎`'s second effect names a mechanism with no producer, so it does not ship
+
+Entry 1 ruled that `⏎` cannot simply *be* the interaction key, because `rowActivate` already
+holds `(liveBlock, enter)` and two bindings on one pair is a construction error (→ C16 I10).
+The remedy was one binding with two effects in order, on C16 I22's precedent. **Deciding the
+order required asking what "the block declares no keys" means, and there are two absences
+behind that phrase.**
+
+| | the absence | what it is a fact about | observable today? |
+|---|---|---|---|
+| **A** | the block declares no **keymap** | the block — whether the mode has anything in it | **no.** Nothing reports it |
+| **B** | the element declares no **`activate`** | the element — whether `⏎` has an action | **yes.** `NavElement.activate` is optional |
+
+**They do not resolve the same way, and collapsing them is how the trap would have shipped.**
+B is a per-element silence and is already right: pressing `⏎` on a row that does nothing is a
+question, not a mistake, and a refusal per keystroke on a table where most rows have none is
+noise the reader cannot act on. **A is structural**, and it is currently true of every block:
+
+- `Keymap.mergeBlock` — the seam an adapter attaches a `BlockKeymap` through — **has no caller
+  in `src/`.** `src/index.ts` §3 records it as one of three members ruled interior and dropped,
+  *"not public, not finished"*.
+- `register("interaction", …)` binds **`⌃c` and nothing else**. `Esc` is not on the target;
+  I14's two-level escape is unimplemented.
+
+So entering interaction today produces a mode with **zero bindings**, which takes every key
+away from the prompt and is left only by `⌃c`. That is row **g**: A03 §2's vacuity class
+arriving as a *reachable state* rather than as a rule nothing can violate.
+
+#### The ruling, and why it is narrower than §2 said
+
+**`⏎` dispatches the focused element's `activate`, and does nothing otherwise. It does not
+enter interaction, and the second effect returns with the mechanism that makes the mode
+inhabitable** — in the commit that gives `mergeBlock` a producer.
+
+**Not a deferral of convenience: the arm cannot be written.** *Enter interaction when the
+block declares keys* names a question nothing in the tree can answer — no element, no
+definition and no registry reports whether a block has a keymap, because the only thing that
+would attach one has no producer. **When a ruling names an operation, check the operation
+exists** (C23 §8a A4), and this is that check run on the ruling the walk had already made.
+Shipping the arm would mean inventing a mechanism to report an absence that is currently
+total, in order to guard a mode nothing can act in.
+
+The finding survives and only the remedy changes, which is A4's disposition exactly. What
+would have shipped without the check is worse than a missing feature: `⏎` on any row without
+an action would have entered a keyless mode and the prompt would have stopped responding.
+
+**Stage 3's code already implements the ruling** — `rowActivate` resolves the address and
+dispatches the element's own `activate` — so this entry changes a commitment and no code, which
+is the shape a spec commit should have.
+
+---
+
 ## 9. Commitments
 
 1. The scope stack is `entry → block → row → cell`, at most four deep (I1).
 2. Navigation and interaction are modes, and interaction is a focus target (I2).
-3. `⏎` enters interaction; `Esc` leaves it, then leaves the scope (I14).
+3. `⏎` dispatches the focused element's `activate` and is silent otherwise; `Esc` leaves interaction, then leaves the scope (I14). **`⏎`'s second effect — entering interaction — is not committed**, because the mode has no bindings and the seam that would supply them has no producer (§8b.8). It arrives with that producer, as one binding with two effects in order (→ C16 I22).
 4. `ArrowPolicy` and `EscapePolicy` resolve global → kind → per-node override, and an override for a level the kind does not report is a construction error (I15).
 5. `BlockDefinition.elements` is optional, pure in `(block, width)`, and is the single source for both keyboard and pointer (I3, I8).
 6. Element lists satisfy containment, reading order, per-level disjointness and stability (I4, I5, I6) — checked generically by a conformance sweep, as `window`'s equality is.
 7. A kind declaring both `window` and `elements` satisfies their agreement (I7), and the invariant's emptiness is recorded rather than left to be found.
 8. Focus changes tone and nothing else (I9, → C11 I14).
-9. Restoration is by id with a fall-forward (I10).
+9. Focus is stored as a `(blockId, elementId)` address, and restoration is a re-resolution of it with a fall-forward, through one resolver shared by render and keys (I10).
 10. Element resolution is a pull (I11).
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
 
@@ -391,8 +658,25 @@ Named against the invariants; the tiers are the six.
   by identity rather than equality. The keymap's `/help` traversal is the precedent: identity
   is what makes "one source" checkable.
 - **T3.x** (I10, I12) — evict, resize and `putBlock` under a live focus; and a kind whose
-  `elements` throws.
+  `elements` throws. **Two of the three need a fabricated kind or are unreachable** (§8b.7):
+  eviction exempts the live entry, and `table` yields an element per row at every width, so
+  the resize arm has no subject until a definition that drops one exists.
+- **T3.x** (I10) — two blocks sharing an element id, focus on the second: the highlight draws
+  on the **second** and the next arrow continues from it. `tableOf` collides by construction,
+  so the fixture is the state the defect needed rather than one invented to suit.
+- **T3.x** (I10) — an address whose `blockId` matches and `elementId` does not, and the
+  converse. **These are the rows a bare-id implementation still passes**, which is what makes
+  them the ones worth writing.
+- **T6.x** (I10) — resolution matching on `elementId` alone → the collision row fails; the
+  fall-forward taking the first element rather than the nearest forward → the `putBlock` row
+  fails.
 - **T3.x** (I13) — `reset()` and `toPrompt()` produce different locations.
+- **T2.x** (§8b.8, I14) — **the vacuity of interaction mode, asserted rather than described.**
+  `Keymap.mergeBlock` has no caller in `src/` and `interaction` carries one binding, so the
+  mode has nothing in it and `⏎`'s second effect is not committed. The row asserts both facts,
+  and it **fails the day either changes** — which is when the second effect and I14's first
+  level go live and this row is inverted. A premise recorded and unchecked is a premise that
+  goes quiet (F102's disposal, and T2.17's shape for the `window` × `elements` agreement).
 - **T6.x** (I6) — making disjointness global → the nesting fixtures fail.
 - **T6.x** (I11) — turning the pull into a subscription → the half-applied-store row fails.
 - **T6.x** (I2) — moving the mode out of `FOCUS_ORDER` into a pre-dispatch flag → the ladder

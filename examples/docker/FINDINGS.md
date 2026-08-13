@@ -7431,3 +7431,51 @@ is published.
 entry in `SHOTS`, so the README's claim that these images *"regenerate when the app changes
 rather than rotting"* holds for fourteen of fifteen. Filed rather than fixed: restoring its shot
 means reconstructing the menu-over-diff state, which is a row of its own.
+
+---
+
+## F159 — MG24 does not see a single-line type declaration, so the line shape decides what is watched ★★★
+
+**Found by running the check rather than by reading it.** C26 stage 3 added
+`ElementAddress` with a note arguing that `elementId` was named so MG24 could say
+something about it — `blockId` being satisfied by any of `FocusState.blockId`'s readers,
+since the rule matches members by name. The argument is correct. It guaranteed nothing.
+
+A fabricated unconsumed member on the type passed `make enforce` clean:
+
+| declaration | fabricated member caught? |
+|---|---|
+| `export type X = Readonly<{ a: string; b: string }>;` | **no** |
+| `export interface X { readonly a: string; readonly b: string }` | **no** |
+| the same alias broken across lines | **yes** |
+
+So neither the keyword nor the name is the discriminator — **the line shape is.** MG24's
+member walk reads members off their own lines, and a declaration written on one line
+presents none.
+
+**40 published object types under `src/` are declared on a single line** and are outside
+the rule for that reason alone: `Anchor`, `Region`, `TerminalSize`, `PromptAnchor`,
+`ViewportChange`, `Choice` and thirty-four more. None of them is unwatched by a decision
+anybody took.
+
+**This is F84's sibling and the reason it is worth filing separately.** F84 found MG24's
+*keyword* scope excluded 74% of its subject, and that was fixed — MG24 caught
+`NavElement.arrow` and `.escape` in a type alias two commits ago, which is what made the
+scope look closed. **A rule can be widened along the axis a finding named and stay narrow
+along one it did not**, and the second axis is invisible precisely because the first was
+addressed: the fix is real, so the clean result reads as coverage.
+
+**Both C26 types were reformatted rather than filed around** — `ElementAddress` and
+`PlacedNavElement` are now multi-line and inside the population, with the reason recorded
+at each declaration so a later reformat is not silently a scope change. That is the
+instance closed. **The class is not**: the rule should read a declaration's members
+regardless of line breaks, and until it does, forty types are watched or not by their
+formatting. Filed rather than fixed here because widening the walk changes the population
+of a gate mid-stage, and what it then reports has to be read rather than assumed clean —
+which is a step of its own.
+
+**The instrument, again.** *Ask where a settled claim is written down* — this claim was
+written down, in a comment I had just written, and it was still a belief. Twenty minutes
+of fabricated violations, and the rule's blind spot is now stated rather than assumed
+absent. A justification that is true about the mechanism it names and silent about whether
+the mechanism runs reads exactly like one that holds.
