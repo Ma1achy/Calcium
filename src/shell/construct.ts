@@ -742,7 +742,6 @@ export async function constructGraph(
    */
   const confirm = createConfirmHost({
     overlays: stores.overlays,
-    capabilities: detection.capabilities,
     invalidate: () => void scheduler.commit("input"),
   });
 

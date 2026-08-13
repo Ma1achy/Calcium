@@ -25,8 +25,7 @@ import type { Block } from "../data/viewmodel/types.js";
 import type { InputEvent } from "../interaction/router/types.js";
 import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
-import type { TerminalCapabilities } from "../terminal/capabilities.js";
-import { glyphFor } from "../presentation/blocks/index.js";
+import { cells } from "../presentation/text.js";
 
 export const CONFIRM_LAYER_ID = "confirm";
 
@@ -47,17 +46,6 @@ export const CONFIRM_WIDTH = 72;
 
 export type ConfirmDeps = Readonly<{
   overlays: OverlayManager;
-  /**
-   * For the selection marker alone (C09 I22, F122).
-   *
-   * The marker is `▸`, which **is** a member of C09's vocabulary — `expand`,
-   * paired with `>` — and this file wrote the character. A `raw` block carries
-   * text rather than a slot, so the substitution cannot happen at L1 and the
-   * capability has to arrive here. That is the cost of choosing `raw` for a
-   * list, and it is named rather than absorbed: a `list` block would have
-   * carried the slot.
-   */
-  capabilities: Pick<TerminalCapabilities, "unicode">;
   /** The frame is L4's to commit; C15 never paints (A02 Seam 4). */
   invalidate: () => void;
 }>;
@@ -90,11 +78,56 @@ function defaultChoice(choices: readonly Choice[]): Choice {
   return choices.find((c) => c.default === true) ?? choices[choices.length - 1]!;
 }
 
-function render(
-  opts: AskOptions,
-  selected: number,
-  caps: Pick<TerminalCapabilities, "unicode">,
-): readonly Block[] {
+/**
+ * The choices, as a table rather than as written text (entry 16 A5).
+ *
+ * **Three columns, and the first holds nothing but the marker.** A glyph is part
+ * of a cell's width rather than an addition to it (`table/cells.ts:123`), so a
+ * marker sharing the key's cell would shift the selected row two columns left of
+ * the others — the alignment the `raw` form got by padding with a space.
+ *
+ * **The marker is `bullet` and it used to be `expand`, which is a collision the
+ * `raw` form concealed.** C11 renders `expand`/`collapse` for a row that can be
+ * opened (`table/cells.ts:91`), so `▸` inside a table row already means
+ * *expandable* to the same renderer. While the choices were text nothing could
+ * notice; as blocks the two meanings arrive in one place. `bullet` is what the
+ * completion menu marks a selected row with, and one marker across the popups is
+ * the drift this entry exists to close.
+ *
+ * And the capability is gone from this file with the written character: a `raw`
+ * block carries text where a cell carries a slot, so L1 substitutes and L4 never
+ * spells the glyph (C09 I22, F122).
+ */
+function choiceBlock(choices: readonly Choice[], selected: number): Block {
+  return block({
+    kind: "table",
+    id: "confirm-choices",
+    gapBefore: true,
+    columns: [
+      { key: "mark", label: "", align: "left", priority: 3, minWidth: 1, sortable: false },
+      { key: "key", label: "", align: "left", priority: 2, minWidth: keyWidth(choices), sortable: false },
+      { key: "label", label: "", align: "left", priority: 1, minWidth: 1, flex: true, sortable: false },
+    ],
+    rows: choices.map((c, i) => ({
+      id: `confirm-choice-${c.key}`,
+      cells: {
+        mark: { text: "", ...(i === selected ? { glyph: "bullet" as const } : {}) },
+        key: { text: `[${c.key}]` },
+        label: { text: c.label },
+      },
+    })),
+    showHeader: false,
+  });
+}
+
+/** The widest `[k]`, so the labels line up whatever the accelerators are. */
+function keyWidth(choices: readonly Choice[]): number {
+  let widest = 1;
+  for (const c of choices) widest = Math.max(widest, cells(c.key) + 2);
+  return widest;
+}
+
+function render(opts: AskOptions, selected: number): readonly Block[] {
   const children: Block[] = [
     block({ kind: "notice", id: "confirm-question", tone: "warn", glyph: "warn", text: opts.question }),
   ];
@@ -102,16 +135,7 @@ function render(
   // rather than in the entry that follows it.
   if (opts.detail !== undefined) children.push(opts.detail);
 
-  children.push(
-    block({
-      kind: "raw",
-      id: "confirm-choices",
-      gapBefore: true,
-      text: opts.choices
-        .map((c, i) => `${i === selected ? glyphFor("expand", caps) : " "} [${c.key}] ${c.label}`)
-        .join("\n"),
-    }),
-  );
+  children.push(choiceBlock(opts.choices, selected));
 
   return [block({ kind: "panel", id: "confirm-panel", title: "Confirm", children })];
 }
@@ -146,7 +170,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         id: CONFIRM_LAYER_ID,
         kind: "overlay",
         placement: { kind: "centred" },
-        content: render(opts, selected, deps.capabilities),
+        content: render(opts, selected),
         dismissable: false,
         // **Declared, and the frame-read is why.** Without it C15 gives a
         // centred layer the region's width, so `Placed.left` is always 0 and
@@ -171,7 +195,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
         };
 
         const redraw = (): boolean => {
-          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected, deps.capabilities) });
+          deps.overlays.update(CONFIRM_LAYER_ID, { content: render(opts, selected) });
           deps.invalidate();
           return true;
         };

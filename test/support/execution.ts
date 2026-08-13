@@ -192,7 +192,7 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
      * answer, so a handler that asks and ignores the reply would pass — and the
      * one test that matters is whether declining stops the command.
      */
-    confirm: createConfirmHost({ capabilities: { unicode: "full" }, overlays: harnessOverlays, invalidate: () => undefined }),
+    confirm: createConfirmHost({ overlays: harnessOverlays, invalidate: () => undefined }),
     theme,
     // `append` is real, because C23 I29 records every settled submission
     // through it — a fake without it throws inside the append funnel and the

@@ -43,6 +43,28 @@ import { createConfirmHost } from "../../src/shell/confirm.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { measureSequence } from "../support/viewport.js";
 import { registry } from "../support/overlay.js";
+import { tableDefinition } from "../../src/presentation/table/index.js";
+import { ASCII_CAPS, measurable, visible } from "../support/render.js";
+import type { OverlayManager } from "../../src/viewport/overlay/index.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+
+/**
+ * The confirm's layer, rendered — the frame rather than the blocks.
+ *
+ * Read through C09's registry with `table` registered, because the claim being
+ * checked is about columns lining up and about a glyph a slot resolves. A
+ * structural assertion on the block sees the marker on the right row and cannot
+ * see either.
+ */
+function frameOf(overlays: OverlayManager, caps?: TerminalCapabilities): readonly string[] {
+  const layer = overlays.top;
+  if (layer === null) throw new Error("no layer to read");
+  const r = measurable({
+    definitions: [tableDefinition],
+    ...(caps === undefined ? {} : { capabilities: caps }),
+  });
+  return layer.content.flatMap((b) => r.renderToLines(b, 72).map(visible));
+}
 
 const key = (name: string, mods: Partial<Key> = {}): InputEvent => ({
   kind: "key",
@@ -65,7 +87,7 @@ function world(over: Partial<RouterDeps> = {}) {
   const globalSeen: InputEvent[] = [];
   let cancels = 0;
 
-  const confirm = createConfirmHost({ capabilities: { unicode: "full" }, overlays, invalidate });
+  const confirm = createConfirmHost({ overlays, invalidate });
 
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),
@@ -267,6 +289,96 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.router.dispatch(ctrlC)).toBe(true);
     expect(w.cancels()).toBe(1);
     expect(w.router.lastStages).toContain("cancel");
+  });
+
+  it("T4.12 (C23 I36, entry 16 R1): the marker opens on the default, not on the first", () => {
+    // **The mutation this row exists for**, and it is a safety defect rather
+    // than a navigation one: every assertion about arrows moving agrees with an
+    // index that opens at 0, and a destructive verb's confirm then sits on
+    // `yes`. `confirm.ts` puts the safe choice last by convention, so `yes`
+    // first and `no` marked default is the arrangement where the two readings
+    // disagree — an ordering where the default is already first passes both.
+    const w = world();
+    void w.confirm.ask({ question: "Remove 6 containers?", choices: YES_NO });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.find((l) => l.includes("[n]")), "the default carries the marker").toContain("•");
+    expect(drawn.find((l) => l.includes("[y]")), "and nothing else does").not.toContain("•");
+  });
+
+  it("T4.13 (C09 I22, F122, entry 16 A5): the choices are a block, and no glyph is written here", () => {
+    // **The seam this deletes.** `ConfirmDeps` carried `capabilities` for one
+    // reason — a `raw` block holds text, so a marker written at L4 could never
+    // be substituted — and a cell holds a slot instead. The assertion is on the
+    // ASCII rendering rather than on the type: a file that stopped taking the
+    // capability and still spelled `•` would compile and would draw `•` on a
+    // `LANG=C` terminal.
+    const w = world();
+    void w.confirm.ask({ question: "Remove 6 containers?", choices: YES_NO });
+
+    const ascii = frameOf(w.overlays, ASCII_CAPS);
+    expect(ascii.find((l) => l.includes("[n]"))).toContain("-");
+    expect(ascii.join("\n"), "the Unicode marker never reaches an ASCII terminal").not.toContain("•");
+  });
+
+  it("T4.14 (entry 16 A5): the labels align whether or not a row is marked", () => {
+    // **The frame, not the arithmetic.** A glyph is part of a cell's width
+    // rather than an addition to it, so a marker sharing the key's cell shifts
+    // the selected row two columns left of the others — self-consistent in
+    // every count, and visible only by reading the rows against each other.
+    // The `raw` form got this by padding with a space; the marker's own column
+    // is what replaces that.
+    const w = world();
+    void w.confirm.ask({ question: "Remove 6 containers?", choices: YES_NO });
+
+    const drawn = frameOf(w.overlays);
+    const at = (needle: string): number => {
+      const line = drawn.find((l) => l.includes(needle));
+      return line === undefined ? -1 : line.indexOf(needle);
+    };
+    expect(at("[y]"), "both keys start in the same column").toBe(at("[n]"));
+    expect(at("[y]")).toBeGreaterThan(0);
+  });
+
+  it("T4.15 (C23 I36, entry 16 R1): an unmarked question falls back to the last choice", () => {
+    // **`confirm.ts:83`'s argument, asserted rather than described.** Every
+    // caller in this repository marks a default, so the fallback only ever runs
+    // for a caller that forgot — and the whole claim is that forgetting should
+    // be safe. It was first written as a mutation exemption on the grounds that
+    // the state is unreachable; it is reachable in one line, and an exemption
+    // for a constructible state is a gap wearing a reason.
+    const w = world();
+    void w.confirm.ask({
+      question: "Remove 6 containers?",
+      choices: [
+        { key: "y", label: "yes" },
+        { key: "n", label: "no" },
+      ],
+    });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.find((l) => l.includes("[n]")), "the last, which is the safe one").toContain("•");
+    expect(drawn.find((l) => l.includes("[y]"))).not.toContain("•");
+  });
+
+  it("T4.16 (entry 16 A5): the key column fits the widest accelerator", () => {
+    // Two-character keys are legal — `AskOptions` puts no width on `key` — and a
+    // floor taken from one of them truncates whichever is longer. That reads as
+    // a rendering flicker rather than as a width defect, which is C19's own
+    // argument for putting its glyph in the floor (`menu.ts:39`).
+    const w = world();
+    void w.confirm.ask({
+      question: "Which?",
+      choices: [
+        { key: "y", label: "yes" },
+        { key: "no", label: "no", default: true as const },
+      ],
+    });
+
+    const drawn = frameOf(w.overlays);
+    expect(drawn.join("\n"), "`[no]` is whole").toContain("[no]");
+    const at = (n: string): number => drawn.find((l) => l.includes(n))?.indexOf(n) ?? -1;
+    expect(at("yes"), "and the labels still line up").toBe(at("no ") === -1 ? at("no") : at("no "));
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {
