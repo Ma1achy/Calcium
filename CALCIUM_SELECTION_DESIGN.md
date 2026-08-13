@@ -148,9 +148,28 @@ terminal. Suspension is a state it can reason about; a silent no-op is a state i
 cannot see. That is the same reason C15's `kind === "view"` was replaced by the
 property rather than a proxy for it (C16 I8).
 
-**Owed before code:** what `flush()` means while suspended, and whether a resize
-overrides suspension. A resize probably must — a wrapped line corrupts the
-alternate screen, which is the one failure the application can no longer see.
+**Both owed questions are now ruled, at C03 §4a with I13 and I14** — before the
+code rather than during it.
+
+**Suspension gates `render`, never `repaint`**, and that is the whole rule. It
+falls on a branch `writeFrame` already has. Suspension is about *staleness*,
+which the reader asked for; contamination is about a screen whose contents
+nobody knows, which suspension may not produce and may not hold. So **resize
+overrides**, via I7 — width is the axis that wraps, a wrapped line scrolls the
+alternate screen, and a native selection over a corrupted screen is worthless.
+Deferring protects nothing and costs the state.
+
+**`flush()` forces nothing while suspended, and introduces no queue** — because
+there is none to bound. `commit` already collapses everything into one `state`
+and one `deferred` reason, O(1) and bounded long before suspension existed. Both
+obvious answers were wrong: composing makes suspension advisory, queueing makes
+it unbounded, and the third answer is that the existing collapse is already the
+whole memory.
+
+**`resume()` writes an ordinary diffed frame, not a repaint** — and the reason is
+the property that made `suspend()` the right seam. Suspension writes nothing, so
+the terminal still holds the last frame written and the diff's model of it is
+still true.
 
 ---
 
