@@ -181,6 +181,44 @@ describe("roadmap-status — the Order column's verifier", () => {
     expect(r.out).toContain("re-earn the exemption or drop it");
   });
 
+  it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
+    // **The sixth sweep's finding, made countable.** Every earlier sweep claimed
+    // *the symbols these entries name are absent from `src/`*, which is exact when
+    // an entry names one. 40 and 41 name none — *"the trigger, not the engine"*,
+    // *"typo detection — trivial, delightful"* — so the sweep passed over them and
+    // recorded a confirmation it had not made. Both were built.
+    //
+    // **Reported and never gated**, because an entry is allowed to name no symbol
+    // and demanding one would push rows into inventing a citation that means
+    // nothing — the trap the optional `:line` already avoids.
+    //
+    // The row asserts the *source text*, which is where the first implementation
+    // was wrong in both directions: measuring the Order row said 4 of 19, counting
+    // 9 and 11 as unreachable when their titles (`mermaid`, `markdown`) are
+    // perfectly greppable. The question is what the sweep wrote down.
+    const r = run();
+    expect(r.ok).toBe(true);
+    const m = /grep reach · (\d+)\/(\d+) confirmed-OPEN/u.exec(r.out);
+    expect(m, "the signal line").not.toBeNull();
+    const [carried, total] = [Number(m?.[1]), Number(m?.[2])];
+    expect(total, "the confirmed-OPEN population").toBeGreaterThan(10);
+    expect(carried, "some entries do carry their own symbol").toBeGreaterThan(0);
+    expect(carried, "and most rest on a blanket claim — that is the finding").toBeLessThan(total);
+  });
+
+  it("RS9b: an entry given its own symbol moves the signal", () => {
+    // **The mutation, because a count that cannot move is not a measurement.** A
+    // signal asserted only against itself passes whatever it reports, which is the
+    // shape RS1 already had to be rewritten for.
+    const before = /grep reach · (\d+)\//u.exec(run().out)?.[1];
+    const given = mutate(
+      "which is the state the entry describes) · **22**",
+      "which is the state the entry describes) · **22** (no `b.art` in `src/`)",
+    );
+    const after = /grep reach · (\d+)\//u.exec(run(given).out)?.[1];
+    expect(Number(after), "22 now carries its own symbol").toBe(Number(before) + 1);
+  });
+
   it("RS5: an entry in two of the three sets fails", () => {
     // 13 is BUILT. Naming it in the unchecked list as well makes the document say
     // two things, and a partition that only checked coverage would pass.

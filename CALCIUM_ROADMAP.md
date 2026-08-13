@@ -2569,9 +2569,12 @@ RULED 39 theme background ★      RULED: theme declares `background: "terminal"
                                    paints, because it cannot work otherwise. Shares row-padding
                                    with selection's wash. Plus: /help's verb list came
                                    back empty — both found by looking
-      40 as-you-type completion    the trigger, not the engine — and it makes the manifest
+BUILT 40 as-you-type completion    the trigger, not the engine — and it makes the manifest
                                    claim visible. Largely subsumes the next line
-      41 typo detection            trivial, delightful — smaller once 40 lands
+BUILT 41 typo detection            trivial, delightful — smaller once 40 lands. BOTH BUILT, and
+                                   both found by the sixth sweep because NEITHER NAMES A
+                                   SYMBOL — a grep sweep passes over an entry with nothing to
+                                   grep and records a confirmation it did not make
       42 rebindable keys          precedence ladder (framework < app < user), not a refusal —
                                    a user override IS a collision. Unbind is `action: null`, a
                                    VALUE not an absence, and it falls through to the next rung
@@ -2654,14 +2657,73 @@ what landed**.
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
 | 39 | RULED | the ruling is in the entry; `Style.background` exists at `src/presentation/theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
 | 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |
+| 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:185` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
+| 41 | BUILT | **both populations, one suggester.** `suggestName` — `src/data/manifest/validate.ts:147` — is the single distance-2 cutoff (C05 I18), read for unknown flags at `src/data/manifest/validate.ts:284` and unknown verbs at `src/interaction/parser/parse.ts:183`, sharing the tie-break so a second implementation cannot diverge. `test/unit/parser.test.ts` asserts distance 3 outside and 2 inside | — |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **31** · **33** · **36** · **37** · **41** · **42**. First sweep: **15** — `enterCopyMode` is defined nowhere in
-`src/`, and there is no OSC 52 · **26**, **32**, **40** — the symbols the entries name are
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **31** · **33** · **36** · **37** · **42**. First sweep: **15** — `enterCopyMode` is defined nowhere in
+`src/`, and there is no OSC 52 · **26**, **32** — the symbols the entries name are
 absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
 until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **44** —
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
 which is worth saying because it reads as coverage.
+
+**SIXTH SWEEP, 2026-08-13 — every OPEN entry taken to the reader rather than to the symbol.**
+Nineteen of twenty-one survive. Two did not, and **both are in the same class**: they name no
+symbol a grep could resolve.
+
+| entry | at HEAD |
+|---|---|
+| **40** as-you-type completion | **BUILT.** `afterEdit()` — `src/shell/keys.ts:185` — is called by the composition root after every printable key and every paste; static sources only (C19 I3, T2.1a), which is the boundary the entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts:54` watches the menu open on a flag prefix in a real PTY |
+| **41** typo detection | **BUILT**, and for **both** populations. One distance-2 suggester (C05 I18) — `src/data/manifest/validate.ts:147` — used for unknown flags at `validate.ts:284` and unknown verbs at `src/interaction/parser/parse.ts:183`, sharing the cutoff *and* the tie-break so a second implementation cannot diverge. `test/unit/parser.test.ts:213` asserts distance 3 is outside and 2 inside |
+
+**The class is the finding, and it indicts the method rather than the entries.** Every earlier
+sweep's claim was *"the symbols these entries name are absent from `src/`"* — which is exact
+when an entry names one. **40 and 41 name none**: *"the trigger, not the engine"* and *"typo
+detection — trivial, delightful"* have nothing to grep, so the sweep passed over them and
+recorded a confirmation it had not made. An entry with no symbol reads exactly like one whose
+symbol is absent, which is A03 §2's vacuity class arriving in the sweep instead of in the list.
+
+**Two arms this sweep used that no rule has**, both from entry 21's shape and both a *read*:
+
+- **A citation that resolves and describes a superseded state.** The question is whether the
+  sentence still describes the file, not whether the line exists. Five confirmed-OPEN entries
+  cite code that exists — 24, 28, 29, 44, 45 — and all five survive: `paint.ts:241` still says
+  *"until C17's `cursorCell` is threaded through"*, `chromeRows` is still C14's per-entry chrome
+  and not the frame budget, `cursorSequence` is still positioning, `persist.ts` is still C20's
+  history.
+- **A deferral chain.** *Would landing this close it* asked of a deferral, which only going to
+  the downstream reader answers.
+
+**And one cascade, which is what a stale entry costs beyond itself.** 31 says *"RANK BEFORE
+as-you-type, or the menu is worse for opening itself"* — and 40 landed without it, so that
+ordering was violated by a build nobody recorded. 41's *"smaller once 40 lands"* had already
+resolved.
+
+**And the class is now counted, because a finding about a method deserves a number.**
+`tools/roadmap-status.mjs` reports it every run:
+
+```
+grep reach · 6/19 confirmed-OPEN entries carry their own symbol; the rest rest on a blanket claim
+```
+
+**Six of nineteen.** The other thirteen sit under *"the symbols these entries name are absent
+from `src/`"* with no clause of their own, and **both stale entries were in that thirteen**.
+Reported and never gated: an entry is allowed to name no symbol, and demanding one would push
+rows into inventing a citation that means nothing — the trap the optional `:line` already
+avoids.
+
+**The first version of that signal measured the Order row and said 4 of 19, and it was wrong in
+both directions** — 9 and 11 carry no backticks and their titles, `mermaid` and `markdown`, are
+perfectly greppable. The question is not what an entry contains but **what the sweep wrote
+down**, so the text to read is the sweep's own sentence. Recorded because a measurement that
+was nearly taken against the convenient text is the same error one layer down.
+
+**Seventeen stale claims across six sweeps — fourteen of forty-four entries, 32%.** The rate
+has risen at every sweep, and a rate that rises is not a list converging on the truth. **What
+the sixth sweep changes is which instrument the number indicts**: nineteen of twenty-one
+survived a read, so the *list* is sound and the *method* was not. On the criterion set before
+the sweep — *if it is most of them, the list is sound and entry 9 is next* — it is most of them.
 
 **Not checked, and named rather than left to look checked:** 2, 3, 4. Three of forty-five, and
 they are the three that **cannot** be checked from here: each names `prism-tui`, a consumer
