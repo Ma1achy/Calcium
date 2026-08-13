@@ -561,3 +561,113 @@ describe("C17 §5b — selection", () => {
     expect(e.killBuffer, "the clipboard is not undo state (I16)").toBe("beta");
   });
 });
+
+describe("C17 §5a — copy writes the kill buffer", () => {
+  it("T1.32 (§5a): ⌃k then y then ⌃y yanks what y copied — one clipboard", () => {
+    // **The sequence the ruling was made on.** A second store would leave the
+    // reader with two paste targets under one paste key, and §5 already calls
+    // this buffer a clipboard and already rules on it.
+    const e = createEditor({ text: "alpha beta", cursor: 10 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer, "the kill filled it").toBe("beta");
+
+    e.move("bufferStart");
+    e.extend("wordRight");
+    expect(e.selected).toBe("alpha");
+    e.copy();
+
+    expect(e.killBuffer, "the copy replaced it — one buffer, not two").toBe("alpha");
+
+    e.move("bufferEnd");
+    e.yank();
+    expect(e.text).toBe("alpha alpha");
+  });
+
+  it("T1.33 (§5a): a copy replaces rather than appending, and ends a kill run", () => {
+    // **The control is the kill run either side of it.** §5's append is about a
+    // run of deletions building one entry; a copy is not a deletion, so a kill
+    // after one must start fresh rather than prepending to the copied text.
+    const e = createEditor({ text: "one two three", cursor: 13 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("three");
+
+    e.move("bufferStart");
+    e.extend("wordRight");
+    e.copy();
+    expect(e.killBuffer).toBe("one");
+
+    // Two copies in a row leave the second, not both.
+    e.move("bufferStart");
+    e.extend("charRight");
+    e.copy();
+    expect(e.killBuffer, "replaced, not appended").toBe("o");
+
+    // And the run is broken: this kill starts a fresh buffer rather than
+    // prepending to the copied text. `"otwo "` is what a copy that joined the
+    // run would leave, and it is a plausible-looking buffer.
+    e.move("bufferEnd");
+    e.killTo("wordLeft");
+    expect(e.killBuffer, "the copy ended the run").toBe("two ");
+  });
+
+  it("T1.34 (§5a): a copy is not an undo unit", () => {
+    // §5's reason inverted: a copy changes no text, so there is nothing to
+    // restore — and a unit here makes `undo` a no-op the user presses twice.
+    const e = createEditor({ text: "hello", cursor: 0 });
+    e.insert("X");
+    const depth = e.undoDepth;
+
+    e.selectAll();
+    e.copy();
+
+    expect(e.undoDepth, "no unit recorded").toBe(depth);
+    expect(e.text).toBe("Xhello");
+
+    e.undo();
+    expect(e.text, "one press undoes the typing").toBe("hello");
+  });
+
+  it("T1.35 (§5a): a copy with no region is a no-op, not an emptying", () => {
+    // The same guard `yank` has. Without it, `⌥w` on a bare caret silently
+    // discards whatever a previous kill put there.
+    const e = createEditor({ text: "hello", cursor: 5 });
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("hello");
+
+    e.copy();
+
+    expect(e.killBuffer, "the buffer a kill filled survives").toBe("hello");
+  });
+});
+
+describe("C17 §5b — extend obeys the kill-run rule (I16)", () => {
+  it("T1.36 (I16): an extending motion ends a kill run, with no move between", () => {
+    // **The state T1.33 could not construct.** Every sequence there had a
+    // `move` between the kill and the copy, and `move` ends the run — so
+    // removing `extend`'s own `endKill` failed nothing, and the mutation pass
+    // said so. §5's rule is *any non-kill operation ends the run*; `extend` is
+    // a non-kill operation and this is the row that holds it to that.
+    //
+    // It is also what let `copy()` drop an `endKill` of its own: the run is
+    // already over by the time a region exists, so the call there could never
+    // be the thing that ended it.
+    const e = createEditor({ text: "one two three", cursor: 13 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("three");
+
+    // No `move`. The extension is the only thing between the two kills.
+    e.extend("wordLeft");
+    expect(e.selected).toBe("two ");
+    e.copy();
+    expect(e.killBuffer).toBe("two ");
+
+    e.killTo("wordLeft");
+
+    // `"one two "` is what a still-open run produces: the second cut prepended
+    // to the copied text, one buffer describing a deletion and a copy at once.
+    expect(e.killBuffer, "a fresh entry, not a continuation of the run").toBe("one ");
+  });
+});

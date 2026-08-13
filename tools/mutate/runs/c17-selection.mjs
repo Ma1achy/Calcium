@@ -104,6 +104,49 @@ const MUTATIONS = [
     to: "    this.#cursor = clamp(s.cursor, count(s.text));\n    if (false)\n    // **A region does not survive an undo**",
     expect: "T1.31",
   },
+  {
+    // **The second clipboard, arrived by accident.** Appending instead of
+    // replacing is what a reader who remembers §5's consecutive-kill rule
+    // writes, and it makes the buffer hold text from two different gestures
+    // with no way to tell which `⌃y` will paste.
+    name: "a copy appends to the kill buffer rather than replacing it",
+    file: EDITOR,
+    from: "    this.#kill = text;",
+    to: "    this.#kill += text;",
+    expect: "T1.33",
+  },
+  {
+    // **Where ending the kill run actually happens, and the pass is what found
+    // that.** `copy()` called `endKill()` itself and the mutation removing it
+    // SURVIVED — every path to a region goes through `extend` or `selectAll`,
+    // both of which end the run first, so the call could never be the thing
+    // that did it. A line with nothing to be wrong about reads exactly like one
+    // that is obeyed. It is gone, and this is the mutation that bites.
+    name: "extend does not end the kill run, so a copy joins it",
+    file: EDITOR,
+    from: "  extend(motion: Motion): void {\n    this.#history.close();\n    this.#history.endKill();",
+    to: "  extend(motion: Motion): void {\n    this.#history.close();",
+    expect: "T1.36",
+  },
+  {
+    // **A copy records an undo unit.** Nothing changed, so `undo` becomes a
+    // no-op the user has to press twice — and the text after one press is
+    // correct, which is how it reads as a near-miss.
+    name: "a copy records an undo unit",
+    file: EDITOR,
+    from: '    this.#kill = text;',
+    to: '    this.#history.edit(this.#snapshot(), "structural");\n    this.#kill = text;',
+    expect: "T1.34",
+  },
+  {
+    // **The empty guard removed**, so `⌥w` on a bare caret discards whatever a
+    // previous kill put in the buffer. Same shape as `yank`'s guard.
+    name: "a copy with no region empties the buffer",
+    file: EDITOR,
+    from: '    if (text === "") return;',
+    to: '    if (false) return;',
+    expect: "T1.35",
+  },
 ];
 
 /**

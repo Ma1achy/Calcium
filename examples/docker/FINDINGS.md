@@ -7613,6 +7613,29 @@ founding instances**, so the arm's very first false positive is the rule's own r
 existing. L4 wires by injection; a consumer never imports its producer, and any rule
 assuming otherwise is describing a different architecture.
 
+### A live instance, 2026-08-13 — the blind spot in code written the same day
+
+**Filed because the two instances above are retrospective and this one is not.** Entry 15
+step 2 added two published readers to `LineEditor` in one commit: `selection` and
+`selected`. MG24 fired on `selection` and said nothing about `selected` — because
+`KeyEffects.selected`, C19's menu row, carries the same name, so the rule read a member of a
+different type in a different layer as this one's consumer.
+
+**Stronger evidence than either retrospective case, and for a reason worth naming.** F105 and
+the case below are both *a rule failing on code that was already there*, which leaves open
+the reading that the tree grew into the blind spot. This is the rule failing on the day the
+member was written, on a name a developer chose without knowing another type had it. Nothing
+about the tree's age is involved: **the collision is created by the next member anyone adds.**
+
+It also changes what the exemption list can promise. `LineEditor.selection`'s entry says the
+equality arm removes it when a consumer lands — and `selected` shows the other half of that:
+a member with the same name would never have got an entry at all, so the arm has nothing to
+expire. **The list is honest about what it holds and silent about what the rule never
+offered it.**
+
+Not a reopening. The three rejected tightenings below still stand, and this instance is
+evidence for the *class* rather than for any of them.
+
 ### The remedy F160 proposed does not key uniquely either
 
 **F160 named the looseness correctly and its fix assumed a uniqueness the tree does not

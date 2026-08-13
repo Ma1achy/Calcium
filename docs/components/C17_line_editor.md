@@ -131,9 +131,16 @@ which store `⌃y` yanks from — two paste targets and one paste key. So `⌃k`
 then `⌃y` yanks what `y` copied, which is the least surprising sequence and needs no
 new rule.
 
-**Copy is not a kill, so it does not join a kill run.** §5's consecutive-kill append
-is about a run of deletions building one entry; a copy replaces the buffer outright
-and ends any run in progress, exactly as any non-kill operation does. Two copies in
+**Copy is not a kill, so it does not join a kill run** — and the run is over before
+`copy` is reached, which is a correction the mutation pass forced. `copy` used to end
+the run itself, and removing that call failed nothing: every path to a region goes
+through an extending motion or `selectAll`, and §5's *any non-kill operation ends the
+run* already covers both. **A line with nothing to be wrong about reads exactly like
+one that is obeyed**, which is A03 §2's vacuity class in code rather than in prose.
+
+So the rule is stated where it holds: **an extending motion ends the run** (T1.36, and
+the row had to construct a sequence with no `move` in it, because `move` ends the run
+too and every earlier row had one). A copy replaces the buffer outright — two copies in
 a row leave the second, not both.
 
 **Copy is not an undo unit either**, and for §5's reason inverted: a copy changes no
@@ -448,6 +455,11 @@ test rather than as its steps: the sequence is what the invariants do not constr
 - **T1.20** (I15): `insert("a b c")` as one call → one undo unit, not three. The per-character reading splits it and `yank` is the caller that suffers.
 - **T1.21** (I16): two consecutive `killTo("wordLeft")` then one `undo` → **both** words return. Half of them is the kill buffer and the undo stack disagreeing.
 - **T1.22** (I16): kill, `undo`, `yank` → the killed text is inserted; `undo` left the kill buffer alone.
+- **T1.32** (§5a): `⌃k`, then `y` over a region, then `⌃y` → the *copied* text is inserted. One clipboard, asserted as the sequence the ruling was made on rather than as two independent facts about one buffer.
+- **T1.33** (§5a): a copy replaces rather than appending — two in a row leave the second.
+- **T1.34** (§5a): a copy records no undo unit. `undoDepth` is unchanged and one `undo` press undoes the typing before it, rather than the copy.
+- **T1.35** (§5a): a copy with no region is a no-op, not an emptying. The same guard `yank` has, and without it `⌥w` on a bare caret discards what a kill put there.
+- **T1.36** (I16, §5b): an extending motion ends a kill run, **with no `move` between the kill and the copy**. The sequence is the assertion: every earlier row had a `move` in it, which ends the run too, so `extend`'s own call could be removed with nothing failing. The mutation pass is what found that, and it is what took a vacuous line out of `copy`.
 - **T1.23** (I21): `⇧→` twice from index 0 → the region is `[0, 2)`. **Two motions, because one passes whichever end moved** — an implementation that moves the anchor gives `[1, 2)` here and a correct-looking `[0, 1)` after one. The mutation this row exists for is the first one written for step 2.
 - **T1.24** (I21): `⇧→`, `⇧→`, then `⇧←` → `[0, 1)`. The head walks back and the anchor has still not moved, which is the same defect asserted through a reversal rather than through a repeat.
 - **T1.25** (I21): `anchor === head` reports `selection === null`, not an empty region. Asserted after `⇧→` then `⇧←`, so the state is reached by moving rather than by never having selected — the two spellings of "no region" are what this forbids.

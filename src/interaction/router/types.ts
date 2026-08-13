@@ -192,6 +192,10 @@ export type KeyAction =
   | "extendLineStart"
   | "extendLineEnd"
   | "selectAll"
+  // **Copy, and there is one clipboard** (C17 §5a). `⌥w` writes the kill
+  // buffer that `⌃k` writes and `⌃y` reads — the emacs pairing readline users
+  // already have, and the one key that does not collide with `⌃c`'s cancel.
+  | "copySelection"
   // --- focus (I22) ---------------------------------------------------------
   //
   // `↓` enters through `historyNext`'s second clause rather than an action of

@@ -320,6 +320,7 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt s+home": ["\u001b[1;2H"],
       "prompt s+end": ["\u001b[1;2F"],
       "prompt m+a": ["\u001ba"],
+      "prompt m+w": ["\u001bw"],
 
       // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
       // provisional — which key enters copy mode is the rebindable-keys row's

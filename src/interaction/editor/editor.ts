@@ -56,8 +56,26 @@ export interface LineEditor {
    * spelling, which is what stops two states meaning the same thing.
    */
   readonly selection: Readonly<{ anchor: number; head: number }> | null;
-  /** The selected text, or `""`. What step 3's copy reads. */
+  /** The selected text, or `""`. What `copy` reads. */
   readonly selected: string;
+  /**
+   * Copy the region into the kill buffer (§5a).
+   *
+   * **One clipboard, not two.** §5 already calls the kill buffer a clipboard
+   * and already rules on it — *a paste target that silently rewound when the
+   * user undid something else would be a worse surprise than the one it
+   * prevents* — so a second store would need that ruling restated and would
+   * leave the reader with two paste targets under one paste key. `⌃k` then `y`
+   * then `⌃y` yanks what `y` copied.
+   *
+   * **Replaces rather than appending**, and ends any kill run: §5's append is
+   * about a run of deletions building one entry, and a copy is not a deletion.
+   * Two copies in a row leave the second.
+   *
+   * **Not an undo unit**, which is §5's reason inverted: a copy changes no
+   * text, so there is nothing for undo to restore.
+   */
+  copy(): void;
   killTo(motion: Motion): void;
   yank(): void;
   setText(text: string, cursor?: number): void;
@@ -340,6 +358,24 @@ class Editor implements LineEditor {
 
     this.#text = removeBetween(this.#text, this.#cursor, to);
     this.#cursor = Math.min(this.#cursor, to);
+  }
+
+  copy(): void {
+    const text = this.selected;
+    // A no-op with no region, so `y` on a bare caret does not silently empty
+    // the buffer a previous kill filled — the same shape as `yank`'s guard.
+    if (text === "") return;
+    // **The run is already ended, and this used to call `endKill()` itself.**
+    // The mutation pass removed that call and nothing failed — because every
+    // path to a region goes through `extend` or `selectAll`, and both end the
+    // run before this can be reached. A line that cannot be violated reads
+    // exactly like one that is obeyed, which is A03 §2's vacuity class in code
+    // rather than in prose. §5a says so now instead of implying a mechanism
+    // here; the mutation that *is* load-bearing is `extend` dropping its own
+    // `endKill`.
+    this.#kill = text;
+    // No `edit` call: the text has not changed, so there is nothing to restore
+    // and a unit here would make `undo` a no-op the user has to press twice.
   }
 
   /** One atomic edit (§5). A no-op when nothing has been killed (T3.9). */

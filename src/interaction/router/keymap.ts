@@ -294,6 +294,11 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // one of the two would silently never run. Not a collision — the byte has a
   // meaning.
   { target: "prompt", key: { name: "a", meta: true }, action: "selectAll" },
+  // **`⌥w`, the emacs `kill-ring-save` key**, and the choice is forced rather
+  // than preferred: `⌃c` is cancel at every rung of the ladder and `⌃w` is a
+  // word kill in every readline application. Checked through the decoder —
+  // `ESC w` is `m+w`, and `w` is free on the meta path.
+  { target: "prompt", key: { name: "w", meta: true }, action: "copySelection" },
 
   // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
   //

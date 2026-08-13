@@ -724,6 +724,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     extendLineStart: () => void deps.editor.extend("lineStart"),
     extendLineEnd: () => void deps.editor.extend("lineEnd"),
     selectAll: () => void deps.editor.selectAll(),
+    // **The region reaches the kill buffer and nowhere else** (C17 §5a). The
+    // system clipboard is a separate axis — a capability question about the
+    // terminal — and folding it in here would make "one clipboard" a claim
+    // about two things, one of which C17 cannot see.
+    copySelection: () => void deps.editor.copy(),
 
     // --- copy mode (C16 §5b) -----------------------------------------------
     //
