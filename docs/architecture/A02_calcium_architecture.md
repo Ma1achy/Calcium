@@ -154,6 +154,10 @@ type FocusTarget =
 
 Array order **is** the priority. Focus is derived on every dispatch from what is on screen, plus exactly one stored bit (`prompt` vs `liveBlock`) owned by C16 and reset on every transcript append. C16 §3 owns the resolution rules.
 
+**C26 replaces this union with a scope stack plus a mode, and the seam survives because the mode is a target.** A navigation model that consulted a mode *before* resolving a target would put a second priority list beside `FOCUS_ORDER`, and C16 §5's ladder — whose rungs are handlers registered on these targets precisely so it holds no order of its own — would acquire one again. That is the defect C16's own spec pass found, so C26 I2 forbids the shape rather than the symptom. `docs/components/C26_navigation.md` §2.
+
+**And C26 adds one L1→L3 edge**, which is downward and therefore ordinary: `BlockDefinition.elements` declares what a block offers to keyboard and pointer, and C26 reads it. The precedent is already in the tree — C11's `focusableRowIds` is that edge at one scope level for one kind, and C11 I14's *focus is rendered by C11 and owned by C16* is why it points this way rather than the other. C16 → C26 is sideways inside L3, permitted by §1's acyclicity and enforced by MG1/MG22.
+
 ### Seam 4 — L4 orchestrates cross-layer effects
 
 No component reaches sideways or upward to cause an effect in another. Where an effect must cross, **L4 sequences it**:

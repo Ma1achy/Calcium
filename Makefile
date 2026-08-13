@@ -9,7 +9,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks check enforce instruments regime test golden e2e audit proof all clean
+.PHONY: install hooks check enforce instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
 	git config core.hooksPath .githooks
@@ -54,6 +54,13 @@ enforce:            ## A03 — module graph, source scans, supply chain
 
 instruments:        ## every instrument's own fixture, and the inventory by equality (group 9)
 	node tools/instruments.mjs
+
+roadmap:            ## the Order column's claims, resolved against the tree
+	@# **Reports through `make instruments` as well**, where its fixture lives.
+	@# Here as a target of its own because the column is edited by hand and this
+	@# is the one-line answer to *did I break a citation* — the same reason
+	@# `enforce` is separable from `all`.
+	node tools/roadmap-status.mjs
 
 regime:             ## what a source-scan pass costs *here*, beside the recorded figures
 	@# **Reports, never fails.** A budget is a claim about a regime and a runner
