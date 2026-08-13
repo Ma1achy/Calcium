@@ -753,6 +753,53 @@ is added to `FlagDef`. The public type is unchanged, and a field added later wit
 is additive — which is what entry 6.2 always claimed to be, and is now true of the deferral
 rather than of the field.
 
+### 8b.7 — the reader exists, and it answers 6.2 by not needing it
+
+**§8b.6 deferred the value set to entry 21's `--help`, on the ground that a vocabulary cannot
+be chosen before its reader is written. Going to write that reader found it already written.**
+
+| entry 21's claim | at HEAD |
+|---|---|
+| reserve `--help` framework-side | `FRAMEWORK_FLAGS` — `framework.ts:126`, `shellOnly: true` — appended to every tool (I22) |
+| a user-invokable path, not only `exitCode === 2` | `execution.ts:1300` routes both `app` and `local` on `validation.args["help"]`, gated on `validation.ok`, and returns before any spawn |
+| the document | `usageDoc` — `src/shell/documents.ts:211` — `status: "ok"`, because asking what a verb takes is not an error |
+| `/help`'s flat wall becomes two-level | `handlers.ts:110` groups by C05 §3's partition, and `/help keys` is the second question |
+| tested | T4.8 asserts **both halves** — the document, and that nothing spawned |
+
+**So the question is answerable now, and the answer is that there is no field.**
+
+**`--help` replaces the result; it does not select among renderings of one.** The route returns
+before the spawn, so there is no result to render — `usageDoc` is composed from the manifest
+alone. That is the disjunction the deferral turned on, and it falls on the side where no
+vocabulary is needed: *one rendering that replaces the result entirely* is a boolean `shellOnly`
+switch whose handler composes a different document, which is exactly what `--raw` already is at
+`examples/docker/src/inspect.ts:192` — the same shape, one handled framework-side because the
+name is reserved, one adapter-side because the app declared it.
+
+**And `usageBlocks` groups nothing.** `mapping.ts:169` lists every flag flat, `--help` among
+them, *"since it is a flag like any other"* (T4.8). The one reader that could have wanted to say
+*these change what you see* does not distinguish them — so the grouping want has no instance
+either, which was the last thing holding the field open.
+
+### 8b.8 — the ruling, and §2's closed-set test answered
+
+**Entry 6.2 closes with no field, and `FlagDef` is unchanged permanently rather than pending.**
+
+§2 asks whether the framework must understand every member of a set. **There are no members.**
+The framework understands exactly one presentation-selecting flag — `--help` — and it
+understands it by **reserving the name**, which is I22's mechanism and not a field. Every other
+one is the app's, read from `ctx.flags`, and A02 Seam 2 already says which blocks go into a
+document is the adapter's business. A field would have published a fact the framework has no
+use for, to be read by a component that composes nothing.
+
+**Three deferrals in a row, each correct and each nearly wrong in the same direction.** §8b.4
+left the value open as a C09/C22 question; §8b.6 narrowed it to *whatever entry 21 must say*;
+§8b.7 found entry 21 built and needing nothing. **Every step was a citation to a downstream
+reader, and every step reads as coverage** — the finding is not that any of the three was
+mistaken but that a deferral chain is a claim nothing resolves. *Would landing this close it*
+applies to a deferral as much as to a fix, and the only thing that answered it was going to the
+reader and finding it there.
+
 ## 9. Out of scope
 
 | Not here | Where |
