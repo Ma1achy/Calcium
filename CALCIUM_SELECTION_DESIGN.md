@@ -32,7 +32,7 @@ clipboard is the seam.
 
 ---
 
-## 2. Step 0 — the decoder, before any binding
+## 2. Step 0 — the decoder, before any binding · **LANDED 2026-08-13**
 
 **Not in the original order, and it is here because the measurement moved it.**
 Four bindings were checked through the built decoder before being designed
@@ -53,9 +53,21 @@ decodes as `s+left`. Not a missing key: **a different, live key.** On a terminal
 sending Meta rather than Alt, extend-by-word would extend by character and every
 test about `⇧←` would pass while it happened.
 
-One line to fix, and it lands first. With it absent the two wire forms of one
+One line, landed first and alone. With it absent the two wire forms of one
 binding disagree about which binding was pressed, and no test above the decoder
 can see it.
+
+**T1.3e is the row, and the pair is the assertion**: `CSI 1;10D` and `CSI 1;2D`
+decode to different keys, `CSI 1;10D` and `CSI 1;4D` to the same one. Either form
+alone passes with bit 8 unread — which `CSI 1;16D` demonstrates by being correct
+in the broken state. **An assertion about one wire form of a two-form key is an
+assertion about the terminal you happened to test on.** Fabricated rather than
+found, because the defect produces a well-formed key.
+
+Four mutations, all caught (`tools/mutate/runs/c16-modifiers.mjs`): the defect
+restored, bit 8 read *instead of* bit 2 — the careless fix, which breaks the
+Alt-sending majority every existing test was written against — `shift` claiming
+bit 8, and the plus-one dropped from the encoding.
 
 **Four bindings lost to this check across the project now** — `⌃_`, `⌃⇧a`,
 `⇧⌃a`, `⇧⌃e` — all before anything was built, and one decoder defect found by

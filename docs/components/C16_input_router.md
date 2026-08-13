@@ -72,11 +72,11 @@ of consistent. One constant, one behaviour, one bug report.
 
 Terminals send no key-up events and repeat held keys as fresh presses, so there is no chord support beyond modifiers. Saying so prevents someone designing a keymap that cannot work.
 
-### `modifiersOf` reads three bits of four, and the fourth collapses onto a live binding
+### `modifiersOf` read three bits of four, and the fourth collapsed onto a live binding
 
-**Measured 2026-08-13 by pressing sequences through the built decoder**, while checking the bindings entry 15's selection model would add. It is a defect in shipped code, not a design input.
+**Measured 2026-08-13 by pressing sequences through the built decoder**, while checking the bindings entry 15's selection model would add. It was a defect in shipped code, not a design input. **Fixed the same day** (T1.3e, `tools/mutate/runs/c16-modifiers.mjs`); the table below is the state it was found in.
 
-xterm's modifier parameter is `1 + (shift 1 | alt 2 | ctrl 4 | meta 8)`. `modifiersOf` maps bits 1, 2 and 4 — the decoder's `meta` is xterm's **alt** — and **never reads bit 8**. So every Meta-modified key loses its modifier silently:
+xterm's modifier parameter is `1 + (shift 1 | alt 2 | ctrl 4 | meta 8)`. `modifiersOf` mapped bits 1, 2 and 4 — the decoder's `meta` is xterm's **alt** — and **never read bit 8**. So every Meta-modified key lost its modifier silently:
 
 | sent | xterm means | decoder emits |
 |---|---|---|
@@ -88,7 +88,11 @@ xterm's modifier parameter is `1 + (shift 1 | alt 2 | ctrl 4 | meta 8)`. `modifi
 
 **This is worse than the unexecuted-binding class and it is the reason to record it separately.** That class is a binding no event can produce: dead, and silent. This is an event decoding as a *different, live* binding — on a terminal that sends Meta rather than Alt, `⌥⇧←` would extend a selection by one character instead of one word, and every assertion written about `⇧←` passes while it happens. A test indexed by "which keys does the decoder produce" agrees, because it produces a perfectly good key.
 
-The fix is to include bit 8 in `meta`: the `Key` shape has one alt/meta flag and both bits mean the same thing to every binding above. **It lands before any shifted-motion binding**, because with it absent the two arms of `⌥⇧←` disagree about which key was pressed.
+The fix includes bit 8 in `meta`: the `Key` shape has one alt/meta flag and both bits mean the same thing to every binding above. Splitting them would put the terminal's Option-key configuration into the keymap. **It landed before any shifted-motion binding**, because with it absent the two wire forms of `⌥⇧←` disagree about which key was pressed.
+
+**The test row is the pair, not either form.** T1.3e asserts that `CSI 1;10D` and `CSI 1;2D` decode to *different* keys, and that `CSI 1;4D` and `CSI 1;10D` decode to the *same* one. A row asserting either form alone passes in the broken state — which is exactly what `CSI 1;16D` demonstrates by being correct with the bit unread. **An assertion about one wire form of a two-form key is an assertion about the terminal you happened to test on.**
+
+Four mutations, all caught: the defect restored, bit 8 read *instead of* bit 2 (the careless fix, which breaks the Alt-sending majority every existing test was written against), `shift` claiming bit 8, and the plus-one dropped from the encoding.
 
 **And the ESC-prefixed CSI form is shredded.** `ESC ESC [ 1 ; 2 D` decodes as `m+escape` followed by six printable keys — `[`, `1`, `;`, `2`, `D` — which are text an editor would insert. The roadmap names this as a wire form `⌥⇧←` may arrive in; **no terminal has been measured emitting it**, so this is recorded as an owed check rather than a second defect. The measurement is of the decoder, which is what was run.
 
@@ -685,6 +689,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T1.3b** (I17): `\r` decodes to `enter` and `\n` to `Ctrl-J` — asserted as a pair, because the defect was that they were the same event and either one alone still passes.
 - **T1.3c** (I17): `ESC \r` decodes to `{name: "enter", meta: true}` — the name the keymap uses, not the byte.
 - **T1.3d** (I17): `CSI 13;2u` and `CSI 27;2;13~` both decode to `{name: "enter", shift: true}`. Both forms, because a terminal sends one or the other and a rule satisfied by either is satisfied on half the terminals.
+- **T1.3e** (I17, §2): xterm's Meta bit is read. `CSI 1;10D` and `CSI 1;2D` decode to **different** keys, and `CSI 1;10D` and `CSI 1;4D` to the **same** one — the two wire forms of `⌥⇧←`. The pair is the assertion: either form alone passes with bit 8 unread, which `CSI 1;16D` shows by being correct in the broken state. Fabricated rather than found, because the defect produces a well-formed key and nothing above the decoder can see it.
 - **T1.4**: `CSI 200~` enters buffering.
 - **T1.5** (I12): bytes during buffering emit no key events.
 - **T1.6** (I6): `CSI 201~` emits exactly one `paste` carrying the buffered text.
@@ -797,6 +802,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.9b** (I17): collapsing `\r` and `\n` back into one key → T1.3b fails, C17's Ctrl-J binding resolves against an event nothing produces, and every line of an unbracketed paste submits.
 - **T6.9c** (I17): passing the meta path's character through unnamed → T1.3c and C17 T4.2 fail, and Alt-Enter inserts nothing on every terminal.
 - **T6.9d** (I17): dropping the CSI-u and `modifyOtherKeys` branches → T1.3d and T2.13 fail, and Shift-Enter is unreachable on every terminal that sends it.
+- **T6.9e** (I17): dropping bit 8 from `modifiersOf`'s `meta` → T1.3e fails, and `⌥⇧←` arrives as `⇧←` on every terminal that sends Option as Meta — a **live** binding rather than a dead one, which is why no row above the decoder fails with it.
 
 ---
 

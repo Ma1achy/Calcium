@@ -2517,7 +2517,10 @@ BUILT 14 cells() ASCII fast path  the hottest function walks Intl.Segmenter over
                                    DESIGNED 2026-08-13 — CALCIUM_SELECTION_DESIGN.md, four
                                    steps plus a step 0: the decoder check found modifiersOf
                                    reading 3 of xterm's 4 modifier bits, so Meta-Shift-Left
-                                   decodes as ⇧← — a live binding, not a missing one (C16 §2).
+                                   decoded as ⇧← — a live binding, not a missing one (C16 §2).
+                                   STEP 0 LANDED 2026-08-13: bit 8 read, T1.3e asserts the
+                                   PAIR since either wire form alone passes broken, 4/4
+                                   mutations caught.
                                    B4 ruled: copy mode suspends FRAME COMMITS, not data —
                                    C23 I46's pause reaches polled parts and not a live stream,
                                    which is the case a reader most wants to copy from

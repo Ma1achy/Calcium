@@ -94,12 +94,27 @@ const CSI_TILDE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  *
  * Plus one, so 1 means "no modifiers" — which is why a bare `ESC [ 1 ; 1 A` and
  * a bare `ESC [ A` mean the same thing and neither sets a flag.
+ *
+ * **Four bits, and reading three of them was a live defect** (C16 §2, T1.3e).
+ * xterm's bit 8 is Meta and this function ignored it, so `CSI 1;9D` — Meta-Left —
+ * arrived as a bare `left` and `CSI 1;10D` — Meta-Shift-Left — arrived as
+ * `s+left`, which **is a bound key meaning something else**. Not the
+ * unexecuted-binding class: that class is a binding no event can produce, dead
+ * and silent. This one worked, and was wrong, and no test above the decoder could
+ * see it because the decoder was producing a perfectly good key. `CSI 1;16D` —
+ * all four bits — was correct by accident, since the other three were set.
+ *
+ * **Alt and Meta both set `meta`, deliberately.** `Key` carries one flag for the
+ * pair and every binding above treats them as one key: a terminal sending Option
+ * as Alt (bit 2) and one sending it as Meta (bit 8) are describing the same
+ * keystroke, and splitting them here would put the terminal's configuration into
+ * the keymap.
  */
 function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
   const bits = param === undefined ? 0 : Math.max(0, Number(param) - 1);
   return {
     shift: (bits & 1) !== 0,
-    meta: (bits & 2) !== 0,
+    meta: (bits & 2) !== 0 || (bits & 8) !== 0,
     ctrl: (bits & 4) !== 0,
   };
 }
