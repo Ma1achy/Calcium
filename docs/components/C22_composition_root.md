@@ -1647,6 +1647,85 @@ table indexes it (C13's `settle(id, doc)` is the measured case).
 
 ---
 
+## 13b. The empty-block convention, walked by hand — entry 6.1
+
+**Roadmap 2.1 says *"absence of output is the same picture as failure to produce output"* and
+lists four instances across three layers.** Read against the tree, the four are **two classes
+with different remedies**, and the one sentence is the statement of the confusion rather than
+a description of one fix. That is the whole of this walk, and it answers *convention or
+mechanism* with **both, because it is two things.**
+
+**A table, not a trace.** Every row here holds at rest — a frame is on screen and the question
+is what it means. No event sits between the rules. (C05 §8a's reason, and C19 §8a's warning
+that taking the trace because the subject looks like a state machine is how the structural half
+goes unexamined.)
+
+### 13b.1 — the four instances, classified
+
+| # | instance | the frame | why it is empty | class |
+|---|---|---|---|---|
+| 1 | F15 — `/dashboard` | prompt clears, no entry | the document was **rejected**: two blocks with id `running` (C04 I14) | **destroyed diagnostic** |
+| 2 | F35 — `/drift no-such-container` | prompt clears, no entry | three app documents set `status: "error"` and omitted `error` (C04 I3) | **destroyed diagnostic** |
+| 3 | C22 I47 — a view taller than its region | content stops mid-object | C15 truncated it and nothing said so | **destroyed diagnostic** |
+| 4 | `/drift` agreeing, `/config` identical | an empty block | **nothing is wrong**: the two sources match | **nothing to say, said as nothing** |
+
+**Rows 1–3 are one mechanism and row 4 is not.** In 1–3 the framework knows precisely what
+happened and throws the knowledge away; the remedy is a channel. In 4 nothing has gone wrong
+at all and there is no diagnostic to preserve; the remedy is a **rendering** — *they agree*
+drawn as a positive statement rather than as the absence of rows.
+
+**Conflating them is what makes the convention look like it needs a mechanism.** A helper that
+composed *"they agree"* would do nothing for rows 1–3, and a diagnostic channel does nothing
+for row 4 — the state row 4 describes is a **success**.
+
+### 13b.2 — the destroyed-diagnostic class is mostly closed, and this is the residue
+
+| | |
+|---|---|
+| F15 | **CLOSED.** Two channels — a fault notice at the moment with `origin: "defect"`, and `Pipeline.faults` drained at §8 step 3. Two because *the reporting path is the path that failed* |
+| F35 | app-side ×3, closed as a class by `examples/docker/test/documents.test.ts`; the framework half is F15's |
+| I47 | **specified, and the walk owes whether it is built.** `Placed.truncated` carries the fact and C19's menu reads it; the duty to read it *for a view* is I47's, and I47 is an invariant with an owner |
+
+**So entry 6.1 does not own rows 1–3.** It owns row 4, and naming that is what stops the entry
+being planned once and fixed never — *would landing this close it* is the test, and a fix for
+the diagnostic class would close none of row 4.
+
+### 13b.3 — the ruling: a convention, and the helper is refused
+
+**Row 4 is a documented convention with no helper, and the refusal is the ruling rather than
+a scoping choice.**
+
+The roadmap offers *"possibly one helper"*. A helper nothing is obliged to use is the exact
+shape that produced this finding four times: `/drift` **predicted** the empty frame and
+`/config` **reached it independently**, which means two authors who had both read the
+convention still shipped it. A helper makes that three authors and an unused function — and
+`usageBlocks` is the measured case of a complete mechanism nobody was obliged to call
+(F92, and entry 21 is still waiting on it).
+
+**What a convention can be enforced by and a helper cannot.** The obligation belongs where the
+emptiness is *decidable*: a block computed from two sources is empty exactly when they agree,
+and the producer is the only party that knows the difference between *agree* and *failed to
+compare*. C09 cannot tell them apart from a block with no rows, and neither can a helper — it
+would be handed the same empty list.
+
+**So the convention is: a block whose emptiness is a result states the result.** Not *"no
+rows"* — *"3 keys, all matching"*. The framework's duty is the one it already has, I47's:
+**content stopping with no indicator is indistinguishable from content ending**, which is the
+same sentence one layer up and is why I47 is in this walk rather than beside it.
+
+### 13b.4 — the row the walk owes, and it is not answerable here
+
+**An empty block whose emptiness is a *failure to compute* is row 4 wearing row 1's clothes**,
+and nothing in this component can tell them apart. `/drift` against an unreachable daemon and
+`/drift` against a container that matches produce the same block. The producer knows; the
+framework does not; and C04 I3 already requires `error` when `status` is `"error"`, so the
+vocabulary exists.
+
+**Whether that is enough is a C04 question and is named rather than answered** — the walk's
+rule is that a ruling naming an operation checks the operation exists (C23 §8a A4), and here
+the operation exists and the *obligation* to reach for it is the open half. It is entry 6.1's
+first row when it is built, and it is stated so the entry is not read as closed by 13b.3.
+
 ## 13. Out of scope
 
 | Not here | Where |

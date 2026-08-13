@@ -130,18 +130,63 @@ degradation story that is complete except for the one character always on screen
 across three layers, and `/drift` predicted it while `/config` reached it independently —
 which is the threshold for calling it general.
 
-Mostly a **documented convention**, possibly one helper: any block computed from two sources
-needs a rendering for *"they agree"*. Cheap, and no public shape changes.
+**WALKED — C22 §13b, and the four are two classes with different remedies.** F15, F35 and
+C22 I47 are a **destroyed diagnostic**: the framework knows exactly what happened and throws
+it away, and the remedy is a channel. `/drift` agreeing and `/config` identical are **nothing
+to say, said as nothing** — a success, with no diagnostic to preserve, whose remedy is a
+*rendering*. The one sentence above is the statement of the confusion, not one fix.
+
+**The diagnostic class is mostly closed and this entry does not own it.** F15 landed two
+channels — a fault notice at the moment and `Pipeline.faults` at exit, two because the
+reporting path is the path that failed. What this entry owns is the fourth instance.
+
+**RULED: a documented convention, and the helper is refused.** A helper nothing is obliged to
+use is the shape that produced this four times — two authors who had both read the convention
+still shipped the empty frame — and `usageBlocks` is the measured case of a complete mechanism
+nobody was obliged to call. The obligation belongs where the emptiness is *decidable*: only the
+producer knows *agree* from *failed to compare*, and a helper would be handed the same empty
+list C09 already sees. The convention is **a block whose emptiness is a result states the
+result** — not *"no rows"* but *"3 keys, all matching"*.
+
+**Residue, so 13b.3 is not read as closing it**: an empty block whose emptiness is a *failure
+to compute* is the fourth instance wearing the first's clothes, and nothing in C22 can tell
+them apart. C04 I3's vocabulary exists; the obligation to reach for it is the open half.
+No public shape changes.
 
 <a id="rendering-flags"></a>
 ### 2.2 Flags that select a rendering — F39
 
-There is no way to declare a flag that chooses a presentation rather than an invocation, so
-`--raw` reached docker and it exited 125. Every declared flag is transmitted. The shim
-absorbed it, which is honest and not a fix.
+**CORRECTED — the first half of this entry closed and the prose kept the old state.** It read
+*every declared flag is transmitted, so `--raw` reached docker and it exited 125*, and *the
+shim absorbed it*. C05 I21 shipped: a `shellOnly` switch is absent from `argv`, and the shim
+records the strip being **deleted** rather than commented, citing F39. F39 is now PARTIAL.
 
-Additive (a field on `FlagDef`), so it can follow — but it is a real capability gap and any
-app with a `--raw`, `--wide` or `--json` mode hits it immediately.
+What remains is the second half: there is no way to declare a flag that chooses a
+**presentation**. `FlagDef` has twelve members and none of them selects one.
+
+**WALKED — C05 §8b, and two things are settled before the design starts.**
+
+- **It cannot be `shellOnly` widened.** I21 ruled *the axis is transmission, not presentation,
+  and the two do not coincide*: `--json` selects a rendering **and** is transmitted, `--raw`
+  selects one and is not. A field meaning both would be wrong about `--json` the day it landed.
+- **`--help` and `--raw` are not the same kind of thing**, and two consumers that look alike is
+  where a vocabulary gets fixed wrongly (`view`'s two declarations cost F118). `--raw` selects
+  a rendering **of the result**, read after a document exists; `--help` selects a mode **of the
+  invocation**, read before anything is spawned — and it is not a field at all but a reserved
+  name (I22), because a per-app `--help` is a per-app discipline.
+
+**RULED: the field is the result-rendering axis alone.** It does not decide transmission — an
+app declaring `--json` writes the presentation field and **no** `shellOnly`, and that row is
+what breaks any future field implying the other.
+
+**Left open on purpose**: the field's *value*. A closed set is right when the framework must
+understand every member (§2's `ARG_TYPES` rule) and an app's `--wide` is not such a member —
+a C09/C22 question, named rather than chosen. And the name matters before it is written: MG24
+is exact for 376 of 1150 members, so a field called `kind`, `id`, `text` or `width` is one the
+rule can say nothing about.
+
+Additive, so it can follow — but it is a real capability gap and any app with a `--raw`,
+`--wide` or `--json` mode hits it immediately.
 
 ---
 
@@ -2312,7 +2357,21 @@ PART  1  PHASE 1                   producer context · change axis · builder au
 PART  5  publication prep          error messages · the outside-reader test · 0.x · CI from the
                                    tarball
       —  PUBLISH 0.x               with two real consumers behind it
-      6  phase 2                   the empty-block convention · rendering flags
+RULED 6  phase 2                   the empty-block convention · rendering flags. WALKED, and
+                                   both halves ruled with no code. 2.1: the four instances are
+                                   TWO CLASSES — F15/F35/I47 are a destroyed diagnostic (mostly
+                                   closed, and this entry does not own it) and /drift agreeing
+                                   is a SUCCESS with nothing to preserve. RULED a convention,
+                                   HELPER REFUSED: only the producer knows agree from failed-to-
+                                   compare, so a helper is handed the same empty list C09 sees,
+                                   and a helper nothing must call is what produced this four
+                                   times. 2.2: the first half CLOSED by C05 I21 and the prose
+                                   kept the old state — F39 is now PARTIAL. It cannot be
+                                   shellOnly widened (--json selects a rendering AND is
+                                   transmitted), and --help is a mode of the INVOCATION where
+                                   --raw is a rendering of the RESULT. RULED: the field is the
+                                   result-rendering axis alone. Left open on purpose: the
+                                   field's VALUE, a C09/C22 question. C05 §8b, C22 §13b
 PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
                                    the small navigation items rather than sitting beside them.
                                    SPECIFIED as C26; stages 1–3 built (interaction is a focus
@@ -2541,6 +2600,7 @@ what landed**.
 | 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:440` | 1.1, 1.3, 1.4 not checked in this pass |
 | 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
 | 7 | PART | **specified as C26, and three stages built.** `ElementAddress` — `interaction/router/types.ts:84` — and one shared resolver, `resolveFocus` — `interaction/router/focus.ts:122` — so focus holds an address and render and keys answer from the same place. Stage 1 made `interaction` a focus target, stage 2 gave blocks `elements`, stage 3 the address; the ⏎ ruling followed. `docs/components/C26_navigation.md` | **§4's policy resolution and the modes.** `ArrowPolicy` and `EscapePolicy` are absent from `src/` — withdrawn under MG24 because `NavElement.arrow` and `.escape` had no reader, **re-checked against the widened rule (F159) and the withdrawal holds**, so §4 is still a design question. The scroller is the fourth kind that check runs against (46) |
+| 6 | RULED | **the ruling is in the entry, and the walk is in two specs.** `docs/components/C05_tool_manifest.md` §8b and `docs/components/C22_composition_root.md` §13b. 2.2's first half is built and the prose had not caught up: `shellOnly` — `data/manifest/types.ts:88` — is absent from `argv` via `validateInvocation`, `data/manifest/validate.ts:254`, and `examples/docker/bin/docker-json` records the shim's strip being deleted rather than commented | **no code, deliberately.** 2.1's convention is unwritten and its residue is an empty block whose emptiness is a *failure to compute*, which C22 cannot tell from a success. 2.2's field does not exist and its **value** is left open — a C09/C22 question, named rather than chosen |
 | 8 | BUILT | **C14 I4/I5/I6.** `src/viewport/viewport/viewport.ts:347` — `#afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
 | 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `src/shell/local/registry.ts:59`, reached as `ctx.ask` at `src/shell/execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
 | 12 | BUILT | `src/shell/render-frame.ts:153` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
@@ -2560,9 +2620,7 @@ what landed**.
 | 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **31** · **33** · **36** · **37** · **41** · **42**. First sweep: **6** —
-`FlagDef` has no presentation-selecting field (`data/manifest/types.ts:42–56`), and F15 being
-CLOSED does not close 2.1's convention · **15** — `enterCopyMode` is defined nowhere in
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **31** · **33** · **36** · **37** · **41** · **42**. First sweep: **15** — `enterCopyMode` is defined nowhere in
 `src/`, and there is no OSC 52 · **26**, **32**, **40** — the symbols the entries name are
 absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` anywhere in `src/`; `cursorSequence` (`src/terminal/lifecycle.ts:48`) is *positioning*, which reads as coverage and is not · **28** — `paint.ts:241` still reads *"around the end rather than around the cursor,
 until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **44** —
@@ -2600,6 +2658,20 @@ four rows, two real and two using a built-word without asserting anything exists
 *built with prism-tui as the consumer* and 15's *is built three times*. The pattern is not
 narrowed to fit them; they are named exemptions quoting the sentence, with an equality arm,
 so a row that changes its wording has to re-earn the exemption.
+
+**And the fourth sweep found one the column could not have.** Entry 6's status was OPEN and
+its evidence was **correct** — `FlagDef` genuinely has no presentation-selecting field. What
+was stale was §2.2's **body**: *"every declared flag is transmitted, so `--raw` reached docker
+and it exited 125"*, false since C05 I21 shipped, with `examples/docker/bin/docker-json`
+recording the shim's strip being deleted and citing F39 by name. F39's own body had gone stale
+in the same direction while its title still read true.
+
+**That is a surface neither instrument covers, and saying so is the point of counting.** The
+verifier resolves the Order list's citations and the evidence table's; **nothing resolves a
+body section**, and a body section is where a claim goes stale most quietly, because the entry
+above it is still open and reads as coverage. Twelve stale claims across four sweeps — eleven
+of forty-four entries, 25%, plus this one, which is not an entry. The rate has risen at every
+sweep, which is what says the column is being verified rather than maintained.
 
 **Entry 7's four subsumed rows stand.** `docs/components/C26_navigation.md` — specified, and
 stages 1–3 built. **10** (the question / menu

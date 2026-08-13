@@ -592,6 +592,108 @@ answers with a precedence policy — *`false` wins*, *the last flag wins*, *the 
 and the ruling answers it by making the question unaskable. A policy would have been
 correct, testable, and a thing to remember; rows 3 and 4 mean there is nothing to remember.
 
+## 8b. The walk — entry 6's third axis, and what a presentation flag selects
+
+**A table again, and for §8a's reason.** A manifest is at rest; a flag's declarations are
+statements that all hold at once, with no event between them. Indexed by which two
+declarations could both claim an answer.
+
+### 8b.1 — the premise the roadmap states is false at HEAD, and this is what remains
+
+Roadmap 2.2 reads *"every declared flag is transmitted, so `--raw` reached docker and it
+exited 125"* and *"the shim absorbed it."* **Both halves are the old state.** I21 shipped:
+`validateInvocation` returns `transmitted`, a `shellOnly` switch is absent from `argv`, and
+`examples/docker/bin/docker-json:152` records the strip being **deleted** rather than
+commented, citing F39 by name.
+
+So F39 is two claims and only one is closed:
+
+| F39's claim | at HEAD |
+|---|---|
+| `--raw` reaches the far side and it exits 125 | **closed** by I21 — the flag never reaches `argv` |
+| there is no way to declare a flag that selects a **rendering** rather than an invocation | **open**, and it is the whole of entry 6.2 |
+
+**The finding's body is stale in the other direction from its title**, which is why this is
+worth a row rather than a correction in passing: F39 still reads *"absorbed by the shim, which
+now strips `--raw` for `inspect`"*, and the shim says the opposite. Read the abstract against
+its own section before reading the section against the code — here the title survived and the
+body did not.
+
+### 8b.2 — the axis is settled before the design starts, and `shellOnly` settled it
+
+I21 states it outright: **the axis is transmission, not presentation, and the two do not
+coincide.**
+
+| flag | selects a rendering | far side understands it | `shellOnly` |
+|---|---|---|---|
+| `--json` | yes | yes — C06 appends it | **no**, it stays transmitted |
+| `--raw` | yes | no | yes |
+| `--all` | no | yes | no |
+| `--help` | *not a rendering of the result* — see 8b.3 | no | yes |
+
+**Two of the four cells disagree with each other**, so no widening of `shellOnly` can express
+presentation: `--json` is presentation-selecting and transmitted, `--raw` is presentation-
+selecting and not. A field that meant both would be wrong about `--json` on the day it landed.
+That is a ruling inherited rather than made, and the walk's job here is to record that it was
+already made and by which sentence.
+
+### 8b.3 — the row the walk owes: two consumers that look alike
+
+`--help` and `--raw` are both `shellOnly`, both change what the reader sees, and **they are
+not the same kind of thing.**
+
+| | `--raw` | `--help` |
+|---|---|---|
+| is there a result to render? | **yes** — the verb runs and returns a document | **no** — the verb does not run at all |
+| what is selected | a rendering **of the result** | a mode **of the invocation** |
+| when it is read | after the far side answers | before anything is spawned |
+| built today | no | yes — I22, and `usageBlocks` at `src/shell/documents.ts:215` |
+
+**These are two axes and one of them already exists.** `--help` is the invocation-mode axis
+and it is not a field at all — it is a reserved name (I22) whose behaviour the shell hardcodes,
+because *a per-app `--help` is a per-app discipline*. `--raw` is the result-rendering axis and
+it has no field.
+
+**The ruling: entry 6.2's field is the result-rendering axis alone, and it does not
+generalise to invocation modes.** The reasons, in the order they bind:
+
+1. **They are read at different times by different code.** An invocation mode is resolved
+   before the spawn, by the same walk that resolves `interactive` (I23); a result rendering is
+   resolved after a document exists, by whatever composes it. A field spanning both would be
+   read twice by two components for two purposes, which is the seam A02 forbids one field from
+   straddling.
+2. **The invocation-mode axis already has an occupant and it is not a field.** `--help` is
+   reserved, and I22's argument for reserving it — one app forgetting it is a verb with no
+   help — applies to every member of that axis. A declarable invocation mode would be the
+   thing I22 refuses.
+3. **Two consumers that look alike is where a vocabulary gets fixed wrongly**, and the
+   measured instance is `view` (I20): a flag-level and a tool-level declaration of *the same*
+   axis, which cost F118 — a refusal reading one declaration of two. A field covering two
+   axes would be that defect with no second declaration to compare against.
+
+**What the field does NOT decide, stated because the absence is the finding.** It does not
+decide transmission — I21 does, independently, and `--json` is the case that proves they must
+stay separate. An app declaring `--json` writes the presentation field **and no `shellOnly`**;
+an app declaring `--raw` writes both. If a future field implies the other, `--json` is the row
+that breaks it.
+
+### 8b.4 — what the walk cannot rule, and why it stops here
+
+**The field's *value* is not rulable from inside this component.** A rendering selector names
+something C09 resolves, and C05 is L0: it can carry a string the way `kind` is a string, or a
+closed set the way `ARG_TYPES` is closed. §2's `ARG_TYPES` rule says a closed set is right when
+the framework must understand every member, and an app's `--wide` is not a member the framework
+can know. That is a C09/C22 question and it is named here rather than answered, which is what
+*say so rather than choosing* asks for.
+
+**And one fact belongs beside the field before it is written, not after.** MG24 matches
+published members by name and is exact for 376 of 1150 members — the figure `make enforce`
+prints every run. If this field is named `kind`, `id`, `text` or `width`, **MG24 can say
+nothing about whether anything consumes it**, because those names have 30, 23, 15 and 10 owners
+respectively. `elementId` was named for exactly this reason in C26 and the argument was correct
+and guaranteed nothing (F159); here the argument is correct and the *other* half — the name —
+is the half that still works. A firing is trustworthy; only a silence is suspect.
+
 ## 9. Out of scope
 
 | Not here | Where |

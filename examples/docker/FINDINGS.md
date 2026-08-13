@@ -1614,7 +1614,7 @@ a real feature, not a binding.
 
 ---
 
-## F39 — a flag that selects a rendering is sent to the far side ★★★
+## F39 — a flag that selects a rendering is sent to the far side ★★★ — **PARTIAL**
 
 **Every flag a `ToolDef` declares is transmitted.** C06 I4 sends argv over verbatim, which
 is right for `--all` and wrong for `--raw`: `/inspect <c> --raw` ran
@@ -1626,11 +1626,34 @@ this verb passed, because they hand argv to the adapter directly and never spawn
 the tests cover the mechanism and this is the wiring. The recurrence CLAUDE.md names, in the
 place it keeps happening.
 
-Absorbed by the shim, which now strips `--raw` for `inspect` before `exec docker`. The
-adapter still sees it, because `RawResult.argv` is what Calcium built rather than what
-reached the binary. Third translation in that file and the first that is not about docker's
-shape at all — `--json` and `--no-stream` are about the far side; this one is about the
-framework having no place to put a presentation flag.
+Absorbed at the time by the shim, which stripped `--raw` for `inspect` before
+`exec docker` — honest, and not a fix.
+
+### PARTIAL — one of the two claims closed, and the body was stale in the other direction
+
+**This finding is two claims and only the first is closed**, which is why it is marked rather
+than left whole or closed whole. *Would landing this close it* is the test, and I21 closes half.
+
+| the claim | at HEAD |
+|---|---|
+| `--raw` reaches the far side and it exits 125 | **closed.** C05 I21 — `validateInvocation` returns `transmitted`, and a `shellOnly` switch is absent from `argv` |
+| there is no way to declare a flag that selects a **rendering** rather than an invocation | **open.** `FlagDef` has twelve members and none of them is presentation-selecting |
+
+`examples/docker/bin/docker-json:152` records the strip being **deleted** rather than
+commented, citing this finding: *"a shim that strips a flag Calcium already removed is a second
+answer to a settled question."*
+
+**The paragraph above said the shim "now strips `--raw`" while the shim said the opposite**,
+and it survived because nothing re-reads a body once its title still reads true. That is F86,
+F89 and F92's mechanism arriving from the other end: not a summary that dropped a condition,
+but a **body** that kept a state the title never named. *Read the abstract against its own
+section* catches the first and not this — what catches this is a walk that goes to the code
+the body describes. C05 §8b.1 is where that happened.
+
+**And I21 settled the axis the remaining half has to avoid.** *The axis is transmission, not
+presentation, and the two do not coincide*: `--json` selects a rendering **and** is
+transmitted, `--raw` selects one and is not. So the open half cannot be `shellOnly` widened,
+and that is inherited rather than a design option. C05 §8b.2 carries the table.
 
 ---
 
