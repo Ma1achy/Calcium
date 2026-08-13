@@ -641,7 +641,21 @@ export type InteractivePty = {
    * when it was not.
    */
   waitForFrame(ok: (frame: readonly string[]) => boolean, ms?: number): Promise<void>;
-  done(): Promise<number>;
+  /**
+   * The exit code, or reject after `ms` (default 20 s).
+   *
+   * **It was unbounded, and that is what a 75-second failure with no message
+   * looks like.** `waitFor` and `waitForFrame` both reject with what they were
+   * waiting for; this returned a promise nothing ever rejected, so a session
+   * that did not exit produced vitest's bare *"Test timed out in 75000ms"* and
+   * no evidence at all — pointing at the `it` rather than at the await. The one
+   * await with no budget is the one a hang lands on, and it was the only one
+   * that could not say so.
+   *
+   * The rejection carries the last frame, because *why has it not exited* is a
+   * question about what is on screen.
+   */
+  done(ms?: number): Promise<number>;
   kill(): void;
 };
 
@@ -813,9 +827,22 @@ export function interactivePty(
         });
       });
     },
-    done() {
+    done(ms = 20_000) {
       if (exited !== null) return Promise.resolve(exited);
-      return new Promise((resolve) => exitWaiters.push(resolve));
+      return new Promise<number>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(
+            new Error(
+              `the session did not exit within ${String(ms)}ms. The last frame:\n` +
+                paint.rows().join("\n"),
+            ),
+          );
+        }, ms);
+        exitWaiters.push((code: number) => {
+          clearTimeout(timer);
+          resolve(code);
+        });
+      });
     },
     kill: () => term.kill(),
   };

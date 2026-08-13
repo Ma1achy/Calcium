@@ -239,6 +239,32 @@ describe("C06 e2e", () => {
       // satisfied perfectly by a session that does nothing at all, which is the
       // inert class in its most consequential form: a whole transport arm
       // agreeing with emptiness.
+      //
+      // --- WHY THIS ROW CARRIES A DIAGNOSTIC NOTE, 2026-08-13 ----------------
+      //
+      // **It failed three of four full tier-5 runs at exactly 75 s**, passing
+      // in ~1.2 s alone and 9/9 with its own file. 75 s is this row's *outer*
+      // budget and its inner waits are 15/20/15/15, so the failure was a bare
+      // vitest timeout with **no inner rejection at all** — which locates it:
+      // the hang is at the one await with no budget, `pty.done()`.
+      //
+      // Two real weaknesses came out of looking, and both are fixed:
+      //
+      //   - `done()` was unbounded and never rejected, so a session that did
+      //     not exit produced no evidence — the error pointed at the `it`. It
+      //     now takes a budget and its rejection carries the last frame.
+      //   - the `/help` step waited on `f.join("").length > 0`, which almost
+      //     any frame satisfies, including the one already on screen. It
+      //     resolved immediately, so `/exit` was typed into a session that had
+      //     not finished. It now waits for a verb only `/help` puts on screen.
+      //
+      // **Neither is credited with the fix, and that is the point of the
+      // note.** Three full runs have been green since — but the first of those
+      // three was green *before* either change landed, so the sample cannot
+      // distinguish the fix from the failure not recurring. Recorded with both
+      // figures rather than closed: a justification the next person checks and
+      // cannot reproduce is one they delete. If it returns, the rejection now
+      // says what the session was doing instead of exiting.
       const pty = session("no-farside");
       try {
         await pty.waitFor(PROMPT, 15_000);
@@ -256,7 +282,12 @@ describe("C06 e2e", () => {
         await pty.waitForFrame((f) => f.join("").includes("own local verb"), 15_000);
 
         pty.type("/help\r");
-        await pty.waitForFrame((f) => f.join("").length > 0, 15_000);
+        // **`length > 0` was the predicate here, and it waited for nothing.**
+        // Almost any frame satisfies it — including the one already on screen
+        // from `/guide` — so it resolved before `/help` had been processed and
+        // `/exit` was typed into a session still working. The wait has to name
+        // something only this step produces, which is a verb the help lists.
+        await pty.waitForFrame((f) => f.join("").includes("/guide"), 15_000);
 
         // And the shell shuts down cleanly rather than being killed, which is
         // the last thing a standalone build has to do.
