@@ -290,8 +290,12 @@ notice here.
   second source.
 - **I9** — Focus is rendered by the block and owned here (C11 I14). C26 holds a location; it
   draws nothing and commits no frame.
-- **I10** — Restoring focus is a re-resolution by id with a fall-forward to the nearest
-  survivor, never an index (C14 I6's shape).
+- **I10** — Focus is stored as an **address**, `(blockId, elementId)`, and restoring it is a
+  re-resolution by that address with a fall-forward to the nearest survivor **forward in
+  reading order**, never an index (C14 I6's shape). **One resolver answers for both the render
+  side and the key side**, so what is highlighted and where the next arrow goes cannot
+  disagree; it writes nothing, and the store is repaired by the next focus-moving keystroke
+  (§8b.7).
 - **I11** — Element resolution is a pull, recomputed on dispatch. C26 subscribes to no change
   stream.
 - **I12** — A refused or throwing `elements` makes the block atomic for that dispatch and
@@ -360,10 +364,15 @@ the block is atomic for that dispatch and focus falls to the block level → **I
 
 ## 8b. What the implementation falsified
 
-**The walk rules the shape; code is the first thing that can disprove it.** Both entries
-below were found by reading the call sites before writing a line, and both make a §8a ruling
+**The walk rules the shape; code is the first thing that can disprove it.** Every entry below
+was found by reading the call sites before writing a line, and most make a §8a ruling
 *sharper* rather than wrong — which is the disposition worth having a heading for, because a
 walk that is only ever confirmed is a walk nobody checked.
+
+**This heading said "Both entries below" over six of them**, and it is F142's lesson arriving
+in the smallest possible form: *a count in prose is a snapshot with no mechanism.* It was
+written when there were two and was never a claim anyone re-read. Corrected to a quantifier,
+which cannot go stale.
 
 ### 1. `⏎` is already bound on `liveBlock`, so §2 cannot have it
 
@@ -469,6 +478,91 @@ position. Every step is individually correct.
 is addressed by its own id within a declaration that knows which block produced it, so there
 is no flat namespace for two rows to collide in.
 
+**Half of that landed in stage 2 and half did not, which entry 7 below is about.**
+`elementsIn` pairs every element with its block, so the *declaration* side has no flat
+namespace. `StoredFocus.rowId` stayed a bare string, so the *stored* side still had one, and
+the defect above survived a change whose whole subject it was.
+
+---
+
+### 7. The address type already exists one layer down, and `focusFor` manufactures the other half
+
+Reading every reader of `rowId` before choosing the type — the same pass that falsified §5's
+signature in entry 3 — moves two decisions and confirms three.
+
+**`FocusState` is already the address.** `presentation/blocks/types.ts:17` is
+`{blockId, rowId: string | null}`, because C09 needs a pair to tell one block it holds focus
+(C11 I14). The store held half of it and `session.ts` re-derived the other half by taking the
+**first** element whose id matched.
+
+So entry 6's diagnosis was true and named the wrong subject. It is not that row ids collide —
+C04 I31 makes them unique *within* a table and says nothing across blocks, so a collision
+between two tables is well-formed and always was. **It is that one type is the address and
+the other is half of it, and the join between them is a first-match search.** The remedy is
+not a uniqueness rule anywhere; it is that the stored form stops being narrower than the form
+it is rendered as.
+
+**I10 is ruled and unimplemented, and its four readers improvise four different answers.**
+Against an id the block no longer has:
+
+| reader | today |
+|---|---|
+| `keys.ts` `rowUp` | `indexOf` → −1, `i <= 0` → leaves to the prompt |
+| `keys.ts` `rowDown` | `indexOf` → −1, `rows[0]` → jumps to the first row |
+| `session.ts` `focusFor` | no match → `null` → no highlight drawn |
+| `keys.ts` `rowActivate` | `null` → silent |
+
+None is I10's fall-forward. So *what does a stale address do* is not a question the new type
+raises — it is a ruling that exists, that nothing implements, and that four call sites answer
+four ways. **A spread of dispositions with no shared source is what an unimplemented invariant
+looks like from the code**, and it is invisible to a reader checking any one of them.
+
+**The address is well-founded on invariants that already exist.** C04 **I14** makes block ids
+unique within the document, *nested children included* (`src/data/viewmodel/validate.ts:439`);
+**I6** above makes element ids unique within a block's declaration. `(blockId, elementId)` is
+therefore unique with no new rule, and entry 6's *closes it by construction* becomes checkable
+rather than asserted.
+
+**`liveRowAction`'s reason for being a second function is already false in the code.** Its
+comment argues two functions rather than one returning pairs *because `liveRows` is asked on
+every arrow keystroke and this only on `enter`* — while its body calls `liveElements()`, the
+same full registry walk. The cheap/expensive split does not exist and has not since stage 2
+rewired it. Both signatures have to change for the address anyway, so they collapse to one
+pull. **A justification that was true when written and was falsified by a later change reads
+exactly like one that still holds** — the sibling of §7's mutation lesson, one artefact over.
+
+**Eviction and resize are not the reachable staleness; patch is.** §8a listed three, and
+against the tree:
+
+- **Eviction** (trace 1) — C13's sweep exempts live and streaming entries, and both `focusFor`
+  and `activeTarget` gate on the live entry. Unreachable until block-to-block movement exists,
+  which §11 defers.
+- **Resize** (trace 3) — element ids are row ids and are width-independent; only positions
+  move. The trace's premise is true *generically* and **vacuous for `table`**, which yields an
+  element per row at every width. It cannot be tested with a real kind, so a fabricated one is
+  owed — a check whose only subject is the kind that cannot violate it passes exactly like one
+  that is satisfied (A03 §2).
+- **Patch** (trace 4) — `putBlock` is total and never throws, so the element vanishes with no
+  signal. **The only case reachable today**, and the one the disposition is written for.
+
+#### The ruling I10 was owed
+
+Resolution is **exact match on `(blockId, elementId)` first; on no match, the nearest survivor
+forward in the list**. The list is in reading order by I5, so *nearest* is the list's own order
+and not a second notion of distance that could disagree with it.
+
+**One resolver, shared by the render side and the key side**, and the reason is that the
+obvious placement is wrong. `focusFor` is a render query and must write nothing, so a
+fall-forward computed there would leave the store holding a dead address and the next `↓`
+computing from it — the original defect one layer over. A fall-forward that *did* write would
+put a mutation in a per-frame read. So neither side owns it: both call the same pure function,
+display and the next keystroke agree by construction, and the store is repaired by the next
+focus-moving keystroke. Same argument as `elements` itself — one source, or they disagree.
+
+It takes its element list **structurally rather than by import**, on the argument `focus.ts`
+already makes for `FocusInputs`: taking C15's and C13's shapes by structure *keeps purity a
+property of the signature*. One decision applied twice, not a second one that agrees.
+
 ---
 
 ## 9. Commitments
@@ -481,7 +575,7 @@ is no flat namespace for two rows to collide in.
 6. Element lists satisfy containment, reading order, per-level disjointness and stability (I4, I5, I6) — checked generically by a conformance sweep, as `window`'s equality is.
 7. A kind declaring both `window` and `elements` satisfies their agreement (I7), and the invariant's emptiness is recorded rather than left to be found.
 8. Focus changes tone and nothing else (I9, → C11 I14).
-9. Restoration is by id with a fall-forward (I10).
+9. Focus is stored as a `(blockId, elementId)` address, and restoration is a re-resolution of it with a fall-forward, through one resolver shared by render and keys (I10).
 10. Element resolution is a pull (I11).
 11. `focusableRowIds` is replaced by `elements` rather than joined by it — one source, or the keyboard and the pointer disagree (I8).
 
@@ -506,7 +600,18 @@ Named against the invariants; the tiers are the six.
   by identity rather than equality. The keymap's `/help` traversal is the precedent: identity
   is what makes "one source" checkable.
 - **T3.x** (I10, I12) — evict, resize and `putBlock` under a live focus; and a kind whose
-  `elements` throws.
+  `elements` throws. **Two of the three need a fabricated kind or are unreachable** (§8b.7):
+  eviction exempts the live entry, and `table` yields an element per row at every width, so
+  the resize arm has no subject until a definition that drops one exists.
+- **T3.x** (I10) — two blocks sharing an element id, focus on the second: the highlight draws
+  on the **second** and the next arrow continues from it. `tableOf` collides by construction,
+  so the fixture is the state the defect needed rather than one invented to suit.
+- **T3.x** (I10) — an address whose `blockId` matches and `elementId` does not, and the
+  converse. **These are the rows a bare-id implementation still passes**, which is what makes
+  them the ones worth writing.
+- **T6.x** (I10) — resolution matching on `elementId` alone → the collision row fails; the
+  fall-forward taking the first element rather than the nearest forward → the `putBlock` row
+  fails.
 - **T3.x** (I13) — `reset()` and `toPrompt()` produce different locations.
 - **T6.x** (I6) — making disjointness global → the nesting fixtures fail.
 - **T6.x** (I11) — turning the pull into a subscription → the half-applied-store row fails.
