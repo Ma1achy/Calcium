@@ -174,6 +174,24 @@ export type KeyAction =
   | "home"
   | "end"
   | "left"
+  // --- selection (C17 §5b, I21) --------------------------------------------
+  //
+  // **Every motion twice**, and the second half is the first with the anchor
+  // held. They are separate actions rather than a modifier on the existing
+  // rows because the keymap resolves `(target, key)` to one action — a
+  // "shifted" flag on an action would be a second dispatch mechanism beside
+  // the one C16 I19 commits to.
+  //
+  // `extendLineStart`/`extendLineEnd` are `⇧Home`/`⇧End` and **not**
+  // `⇧⌃a`/`⇧⌃e`: ctrl+shift+letter is the same `0x01` that killed `⌃⇧a` for
+  // select-all, which is two more bindings T2.13 has cost.
+  | "extendCharLeft"
+  | "extendCharRight"
+  | "extendWordLeft"
+  | "extendWordRight"
+  | "extendLineStart"
+  | "extendLineEnd"
+  | "selectAll"
   // --- focus (I22) ---------------------------------------------------------
   //
   // `↓` enters through `historyNext`'s second clause rather than an action of

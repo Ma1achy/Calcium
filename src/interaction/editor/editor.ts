@@ -37,6 +37,27 @@ export interface LineEditor {
   deleteBackward(): void;
   deleteForward(): void;
   move(motion: Motion): void;
+  /**
+   * The same motion with the anchor held (§5b, I21).
+   *
+   * **One line different from `move`, and that is the design.** Both compute
+   * their target through the same private function, so there is no second
+   * implementation of any motion to drift — and a shifted form that moved the
+   * anchor would be right on the first keystroke and wrong on the second,
+   * which no single-motion test can see.
+   */
+  extend(motion: Motion): void;
+  /** The degenerate case of a region: the whole buffer (§5b). */
+  selectAll(): void;
+  /**
+   * The region, or `null` (I21).
+   *
+   * **`anchor === head` is `null`, not an empty region.** The caret has one
+   * spelling, which is what stops two states meaning the same thing.
+   */
+  readonly selection: Readonly<{ anchor: number; head: number }> | null;
+  /** The selected text, or `""`. What step 3's copy reads. */
+  readonly selected: string;
   killTo(motion: Motion): void;
   yank(): void;
   setText(text: string, cursor?: number): void;
@@ -64,6 +85,8 @@ export interface LineEditor {
 class Editor implements LineEditor {
   #text = "";
   #cursor = 0;
+  /** §5b — the only new state; the head is `#cursor` itself (I21). */
+  #anchor: number | null = null;
   #kill = "";
   readonly #history = new History();
 
@@ -98,6 +121,10 @@ class Editor implements LineEditor {
   #apply(s: Snapshot): void {
     this.#text = s.text;
     this.#cursor = clamp(s.cursor, count(s.text));
+    // **A region does not survive an undo** (I22) — I16 inverted. The kill
+    // buffer is a clipboard and survives; a region is a statement about where
+    // the caret is, and the caret has just moved to somewhere else entirely.
+    this.#anchor = null;
   }
 
   /**
@@ -122,10 +149,19 @@ class Editor implements LineEditor {
     // whether this joins the run's unit, so ending the run afterwards would let
     // a keystroke merge into the kill it interrupted.
     this.#history.endKill();
+    // **The snapshot is taken before the region goes, and once** (I22). Typing
+    // over a selection is one undo unit covering both the removal and the
+    // insertion; two units would let `undo` restore a buffer with the region
+    // already deleted, which reads as an undo that did half the job.
+    //
+    // `structural`, not `insert`: a replacement is not typing that should
+    // coalesce with what follows it.
+    const hadSelection = this.selection !== null;
     this.#history.edit(
       this.#snapshot(),
-      opts?.atomic === true ? "atomic" : closes ? "insertClosing" : "insert",
+      hadSelection ? "structural" : opts?.atomic === true ? "atomic" : closes ? "insertClosing" : "insert",
     );
+    this.#takeSelection();
 
     const { head, tail } = splitAt(this.#text, this.#cursor);
     this.#text = head + clean + tail;
@@ -133,6 +169,16 @@ class Editor implements LineEditor {
   }
 
   deleteBackward(): void {
+    // **The region, or a character — never both** (I22). Deleting the region
+    // *and* the grapheme before it is the natural implementation and is
+    // indistinguishable from the correct one when the region is one grapheme
+    // wide, which is why T1.29 uses three.
+    if (this.selection !== null) {
+      this.#history.endKill();
+      this.#history.edit(this.#snapshot(), "structural");
+      this.#takeSelection();
+      return;
+    }
     if (this.#cursor <= 0) return;
     this.#history.endKill();
     this.#history.edit(this.#snapshot(), "structural");
@@ -141,6 +187,12 @@ class Editor implements LineEditor {
   }
 
   deleteForward(): void {
+    if (this.selection !== null) {
+      this.#history.endKill();
+      this.#history.edit(this.#snapshot(), "structural");
+      this.#takeSelection();
+      return;
+    }
     if (this.#cursor >= count(this.#text)) return;
     this.#history.endKill();
     this.#history.edit(this.#snapshot(), "structural");
@@ -191,10 +243,71 @@ class Editor implements LineEditor {
     return { start, end };
   }
 
+  get selection(): Readonly<{ anchor: number; head: number }> | null {
+    // **`null` when the two coincide** (I21). Computed rather than stored, so
+    // the "empty region" state cannot be constructed at all — a collapse that
+    // forgot to clear the anchor would otherwise leave one.
+    if (this.#anchor === null || this.#anchor === this.#cursor) return null;
+    return Object.freeze({ anchor: this.#anchor, head: this.#cursor });
+  }
+
+  get selected(): string {
+    const sel = this.selection;
+    if (sel === null) return "";
+    return sliceBetween(this.#text, Math.min(sel.anchor, sel.head), Math.max(sel.anchor, sel.head));
+  }
+
   move(motion: Motion): void {
     this.#history.close();
     this.#history.endKill();
+    // **Unshifted motions collapse** (I21), which is what keeps the model
+    // invisible until someone holds Shift — and why every test written before
+    // it existed still passes unchanged.
+    this.#anchor = null;
     this.#cursor = clamp(this.#target(motion), count(this.#text));
+  }
+
+  /**
+   * `move` with the anchor held (I21).
+   *
+   * The anchor is placed on the **first** extension and never touched again
+   * until something collapses. Every line below that is not the assignment to
+   * `#cursor` is shared with `move`, deliberately: two motion implementations
+   * would be two answers to where a word ends.
+   */
+  extend(motion: Motion): void {
+    this.#history.close();
+    this.#history.endKill();
+    this.#anchor ??= this.#cursor;
+    this.#cursor = clamp(this.#target(motion), count(this.#text));
+  }
+
+  selectAll(): void {
+    this.#history.close();
+    this.#history.endKill();
+    // The whole buffer, across newlines — `[0, count)` and not the current
+    // line, which is what `lineStart`/`lineEnd` would give (T1.27).
+    this.#anchor = 0;
+    this.#cursor = count(this.#text);
+  }
+
+  /**
+   * Remove the region, if there is one, without recording a unit (I22).
+   *
+   * **The caller records**, because the replacement and the edit that follows
+   * it are one undo unit. A snapshot taken here would make them two, and the
+   * second would restore a buffer with the region already gone — which reads
+   * as an undo that did half the job.
+   */
+  #takeSelection(): boolean {
+    const sel = this.selection;
+    this.#anchor = null;
+    if (sel === null) return false;
+    const from = Math.min(sel.anchor, sel.head);
+    const to = Math.max(sel.anchor, sel.head);
+    this.#text = removeBetween(this.#text, from, to);
+    this.#cursor = from;
+    return true;
   }
 
   /**
@@ -207,6 +320,11 @@ class Editor implements LineEditor {
    * cost C14 a blank screen with every assertion passing.
    */
   killTo(motion: Motion): void {
+    // **Collapses rather than cutting the region** (I22). A kill already names
+    // where to cut *to*, so a selection would be a second answer to one
+    // question. Copy is the operation that reads a region (§5a), and it is not
+    // this one.
+    this.#anchor = null;
     const to = clamp(this.#target(motion), count(this.#text));
     if (to === this.#cursor) return;
 
@@ -239,6 +357,9 @@ class Editor implements LineEditor {
   setText(text: string, cursor?: number): void {
     this.#history.endKill();
     this.#history.edit(this.#snapshot(), "structural");
+    // The buffer is being replaced wholesale; a region into the old one points
+    // at characters that no longer exist.
+    this.#anchor = null;
     this.#text = stripForBuffer(text);
     this.#cursor = clamp(cursor ?? count(this.#text), count(this.#text));
   }

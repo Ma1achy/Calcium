@@ -302,6 +302,25 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt c+z": ["\u001a"],
       "prompt m+z": ["\u001bz"],
 
+      // --- selection (C17 §5b) ---------------------------------------------
+      //
+      // **`⌥⇧←` carries BOTH forms, and step 0 is why it can.** A terminal
+      // sending Option as Alt gives `CSI 1;4D`; one sending it as Meta gives
+      // `CSI 1;10D`, and `modifiersOf` read three of xterm's four modifier bits
+      // — so the second decoded as `s+left`, which is a *different bound key*.
+      // Listing one form here would have passed on half the terminals, which is
+      // the same argument Shift-Enter's row makes above.
+      //
+      // `⇧⌃a`/`⇧⌃e` are absent rather than approximated: ctrl+shift+letter is
+      // `0x01`, the collision that already cost `⌃⇧a` and `⌃_`.
+      "prompt s+left": ["\u001b[1;2D"],
+      "prompt s+right": ["\u001b[1;2C"],
+      "prompt ms+left": ["\u001b[1;4D", "\u001b[1;10D"],
+      "prompt ms+right": ["\u001b[1;4C", "\u001b[1;10C"],
+      "prompt s+home": ["\u001b[1;2H"],
+      "prompt s+end": ["\u001b[1;2F"],
+      "prompt m+a": ["\u001ba"],
+
       // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
       // provisional — which key enters copy mode is the rebindable-keys row's
       // question — and its *wire form* is not: this check fired on the binding

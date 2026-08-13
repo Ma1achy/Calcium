@@ -418,3 +418,146 @@ describe("C17 §2 — geometry at the edges", () => {
     expect(e.cursor).toBe(0);
   });
 });
+
+describe("C17 §5b — selection", () => {
+  it("T1.23 (I21): two extensions leave the anchor where it was", () => {
+    // **Two, because one passes whichever end moved.** From index 0, one `⇧→`
+    // gives `[0, 1)` under both the correct implementation and one that moves
+    // the anchor — `{anchor: 0, head: 1}` and `{anchor: 1, head: 0}` describe
+    // the same characters. The second motion is where they part.
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.extend("charRight");
+    e.extend("charRight");
+
+    expect(e.selection).toEqual({ anchor: 0, head: 2 });
+    expect(e.selected).toBe("ab");
+    expect(e.cursor, "the head is the cursor, not a second position").toBe(2);
+  });
+
+  it("T1.24 (I21): the head walks back and the anchor still has not moved", () => {
+    // The same defect through a reversal rather than a repeat: an anchor that
+    // follows the motion ends up ahead of the head here, and `selected` reads
+    // the same either way because it sorts the pair.
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.extend("charRight");
+    e.extend("charRight");
+    e.extend("charLeft");
+
+    expect(e.selection).toEqual({ anchor: 0, head: 1 });
+    expect(e.selected).toBe("a");
+  });
+
+  it("T1.25 (I21): anchor === head is no region, not an empty one", () => {
+    // **Reached by moving**, not by never having selected — the two spellings
+    // of "no region" are exactly what this forbids, and a stored empty region
+    // can only be constructed this way.
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.extend("charRight");
+    expect(e.selection).not.toBeNull();
+
+    e.extend("charLeft");
+    expect(e.selection, "back where it started is no selection").toBeNull();
+    expect(e.selected).toBe("");
+  });
+
+  it("T1.26 (I21): an unshifted motion collapses", () => {
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+
+    e.selectAll();
+    expect(e.selection).toEqual({ anchor: 0, head: 6 });
+
+    e.move("charLeft");
+
+    expect(e.selection).toBeNull();
+    expect(e.cursor, "and the motion still moved the cursor").toBe(5);
+  });
+
+  it("T1.27 (I21): selectAll crosses newlines — it is not lineStart to lineEnd", () => {
+    const e = createEditor({ text: "one\ntwo\nthree", cursor: 5 });
+
+    e.selectAll();
+
+    expect(e.selection).toEqual({ anchor: 0, head: 13 });
+    expect(e.selected).toBe("one\ntwo\nthree");
+  });
+
+  it("T1.28 (I22): typing over a region replaces it in one undo unit", () => {
+    const e = createEditor({ text: "abcdef", cursor: 0 });
+    const before = e.undoDepth;
+
+    e.extend("charRight");
+    e.extend("charRight");
+    e.extend("charRight");
+    e.insert("X");
+
+    expect(e.text).toBe("Xdef");
+    expect(e.undoDepth - before, "one unit, not two").toBe(1);
+
+    // **One `undo`, and the whole original comes back.** Two units restore
+    // `"def"` first — an undo that did half the job, and correct after a
+    // second press, which is how it would read as a near-miss rather than a
+    // defect.
+    e.undo();
+    expect(e.text).toBe("abcdef");
+  });
+
+  it("T1.29 (I22): deleteBackward removes the region and not a character as well", () => {
+    // **Three graphemes, deliberately.** With a one-grapheme region the correct
+    // implementation and the one that also deletes backwards produce the same
+    // buffer, so the row would pass for both.
+    const e = createEditor({ text: "abcdef", cursor: 1 });
+
+    e.extend("charRight");
+    e.extend("charRight");
+    e.extend("charRight");
+    expect(e.selected).toBe("bcd");
+
+    e.deleteBackward();
+
+    expect(e.text, "the `a` is untouched").toBe("aef");
+    expect(e.cursor).toBe(1);
+    expect(e.selection).toBeNull();
+  });
+
+  it("T1.30 (I22): killTo collapses rather than cutting the region", () => {
+    // The kill buffer's contents are what say which of the two answers was
+    // taken — the text is the same length either way at the wrong widths.
+    const e = createEditor({ text: "alpha beta", cursor: 10 });
+
+    e.extend("charLeft");
+    e.extend("charLeft");
+    expect(e.selected).toBe("ta");
+
+    e.killTo("wordLeft");
+
+    // **Extending moved the cursor**, because the head *is* the cursor — so
+    // the motion runs from 8 and takes `be`. Cutting the region would take
+    // `ta`, and the kill buffer is the only thing that distinguishes them:
+    // both leave a buffer of the same length.
+    expect(e.killBuffer, "the motion's text, not the region's").toBe("be");
+    expect(e.text).toBe("alpha ta");
+    expect(e.selection).toBeNull();
+  });
+
+  it("T1.31 (I22, I16): a region does not survive an undo — and the kill buffer does", () => {
+    // **Both in one row, in opposite directions.** A rule that collapses
+    // everything satisfies the first half and fails the second; one that
+    // collapses nothing does the reverse. Only the pair pins it.
+    const e = createEditor({ text: "alpha beta", cursor: 10 });
+
+    e.killTo("wordLeft");
+    expect(e.killBuffer).toBe("beta");
+
+    e.extend("charLeft");
+    e.extend("charLeft");
+    expect(e.selection).not.toBeNull();
+
+    e.undo();
+
+    expect(e.selection, "the caret has moved; the region pointed at other text").toBeNull();
+    expect(e.killBuffer, "the clipboard is not undo state (I16)").toBe("beta");
+  });
+});

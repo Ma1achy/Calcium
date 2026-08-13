@@ -1101,6 +1101,25 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "diagnostics, and already an explicit exception in C16 T2.14's non-editing list",
   "IdentityLoop.warned": "diagnostics; its own declaration says so and C22 T3.12 reads it",
 
+  // **The region, published before the two things that read it** (C17 I21).
+  // Entry 15 step 3 — copy writing the kill buffer — and roadmap entry 23 —
+  // the wash — are its consumers, and neither exists. Published now rather
+  // than later because I21 cannot be *stated* without it: "an extending motion
+  // never moves the anchor" is a claim about a value, and a model whose only
+  // observable is `cursor` cannot distinguish the defect the whole shape was
+  // built against.
+  //
+  // **Its sibling `LineEditor.selected` is NOT here, and that is a finding
+  // rather than an inconsistency.** MG24 matches by name, and `KeyEffects.selected`
+  // — C19's menu row — carries the same one, so the rule reads it as consumed
+  // and says nothing. Measured the day both landed: F105/F160's blind spot as a
+  // live false negative in new code, not a hypothetical. The list is compared by
+  // equality, so adding it here would fire MG24's own bidirectional arm.
+  "LineEditor.selection":
+    "C17 I21 — the region, read by entry 15 step 3 (copy) and entry 23 (the wash); " +
+    "published now because I21 is unstateable without it, and the equality arm removes " +
+    "this entry the day either consumer lands",
+
   // **Four more, and comments were the only thing hiding them.** MG24 counted a
   // name inside a comment as a consumer until the day it stopped; these four
   // fired on the first run that stripped prose, in shipped code, alongside the

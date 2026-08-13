@@ -270,6 +270,31 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   { target: "pushedView", key: { name: "down" }, action: "viewPageDown" },
   { target: "pushedView", key: { name: "escape" }, action: "viewPop" },
 
+  // --- selection (C17 §5b, entry 15 step 2) --------------------------------
+  //
+  // **Every wire form here was pressed through the real decoder before it was
+  // written down** (T2.13, T2.14), and the check cost two of the four rows it
+  // was given: `⇧⌃a`/`⇧⌃e` for line start and end are ctrl+shift+letter, which
+  // is the same `0x01` that killed `⌃⇧a`. `⇧Home`/`⇧End` replace them and are
+  // what GUI editors use anyway.
+  //
+  // **`⌥⇧←` has two wire forms and they disagreed until step 0.** A terminal
+  // sending Option as Alt gives `CSI 1;4D`; one sending it as Meta gives
+  // `CSI 1;10D`, which the decoder read as `⇧←` because `modifiersOf` never
+  // looked at xterm's bit 8. Both forms are in T2.13's table so the row cannot
+  // pass on half the terminals.
+  { target: "prompt", key: { name: "left", shift: true }, action: "extendCharLeft" },
+  { target: "prompt", key: { name: "right", shift: true }, action: "extendCharRight" },
+  { target: "prompt", key: { name: "left", meta: true, shift: true }, action: "extendWordLeft" },
+  { target: "prompt", key: { name: "right", meta: true, shift: true }, action: "extendWordRight" },
+  { target: "prompt", key: { name: "home", shift: true }, action: "extendLineStart" },
+  { target: "prompt", key: { name: "end", shift: true }, action: "extendLineEnd" },
+  // **`⌥a`, not `⌃⇧a`.** `⌃a` is line-start in every readline application and
+  // `⌃⇧a` is the same byte, so the row would have resolved against `home` and
+  // one of the two would silently never run. Not a collision — the byte has a
+  // meaning.
+  { target: "prompt", key: { name: "a", meta: true }, action: "selectAll" },
+
   // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
   //
   // **`⌥v` is PROVISIONAL and the word is load-bearing.** Which key enters copy

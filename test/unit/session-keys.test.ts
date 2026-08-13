@@ -204,6 +204,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       "layout",
       "displayRows",
       "cursorCell",
+      // Readers of the selection, not operations on it (C17 §5b). `extend` and
+      // `selectAll` are the bound half and are covered above; these two are
+      // what step 3's copy and entry 23's wash will read.
+      "selection",
+      "selected",
       // Diagnostics, and C16's `lastStages` precedent.
       "undoDepth",
       "redoDepth",

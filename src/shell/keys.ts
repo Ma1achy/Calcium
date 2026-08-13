@@ -712,6 +712,19 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       refreshSearchLayer();
     },
 
+    // --- selection (C17 §5b, I21) ------------------------------------------
+    //
+    // **Seven rows and no logic**, which is the point: `extend` is `move` with
+    // the anchor held inside C17, so nothing here decides anything and there is
+    // no second place for the two to disagree.
+    extendCharLeft: () => void deps.editor.extend("charLeft"),
+    extendCharRight: () => void deps.editor.extend("charRight"),
+    extendWordLeft: () => void deps.editor.extend("wordLeft"),
+    extendWordRight: () => void deps.editor.extend("wordRight"),
+    extendLineStart: () => void deps.editor.extend("lineStart"),
+    extendLineEnd: () => void deps.editor.extend("lineEnd"),
+    selectAll: () => void deps.editor.selectAll(),
+
     // --- copy mode (C16 §5b) -----------------------------------------------
     //
     // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
