@@ -873,25 +873,13 @@ export async function constructGraph(
     // **It also only ever saw the top level**, so a table inside a `panel` could
     // not be focused at all. `elementsIn` recurses because the registry already
     // walks children for `measure` and `render` (C26 §8b.5).
-    liveRows: () => liveElements().map((f) => f.element.id),
-    /**
-     * **Beside `liveRows`, because it is the same question** (C23 I37, F21).
-     * That comment says this is the one place that knows a live entry's blocks;
-     * a second walk elsewhere would be a second answer to *what is here*, and
-     * the two would disagree the first time a block kind became navigable.
-     *
-     * The first action, per C23 I37 — C04 I19 makes `fill` the default kind, so
-     * a well-formed row's first action is the one `enter` should do.
-     */
-    liveRowAction: (rowId: string) => {
-      const id = stores.transcript.liveId;
-      if (id === null) return null;
-      // `activate` is the element's own, declared by the kind rather than dug
-      // out of a row shape this layer would otherwise have to know (C26 §5).
-      const found = liveElements().find((f) => f.element.id === rowId);
-      const action = found?.element.activate;
-      return action === undefined ? null : { action, from: id };
-    },
+    // **One dep where there were two** (C26 §8b.7). `liveRows` mapped this to a
+    // flat list of ids and `liveRowAction` walked it again by id — two answers
+    // to *what is here*, in the file whose comment named that hazard. The
+    // second's stated reason (cheap on arrows, expensive on `enter`) was
+    // falsified by this very walk: both call `liveElements()`.
+    liveElements,
+    liveEntryId: () => stores.transcript.liveId,
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
     onAction: (action, from) => {
       pipeline.onAction(action, from);

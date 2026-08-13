@@ -33,6 +33,7 @@ import { focusKey } from "./render-cache.js";
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import { contextAt } from "../interaction/completion/index.js";
+import { resolveFocus } from "../interaction/router/focus.js";
 import { PROMPT_GUTTER } from "./config.js";
 import { createIdentityLoop } from "./identity.js";
 import {
@@ -727,11 +728,18 @@ function focusFor(graph: Graph, entryId: string): FocusState | null {
   //
   // It also stopped at the top level, so a table inside a `panel` was never told
   // it held focus and drew no highlight for a row the reader had moved to.
-  const found = graph.liveElements().find(
-    (f) => stored.rowId === null || f.element.id === stored.rowId,
-  );
+  //
+  // **And it manufactured the block half of the address by searching for the
+  // first element whose id matched** (C26 §8b.7), so with two tables each
+  // carrying `r1` the highlight drew on the first while focus was on the second.
+  // `resolveFocus` is the same function the key effects use, which is what makes
+  // *what is highlighted* and *where the next arrow goes* one answer rather than
+  // two that agree — and it writes nothing, because this runs per frame.
+  const elements = graph.liveElements();
+  const i = resolveFocus(stored.element, elements);
+  const found = i === null ? undefined : elements[i];
   if (found === undefined) return null;
-  return Object.freeze({ blockId: found.blockId, rowId: stored.rowId });
+  return Object.freeze({ blockId: found.blockId, rowId: found.element.id });
 }
 
 /** What `session` reads before the graph exists — §9's `created` state. */

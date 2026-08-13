@@ -10,6 +10,7 @@ import { createFocusStore } from "../../src/interaction/router/focus.js";
 import { createKeymap } from "../../src/interaction/router/keymap.js";
 import { createRouter, type Placed, type RouterDeps } from "../../src/interaction/router/router.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
+import { addr } from "../support/focus.js";
 
 const key = (name: string, mods: Partial<Key> = {}): InputEvent => ({
   kind: "key",
@@ -280,7 +281,7 @@ describe("C16 §5 — the ladder, as handlers on their targets", () => {
 
   it("T1.14: Ctrl-C in the live block returns focus to the prompt, keeping the buffer", () => {
     const { router, focus, calls } = harness({ promptHasText: () => true });
-    focus.enterLiveBlock("r3");
+    focus.enterLiveBlock(addr("r3"));
 
     expect(router.dispatch(ctrlC)).toBe(true);
     expect(focus.current).toEqual({ at: "prompt" });
@@ -361,7 +362,7 @@ describe("C16 §7 — the arming machine observes before dispatch", () => {
 describe("C16 §4 — mouse routes by position", () => {
   it("T1.3c, T1.3d (I3): a click resolves by position, not by focus", () => {
     const { router, layer, focus } = harness();
-    focus.enterLiveBlock("r0");
+    focus.enterLiveBlock(addr("r0"));
 
     router.dispatch(click(3));
     expect(router.lastStages, "row 3 of the region is row 2 of the transcript").toContain(
@@ -461,7 +462,7 @@ describe("C16 — the dispatch trace, run against the implementation", () => {
     step("down (menu open)", key("down"));
     layer.top = null;
     step("down (menu gone)", key("down"));
-    focus.enterLiveBlock("r1");
+    focus.enterLiveBlock(addr("r1"));
     step("s (block keymap)", key("s"));
     step("ctrl-c (live block)", ctrlC);
     step("click row 2", click(3));

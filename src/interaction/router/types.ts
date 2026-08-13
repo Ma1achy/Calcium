@@ -45,6 +45,48 @@ export type FocusTarget =
   | "global";
 
 /**
+ * Where focus is, as a thing that can be resolved (C26 I10, §8b.7).
+ *
+ * **`FocusState` in C09 was already this shape**, `{blockId, rowId}`, because a
+ * block has to be told whether the focus it is handed is its own (C11 I14). The
+ * store held only the second half and `session.ts` re-derived the first by taking
+ * the **first** element whose id matched — so two tables each carrying `r1` gave
+ * `↓` onto the second's row, the highlight on the first's, and the next `↓`
+ * continuing from the first's position.
+ *
+ * **The defect was never that ids collide.** C04 I31 makes a row id unique within
+ * its table and says nothing across blocks, so two tables sharing `r1` are
+ * well-formed. It was that one type was the address and the other was half of it,
+ * joined by a search — and the remedy is that the stored form stops being
+ * narrower than the form it is rendered as, not a uniqueness rule anywhere.
+ *
+ * Unique with no new rule: C04 I14 makes block ids unique across the document,
+ * nested children included, and C26 I6 makes element ids unique within a block's
+ * own declaration.
+ *
+ * **`elementId` rather than `id`, because A03 MG24 matches published members by
+ * *name*** — so `blockId` here would be satisfied by any of `FocusState.blockId`'s
+ * readers and the rule could say nothing about it, while `elementId` is a name
+ * nothing else carries.
+ *
+ * **The reasoning is right and it guaranteed nothing until this declaration was
+ * reformatted, which was measured rather than assumed.** Written on one line —
+ * `Readonly<{ blockId: string; elementId: string }>` — a fabricated unconsumed
+ * member passes `make enforce` clean, in the `export interface` form too.
+ * **MG24's member walk only sees a multi-line declaration**, so the line shape
+ * decides whether a published type is watched at all. Broken across lines it
+ * fires, which is why it is written this way and must stay so. FINDINGS F159.
+ *
+ * The naming argument stands and is kept; the sentence that used to follow it —
+ * *therefore this member is checked* — did not, and a correct justification
+ * attached to a guarantee nobody verified is F84's shape one rule over.
+ */
+export type ElementAddress = Readonly<{
+  blockId: string;
+  elementId: string;
+}>;
+
+/**
  * The one stored piece of focus state (C16 §3, I1).
  *
  * A *location*, not a bit — which row holds focus inside the live block is part
@@ -65,7 +107,12 @@ export type StoredFocus =
    * invariant about interaction mode holds trivially while nothing can enter
    * it, and the day something can is the day it is first tested for real.
    */
-  | Readonly<{ at: "liveBlock"; rowId: string | null; mode: "navigate" | "interact" }>;
+  | Readonly<{
+      at: "liveBlock";
+      /** `null` — in the block, on no element yet. */
+      element: ElementAddress | null;
+      mode: "navigate" | "interact";
+    }>;
 
 export type InputEvent =
   | Readonly<{ kind: "key"; key: Key }>

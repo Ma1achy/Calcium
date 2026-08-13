@@ -12,7 +12,7 @@
  * the commit where both files exist. `FOCUS_ORDER` below is that single artefact.
  */
 
-import type { FocusTarget, StoredFocus } from "./types.js";
+import type { ElementAddress, FocusTarget, StoredFocus } from "./types.js";
 
 /**
  * What `activeTarget` needs to know, structurally.
@@ -84,6 +84,73 @@ export function activeTarget(deps: FocusInputs): FocusTarget {
 }
 
 /**
+ * What resolution needs of an element list, structurally (C26 I10).
+ *
+ * **Structural rather than an import of `NavElement`, on the argument this file
+ * already makes for `FocusInputs`**: taking the shape by structure keeps purity a
+ * property of the signature, and keeps a file about stored focus free of an edge
+ * into `presentation/`. One decision applied twice, not a second one that agrees.
+ */
+export type PlacedElement = Readonly<{
+  blockId: string;
+  element: Readonly<{ id: string }>;
+}>;
+
+/**
+ * Which element an address names, **or the nearest survivor forward** (C26 I10).
+ *
+ * Exact match on both halves first. On no match the address is stale — a refresh
+ * replaced the block under it (`putBlock` is total and never throws, so nothing
+ * signals that the element went) — and resolution falls **forward** to the next
+ * element in the list.
+ *
+ * *Nearest* is the list's own order and not a second notion of distance: the list
+ * is in reading order by C26 I5, so the two cannot disagree.
+ *
+ * **One resolver for the render side and the key side, because neither can own
+ * it.** `focusFor` is a per-frame read and must write nothing, so a fall-forward
+ * computed there would leave the store holding a dead address and the next `↓`
+ * counting from it — the collision this replaced, one layer over. A fall-forward
+ * that *did* write would put a mutation inside a render query. Both call this,
+ * display and the next keystroke agree by construction, and the store is repaired
+ * by the next focus-moving keystroke. Same argument as `elements` itself: one
+ * source, or they disagree (C26 I8).
+ *
+ * Returns an **index**, because every caller wants either the element or its
+ * neighbours and only the index answers both.
+ */
+export function resolveFocus(
+  address: ElementAddress | null,
+  elements: readonly PlacedElement[],
+): number | null {
+  if (elements.length === 0) return null; // graphemes-ok: an element count, not text
+  // **In the block, on no element yet** — entry's own state, not a stale address.
+  // It resolves to the first element rather than to nothing, so `↓` from here
+  // moves to the second and not back to the top.
+  if (address === null) return 0;
+
+  const exact = elements.findIndex(
+    (p) => p.blockId === address.blockId && p.element.id === address.elementId,
+  );
+  if (exact !== -1) return exact;
+
+  // Stale — the element went. **Its position went with it**, and that is the
+  // limit on how fine this can be: the list is the new one, so there is no index
+  // to count from and nothing says where the missing element used to sit. The
+  // block is therefore the finest scope resolution can honour, and saying so is
+  // better than an arithmetic that looks precise and is guessing.
+  //
+  // The block survives — a row was removed from a table the reader is still
+  // looking at — so focus stays in it, at its first element.
+  const inBlock = elements.findIndex((p) => p.blockId === address.blockId);
+  if (inBlock !== -1) return inBlock;
+
+  // The block itself went. Nothing about the old position survives, so this
+  // falls to the start of what is there rather than pretending to a neighbour.
+  return 0;
+}
+
+/**
  * The one piece of stored focus state in the system (§3).
  *
  * A location rather than a bit: when focus is in the live block, which row holds
@@ -99,8 +166,8 @@ export interface FocusStore {
   readonly current: StoredFocus;
   /** Called by L4 on append. The whole of I2. */
   reset(): void;
-  /** `↓` from the prompt. `null` row means "the block, no row yet". */
-  enterLiveBlock(rowId: string | null): void;
+  /** `↓` from the prompt. `null` means "the block, no element yet". */
+  enterLiveBlock(element: ElementAddress | null): void;
   /**
    * **The reader stepped out**, and it is not `reset()` (C26 I13).
    *
@@ -116,8 +183,8 @@ export interface FocusStore {
    * C26 §8b.2.
    */
   toPrompt(): void;
-  /** Row navigation within the live block; a no-op at the prompt. */
-  focusRow(rowId: string | null): void;
+  /** Movement between elements; a no-op at the prompt. */
+  focusRow(element: ElementAddress | null): void;
   /**
    * Enter or leave interaction mode on the focused row (C26 I2, I14).
    *
@@ -140,15 +207,15 @@ export function createFocusStore(): FocusStore {
     reset() {
       stored = AT_PROMPT;
     },
-    enterLiveBlock(rowId) {
+    enterLiveBlock(element) {
       // Entry is always into navigation. Landing in interaction would give the
       // block every key before the reader has seen where focus went.
-      stored = Object.freeze({ at: "liveBlock", rowId, mode: "navigate" });
+      stored = Object.freeze({ at: "liveBlock", element, mode: "navigate" });
     },
     toPrompt() {
       stored = AT_PROMPT;
     },
-    focusRow(rowId) {
+    focusRow(element) {
       // Deliberately a no-op at the prompt rather than a way in. Entering the
       // live block is `↓`'s decision and belongs to one call, or a row focus
       // arriving from a stale handler would move focus without a keystroke.
@@ -157,11 +224,11 @@ export function createFocusStore(): FocusStore {
       // escape read from the other end: a mode belongs to the element it was
       // entered on, and carrying it to the next row would make `↓` mean
       // something different depending on how the reader arrived.
-      stored = Object.freeze({ at: "liveBlock", rowId, mode: "navigate" });
+      stored = Object.freeze({ at: "liveBlock", element, mode: "navigate" });
     },
     setMode(mode) {
       if (stored.at !== "liveBlock") return;
-      stored = Object.freeze({ at: "liveBlock", rowId: stored.rowId, mode });
+      stored = Object.freeze({ at: "liveBlock", element: stored.element, mode });
     },
   };
 }

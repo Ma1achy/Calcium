@@ -17,6 +17,7 @@ import { createFocusStore } from "../../src/interaction/router/focus.js";
 import { createKeymap } from "../../src/interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../../src/interaction/router/router.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
+import { addr } from "../support/focus.js";
 import { measureSequence, rowsDoc } from "../support/viewport.js";
 import { registry, rows } from "../support/overlay.js";
 
@@ -127,7 +128,7 @@ describe("C16 integration", () => {
   it("T4.5 (with C13): focus enters the live block and an append returns it", () => {
     const { store, router, focus } = world();
     store.append(rowsDoc(3, "a"));
-    focus.enterLiveBlock("r1");
+    focus.enterLiveBlock(addr("r1"));
     expect(router.target).toBe("liveBlock");
 
     // One `append()` — which C13 reports as more than one change. Nothing here
@@ -152,7 +153,7 @@ describe("C16 integration", () => {
     expect(entries.find((e) => e.id === first)?.streaming, "still streaming").toBe(true);
     expect(entries.find((e) => e.id === first)?.live, "and frozen all the same").toBe(false);
 
-    focus.enterLiveBlock("r0");
+    focus.enterLiveBlock(addr("r0"));
     expect(router.target).toBe("liveBlock");
     // The focusable block is whichever C13 says is live — never the frozen one,
     // whether or not it is still receiving patches.
