@@ -7434,7 +7434,50 @@ means reconstructing the menu-over-diff state, which is a row of its own.
 
 ---
 
-## F159 — MG24 does not see a single-line type declaration, so the line shape decides what is watched ★★★
+## F159 — MG24 does not see a single-line type declaration, so the line shape decides what is watched ★★★ — **CLOSED**
+
+### CLOSED — the walk reads a member, not a line, and the report is the deliverable
+
+`interfaceMembers` now segments a declaration body at depth 0 on a newline **or a
+separator**, so the line shape decides nothing. The line walk is subsumed: every segment
+begins at depth 0 by construction, which is what the old `atTop` flag asserted, and F95's
+guard survives untouched because a parameter list sits inside `(` and never returns to
+depth 0.
+
+**What widening the gate found, read rather than assumed clean.** 46 members entered the
+population — the second-and-later members of the 40 single-line declarations — and
+**45 of the 46 were already consumed**. One fired:
+
+`Redaction.fired` (`src/interaction/history/redact.ts:23`), and its own declaration three
+lines above had already said what it was: *"which rule fired, for T2.12 — a right answer
+through the wrong rule is a redactor about to give a wrong one."* `test/contract/history.test.ts:17`
+is the only reader. That is the diagnostics category `UNCONSUMED_MEMBERS` already carries
+four entries for, so the disposition is an exemption with a reason rather than a concession.
+
+**One violation from 46, against 38 from MG24's first widening.** The smaller number is
+reported because it is the number: this widening reached members of types that were
+already mostly wired, where F84's reached a keyword's worth of unexamined surface.
+
+**And the widening cost something before it paid.** Splitting at a separator means a `,`
+inside a sentence starts a segment mid-prose, and the probe produced three phantoms —
+`CompletionEngine.synchronously`, `Pipeline.appended`, `TuiConfig.wired` — from comments
+the line walk could not match because a comment line begins `*` or `//`. A phantom is the
+worst shape a violation takes (F95): it cannot be wired and cannot be deleted, so an
+exemption is the only resolution and it justifies something that does not exist.
+`interfaceMembers` now strips prose before reading structure, which `checkSeamConsumers`
+had done on the *consumer* side since MG25's trap was carried over and had never done on
+the declaration side. Both rows are in `test/unit/enforce-rules.test.ts`; the one that
+matters was **shown to fail against the old walk** before it was trusted.
+
+**The stated limit, because an unrecorded one reads as strength.** `<` and `>` are not
+depth-counted — they cannot be, without `=>` and comparisons breaking it — so a top-level
+comma inside `Map<string, number>` does split, into ` number>`, which needs a `:` or `(`
+after the identifier and matches nothing. **The failure mode is a member missed, never one
+invented.** The comma arm adds **0 members over the semicolon arm on this tree**: it is
+there because `Readonly<{ a: X, b: Y }>` is legal, not because anything writes it.
+
+---
+
 
 **Found by running the check rather than by reading it.** C26 stage 3 added
 `ElementAddress` with a note arguing that `elementId` was named so MG24 could say
@@ -7482,7 +7525,73 @@ the mechanism runs reads exactly like one that holds.
 
 ---
 
-## F160 — MG24 matches published members by name, so any file can create a false negative ★★★
+## F160 — MG24 matches published members by name, so any file can create a false negative ★★★ — **CLOSED as one class with F105**
+
+### CLOSED — the class, not the instance, and not by tightening
+
+**F105 and F160 are one mechanism measured twice**, which is this repo's own threshold for
+closing a kind rather than adding a second arm. F105 saw the false-positive direction — a
+frozen marker table gained the keys `changed` and `removed`, two unrelated `CorpusDiff`
+members read as consumed, and the equality arm caught it. F160 is the same matching in the
+direction that does not announce itself. Two instances fitting a rule is the minimum for
+noticing one, and the third case is what usually breaks the axis; here the third case broke
+the **remedy** instead.
+
+**Three tightenings measured, all three rejected, with the figures so nobody re-derives them:**
+
+| tightening | why not |
+|---|---|
+| scope the shorthand arm to files naming the owner | 19 false violations, all the `*Deps` record built inline at a call site — F105 measured this |
+| key by `(owner, name)` exactly | needs a receiver's **type**; no regex over source has one |
+| restrict a consumer to import-reachable files | 93 flagged, dominated by the deps-injection pattern that **is** this architecture |
+
+The third is new and the reason it fails is worth having. `keys.ts:658` calls
+`deps.viewport.scrollToTop()` and imports no viewport module at all — the deps record is
+typed structurally in `keys.ts` itself. That member is **C16 I23, one of MG24's four
+founding instances**, so the arm's very first false positive is the rule's own reason for
+existing. L4 wires by injection; a consumer never imports its producer, and any rule
+assuming otherwise is describing a different architecture.
+
+### The remedy F160 proposed does not key uniquely either
+
+**F160 named the looseness correctly and its fix assumed a uniqueness the tree does not
+have** — C23 §8a A4's shape, an artefact right about what it found and wrong about a
+mechanism it assumed existed. Three owner names are declared twice under `src/`:
+
+```
+Placed              viewport/overlay/types.ts:78   ·  interaction/router/router.ts:20
+Token               interaction/parser/types.ts:43 ·  presentation/blocks/kinds/code.ts:133
+ConformanceReport   testing/boundary-conformance.ts:43 · testing/measurement-conformance.ts:85
+```
+
+Seven `owner.name` pairs collide, which is **exactly the gap between the seam signal's 1157
+and the exactness signal's 1150** — the two numbers now print on adjacent lines, and this is
+why they differ.
+
+### What closes it: the reach, computed every run
+
+Exact, cheap, and needing no type analysis — **a member name declared by one owner is
+matched unambiguously and the rule is exact about it**; a name several owners declare is
+where a consumed verdict may belong to a sibling. That set is the blind spot's reach.
+
+```
+name exactness · MG24 is exact for 376/1150 members; the rest share a name with
+another owner — id (30), kind (23), text (15), capabilities (13), width (10)
+```
+
+**33%.** Too large to gate on — the same call C24 I11 makes for the unused-export scan and
+F94 makes for the seam signal: a signal that broad describes the architecture, not a defect,
+so it is reported and not enforced.
+
+**Printed rather than filed, and that is the mechanism.** Both these findings came out of a
+claim written in a comment that was still a belief. A number in prose is a snapshot with no
+mechanism (F142); a number recomputed on every run moves when the tree does, and a fall in
+exactness is a component having grown a surface named like everything else — worth a look
+rather than a failure. The blind spot was invisible for the same reason F159's was: **a
+clean run looks identical either way**, and now it does not.
+
+---
+
 
 **Found in C26 stage 2, and it is the other direction from F159.** F159 is about which
 declarations MG24 *reads*; this is about how it *compares* what it read.
