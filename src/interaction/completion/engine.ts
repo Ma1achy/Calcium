@@ -77,6 +77,21 @@ export type EngineOptions = Readonly<{
   /** One line per failure, not per keystroke (T3.6). */
   onSourceError?: (sourceId: string, error: unknown) => void;
   cache?: CompletionCache;
+  /**
+   * When a candidate's value was last run, or `null` for never (I26).
+   *
+   * **A function of one argument, not C20's store**, and the reason is the
+   * layer. C19 and C20 are both L3, so an edge between them is sideways —
+   * legal while it stays acyclic (A02 §1), and a store handle is an invitation
+   * to reach for `list()`, `search` or the navigation cursor the first time
+   * something looks convenient. This cannot grow into one. Same argument
+   * `FocusInputs` makes for taking C15's layer and C13's entry structurally.
+   *
+   * **Optional, and absent means unranked.** An engine built without it orders
+   * exactly as it did before I26, which is what lets C22 wire it in one place
+   * and every test that does not care about ordering keep its fixture.
+   */
+  recency?: (value: string) => number | null;
 }>;
 
 function longestCommonPrefix(values: readonly string[]): string {
@@ -102,6 +117,54 @@ function dedupe(candidates: readonly Candidate[]): readonly Candidate[] {
     out.push(c);
   }
   return Object.freeze(out);
+}
+
+/**
+ * Most-recently-run first, source order underneath (I26, §3a).
+ *
+ * **A refinement of source order rather than a replacement**, which is the whole
+ * of why this is safe to land without a second ruling about ties. Never-run
+ * candidates all compare equal and a stable sort leaves them exactly as they
+ * arrived — so on a fresh session, where every value is `null`, the menu is
+ * identical to the one before I26.
+ *
+ * **After `dedupe`, and the mutation pass proved that is a preference rather than
+ * a constraint.** The first version of this comment said ranking first would let
+ * the *later* source's copy win the position and reverse T3.18. It would not:
+ * `recency` is a function of the **value**, so two copies of one value carry
+ * identical keys, and a stable sort leaves the first where it was. Swapping the
+ * two steps is behaviourally equivalent, and the mutation that swaps them
+ * survives — a finding about the sentence, not about the tests (`tools/mutate/
+ * runs/c19-ranking.mjs`).
+ *
+ * It stays in this order because sorting a list you are about to shorten is work
+ * for nothing, which is a real reason and a much smaller one than the sentence it
+ * replaces. **A correct-sounding justification for a decision it does not
+ * constrain reads exactly like one that holds**, and only asking whether it can be
+ * violated tells them apart.
+ *
+ * `Array.prototype.sort` is specified stable, so the order among equals is the
+ * input's. Stated because the guarantee is what the rule rests on and it reads
+ * like an implementation detail.
+ */
+function rank(
+  candidates: readonly Candidate[],
+  recency: EngineOptions["recency"],
+): readonly Candidate[] {
+  if (recency === undefined) return candidates;
+  const at = new Map(candidates.map((c) => [c.value, recency(c.value)]));
+  return Object.freeze(
+    [...candidates].sort((a, b) => {
+      const x = at.get(a.value) ?? null;
+      const y = at.get(b.value) ?? null;
+      if (x === y) return 0;
+      // Never-run sorts after every timestamp, in both directions, so the
+      // comparator stays a total order rather than answering `0` for one arm.
+      if (x === null) return 1;
+      if (y === null) return -1;
+      return y - x;
+    }),
+  );
 }
 
 export function createEngine(opts: EngineOptions): CompletionEngine {
@@ -145,7 +208,7 @@ export function createEngine(opts: EngineOptions): CompletionEngine {
         opts.onSourceError?.(source.id, error);
       }
     }
-    return dedupe(matching(out, ctx.prefix));
+    return rank(dedupe(matching(out, ctx.prefix)), opts.recency);
   }
 
   return {
@@ -203,7 +266,7 @@ export function createEngine(opts: EngineOptions): CompletionEngine {
 
       for (const settled of await Promise.all(calls)) results.push(...settled);
 
-      const candidates = dedupe(matching(results, ctx.prefix));
+      const candidates = rank(dedupe(matching(results, ctx.prefix)), opts.recency);
       const superseded = active !== requested;
 
       return Object.freeze({
