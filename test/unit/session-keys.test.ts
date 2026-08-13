@@ -79,6 +79,8 @@ function openOverlay(graph: Graph): void {
     placement: { kind: "centred" },
     content: [],
     dismissable: true,
+    // Declared, because a centred layer must be (C15 I20).
+    width: 20,
   });
 }
 

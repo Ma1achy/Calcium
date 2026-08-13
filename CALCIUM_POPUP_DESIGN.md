@@ -230,6 +230,39 @@ menu. A merge that picks one either invents an answer or hangs a handler.
 carries a selection that is never `null`. That is a constructor-level pairing, not a runtime
 check, and it is the one thing here that no test could have found before the type existed.
 
+### 6e — A7 answered, and it is not a fourth parameter
+
+**The empty list's two dispositions fall out of `onSelect`'s arm**, so the ruling is one
+sentence and the parameter list stays at three.
+
+**An empty list is a construction error exactly when the list is the only path to the
+answer.** `resolve(key)` — the confirm, the question over choices — has no other path, so
+`ask()` rejecting is right: inventing a key would put a value in the handler's hands that no
+caller wrote. `insert` and `none` — the menu, the peek — are showing what is available, so an
+empty set means *nothing to show*, and C15 omits a zero-row layer without dismissing anything
+(C15 I15). Both behaviours are already in the tree and neither has to change.
+
+**And the case that shows the axis is not `onSelect` wholesale is A3's free-text question.**
+`resolve(text)` takes its answer from an editor rather than from the list, so a question with
+zero choices is legitimate there — the same arm that makes an empty confirm an error makes an
+empty free-text question ordinary. Which is why the rule is stated about *where the answer
+comes from* rather than about which arm is set: a partition over `onSelect`'s four values would
+have put `resolve(text)` on the wrong side, and only the third instance shows it.
+
+### 6f — And placement is live in the type with nothing keeping it current
+
+Found while ruling on B6, by asking who writes a placement rather than who may. The prompt's
+anchor is recomputed on every keystroke — `showMenu` passes `deps.anchor()` and `update`
+carries the placement with the content — and **the resize path does not**. `construct.ts`'s
+`onResize` resizes the viewport and commits a frame; nothing refreshes an open layer's
+`placement.row`, and `redrawMenu` sends content alone.
+
+So a resize with the completion menu open leaves it anchored to the **previous** region height
+until the next keystroke. C15 clamps, so nothing faults and no number is inconsistent — the
+menu is simply in the wrong place, which is the class every `Placed` defect in this component
+has belonged to. Filed rather than fixed here: it is C19's wiring and not entry 16's, and the
+fix is one call rather than a mechanism.
+
 ### 6d — And there is a fifth producer, which is a second confirm
 
 `clearConfirmLayer` (`src/interaction/history/layers.ts:95`) is centred, non-dismissable, and

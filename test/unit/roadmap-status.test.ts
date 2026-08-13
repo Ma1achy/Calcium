@@ -211,10 +211,10 @@ describe("roadmap-status — the Order column's verifier", () => {
     // signal asserted only against itself passes whatever it reports, which is the
     // shape RS1 already had to be rewritten for.
     const before = /grep reach · (\d+)\//u.exec(run().out)?.[1];
-    const given = mutate(
-      "which is the state the entry describes) · **22**",
-      "which is the state the entry describes) · **22** (no `b.art` in `src/`)",
-    );
+    // The anchor moved when 16 left the confirmed-OPEN list and took its
+    // parenthetical with it. Anchored on the bare id run now, which is the form
+    // an entry has *before* anyone gives it a symbol — the state under test.
+    const given = mutate("**9** · **11** · **22**", "**9** · **11** · **22** (no `b.art` in `src/`)");
     const after = /grep reach · (\d+)\//u.exec(run(given).out)?.[1];
     expect(Number(after), "22 now carries its own symbol").toBe(Number(before) + 1);
   });

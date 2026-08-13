@@ -23,7 +23,7 @@
 import { block } from "../data/viewmodel/construct.js";
 import type { Block } from "../data/viewmodel/types.js";
 import type { InputEvent } from "../interaction/router/types.js";
-import type { Layer, OverlayManager } from "../viewport/overlay/index.js";
+import type { Layer, OverlayManager, Placement } from "../viewport/overlay/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
 import { cells } from "../presentation/text.js";
 
@@ -46,6 +46,18 @@ export const CONFIRM_WIDTH = 72;
 
 export type ConfirmDeps = Readonly<{
   overlays: OverlayManager;
+  /**
+   * The prompt's own span, for an anchored question (`AskOptions.placement`).
+   *
+   * The same seam C19's menu takes, and for its reason: `rows` is the prompt's
+   * extent rather than 1, because a two-row prompt has no single row that
+   * places an overlay correctly and both wrong answers produce a placement
+   * whose every number is self-consistent (C15 I17).
+   *
+   * Read at `ask` time and not held: it is a fact about the frame, and the
+   * frame moves.
+   */
+  anchor: () => Readonly<{ row: number; rows: number }>;
   /** The frame is L4's to commit; C15 never paints (A02 Seam 4). */
   invalidate: () => void;
 }>;
@@ -140,6 +152,37 @@ function render(opts: AskOptions, selected: number): readonly Block[] {
   return [block({ kind: "panel", id: "confirm-panel", title: "Confirm", children })];
 }
 
+/**
+ * The layer's placement and width together, because for this owner they are one
+ * decision (entry 16 A3, C15 I20).
+ *
+ * **Centred declares `CONFIRM_WIDTH`, and C15 I20 now refuses anything else.**
+ * Without it C15 gives a centred layer the region's width, so `Placed.left` is
+ * always 0 and the box reads as `fill` however it was placed — which is the
+ * appearance that made *the question covers its region* a tempting reading. The
+ * rule used to live in a comment here; it lives in `push` now, and this is the
+ * caller that stopped needing to remember it.
+ *
+ * **Anchored declares none, which is the menu's argument and not an omission**
+ * (C19 §"the menu spans the region"): a layer narrower than the region leaves
+ * whatever is behind it visible on the same rows, so a reader sees two
+ * unrelated things on one line. A question anchored to the prompt is chrome for
+ * the prompt, and the prompt spans the frame.
+ *
+ * `prefer: "above"` for C19's reason — the prompt is near the bottom by
+ * definition, and C15 flips when there is no room.
+ */
+function placementOf(
+  opts: AskOptions,
+  deps: ConfirmDeps,
+): Readonly<{ placement: Placement; width?: number }> {
+  if (opts.placement !== "anchored") {
+    return { placement: { kind: "centred" }, width: CONFIRM_WIDTH };
+  }
+  const at = deps.anchor();
+  return { placement: { kind: "anchored", row: at.row, rows: at.rows, prefer: "above" } };
+}
+
 export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let handler: ((e: InputEvent) => boolean) | null = null;
 
@@ -169,18 +212,9 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       const layer: Layer = {
         id: CONFIRM_LAYER_ID,
         kind: "overlay",
-        placement: { kind: "centred" },
+        ...placementOf(opts, deps),
         content: render(opts, selected),
         dismissable: false,
-        // **Declared, and the frame-read is why.** Without it C15 gives a
-        // centred layer the region's width, so `Placed.left` is always 0 and
-        // the box reads as `fill` however it was placed — which is the
-        // appearance the ruling was talking about when it said the question
-        // covers its region, and the reason that reading was tempting. C15
-        // clamps this to the region, so a narrow terminal still gets a box that
-        // fits (C15 I16: width is declared because the registry answers height
-        // at a width and never the reverse).
-        width: CONFIRM_WIDTH,
       };
 
       const disposable = deps.overlays.push(layer);

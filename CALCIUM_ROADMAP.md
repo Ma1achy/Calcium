@@ -2525,7 +2525,7 @@ BUILT 15 text selection + copy ★  BUILT 2026-08-13 in four steps plus a step 0
                                    B4 ruled: copy mode suspends FRAME COMMITS, not data —
                                    C23 I46's pause reaches polled parts and not a live stream,
                                    which is the case a reader most wants to copy from
-      16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
+PART  16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
                                    THREE parameters. C19's menu already has the flip, the
                                    selection and `… N more`; the confirm reimplements or lacks
                                    all of it. READ 2026-08-13 and it survives, with two
@@ -2558,7 +2558,22 @@ BUILT 15 text selection + copy ★  BUILT 2026-08-13 in four steps plus a step 0
                                    clearConfirmLayer (history/layers.ts:95) is a second
                                    confirm, in L3, with `(y/N)` in a notice's text and no
                                    choice list — published, tested, and pushed by nothing in
-                                   src/. CALCIUM_POPUP_DESIGN.md §6
+                                   src/. CALCIUM_POPUP_DESIGN.md §6.
+                                   STEP 1 BUILT 2026-08-13: the choices are a table, so the
+                                   marker is a slot and `capabilities` left ConfirmDeps with
+                                   the character it was there for. STEP 2 BUILT: C15 I20 — a
+                                   centred layer declares a width, refused at push AND at
+                                   update, which found the tree's second instance
+                                   (clearConfirmLayer declared none); and AskOptions gains
+                                   `placement: "centred" | "anchored"` — a CHOICE between
+                                   placements rather than a `Placement`, since anchored
+                                   carries row/rows that only the session can compute.
+                                   A7 ANSWERED and it is not a fourth parameter: an empty
+                                   list is a construction error exactly when the list is the
+                                   only path to the answer, which `resolve(text)` shows is
+                                   not a partition over onSelect's four values.
+                                   STILL OPEN: the flip and `…` for the confirm (step 3),
+                                   and the shared selection store
 PART  17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
                                    MAX_ROWS is the fallback adapter's alone. diffing → caching → window
                                    the block → cap with a marker. A CHAIN, in that order
@@ -2741,7 +2756,14 @@ PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    selects FOR name reuse. What could work is not a rule
                                    change — a SECOND CONSUMER written from the public
                                    surface names every field it uses, and the residue is the
-                                   candidates, by USE rather than by name. F160
+                                   candidates, by USE rather than by name. F160.
+                                   FOURTH INSTANCE, 2026-08-14, and it moved the WRONG WAY:
+                                   adding `AskOptions.placement` — a well-named field on a
+                                   PUBLIC type — collided with `Layer.placement` and took an
+                                   existing exact member OUT of exactness. Members 1177→1179,
+                                   exact 382→381. So the blind spot grows as the API grows,
+                                   which is the vocabulary argument arriving as a measurement
+                                   rather than as a prediction
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
@@ -2797,10 +2819,11 @@ what landed**.
 | 40 | BUILT | `afterEdit()` — `src/shell/keys.ts:185` — called by the composition root after every printable key and every paste, static sources only (C19 I3, T2.1a), which is the boundary this entry called *"the trigger, not the engine"*. `test/e2e/editor.test.ts` watches the menu open on a flag prefix in a real PTY | — |
 | 41 | BUILT | **both populations, one suggester.** `suggestName` — `src/data/manifest/validate.ts:147` — is the single distance-2 cutoff (C05 I18), read for unknown flags at `src/data/manifest/validate.ts:284` and unknown verbs at `src/interaction/parser/parse.ts:183`, sharing the tie-break so a second implementation cannot diverge. `test/unit/parser.test.ts` asserts distance 3 outside and 2 inside | — |
 | 23 | BUILT | **a surface with its own pairing, and the ruling it corrected.** `surfaces.selection` — `src/presentation/theme/tokens-dark.ts:36`, `#264057` at 7.25 : 1 against `tone.default` — is checked by `selectionPairs`, `src/presentation/theme/contrast.ts:158`, a **sibling** of `diffPairs` rather than an entry in it. The cells come from `selectionSpans` — `src/interaction/editor/layout.ts:167` — off the same walk `layout` uses, and `washed` in `src/shell/paint.ts:291` applies them after `exact` squares the row, which is where full-row rather than text-width comes from. `inverse` is the 1-bit rung. T4.22–T4.26 and T1.37–T1.41 | a `carries: "meaning"` **palette** cannot be a wash — `resolveBackground` refuses any ref that is not `surface.*`, so the entry named a mechanism C10 does not have (C10 §4b) |
+| 16 | PART | **two steps of four, and both were resized by the walk.** Step 1: the choices are a table — `choiceBlock` at `src/shell/confirm.ts:101` — so the marker is a `bullet` slot L1 resolves and `ConfirmDeps` no longer takes a capability record at all. Step 2: `assertPlaceable` at `src/viewport/overlay/manager.ts:167` refuses a centred layer with no width at **both** entry points (C15 I20), which found the tree's second instance — `clearConfirmLayer` at `src/interaction/history/layers.ts:95` declared none — and `AskOptions.placement` at `src/shell/local/registry.ts:44` is a choice between placements, resolved by `placementOf` in `src/shell/confirm.ts`. T1.21, T1.22, T4.12–T4.18 | the flip and `…` for the confirm, and the shared selection store. `… N more` is not portable: only a layer holding its own list can count (design §6 R2) |
 | 15 | BUILT | **four steps and a step 0, and the mode is a target throughout.** Copy mode: `#setCopyMode` holds the state at `src/shell/session.ts:586`, C03 gains `suspend`/`resume` at `src/terminal/frame-scheduler.ts:263` (§4a), C01 gains `setMouseTracking` at `src/terminal/lifecycle.ts:348` because nowhere else writes an escape. The prompt: an anchor plus the cursor, with `⌥a`/`⇧←`/`⇧Home` bound after `modifiersOf` — `src/interaction/router/decode.ts:113` — learned xterm's fourth bit. One clipboard: `copyText`, `src/interaction/editor/editor.ts:377`, written by `⌥w` and by the transcript's `copyElement`, `src/shell/keys.ts:778`, over a range held by `extendRow`, `src/interaction/router/focus.ts:246`, copying `rowCopyText`'s source text, `src/presentation/table/definition.ts:290`. The wash is entry 23 | OSC 52 is a separate axis and is not built: whether a copy **also** reaches the system clipboard is a capability question about the terminal, and it changes nothing about where the text lands in-process |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. **48** joins them measured rather than
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
 is open with its first candidate already refused. · **26**, **32** — the symbols the entries name are
@@ -2808,6 +2831,10 @@ absent · **45** — no `DECSCUSR`, no cursor-style escape and no `cursorStyle` 
 until C17's `cursorCell` is…"*, and `cursorCell` exists at `editor/layout.ts:134` · **44** —
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
 which is worth saying because it reads as coverage.
+
+**16 left this list on 2026-08-14**, marked PART. Two of its four steps landed, and the row it
+left on was *the confirm and the completion menu are two mechanisms* — which is still true of
+the selection and is no longer true of the marker, the placement or the width rule.
 
 **SIXTH SWEEP, 2026-08-13 — every OPEN entry taken to the reader rather than to the symbol.**
 Nineteen of twenty-one survive. Two did not, and **both are in the same class**: they name no

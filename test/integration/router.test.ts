@@ -88,7 +88,9 @@ describe("C16 integration", () => {
     overlays.push({
       id: "menu",
       kind: "overlay",
-      placement: { kind: "centred" },
+      // Anchored, because a menu is (C15 I20). It stood in for the completion
+      // menu as a centred layer with no width, which is neither.
+      placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: rows(3, "m"),
       dismissable: true,
     });
@@ -112,6 +114,9 @@ describe("C16 integration", () => {
       placement: { kind: "centred" },
       content: rows(2, "c"),
       dismissable: false,
+      // A centred layer declares its width (C15 I20), and a confirm is the
+      // shape that field exists for.
+      width: 20,
     });
 
     expect(router.target).toBe("overlay");
@@ -185,7 +190,9 @@ describe("C16 integration", () => {
     overlays.push({
       id: "menu",
       kind: "overlay",
-      placement: { kind: "centred" },
+      // Anchored, because a menu is (C15 I20). It stood in for the completion
+      // menu as a centred layer with no width, which is neither.
+      placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: rows(2, "m"),
       dismissable: true,
     });

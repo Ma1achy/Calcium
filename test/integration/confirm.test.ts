@@ -39,7 +39,7 @@ import { createViewport } from "../../src/viewport/viewport/index.js";
 import { createFocusStore } from "../../src/interaction/router/focus.js";
 import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../../src/interaction/router/router.js";
-import { createConfirmHost } from "../../src/shell/confirm.js";
+import { CONFIRM_WIDTH, createConfirmHost } from "../../src/shell/confirm.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { measureSequence } from "../support/viewport.js";
 import { registry } from "../support/overlay.js";
@@ -87,7 +87,7 @@ function world(over: Partial<RouterDeps> = {}) {
   const globalSeen: InputEvent[] = [];
   let cancels = 0;
 
-  const confirm = createConfirmHost({ overlays, invalidate });
+  const confirm = createConfirmHost({ overlays, anchor: () => ({ row: 8, rows: 1 }), invalidate });
 
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),
@@ -229,7 +229,11 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     w.overlays.push({
       id: "menu",
       kind: "overlay",
-      placement: { kind: "centred" },
+      // **Anchored, because a menu is** (C15 I20 made the placement a
+      // decision rather than a default). This stands in for the completion
+      // menu while the row is about routing; it was centred with no width,
+      // which is neither what a menu is nor a placeable layer.
+      placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: [],
       dismissable: true,
     });
@@ -379,6 +383,47 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(drawn.join("\n"), "`[no]` is whole").toContain("[no]");
     const at = (n: string): number => drawn.find((l) => l.includes(n))?.indexOf(n) ?? -1;
     expect(at("yes"), "and the labels still line up").toBe(at("no ") === -1 ? at("no") : at("no "));
+  });
+
+  it("T4.17 (entry 16 A3, A6, C15 I20): placement is a parameter, and width is not derived from it", () => {
+    // **Both arms in one row, because either alone is satisfied by a constant.**
+    // A confirm that is always centred passes an assertion about `left`; one
+    // that is always anchored passes an assertion about the anchor. And the
+    // widths are the claim's other half: the centred arm declares one, without
+    // which C15 refuses it (I20), and the anchored arm declares none, which is
+    // how a layer says *the whole region* — the menu's argument, since a
+    // question anchored to the prompt is chrome for the prompt.
+    const c = world();
+    void c.confirm.ask({ question: "q?", choices: YES_NO });
+    expect(c.overlays.top?.placement).toEqual({ kind: "centred" });
+    expect(c.overlays.top?.width).toBe(CONFIRM_WIDTH);
+
+    const a = world();
+    void a.confirm.ask({ question: "q?", choices: YES_NO, placement: "anchored" });
+    expect(a.overlays.top?.placement).toEqual({
+      kind: "anchored",
+      row: 8,
+      rows: 1,
+      prefer: "above",
+    });
+    expect(a.overlays.top?.width, "the whole region, as the menu does").toBeUndefined();
+  });
+
+  it("T4.18 (entry 16 A6, C15 I14): the anchored question is still not escapable", () => {
+    // **The pairing the walk's A6 names**, and the cell nothing in the tree
+    // produced until now: `dismissable: false` with `anchored`. Placement is a
+    // live parameter and escapability is a construction one (C15 I14, and
+    // `LayerUpdate` excludes it deliberately) — so moving the box must not
+    // move the flag. The symptom of getting this wrong is "the shell froze",
+    // three components from the cause.
+    const w = world();
+    const answer = w.confirm.ask({ question: "q?", choices: YES_NO, placement: "anchored" });
+    expect(w.overlays.top?.dismissable).toBe(false);
+    expect(w.overlays.pop(), "the router cannot take it").toBeNull();
+    expect(w.overlays.top?.id).toBe("confirm");
+
+    w.router.dispatch(key("escape"));
+    return expect(answer).resolves.toBe("n");
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {

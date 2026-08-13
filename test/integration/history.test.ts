@@ -41,6 +41,10 @@ describe("T4.3 (with C15) — the search overlay", () => {
       placement: { kind: "centred" },
       content: [{ kind: "raw", id: "later-row", text: "later" }],
       dismissable: true,
+      // Declared, because a centred layer must be (C15 I20). This stand-in is
+      // "a confirm, say" and a confirm has a width; it was reaching I16's
+      // fallback and standing in for a `fill` layer.
+      width: 20,
     });
 
     // **The caret is at the end of the query, and it moves with it** (C15 I19).

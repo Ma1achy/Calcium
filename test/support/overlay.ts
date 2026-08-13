@@ -57,6 +57,15 @@ export function anchored(
   };
 }
 
+/**
+ * **The width defaults to the region's rather than being absent** (C15 I20).
+ *
+ * A centred layer declares its width or is refused, and the default here is a
+ * decision rather than a way round the rule: the region's width is what every
+ * row using this helper was already getting, silently, from I16's fallback. So
+ * the number is the one these assertions were written against and now it is
+ * stated — and a row that is *about* centring passes its own, as T1.15 does.
+ */
 export function centred(
   id: string,
   height: number,
@@ -68,7 +77,7 @@ export function centred(
     placement: { kind: "centred" },
     content: rows(height, id),
     dismissable: opts.dismissable ?? true,
-    ...(opts.width !== undefined && { width: opts.width }),
+    width: opts.width ?? REGION.width,
   };
 }
 

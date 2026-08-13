@@ -34,6 +34,22 @@ export type AskOptions = Readonly<{
   /** What the answer will affect — a dry-run, or the matching `ls`. */
   detail?: Block;
   choices: readonly Choice[];
+  /**
+   * Where the question sits; `centred` by default (roadmap entry 16 A6).
+   *
+   * **A choice between placements rather than a `Placement`**, and that is the
+   * shape rather than a simplification. C15's `anchored` carries `row` and
+   * `rows` — the prompt's own extent, which the session computes and a local
+   * handler cannot know — so a field of that type would be public and half
+   * unfillable. The two arms are the decision a caller can actually make; L4
+   * supplies the anchor for the second.
+   *
+   * The width is not derived from this in general (entry 16 A3: the completion
+   * menu declares none and reverse search declares one, both anchored). It is
+   * derived here, by the layer's own owner, which is what A3 says the decision
+   * is.
+   */
+  placement?: "centred" | "anchored";
 }>;
 
 /**

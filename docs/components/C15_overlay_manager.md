@@ -267,6 +267,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I17** — An anchored overlay never covers its anchor's own rows, `[row, row + rows − 1]`, **whenever either side has a row to offer**. A single-row anchor is the default and the special case, not the general one. The qualification is T3.8's: a one-row region with a one-row anchor has no room on either side, and an overlay covering its anchor is a better answer than one silently absent.
 - **I18** — The `maxHeightFraction` clamp is floored at one row. `floor(1 × 0.5)` is zero, and a region too short for the fraction must not swallow every overlay it holds.
 - **I19** — The terminal cursor is placed by whatever holds focus and hidden when that thing has none. A layer states its own through `Placed.cursor`, relative to its origin; absent means hidden. The choice is the drawer's and never C17's — a `cursorCell` that varied with focus would put focus inside a component that has no notion of it.
+- **I20** — **A `centred` layer declares a width, and `push` and `update` refuse one that does not.** I16 resolves an absent width to the region's, which is right for an anchored layer and is the whole of what `fill` means — so a centred layer without one is placed at `left = floor((region.width − region.width) / 2)` and is indistinguishable from a `fill` layer at every width. **The state reads as correct everywhere and is wrong about what it was asked to be**, which is why the check is at construction rather than in a caller's comment: `confirm.ts` carried exactly that comment, written after the defect had been found once, and a second centred layer written by anyone else would have reached it again. `update` is checked too, because `LayerUpdate` admits `placement` — so a layer pushed anchored and updated to centred reaches the same state by a route the push-time check cannot see.
 
 ---
 
@@ -290,6 +291,7 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 16. An anchor is a span rather than a row, and an overlay never covers it while either side has room (I17).
 17. Both clamps have a floor of one row, so a short region never silently swallows a layer (I18).
 18. The terminal cursor is placed by whatever holds focus and hidden when that thing has none; a layer states its own in `Placed`, and C17's `cursorCell` is unchanged because it has no notion of focus (I19).
+19. A centred layer declares its own width, and both entry points refuse one that does not — the absent-width default is `fill`'s meaning, and a centred layer that inherits it is `fill` while reading as centred (I20, I16).
 
 ---
 
@@ -299,6 +301,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 1 — unit
 
+- **T1.21** (I20): a centred layer pushed with no width → refused, naming the layer. **The frame is the control**: the same layer with a width placed beside a `fill` layer at the same region, read for a `left` that differs — without it the row asserts a throw and says nothing about the state the throw prevents, which is a placement indistinguishable from `fill` at every width.
+- **T1.22** (I20): a layer pushed **anchored** and updated to `centred` with no width → refused, and the layer is left exactly as it was. The route the push-time check cannot see, and the assertion on the survivor is the half that matters: a guard that throws after mutating leaves a layer neither placed nor removed.
 - **T1.20** (I19): a layer carrying a cursor and a layer carrying none, placed → the first's `Placed.cursor` is relative to its own origin and survives the flip from `below` to `above`; the second's is absent. Both, because a field that is always present and always ignored passes any test of the first alone — and the two live producers answer oppositely, which is why this is a field.
 
 - **T1.1**: `push(overlay)` on empty → stack of one, `top` is it, `hasView` false.
@@ -395,6 +399,7 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.14** (I14): widening `LayerUpdate` to include `dismissable` → T1.13 fails, and C16's Ctrl-C ladder starts depending on when it looked.
 - **T6.15** (I17): computing the anchored sides from `row ± 1` rather than from the span → T3.5b fails, and a menu lands on the second line of a two-row prompt while every number in `Placed` agrees with every other.
 - **T6.16** (I18): dropping either clamp's floor of one row → T3.8 and T3.8b fail, and a short terminal loses its overlays entirely rather than showing them badly.
+- **T6.17** (I20): moving the width check into `confirm.ts` — where it lived as a comment — → T1.21 and T1.22 both fail. **The revert that reads as a tidy-up**: the comment was correct, was written after the defect, and constrained exactly one caller. The second centred layer in the tree (`clearConfirmLayer`, C20) declares no width at all.
 
 ---
 

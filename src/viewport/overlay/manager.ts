@@ -65,6 +65,7 @@ class Manager implements OverlayManager {
     if (this.#stack.some((l) => l.id === layer.id)) {
       throw new OverlayError(`layer ${layer.id} is already on the stack`);
     }
+    assertPlaceable(layer);
 
     this.#stack = Object.freeze([...this.#stack, layer]);
     this.#emit({ kind: "push", id: layer.id, layerKind: layer.kind });
@@ -111,6 +112,11 @@ class Manager implements OverlayManager {
       // layer changes — a pop-and-repush is not (§4).
       ...(next.cursor !== undefined && { cursor: next.cursor }),
     });
+    // **Before the stack moves, not after** (I20). A guard that throws having
+    // already written leaves a layer neither placed nor removed, which is the
+    // class C13's `settle(id, doc)` produced two components from the ruling
+    // that made it possible.
+    assertPlaceable(updated);
 
     const copy = [...this.#stack];
     copy[i] = updated;
@@ -140,6 +146,32 @@ class Manager implements OverlayManager {
   #emit(change: OverlayChange): void {
     for (const cb of [...this.#subscribers]) cb(change);
   }
+}
+
+/**
+ * I20 — a centred layer declares its own width.
+ *
+ * **Both entry points, and `update` is not the redundant one.** `LayerUpdate`
+ * admits `placement`, so a layer pushed anchored and updated to centred reaches
+ * the state by a route the push-time check cannot see.
+ *
+ * The state it forbids reads as correct at every width, which is why this is a
+ * throw rather than a default: I16 resolves an absent width to the region's,
+ * and a centred layer that inherits it is placed at `left = 0` and is
+ * indistinguishable from `fill`. Defaulting to something narrower would invent
+ * a number this component has no basis for — C15 knows the region and nothing
+ * else (I16), and the owner is the only one that can measure its content.
+ *
+ * It lived as a comment in `shell/confirm.ts`, written after the defect had
+ * been found once. `clearConfirmLayer` in C20 is the second centred layer in
+ * the tree and declared no width at all.
+ */
+function assertPlaceable(layer: Layer): void {
+  if (layer.placement.kind !== "centred" || layer.width !== undefined) return;
+  throw new OverlayError(
+    `centred layer ${layer.id} declares no width: it would be placed at left 0 ` +
+      `across the whole region, which is \`fill\` and not \`centred\` (I20)`,
+  );
 }
 
 export function createOverlayManager(opts: OverlayOptions): OverlayManager {

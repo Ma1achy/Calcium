@@ -742,6 +742,8 @@ export async function constructGraph(
    */
   const confirm = createConfirmHost({
     overlays: stores.overlays,
+    // The same anchor C19's menu takes, read at `ask` time (C15 I17).
+    anchor: deps.frame.promptAnchor,
     invalidate: () => void scheduler.commit("input"),
   });
 

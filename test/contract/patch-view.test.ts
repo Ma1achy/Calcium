@@ -128,7 +128,11 @@ describe("C22 §3 — the fullscreen patch view", () => {
     h.overlays.push({
       id: "menu",
       kind: "overlay",
-      placement: { kind: "centred" },
+      // **Anchored, because a menu is** (C15 I20 made the placement a
+      // decision rather than a default). This stands in for the completion
+      // menu while the row is about routing; it was centred with no width,
+      // which is neither what a menu is nor a placeable layer.
+      placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: [],
       dismissable: true,
     });
