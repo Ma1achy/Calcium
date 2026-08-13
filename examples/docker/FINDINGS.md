@@ -7636,6 +7636,31 @@ offered it.**
 Not a reopening. The three rejected tightenings below still stand, and this instance is
 evidence for the *class* rather than for any of them.
 
+### A third instance, same day, and it is on a **public** field
+
+**Measured the same way and it is worse than the second.** Entry 15 step 4 added
+`NavElement.copy` — the element's source text, the field semantic copy is built on.
+MG24 says nothing about it, and removing its only consumer leaves `make enforce`
+**green**: `LineEditor.copy()` carries the same name, so the rule reads a method on a
+different type in a different layer as this field's consumer. Verified by deleting the
+read in `shell/keys.ts` and running the gate, not by reading the rule.
+
+**`NavElement` is part of the block vocabulary an application declares**, where
+`selected` was a getter on an internal interface. So the blind spot now covers a
+member of a published, freeze-relevant type — and MG24 exists precisely to catch *a
+field that exists and nothing reads*, which is F21's shape and the reason the rule was
+written.
+
+**Three instances, and the third is what usually breaks the axis** — it did not. All
+three are one mechanism: matching by name alone. What it does change is the count of
+false negatives observed in code written the same day, which is now two of two new
+members that happened to collide. The collision is not rare; it is created by whichever
+name a developer reaches for.
+
+Still not a reopening: the three tightenings below were measured and rejected, and none
+of them would have caught this one either — `(owner, name)` needs a receiver's type,
+which no regex over source has.
+
 ### The remedy F160 proposed does not key uniquely either
 
 **F160 named the looseness correctly and its fix assumed a uniqueness the tree does not

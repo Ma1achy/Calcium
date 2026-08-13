@@ -548,6 +548,7 @@ describe("C26 §8b.8 — interaction mode is vacuous, and this is the row that s
     expect(focus.current, "and stays on the row, per the two-level shape").toEqual({
       at: "liveBlock",
       element: addr("r1"),
+      anchor: null,
       mode: "navigate",
     });
 

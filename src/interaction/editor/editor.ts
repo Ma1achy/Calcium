@@ -76,6 +76,16 @@ export interface LineEditor {
    * text, so there is nothing for undo to restore.
    */
   copy(): void;
+  /**
+   * Put arbitrary text in the clipboard (§5a).
+   *
+   * **The primitive `copy` is written in terms of**, and it exists because the
+   * clipboard is one and the transcript's copy is not the editor's. `y` on a
+   * focused element copies what the element *is*, and that text never passes
+   * through the buffer — but it lands in the same place `⌃y` reads, or there
+   * are two paste targets under one paste key.
+   */
+  copyText(text: string): void;
   killTo(motion: Motion): void;
   yank(): void;
   setText(text: string, cursor?: number): void;
@@ -361,7 +371,10 @@ class Editor implements LineEditor {
   }
 
   copy(): void {
-    const text = this.selected;
+    this.copyText(this.selected);
+  }
+
+  copyText(text: string): void {
     // A no-op with no region, so `y` on a bare caret does not silently empty
     // the buffer a previous kill filled — the same shape as `yank`'s guard.
     if (text === "") return;

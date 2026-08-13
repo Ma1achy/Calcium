@@ -249,6 +249,33 @@ inherits the property rather than being the component that breaks it.
 
 ---
 
+
+## 5c. The transcript's selection, and semantic copy
+
+**One mechanism, two shapes, one clipboard.** C17 §5b holds a character range in the prompt; this holds a set of element addresses in the transcript; both land in the kill buffer (C17 §5a). What does *not* unify is the region — a character range and a set of addresses have nothing in common but their destination, which is why there is no abstract `Selection` type anywhere.
+
+### The anchor is the only new state, one level up
+
+`StoredFocus.anchor` beside `element`, and **`element` is the head** — there is not a second position to keep in step with where focus is. `anchor === element` is no selection. `extendRow` places the anchor on the **first** extension and never touches it again; `focusRow` collapses. That is C17 I21 restated at the level above, and the defect it forbids is the same one: an extension that moves the anchor is right on the first keystroke and wrong on the second, and every assertion about *a row being selected* passes either way.
+
+**`⇧↑` stops at the first element rather than leaving the block.** Unshifted `↑` exits to the prompt — the reader stepping out (I13) — and extending is a gesture *inside* the block; one that walked out would take the selection with it and leave nothing to copy.
+
+### `y` lives in `navigate` only, and the two targets are why
+
+C16 §5a row A4: a block's declared keys are an open set (I14), so a framework binding inside interaction silently shadows one. `interaction` and `liveBlock` being separate targets makes that **structural** rather than a rule someone has to remember — the binding is declared at `liveBlock` and there is nowhere for it to leak.
+
+### `NavElement.copy` is the element's source, never its rendering
+
+**This is the whole of semantic copy and it is the one thing a raw terminal cannot offer.** The painted cells are a rendering: columns are dropped at narrow widths, values are truncated with an ellipsis, and a marker column carries a glyph nobody typed. A copy taken from them is *what is on screen* — which passes every assertion about what is on screen and is wrong about exactly what this exists for.
+
+So the **declarer** supplies it from the data it was given. `tableElements` joins every declared column's `cell.text`, in declared order, at no width — so the copy is the same text at 60 columns and at 200. `planColumns` is deliberately not consulted: a copy that changed with the terminal's size would be the defect rather than a feature.
+
+Tab-separated, because that is what pastes into a spreadsheet and into every shell tool that takes columns; newline-joined across a range, because the elements are rows. An element declaring no `copy` contributes nothing rather than a blank line — it is a place to stand, not empty data.
+
+**And MG24 cannot see this field**, which is measured rather than assumed: removing its only consumer leaves `make enforce` green, because `LineEditor.copy()` carries the same name. F160's blind spot on a published field of the block vocabulary, and the third instance of it. Recorded here so a later reader does not take the gate's silence as coverage.
+
+---
+
 ## 6. Pointer
 
 **The plumbing is built.** SGR decoding (`decode.ts:393`), a `mouse` capability that is off
@@ -335,6 +362,8 @@ notice here.
   no subject and the second is `liveBlock`'s existing exit. The day a block declares keys,
   both levels are first tested for real.
 - **I15** — Policies resolve global → kind → per-node override, and **an override naming a
+- **I16** — **The transcript's selection is an anchor plus the focused element**, and the focused element is the head. `anchor === element` is no selection; an extending motion moves the head and never the anchor; an unshifted motion collapses. C17 I21 at the level above, and the same two halves fail the same two ways.
+- **I17** — **An element's `copy` is its source, never its rendering.** The declarer supplies it from the data, at no width, so a dropped column and a truncation are absent from it and the text is the same at every terminal size. A copy assembled from painted cells satisfies every assertion about the painted frame, which is why this is an invariant rather than a preference.
   level the kind reports no element at is a construction error**, the way a duplicate
   binding is (→ C16 I10). An override for an absent level is unreachable and reads as
   configured, which is A03 §2's vacuity class arriving in a config value.
@@ -675,6 +704,8 @@ Named against the invariants; the tiers are the six.
   over every kind declaring `elements`. The shape is C09's window conformance: it walks every
   fixture rather than asserting one, because a single-element row passes against a wrong
   implementation. **Two fabrications confirm it is live**, as F134's did.
+- **T1.42, T1.43** (I17, §5c) — an element's `copy` carries **every declared column**, including the ones the width dropped, is the same text at 60 columns and at 200, and is untruncated. The control is `planColumns(...).dropped` being non-empty at that width: without it the row passes for a table that drops nothing. The expand column contributes its **cell**, not the marker a renderer puts there.
+- **T1.44, T1.45, T1.46** (I16, §5c) — `⇧↓` twice leaves the anchor where it was and `y` copies the range newline-joined; an unshifted motion collapses, so `y` afterwards copies one row; and `⇧↑` at the first element stays in the block, where unshifted `↑` leaves. **Two extensions in the first, because one passes whichever end moved** — C17 T1.23's argument one level up.
 - **T2.x** (I2) — the ladder still derives from `FOCUS_ORDER` with the mode present:
   exhaustive over the target union, not over a hand-written list.
 - **T2.x** (I8) — a click and the equivalent walk reach the **same element object**, asserted

@@ -331,10 +331,11 @@ const OPEN_BUILT_WORDS = Object.freeze({
     phrase: "built with prism-tui as the consumer",
     why: "instrumental, not an assertion — it says what 3 will be built WITH, and prism-tui does not exist in this tree at all (3 is one of the three unchecked entries)",
   },
-  "15": {
-    phrase: "is built three times",
-    why: "the consequence of a hypothetical — *build one scope alone and the model is built three times* — which is the entry's argument for doing all three at once, not a claim that any of them exists",
-  },
+  // 15's exemption was here and is gone: the entry is BUILT, so the phrase it
+  // covered — *build one scope alone and the model is built three times* — is
+  // no longer a claim about something absent. The arm removed it rather than
+  // anyone remembering, which is the second exemption this month disposed of by
+  // its subject being wired.
 });
 const BUILT_CLAIM = /\b(built|shipped|landed|already exists|is wired)\b/i;
 for (const entry of [...all].sort((a, b) => Number(a) - Number(b))) {

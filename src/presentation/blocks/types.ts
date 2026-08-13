@@ -143,6 +143,24 @@ export type NavElement = Readonly<{
    * that gives them a consumer.
    */
   activate?: Action;
+  /**
+   * What `y` copies here — the element's **source**, never its rendering (C26 §5c).
+   *
+   * **Declared by the block, and that is the whole of semantic copy.** The
+   * painted cells are a rendering: columns are dropped at narrow widths, values
+   * are truncated with an ellipsis, and a marker column carries a glyph nobody
+   * typed. A copy taken from them is *what is on screen*, which passes every
+   * assertion about what is on screen and is wrong about exactly the thing this
+   * exists for.
+   *
+   * So the declarer supplies it from the data it was given: `tableElements`
+   * joins **every declared column's** `cell.text`, including the ones this width
+   * dropped. That is what a raw terminal cannot offer.
+   *
+   * Optional, because an element may be a place to stand and nothing more —
+   * `activate`'s reason, and the same shape.
+   */
+  copy?: string;
 }>;
 
 export interface BlockDefinition<B extends Block = Block> {

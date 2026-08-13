@@ -300,6 +300,19 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // `ESC w` is `m+w`, and `w` is free on the meta path.
   { target: "prompt", key: { name: "w", meta: true }, action: "copySelection" },
 
+  // --- the transcript's selection (C26 §5c) --------------------------------
+  //
+  // **`liveBlock`, never `interaction`** — C16 §5a row A4. A block's declared
+  // keys are an open set (C26 I14), and the two being separate targets is what
+  // makes that structural rather than a rule someone has to remember.
+  //
+  // Plain `y`, because this target has no prompt competing for letters — the
+  // same argument `pushedView`'s `n`/`p`/`g` make. Checked through the decoder:
+  // `⇧↑` is `CSI 1;2A` and `⇧↓` is `CSI 1;2B`, both `s+up`/`s+down`.
+  { target: "liveBlock", key: { name: "up", shift: true }, action: "extendRowUp" },
+  { target: "liveBlock", key: { name: "down", shift: true }, action: "extendRowDown" },
+  { target: "liveBlock", key: { name: "y" }, action: "copyElement" },
+
   // --- copy mode (C16 §5b, entry 15 step 1) --------------------------------
   //
   // **`⌥v` is PROVISIONAL and the word is load-bearing.** Which key enters copy

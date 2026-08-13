@@ -111,6 +111,18 @@ export type StoredFocus =
       at: "liveBlock";
       /** `null` — in the block, on no element yet. */
       element: ElementAddress | null;
+      /**
+       * The other end of an element selection, or `null` (C26 §5c).
+       *
+       * **The same shape as C17's, one level up**: the *head* is `element`
+       * itself rather than a second position, so there is one record of where
+       * focus is and the anchor is the only new state. `anchor === element` is
+       * no selection, exactly as `anchor === head` is in the editor.
+       *
+       * One mechanism, two shapes: a character range in the prompt, a set of
+       * addresses here, and one clipboard under both (C17 §5a).
+       */
+      anchor: ElementAddress | null;
       mode: "navigate" | "interact";
     }>;
 
@@ -196,6 +208,19 @@ export type KeyAction =
   // buffer that `⌃k` writes and `⌃y` reads — the emacs pairing readline users
   // already have, and the one key that does not collide with `⌃c`'s cancel.
   | "copySelection"
+  // --- the transcript's selection (C26 §5c) ---------------------------------
+  //
+  // **`liveBlock` only, never `interaction`** (C16 §5a row A4). A block's
+  // declared keys are an open set (C26 I14), so a framework binding inside
+  // interaction silently shadows one — and the two are separate targets, so the
+  // rule is structural rather than remembered.
+  //
+  // One mechanism, two shapes: `extendRowUp`/`extendRowDown` are `rowUp`/
+  // `rowDown` with the anchor held, exactly as C17's extending motions are its
+  // ordinary ones.
+  | "extendRowUp"
+  | "extendRowDown"
+  | "copyElement"
   // --- focus (I22) ---------------------------------------------------------
   //
   // `↓` enters through `historyNext`'s second clause rather than an action of

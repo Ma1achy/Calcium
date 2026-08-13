@@ -204,6 +204,11 @@ describe("C22 §3 step 11 — the effect table", () => {
       "layout",
       "displayRows",
       "cursorCell",
+      // The clipboard primitive `copy` is written in terms of, and the
+      // transcript's `y` writes through it — so it *is* reached by a binding,
+      // just not by one at this target. C16 §5a row A4 is why `copyElement`
+      // lives on `liveBlock` and cannot be bound here.
+      "copyText",
       // Readers of the selection, not operations on it (C17 §5b). `extend` and
       // `selectAll` are the bound half and are covered above; these two are
       // what step 3's copy and entry 23's wash will read.
@@ -818,6 +823,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     expect(focus.current, "the third element, in the second block").toEqual({
       at: "liveBlock",
       element: { blockId: "b", elementId: "r1" },
+      anchor: null,
       mode: "navigate",
     });
 
@@ -828,6 +834,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     expect(focus.current, "forward, not back to the first block").toEqual({
       at: "liveBlock",
       element: { blockId: "b", elementId: "r2" },
+      anchor: null,
       mode: "navigate",
     });
   });
@@ -854,11 +861,118 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     expect(focus.current, "fell forward into block b, then stepped up").toEqual({
       at: "liveBlock",
       element: { blockId: "a", elementId: "r2" },
+      anchor: null,
       mode: "navigate",
     });
 
     focus.enterLiveBlock({ blockId: "a", elementId: "r1" });
     effects.table["rowUp"]?.();
     expect(focus.current, "and a real first element does leave").toEqual({ at: "prompt" });
+  });
+});
+
+describe("C26 §5c — the transcript's selection and semantic copy", () => {
+  /** A live block whose elements carry source text no rendering would produce. */
+  const copyEffects = () => {
+    const focus = createFocusStore();
+    const kill: string[] = [];
+    const effects = createKeyEffects({
+      editor: { copyText: (t: string) => void kill.push(t) },
+      completion: {},
+      overlays: {},
+      history: { entries: [], append: () => undefined, next: () => null },
+      patchView: { open: () => null, move: () => false, pop: () => false },
+      documentView: {
+        open: () => null,
+        fill: () => false,
+        putBlock: () => false,
+        blockAt: () => null,
+        move: () => false,
+        pop: () => false,
+        openFor: null,
+      },
+      releaseView: () => undefined,
+      visibilityChanged: () => undefined,
+      manifest: null,
+      viewport: recordingViewport().viewport,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+      focus,
+      liveElements: () => [
+        { blockId: "a", element: navElement("r1", 0, undefined, "web\t3\trunning") },
+        { blockId: "a", element: navElement("r2", 1, undefined, "api\t1\tstopped") },
+        { blockId: "a", element: navElement("r3", 2, undefined, "db\t2\trunning") },
+      ],
+      liveEntryId: () => "e1",
+      onAction: () => undefined,
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
+    } as unknown as Parameters<typeof createKeyEffects>[0]);
+    return { effects, focus, kill };
+  };
+
+  it("T1.42 (§5c): y copies the element's source, into the one clipboard", () => {
+    const { effects, kill } = copyEffects();
+
+    effects.table["historyNext"]?.(); // ↓ from the prompt, onto the first row
+    effects.table["copyElement"]?.();
+
+    expect(kill, "the declared source, through the editor's clipboard").toEqual([
+      "web\t3\trunning",
+    ]);
+  });
+
+  it("T1.43 (C26 §5c, C17 I21): ⇧↓ extends and y copies the range, newline-joined", () => {
+    const { effects, focus, kill } = copyEffects();
+
+    effects.table["historyNext"]?.();
+    effects.table["extendRowDown"]?.();
+    effects.table["extendRowDown"]?.();
+
+    // **The anchor has not moved**, which is C17 T1.23's assertion one level
+    // up and the defect the shape was built against: an extension that moved
+    // the anchor is right on the first keystroke and wrong on the second.
+    expect(focus.current).toEqual({
+      at: "liveBlock",
+      element: { blockId: "a", elementId: "r3" },
+      anchor: { blockId: "a", elementId: "r1" },
+      mode: "navigate",
+    });
+
+    effects.table["copyElement"]?.();
+    expect(kill).toEqual(["web\t3\trunning\napi\t1\tstopped\ndb\t2\trunning"]);
+  });
+
+  it("T1.44 (§5c): an unshifted motion collapses the range", () => {
+    const { effects, focus, kill } = copyEffects();
+
+    effects.table["historyNext"]?.();
+    effects.table["extendRowDown"]?.();
+    effects.table["rowDown"]?.();
+
+    expect(focus.current, "the anchor is gone").toEqual({
+      at: "liveBlock",
+      element: { blockId: "a", elementId: "r3" },
+      anchor: null,
+      mode: "navigate",
+    });
+
+    effects.table["copyElement"]?.();
+    expect(kill, "one row, not three").toEqual(["db\t2\trunning"]);
+  });
+
+  it("T1.45 (§5c): ⇧↑ stops at the first element rather than leaving the block", () => {
+    // **Unshifted `↑` exits to the prompt** (C26 I13, the reader stepping out).
+    // Extending is a gesture *inside* the block, and one that walked out would
+    // take the selection with it and leave nothing to copy.
+    const { effects, focus } = copyEffects();
+
+    effects.table["historyNext"]?.();
+    effects.table["extendRowUp"]?.();
+
+    expect(focus.current.at, "still in the block").toBe("liveBlock");
   });
 });

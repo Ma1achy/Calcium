@@ -730,6 +730,69 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // about two things, one of which C17 cannot see.
     copySelection: () => void deps.editor.copy(),
 
+    // --- the transcript's selection (C26 §5c) ------------------------------
+    //
+    // **`rowUp`/`rowDown` with the anchor held**, and the two lines that differ
+    // are the store call. No second notion of *which element is next* — the
+    // list and the resolver are the ones the unshifted motions use, so a word
+    // this pair disagreed about could not exist.
+    extendRowDown: () => {
+      const elements = deps.liveElements();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const i = resolveFocus(current.element, elements);
+      if (i === null) return;
+      const next = elements[i + 1];
+      if (next !== undefined) deps.focus.extendRow(addressOf(next));
+    },
+    extendRowUp: () => {
+      const elements = deps.liveElements();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const i = resolveFocus(current.element, elements);
+      // **Stops at the first element rather than leaving.** `↑` unshifted exits
+      // to the prompt (C26 I13, the reader stepping out); extending is a
+      // gesture *inside* the block, and one that walked out of it would take
+      // the selection with it and leave nothing to copy.
+      if (i === null || i === 0) return;
+      const prev = elements[i - 1];
+      if (prev !== undefined) deps.focus.extendRow(addressOf(prev));
+    },
+
+    /**
+     * `y` — semantic copy (C26 §5c).
+     *
+     * **What the element *is*, never what is on screen.** Each element declares
+     * its own `copy` from the data it was given, so a dropped column, a
+     * truncation and a marker glyph are all absent from it — which is the whole
+     * of why this beats dragging, and it is invisible to any assertion about
+     * the painted frame.
+     *
+     * **One clipboard** (C17 §5a): the text lands where `⌃k` puts its and where
+     * `⌃y` reads, rather than in a second store nothing else can reach.
+     *
+     * Newline-joined over the range, because the elements are rows and rows are
+     * lines. An element declaring no `copy` contributes nothing rather than a
+     * blank line — it is a place to stand, not empty data.
+     */
+    copyElement: () => {
+      const elements = deps.liveElements();
+      const current = deps.focus.current;
+      if (current.at !== "liveBlock") return;
+      const head = resolveFocus(current.element, elements);
+      if (head === null) return;
+      const anchor = current.anchor === null ? head : resolveFocus(current.anchor, elements);
+      if (anchor === null) return;
+
+      const text = elements
+        .slice(Math.min(anchor, head), Math.max(anchor, head) + 1)
+        .map((p) => p.element.copy)
+        .filter((c): c is string => c !== undefined && c !== "")
+        .join("\n");
+      if (text === "") return;
+      deps.editor.copyText(text);
+    },
+
     // --- copy mode (C16 §5b) -----------------------------------------------
     //
     // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not

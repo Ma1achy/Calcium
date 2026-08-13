@@ -322,6 +322,15 @@ describe("§6 — the default table (C17 I12)", () => {
       "prompt m+a": ["\u001ba"],
       "prompt m+w": ["\u001bw"],
 
+      // --- the transcript's selection (C26 §5c) ----------------------------
+      //
+      // `⇧↑`/`⇧↓` reach the letter table with `modifiersOf("2")`, and plain `y`
+      // is a byte. The application-cursor form has no modified variant, so
+      // unlike the unshifted arrows these carry one wire form each.
+      "liveBlock s+up": ["\u001b[1;2A"],
+      "liveBlock s+down": ["\u001b[1;2B"],
+      "liveBlock y": ["y"],
+
       // Copy mode's entry, at both targets it is bound to (C16 §5b). The key is
       // provisional — which key enters copy mode is the rebindable-keys row's
       // question — and its *wire form* is not: this check fired on the binding
