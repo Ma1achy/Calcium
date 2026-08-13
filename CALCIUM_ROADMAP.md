@@ -161,8 +161,13 @@ No public shape changes.
 shim absorbed it*. C05 I21 shipped: a `shellOnly` switch is absent from `argv`, and the shim
 records the strip being **deleted** rather than commented, citing F39. F39 is now PARTIAL.
 
-What remains is the second half: there is no way to declare a flag that chooses a
-**presentation**. `FlagDef` has twelve members and none of them selects one.
+**CORRECTED AGAIN — and the second correction is the one worth reading.** The first said the
+*second* half remained: no way to declare a flag that chooses a presentation. That sentence is
+literally true and **names no defect**. Going to write the field showed all three wants this
+entry lists already work — `--raw` and `--wide` are `shellOnly` switches the adapter reads
+(`examples/docker/src/inspect.ts:192`), `--json` is transmitted because the far side understands
+it. **F39 is CLOSED**, and the sentence named the wrong axis: it said *rendering* and the axis
+it needed was *transmission*.
 
 **WALKED — C05 §8b, and two things are settled before the design starts.**
 
@@ -175,18 +180,27 @@ What remains is the second half: there is no way to declare a flag that chooses 
   invocation**, read before anything is spawned — and it is not a field at all but a reserved
   name (I22), because a per-app `--help` is a per-app discipline.
 
-**RULED: the field is the result-rendering axis alone.** It does not decide transmission — an
-app declaring `--json` writes the presentation field and **no** `shellOnly`, and that row is
-what breaks any future field implying the other.
+**RULED: the field is the result-rendering axis alone, and it arrives with the resolution that
+reads it.** A presentation-selecting field today is a published member with no consumer —
+MG24's founding class and F21's shape, *a field that existed, so nothing looked*. This repo
+ruled the identical question three weeks ago on the identical kind of field: `NavElement.arrow`
+and `.escape` are drawn in C26 §5 and absent from the tree because *"landing them before §4's
+resolution exists would publish two fields with no reader"*. That withdrawal was re-measured
+against the widened MG24 (F159) and holds. Inherited, not re-derived.
 
-**Left open on purpose**: the field's *value*. A closed set is right when the framework must
-understand every member (§2's `ARG_TYPES` rule) and an app's `--wide` is not such a member —
-a C09/C22 question, named rather than chosen. And the name matters before it is written: MG24
-is exact for 376 of 1150 members, so a field called `kind`, `id`, `text` or `width` is one the
-rule can say nothing about.
+**Its consumer is entry 21.** `--help` per verb is the one party needing *this changes what you
+see* as distinct from *this changes what runs*, because that is a grouping in rendered usage.
 
-Additive, so it can follow — but it is a real capability gap and any app with a `--raw`,
-`--wide` or `--json` mode hits it immediately.
+**And that dissolves the value question rather than answering it.** The value set is whatever
+`--help` must be able to say, so it cannot be chosen before the consumer is written — picking a
+vocabulary for a reader that does not exist is how `view` acquired two declarations and F118.
+Whether the framework must understand every member, which is §2's test for a closed set, is a
+question only entry 21 can answer, and it is the freeze-relevant part.
+
+**Nothing is added to `FlagDef`, so the freeze is unaffected.** The entry was always additive;
+that is now true of the deferral rather than of the field. And the naming fact stays discharged:
+MG24 is exact for 376 of 1150 members, so a field called `kind`, `id`, `text` or `width` is one
+the rule can say nothing about — a firing is trustworthy, a silence is not.
 
 ---
 
@@ -2369,9 +2383,16 @@ RULED 6  phase 2                   the empty-block convention · rendering flags
                                    kept the old state — F39 is now PARTIAL. It cannot be
                                    shellOnly widened (--json selects a rendering AND is
                                    transmitted), and --help is a mode of the INVOCATION where
-                                   --raw is a rendering of the RESULT. RULED: the field is the
-                                   result-rendering axis alone. Left open on purpose: the
-                                   field's VALUE, a C09/C22 question. C05 §8b, C22 §13b
+                                   --raw is a rendering of the RESULT. THEN THE CODE STEP
+                                   FALSIFIED THE WALK: the field has no instance. --raw and
+                                   --wide are shellOnly switches the adapter reads, --json is
+                                   transmitted, so all three wants work and F39 is CLOSED —
+                                   its sentence named RENDERING and the axis it needed was
+                                   TRANSMISSION. RULED: the field arrives with the resolution
+                                   that reads it, which is 21's --help per verb, on C26 §5's
+                                   arrow/escape precedent. That dissolves the value question:
+                                   the set is whatever --help must say. FlagDef is unchanged,
+                                   so the freeze is unaffected. C05 §8b, C22 §13b
 PART  7  THE NAVIGATION MODEL      scopes + modes + policies + pointer — design first, it subsumes
                                    the small navigation items rather than sitting beside them.
                                    SPECIFIED as C26; stages 1–3 built (interaction is a focus
@@ -2436,7 +2457,13 @@ BUILT 20 off-screen live parts ★  b.live keeps ticking when scrolled off — n
                                    --watch), and fetch on re-entry. Spawns processes for nobody
 PART  21 --help per verb ★        usageBlocks() is built, exported, and uncallable. Reserve
                                    --help framework-side, and it makes /help's fifty-verb wall
-                                   a two-level problem instead. Needs F39's render-selecting flag
+                                   a two-level problem instead. THE DEPENDENCY ON 6 IS INVERTED,
+                                   not removed: this said "needs F39's render-selecting flag",
+                                   and 6's walk found that field has no instance and no consumer
+                                   until THIS renders per-verb usage. So 21 does not wait on 6;
+                                   6.2 waits on 21, and the field's value set is whatever --help
+                                   must be able to say (C05 §8b.6). --help itself is already
+                                   reserved on every tool by C05 I22
       22 b.art — banners          sparse variants, fallback ends at styled text, and VALIDATION
                                    PER VARIANT (no tabs, uniform width, measured cells) — ~30
                                    lines that would have caught every banner defect
@@ -2600,7 +2627,7 @@ what landed**.
 | 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:440` | 1.1, 1.3, 1.4 not checked in this pass |
 | 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
 | 7 | PART | **specified as C26, and three stages built.** `ElementAddress` — `interaction/router/types.ts:84` — and one shared resolver, `resolveFocus` — `interaction/router/focus.ts:122` — so focus holds an address and render and keys answer from the same place. Stage 1 made `interaction` a focus target, stage 2 gave blocks `elements`, stage 3 the address; the ⏎ ruling followed. `docs/components/C26_navigation.md` | **§4's policy resolution and the modes.** `ArrowPolicy` and `EscapePolicy` are absent from `src/` — withdrawn under MG24 because `NavElement.arrow` and `.escape` had no reader, **re-checked against the widened rule (F159) and the withdrawal holds**, so §4 is still a design question. The scroller is the fourth kind that check runs against (46) |
-| 6 | RULED | **the ruling is in the entry, and the walk is in two specs.** `docs/components/C05_tool_manifest.md` §8b and `docs/components/C22_composition_root.md` §13b. 2.2's first half is built and the prose had not caught up: `shellOnly` — `data/manifest/types.ts:88` — is absent from `argv` via `validateInvocation`, `data/manifest/validate.ts:254`, and `examples/docker/bin/docker-json` records the shim's strip being deleted rather than commented | **no code, deliberately.** 2.1's convention is unwritten and its residue is an empty block whose emptiness is a *failure to compute*, which C22 cannot tell from a success. 2.2's field does not exist and its **value** is left open — a C09/C22 question, named rather than chosen |
+| 6 | RULED | **the ruling is in the entry, and the walk is in two specs.** `docs/components/C05_tool_manifest.md` §8b and `docs/components/C22_composition_root.md` §13b. 2.2's first half is built and the prose had not caught up: `shellOnly` — `data/manifest/types.ts:88` — is absent from `argv` via `validateInvocation`, `data/manifest/validate.ts:254`, and `examples/docker/bin/docker-json` records the shim's strip being deleted rather than commented | **no code, and 2.2's half is now a deferral rather than a design.** 2.1's convention is unwritten and its residue is an empty block whose emptiness is a *failure to compute*, which C22 cannot tell from a success. 2.2's field is **blocked on 21** — it would have no consumer until `--help` renders per verb, which is C26 §5's `arrow`/`escape` ruling applied unchanged |
 | 8 | BUILT | **C14 I4/I5/I6.** `src/viewport/viewport/viewport.ts:347` — `#afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
 | 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `src/shell/local/registry.ts:59`, reached as `ctx.ask` at `src/shell/execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
 | 12 | BUILT | `src/shell/render-frame.ts:153` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
@@ -2610,7 +2637,7 @@ what landed**.
 | 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
 | 19 | PART | **the first claim holds and the second does not.** `resize` is an immediate commit reason, never coalesced (C03 §, I2). But *every SIGWINCH rebuilds the Fenwick index* is false: `src/viewport/viewport/viewport.ts:197` rebuilds **only when the width changed** — C14 I8, *a height change invalidates none, and doing both would make dragging a terminal's bottom edge cost a full remeasure per frame* — and step 0 refuses a resize to the size already held (C14 I21) | a **horizontal** drag is still N rebuilds + N renders + N writes, which is the half that survives |
 | 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `src/shell/refresh.ts:212`, wired at `src/shell/construct.ts:760` | — |
-| 21 | PART | `usageBlocks` **has a caller** — `src/shell/documents.ts:215`, on `raw.exitCode === 2` | `--help` per verb, which needs 6's render-selecting flag |
+| 21 | PART | `usageBlocks` **has a caller** — `src/shell/documents.ts:215`, on `raw.exitCode === 2` | `--help` per verb. **Not blocked on 6 — the reverse**: 6.2's field has no consumer until this renders per-verb usage, so 21 leads and 6.2 follows (C05 §8b.6) |
 | 25 | PART | drawn: `src/shell/paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static |
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |

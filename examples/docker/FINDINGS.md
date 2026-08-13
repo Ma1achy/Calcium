@@ -1614,7 +1614,7 @@ a real feature, not a binding.
 
 ---
 
-## F39 — a flag that selects a rendering is sent to the far side ★★★ — **PARTIAL**
+## F39 — a flag that selects a rendering is sent to the far side ★★★ — **CLOSED**
 
 **Every flag a `ToolDef` declares is transmitted.** C06 I4 sends argv over verbatim, which
 is right for `--all` and wrong for `--raw`: `/inspect <c> --raw` ran
@@ -1629,15 +1629,30 @@ place it keeps happening.
 Absorbed at the time by the shim, which stripped `--raw` for `inspect` before
 `exec docker` — honest, and not a fix.
 
-### PARTIAL — one of the two claims closed, and the body was stale in the other direction
+### CLOSED — and the PARTIAL marking above it was the same error one level up
 
-**This finding is two claims and only the first is closed**, which is why it is marked rather
-than left whole or closed whole. *Would landing this close it* is the test, and I21 closes half.
+**C05 I21 closes it.** `validateInvocation` returns `transmitted`, a `shellOnly` switch is
+absent from `argv`, and the consumer says so at `examples/docker/src/inspect.ts:190`: *"`ctx.flags`,
+not `result.argv`: a shellOnly flag is absent from argv by construction, **which is the whole of
+what F39 asked for**."* `--raw` selects a rendering today — the adapter returns `splitRaw(…)`
+instead of `structuredBlocks(…)` — and docker never sees the flag.
 
-| the claim | at HEAD |
-|---|---|
-| `--raw` reaches the far side and it exits 125 | **closed.** C05 I21 — `validateInvocation` returns `transmitted`, and a `shellOnly` switch is absent from `argv` |
-| there is no way to declare a flag that selects a **rendering** rather than an invocation | **open.** `FlagDef` has twelve members and none of them is presentation-selecting |
+**This was marked PARTIAL for an hour, and the reason it was wrong is worth more than the
+correction.** The second sentence of this finding — *there is no way to declare a flag that
+selects a rendering rather than an invocation* — is **literally true at HEAD**, and it was read
+as an open defect without asking whether any app still hits one. All three wants this finding
+names work: `--raw` and `--wide` are `shellOnly` switches the adapter reads, `--json` is
+transmitted because the far side understands it.
+
+*A citation reads as coverage* inverted: a sentence read as a **gap** because it is literally
+true, with nothing checked about whether anything is missing. The test is the same in both
+directions — **would landing this close it** — and what landed was I21.
+
+**And the sentence named the wrong axis, which is why only the code could show it.** It said
+*rendering rather than invocation*; the axis it needed was **transmission**. Rendering was never
+the framework's decision — the adapter composes the document and which blocks go in it is the
+adapter's business (A02 Seam 2). C13's patch gate is the precedent: two instances looked like
+one axis and the third showed the axis was wrong rather than the classification incomplete.
 
 `examples/docker/bin/docker-json:152` records the strip being **deleted** rather than
 commented, citing this finding: *"a shim that strips a flag Calcium already removed is a second
