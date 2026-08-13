@@ -24,7 +24,7 @@ import { createElement, type ReactElement } from "react";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { clampSpans, paint, tone } from "../blocks/paint.js";
-import type { BlockDefinition, RenderContext } from "../blocks/types.js";
+import type { BlockDefinition, NavElement, RenderContext } from "../blocks/types.js";
 import { emptySpans, headerSpans, rowSpans } from "./cells.js";
 import { detailBlocks, isExpandable } from "./detail.js";
 import { planColumns } from "./plan.js";
@@ -76,6 +76,8 @@ function detailHeight(
 
 export const tableDefinition: BlockDefinition<Table> = {
   kind: "table",
+
+  elements: tableElements,
 
   measure(block: Table, width: number, measureChild: MeasureFn): number {
     const w = normaliseWidth(width);
@@ -220,13 +222,57 @@ function textOf(line: string): string {
 }
 
 /**
- * The rows C16 may move focus between, in the order they are drawn (T4.6).
+ * C26 §5 — what a table offers to keyboard and pointer, from one declaration.
  *
- * Sorted, because focus follows what the user sees: arrow keys moving through the
- * declared order while the screen shows another would land somewhere the reader
- * did not point at. **C11 holds no focus state** (I14) — this is a question about
- * the block, answered from the block.
+ * **This replaced `focusableRowIds`, which is deleted** — C26 commitment 11. Two
+ * parallel mechanisms are the defect the spec names by name, because the
+ * roadmap's constraint on the mouse work is *one source, or they will disagree*,
+ * and a function left standing is the second source however few callers it has.
+ *
+ * It answered *which rows*, in drawn order, for one kind at one level. This
+ * answers *what is here and where*, for any kind at any level, which is what a
+ * pointer needs and what a keyboard needed all along.
+ *
+ * **The offsets are `measure`'s arithmetic and must stay its arithmetic.**
+ * `header + Σ(1 + detailHeight(row))`, walked in `sortedRows` order because
+ * focus follows what the reader sees. A second summation here that agreed today
+ * would disagree the first time either changed — so the same `detailHeight` is
+ * called, with the same injected `measureChild` (C26 §8b.3).
+ *
+ * **A row's element spans its detail.** The detail belongs to the row that
+ * expanded it, so a pointer landing in the detail resolves to the row rather
+ * than to nothing — and the ranges stay disjoint, which C26 I6 requires at a
+ * level.
+ *
+ * **The action bar is not an element.** C11 I17 makes its *presence* follow the
+ * data and its *content* follow focus; it is a readout of the focused row, not
+ * somewhere focus can be. Giving it one would put a place to stand inside the
+ * thing that describes where you are standing.
  */
-export function focusableRowIds(block: Table): readonly string[] {
-  return sortedRows(block).map((row) => row.id);
+export function tableElements(
+  block: Table,
+  width: number,
+  measureChild: MeasureFn,
+): readonly NavElement[] {
+  const w = normaliseWidth(width);
+  if (!hasBody(block)) return Object.freeze([]);
+
+  const out: NavElement[] = [];
+  let row = hasHeader(block) ? 1 : 0; // cells-ok — a row cursor, not a width
+
+  for (const r of sortedRows(block)) {
+    const height = 1 + detailHeight(block, r, w, measureChild);
+    const action = r.actions?.[0];
+    out.push(
+      Object.freeze({
+        id: r.id,
+        level: "row" as const,
+        rows: Object.freeze({ from: row, to: row + height }),
+        cols: Object.freeze({ from: 0, to: w }),
+        ...(action === undefined ? {} : { activate: action }),
+      }),
+    );
+    row += height;
+  }
+  return Object.freeze(out);
 }

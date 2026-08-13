@@ -1312,6 +1312,15 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "ConformanceReport.kindsCovered": "C09 §7 — measurement-conformance coverage, asserted by the harness's own row",
   "Failure.check": "C09 §7 — measurement failure record, asserted by the harness",
   "Failure.expected": "C09 §7 — as `check`",
+  "ElementFailure.predicate":
+    "C26 §5 — element-conformance failure record, asserted by the harness's own row. " +
+    "Same disposal as `Failure.check` above and for the same reason: a conformance " +
+    "report is read by the suite that runs it, not by `src/`",
+  "ElementReport.agreements":
+    "C26 I7 — the count of kinds declaring BOTH `window` and `elements`, which is " +
+    "zero today and is asserted to be zero by T2.17. It exists so the vacuity is " +
+    "reported rather than implied: the day a kind declares both, that row fails and " +
+    "the agreement becomes live with nothing new to write",
   "ToolDef.oneShot":
     "C05 — **already documented at length as having no subject** (C22 §4). Correct " +
     "disposal, independently confirmed: the coverage audit reached it from the " +

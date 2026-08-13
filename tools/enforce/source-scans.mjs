@@ -830,6 +830,8 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "a corpus-drift report written to a developer's terminal by a developer's command — never composed into a frame",
   "src/testing/measurement-conformance.ts":
     "the conformance report, same premise: a tool's output, not a rendered document",
+  "src/testing/navigation-conformance.ts":
+    "the element-conformance report, and the same premise as its sibling above: a tool's output read by a developer, never composed into a frame",
 });
 
 /**

@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync } from "node:fs";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
-import { focusableRowIds, planColumns, tableDefinition } from "../../src/presentation/table/index.js";
+import { tableElements, planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import {
   surfaceColumns,
   surfaceDrops,
@@ -326,7 +326,7 @@ describe("C11 tier 4 — the table inside C09", () => {
       sort: { key: "age", direction: "asc" },
     };
 
-    const ids = focusableRowIds(block);
+    const ids = tableElements(block, 120, registry.measure).map((e) => e.id);
     const lines = registry.renderToLines(block, 120).slice(1);
     // The rendered rows carry their uuid, so the order on screen is readable from
     // the frame rather than from the fixture — which is what makes this an

@@ -74,3 +74,14 @@ export {
   type Finding,
   type ConformanceReport as BoundaryReport,
 } from "./boundary-conformance.js";
+
+// C26 §5 — the four predicates `elements` earns. Weaker than `window`'s single
+// equality, and the strongest of them is vacuous today; the module says which
+// premise that rests on.
+export {
+  checkElements,
+  formatElementReport,
+  type ElementFailure,
+  type ElementReport,
+  type NavigableRegistry,
+} from "./navigation-conformance.js";

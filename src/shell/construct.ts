@@ -27,6 +27,7 @@
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
+import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
 import { createManifestStore, parseManifest } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
@@ -50,7 +51,6 @@ import { createOverlayManager } from "../viewport/overlay/index.js";
 import { createEditor } from "../interaction/editor/index.js";
 import { createEngine, frameworkSources, MENU_ID } from "../interaction/completion/index.js";
 import { createFocusStore } from "../interaction/router/focus.js";
-import { focusableRowIds } from "../presentation/table/index.js";
 import { createKeymap, defaultKeymap, keyText } from "../interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { createConfirmHost, type ConfirmHost } from "./confirm.js";
@@ -200,6 +200,14 @@ export type ConstructDeps = Readonly<{
 }>;
 
 export type Graph = Readonly<{
+  /**
+   * The live entry's elements, from the registry's one walk (C26 §5, §8b.4).
+   *
+   * **On the graph so `session.ts` reads this walk rather than a fourth.** Three
+   * copies existed and the third was in this file's consumer, which is why the
+   * comment warning about the second could not see it.
+   */
+  liveElements: () => readonly Readonly<{ blockId: string; element: NavElement }>[];
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
   capabilities: TerminalCapabilities;
@@ -816,6 +824,32 @@ export async function constructGraph(
   // the pipeline built at 10, and the pipeline closes over the router built at
   // 9. Registering with the router would require one of the two to exist before
   // it does.
+  /**
+   * The live entry's elements, once (C26 §5).
+   *
+   * **One walk feeding three consumers**, which is the whole of §8b.4: `liveRows`,
+   * `liveRowAction` and — through `graph.liveElements` — `session.ts`'s
+   * `focusFor` all read this. Three copies is what the tree had, and the third
+   * sat in another component where the comment warning about the second could
+   * not see it.
+   *
+   * **A pull, recomputed per call** (C26 I11). C16 registers no subscription and
+   * neither does this: C13 emits `append` then `evict` for one `append()`, so a
+   * cached list read as current state is the half-applied store that cost C14 a
+   * blank screen every assertion passed.
+   *
+   * The width is the region's, because that is the width the blocks were
+   * measured and drawn at. A second width here would put the elements somewhere
+   * the frame is not.
+   */
+  const liveElements = (): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
+    const id = stores.transcript.liveId;
+    if (id === null) return [];
+    const entry = stores.transcript.entries.find((e) => e.id === id);
+    if (entry === undefined) return [];
+    return built.blocks.elementsIn(entry.doc.blocks, deps.frame.overlayRegion().width);
+  };
+
   const keys = createKeyEffects({
     editor: stores.editor,
     completion: built.completion,
@@ -830,20 +864,16 @@ export async function constructGraph(
     documentView,
     releaseView: () => void pipeline.releaseView(),
     focus,
-    // **Answered from the block** (C16 I22, C11 I14). C16 takes row ids as data
-    // and holds no opinion about what a row is, so this is the one place that
-    // knows a live entry's blocks and can ask C11 which of them are navigable.
-    liveRows: () => {
-      const id = stores.transcript.liveId;
-      if (id === null) return [];
-      const entry = stores.transcript.entries.find((e) => e.id === id);
-      if (entry === undefined) return [];
-      const out: string[] = [];
-      for (const block of entry.doc.blocks) {
-        if (block.kind === "table") out.push(...focusableRowIds(block));
-      }
-      return out;
-    },
+    // **One walk, and it is the registry's** (C26 §5, §8b.4). This asked C11
+    // directly and tested `block.kind === "table"`, which was one of *three*
+    // such walks — the two below and `focusFor` in `session.ts`. Each was a
+    // separate answer to *what is here*, and the comment on the next one had
+    // already named the hazard while sitting beside the walk it warned about.
+    //
+    // **It also only ever saw the top level**, so a table inside a `panel` could
+    // not be focused at all. `elementsIn` recurses because the registry already
+    // walks children for `measure` and `render` (C26 §8b.5).
+    liveRows: () => liveElements().map((f) => f.element.id),
     /**
      * **Beside `liveRows`, because it is the same question** (C23 I37, F21).
      * That comment says this is the one place that knows a live entry's blocks;
@@ -856,15 +886,11 @@ export async function constructGraph(
     liveRowAction: (rowId: string) => {
       const id = stores.transcript.liveId;
       if (id === null) return null;
-      const entry = stores.transcript.entries.find((e) => e.id === id);
-      if (entry === undefined) return null;
-      for (const blk of entry.doc.blocks) {
-        if (blk.kind !== "table") continue;
-        const row = blk.rows.find((r) => r.id === rowId);
-        const action = row?.actions?.[0];
-        if (action !== undefined) return { action, from: id };
-      }
-      return null;
+      // `activate` is the element's own, declared by the kind rather than dug
+      // out of a row shape this layer would otherwise have to know (C26 §5).
+      const found = liveElements().find((f) => f.element.id === rowId);
+      const action = found?.element.activate;
+      return action === undefined ? null : { action, from: id };
     },
     // C23 I16 — the dispatcher is C23's and is supplied, never built here.
     onAction: (action, from) => {
@@ -1119,6 +1145,7 @@ export async function constructGraph(
      * taking keys.
      */
     promptUnderMenu,
+    liveElements,
     capabilities: detection.capabilities,
     /**
      * C22 I6a — construction, then the session, then what the session contained.
