@@ -687,6 +687,59 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ]);
   });
 
+  it("MG24 reads a member on any line, so formatting does not decide what is watched", () => {
+    // **F159.** The walk read one member per line, so a declaration written on
+    // one line presented exactly one member and every later one was outside the
+    // rule. 40 published object types under `src/` were single-line, and none of
+    // them was unwatched by a decision anybody took.
+    //
+    // **The row is written against the fabricated violation that found it**: this
+    // fixture passed `make enforce` clean under both keywords, and was caught
+    // only when the same alias was broken across lines. Both keywords are here,
+    // because the discriminator turned out to be neither of them.
+    const oneLine: Record<string, string> = {
+      "src/data/manifest/types.ts":
+        "export type Anchor = Readonly<{ rowOffset: number; rows: number }>;\n" +
+        "export interface Region { readonly height: number; readonly width: number }\n",
+      // First member of each is supplied or accessed; the second of each is not.
+      "src/viewport/viewport/anchor.ts": "const a = { rowOffset: 0 };\nvoid r.height;\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(oneLine), (f) => oneLine[f] ?? "", {});
+    const named = violations.map((v) => v.message.split(" ")[0]).sort();
+
+    expect(named, "the second member of a one-line declaration is reachable").toEqual([
+      "Anchor.rows",
+      "Region.width",
+    ]);
+  });
+
+  it("MG24 does not read a member out of a comment inside a declaration", () => {
+    // **The cost of segmenting, paid before it was charged.** Splitting at a
+    // separator rather than at a newline means a `,` inside a sentence starts a
+    // segment mid-prose, and the probe produced three phantoms —
+    // `CompletionEngine.synchronously`, `Pipeline.appended`, `TuiConfig.wired` —
+    // from comments that the line walk could not match because a comment line
+    // begins `*` or `//`.
+    //
+    // A phantom is the worst shape a violation takes (F95): it cannot be wired
+    // and cannot be deleted, so an exemption is the only resolution and it
+    // justifies something that does not exist. Stripping prose before reading
+    // structure is what `checkSeamConsumers` already did on the *consumer* side.
+    const prose: Record<string, string> = {
+      "src/shell/types.ts":
+        "export interface Pipeline {\n" +
+        "  /** Runs, appended: exactly once per source. */\n" +
+        "  readonly run: () => void;\n" +
+        "}\n",
+      "src/shell/construct.ts": "p.run();\n",
+    };
+
+    const violations = checkSeamConsumers(Object.keys(prose), (f) => prose[f] ?? "", {});
+
+    expect(violations, "`appended` is a word in a sentence, not a member").toEqual([]);
+  });
+
   it("MG24 does not report a method PARAMETER as an interface member", () => {
     // **F95.** The member pattern is line-oriented, so a parameter inside a
     // multi-line signature matched it — `take(sourceId, key, ttlMs, run)` gave
