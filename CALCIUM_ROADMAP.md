@@ -2314,23 +2314,23 @@ what landed**.
 | # | status | evidence in the tree | residue |
 |---|---|---|---|
 | 0 | BUILT | `examples/docker/README.md` (F157), the media (F158), `.github/workflows/ci.yml` `fast`/`proof` (F150, F154, F156) | — |
-| 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `data/viewmodel/types.ts:440` | 1.1, 1.3, 1.4 not checked in this pass |
-| 5 | PART | **CI from the tarball** built: `ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
-| 8 | BUILT | **C14 I4/I5/I6.** `viewport.ts:347 #afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
-| 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `shell/local/registry.ts:59`, reached as `ctx.ask` at `execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
-| 12 | BUILT | `shell/render-frame.ts` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
-| 13 | BUILT | `shell/render-cache.ts`, keyed on entry · `rev` · width · **focus** · theme name | — |
-| 14 | BUILT | `presentation/text.ts:89–108` — an equality, not an approximation | — |
-| 17 | PART | `logs` — `blocks/kinds/structured.ts:123` — **and** `patch` — `presentation/patch/definition.ts:211` — declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step) | **two implementers, not four.** `keyValue` and `code` declare none and render whole at every offset |
-| 18 | BUILT | `shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
-| 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `refresh.ts:212`, wired at `construct.ts:760` | — |
-| 21 | PART | `usageBlocks` **has a caller** — `shell/documents.ts:215`, on `raw.exitCode === 2` | `--help` per verb, which needs 6's render-selecting flag |
-| 25 | PART | drawn: `paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static |
-| 27 | PART | **16 languages** registered in `presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
-| 34 | PART | animation exists as `RenderContext.tick` (C09 I8 — appearance only) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
-| 38 | PART | `Group` ships with `direction: "row" \| "column"` — `viewmodel/types.ts:556`, `b.group`, `containers.ts:236` | **the width fractions this entry says ship with it do not.** `childWidths` gives every child the same width — `viewmodel/measure.ts:118–124` |
-| 39 | RULED | the ruling is in the entry; `Style.background` exists at `theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
-| 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `terminal/capabilities.ts:19,148` | no renderer |
+| 1 | PART | **1.2 change axis** built: `change?: "unchanged" \| "changed" \| "added" \| "removed"`, `src/data/viewmodel/types.ts:440` | 1.1, 1.3, 1.4 not checked in this pass |
+| 5 | PART | **CI from the tarball** built: `.github/workflows/ci.yml` `proof` job + `make regime`. **0.x** said: `README.md:472` | error messages: F151 fixed, **F152 and F153 open**. The outside-reader test is **owed and unrunnable from inside the repository** (R01 R4.4) |
+| 8 | BUILT | **C14 I4/I5/I6.** `src/viewport/viewport/viewport.ts:347` — `#afterContent()` restores from the anchor on **every** content change, not only on resize; `T5.3` is the tier-5 row — *a `--logs` tail at 1,000 lines/s while scrolled up → the view does not move* | the floating jump-to-bottom indicator, which is chrome and belongs to 29 |
+| 10 | PART | `ask: (opts: AskOptions) => Promise<string>` with `choices` — `src/shell/local/registry.ts:59`, reached as `ctx.ask` at `src/shell/execution.ts:616` | the in-transcript menu block, and the popup unification (16) |
+| 12 | BUILT | `src/shell/render-frame.ts:153` `body()` — `previous()`, per-row `cursorTo(i, 0)`, `SGR_RESET` per row (I57) | — |
+| 13 | BUILT | `src/shell/render-cache.ts`, keyed on entry · `rev` · width · **focus** · theme name | — |
+| 14 | BUILT | `src/presentation/text.ts:108` — an equality, not an approximation | — |
+| 17 | PART | `logs` — `src/presentation/blocks/kinds/structured.ts:123` — **and** `patch` — `src/presentation/patch/definition.ts:211` — declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step) | **two implementers, not four.** `keyValue` and `code` declare none and render whole at every offset |
+| 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
+| 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `src/shell/refresh.ts:212`, wired at `src/shell/construct.ts:760` | — |
+| 21 | PART | `usageBlocks` **has a caller** — `src/shell/documents.ts:215`, on `raw.exitCode === 2` | `--help` per verb, which needs 6's render-selecting flag |
+| 25 | PART | drawn: `src/shell/paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static |
+| 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
+| 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
+| 38 | PART | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` | **the width fractions this entry says ship with it do not.** `childWidths` gives every child the same width — `src/data/viewmodel/measure.ts:122` |
+| 39 | RULED | the ruling is in the entry; `Style.background` exists at `src/presentation/theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
+| 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
 **Checked and confirmed OPEN**, which is evidence rather than an absence of it: **6** —
 `FlagDef` has no presentation-selecting field (`data/manifest/types.ts:42–56`), and F15 being

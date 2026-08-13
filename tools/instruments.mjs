@@ -49,6 +49,16 @@ const COVERED = [
   // out: `scan-cost.mjs` was added, `make instruments` went from 16/16 to
   // 17 found, 16 with a fixture, and named the file.
   ["tools/scan-cost.mjs", ["npx", "vitest", "run", "test/unit/scan-cost.test.ts"]],
+  // The Order column's verifier. **It caught this target's own claim a second
+  // time**: `make instruments` went 19 found / 18 with a fixture and named the
+  // file, which is the equality comparison paying out on the day the instrument
+  // landed rather than the day someone noticed.
+  //
+  // Its `--file` flag is corrections.mjs's `--root` for the same reason — RS2's
+  // fabricated wrong-file citation could not be written without pointing the tool
+  // at a fabricated roadmap, and a row that cannot be written is how the other
+  // nine end up certifying a tool that prints a hard-coded answer.
+  ["tools/roadmap-status.mjs", ["npx", "vitest", "run", "test/unit/roadmap-status.test.ts"]],
   ["tools/mutate/mutate.mjs", ["npx", "vitest", "run", "test/unit/mutate-harness.test.ts"]],
   ["tools/proof.sh", ["npx", "vitest", "run", "test/unit/proof-guards.test.ts"]],
   ["examples/docker/tools/screen.py", ["python3", "examples/docker/tools/screen_test.py"]],
