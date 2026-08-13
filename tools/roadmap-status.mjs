@@ -122,7 +122,7 @@ function parse(text) {
     marked,
     evidence,
     confirmedOpen: listed("**Checked and confirmed OPEN**"),
-    unchecked: listed("**Not checked in this pass"),
+    unchecked: listed("**Not checked, and named"),
   };
 }
 
@@ -228,7 +228,7 @@ for (const [entry] of [...marked].sort((a, b) => Number(a[0]) - Number(b[0]))) {
 
 // --- 2. the partition, by equality ------------------------------------------
 if (confirmedOpen === null) fail.push("no `Checked and confirmed OPEN` paragraph");
-if (unchecked === null) fail.push("no `Not checked in this pass` paragraph");
+if (unchecked === null) fail.push("no `Not checked, and named` paragraph");
 
 if (confirmedOpen !== null && unchecked !== null) {
   const accounted = new Set([...marked.keys(), ...confirmedOpen, ...unchecked]);

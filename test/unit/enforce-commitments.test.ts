@@ -78,10 +78,15 @@ const at =
 describe("A03 SP1 — commitment/invariant pairing", () => {
   it("SP1: the real corpus is clean, and it is a corpus", () => {
     // Both halves. The first is the rule; the second is what stops it passing
-    // because it looked at nothing — twenty-five specs, several hundred
+    // because it looked at nothing — twenty-six specs, several hundred
     // commitments, and a count that fails if the glob ever stops matching.
+    //
+    // **It fired on C26 and that is the guard working**, not a maintenance cost:
+    // the count went 25 → 26 the moment a spec landed, in CI, on a change whose
+    // author had run `enforce` and `check` and not `test`. A derived count would
+    // have said nothing, which is the state this number exists to prevent.
     const files = specFiles();
-    expect(files.length).toBe(25);
+    expect(files.length).toBe(26);
 
     const total = files.reduce((n, f) => n + commitmentsOf(f).length, 0);
     expect(total).toBeGreaterThan(300);
@@ -242,9 +247,9 @@ describe("A03 SP2 — invariants are numbered 1..n, in order", () => {
 
   it("SP2: the real corpus, and it is a corpus", () => {
     // The vacuity half. `checkOrdering` skips a spec declaring nothing, so a
-    // parser that stopped matching would report twenty-five clean documents.
+    // parser that stopped matching would report twenty-six clean documents.
     const files = specFiles();
-    expect(files.length).toBe(25);
+    expect(files.length).toBe(26);
 
     const total = files.reduce((n, f) => n + invariantOrderOf(f).length, 0);
     expect(total, "355 invariants at the last audit; the parser must still see them").toBeGreaterThan(
@@ -352,10 +357,10 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     //
     // Asserting the *share* rather than the presence, because a single component
     // file slipping into the corpus would satisfy a membership check while the
-    // other twenty-four stayed invisible.
+    // other twenty-five stayed invisible.
     const files = referenceFiles();
     const components = files.filter((f) => f.startsWith("docs/components/"));
-    expect(components.length, "all 25 component specs").toBe(25);
+    expect(components.length, "all 26 component specs").toBe(26);
 
     const { resolved } = checkReferences(components);
     expect(resolved, "the densest citation corpus in the project").toBeGreaterThan(1500);

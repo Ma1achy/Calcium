@@ -2212,7 +2212,7 @@ BUILT 18 SHARED POLLERS ★★       source → derivation → part. One fetch A
                                    source; only the render is per instance. A CORRECTNESS fix
                                    first. Render memoised on (sourceVersion, viewState, width),
                                    one batch per source, and the stagger gets less to do
-      19 resize coalescing        never delayed by C03 I2, and every SIGWINCH rebuilds the Fenwick
+PART  19 resize coalescing        never delayed by C03 I2, and every SIGWINCH rebuilds the Fenwick
                                    index. A drag is N rebuilds + N renders + N writes
 BUILT 20 off-screen live parts ★  b.live keeps ticking when scrolled off — no visibility check
                                    exists. Throttle, not pause (I9 protects a scrolled-away
@@ -2323,6 +2323,7 @@ what landed**.
 | 14 | BUILT | `src/presentation/text.ts:108` — an equality, not an approximation | — |
 | 17 | PART | `logs` — `src/presentation/blocks/kinds/structured.ts:123` — **and** `patch` — `src/presentation/patch/definition.ts:211` — declare `BlockDefinition.window` (F134, CLOSED: 13–21× opening, 90–102× per drag step) | **two implementers, not four.** `keyValue` and `code` declare none and render whole at every offset |
 | 18 | BUILT | `src/shell/refresh.ts` — `Source`, the `folds` memo (I47), stagger by source not by part | — |
+| 19 | PART | **the first claim holds and the second does not.** `resize` is an immediate commit reason, never coalesced (C03 §, I2). But *every SIGWINCH rebuilds the Fenwick index* is false: `src/viewport/viewport/viewport.ts:197` rebuilds **only when the width changed** — C14 I8, *a height change invalidates none, and doing both would make dragging a terminal's bottom edge cost a full remeasure per frame* — and step 0 refuses a resize to the size already held (C14 I21) | a **horizontal** drag is still N rebuilds + N renders + N writes, which is the half that survives |
 | 20 | BUILT | `visible: (host: RefreshHost) => boolean`, `src/shell/refresh.ts:212`, wired at `src/shell/construct.ts:760` | — |
 | 21 | PART | `usageBlocks` **has a caller** — `src/shell/documents.ts:215`, on `raw.exitCode === 2` | `--help` per verb, which needs 6's render-selecting flag |
 | 25 | PART | drawn: `src/shell/paint.ts:303` reads `ghost()` fresh per paint (I50) | sole-candidate only, and static |
@@ -2332,7 +2333,7 @@ what landed**.
 | 39 | RULED | the ruling is in the entry; `Style.background` exists at `src/presentation/theme/types.ts:87`, set only by `resolveBackground` | `--no-bg` matches nothing in `src/` |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it: **6** —
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **16** (the confirm and the completion menu are two mechanisms, which is the state the entry describes) · **22** · **23** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **31** · **33** · **36** · **37** · **41** · **42** · and **7**, which is now specified as C26 and has no `src/interaction/navigation/`. First sweep: **6** —
 `FlagDef` has no presentation-selecting field (`data/manifest/types.ts:42–56`), and F15 being
 CLOSED does not close 2.1's convention · **15** — `enterCopyMode` is defined nowhere in
 `src/`, and there is no OSC 52 · **26**, **32**, **40** — the symbols the entries name are
@@ -2343,10 +2344,15 @@ expired; the `steps` block already animates off `ctx.tick` (`structured.ts:403`)
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
 which is worth saying because it reads as coverage.
 
-**Not checked in this pass, and named rather than left to look checked:** 2, 3, 4, 7, 9, 11,
-16, 19, 22, 23, 24, 29, 30, 31, 33, 36, 37, 41, 42. Nineteen of forty-five. Their rows are
-unmarked, which is what an unmarked row has always meant, and that is the point of saying so
-here — an OPEN nobody verified reads exactly like one somebody did.
+**Not checked, and named rather than left to look checked:** 2, 3, 4. Three of forty-five, and
+they are the three that **cannot** be checked from here: each names `prism-tui`, a consumer
+repository that does not exist in this tree. That is a different state from *not looked at* and
+it is said rather than folded into the other two — an OPEN nobody verified reads exactly like
+one somebody did, and so does one nobody could.
+
+**The second sweep found a ninth stale entry**, which is the argument for having run it: 19's
+*every SIGWINCH rebuilds the Fenwick index* has been false since C14 I8 landed. Nine of
+forty-two checked — 21% — and the rate did not fall between sweeps.
 
 **Entry 7 is now specified, and four rows below it are inside it rather than beside it.**
 `docs/components/C26_navigation.md` — design only, nothing built. **10** (the question / menu

@@ -54,8 +54,15 @@ describe("roadmap-status — the Order column's verifier", () => {
     const r = run();
     expect(r.out, "the real roadmap").toContain("45/45 entries accounted for");
     expect(r.ok).toBe(true);
-    // The counter, not only the status — a run over 3 entries also exits 0.
-    expect(r.out).toMatch(/45 entries · 18 marked, 18 resolving/u);
+    // **The counter, not only the status** — a run over 3 entries also exits 0.
+    // The corpus size is pinned because it is structural; the marked count is
+    // asserted as a relation rather than a figure, because a number that churns
+    // on every status change is a number people update without reading. What has
+    // to hold is that something was marked and that every marked row resolved.
+    const m = /45 entries · (\d+) marked, (\d+) resolving/u.exec(r.out);
+    expect(m, "the counter line").not.toBeNull();
+    expect(Number(m?.[1]), "marked rows").toBeGreaterThan(0);
+    expect(Number(m?.[2]), "every marked row resolves").toBe(Number(m?.[1]));
   });
 
   it("RS2: a claim naming the wrong file fails, and names the identifier", () => {
@@ -118,21 +125,21 @@ describe("roadmap-status — the Order column's verifier", () => {
   });
 
   it("RS4: an entry in none of the three sets fails — the arm that matters", () => {
-    // 41 is in the unchecked list today. Dropping it there leaves it unmarked,
+    // 4 is in the unchecked list today. Dropping it there leaves it unmarked,
     // unconfirmed and unnamed — which is exactly what an entry silently added to
     // the Order list looks like, and it is indistinguishable from a verified OPEN
     // by reading.
-    const r = run(mutate("33, 36, 37, 41, 42", "33, 36, 37, 42"));
+    const r = run(mutate("2, 3, 4. Three of", "2, 3. Three of"));
     expect(r.ok).toBe(false);
     expect(r.out).toContain("entries in neither the column");
-    expect(r.out).toContain("41");
+    expect(r.out).toContain("4");
     expect(r.out).toMatch(/reads exactly like one somebody did/u);
   });
 
   it("RS5: an entry in two of the three sets fails", () => {
     // 13 is BUILT. Naming it in the unchecked list as well makes the document say
     // two things, and a partition that only checked coverage would pass.
-    const r = run(mutate("33, 36, 37, 41, 42", "13, 33, 36, 37, 41, 42"));
+    const r = run(mutate("2, 3, 4. Three of", "2, 3, 4, 13. Three of"));
     expect(r.ok).toBe(false);
     expect(r.out).toContain("in two of the three sets");
   });
@@ -154,8 +161,8 @@ describe("roadmap-status — the Order column's verifier", () => {
     // set, because a heading someone renamed would otherwise silently move every
     // entry into the unaccounted pile — or, if the partition were computed the
     // other way, out of it.
-    const r = run(mutate("**Not checked in this pass", "**Left for later"));
+    const r = run(mutate("**Not checked, and named", "**Left for later"));
     expect(r.ok).toBe(false);
-    expect(r.out).toContain("no `Not checked in this pass` paragraph");
+    expect(r.out).toContain("no `Not checked, and named` paragraph");
   });
 });
