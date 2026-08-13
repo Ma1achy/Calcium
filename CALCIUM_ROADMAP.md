@@ -2538,7 +2538,27 @@ BUILT 15 text selection + copy ★  BUILT 2026-08-13 in four steps plus a step 0
                                    `{kind: "centred"}` at `src/shell/confirm.ts:148` and the
                                    menu is anchored. The design's own §1 draws it anchored,
                                    so the figure and the list disagreed with the code in
-                                   opposite directions and not with each other
+                                   opposite directions and not with each other.
+                                   WALKED 2026-08-13, both artefacts, and it resizes AGAIN.
+                                   The cycling is IDENTICAL in both copies (`% length` at
+                                   confirm.ts:194 and keys.ts:496) — the divergence is where
+                                   the selection STARTS: menu at null-or-0, confirm at the
+                                   `default` choice falling back to LAST, deliberately, so a
+                                   merged store opening at 0 puts a destructive confirm on
+                                   `yes` and passes every navigation assertion. `… N more` is
+                                   NOT portable: the menu counts in a second pass after
+                                   layout because it holds its own candidates, and the
+                                   confirm's payload is a caller's block with no registry —
+                                   so the shared piece is `Placed.truncated` and a confirm
+                                   gets `…`. The parameters are TWO KINDS: placement and
+                                   content are live through LayerUpdate, dismissable and
+                                   onSelect are frozen at construction (C15 I14). And the
+                                   empty list keeps two opposite dispositions — ask() rejects,
+                                   menuBlocks draws nothing (C15 I15). FIFTH PRODUCER:
+                                   clearConfirmLayer (history/layers.ts:95) is a second
+                                   confirm, in L3, with `(y/N)` in a notice's text and no
+                                   choice list — published, tested, and pushed by nothing in
+                                   src/. CALCIUM_POPUP_DESIGN.md §6
 PART  17 LARGE BLOCKS ★★         nothing bounds ONE block's size — D40 caps blocks per document,
                                    MAX_ROWS is the fallback adapter's alone. diffing → caching → window
                                    the block → cap with a marker. A CHAIN, in that order
