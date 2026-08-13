@@ -33,6 +33,39 @@
 // the list, or dropped from the unchecked paragraph, fails here on the day it
 // happens.
 //
+// ## The population it does NOT check, filed rather than closed — and measured
+//
+// **Nothing here resolves a body section**, and a body section is where a claim
+// goes stale most quietly: the entry above it is still open, so the section reads
+// as coverage. The fourth sweep found one — §2.2 said *"every declared flag is
+// transmitted, so `--raw` reached docker and it exited 125"*, false since C05 I21
+// shipped — while entry 6's Order row and its evidence were both **correct**. So
+// the population that goes stale is larger than the population checked, and it is
+// the larger half that reads as coverage.
+//
+// **Extending check 1 over the body was measured and does not work**, which is why
+// this is filed with the figures rather than built:
+//
+//     body sections   30 file citations, 23 of them unresolvable
+//     Order + table   49 file citations, all resolvable
+//
+// The 23 are `paint.ts`, `session.ts`, `router.ts` — **bare basenames used as
+// prose**, where the table writes `shell/paint.ts:241`. Two conventions, and the
+// rule would fire on the convention rather than on staleness: F94's shape, a
+// violation describing the document instead of a defect.
+//
+// **And it would not have caught the instance that motivated it.** *"Every declared
+// flag is transmitted"* cites no file at all. A citation resolver checks citations;
+// the sentence that went stale had none, and the sentences most likely to go stale
+// are exactly the confident summarising ones that cite nothing. That is F86, F89
+// and F92's mechanism — a claim is falsified by being summarised — arriving where
+// no resolver reaches.
+//
+// So the honest instrument for a body section is the walk that goes to the code,
+// not a rule over the document. Recorded here rather than only in a finding,
+// because a deliberate gap recorded only in a finding goes quiet — MG24's header
+// makes the same argument about its own.
+//
 // ## Its blind spot, stated because an unrecorded limit reads as strength
 //
 // **An identifier is checked for presence, not for meaning.** `window` appearing
