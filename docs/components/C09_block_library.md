@@ -67,7 +67,7 @@ interface BlockDefinition<B extends Block = Block> {
   // rather than a second one that agrees: an absent member cannot be deleted by a
   // later edit while a branch returning `[]` can. Pure in (block, width) and never
   // in focus, which is what keeps C11 I14 true by signature. UNBUILT.
-  elements?: (block: B, width: number) => readonly NavElement[];
+  elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
 }
 
 type Windowed<B extends Block = Block> = Readonly<{

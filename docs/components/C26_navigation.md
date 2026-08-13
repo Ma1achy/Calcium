@@ -136,7 +136,7 @@ when the third case was not sought.
 ## 5. Element resolution — one declaration, keyboard and pointer
 
 ```typescript
-elements?: (block: B, width: number) => readonly NavElement[];
+elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
 ```
 
 on `BlockDefinition`, beside `window?`.
@@ -406,6 +406,68 @@ draws has never been honoured.
 about the interaction and wrong about the mechanism it assumed — C23 §8a A4's class. Here it
 assumed a mechanism was *missing* that is present and unused, which is the same error with
 the sign flipped, and it is cheaper to find at the call site than at the cache.
+
+### 3. `elements` cannot compute its own positions — the signature is wrong
+
+§5 declares `elements?(block, width)`. **A table's row offsets are not a function of those
+two.** `measure` is `(block, width, measureChild)` and a row's offset is
+`header + Σ(1 + detailHeight(row))`, where `detailHeight` calls `sequenceHeight(...,
+measureChild)` for every expanded row (`table/definition.ts:88`). Without it the positions
+would have to be guessed, and a guessed position is a pointer landing on the wrong row —
+the drift class, arriving through the seam built to prevent it.
+
+**The signature is `Measure<B>`'s, and that is the argument rather than a convenience.**
+A02 Seam 1 injects measurement precisely so a container composes children whose kind it does
+not know; `elements` has the same problem and takes the same seam. The registry supplies it,
+as it already does for `measure` — which also means an implementation cannot reach for its
+own measurer.
+
+```typescript
+elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
+```
+
+### 4. There are three parallel walks, and the code predicted it
+
+§5 says a second mechanism beside `focusableRowIds` is the defect to avoid. **There are
+already three, each with `block.kind === "table"` written into it:**
+
+| walk | file | answers |
+|---|---|---|
+| `liveRows` | `shell/construct.ts:838` | the ordered row ids |
+| `liveRowAction` | `shell/construct.ts:856` | the focused row's action |
+| `focusFor` | `shell/session.ts:715` | which block owns the focused row |
+
+`liveRowAction`'s own comment names the hazard — *"a second walk elsewhere would be a second
+answer to what is here, and the two would disagree the first time a block kind became
+navigable"* — and it is written **beside** the walk it was warning about, while the third sat
+in another component. Two instances read as a pair; the third is in a different file, which is
+why the comment did not find it.
+
+### 5. All three walk the top level only, so a nested table is unreachable
+
+Each iterates `entry.doc.blocks` and stops. `panel` and `group` hold `children: readonly
+Block[]` (`viewmodel/types.ts:553,560`), so **a table inside a panel cannot be focused, moved
+through, or activated** — by keyboard or, once it exists, by pointer.
+
+C04 exports `descendants` and C13's cap uses it *by name*, with a comment saying a second copy
+would miss things. None of the three focus walks call it. Registry-side `elements` resolution
+inherits the recursion for free, because the registry already walks children for `measure` and
+`render`.
+
+### 6. Row ids collide across blocks, and focus resolves to the wrong one
+
+Row ids are unique within a block at best — C11 T3.15 records that even *that* is unchecked
+and is C04's to add. `liveRows` **concatenates** ids across every table in the entry, `rowUp`
+and `rowDown` use `rows.indexOf(...)`, and `focusFor` returns the **first** block containing
+the id.
+
+So two tables in one document each carrying a row `r1` give: `↓` onto the second table's `r1`,
+highlight drawn on the *first* table's, and the next `↓` continuing from the first table's
+position. Every step is individually correct.
+
+**`elements` closes it by construction rather than by adding a uniqueness rule**: an element
+is addressed by its own id within a declaration that knows which block produced it, so there
+is no flat namespace for two rows to collide in.
 
 ---
 
