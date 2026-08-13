@@ -1707,11 +1707,19 @@ the *degenerate case* of a selection model — the whole buffer as one region �
 alone means shipping an anchor and a region for one binding and then generalising them:
 
 ```
-⇧← ⇧→          extend by character
-⌥⇧← ⌥⇧→        extend by word            — pairs with ⌥b/⌥f, which exist
-⇧⌃a ⇧⌃e        extend to line start/end  — pairs with ⌃a/⌃e, which exist
-⌥a             select all              — ⌃⇧a is 0x01, which is ⌃a, which is bound
+⇧← ⇧→          extend by character       — CLEAR: s+left, s+right
+⌥⇧← ⌥⇧→        extend by word            — BLOCKED by a decoder defect, C16 §2
+⇧Home ⇧End     extend to line start/end  — CLEAR: s+home, s+end
+⌥a             select all                — CLEAR: m+a
+⇧⌃a ⇧⌃e        DEAD — ctrl+shift+letter is 0x01, the same collapse as ⌃⇧a
 ```
+
+**Every row above was pressed through the built decoder, 2026-08-13**, per T2.13 — the check
+that has now cost four bindings and, on this run, found a defect in shipped code:
+`modifiersOf` reads three of xterm's four modifier bits, so `CSI 1;10D` (Meta-Shift-Left)
+decodes as `s+left` — **a different, live binding rather than a missing one**. C16 §2 carries
+the measurement. `⇧Home`/`⇧End` replace the dead ctrl-shift pair and are what GUI editors use
+anyway.
 
 **Every one of these has its unshifted motion already bound**, so the keys are not the work
 and the list is short for the same reason select-all is: each shifted form is *move, and
@@ -2505,7 +2513,14 @@ BUILT 14 cells() ASCII fast path  the hottest function walks Intl.Segmenter over
                                    is the app having none; ⌥a, not ⌃⇧a, which is 0x01 = ⌃a and
                                    bound to home; the mouse toggle is a mechanism this entry
                                    ADDS, not one it inherits. exitCopyMode is a second stub,
-                                   so producer and exit ship together or neither does
+                                   so producer and exit ship together or neither does.
+                                   DESIGNED 2026-08-13 — CALCIUM_SELECTION_DESIGN.md, four
+                                   steps plus a step 0: the decoder check found modifiersOf
+                                   reading 3 of xterm's 4 modifier bits, so Meta-Shift-Left
+                                   decodes as ⇧← — a live binding, not a missing one (C16 §2).
+                                   B4 ruled: copy mode suspends FRAME COMMITS, not data —
+                                   C23 I46's pause reaches polled parts and not a live stream,
+                                   which is the case a reader most wants to copy from
       16 ONE POPUP ★             confirm · completion · peek · question are one mechanism with
                                    two parameters. C19's menu already has the flip, the selection
                                    and `… N more`; the confirm reimplements or lacks all of it

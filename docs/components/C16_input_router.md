@@ -72,6 +72,26 @@ of consistent. One constant, one behaviour, one bug report.
 
 Terminals send no key-up events and repeat held keys as fresh presses, so there is no chord support beyond modifiers. Saying so prevents someone designing a keymap that cannot work.
 
+### `modifiersOf` reads three bits of four, and the fourth collapses onto a live binding
+
+**Measured 2026-08-13 by pressing sequences through the built decoder**, while checking the bindings entry 15's selection model would add. It is a defect in shipped code, not a design input.
+
+xterm's modifier parameter is `1 + (shift 1 | alt 2 | ctrl 4 | meta 8)`. `modifiersOf` maps bits 1, 2 and 4 — the decoder's `meta` is xterm's **alt** — and **never reads bit 8**. So every Meta-modified key loses its modifier silently:
+
+| sent | xterm means | decoder emits |
+|---|---|---|
+| `CSI 1;9D` | Meta-Left | **`left`** — bare, every modifier gone |
+| `CSI 1;10D` | Meta-Shift-Left | **`s+left`** — which is `⇧←`, a *different key* |
+| `CSI 1;13D` | Meta-Ctrl-Left | `c+left` |
+| `CSI 1;4D` | Alt-Shift-Left | `ms+left` — correct |
+| `CSI 1;16D` | all four | `cms+left` — correct **by accident**, since the other three bits are all set |
+
+**This is worse than the unexecuted-binding class and it is the reason to record it separately.** That class is a binding no event can produce: dead, and silent. This is an event decoding as a *different, live* binding — on a terminal that sends Meta rather than Alt, `⌥⇧←` would extend a selection by one character instead of one word, and every assertion written about `⇧←` passes while it happens. A test indexed by "which keys does the decoder produce" agrees, because it produces a perfectly good key.
+
+The fix is to include bit 8 in `meta`: the `Key` shape has one alt/meta flag and both bits mean the same thing to every binding above. **It lands before any shifted-motion binding**, because with it absent the two arms of `⌥⇧←` disagree about which key was pressed.
+
+**And the ESC-prefixed CSI form is shredded.** `ESC ESC [ 1 ; 2 D` decodes as `m+escape` followed by six printable keys — `[`, `1`, `;`, `2`, `D` — which are text an editor would insert. The roadmap names this as a wire form `⌥⇧←` may arrive in; **no terminal has been measured emitting it**, so this is recorded as an owed check rather than a second defect. The measurement is of the decoder, which is what was run.
+
 ---
 
 ## 3. Derived focus
