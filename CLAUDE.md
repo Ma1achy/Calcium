@@ -306,6 +306,29 @@ Each of these produces code that compiles, passes review, and is wrong.
   picking up the entry begins by grepping it.** Grepping `src/` for forward-looking
   deferrals returns one line today, which is the number that makes the habit cheap.
 
+  **Three instances now, and they share a shape the first one did not show.** The condition
+  is written **where the deferral is**, and the thing that satisfies it is written
+  **somewhere else** — so nobody holding either half is looking at the other, and neither
+  half is wrong.
+
+  | the deferral | its condition | what met it, elsewhere |
+  |---|---|---|
+  | `paint.ts`'s simplification | *until `cursorCell` is threaded through* | `cursorCell` on the editor's public interface, read forty lines below |
+  | roadmap 38, on `height: "fill"` | *the producer cannot see the height — that is F37* | `ProducerContext.height`, granted by phase 1's row 2, non-null exactly in the case the entry names |
+  | C04 §3, on a `weights` field | *add weights when a surface needs them* | the banner, needing 15 / 1 / 61 against a 38 / 38 split — which hand-composed a `raw` block instead |
+
+  **The third is the one that shows the cost**, because the surface that met the condition
+  did not know it was the condition: it worked around the missing field, and the workaround
+  became roadmap 38's evidence list — *padded to a uniform 40 by hand, top-padded by one row,
+  the composed width measured three times*. A deferral that is never revisited does not stay
+  deferred; it gets paid for at every call site that needed it, in a currency nobody totals.
+
+  **And the direction to grep is from the satisfier, not from the deferral.** Two of the
+  three were found by reading an entry and checking its premises against the tree — the
+  seventh pass's own method — rather than by anything watching the condition. The habit that
+  reaches them is the one already written down: **when picking up an entry, check what its
+  claims resolve to at HEAD rather than trusting the row.**
+
 - **A correct sentence justifying the wrong decision survives being read carefully.**
   MG24 was scoped to `export interface` because *"a type alias is structural and can be
   satisfied without being named"* — which is **true**, about satisfying a type, and

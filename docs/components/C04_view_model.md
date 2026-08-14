@@ -272,6 +272,81 @@ This is a rule about a degenerate width rather than a layout feature: above `2n 
 
 A `pills` block is **one logical row**. Prism's two-row filter layout (kind row, then status row) is two `pills` blocks, not one block that wraps — wrapping is overflow behaviour, not a layout choice.
 
+### Weights, walked by hand — roadmap 38
+
+**The deferral above named its own condition and nothing watched it.** *Add weights
+when a surface needs them, and not before* — and a surface needed them: the docker
+banner is 15 cells of triangle, one of separator and 61 of wordmark (A01 A.1), where
+an equal split of two children gives 38 and 38. It could not say so, so it
+hand-composed a `raw` block, padding the art to a uniform 40 by hand, top-padding one
+side by a row, and measuring the composed width three times before it was right.
+**Every item on roadmap 38's evidence list is the cost of a field this section
+deferred**, and the entry is written as though no container existed.
+
+**Which is why `direction: "row"` has no caller.** Six `b.group` sites in the tree —
+five in the docker example and one in the stream adapter — and every one is
+`"column"`. C09 §485 recorded *no in-tree adapter builds a row group today* as a
+reason its width-1 substitution was latent; it is still true, and the reason is this
+one rather than obscurity.
+
+#### The artefact is a table, and that is a decision
+
+Layout here is **structural**: `measure` is pure and total over `(block, width)`, no
+container holds state, and nothing accumulates between calls. A sequence trace would
+be rows about resize — and a resize is the same table evaluated at a second width,
+which is a restatement rather than an interaction. The one row that tested it is
+row 8, where a width change moves a child across the placement boundary; it is
+width-indexed, so it belongs here.
+
+#### The classification table — which rule owns a cell
+
+| # | The cell | Rule A | Rule B | Ruling |
+|---|---|---|---|---|
+| 1 | **C11's `flex` as the precedent** | roadmap 38: *the same `flex` concept C11 already has, one level up*, and *worth following exactly* | `Column.flex` is a **boolean** — absorb the residual or do not — resting on a per-column *minimum* derived from content (C11 §3) | **R1 — the precedent cannot be followed, because the information it rests on does not exist here.** A table knows what each column would like to be; a group knows `measure(block, width) → height` and **no preferred width**. There is nothing for a child to absorb residual *from*, so the only expressible allocation is a declared proportion. Following C11 exactly would give `flex: [true, false]`, which says nothing about a 2 : 1 row. The name is kept and the mechanism is not the same one |
+| 2 | **weights × *a child that cannot be placed is not measured*** | children are placed left to right while the budget lasts | with weights the budget is no longer uniform, so the *cost* of each child differs | **R2 — placement stays left to right, by position and never by size.** Dropping the smallest or the largest would make the rendered set depend on the weights, so two documents differing only in a number would place different children — and the order is the one thing the author stated outright. **The equal split made this invisible**: with every child costing the same, by-position and by-size are the same rule |
+| 3 | a weight of `0` | a weight is a share of the budget | the floor gives every *placed* child at least 1 cell | **R3 — refused at construction.** Zero has two readings and neither adds anything: *not placed*, which the author expresses by leaving the child out, and *placed at one cell*, which is what `1` already means. A value that means two things is the defect this project has removed four times. Negatives and non-finite values go with it |
+| 4 | **the gutter, when the budget is weighted** | `n − 1` cells, one between each pair | the budget is divided in proportion | **R4 — off the top, before any share is computed.** A proportional gutter makes the separator between a 2 and a 1 narrower than the one between two 2s, and a gutter's job is identical between every pair. **Equal split makes the two identical, which is why the current rule does not say** — and taking it off the top is what makes equal weights reproduce today's arithmetic exactly, which is the row's real assertion |
+| 5 | the remainder after flooring | each child takes `floor(share)` | the floors sum to less than the budget | **R5 — the remainder goes to the leftmost child, and it is C11's rule rather than a new one**: *the remainder goes to the leftmost flex column, so the extra cell lands in* the first. Weights make the remainder larger than the equal split's, which is why it stops being ignorable |
+| 6 | **weights × nesting** | *uneven allocation is expressible as nested groups* — this section's own remedy | a weighted row expresses the same layout in one block | **R6 — both stay, and neither supersedes, because they are not the same layout.** The equivalence holds while everything fits and ends at the placement boundary: a nested group is **one** child of the outer row and is dropped whole, where three flat children are dropped one at a time. Nesting also expresses *grouping* — a subtree that moves together, gaps, a panel around it — which a weight cannot say. **So the deferral's remedy was an approximation, and this row is where the approximation ends** |
+| 7 | weights × the 1-cell floor | every placed child measures at ≥ 1 | a small share reaches 1 far sooner than an equal one | **R7 — the floor is unchanged and the hazard is now live.** C09 §485 measured the width-1 substitution boundary as `w ≤ 2n − 1` — sixty children at 120 columns — and called it degenerate. `flex: [50, 1]` reaches width 1 for the second child at **80 columns with two children**, so a rule about a degenerate width becomes reachable at an ordinary size. Recorded with both figures, because the old one reads as *this cannot happen* |
+| 8 | weights × a width change | the placement boundary is `2n − 1` under an equal split | under weights each child has its own boundary | Confirms, and it is the row that would have been the trace's: a child crosses in or out as the width moves, the block re-measures at the new width, and nothing carries over — `measure` is `(block, width)` and C14's cache keys on both. **The height is non-monotonic in the width and always has been**; weights change which width, not the shape |
+| 9 | `flex` on a `direction: "column"` group | a column's children all take `w` | the field is on the group, which has both directions | **R9 — ignored, not an error, on this section's own precedent**: `gapBefore` inside a row group *is meaningless and is ignored rather than being an error*, so the same block travelling into either direction does not fail. **Knowingly vacuous**, which is why it is written down: an ignored field is how a value comes to be silently unread |
+| 10 | `flex.length ≠ children.length` | one weight per child | the two are declared separately | **R10 — a construction error.** Unlike row 9 there is no reading to fall back on: a two-weight list over three children is an authoring mistake, and inferring the third from anywhere would be the framework choosing a layout |
+| 11 | `align` × the unspent remainder | alignment is per child, and comes with the row | a child's rendered lines may be narrower than its allotment | **Confirms.** Alignment places rendered lines inside a width the group already computed, so it changes no measurement — the same containment that keeps `measure`'s shape. It is the entry's one addition that touches only the renderer |
+| 12 | **`padding` × everything** | roadmap 38 bundles *padding as a general property rather than `gapBefore` being the only spacing* | padding on any block changes what `measure` returns for it | **R12 — not in this entry.** It is general, it changes every block's measurement, and bundling it means the weights cannot land without it. **A bundled row can only be split**: the shared blocker on the row is rarely any of the subjects' own |
+
+**Row 1 is the one that would have shipped.** The entry says the precedent is *worth
+following exactly*, and following it exactly produces a field that cannot express the
+banner — a boolean absorb-flag over a minimum nothing computes. It reads as a citation
+of a solved problem, and the two mechanisms share only a name.
+
+#### The rulings
+
+- **R1 — weights, not C11's boolean.** A group has no preferred width to absorb from.
+- **R2 — placement stays left to right**, by position and never by size.
+- **R3 — `0` is a construction error**, with negatives and non-finite values.
+- **R4 — the gutter comes off the top**, so equal weights reproduce today's arithmetic.
+- **R5 — the remainder goes to the leftmost child**, which is C11's rule.
+- **R6 — weights and nesting both stay**; they differ at the placement boundary.
+- **R7 — the 1-cell floor is unchanged and its boundary is now reachable.**
+- **R9 — a weight on a column group is ignored**, on `gapBefore`'s precedent.
+- **R10 — a length mismatch is a construction error.**
+- **R12 — `padding` is a separate entry**, and so is `height: "fill"` (below).
+
+#### What the rulings leave behind
+
+- **The field goes on `group` and there is no `b.row`.** The name is taken — `b.row(id,
+  cells)` builds a table row and every example calls it — and the honest shape was
+  never a new container anyway: this section deferred *weights*, not a block kind.
+- **`height: "fill"` is unblocked and is not in this entry.** Roadmap 38 defers it
+  because *the producer cannot see the height — that is F37*, and `ProducerContext.height`
+  is `number | null`, non-null **iff** the document is bound by a region (I18) — which is
+  exactly the pushed-view case the entry names as the only one where *fill* has a
+  referent. So the claim is stale, the resolve-then-measure ruling the entry already
+  carries is the whole of what it needs, and it is a step of its own.
+- **Equal weights must reproduce today's arithmetic byte for byte**, which is R4's real
+  purpose and the only assertion that can catch a gutter rule that looks right.
+
 ### `patch` and `comparison` are not variants of each other
 
 **They used to share a name, and that was the whole problem.** `comparison` is rows of `{field, a, b, comparison}` — a structured comparison of two values for one key, right for S07's metric table. `patch` is hunks of text with line numbers, two palettes and collapse. Merging them would produce a block whose measurement depends on which mode it is in, and C09 I1 is the invariant that cannot bend: a kind whose height rule branches on a mode flag is a kind whose measurer and renderer drift apart quietly.
@@ -703,6 +778,8 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 - **I39** — `Panel.live` names whether a region is refreshing; C09 draws the `live` glyph from it. The block names the fact and the renderer owns the mark, so a live panel differs from a static one under ASCII and at one bit, where a character written into the title would not (F18, → C09 I5).
 - **I40** — `Comparison.labels` names what the two columns are, and their absence means positional. `a`/`b` is right about the *type* — S07 compares two runs and neither is "before" — and was never an answer to whether a consumer may say which side is which; both shipped consumers said it in a `keyValue` block above the block it explained (F33).
 - **I41** — **`yFormat` names the unit the value arrives in.** `fraction` takes `0.84`, `percent` takes `100.2`, and both render a per-cent sign — so the rendered form cannot distinguish them and naming them by it produced a member whose obvious use was wrong by a factor of 100 (F31). The arm that multiplies is `fraction`; it is the old `percent` renamed, and it carries the surprising name because it is the surprising arm. **The value is not appearance**: `labelWidth` measures the rendered labels to size the gutter (C12 §3), so an arm that changes a label's width changes the block's geometry, and this rename moves both. An unknown arm is a validation error rather than a silent fall-through to `number`.
+- **I42** — **A `row` group divides its width by declared weights, and every rule the equal split made invisible is stated with it.** The gutter comes **off the top** before any share is computed, so equal weights reproduce the current arithmetic exactly and a separator never varies with its neighbours' sizes; the remainder after flooring goes to the **leftmost** child, which is C11's rule rather than a new one; a weight of `0` is a **construction error**, because *not placed* is expressed by omitting the child and *placed at one cell* is what `1` means; and a length that does not match the children is one too, since there is no reading to fall back on. **Placement stays left to right and never by size** (§3): with an equal split, by-position and by-cost are the same rule, and under weights they are not — dropping by size would make the rendered set depend on a number rather than on the order the author stated. **The mechanism is not C11's `flex`**, which is a boolean over a content-derived minimum: a group knows `measure(block, width) → height` and no preferred width, so there is nothing to absorb residual from and a proportion is the only expressible allocation. A weight on a `column` group is **ignored** rather than refused, on `gapBefore`'s precedent, and it is knowingly vacuous.
+- **I43** — **Weights and nested groups both express uneven allocation, and they differ where it matters.** §3 deferred weights on the grounds that *uneven allocation is expressible as nested groups*, and that equivalence holds **only while every child fits**: a nested group is one child of the outer row and is dropped whole, where flat children are dropped one at a time (§3, roadmap 38). Neither supersedes the other — nesting also expresses grouping, which a number cannot — and the 1-cell floor's boundary, measured as degenerate at `w ≤ 2n − 1`, becomes reachable at ordinary widths under weights: `[50, 1]` puts the second child at one cell in eighty columns (→ C09 §4b).
 
 ---
 
@@ -750,6 +827,8 @@ The ellipsis is the case that catches people: `…` is one column and `...` is t
 36. A mark is derived from a named fact. Where a shape names one, no field is added; where it names only a tone, a glyph slot is the remedy and it waits for a surface. Two of seven tone-bearing shapes carry a slot, and that asymmetry is a ruling rather than an oversight (I38).
 37. A panel says whether it is live, and C09 draws the slot that has existed unreachable since C04 was written (I39, → C09 I5).
 38. A comparison may name its two columns; absent, they are positional. The type's `a`/`b` was the right answer to a different question (I40).
+39. **A row group's weights state everything the equal split made invisible** — the gutter off the top, the remainder leftmost, zero and mismatched lengths refused, placement by position — and equal weights reproduce the current arithmetic exactly (I42, §3).
+40. **Weights and nesting are both kept**, because the equivalence §3 deferred weights on holds only while every child fits, and the floor's degenerate boundary is reachable at ordinary widths once shares are uneven (I43, §3).
 
 ---
 
@@ -779,6 +858,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.19** (§3): constructing a `plot` with `form: "line"` and no `height` throws; `sparkline` without one does not.
 - **T1.17** (I27): a document whose `panel` contains itself is refused by `validateDocument` with a named error, and the call returns. A shared-but-acyclic subtree appearing twice validates — the seen-set is path-scoped, and a global one would fail this.
 - **T1.18** (I1, §4b): C24's `b` produces blocks frozen exactly once — the constructor is the only freeze point, asserted by spying on it.
+- **T1.20** (I42): a weight of `0`, a negative, a non-finite, and a list whose length does not match the children — each refused at construction with a named error. **Four values in one row**, because the field's whole risk is a number that reads as meaningful and means two things.
 
 ### Tier 2 — contract / interface
 
@@ -812,6 +892,10 @@ The generic suite. **These run against every registered block kind, including ap
 - **T3.10**: a block containing a combining mark → the base character's width, not two.
 - **T3.11**: `logs` line longer than `w` → 1 line (truncated), not wrapped. Logs never wrap; this is the property that keeps a tail's height predictable.
 - **T3.12**: a `table` where every row is expanded → height includes every detail; collapsing all returns the original.
+- **T3.16** (I42, §3): **equal weights measure identically to no weights**, at every width in the corpus and for two, three and five children. The row R4 exists for: a gutter taken proportionally is right at every equal split and wrong at every uneven one, so nothing but this comparison distinguishes the two rules.
+- **T3.17** (I42): a `[2, 1]` row at 80 — shares of 52 and 26 after one gutter cell off the top, the leftover cell to the leftmost child, and each child measured at its own width. Asserted on the widths handed down, not on the resulting height: two allocation rules can produce one height and differ on which child was narrow.
+- **T3.18** (I42, §3): a weighted row too narrow for every child places **left to right** and drops the last, whatever the weights say — asserted with the largest weight last, which is the arrangement a by-size rule would place first.
+- **T3.19** (I43, → C09 §4b): `[50, 1]` at 80 columns puts the second child at the 1-cell floor, and the same three children nested as `group(row, [a, group(row, [b, c])])` drop differently at a width where both overflow. **The row where the deferral's equivalence ends**, and it is the pair of assertions that says so rather than either alone.
 - **T3.13**: `applyPatch` with a `merge` carrying an empty row array → `{ok: true}`, document unchanged.
 - **T3.13b** (§4): a `merge` whose payload omits half the existing rows → every omitted row survives. Absence is not deletion.
 - **T3.14**: a document at the 10,000-block cap (D40) → validation flags `truncated`, and measurement of the whole set completes within budget.
@@ -851,6 +935,9 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.17** (I27): swapping the path-scoped seen-set for a global one → T1.17's shared-subtree half fails; removing it entirely hangs T3.15 rather than failing it, which is why T1.17 asserts the call *returns*.
 - **T6.14** (I17): removing the `max(1, …)` floor → T3.6b fails at all three kinds.
 - **T6.15** (§3): giving a `row` group's children the full width → T3.6c fails, and T2.1 fails at every width where a child wraps.
+- **T6.20** (I42): taking the gutter proportionally rather than off the top → T3.16 fails and T3.17's shares move by a cell. **Equal splits agree under both rules**, which is why the failing row is the one comparing weighted to unweighted rather than any row about a weighted layout.
+- **T6.21** (I42, §3): dropping by size rather than by position → T3.18 fails. Every assertion about a row that fits still passes, because the two rules are the same rule until the budget runs out.
+- **T6.22** (I42): accepting a `0` weight → T1.20 fails, and a value with two readings and no use enters a published type.
 - **T6.16** (§4b): freezing inside C24's `b` as well as in the constructor → T1.18 fails on the spy count.
 
 ---

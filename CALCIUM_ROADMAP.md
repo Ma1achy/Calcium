@@ -2823,9 +2823,36 @@ RULED 35 progress feedback        the spinner is static by a ruling whose premis
       37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
                                    bracketed with them. C10's no-background choice means a drawn
                                    line is the only tool available
-PART  38 horizontal composition   b.row — the banner already paid for its absence by hand
+RULED 38 horizontal composition   b.row — the banner already paid for its absence by hand
                                    (width fractions ship with it; height fill is separate and
-                                    waits on phase 1.1's producer-context contract)
+                                    waits on phase 1.1's producer-context contract).
+                                   WALKED 2026-08-14, C04 §3 — a classification table and a
+                                   STATED DECISION not to write a trace: layout is pure over
+                                   (block, width), nothing accumulates, and a resize is the
+                                   same table at a second width. FOUR CORRECTIONS. (1) `b.row`
+                                   IS TAKEN — it builds a TABLE ROW and every example calls
+                                   it, so the feature is a field on `group` and always was:
+                                   C04 §3 deferred WEIGHTS, not a container. (2) THE
+                                   CONTAINER SHIPS: b.group("row", …) measures, splits and
+                                   drops what does not fit, and its equal split is a ruled
+                                   policy with a stated expiry — "add weights when a surface
+                                   needs them, and not before". The surface needed them: the
+                                   banner is 15/1/61 against a 38/38 split, could not say so,
+                                   and hand-composed a raw block. Third deferral this session
+                                   whose condition was met elsewhere. (3) C11'S PRECEDENT
+                                   CANNOT BE FOLLOWED, and the entry says to follow it
+                                   exactly: Column.flex is a BOOLEAN over a content-derived
+                                   minimum, and a group knows measure(block,width)→height and
+                                   NO PREFERRED WIDTH — nothing to absorb residual from, so a
+                                   proportion is the only expressible allocation. The two
+                                   share a name and not a mechanism. (4) F37 IS STALE:
+                                   ProducerContext.height is number|null, non-null iff the
+                                   document is bound by a region — exactly the pushed-view
+                                   case the entry names — so height:"fill" is unblocked and
+                                   is a step of its own, as `padding` is. AND direction:"row"
+                                   HAS NO CALLER anywhere: six b.group sites, every one
+                                   "column". C04 I42 I43, commitments 39–40, T1.20,
+                                   T3.16–T3.19, T6.20–T6.22
 BUILT 39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
                                    overrides with `/theme <theme> --no-bg` (a FlagDef, free in
                                    --help, per-invocation not sticky; warn and comply). Painting
@@ -3035,7 +3062,7 @@ what landed**.
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 31 | PART | **recency-first landed.** `rank` — `src/interaction/completion/engine.ts` — runs after `dedupe` at both call sites over an injected `recency`, and C22 supplies it from C20's history at `src/shell/construct.ts`. `null` sorts last and stably, so it refines source order rather than replacing it. C19 I26, §3a; five mutations in `tools/mutate/runs/c19-ranking.mjs` | **substring and subsequence.** Substring is **refused** and I27 says why: the verb source emits one word at a time, so the whole name never reaches the filter and widening it changes nothing. Subsequence wants a match-quality scorer, which is a separate ruling |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
-| 38 | PART | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` | **the width fractions this entry says ship with it do not.** `childWidths` gives every child the same width — `src/data/viewmodel/measure.ts:122` |
+| 38 | RULED | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` — and C04 §3 walks the weights it deferred: I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22 | **every ruling, no code.** `childWidths` still gives every child the same width — `src/data/viewmodel/measure.ts:122` — and **`direction: "row"` has no caller**: six `b.group` sites in the tree and every one is `"column"`. `padding` and `height: "fill"` are named as separate steps |
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
 | 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |
