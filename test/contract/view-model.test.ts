@@ -15,7 +15,7 @@ import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import {
   applyPatch,
   childWidths,
-  groupChildWidth,
+  groupChildWidths,
   insetWidth,
   normaliseWidth,
   ACTION_KINDS,
@@ -62,6 +62,20 @@ const EXPECTED_KINDS = [
 ] as const;
 const _exhaustive: readonly BlockKind[] & { length: 17 } = EXPECTED_KINDS;
 void _exhaustive;
+
+/**
+ * A `row`/`column` group of `n` trivial children — the shape `groupChildWidths`
+ * takes, since the width rule now reads the block's own weights (C04 I42).
+ */
+function rowOf(n: number, direction: "row" | "column", flex?: readonly number[]): Group {
+  return {
+    kind: "group",
+    id: "g",
+    direction,
+    children: Array.from({ length: n }, (_, i) => ({ kind: "raw", id: `r${String(i)}`, text: "x" }) as Block),
+    ...(flex === undefined ? {} : { flex }),
+  } as Group;
+}
 
 describe("C04 contract", () => {
   it("T2.11 (C04 I34): the five action kinds are exhaustive, and each is checked for its own field", () => {
@@ -264,12 +278,12 @@ describe("C04 measurement arithmetic (§3)", () => {
   });
 
   it("T2.16: a column group passes the full width; a row group splits equally", () => {
-    expect(groupChildWidth("column", 80, 4), "column children get the full width").toBe(80);
+    expect(groupChildWidths(rowOf(4, "column"), 80)[0], "column children get the full width").toBe(80);
 
     // floor((80 - 2) / 3) = 26, with one cell of gutter between each pair.
-    expect(groupChildWidth("row", 80, 3)).toBe(26);
-    expect(groupChildWidth("row", 80, 1), "one child, no gutter").toBe(80);
-    expect(groupChildWidth("row", 80, 2)).toBe(39);
+    expect(groupChildWidths(rowOf(3, "row"), 80)[0]).toBe(26);
+    expect(groupChildWidths(rowOf(1, "row"), 80)[0], "one child, no gutter").toBe(80);
+    expect(groupChildWidths(rowOf(2, "row"), 80)[0]).toBe(39);
   });
 
   it("T2.17: childWidths agrees with the per-kind rules, for both containers", () => {

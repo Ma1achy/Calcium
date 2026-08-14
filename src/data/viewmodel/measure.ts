@@ -52,26 +52,43 @@ export function insetWidth(width: number): number {
 }
 
 /**
- * The width a `group` gives each child (§3).
+ * The width a `group` gives each child, in order (§3, I42).
  *
- * `column` passes `w` through. `row` splits equally —
- * `floor((w - gaps) / n)`, with `n - 1` gutters — and takes the max of the
- * results. There is no weights field: uneven allocation is expressible as
- * nested groups, and a weights field would be a second layout system inside a
- * height rule that has to stay simple enough to hold I7.
+ * `column` passes `w` through to every child. `row` divides it by the declared
+ * weights, and **four rules the equal split made invisible are stated here**
+ * because they are identical under it and differ the moment a weight does:
  *
- * The split can floor to 0 at narrow widths; `normaliseWidth` takes it to 1, so
- * a `row` group still measures rather than dividing by zero (T3.6c).
+ *   - **The gutter comes off the top**, before any share is computed. Taking it
+ *     proportionally makes the separator between a 2 and a 1 narrower than the
+ *     one between two 2s, and a gutter's job is identical between every pair.
+ *   - **The remainder after flooring is unspent**, exactly as it is with no
+ *     weights at all. Spending it — on the leftmost child, as C11 does with a
+ *     table's residual — would make `flex: [1, 1]` differ from no `flex`, and a
+ *     table's residual exists *to be absorbed* where a group has no child that
+ *     claims it.
+ *   - **Absent weights are an equal split**, and the arithmetic below reduces to
+ *     the old `floor((w - gaps) / n)` when every weight is equal. T3.16 asserts
+ *     that against the unweighted path rather than against a number.
+ *   - **The floor of 1 is unchanged.** `normaliseWidth` takes a share of 0 to 1,
+ *     so a `row` group still measures rather than dividing by zero (T3.6c) —
+ *     and weights move C09 §4b's degenerate boundary into ordinary range rather
+ *     than adding a rule: `[50, 1]` reaches the floor at eighty columns with two
+ *     children, where the equal split needs sixty children at a hundred and
+ *     twenty.
  */
-export function groupChildWidth(
-  direction: Group["direction"],
-  width: number,
-  childCount: number,
-): number {
+export function groupChildWidths(block: Group, width: number): readonly number[] {
   const w = normaliseWidth(width);
-  if (direction === "column" || childCount <= 1) return w;
-  const gaps = (childCount - 1) * ROW_GUTTER;
-  return normaliseWidth(Math.floor((w - gaps) / childCount));
+  const n = block.children.length;
+  if (block.direction === "column" || n <= 1) return block.children.map(() => w);
+
+  const gaps = (n - 1) * ROW_GUTTER;
+  const budget = w - gaps;
+  const weights = block.flex ?? block.children.map(() => 1);
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+
+  return block.children.map((_child, i) =>
+    normaliseWidth(Math.floor((budget * (weights[i] ?? 1)) / total)),
+  );
 }
 
 /**
@@ -101,10 +118,14 @@ export function placeable(block: Panel | Group, width: number): number {
   }
 
   const w = normaliseWidth(width);
-  const each = groupChildWidth(block.direction, width, block.children.length);
+  // **Left to right, by position and never by size** (I42). Under an equal split
+  // the two are the same rule, because every child costs the same; under weights
+  // they are not, and dropping the smallest or the largest would make the
+  // rendered set depend on a number rather than on the order the author wrote.
+  const widths = groupChildWidths(block, width);
   let used = 0;
   let placed = 0;
-  for (const _child of block.children) {
+  for (const each of widths) {
     const needed = placed === 0 ? each : each + ROW_GUTTER;
     if (used + needed > w) break;
     used += needed;
@@ -119,8 +140,7 @@ export function childWidths(block: Panel | Group, width: number): readonly numbe
   if (block.kind === "panel") {
     return block.children.map(() => insetWidth(width));
   }
-  const each = groupChildWidth(block.direction, width, block.children.length);
-  return block.children.map(() => each);
+  return groupChildWidths(block, width);
 }
 
 /**

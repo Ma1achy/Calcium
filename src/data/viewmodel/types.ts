@@ -558,6 +558,26 @@ export type Group = Readonly<{
   id: string;
   direction: "row" | "column";
   children: readonly Block[];
+  /**
+   * How a `row` group's width is divided — one weight per child (I42, §3).
+   *
+   * **Absent is an equal split**, which is what every group did before this
+   * field and what `[1, 1, …]` still means: the arithmetic is identical, and a
+   * row asserting that is what keeps the two from drifting.
+   *
+   * **Not C11's `flex`, which shares the name and not the mechanism.**
+   * `Column.flex` is a boolean over a minimum derived from the column's
+   * content — absorb the residual, or do not. A group knows
+   * `measure(block, width) → height` and **no preferred width**, so there is
+   * nothing here for a child to absorb *from*, and a declared proportion is the
+   * only allocation this level can express.
+   *
+   * Ignored on a `column` group, where every child takes the full width, on
+   * `gapBefore`'s precedent: the same block travelling into either direction
+   * should not fail. Knowingly vacuous, and said out loud because an ignored
+   * field is how a value comes to be silently unread.
+   */
+  flex?: readonly number[];
 }> & Gap;
 
 /** The escape hatch, and load-bearing: the vocabulary never has to be complete. */

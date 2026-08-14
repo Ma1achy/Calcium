@@ -254,9 +254,54 @@ const KIND_CHECKS: Readonly<Record<BlockKind, KindCheck>> = Object.freeze({
     if (b["direction"] !== "row" && b["direction"] !== "column") {
       e.push(`${at}: "direction" must be "row" or "column"`);
     }
+    checkFlex(b, e, at);
   },
   raw: (b, e, at) => requireString(b, "text", e, at),
 });
+
+/**
+ * A `row` group's weights (C04 I42, §3).
+ *
+ * **`0` is refused because it means two things and neither is new.** *Not
+ * placed* is what leaving the child out says, and *placed at one cell* is what
+ * `1` says — the floor gives every placed child at least one column. A value
+ * with two readings and no use is the defect this project has removed four
+ * times, so it does not enter a published type. Negatives and non-finite values
+ * go with it.
+ *
+ * **A length mismatch is refused for a different reason**: there is no reading
+ * to fall back on. Inferring the missing weight from anywhere would be the
+ * framework choosing a layout, and `flex` exists so the author chooses one.
+ *
+ * Checked on a `column` group too, where the field is ignored at layout time —
+ * a wrong value is still wrong, and refusing it only in one direction would
+ * make the same block valid or invalid depending on where it travelled.
+ */
+function checkFlex(b: Record<string, unknown>, e: string[], at: string): void {
+  const flex = b["flex"];
+  if (flex === undefined) return;
+
+  if (!Array.isArray(flex)) {
+    e.push(`${at}: "flex" must be an array of weights, one per child`);
+    return;
+  }
+
+  const children = b["children"];
+  if (Array.isArray(children) && flex.length !== children.length) {
+    e.push(
+      `${at}: "flex" has ${String(flex.length)} weights for ${String(children.length)} children`,
+    );
+  }
+
+  for (const [i, weight] of flex.entries()) {
+    if (typeof weight !== "number" || !Number.isFinite(weight) || weight <= 0) {
+      e.push(
+        `${at}.flex[${String(i)}]: a weight is a finite number above zero; ` +
+          `omit the child to leave it unplaced, and 1 is one share`,
+      );
+    }
+  }
+}
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set(Object.keys(KIND_CHECKS));
 

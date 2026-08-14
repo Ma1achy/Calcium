@@ -1046,12 +1046,20 @@ children, and it is **the same `flex` concept C11 already has for table columns*
 up:
 
 ```
-b.row([plot, stats], { flex: [2, 1] })     the plot takes two thirds
+b.group("row", [plot, stats], { flex: [2, 1] })     the plot takes two thirds
 ```
 
-C11's precedent is worth following exactly, including its lesson: **F50 found that a column
-with no `flex` gets its minimum and nothing more** — so a row's children need the same
-opt-in, and the same care about where slack goes. The `/ps` NAME column carried that comment
+~~C11's precedent is worth following exactly~~ — **CORRECTED BY THE WALK, and it cannot be
+followed at all** (C04 §3, I42). `Column.flex` is a **boolean** over a minimum derived from the
+column's content: absorb the residual, or do not. A group knows `measure(block, width) →
+height` and **no preferred width**, so there is nothing for a child to absorb residual *from*,
+and a declared proportion is the only allocation this level can express. Following it exactly
+would give `flex: [true, false]`, which says nothing about a 2 : 1 row — **the two share a name
+and not a mechanism.**
+
+Its lesson still lands: **F50 found that a column with no `flex` gets its minimum and nothing
+more** — so a row's children need the same opt-in, which is why absent weights are an equal
+split and a weight is declared rather than inferred. The `/ps` NAME column carried that comment
 three lines from where it was written again.
 
 **F50 is cited here as precedent and is not fixed here.** It is an open finding against C11's
@@ -1059,7 +1067,9 @@ three lines from where it was written again.
 matters because the citation reads as coverage — which is how a finding gets planned once and
 fixed never.
 
-**Ships with `b.row`. No new concept, no measurement change.**
+~~**Ships with `b.row`.**~~ **`b.row` is the table-row builder**, so this ships as `flex` on
+`group` — the shape C04 §3 deferred anyway: *add weights*, not *add a container*. No new
+concept, no measurement change. **BUILT 2026-08-14.**
 
 #### Height flexibility — real, and it collides with two open things
 
@@ -2823,7 +2833,7 @@ RULED 35 progress feedback        the spinner is static by a ruling whose premis
       37 region separators        the prompt bracketed on BOTH sides, header/footer optional and
                                    bracketed with them. C10's no-background choice means a drawn
                                    line is the only tool available
-RULED 38 horizontal composition   b.row — the banner already paid for its absence by hand
+PART  38 horizontal composition   b.row — the banner already paid for its absence by hand
                                    (width fractions ship with it; height fill is separate and
                                     waits on phase 1.1's producer-context contract).
                                    WALKED 2026-08-14, C04 §3 — a classification table and a
@@ -2852,7 +2862,30 @@ RULED 38 horizontal composition   b.row — the banner already paid for its abse
                                    is a step of its own, as `padding` is. AND direction:"row"
                                    HAS NO CALLER anywhere: six b.group sites, every one
                                    "column". C04 I42 I43, commitments 39–40, T1.20,
-                                   T3.16–T3.19, T6.20–T6.22
+                                   T3.16–T3.19, T6.20–T6.22.
+                                   WEIGHTS BUILT 2026-08-14 — `flex?: readonly number[]` on
+                                   Group, refused at the builder AND the validator for 0,
+                                   negatives, non-finites and a length mismatch. 7 mutations,
+                                   7 caught, AFTER TWO SURVIVORS THAT WERE BOTH FINDINGS
+                                   ABOUT MY OWN ROWS: the by-position fixture could not
+                                   construct the difference — shares always sum inside the
+                                   budget, so nothing drops until the floor raises one, and
+                                   among floored children every width is 1, so the two rules
+                                   diverge only where a wide child sits beside several
+                                   floored ones, and the fixture was SEARCHED FOR rather
+                                   than guessed — and the validator row passed on a document
+                                   already invalid three ways over, so ok===false held
+                                   whatever flex did. AND R5 WAS CORRECTED BY THE CODE: the
+                                   remainder is UNSPENT, as it is today, because giving it
+                                   to the leftmost contradicts R4 and would make [1,1]
+                                   differ from absent — the trap the equal-weights row
+                                   exists to catch. THE BANNER DOES NOT CLOSE: two
+                                   multi-line raw blocks DO compose side by side, measured —
+                                   but the whale is padded to a fixed 40 with a fixed 4-cell
+                                   gap, and a proportion cannot pin a cell count, so the gap
+                                   widens with the terminal. The measured consumer needs a
+                                   FIXED width and weights are a ratio — R1's finding
+                                   arriving as a consequence, and the next argument
 BUILT 39 theme background ★      RULED: theme declares `background: "terminal" | <colour>`, user
                                    overrides with `/theme <theme> --no-bg` (a FlagDef, free in
                                    --help, per-invocation not sticky; warn and comply). Painting
@@ -3062,7 +3095,7 @@ what landed**.
 | 27 | PART | **16 languages** registered in `src/presentation/blocks/kinds/code.ts`, up from 2 | the entry's own target is 24 |
 | 31 | PART | **recency-first landed.** `rank` — `src/interaction/completion/engine.ts` — runs after `dedupe` at both call sites over an injected `recency`, and C22 supplies it from C20's history at `src/shell/construct.ts`. `null` sorts last and stably, so it refines source order rather than replacing it. C19 I26, §3a; five mutations in `tools/mutate/runs/c19-ranking.mjs` | **substring and subsequence.** Substring is **refused** and I27 says why: the verb source emits one word at a time, so the whole name never reaches the filter and widening it changes nothing. Subsequence wants a match-quality scorer, which is a separate ruling |
 | 34 | PART | animation exists as `RenderContext.tick` — `src/presentation/blocks/types.ts:39`, and `measure` never receives it (C09 I8) | structured export: no `exportAs`/`toJSON` anywhere in `src/` |
-| 38 | RULED | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` — and C04 §3 walks the weights it deferred: I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22 | **every ruling, no code.** `childWidths` still gives every child the same width — `src/data/viewmodel/measure.ts:122` — and **`direction: "row"` has no caller**: six `b.group` sites in the tree and every one is `"column"`. `padding` and `height: "fill"` are named as separate steps |
+| 38 | PART | `Group` ships with `direction: "row" \| "column"` — `src/data/viewmodel/types.ts:556`, `b.group`, `src/presentation/blocks/kinds/containers.ts:236` — and the weights C04 §3 deferred are built: `flex?: readonly number[]` at `src/data/viewmodel/types.ts:580`, `groupChildWidths` at `src/data/viewmodel/measure.ts:79`, refused at `b.group` and by `checkFlex` — `src/data/viewmodel/validate.ts:280`. C04 §3, I42, I43, commitments 39–40, T1.20, T3.16–T3.19, T6.20–T6.22; `tools/mutate/runs/c04-weights.mjs` | **the banner still does not close**, and the frame-read says why: two multi-line `raw` blocks compose side by side correctly, but the whale is padded to a fixed 40 with a fixed 4-cell gap and a proportion cannot pin a cell count. A fixed-width child is the next argument. `align`, `padding` and `height: "fill"` are separate steps, and **`direction: "row"` still has no caller in the tree** |
 | 35 | RULED | **the ruling is in the entry.** The spinner is one frame by a premise that has expired — `src/shell/paint.ts:110` says a ticker is *"a timer this layer does not own and must not grow"*, and the refresh driver has owned one since 18 landed; the `steps` block already animates off `ctx.tick` (`src/presentation/blocks/kinds/structured.ts:403`). The pending entry is appended blank — `src/shell/execution.ts:895`, `blocks: []` | nothing composes the notice, and there is no elapsed-time part. **The adapter override has no surface yet** |
 | 39 | BUILT | **the declaration is a choice**: `ThemeTokens.background: "terminal" \| "surface"` at `src/presentation/theme/types.ts:89`, painting `surfaces.bg` — the one surface every floor is already measured against, so a colour here would let a theme paint one value and prove its floor against another. `LIGHT` declares `surface` (`src/presentation/theme/tokens-light.ts`) and `DARK` inherits (`src/presentation/theme/tokens-dark.ts`). `resolveBase` and `validatePaintedFloors` at `src/presentation/theme/resolve.ts`; the 8-bit floor is recomputed against the **quantised** base, because indices 16–255 are what a terminal paints and the token is not. The base is applied by `based` in `src/shell/paint.ts` — one pass over a finished row, re-establishing it after every `toTerminalDefault()` match and **closing the row**, which is what leaves every lifecycle path untouched. `--no-bg` is a `shellOnly` `FlagDef` on `/theme` (`src/data/manifest/framework.ts`) read through `LocalContext.args`. C10 §4c I25 I26 commitments 22–23, C22 §6g I65 I66 commitments 36–37; T1.17–T1.19, T1.23–T1.23d, T4.27–T4.29, T4.34; `tools/mutate/runs/c22-background.mjs` | **the painting arm ships with one theme exercising it**, since dark inherits by decision — every golden frame is still drawn on the inheriting branch. And the foreground's own 8-bit quantisation is deliberately not in the recomputed floor: it predates this entry and is unchanged by it |
 | 46 | PART | **two of the three pieces exist.** `window` — `presentation/blocks/kinds/structured.ts:123` — and `elements` — `presentation/blocks/types.ts` — are both declared, which is what the entry itself says | **the third is the missing one**: nothing holds a per-container offset as view state — no `scrollOffset`, `containerOffset` or `innerOffset` in `src/`. And it stays blocked on 7, because scroll follows focus |

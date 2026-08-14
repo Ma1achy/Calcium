@@ -70,7 +70,7 @@ export {
   gapRows,
   placeable,
   sequenceHeight,
-  groupChildWidth,
+  groupChildWidths,
   insetWidth,
   normaliseWidth,
 } from "./measure.js";

@@ -509,9 +509,50 @@ function panel(
  * Gapping the group *and* the first child that carries its own default produces
  * two blank rows where the surfaces draw one.
  */
-function group(direction: "row" | "column", children: readonly Block[], opts?: BlockOpts): Group {
+/**
+ * A container. `row` divides its width by `flex`, one weight per child (C04 I42).
+ *
+ * **Weights and not a boolean, and not C11's `flex` despite the name.** A table
+ * column has a minimum derived from its content and `flex` says whether it
+ * absorbs what is left; a group knows `measure(block, width) → height` and no
+ * preferred width, so there is nothing to absorb from and a declared proportion
+ * is the only allocation this level can express.
+ *
+ * **Throws rather than returning an invalid block**, as `plot` does for a line
+ * form with no height: `0`, a negative, a non-finite value and a length that
+ * does not match the children are all authoring mistakes with no reading, and
+ * the constructor is where an author finds out.
+ */
+function group(
+  direction: "row" | "column",
+  children: readonly Block[],
+  opts?: BlockOpts & { flex?: readonly number[] },
+): Group {
+  const flex = opts?.flex;
+  if (flex !== undefined) {
+    if (flex.length !== children.length) {
+      throw new TypeError(
+        `b.group: ${String(flex.length)} weights for ${String(children.length)} children`,
+      );
+    }
+    for (const weight of flex) {
+      if (!Number.isFinite(weight) || weight <= 0) {
+        throw new TypeError(
+          `b.group: a weight is a finite number above zero — got ${String(weight)}; ` +
+            `omit the child to leave it unplaced, and 1 is one share`,
+        );
+      }
+    }
+  }
+
   return finish<Group>(
-    { kind: "group", id: idOf(opts, "group"), direction, children } as Group,
+    {
+      kind: "group",
+      id: idOf(opts, "group"),
+      direction,
+      children,
+      ...(flex === undefined ? {} : { flex: [...flex] }),
+    } as Group,
     opts,
     false,
   );
