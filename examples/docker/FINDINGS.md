@@ -7866,3 +7866,58 @@ the type system was the thing enforcing it.
 **Related to F142's class from the other side.** F142 is a count with no mechanism; this is a
 mechanism whose result was reported without being re-run. Both publish a number that was true
 once.
+
+---
+
+## F163 — golden has never seen a frame, and its README says it has ★★
+
+| | |
+|---|---|
+| **Surface** | the golden suite itself, found while reading roadmap 24's residue |
+| **Reached for** | any golden coverage of the arm roadmap 39 added |
+| **Verdict** | **a real Calcium finding**, filed rather than fixed — roadmap 49 |
+| **Absorbed by** | nothing; the gap is stated and the entry that closes it is its own |
+
+`test/golden/README.md` reads, in full:
+
+```
+# golden
+
+Frames at 4 widths x 2 themes x 2 unicode modes.
+```
+
+**Not one of them is a frame.** `blocks`, `table`, `patch` and `plot` all go through
+`measurable().renderToLines`, which is C09's block renderer. No golden test imports anything
+from `src/shell/`, so **`paint.ts` has never appeared in a golden snapshot** — and neither has
+`composite`, `render-frame`, or the frame assembly that puts a header, a transcript, a prompt
+and a footer into `rows × columns`.
+
+**What that costs, named rather than counted.** Everything the painter alone decides is
+uncovered by the category built to cover exactly this kind of change:
+
+| Never in a golden snapshot | Where it is decided |
+|---|---|
+| the theme's background base | `paint.ts` `based` (C22 I65) |
+| the prompt window and its elision markers | `paint.ts` `promptWindow` (C22 I62) |
+| the selection wash | `paint.ts` `washed` (roadmap 23) |
+| the chrome rows, and the frame's height arithmetic | `frame.ts` + `paint.ts` (S01 §3) |
+| the cursor shape and position sequences | `render-frame.ts` (C22 I63) |
+| the diff a frame is written as | `render-frame.ts` `body` (C22 I57) |
+
+**This was found by re-measuring a residue rather than by a test.** Roadmap 39 recorded *every
+golden frame is still drawn on the inheriting branch*, whose stated reason was that `dark`
+inherits — true, and not the reason. The real one is that **golden stops one layer below the
+painter**, which no amount of adding themes changes. A residue is a claim like any other, and
+this one was wrong in the direction that made the gap look smaller than it is: had it been
+right, entry 24 would have closed it as a side effect.
+
+**Why it is not roadmap 24's to fix.** A golden *frame* category needs a composed frame, which
+needs a session's deps — a stand-in registry, capabilities, a transcript, a prompt — and the
+snapshot has to be stable across an unrelated change to any of them. That is test
+infrastructure with more consumers than a theme: every entry above touches it, and three of
+them shipped defects that a golden frame would have shown at review time (C22 §6e's two, and
+entry 16 step 3's cut choices).
+
+**The README is the durable half.** A category whose own description names something it does
+not contain reads as covered for as long as nobody opens it, which is the compression class
+one level up: **the summary kept the claim and dropped the condition that made it true.**

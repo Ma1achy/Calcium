@@ -2666,8 +2666,42 @@ BUILT 23 selection styling ★      BUILT 2026-08-13 — `surfaces.selection` wi
                                    C10 does not have. `surfaces.selection` plus a
                                    `selectionPairs` sibling delivers the guarantee it wanted
                                    (C10 §4b). dark #264057 at 7.25 : 1, light #c9ddf5 at 8.18
-      24 more default themes      two ship and `light` is dark-on-dark. ThemeSet is a two-field
-                                   record, so more is a PUBLIC TYPE change — freeze-relevant
+RULED 24 more default themes      two ship and `light` WAS dark-on-dark — CLOSED by 39, which
+                                   is what unblocked this. ThemeSet is a two-field record, so
+                                   more is a PUBLIC TYPE change — freeze-relevant.
+                                   WALKED 2026-08-14, both artefacts, C10 §5a. THE FORK THE
+                                   ENTRY DOES NOT DECIDE: a third theme is a third VARIANT or
+                                   a NAMED SET, and it is a measurement rather than a
+                                   preference. `"dark" | "light"` is written at NINE sites and
+                                   every reader of `.variant` uses it as a KEY or as identity
+                                   — five readers, all in store.ts, none in the ladder, the
+                                   floors or resolveBackground, and no consumer in src/ at
+                                   all. So the check that would have sent the fork the other
+                                   way comes back empty. RULED: a named set, each theme
+                                   declaring its own polarity. THE KEY BECAME A NAME THE
+                                   MOMENT I25 LANDED — the keys were carrying "the background
+                                   this assumes" and a theme now declares it, which is a field
+                                   whose meaning was absorbed by something else. AND THE
+                                   STRONGER FORM: polarity is DERIVABLE from
+                                   luminance(surfaces.bg), so `variant` is a second record of
+                                   a fact the tokens carry — and one NOTHING CHECKS: a theme
+                                   declaring `light` over #000000 loads, resolves and clears
+                                   every floor, because I9 compares tones TO bg and has no
+                                   opinion about what bg is. Kept and checked rather than
+                                   derived, since a token cannot express INTENT for a
+                                   mid-luminance theme. THE ROW THAT WOULD HAVE SHIPPED is the
+                                   /theme enum: FRAMEWORK_TOOLS is a module-scope constant
+                                   with values ["dark","light"], so a named set makes
+                                   `/theme high-contrast` a validation error for a theme the
+                                   session HOLDS — visible in no diff, and every existing test
+                                   asks for one of the two names the literal already has.
+                                   Migration is NOTHING: the two literals stay valid names.
+                                   AND THE CONTRAST SUITE'S COVERAGE SET IS A LITERAL IN THE
+                                   TEST FILE — `const VARIANTS = ["dark","light"]`, looped for
+                                   eleven rows including the 4-bit injectivity and floor rows
+                                   this entry names as already-decided. A third theme ships
+                                   unchecked and the suite stays green. C10 I27 I28,
+                                   commitments 24–25, T1.20 T1.21 T2.22 T2.23, T6.24–T6.26
 PART  25 ghost text ★            drawn since PR #27. What remains: it ghosts only a SOLE
                                    candidate, which is when the hint is least needed, and it
                                    is static-only. Design with as-you-type — one hint, two levels
@@ -2897,6 +2931,24 @@ PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    exact 382→381. So the blind spot grows as the API grows,
                                    which is the vocabulary argument arriving as a measurement
                                    rather than as a prediction
+      49 GOLDEN HAS NEVER SEEN A     `test/golden/README.md` says "frames at 4 widths x 2
+         FRAME ★★                    themes x 2 unicode modes" and NOT ONE OF THEM IS A
+                                   FRAME: blocks, table, patch and plot all go through
+                                   renderToLines, and no golden test imports from src/shell/.
+                                   So the theme's background base, the prompt window and its
+                                   elision markers, the selection wash, the chrome rows, the
+                                   frame's height arithmetic, the cursor sequences and the
+                                   write-as-a-diff have never appeared in a snapshot — the
+                                   category whose whole job is catching exactly this class
+                                   stops one layer below it. FOUND BY RE-MEASURING A RESIDUE: 39 recorded
+                                   "every golden frame is still drawn on the inheriting
+                                   branch", whose stated reason was true and was not the
+                                   reason, and which made the gap look smaller than it is.
+                                   NOT 24's TO FIX — a golden frame needs a session's deps and
+                                   a snapshot stable across changes to any of them, which is
+                                   test infrastructure with more consumers than a theme, and
+                                   three defects that reached the tree would have shown at review in one
+                                   (C22 §6e's two, entry 16 step 3's cut choices). F163
       —  video · 3D · embedded editor · matplotlib wrapper · rewind/undo
 ```
 
@@ -2956,15 +3008,17 @@ what landed**.
 | 28 | BUILT | **one comparison, and it was holding two shipped defects at rest.** `promptWindow` — `src/shell/paint.ts:254` — takes the cursor's editor row and returns its content range; `shows()` is the membership test both consumers use, in **editor** coordinates. It was `0 ≤ within < cap`, painted coordinates, where a marker row and a content row are the same kind of number — so the editor row immediately above a marked window mapped to painted 0 and both writers landed on the elision marker: the terminal cursor drawn on it (`cursorFor`, `src/shell/paint.ts:551`) and a selection span washing it (`promptRegion`, `src/shell/paint.ts:369`). Measured in a frame at `cap` 4; neither is visible to any assertion, because the arithmetic is self-consistent throughout. Elision is now marked at **both** ends, which is what makes the clipped wash honest, and the spinner and ghost moved to the cursor's painted row — the row `out.length − 1` only was while the window was tail-anchored. C22 §6e walks it in both artefacts, I62, commitment 33; T1.21–T1.21e, T6.48–T6.51; `tools/mutate/runs/c22-prompt-window.mjs` | the ghost's **column** is unchanged: it is written into the padding after the row's text, which on a mid-buffer edit is not where the cursor is. The row is right and the column is a separate question. And at `cap` 2 mid-buffer, rows below elide with no marker — one content row beats two markers, and T1.5b already ruled that direction |
 | 16 | BUILT | **four steps, and step 3 found two shipped defects.** Step 1: the choices are a table — `choiceBlock` at `src/shell/confirm.ts:101` — so the marker is a `bullet` slot L1 resolves and `ConfirmDeps` no longer takes a capability record at all. Step 2: `assertPlaceable` at `src/viewport/overlay/manager.ts:167` refuses a centred layer with no width at **both** entry points (C15 I20), which found the tree's second instance — `clearConfirmLayer` at `src/interaction/history/layers.ts:95` declared none — and `AskOptions.placement` at `src/shell/local/registry.ts:44` is a choice between placements, resolved by `placementOf` in `src/shell/confirm.ts`. Step 4: `createChoiceSelection` at `src/shell/choice-selection.ts:36`, with `defaultStart` supplying the confirm's start and `Esc`'s answer alike. Step 3: `menuWindow` at `src/interaction/completion/menu.ts:186` windows the list to what the placement holds, and `refreshAnchors` in `src/shell/keys.ts` re-places the anchored layers on a resize. T1.21, T1.22, T4.12–T4.18, T4.28–T4.33 | — |
 | 15 | BUILT | **four steps and a step 0, and the mode is a target throughout.** Copy mode: `#setCopyMode` holds the state at `src/shell/session.ts:586`, C03 gains `suspend`/`resume` at `src/terminal/frame-scheduler.ts:263` (§4a), C01 gains `setMouseTracking` at `src/terminal/lifecycle.ts:403` because nowhere else writes an escape. The prompt: an anchor plus the cursor, with `⌥a`/`⇧←`/`⇧Home` bound after `modifiersOf` — `src/interaction/router/decode.ts:113` — learned xterm's fourth bit. One clipboard: `copyText`, `src/interaction/editor/editor.ts:377`, written by `⌥w` and by the transcript's `copyElement`, `src/shell/keys.ts:778`, over a range held by `extendRow`, `src/interaction/router/focus.ts:246`, copying `rowCopyText`'s source text, `src/presentation/table/definition.ts:290`. The wash is entry 23 | OSC 52 is a separate axis and is not built: whether a copy **also** reaches the system clipboard is a capability question about the terminal, and it changes nothing about where the text lands in-process |
+| 24 | RULED | **the fork is ruled and nothing is built.** The premise is closed: `light` declares `background: "surface"` at `src/presentation/theme/tokens-light.ts:22`, so it paints rather than rendering dark-on-dark. `ThemeSet` is still a two-field record at `src/presentation/theme/types.ts:95`, and `"dark" | "light"` is written at nine sites. C10 §5a walks it in both artefacts; I27 and I28, commitments 24–25, T1.20, T1.21, T2.22, T2.23, T6.24–T6.26 | **every ruling, no code.** The named set, the `variant`-against-`bg` check, the derived `/theme` enum and the derived coverage set are all spec-side; `VARIANTS` is still a literal at `test/contract/theme.test.ts:25`, and no third theme is authored |
+| 49 | OPEN | none, and that is the finding: **no file under `test/golden/` imports from `src/shell/`**, so nothing there reaches `paint.ts`. `test/golden/README.md` says *frames*. F163 | the whole entry — a golden frame category does not exist |
 | 43 | PART | `imageProtocol: "none" \| "iterm2" \| "kitty" \| "sixel"` detected — `src/terminal/capabilities.ts:19` | no renderer |
 
-**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **24** (`defaultTheme` is `{ dark, light }`, `src/presentation/theme/index.ts:43`) · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. **48** joins them measured rather than
+**Checked and confirmed OPEN**, which is evidence rather than an absence of it. **Second sweep, 2026-08-13** — the symbols these entries name are absent from `src/`: **9** · **11** · **22** · **29** (and `chromeRows` in `src/viewport/viewport/types.ts:80` is C14's per-entry chrome, **not** this row's header/footer budget — it reads as coverage and is not) · **30** · **33** · **36** · **37** · **42**. **48** joins them measured rather than
 grepped, 2026-08-13: `nameExactnessSignal` reports 382 of 1171 members exact, and the
 public-surface variant this entry proposes measures 101 of 320 — no better, so the entry
 is open with its first candidate already refused. · **26**, **32** — the symbols the entries name are
 absent  · **44** —
 `interaction/history/persist.ts` is C20's *history* persistence and is not session resume,
-which is worth saying because it reads as coverage.
+which is worth saying because it reads as coverage. **49** joins them the day it is filed, measured rather than assumed: `test/golden/` holds four test files and **not one imports from `src/shell/`**, so nothing in that category reaches `paint.ts` — and its README calls the snapshots frames (F163).
 
 **16 left this list on 2026-08-14**, marked PART. Two of its four steps landed, and the row it
 left on was *the confirm and the completion menu are two mechanisms* — which is still true of

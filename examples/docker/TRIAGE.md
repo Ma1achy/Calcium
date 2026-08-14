@@ -39,7 +39,7 @@ type change.
 | **8** | [Absence indistinguishable from failure](#8) | 11 | **3 open** (6 closed) | partly | real Calcium work · **6 of 9 fixed** — and F151 is the class F35 closed, in the half an app-side test cannot reach |
 | **9** | [**The instrument was wrong**](#9) | 22 | **12** | — | **new at F80** · tooling — F155's instrument is not ours, and **F157's cause is the language the harness is written in** |
 | **10** | [**A claim carried without a record**](#10) | 12 | **6** | — | **new at F80** · method — five findings disproved, and **F161 caught before it was filed** |
-| **11** | [A gate that passes without checking](#11) | 31 | **10** | — | 8 closed · **4 open, all four about a rule's reach** · **F156 is the first found by a foreign runner rather than by us** |
+| **11** | [A gate that passes without checking](#11) | 32 | **10** | — | 8 closed · **5 open** — four about a rule's reach, and **F163 about a gate's *scope*: golden stops one layer below the painter** · **F156 is the first found by a foreign runner rather than by us** |
 | **12** | [**A time-based assertion under contention**](#12) | 2 | **2** | — | **new at F80** · Calcium's own suite |
 | **13** | [Text the framework emits](#13) | 3 | **3** | — | real Calcium work · needs a ruling · **F152 and F153 are a different half — the text is substituted and points at the wrong thing** |
 | — | [Singles](#singles) | 14 | 1 each | — | see each |
@@ -492,10 +492,11 @@ through a menu in as many words — as the reason the implementation writes ever
 | **F139** | the rule was in the file header, and a finding re-derived it wrongly |
 
 
-## 11 · A gate that passes without checking — **12: 6 closed, 6 open**
+## 11 · A gate that passes without checking — **13: 6 closed, 7 open**
 
 | | the gate | what it was not checking |
 |---|---|---|
+| **F163** | **the golden suite, for anything the painter decides** | `test/golden/README.md` says *frames*, and not one of the four files is one: all go through `renderToLines`, and **no golden test imports from `src/shell/`**. So the base, the prompt window, the selection wash, the chrome, the frame arithmetic, the cursor sequences and the write-as-a-diff have never appeared in a snapshot — the category built to catch exactly this class of change stops one layer below it. Found by re-measuring roadmap 39's residue, whose stated reason was true and was not the reason. **Open** — roadmap 49, because a golden *frame* is test infrastructure with more consumers than the entry that found it |
 | **F162** | **`make test`, for a test file's own types** | vitest transpiles rather than typechecks, so a type error **inside** a test row is invisible to that row: T4.31 ran, asserted and went green in a file `tsc` refuses. `check` covers it and `afb88c4` published a clean `check` for a commit that does not typecheck — which makes the remedy an ordering one, **`check` last, not first**. **Fixed** |
 | **F2** | a CI job | Calcium was not a publishable package, and the job proved nothing |
 | **F56** | `package.json`'s `bin` | a claim about an executable, accepted by install, pack, `publish --dry-run` and `make proof`. Three consumers existed and **all three reached around the entry point** |
