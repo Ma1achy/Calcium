@@ -183,28 +183,46 @@ describe("C22 §6 — the paint", () => {
     expect(f.promptWanted, "and what it wanted is kept, so §3 can window").toBe(200);
     expect(f.region.height, "the viewport keeps the rest").toBe(24 - 1 - 1 - 12);
 
-    const lines = paint(f, deps({ promptRows: () => rows }));
+    // **The cursor is named, and it was not** (I62, §6e.4). *The newest rows are
+    // shown* was a consequence of the window being anchored on the buffer's end,
+    // not of the cap — and this fixture left `promptCursor` at the default row 0,
+    // so it asserted tail anchoring while reading as an assertion about the cap.
+    // After a paste the cursor is at the end, which is what makes the newest rows
+    // the right ones to show.
+    const lines = paint(
+      f,
+      deps({ promptRows: () => rows, promptCursor: () => ({ row: 199, col: 0 }) }),
+    );
     expect(lines).toHaveLength(24);
     expect(lines.some((l) => l.includes("⋯")), "windowed, with the elision marker").toBe(true);
-    expect(lines.some((l) => l.includes("line 199")), "and the newest rows are shown").toBe(true);
+    expect(
+      lines.some((l) => l.includes("line 199")),
+      "and the cursor's rows are shown, which after a paste are the newest",
+    ).toBe(true);
   });
 
-  it("T1.5b (S01 C14): a cap of one shows the last row, not a marker with nothing after it", () => {
+  it("T1.5b (S01 C14, C22 I62): a cap of one shows the cursor's row, not a marker with nothing after it", () => {
     // The window is the marker plus the rows that follow it, and at a cap of
     // one there are none: `rows.slice(len - 0)` is empty, so the prompt painted
     // as `⋯` alone with the typed command nowhere on the screen. An elision
     // that elides everything annotates nothing.
     //
+    // **The ruling is *content beats a marker*, and which row was incidental to
+    // it** (§6e.4). It read as *the last row* because the window was anchored
+    // on the buffer's end; the row shown is the cursor's, and this fixture's
+    // cursor is at row 0.
+    //
     // Reachable below the size gate, which `frame.ts` already records as a real
     // window rather than a theoretical one — a resize can arrive between the
-    // gate and the frame.
+    // gate and the frame. That is also what keeps this branch alive under I62
+    // (§6e table row 6).
     const f = frameAt(40, 3, 3);
     expect(f.promptRows, "half of three, floored").toBe(1);
 
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
     const prompt = lines[1 + f.region.height];
 
-    expect(prompt?.startsWith("❯ third"), "the last row, gutter and all").toBe(true);
+    expect(prompt?.startsWith("❯ first"), "the cursor's row, gutter and all").toBe(true);
     expect(lines.join("").includes("⋯"), "and no marker, because there is no room for one").toBe(
       false,
     );
@@ -456,6 +474,11 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
         promptRows: () => ["aa", "bb", "cc", "dd"],
         // The last editor row, which is the only content row the window shows.
         promptSelection: () => [{ row: 3, from: 2, to: 4 }],
+        // **The cursor this row was implicitly relying on** (I62, §6e.4). The
+        // window follows the cursor, so a fixture that leaves it at row 0 puts
+        // the window at the head and drops this span entirely — the mapping
+        // this row is about would then be tested by nothing.
+        promptCursor: () => ({ row: 3, col: 4 }),
       }),
     );
 

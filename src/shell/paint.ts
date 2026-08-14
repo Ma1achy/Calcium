@@ -232,46 +232,110 @@ export function commandRows(
   );
 }
 
+/**
+ * The window the prompt draws, anchored on the cursor (I62, §6e).
+ *
+ * **It was anchored on the buffer's end, with the deferral naming its own
+ * blocker** — *until C17's `cursorCell` is threaded through* — and the blocker
+ * had landed: `cursorCell` is on `EditorHandle` and `PaintDeps.promptCursor`
+ * already carried it into this file, read forty lines below by `cursorFor`.
+ * Two defects lived in the simplification it was still excusing, and both were
+ * *at rest* rather than event-mediated, which is why the classification table
+ * found them and the trace would not have.
+ *
+ * **`count` exists because the range test was the defect.** Membership was
+ * tested on the painted index — `0 ≤ within < cap` — where a marker row and a
+ * content row are the same kind of number, so the row immediately above a
+ * marked window mapped to painted 0 and both consumers wrote there: the
+ * terminal cursor was drawn **on the elision marker**, and a selection span
+ * **washed** it. Returning the content range makes the honest test available
+ * to both, and neither consumer was wrong about its own rule.
+ */
 function promptWindow(
   frame: Composed,
   rows: readonly string[],
+  cursor: number,
   // The capability reaches here for the elision marker alone; `promptRegion`
   // holds `deps` and passes it down rather than a second read (C09 I22).
   caps: Pick<TerminalCapabilities, "unicode">,
 ): PromptWindow {
   const elision = caps.unicode === "ascii" ? ELISION[1] : ELISION[0];
   const cap = frame.promptRows;
+  const n = rows.length;
+  if (n <= cap) return { rows, first: 0, offset: 0, count: n };
 
-  // **A cap of one shows the last row and no marker** (S01 §3, commitment 14).
-  // The window below is the marker plus the rows after it, and at `cap = 1`
-  // there are none: the slice is empty and the prompt paints as `⋯` alone, with
-  // the typed command nowhere on the screen. An elision that elides everything
-  // annotates nothing, and one row of the command beats a marker reporting that
-  // a command exists.
-  if (rows.length <= cap) return { rows, first: 0, offset: 0 };
-  if (cap === 1) return { rows: [rows[rows.length - 1] ?? ""], first: rows.length - 1, offset: 0 };
+  const at = Math.min(Math.max(0, cursor), n - 1);
 
-  // Around the end rather than around the cursor, until C17's `cursorCell` is
-  // threaded through: the cursor is at the end for every case but a mid-buffer
-  // edit, and showing the wrong window is worse than showing the last rows.
-  // Named here so it is a known simplification rather than a silent one.
-  const first = rows.length - (cap - 1);
-  return { rows: [elision, ...rows.slice(first)], first, offset: 1 };
+  // **A cap of one shows one row and no marker** (S01 §3, commitment 14): the
+  // window is the marker plus what follows it, and at `cap = 1` there is
+  // nothing to follow — the prompt painted as `⋯` alone with the command
+  // nowhere on the screen. The row shown is now the **cursor's** rather than
+  // the last; the ruling this row carries is *content beats a marker*, and
+  // which row was always incidental to it (§6e.4).
+  if (cap === 1) return { rows: [rows[at] ?? ""], first: at, offset: 0, count: 1 };
+
+  // The cursor inside the last window's worth: identical to the tail anchoring
+  // this replaced, which is the common frame and is why the change is invisible
+  // wherever the cursor already was (T1.21d, T6.49).
+  const tail = n - (cap - 1);
+  if (at >= tail) {
+    return { rows: [elision, ...rows.slice(tail)], first: tail, offset: 1, count: cap - 1 };
+  }
+
+  // The head, where the elision is **below**. A marker at each end is what the
+  // cursor-following window obliges, and it is not decoration: spans are per
+  // row, so dropping the rows outside clips a wash exactly, and without a
+  // bottom marker a clipped wash reads as one that ended there (§6e table 4).
+  if (at <= cap - 2) {
+    return { rows: [...rows.slice(0, cap - 1), elision], first: 0, offset: 0, count: cap - 1 };
+  }
+
+  // Mid-buffer, both ends marked. **`cap = 2` leaves no content row**, and the
+  // ruling is the marker above plus the cursor's row — the residue being that
+  // rows below are elided unmarked there. Reachable despite `MIN_ROWS`: a
+  // resize can arrive between the size gate and the frame, which T1.5b already
+  // records (§6e table 6).
+  const count = cap - 2;
+  if (count < 1) return { rows: [elision, rows[at] ?? ""], first: at, offset: 1, count: 1 };
+
+  // **No clamp, and it was written with one.** The mutation pass removed it and
+  // nothing failed, which is the *code is dead* disposition rather than a
+  // missing row: this branch is entered only when `cap − 2 < at < n − cap + 1`,
+  // and those guards already put `first` at or above 1 and `first + count` at or
+  // below `n − 1`. A clamp here could never bind, so it would read as careful
+  // and forbid nothing — the same finding `menuWindow` gave up twice over
+  // (entry 16 step 3). Both markers are justified by the branch's own bounds.
+  const first = at - Math.floor((count - 1) / 2);
+  return {
+    rows: [elision, ...rows.slice(first, first + count), elision],
+    first,
+    offset: 1,
+    count,
+  };
 }
 
 /**
  * Which of the editor's rows the prompt is showing, and where they land.
  *
  * `first` is the index in the editor's full layout of the first *content* row
- * in the window, and `offset` is how many painted rows precede it — one when
- * the elision marker is drawn, zero otherwise. The cursor needs both and the
- * paint needs neither, which is why they are returned rather than inlined.
+ * in the window, `count` is how many content rows there are, and `offset` is
+ * how many painted rows precede them — one when a marker is drawn above.
+ *
+ * **`first` and `count` are a range in editor coordinates and `offset` converts
+ * to painted ones**, and keeping the two apart is the whole of I62: a test in
+ * painted coordinates cannot distinguish a content row from a marker.
  */
 type PromptWindow = Readonly<{
   rows: readonly string[];
   first: number;
+  count: number;
   offset: number;
 }>;
+
+/** Whether an editor row is one the window draws (I62). */
+function shows(window: PromptWindow, row: number): boolean {
+  return row >= window.first && row < window.first + window.count;
+}
 
 /**
  * The selection wash, applied to a squared-off row (entry 23).
@@ -304,15 +368,20 @@ function selectionStyle(deps: PaintDeps): Style {
 
 function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly string[] {
   const cap = frame.promptRows;
-  const window = promptWindow(frame, deps.promptRows(), deps.capabilities);
+  const cursor = deps.promptCursor();
+  const window = promptWindow(frame, deps.promptRows(), cursor.row, deps.capabilities);
   const windowed = window.rows;
-  // **Mapped through the window, not assumed aligned with it.** The prompt is
-  // windowed around its end when it exceeds its cap (S01 §3), so an editor row
-  // and a painted row are different numbers whenever the elision marker is up.
+  // **Mapped through the window, not assumed aligned with it.** The prompt
+  // windows when it exceeds its cap (S01 §3), so an editor row and a painted
+  // row are different numbers whenever a marker is up.
+  //
+  // **Membership is tested on the editor row and never on the painted one**
+  // (I62). `at >= 0 && at < cap` was the version that shipped, and it accepts
+  // the row immediately above a marked window — which maps to painted 0, the
+  // marker's own row, and washed it.
   const spans = new Map<number, CellSpan>();
   for (const span of deps.promptSelection()) {
-    const at = span.row - window.first + window.offset;
-    if (at >= 0 && at < cap) spans.set(at, span);
+    if (shows(window, span.row)) spans.set(span.row - window.first + window.offset, span);
   }
 
   const out: string[] = [];
@@ -327,11 +396,20 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on
   // after the rows are squared off, into padding the prompt already has, so
   // `measure` never sees it and `cap` is the same number whether a completion
-  // is in flight or not. Written into the *last* row because that is where the
-  // cursor is and where C19 §7 draws it: `❯ /ps --family=⠋`.
+  // is in flight or not. Written into the **cursor's** row because that is
+  // where C19 §7 draws it: `❯ /ps --family=⠋`.
+  //
+  // **It used to be `out.length - 1`, justified as *that is where the cursor
+  // is*** — true only while the window was anchored on the buffer's end, and
+  // with a marker below the last painted row **is the marker** (§6e table 5).
+  // The row is the same one in every case a spinner or ghost is actually up,
+  // since a completion is in flight over the token being typed; what changes is
+  // that the stated reason is now the reason.
   //
   // Read here rather than passed in, so the value is the one true at paint.
-  const last = out.length - 1;
+  const last = shows(window, cursor.row)
+    ? cursor.row - window.first + window.offset
+    : out.length - 1;
   const row = out[last];
   if (row !== undefined && deps.spinning()) {
     const at = cells(row.trimEnd());
@@ -491,9 +569,16 @@ export function cursorFor(frame: Composed, deps: PaintDeps): Cell | null {
   }
 
   const cell = deps.promptCursor();
-  const window = promptWindow(frame, deps.promptRows(), deps.capabilities);
+  const window = promptWindow(frame, deps.promptRows(), cell.row, deps.capabilities);
+  // **The editor row, not the painted one** (I62). `within < 0 || within >=
+  // cap` was the version that shipped: the row immediately above a marked
+  // window gives `within === 0`, which is inside that range and is the elision
+  // marker's own painted row, so the terminal cursor was drawn on the marker.
+  // The window contains the cursor by construction now, so this is a guard on
+  // `promptCursor` and `promptRows` being read separately rather than the
+  // hiding policy it used to be.
+  if (!shows(window, cell.row)) return null;
   const within = cell.row - window.first + window.offset;
-  if (within < 0 || within >= frame.promptRows) return null;
 
   return { row: frame.region.top + frame.region.height + within, col: cell.col };
 }

@@ -961,6 +961,45 @@ of which change meaning under the ruling while staying green under a partial fix
 which is the shape the owed row was asking after. The fourth is the sharper one:
 an assertion that names the defect and is fixtured where the defect cannot occur.
 
+**And the implementation found a fifth the walk missed — T4.12d**, *the prompt is
+capped at half the terminal*. Two hundred editor rows in a cap of twelve, and its
+second assertion is *"and the newest rows are shown"*, which was a consequence of
+tail anchoring rather than of the cap. Its fixture leaves `promptCursor` at the
+default `{ row: 0 }`, so under the ruling the window follows the cursor to the
+head and `line 199` is nowhere. **The same class as the other three — a fixture
+relying on a cursor it never names — and the walk still did not enumerate it**,
+because §6e.4 was indexed by *rows that mention the window* and this one mentions
+the cap. The honest fixture is a cursor at the end, which is where it is after a
+paste, and the assertion then holds *because that is where the cursor is*.
+
+That is the walk being falsified by the thing it ruled on, which is what code is
+for: the artefact ruled the shape and the first run disagreed about the
+population.
+
+**And the mutation pass falsified it twice more, both about this section's own
+claims rather than about the code.**
+
+- **The two defects are not independently reachable, and §6e.2 implied they were.**
+  Restoring the painted-index test *alone* fails nothing: a cursor-following
+  window contains the cursor by construction, so the comparison that is wrong
+  about rows outside the window never meets one. **It shipped in conjunction with
+  the end anchoring**, and only the pair reproduces it. The wash's identical half
+  *is* independently reachable, because a span is not the cursor and can lie
+  outside a window the cursor is inside. So one comparison, two consumers, two
+  different reachabilities — which is why the run carries a listed survivor with
+  that as its reason rather than a weakened assertion.
+- **The middle branch's clamp was dead.** `first` was written as
+  `clamp(at − ⌊(count−1)/2⌋, 1, n − count − 1)` and removing the clamp failed
+  nothing, because the branch is entered only for `cap − 2 < at < n − cap + 1`
+  and those guards already put both markers on justified rows. It read as
+  careful and could not fire — `menuWindow`'s two dead expressions again, one
+  entry later, in code written by someone who had just recorded that finding.
+
+**And one arithmetic fact neither artefact stated**: a both-ends window needs
+`n > 2·cap − 2`. Below that the head branch and the tail branch meet with no gap
+and the middle case does not exist. Found by a fixture built at `cap` 4 with six
+rows coming back with one marker where the ruling said two.
+
 ### 6e.5 — the ruling
 
 **The window contains the cursor's row, and every range test is in editor
@@ -1292,10 +1331,11 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
 - **T1.19** (I40): `/theme light` writes the variant, and a session constructed against the same `stateDir` opens light. Driven through two real sessions over one fake filesystem rather than by reading the file — the file's contents are an implementation detail and the claim is that the choice survives.
-- **T1.20** (I62, §6e table row 1): a windowed prompt with the cursor **one editor row above the window** → the terminal cursor is not on the elision marker. The state the shipped defect needed and the one no fixture built: `cap` 4 with six editor rows put the cursor on frame row 4, the `❯ ⋯` row, because `within` came out `0` and `0` is inside `[0, cap)`. Asserted against the **painted marker row** rather than against a number, since every number agreed with every other while it was wrong.
-- **T1.20b** (I62, §6e table row 2): the same window with a selection span on that row → the marker row carries no wash. T4.26's *"the marker row is untouched"* cannot construct this, because its span is inside the window, where the marker cannot be washed either way.
-- **T1.20c** (I62, §6e.5): the window follows the cursor, both ends marked — a mid-buffer cursor draws a marker above **and** below, and the content rows are `cap − 2`. The bottom marker is what makes the clipped wash honest (table row 4), so its absence is a defect and not a missing nicety.
-- **T1.20d** (I62, §6e.5): the cursor in the last half-window → the window is **identical** to the tail-anchored one. The row that says the common frame did not change, and the argument for centring over `menuWindow`'s keep-it-last rule.
+- **T1.21** (I62, §6e table row 1): a windowed prompt with the cursor **one editor row above the window** → the terminal cursor is not on the elision marker. The state the shipped defect needed and the one no fixture built: `cap` 4 with six editor rows put the cursor on frame row 4, the `❯ ⋯` row, because `within` came out `0` and `0` is inside `[0, cap)`. Asserted against the **painted marker row** rather than against a number, since every number agreed with every other while it was wrong.
+- **T1.21b** (I62, §6e table row 2): the same window with a selection span on that row → the marker row carries no wash. T4.26's *"the marker row is untouched"* cannot construct this, because its span is inside the window, where the marker cannot be washed either way.
+- **T1.21c** (I62, §6e.5): **a marker wherever rows are elided and nowhere else** — a mid-buffer cursor draws one above and one below with `cap − 2` content rows, and a cursor at the head draws one below only. Both cases, because the middle one alone does not carry the claim: the mutation that removes the head's bottom marker leaves it untouched (T6.50). The bottom marker is what makes the clipped wash honest (table row 4), so its absence is a defect and not a missing nicety. **A both-ends window needs `n > 2·cap − 2`** — below that the head and tail branches meet with no gap — which is arithmetic the ruling implies and did not state, found by the fixture coming back with one marker.
+- **T1.21e** (I62, §6e table row 5): the spinner goes on the **cursor's** painted row, and the bottom marker carries none. Fixtured mid-buffer, because that is the only arrangement where the cursor's row and the last painted row differ — which is why the old justification survived so long.
+- **T1.21d** (I62, §6e.5): the cursor in the last half-window → the window is **identical** to the tail-anchored one. The row that says the common frame did not change, and the argument for centring over `menuWindow`'s keep-it-last rule.
 - **T1.19b** (I40): a `theme` file holding something that is not a variant → the base theme is retained **and a notice is in the transcript**. Two assertions because either alone passes against the other's defect: retaining silently satisfies the first, and a notice beside a switched theme satisfies the second. The control is a valid file, which must produce no notice.
 - **T1.18** (I38): a request with a slow source shows no spinner before the threshold and one after it, on a fake clock, **read off the composed frame** rather than off the engine, and the frame carrying it arrives with **no further input** — and the prompt's height and the frame's widths are identical in both, which is the half that says it is appearance. The two mutations fail differently and both must: reading `spinning` once at request time and caching it → the spinner never appears; dropping the wake → it appears only on the frame the *next keystroke* draws, so the assertion that a frame arrives with no further input is what carries it.
 - **T1.4** (I3): all four seals are closed before the input router accepts anything — C05's, C07's and C09's, and C23's local registry, which is the one a test counting only the construction-time ones would miss. C19's engine has no `seal`, and the test asserts that too: a count is the wrong assertion when one member of the set does not belong to it.
@@ -1472,9 +1512,10 @@ PTY harness.
 - **T6.36** (I40): treating an unreadable `theme` file as fatal, or as silently absent → T1.19b fails on the notice or on the session opening at all. The two halves of C20's repair, arriving one component up.
 - **T6.34** (I39): removing the `cancel()` from the printable path → C19 T5.2 fails on its last assertion, and a menu opens for a prefix the user has typed past. The effect table's own `mine !== seq` guard does not cover it: a printable keystroke does not advance that sequence, which is why the guard looked like the mechanism and was not.
 - **T6.47** (I38): dropping the wake armed at the threshold → T1.18 fails at *drawn by nothing the user did*, on the frame that arrives with no further input, and the spinner appears only once the user types again. The same symptom as an unarmed decoder deadline (I32), through a different timer — which is why it is a separate row rather than a second clause.
-- **T6.48** (I62): testing membership on the painted index — `0 ≤ within < cap` — instead of on the editor row → T1.20 and T1.20b fail together, the cursor lands on the elision marker and a span washes it. **The mutation restores the shipped defect**, and it is one comparison: both consumers were individually correct about their own rule and wrong about the coordinate they compared in.
-- **T6.49** (I62): anchoring the window on the buffer's end again → T1.20 and T1.20c fail and T1.20d passes, which is the point of T1.20d existing — the tail case is identical under both rules, so a revert is invisible to every frame drawn while the cursor is where it usually is.
-- **T6.50** (I62): dropping the bottom marker while keeping the cursor-following window → T1.20c fails. Nothing about the cursor's position changes, and a wash running past the window's lower edge reads as ending there.
+- **T6.48** (I62): testing membership on the painted index — `0 ≤ within < cap` — instead of on the editor row, **in the wash** → T1.21b fails and a span washes the elision marker. The cursor's identical half is a **listed survivor with its reason**, and the reason is a finding rather than an excuse: once the window follows the cursor there is no row outside it for the cursor to be on, so that comparison is never reached. **The two consumers are not symmetric**, because a span is not the cursor and can lie outside a window the cursor is inside — one fault, one comparison, two different reachabilities.
+- **T6.49** (I62): anchoring the window on the buffer's end again → T1.21 and T1.21c fail and **T1.21d passes**, which is the point of T1.21d existing: the tail case is identical under both rules, so a revert is invisible to every frame drawn while the cursor is where it usually is. This is also the mutation that restores the *pair* the tree shipped, since the cursor's range test only misbehaves against an end-anchored window.
+- **T6.50** (I62): dropping the bottom marker at the head while keeping the cursor-following window → T1.21c fails. **Its first draft asserted the middle case only and this mutation was caught by something else**, which is the row's own argument for covering head, middle and tail: *a marker wherever rows are elided and nowhere else* is not carried by the case with two of them.
+- **T6.51** (I62, §6e table row 5): the spinner and ghost written into `out.length − 1` again → T1.21e fails, and with a marker below they are drawn on it. The mutation that asks whether the comment's *"because that is where the cursor is"* constrains anything.
 - **T6.41** (I58): dropping `focus` from the key → T4.17's focus case fails, and moving the selection down a table leaves the highlight where it was until something else moves the entry's `rev`. The mutation nothing else catches: `rev`, width and theme are all unchanged, so every other row agrees.
 - **T6.42** (I58): dropping the theme identity from the key → T4.17's theme case fails, and `/theme light` repaints the chrome while the transcript keeps its dark colours. C03's `invalidate` still fires, which is what makes this survivable-looking: the *frame* is repainted from a cache that was not.
 - **T6.43** (I58): keying on `(entryId, rev)` alone — C14's key minus width, which is the key F90 proposed → T4.17's width case fails, and a resize redraws the transcript at the old wrapping.
