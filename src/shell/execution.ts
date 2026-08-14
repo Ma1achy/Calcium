@@ -655,7 +655,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         durationMs: deps.clock() - startedAt,
       });
       appendAndCommit(doc, line);
-      // A02 Seam 4's theme row: `theme.setVariant` → `scheduler.invalidate`.
+      // A02 Seam 4's theme row: `theme.setTheme` → `scheduler.invalidate`.
       // C10 never invalidates; the sequence is L4's, which is the seam.
       if (verb === "theme") deps.scheduler.invalidate();
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_` alone.

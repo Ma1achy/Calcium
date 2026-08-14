@@ -573,13 +573,14 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T1.18** (I26): the base over all four depths, in one row, because the claim is a ladder and not four claims: the token's hex at 24, a cube index in **16–255** at 8, the theme's own curated index at 4 — asserted against the declared table, not a computed nearest, which is T1.13's argument for this surface — and the empty `Style` at 1.
 - **T1.19** (I26): at 8-bit, the floor recomputed against the **quantised** base rather than the token, for every slot `textSurfaces` pairs with `bg`. Asserted as a recomputation and not as a result: against the shipped tokens both numbers clear, so a row comparing outcomes would agree with the wrong one.
 - **T1.20** (I28): a theme declaring `light` over a dark `bg` is rejected at load, with both the declaration and the measured luminance in the message. **The state that is legal today**, so the row is a new refusal rather than a restatement.
-- **T1.21** (I27): a set of three loads, each resolves independently, and `identity()` distinguishes two themes of the **same** polarity — the case a variant-keyed memo could not express.
+- **T1.21** (I27): a set of three loads, `names` is every key in declaration order, and switching between two themes of the **same** polarity is a switch — the case a variant-keyed store could not express. An unknown name **throws** and says what the set holds, because a silent no-op reports a change that did not happen.
+- **T1.21a** (I27): a set with no `dark` in it opens on its first key, and an empty set is refused. The literal default would be a name this component requires of every app's set; the empty case is the one failure a token check cannot see, because it is about the collection.
 
 ### Tier 2 — contract / interface
 
 - **T2.1** (I1): `resolveTone` called a thousand times returns identical styles and performs no I/O.
 - **T2.22** (I27): `/theme`'s declared `enum` values equal the theme set's keys, for a set of three. Asserted against the set rather than against a list, because a list here is the defect one layer over (§5a.4).
-- **T2.23** (I28, §5a.4): the contrast suite's coverage set **is** `Object.keys(defaultTheme)`. The row that fails the day a shipped theme is added without joining the checks the entry says every shipped theme passes.
+- **T2.23** (I28, §5a.4): the contrast suite's coverage set is **derived**, asserted on the source. **A value comparison here is vacuous and the mutation pass proved it**: `["dark", "light"]` equals `Object.keys(defaultTheme)` for exactly as long as the shipped set has two members, so the row passed against the defect it was written for and would have begun failing at the moment it was meant to protect. The limit is stated in the row — it reads one file.
 - **T2.2** (I11): with the cache warm, results are identical to cold results for every key.
 - **T2.3** (I5): for every shipped theme, the 4-bit mapping is injective across `{ok, warn, error, info, accent}` — the tones whose confusion would be misleading rather than merely dull.
 - **T2.4** (I3): every shipped theme passes every contrast floor, on `bg` **and** `bgElev`, recomputing the ratio from the shipped token rather than reading A01 A.1's recorded figure. A theme cannot ship failing its own rule, and the catalogue is an assertion this test upholds rather than a record of what someone intended.
@@ -621,6 +622,8 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.4** (with C03, L4): a theme switch causes **L4** to call `invalidate()`, producing a full repaint. A spy asserts C10 itself never calls the scheduler (I7).
 - **T4.5** (with C22, → C22 I40): `/theme light` persists and survives a restart. **The persistence is C22's**, not C10's: this component is a pure function over tokens, and a store reaching a disk from L1 is A03 MG23's neighbourhood. The row lives here because the *behaviour* is a theme behaviour, and it is asserted against two real sessions over one `stateDir` (C22 T1.19).
 - **T4.6** (with C22, → C22 I40): a corrupt persisted variant → base theme retained, notice committed, session opens normally. C20's repair-at-open precedent one component up; the notice is the half that stops "absent" and "corrupt" looking the same (C22 T1.19b).
+- **T4.35** (I27, with C23): `/theme high-contrast` on a three-theme session switches, and commits no usage notice. **The handler, the enum and the store on one path**, and the mutation pass is why it is not a store-level row: reading the variant against two literals passes every row that asks for one of those two names, which is every row that existed.
+- **T4.36** (I27, → C22 I40): a persisted `high-contrast` is restored, and a persisted name the set does not hold leaves the opening theme in place. **The only shape that separates a membership test from a literal pair**, since both names a literal knows are in the shipped set.
 
 ### Tier 5 — e2e
 

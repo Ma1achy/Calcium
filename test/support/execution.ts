@@ -25,6 +25,7 @@ import { loadTheme, defaultTheme, type ThemeStore } from "../../src/presentation
 import { slashPolicy } from "../../src/interaction/parser/index.js";
 import { createEditor } from "../../src/interaction/editor/index.js";
 import { fixture } from "./manifest.js";
+import { withThemeNames } from "../../src/data/manifest/index.js";
 import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
@@ -154,7 +155,17 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
       seal: () => undefined,
       sealed: true,
     },
-    manifest: { manifest: fixture(), load: () => undefined, seal: () => undefined, sealed: true },
+    // **`/theme`'s values from the store this harness was given** (C10 I27),
+    // which is the composition root's own wiring: the manifest describes the
+    // verb and the set declares the names. A fixture pinned to the shipped two
+    // would make a three-theme session's third name a validation error here and
+    // nowhere else, so a row about the handler would be a row about the fixture.
+    manifest: {
+      manifest: withThemeNames(fixture(), theme.names),
+      load: () => undefined,
+      seal: () => undefined,
+      sealed: true,
+    },
     blocks: {} as never,
     // C07 I19 / I18 — what `ProducerContext` is built from (C23 I40). Real
     // values rather than stubs: a producer told `ascii` behaves differently, and

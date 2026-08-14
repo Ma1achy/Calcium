@@ -148,7 +148,7 @@ describe("C22 §6c — the render cache", () => {
     expect(screen().rows.join("\n"), "the entry is on screen").toContain("alpha");
     const before = count();
 
-    // `light`, because the session starts `dark` (`store.ts`) and `setVariant`
+    // `light`, because the session starts `dark` (`store.ts`) and `setTheme`
     // is correctly a no-op for the variant already active (C10 T3.6).
     await type("/theme light\r");
     await Promise.resolve();

@@ -90,11 +90,11 @@ describe("C10 resolution", () => {
     }
   });
 
-  it("T1.6: setVariant swaps the variant and clears the cache", () => {
+  it("T1.6: setTheme swaps the variant and clears the cache", () => {
     const themes = store("dark");
     expect(resolveTone("ok", themes.current, caps(24)).colour).toEqual({ kind: "rgb", hex: "#87b86c" });
 
-    themes.setVariant("light");
+    themes.setTheme("light");
 
     expect(themes.current.variant).toBe("light");
     expect(resolveTone("ok", themes.current, caps(24)).colour).toEqual({ kind: "rgb", hex: "#3c793c" });
@@ -356,6 +356,73 @@ describe("C10 resolution", () => {
     // And nothing at all for a theme that inherits: there is no painted value
     // to check against, so the floor is the declared assumption as before.
     expect(validatePaintedFloors({ ...patched, background: "terminal" })).toEqual([]);
+  });
+
+  it("T1.20 (I28): a theme declaring the wrong polarity is rejected at load", () => {
+    // **The state that was legal until this landed.** `variant` was a second
+    // record of a fact the tokens carry — `luminance(bg)` answers it — and
+    // nothing checked the two agreed: I9 compares tones *to* `bg` and has no
+    // opinion about what `bg` is. So a theme could say `light` over black,
+    // resolve, and clear every floor.
+    const dark = defaultTheme["dark"]!;
+    const lying = { ...defaultTheme, liar: { ...dark, variant: "light" as const } };
+
+    const loaded = loadTheme(lying, "dark");
+    expect(loaded.ok, "a theme that lies about its own ground").toBe(false);
+    if (!loaded.ok) {
+      const messages = loaded.error.map((e) => `${e.path}: ${e.message}`).join("; ");
+      expect(messages).toContain("liar.variant");
+      // Both numbers, so the reader can check the claim rather than trust it.
+      expect(messages).toContain(dark.surfaces.bg);
+      expect(messages, "the measured luminance, not just a verdict").toMatch(/luminance is 0\.\d+/u);
+    }
+
+    // And the shipped set clears it by an order of magnitude in both directions.
+    expect(loadTheme(defaultTheme).ok).toBe(true);
+  });
+
+  it("T1.21 (I27): a set of three, and two themes of one polarity are distinct", () => {
+    // **The case a variant-keyed store could not express.** `identity()` puts
+    // the name first, so two dark themes differ — and the switch is by name,
+    // which is what stops one of them being unreachable.
+    const dark = defaultTheme["dark"]!;
+    const three = { ...defaultTheme, "high-contrast": { ...dark, name: "hc" } };
+
+    const loaded = loadTheme(three, "dark");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+
+    const store = loaded.value;
+    expect(store.names, "every theme is a name, in declaration order").toEqual([
+      "dark",
+      "light",
+      "high-contrast",
+    ]);
+
+    const before = store.current;
+    store.setTheme("high-contrast");
+    expect(store.current, "a switch between two dark themes is a switch").not.toBe(before);
+    expect(store.current.variant, "and polarity is untouched by it").toBe("dark");
+    expect(store.current.name).not.toBe(before.name);
+
+    // A name the set does not hold throws rather than no-opping, and says what
+    // it does hold. A silent no-op would report a change that did not happen.
+    expect(() => store.setTheme("solarised")).toThrow(/no theme named "solarised"/u);
+    expect(store.current.name, "and nothing moved on the way out").toBe(
+      loaded.value.current.name,
+    );
+  });
+
+  it("T1.21a (I27): the set opens on its first key, not on a name this component invented", () => {
+    // A literal default is a name C10 would be requiring of every app's set.
+    const only = { midnight: { ...defaultTheme["dark"]!, name: "midnight" } };
+    const loaded = loadTheme(only);
+    expect(loaded.ok, "a set with no `dark` in it opens").toBe(true);
+    if (loaded.ok) expect(loaded.value.current.tokens.name).toBe("midnight");
+
+    // And an empty set is refused — the one failure a token check cannot see,
+    // because it is about the collection rather than about a theme.
+    expect(loadTheme({}).ok).toBe(false);
   });
 
   it("both shipped variants load", () => {

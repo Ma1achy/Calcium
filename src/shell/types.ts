@@ -331,7 +331,7 @@ export type PipelineDeps = Readonly<{
   confirm: ConfirmHost;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
-  persistTheme?: (variant: "dark" | "light") => void;
+  persistTheme?: (name: string) => void;
   /** `--no-bg` for one invocation, written by `/theme`'s handler (C22 I66). */
   setSuppressBackground: (suppressed: boolean) => void;
   history: HistoryStore;

@@ -33,7 +33,7 @@ export type HandlerDeps = Readonly<{
    * Optional, because this file is the local verbs and a harness driving them
    * has no state directory. A session always supplies it.
    */
-  persistTheme?: (variant: "dark" | "light") => void;
+  persistTheme?: (name: string) => void;
   /**
    * `--no-bg` for this invocation (C22 I66).
    *
@@ -162,7 +162,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     },
 
     /**
-     * A02 Seam 4's theme row: `theme.setVariant` → the caller invalidates.
+     * A02 Seam 4's theme row: `theme.setTheme` → the caller invalidates.
      *
      * **The variant comes from `ctx.args`, not from `argv[0]`** (C22 I66). C05
      * parsed it and enum-checked it against the declared values, and re-deriving
@@ -178,7 +178,12 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       // sticky flag is invisible state, and repeating it is one keystroke with
       // `↑` recalling the whole line.
       deps.setSuppressBackground(ctx.args["no-bg"] === true);
-      if (wanted !== "dark" && wanted !== "light") {
+      // **A string is all this arm can test for** (C10 I27). Which strings are
+      // themes is the set's question, and `/theme`'s `enum` — whose values are
+      // the set's keys — has already answered it on every path that validated.
+      // This branch is the one that did not: a local verb is not gated on
+      // validation, so a malformed invocation arrives with nothing parsed.
+      if (typeof wanted !== "string") {
         return doc("/theme", [
           block({
             kind: "notice",
@@ -191,11 +196,11 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
             // someone who typed `/theme purple`. The failure arm is exactly
             // where `args` is empty, which is why the two differ here and
             // nowhere else.
-            text: `usage: /theme dark|light — got \`${argv[0] ?? ""}\``,
+            text: `usage: /theme ${deps.theme.names.join("|")} — got \`${argv[0] ?? ""}\``,
           }),
         ]);
       }
-      deps.theme.setVariant(wanted);
+      deps.theme.setTheme(wanted);
       // **Written on the change, not at exit** (C22 I40). A session killed by
       // `SIGKILL` runs no shutdown path (C01 §5), and a preference that
       // survives a clean exit and not a crash is one people stop trusting.

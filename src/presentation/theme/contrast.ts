@@ -219,8 +219,44 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   }
 
   errors.push(...validateDiffSurfaces(tokens));
+  errors.push(...validateVariant(tokens));
 
   return Object.freeze(errors);
+}
+
+/**
+ * §5a — `variant` against the theme's own background (I28).
+ *
+ * **The field was a second record of a derivable fact and nothing checked it.**
+ * `luminance(surfaces.bg)` answers the same question, so a theme declaring
+ * `light` over `#000000` loaded, resolved and cleared every floor: I9 compares
+ * tones *to* `bg` and has no opinion about what `bg` is.
+ *
+ * **The threshold is the mid-point of the luminance range, and it is a coarse
+ * instrument on purpose.** This is not asking whether a theme is *readable* —
+ * every floor above does that — but whether it is describing itself. A theme
+ * sitting near 0.5 is legitimately either, and its declaration is the answer
+ * rather than the question, which is why `variant` is kept and not derived.
+ * Measured against the shipped set: dark `#1a1a1a` is 0.011 and light `#fafafa`
+ * is 0.961, so both clear it by an order of magnitude and the check has room to
+ * be wrong in neither direction.
+ */
+function validateVariant(tokens: ThemeTokens): readonly ThemeError[] {
+  const bg = tokens.surfaces.bg;
+  if (!isHex(bg)) return [];
+
+  const measured = luminance(bg);
+  const declares = measured >= 0.5 ? "light" : "dark";
+  if (declares === tokens.variant) return [];
+
+  return [
+    {
+      path: "variant",
+      message:
+        `declares "${tokens.variant}" and its background is ${bg}, whose relative ` +
+        `luminance is ${measured.toFixed(3)} — that is a ${declares} ground`,
+    },
+  ];
 }
 
 function validatePalette(

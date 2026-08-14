@@ -29,7 +29,7 @@ import { commandRows } from "./paint.js";
 import { noticeDoc } from "./documents.js";
 import type { NavElement } from "../presentation/blocks/index.js";
 import { initialRegionHeight } from "./frame.js";
-import { createManifestStore, parseManifest } from "../data/manifest/index.js";
+import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
 import type { Result } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
@@ -454,7 +454,11 @@ export async function constructGraph(
     const parsed = parseManifest(document.value);
     if (!parsed.ok) throw new ConstructionError("registries", parsed.error);
 
-    manifest.load(parsed.value);
+    // **`/theme`'s values, supplied where both facts are held** (C10 I27). The
+    // manifest describes the verb and the config declares the themes, and this
+    // is the one place with each — so the enum, the completion and the usage
+    // text all name the set the session actually holds.
+    manifest.load(withThemeNames(parsed.value, Object.keys(config.theme)));
 
     const completion = createEngine({ now: config.clock, recency: recencyOf });
     // **The framework's six first, then the app's** (I3b). §2 called
@@ -600,7 +604,11 @@ export async function constructGraph(
     const persisted = await readOrAbsent(config.fs, themePath(config.stateDir));
     if (persisted !== null) {
       const trimmed = persisted.trim();
-      if (trimmed === "dark" || trimmed === "light") themed.value.setVariant(trimmed);
+      // **A membership test against the set, not a comparison to two literals**
+      // (C10 I27). The migration is nothing — `dark` and `light` are names in
+      // the shipped set — and a literal pair here would refuse a legitimate
+      // name the moment a third theme existed.
+      if (themed.value.names.includes(trimmed)) themed.value.setTheme(trimmed);
       else if (trimmed !== "") {
         // Appended here rather than carried out to `start()`: the transcript
         // exists at this point and a warning threaded through the graph is a

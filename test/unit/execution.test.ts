@@ -220,7 +220,7 @@ function harness(script: Scripted = {}) {
     // against; the rest of the cast is noted in test/support/README.md.
     overlays,
     documentView,
-    theme: { current: {} as never, setVariant: () => undefined, applyOverrides: () => [] },
+    theme: { current: {} as never, setTheme: () => undefined, applyOverrides: () => [] },
     // `append` is real: C23 I29 records every settled submission through it,
     // and a fake without it throws inside the funnel — where the failure reads
     // as a transcript defect rather than as a missing method.

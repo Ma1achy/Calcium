@@ -24,7 +24,7 @@ export {
   type ValidationResult,
 } from "./types.js";
 
-export { parseManifest } from "./parse.js";
+export { parseManifest, withThemeNames } from "./parse.js";
 
 export { findTool, isViewInvocation, visibleTools } from "./find.js";
 

@@ -50,7 +50,7 @@ describe("C10 edges", () => {
 
     const during: string[] = [];
     for (const tone of ["ok", "warn"] as const) {
-      if (tone === "warn") themes.setVariant("light");
+      if (tone === "warn") themes.setTheme("light");
       const colour = resolveTone(tone, held, caps(24)).colour;
       during.push(colour !== undefined && colour.kind === "rgb" ? colour.hex : "");
     }
@@ -62,15 +62,15 @@ describe("C10 edges", () => {
   it("T3.6: switching to the active variant is a no-op", () => {
     const themes = store("dark");
     const before = themes.current;
-    themes.setVariant("dark");
+    themes.setTheme("dark");
     expect(themes.current).toBe(before);
   });
 
   it("T3.7: a theme whose variants are identical loads and switches without error", () => {
-    const twin = loadTheme({ dark: defaultTheme.dark, light: defaultTheme.dark });
+    const twin = loadTheme({ dark: defaultTheme["dark"]!, light: defaultTheme["dark"]! });
     expect(twin.ok).toBe(true);
     if (twin.ok) {
-      expect(() => twin.value.setVariant("light")).not.toThrow();
+      expect(() => twin.value.setTheme("light")).not.toThrow();
       expect(twin.value.current.tokens.variant).toBe("dark"); // a visual no-op, not an error
     }
   });

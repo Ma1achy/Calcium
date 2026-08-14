@@ -5,10 +5,10 @@
 // fails the day the blocker lands rather than the day someone remembers.
 import { describe, expect, it } from "vitest";
 import { pipelineHarness, settled } from "../support/execution.js";
-import { buildSession, fakeFs } from "../support/session.js";
+import { buildGraph, buildSession, fakeFs } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
-import { resolveTone } from "../../src/presentation/theme/index.js";
+import { defaultTheme, loadTheme, resolveTone } from "../../src/presentation/theme/index.js";
 import { caps, store, TONES } from "../support/theme.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { ONE_PER_KIND } from "../support/blocks.js";
@@ -81,7 +81,7 @@ describe("C10 integration", () => {
   });
 
   it("T4.4 (with C03, C23): a theme switch makes L4 call invalidate, and C10 never does", async () => {
-    // **A02 Seam 4's theme row, from C10's side.** `theme.setVariant` →
+    // **A02 Seam 4's theme row, from C10's side.** `theme.setTheme` →
     // `scheduler.invalidate`, and the invalidate is L4's: a theme store that
     // committed its own frame would be L1 reaching into L0.
     //
@@ -103,13 +103,13 @@ describe("C10 integration", () => {
 
     // C10's own path, with no L4 in it.
     const direct = pipelineHarness();
-    direct.theme.setVariant("light");
+    direct.theme.setTheme("light");
     expect(direct.calls, "C10 never invalidates").not.toContain("invalidate");
   });
   it("T4.27 (C22 I66): clearing --no-bg reaches a frame", async () => {
     // **A row about a path rather than about a guard.** The walk ruled that
     // `/theme light --no-bg` then `/theme light` commits nothing, because
-    // `setVariant` is a no-op on an unchanged variant — the mechanism is real
+    // `setTheme` is a no-op on an unchanged variant — the mechanism is real
     // and the consequence does not follow: every `/theme` appends a notice and
     // invalidates on the verb whatever changed. Measuring the caller refuted
     // it, and the obligation is what stays: the flag has to reach the screen.
@@ -182,6 +182,56 @@ describe("C10 integration", () => {
       inheriting?.doc.blocks.some((b) => b.kind === "notice" && b.tone === "warn"),
       "dark inherits anyway, so the flag changed nothing to warn about",
     ).toBe(false);
+  });
+
+  it("T4.35 (C10 I27): a third theme is reachable end to end", async () => {
+    // **The handler, the enum and the store on one path** — and the mutation
+    // pass is why this row exists rather than a store-level one: reading the
+    // variant against two literals passes every existing row, because every
+    // existing row asks for one of the two names a literal already carries.
+    const three = loadTheme({
+      ...defaultTheme,
+      "high-contrast": { ...defaultTheme["dark"]!, name: "hc" },
+    });
+    expect(three.ok).toBe(true);
+    if (!three.ok) return;
+
+    const h = pipelineHarness({ theme: three.value });
+    h.pipeline.submit("/theme high-contrast");
+    await settled();
+
+    expect(h.theme.current.tokens.name, "the switch happened").toBe("hc");
+    const last = h.transcript.entries.at(-1);
+    expect(
+      last?.doc.blocks.some((b) => b.kind === "notice" && b.tone === "warn"),
+      "and it is not a usage error",
+    ).toBe(false);
+  });
+
+  it("T4.36 (C10 I27, C22 I40): a persisted name outside the shipped two is restored", async () => {
+    // **The guard is a membership test against the set** (§5a.3 rows 1–2). A
+    // literal pair passes every persistence row there is, because both names it
+    // knows are in the shipped set — so this row supplies one that is not, and
+    // it is the only shape that can tell the two guards apart.
+    const set = { ...defaultTheme, "high-contrast": { ...defaultTheme["dark"]!, name: "hc" } };
+    // `mkdir` first, because the fake refuses a write to a directory nobody
+    // created — F96's rule, and the reason this harness can see a missing one.
+    const fs = fakeFs();
+    await fs.mkdir("/state");
+    await fs.writeFile("/state/theme", "high-contrast\n");
+
+    const built = await buildGraph({ fs, theme: set, stateDir: "/state" });
+    expect(built.graph.theme.current.tokens.name, "restored by name").toBe("hc");
+
+    // The control: the same session over a directory holding a name the set
+    // does not have keeps the theme it opened on, and says so (C22 I40).
+    const other = fakeFs();
+    await other.mkdir("/state");
+    await other.writeFile("/state/theme", "solarised\n");
+    const fallback = await buildGraph({ fs: other, theme: set, stateDir: "/state" });
+    expect(fallback.graph.theme.current.tokens.name, "an unknown name changes nothing").toBe(
+      defaultTheme["dark"]!.name,
+    );
   });
 
   it("T4.5 (C22 I40): /theme light persists and survives a restart", async () => {

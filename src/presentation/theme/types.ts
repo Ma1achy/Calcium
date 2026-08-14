@@ -72,6 +72,20 @@ export type Surfaces = Readonly<{
 
 export type ThemeTokens = Readonly<{
   name: string;
+  /**
+   * The polarity this theme is, declared and **checked against its own
+   * background** (I28).
+   *
+   * It is otherwise a second record of a derivable fact — `luminance(bg)`
+   * answers the same question — and one nothing validated: a theme declaring
+   * `light` over `#000000` loaded, resolved and cleared every floor, because I9
+   * compares tones *to* `bg` and has no opinion about what `bg` is.
+   *
+   * Kept rather than derived because a token cannot express **intent** for a
+   * mid-luminance theme, and a user asking for the dark one is asking about
+   * intent. Published through `ResolvedTheme` so an app can choose an asset by
+   * it — *no reader here* is not *no reader*.
+   */
   variant: "dark" | "light";
   /**
    * What sits behind the text (I25, roadmap 39).
@@ -92,7 +106,23 @@ export type ThemeTokens = Readonly<{
   fourBit: FourBitMap;
 }>;
 
-export type ThemeSet = Readonly<{ dark: ThemeTokens; light: ThemeTokens }>;
+/**
+ * The themes a session can switch between, **keyed by name** (I27).
+ *
+ * `dark` and `light` are names in the shipped set rather than a closed
+ * vocabulary, so `high-contrast` is a third theme and not a third variant. The
+ * keys were spelling polarity only because a two-theme set had nowhere else to
+ * put it — and I25 took that job when a theme began declaring the background it
+ * assumes.
+ *
+ * **Nothing reads `variant` as polarity**: its readers are all in `store.ts`,
+ * each a key into this record or part of the memo identity. That measurement is
+ * what the name-keying rests on, rather than the argument for it (§5a.1).
+ *
+ * A `{ dark, light }` literal still satisfies this, which is what makes the
+ * widening free for every app that already supplies one.
+ */
+export type ThemeSet = Readonly<Record<string, ThemeTokens>>;
 
 /** `"tone.ok"`, `"syntax.keyword"`, `"surface.bgElev"`. */
 export type ColourRef = `${string}.${string}`;

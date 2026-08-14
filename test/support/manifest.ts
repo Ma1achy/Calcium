@@ -14,7 +14,8 @@
 // want to.
 import { readFileSync } from "node:fs";
 
-import { parseManifest, type Manifest } from "../../src/data/manifest/index.js";
+import { parseManifest, withThemeNames, type Manifest } from "../../src/data/manifest/index.js";
+import { defaultTheme } from "../../src/presentation/theme/index.js";
 
 /** A fresh, mutable plain object each call, so a test can break one field. */
 export function raw(): Record<string, unknown> {
@@ -40,7 +41,12 @@ export function fixture(): Manifest {
   if (!result.ok) {
     throw new Error(`the fixture manifest must parse: ${result.error.map((e) => `${e.path}: ${e.message}`).join("; ")}`);
   }
-  return result.value;
+  // **`/theme`'s values, as the composition root supplies them** (C10 I27). A
+  // parsed manifest carries an `enum` with none, which refuses every `/theme`
+  // invocation — so a fixture that skipped this would be testing a session
+  // nobody can construct, and it would look like a theme bug rather than a
+  // missing step.
+  return withThemeNames(result.value, Object.keys(defaultTheme));
 }
 
 /** A tool from the fixture, by name. */
