@@ -3097,9 +3097,27 @@ PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    The build falsified the walk's second cell — MG24's
                                    keyword split does not carry, because `CompletionSource`
                                    is an interface an app BUILDS — and that was the residue
-                                   over-reporting, which the first cell forbids. What
-                                   remains is the READ over the 86, which is the entry's
-                                   own point: candidates, not verdicts
+                                   over-reporting, which the first cell forbids.
+                                   THE READ, AND ITS FIRST PAYOUT: the 86 stratify by
+                                   WHAT AN APP WOULD HAVE TO DO to reach them — write a
+                                   custom block kind (`RenderContext`, `Style`,
+                                   `TerminalCapabilities`, `PaletteSpec` — 19), author a
+                                   theme (`ThemeTokens` — 4), supply a transport or
+                                   adapter (`VerbTransport`, `TransportRouter`,
+                                   `Adapter`, `Invocation` — 7), drive a fixture world
+                                   (`WorldDriver` — 3), or take an injection seam only a
+                                   test wants (`TuiConfig.clock`/`fs`/`stdin` and the
+                                   rest of `TuiConfig`, `SessionSnapshot`, `Identity` —
+                                   20). NONE OF THOSE IS A DEFECT. What is left is the
+                                   block and manifest fields neither app sets, and the
+                                   first one read produced F165: `ErrorLike.details` is
+                                   in the residue, and reading it found `code` and
+                                   `stage` beside it — three of five members set by
+                                   three producers, the adapter mapping and the app's
+                                   own six sites, rendered by nothing. THE OTHER TWO
+                                   WERE CLEARED, which is the residue's stated direction
+                                   paying out: a candidate is where to look and not what
+                                   is wrong
       49 GOLDEN HAS NEVER SEEN A     `test/golden/README.md` says "frames at 4 widths x 2
          FRAME ★★                    themes x 2 unicode modes" and NOT ONE OF THEM IS A
                                    FRAME: blocks, table, patch and plot all go through

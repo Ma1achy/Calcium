@@ -7985,3 +7985,63 @@ the file typechecks, publishes and passes `make enforce` either way.
 
 **Fixed** — the header names the one withheld thing it still withholds, and records that the
 other returned, so the note that would go stale next is the one a reader can check.
+
+---
+
+## F165 — three of `ErrorLike`'s five members are produced on every route and rendered nowhere ★★★
+
+| | |
+|---|---|
+| **Surface** | every failure document, on both routes |
+| **Reached for** | `ErrorLike.details`, a candidate in roadmap 48's residue |
+| **Verdict** | **a real Calcium finding** — a published type filled by three producers and one app, read by nothing |
+| **Absorbed by** | nothing; the ruling is owed |
+
+`ErrorLike` publishes five members. `errorDoc` — `src/shell/documents.ts:227` — renders
+**two**:
+
+```
+message      → the error notice
+remediation  → a second notice, tone info
+code         → nothing
+stage        → nothing
+details      → nothing
+```
+
+`error.code`, `error.stage` and `error.details` do not appear on the right-hand side of an
+expression anywhere in `src/`. They are produced on every route that can fail:
+
+| producer | what it fills |
+|---|---|
+| `data/adapters/mapping.ts:107–115` | `code`, `stage`, `details`, **off the far side's own error envelope** |
+| `data/viewmodel/patch.ts:32` | `stage` and `code: "patch"` on a rejected patch |
+| `data/manifest/validate.ts:97` · `interaction/parser/parse.ts:45` | `details` on a validation and a parse failure |
+| `examples/docker`, **six sites** | `stage: "adapter"` and `stage: "local"`, by hand |
+
+**The app is the part that makes this a finding rather than an unused field.** Six call
+sites in `examples/docker` write `stage` into an `error`, which is a consumer supplying a
+field on the reasonable belief that supplying it does something. Nothing renders it, nothing
+logs it, and no test asserts it reaches a frame. The far side's structured `details` — the
+one thing a JSON-emitting CLI can say about *why* beyond a sentence — is parsed, typed,
+frozen and dropped.
+
+**Found by a residue, and the residue found one of the three.** Roadmap 48's signal lists
+`ErrorLike.details` because neither example names it. `code` and `stage` were **cleared** —
+`stage` by the app's own six sites, `code` by a name any type may carry — which is the
+instrument's stated direction working as described: it under-reports, and the read that
+starts from one member is what reaches the other two. **A candidate is where to look, not
+what is wrong**, and this is the first measured instance of that being the useful shape.
+
+**MG24 cannot see any of the three.** Each is *constructed* somewhere, and MG24's record arm
+counts construction as consumption for F94's reason — a deps record supplied by object
+literal is genuinely wired. For a **document** type the two are not the same act: a field a
+producer sets and no renderer reads is exactly F21's shape, and the rule that exists to
+catch it reads the setter as the consumer.
+
+**Not fixed here, and the reason is that the remedy is a ruling.** Three dispositions, and
+they are not obviously ordered: render them (a `code` in a corner and a `details` table is a
+design question C09 owns), drop them from the type (a public narrowing, F58b's shape and its
+argument), or keep them as the structured half of a document an agent reads rather than a
+person. The last is the one that would explain `details` existing at all. What is not
+available is the current state, where a producer, an adapter and an app all fill fields on a
+promise nothing keeps.

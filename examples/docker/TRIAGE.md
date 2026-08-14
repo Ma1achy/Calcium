@@ -30,7 +30,7 @@ type change.
 | rank | mechanism | ids keyed | consumers | ⚠ | disposition |
 |---|---|---|---|---|---|
 | **1** | [The consumer cannot reach a fact the framework holds](#1) | 10 | **10 open** | ⚠ C07 · C24 | real Calcium work, with consumers |
-| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 21 | **5 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 12 fixed** |
+| **2** | [A complete mechanism, unreachable from the other side of a seam](#2) | 22 | **6 open** (7 closed) | ⚠ C04 · C23 | real Calcium work · **7 of 13 fixed** — and F165 is the first found by roadmap 48's residue rather than by a consumer reaching for something |
 | **3** | [A block cannot express what the surface needs](#3) | 6 | **4 open** | ⚠ C04 | mixed — two absorbed |
 | **4** | [A change axis distinct from `Tone`](#4) | 4 | **4 open** | ⚠ C04 · C09 · C10 | real Calcium work · needs a ruling |
 | **5** | [The far side's shape is not the framework's contract](#5) | 10 | **2 open** | ⚠ C05 | mostly app-side · one shim |
@@ -119,6 +119,7 @@ reach it. **Seven closes is the strongest evidence in this document that a shape
 | **F41** | `Patch.collapsedAfter`, `actions` | open |
 | **F21** | the action model, from a keystroke | open — the dispatch route |
 | **F23** | `view: true` on a local tool | open — accepted, does nothing |
+| **F165** | **`ErrorLike.code`, `.stage`, `.details` — set by three producers, the adapter mapping and the app's own six sites; rendered by nothing.** The first thing roadmap 48's residue was read for, and it listed one of the three: the other two were *cleared* by the app naming them, which is the instrument's direction working as described | open — the remedy is a ruling, not a patch |
 
 **F78 is the sharpest instance yet and it is worse than the others by a specific mechanism.**
 `b.live` throws when neither `fetch` nor `stream` is given, and throws again when both are —
