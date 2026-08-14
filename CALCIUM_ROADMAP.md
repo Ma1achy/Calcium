@@ -3080,7 +3080,26 @@ PART  46 SCROLLABLE CONTAINERS     a container scrolls IF IT IS FOCUSABLE and it
                                    existing exact member OUT of exactness. Members 1177→1179,
                                    exact 382→381. So the blind spot grows as the API grows,
                                    which is the vocabulary argument arriving as a measurement
-                                   rather than as a prediction
+                                   rather than as a prediction.
+                                   THE SIGNAL THE ENTRY ASKED FOR EXISTS, 2026-08-14:
+                                   `publicSurfaceUseSignal`, printed by `make enforce`
+                                   beside the other two, over the members of the types
+                                   `src/index.ts` exports against both examples' sources.
+                                   86 of 325 named by neither. The rule stays as it is —
+                                   THE SAME NAME-MATCHING IN THE DIRECTION WHERE IT CANNOT
+                                   LIE: MG24's verdict is UNCONSUMED and needs the cleared
+                                   side exact, which it is not; this verdict is CANDIDATE
+                                   and needs the LISTED side exact, and a collision can
+                                   only ever clear. 144 of 226 clearings are ambiguous and
+                                   not one can list. A03 §9 carries the walk, five cells;
+                                   six fixture rows in `test/unit/enforce-rules.test.ts`;
+                                   `tools/mutate/runs/enforce-public-surface.mjs`, 6/6.
+                                   The build falsified the walk's second cell — MG24's
+                                   keyword split does not carry, because `CompletionSource`
+                                   is an interface an app BUILDS — and that was the residue
+                                   over-reporting, which the first cell forbids. What
+                                   remains is the READ over the 86, which is the entry's
+                                   own point: candidates, not verdicts
       49 GOLDEN HAS NEVER SEEN A     `test/golden/README.md` says "frames at 4 widths x 2
          FRAME ★★                    themes x 2 unicode modes" and NOT ONE OF THEM IS A
                                    FRAME: blocks, table, patch and plot all go through

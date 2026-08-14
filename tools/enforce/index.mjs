@@ -10,6 +10,7 @@ import {
   checkSeamConsumers,
   componentSeamSignal,
   nameExactnessSignal,
+  publicSurfaceUseSignal,
 } from "./module-graph.mjs";
 import { checkSourceScans, checkMarks } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
@@ -27,6 +28,7 @@ function walk(dir, out = []) {
   let entries;
   try { entries = readdirSync(dir); } catch { return out; }
   for (const e of entries) {
+    if (e === "node_modules" || e === "dist" || e === "out") continue;
     const p = `${dir}/${e}`;
     if (statSync(p).isDirectory()) walk(p, out);
     else if (/\.tsx?$/.test(e) && !/\.d\.ts$/.test(e)) out.push(p);
@@ -35,6 +37,11 @@ function walk(dir, out = []) {
 }
 
 const files = walk("src");
+// The two consumers written from the public surface, for the by-use signal
+// alone — nothing here gates on them, and `enforce` still governs `src/`.
+// Skipped by the walk above and not by a separate one, because a second walk is
+// where the two would drift.
+const examples = [...walk("examples/minimal"), ...walk("examples/docker")];
 const specs = specFiles();
 const references = referenceFiles();
 const { violations: refViolations, resolved } = checkReferences(references);
@@ -83,6 +90,11 @@ const seam = componentSeamSignal(files);
 // Printed for F142's reason: a number in prose is a snapshot, and this one has to
 // move when the tree does or it goes quiet the way the blind spot did.
 const exactness = nameExactnessSignal(files);
+// Roadmap 48 — the residue F160 said was the shape that could work, now that
+// both consumers exist. The same name-matching in the direction where it cannot
+// lie: a collision only ever clears, so this list under-reports and cannot
+// over-report. A03 §9.
+const surface = publicSurfaceUseSignal(files, examples);
 
 if (violations.length === 0) {
   console.log(
@@ -96,7 +108,18 @@ if (violations.length === 0) {
       `never called outside their own component (F94, reported not gated)${RESET}\n` +
       `  ${DIM}name exactness · MG24 is exact for ${exactness.exact}/${exactness.members} ` +
       `members; the rest share a name with another owner — ${exactness.shared.join(", ")} ` +
-      `(F105/F160, reported not gated)${RESET}`,
+      `(F105/F160, reported not gated)${RESET}\n` +
+      `  ${DIM}public surface by use · ${surface.candidates.length}/${surface.members} ` +
+      `published members named by neither example — ${surface.concentrated.join(", ")}; ` +
+      `${surface.ambiguous} of ${surface.cleared} clearings are ambiguous and none can list, ` +
+      `${surface.testOnly} named only in an example's tests (roadmap 48, reported not gated)${RESET}` +
+      // The residue itself, behind a flag. A summary line is what a gate can
+      // afford and a read needs the names — and printing them unasked would put
+      // ninety lines of *not a violation* above every clean run, which is how a
+      // signal stops being read at all.
+      (process.argv.includes("--surface")
+        ? `\n\n  ${DIM}${surface.candidates.join("\n  ")}${RESET}`
+        : ""),
   );
   process.exit(0);
 }

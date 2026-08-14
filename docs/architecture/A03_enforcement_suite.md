@@ -898,10 +898,13 @@ MG24's verdict is *unconsumed*, so it needs the **cleared** side to be exact —
 and it is not: a member is cleared the moment any unrelated type anywhere
 declares that name and something reads it. This signal's verdict is *candidate*,
 so it needs the **listed** side to be exact — and it is, because a collision can
-only ever *clear*. Measured on the day it landed: **141 of 217 clearings are
+only ever *clear*. Measured on the day it landed: **144 of 226 clearings are
 ambiguous**, and not one of them can put a member into the residue. **The list
 under-reports and cannot over-report**, which is what a set of candidates for a
 read wants and what a gate cannot use.
+
+That property is what row 2 below is decided by, and it is why the row changed
+under the build.
 
 #### The walk — indexed by rule interaction, and a table because none of these is
 event-mediated
@@ -914,11 +917,19 @@ holds at rest, so this is a classification table and not a trace.
 
 | # | the two rules that meet | the cell | ruling |
 |---|---|---|---|
-| 1 | *a use is a name* × *the output is a residue* | a name several published types carry | the direction above: clearing is ambiguous, listing cannot be. **141 of 217.** Stated as the founding claim rather than as a limitation, because it is why the instrument is sound where the rule is not |
-| 2 | *a use is a name* × *the population* | the keyword decides the test, and it was tuned for `src/` — where deps records are built inline and interfaces are called into | an app inverts that: it *builds* declarations and rarely calls in. Measured, the split still holds — **19 of 311 are interface-declared and every one is a thing an app calls** (`TuiInstance.stop`, `VerbTransport.invoke`, `WorldDriver.query`). It holds **by measurement here, not by inheritance**, and that is the difference worth recording |
+| 1 | *a use is a name* × *the output is a residue* | a name several published types carry | the direction above: clearing is ambiguous, listing cannot be. **144 of 226.** Stated as the founding claim rather than as a limitation, because it is why the instrument is sound where the rule is not |
+| 2 | *a use is a name* × *the population* | the keyword decides the test, and it was tuned for `src/` — where deps records are built inline and interfaces are called into | **the walk ruled that the split carried over, and the build falsified it.** `CompletionSource` is declared `export interface` and `examples/docker/src/completion.ts` *supplies* four of its members by object literal — `slots`, `dynamic`, `ttlMs`, `cacheKey` — every one of which the split put in the residue. **That is the residue over-reporting, which row 1 says it cannot do**, so the loose test runs everywhere and the keyword decides nothing here. The correction is row 1's, applied: a wrongly-cleared member only shortens the list |
 | 3 | *two consumers* × *a use is a name* | a member named only in an example's **test** | **13.** A test names a field in order to assert it, which is evidence about the surface and not about use. Neither cleared nor listed — a third bucket, printed |
 | 4 | *the population* × *the output* | a member no app can name without doing something neither app does — writing a custom block kind (`RenderContext`, `Style`, `TerminalCapabilities`), driving a fixture world (`WorldDriver`) | **a candidate is not an unused member.** The residue is read by *what an app would have to do to reach it*, so the read is over strata and not over names. This is the reason it reports and does not gate |
 | 5 | *the population* × *the freeze* | a type withheld from the list for A03 §2's vacuity class and later restored | `ViewRefresh`. Withheld through C22 and C23 because a consumer could declare a refreshing part and never be called; back at `src/index.ts:245` once C23 I32–I35 gave it a driver. **Neither app names any of its three members** — and the file's own header still lists it among the things *a reader will look for and not find*. F164 |
+
+**What the build changed, recorded rather than smoothed over.** Row 2's ruling
+was wrong and row 1's was what corrected it — *the keyword is how the framework
+declares a type, and an app's use is decided by what the type is for*. The walk
+could not have reached it: the interaction is between a rule and **which side of
+a seam a type faces**, and nothing in either artefact shape indexes that. What
+the walk did do is make the correction cheap, because row 1 had already settled
+which direction of error the instrument may take.
 
 **The blind spot, because an unrecorded limit reads as strength.** The residue is
 exact about the claim it makes — *neither example names this member* — and that

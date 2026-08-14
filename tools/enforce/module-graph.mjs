@@ -1776,6 +1776,129 @@ export function nameExactnessSignal(files, readFile = (f) => readFileSync(f, "ut
   return { members: seen.size, exact, shared };
 }
 
+/**
+ * **The public surface by use — roadmap 48, A03 §9.** Reported, never gated.
+ *
+ * F105 and F160 closed MG24's name-matching as a class: four tightenings
+ * measured, four refused. What F160 left is a residue, and it named the shape
+ * that could work — *a second consumer written from the public surface names
+ * every field it uses, and the residue is the candidates, by **use** rather than
+ * by name.* This is that measurement.
+ *
+ * **The same match, in the opposite direction, and that is the whole argument.**
+ * MG24's verdict is *unconsumed*, so it needs the **cleared** side exact — and a
+ * member is cleared the moment any unrelated type anywhere declares the name.
+ * This verdict is *candidate*, so it needs the **listed** side exact — and a
+ * collision can only ever clear. So the residue **under-reports and cannot
+ * over-report**, which is what a set of candidates for a read wants and what a
+ * gate cannot use. `ambiguous` is that figure, printed rather than filed for
+ * F142's reason.
+ *
+ * **The blind spot, stated because an unrecorded limit reads as strength.** The
+ * residue is exact about the claim it makes — *neither example names this
+ * member* — and that claim is a **proxy** for use with one known gap: a builder
+ * can set a field the app never names. `b.live` is the measured instance —
+ * `examples/docker` uses the mechanism `ViewRefresh` declares and reaches it
+ * through a builder whose own `LiveSpec` spells the field differently. So the
+ * first question the read asks of a candidate is whether a builder covers it.
+ *
+ * Two further limits: the population is the types `src/index.ts` exports **as
+ * types**, so a member reachable only through an exported *value* is out of
+ * scope; and a member named only in an example's tests is neither cleared nor
+ * listed, because a test names a field in order to assert it, which is evidence
+ * about the surface rather than about use.
+ */
+export function publicSurfaceUseSignal(
+  files,
+  exampleFiles,
+  readFile = (f) => readFileSync(f, "utf8"),
+) {
+  const strip = (s) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  // The published population — the type names the runtime entry point exports.
+  const entry = files.find((f) => f === "src/index.ts" || f.endsWith("/src/index.ts"));
+  const published = new Set();
+  if (entry !== undefined) {
+    for (const m of strip(readFile(entry)).matchAll(/export\s+type\s*\{([^}]*)\}/g)) {
+      for (const part of m[1].split(",")) {
+        const n = part.trim().split(/\s+as\s+/).pop()?.trim();
+        if (n !== undefined && n !== "") published.add(n);
+      }
+    }
+  }
+
+  const sources = new Map(files.map((f) => [f, readFile(f)]));
+  const members = interfaceMembers(files, (f) => sources.get(f) ?? "").filter((m) =>
+    published.has(m.owner),
+  );
+
+  // A test row names a member to assert it exists; that is the surface, not use.
+  const isTest = (f) => /(^|\/)tests?\//.test(f) || f.endsWith(".test.ts");
+  const joined = (fs) => fs.map((f) => strip(readFile(f))).join("\n");
+  const app = joined(exampleFiles.filter((f) => !isTest(f)));
+  const tests = joined(exampleFiles.filter(isTest));
+
+  // **MG24's looser test, for every member, and the keyword decides nothing
+  // here.** MG24 picks the test by keyword for F94's reason — inside `src/` an
+  // interface is called into and a record is built inline at a call site. That
+  // split was measured against this population and **is false**:
+  // `CompletionSource` is declared `export interface` and `examples/docker`
+  // *builds* four of them by object literal, so under the split `slots`,
+  // `dynamic`, `ttlMs` and `cacheKey` were false candidates — a residue that
+  // over-reports, which is the one thing this signal claims it cannot do.
+  //
+  // The keyword says how the framework **declares** a type, and an app's use is
+  // decided by what the type is *for*: a declaration is supplied, a handle is
+  // called, and the entry point publishes both under both keywords. So the loose
+  // test runs everywhere — justified by the cell above rather than by taste,
+  // since a wrongly-cleared member only ever shortens the list.
+  const uses = (src, { name }) =>
+    new RegExp(`[.?]\\s*${name}\\b|(?:^|[{,(\\s])${name}\\s*:`, "m").test(src);
+
+  const owners = new Map();
+  for (const { owner, name } of members) {
+    if (!owners.has(name)) owners.set(name, new Set());
+    owners.get(name)?.add(owner);
+  }
+
+  const candidates = [];
+  let cleared = 0;
+  let ambiguous = 0;
+  let testOnly = 0;
+  const seen = new Set();
+  for (const m of members) {
+    const key = `${m.owner}.${m.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (uses(app, m)) {
+      cleared += 1;
+      if ((owners.get(m.name)?.size ?? 1) > 1) ambiguous += 1;
+      continue;
+    }
+    if (uses(tests, m)) {
+      testOnly += 1;
+      continue;
+    }
+    candidates.push(key);
+  }
+
+  // Which owners the residue concentrates in is the actionable half: the read is
+  // over strata — *what would an app have to do to reach this* — and an owner is
+  // the closest thing to a stratum the signal can compute.
+  const byOwner = new Map();
+  for (const key of candidates) {
+    const owner = key.slice(0, key.indexOf("."));
+    byOwner.set(owner, (byOwner.get(owner) ?? 0) + 1);
+  }
+  const concentrated = [...byOwner]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([owner, n]) => `${owner} (${String(n)})`);
+
+  return { members: seen.size, candidates, cleared, ambiguous, testOnly, concentrated };
+}
+
 // --- MG25 — a free function with no consumer --------------------------------
 //
 // **MG24's blind spot, and MG24's own header is where it was written down.**
